@@ -14,7 +14,7 @@ import sys
 import time
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Any, Optional
+from typing import Any
 
 import cli_ui
 import torf
@@ -32,7 +32,7 @@ def calculate_piece_size(
     min_size: int,
     max_size: int,
     meta: Meta,
-    piece_size: Optional[int] = None,
+    piece_size: int | None = None,
 ) -> int:
     return TorrentCreator.calculate_piece_size(
         total_size=total_size,
@@ -48,7 +48,7 @@ class CustomTorrent(torf.Torrent):
         self._meta = meta
 
         # Extract and store the precalculated piece size
-        self._precalculated_piece_size: Optional[int] = kwargs.pop('piece_size', None)
+        self._precalculated_piece_size: int | None = kwargs.pop('piece_size', None)
         super().__init__(*args, **kwargs)
 
         # Set piece size directly
@@ -61,7 +61,7 @@ class CustomTorrent(torf.Torrent):
         return PIECE_SIZE_MIN
 
     @piece_size_min.setter
-    def piece_size_min(self, piece_size_min: Optional[int]) -> None:
+    def piece_size_min(self, piece_size_min: int | None) -> None:
         _ = piece_size_min
         return None
 
@@ -70,7 +70,7 @@ class CustomTorrent(torf.Torrent):
         return PIECE_SIZE_MAX
 
     @piece_size_max.setter
-    def piece_size_max(self, piece_size_max: Optional[int]) -> None:
+    def piece_size_max(self, piece_size_max: int | None) -> None:
         _ = piece_size_max
         return None
 
@@ -79,7 +79,7 @@ class CustomTorrent(torf.Torrent):
         return self._piece_size
 
     @piece_size.setter
-    def piece_size(self, value: Optional[int]) -> None:
+    def piece_size(self, value: int | None) -> None:
         if self._precalculated_piece_size is not None:
             value = self._precalculated_piece_size
         if value is None:
@@ -88,7 +88,7 @@ class CustomTorrent(torf.Torrent):
         self._piece_size = value
         self.metainfo['info']['piece length'] = value
 
-    def validate_piece_size(self, _meta: Optional[Meta] = None) -> None:
+    def validate_piece_size(self, _meta: Meta | None = None) -> None:
         if self._precalculated_piece_size is not None:
             self._piece_size = self._precalculated_piece_size
             self.metainfo['info']['piece length'] = self._precalculated_piece_size
@@ -107,7 +107,7 @@ class TorrentCreator:
         min_size: int,
         max_size: int,
         meta: Meta,
-        piece_size: Optional[int] = None,
+        piece_size: int | None = None,
     ) -> int:
         # Set max_size
         if piece_size:
@@ -192,11 +192,11 @@ class TorrentCreator:
         meta: Meta,
         path: str | os.PathLike[str],
         output_filename: str,
-        tracker_url: Optional[str] = None,
+        tracker_url: str | None = None,
         piece_size: int = 0,
     ) -> str | Torrent:
         # Ensure only one torrent creation runs at a time
-        wait_started: Optional[float] = None
+        wait_started: float | None = None
         if cls._create_torrent_semaphore.locked():
             wait_started = time.time()
             if meta.debug:
@@ -586,7 +586,7 @@ async def create_torrent(
     meta: Meta,
     path: str | os.PathLike[str],
     output_filename: str,
-    tracker_url: Optional[str] = None,
+    tracker_url: str | None = None,
     piece_size: int = 0,
 ) -> str | Torrent:
     return await TorrentCreator.create_torrent(

@@ -5,7 +5,7 @@ import os
 import re
 import sys
 from difflib import SequenceMatcher
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -59,11 +59,11 @@ def _nfo_has_store_link(content: str) -> bool:
     return False
 
 
-def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
     return cast(dict[str, Any], guessit_module.guessit(value, options))
 
 
-def _normalize_search_year(value: Any) -> Optional[str]:
+def _normalize_search_year(value: Any) -> str | None:
     if value in (None, ""):
         return None
     if isinstance(value, (str, int)):
@@ -247,13 +247,13 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
     return videoloc, bdinfo
 
 
-async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdinfo: dict[str, Any]) -> tuple[str, str, str, str, str, Optional[dict[str, Any]], str]:
+async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdinfo: dict[str, Any]) -> tuple[str, str, str, str, str, dict[str, Any] | None, str]:
     filename = ""
     untouched_filename = ""
     videopath = ""
     search_term = ""
     search_file_folder = ""
-    mi: Optional[dict[str, Any]] = None
+    mi: dict[str, Any] | None = None
     video = ""
     base_dir = meta.base_dir
     meta_path: str = meta.path or ""
@@ -653,7 +653,7 @@ async def search_metadata(
     skip_tracker_descriptions: bool,
     client: Clients,
     _bdinfo: dict[str, Any],
-    mi: Optional[dict[str, Any]],
+    mi: dict[str, Any] | None,
 ) -> None:
     # Ensure all manual IDs have proper default values
     meta.tmdb_manual = meta.tmdb_manual or 0
@@ -1034,7 +1034,7 @@ async def search_metadata(
 
 
 async def finalize_metadata(
-    prep_instance: Any, meta: Meta, videopath: str, bdinfo: dict[str, Any], mi: Optional[dict[str, Any]], filename: str, _untouched_filename: str, video: str
+    prep_instance: Any, meta: Meta, videopath: str, bdinfo: dict[str, Any], mi: dict[str, Any] | None, filename: str, _untouched_filename: str, video: str
 ) -> None:
     check_valid_data = meta.imdb_info.get("title", "")
     if check_valid_data:

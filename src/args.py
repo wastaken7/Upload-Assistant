@@ -6,7 +6,7 @@ import re
 import sys
 import urllib.parse
 from collections.abc import Sequence
-from typing import Any, Optional
+from typing import Any
 
 from src.book_prep import detect_newspaper, sanitize_book_author, sanitize_book_language
 from src.console import console
@@ -788,7 +788,7 @@ class Args:
             result = "None"
         return result
 
-    def parse_tmdb_id(self, id_str: str, category: Optional[str]) -> tuple[str, int]:
+    def parse_tmdb_id(self, id_str: str, category: str | None) -> tuple[str, int]:
         if category is None:
             category = ''
         parsed_id: str = id_str.lower().strip()

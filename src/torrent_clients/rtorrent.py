@@ -8,7 +8,7 @@ import time
 import traceback
 import xmlrpc.client  # nosec B411 - Secured with defusedxml.xmlrpc.monkey_patch() below
 from collections.abc import Callable
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import bencode
 import defusedxml.xmlrpc
@@ -47,7 +47,7 @@ class RtorrentClientMixin:
 
     def rtorrent(self, path: str, torrent_path: str, torrent: Torrent, meta: Meta, local_path: str, remote_path: str, client: dict[str, Any], tracker: str) -> None:
         # Get the appropriate source path (same as in qbittorrent method)
-        tracker_dir: Optional[str] = None
+        tracker_dir: str | None = None
         dst = path
         filelist = self._coerce_str_list(meta.filelist)
         src = filelist[0] if len(filelist) == 1 and os.path.isfile(filelist[0]) and not meta.keep_folder else meta.path

@@ -5,7 +5,7 @@ import re
 import sys
 from collections.abc import Callable, Mapping
 from difflib import SequenceMatcher
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import cli_ui
@@ -21,7 +21,7 @@ from src.trackersetup import tracker_class_map
 DupeEntry = dict[str, Any]
 
 
-def parse_size_to_bytes(size_str: Any) -> Optional[int]:
+def parse_size_to_bytes(size_str: Any) -> int | None:
     if size_str is None:
         return None
     if isinstance(size_str, (int, float)):
@@ -179,7 +179,7 @@ class UploadHelper:
                     tracker_rename = await tracker_class.edit_name(meta)
                 except Exception:
                     tracker_rename = None
-            display_name: Optional[str] = None
+            display_name: str | None = None
             if tracker_rename is not None:
                 if isinstance(tracker_rename, dict) and 'name' in tracker_rename:
                     tracker_rename_dict = cast(dict[str, Any], tracker_rename)
@@ -663,19 +663,19 @@ class UploadHelper:
                     os.makedirs(nfo_dir, exist_ok=True)
                     json_file_path = os.path.join(nfo_dir, "db_check.json")
 
-                    def imdb_url(imdb_id: Any) -> Optional[str]:
+                    def imdb_url(imdb_id: Any) -> str | None:
                         return f"https://www.imdb.com/title/tt{str(imdb_id).zfill(7)}" if imdb_id and str(imdb_id).isdigit() else None
 
-                    def tmdb_url(tmdb_id: Any, category: Any) -> Optional[str]:
+                    def tmdb_url(tmdb_id: Any, category: Any) -> str | None:
                         return f"https://www.themoviedb.org/{str(category).lower()}/{tmdb_id}" if tmdb_id and category else None
 
-                    def tvdb_url(tvdb_id: Any) -> Optional[str]:
+                    def tvdb_url(tvdb_id: Any) -> str | None:
                         return f"https://www.thetvdb.com/?id={tvdb_id}&tab=series" if tvdb_id else None
 
-                    def tvmaze_url(tvmaze_id: Any) -> Optional[str]:
+                    def tvmaze_url(tvmaze_id: Any) -> str | None:
                         return f"https://www.tvmaze.com/shows/{tvmaze_id}" if tvmaze_id else None
 
-                    def mal_url(mal_id: Any) -> Optional[str]:
+                    def mal_url(mal_id: Any) -> str | None:
                         return f"https://myanimelist.net/anime/{mal_id}" if mal_id else None
 
                     db_check_entry = {

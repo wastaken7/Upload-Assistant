@@ -5,7 +5,7 @@ import datetime
 import warnings
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 from src.meta import Meta
 
@@ -44,8 +44,8 @@ class Bot(commands.Bot):
             description=description,
             intents=intents
         )
-        self.start_time: Optional[datetime.datetime] = None
-        self.app_info: Optional[discord.AppInfo] = None
+        self.start_time: datetime.datetime | None = None
+        self.app_info: discord.AppInfo | None = None
         self.config: Mapping[str, Any] = config
 
     async def setup_hook(self) -> None:
@@ -115,14 +115,14 @@ class Bot(commands.Bot):
         await self.process_commands(message)
 
 
-BotLike = Union[discord.Client, commands.Bot]
+BotLike = discord.Client | commands.Bot
 
 
 class DiscordNotifier:
     @staticmethod
     async def send_discord_notification(
         config: Mapping[str, Any],
-        bot: Optional[BotLike],
+        bot: BotLike | None,
         message: str,
         meta: Meta,
         debug: bool = False,
@@ -165,7 +165,7 @@ class DiscordNotifier:
     @staticmethod
     async def send_upload_status_notification(
         config: Mapping[str, Any],
-        bot: Optional[BotLike],
+        bot: BotLike | None,
         meta: Meta,
     ) -> bool:
         """Send Discord notification with upload status including failed trackers."""
@@ -225,7 +225,7 @@ class DiscordNotifier:
 
 async def send_discord_notification(
     config: Mapping[str, Any],
-    bot: Optional[BotLike],
+    bot: BotLike | None,
     message: str,
     meta: Meta,
     debug: bool = False,
@@ -235,7 +235,7 @@ async def send_discord_notification(
 
 async def send_upload_status_notification(
     config: Mapping[str, Any],
-    bot: Optional[BotLike],
+    bot: BotLike | None,
     meta: Meta,
 ) -> bool:
     return await DiscordNotifier.send_upload_status_notification(config, bot, meta)

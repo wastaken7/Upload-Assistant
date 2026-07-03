@@ -2,7 +2,7 @@
 import os
 import re
 from collections.abc import Callable, MutableMapping, Sequence
-from typing import Any, Optional, TypedDict, cast
+from typing import Any, TypedDict, cast
 
 from cogs.redaction import Redaction
 from src.console import console
@@ -12,19 +12,19 @@ from src.trackers.UNIT3D.HUNO import HUNO
 
 class DupeEntry(TypedDict, total=False):
     name: str
-    size: Optional[int | str]
+    size: int | str | None
     files: list[str]
     file_count: int
     trumpable: bool
-    link: Optional[str]
-    download: Optional[str]
+    link: str | None
+    download: str | None
     flags: list[str]
-    id: Optional[int | str]
-    type: Optional[str]
-    res: Optional[str]
+    id: int | str | None
+    type: str | None
+    res: str | None
     internal: int | bool
-    bd_info: Optional[str]
-    description: Optional[str]
+    bd_info: str | None
+    description: str | None
 
 
 type DupeInput = str | DupeEntry | MutableMapping[str, Any]
@@ -122,7 +122,7 @@ class DupeChecker:
 
                 processed_dupes.append(entry)
 
-        def coerce_int(value: Any) -> Optional[int]:
+        def coerce_int(value: Any) -> int | None:
             try:
                 return int(value) if value is not None else None
             except (TypeError, ValueError):
@@ -136,7 +136,7 @@ class DupeChecker:
         normalized_encoder = await DupeChecker.normalize_filename(video_encode) if video_encode else ""
         video_encode_lower = video_encode.lower()
 
-        file_size: Optional[int] = None
+        file_size: int | None = None
         if meta.is_disc != "BDMV":
             mediainfo = meta.mediainfo
             tracks = cast(list[dict[str, Any]], mediainfo.get('media', {}).get('track', []))
@@ -144,7 +144,7 @@ class DupeChecker:
                 file_size = coerce_int(tracks[0].get('FileSize'))
 
         has_is_disc = bool(meta.is_disc)
-        target_hdr = await DupeChecker.refine_hdr_terms(cast(Optional[str], meta.hdr))
+        target_hdr = await DupeChecker.refine_hdr_terms(cast(str | None, meta.hdr))
         target_season = meta.season
         target_episode = meta.episode
         target_resolution = meta.resolution
@@ -854,8 +854,8 @@ class DupeChecker:
     @staticmethod
     async def is_season_episode_match(
         filename: str,
-        target_season: Optional[str | int],
-        target_episode: Optional[str | int],
+        target_season: str | int | None,
+        target_episode: str | int | None,
     ) -> tuple[bool, bool]:
         """
         Check if the filename matches the given season and episode.
@@ -906,7 +906,7 @@ class DupeChecker:
         return (False, False)  # No match
 
     @staticmethod
-    async def refine_hdr_terms(hdr: Optional[str]) -> set[str]:
+    async def refine_hdr_terms(hdr: str | None) -> set[str]:
         """
         Normalize HDR terms for consistent comparison.
         Simplifies all HDR entries to 'HDR' and DV entries to 'DV'.
@@ -922,11 +922,11 @@ class DupeChecker:
         return terms
 
     @staticmethod
-    async def has_matching_hdr(file_hdr: set[str], target_hdr: set[str], meta: Meta, tracker: Optional[str] = None) -> bool:
+    async def has_matching_hdr(file_hdr: set[str], target_hdr: set[str], meta: Meta, tracker: str | None = None) -> bool:
         """
         Check if the HDR terms match or are compatible.
         """
-        def simplify_hdr(hdr_set: set[str], tracker_name: Optional[str] = None) -> set[str]:
+        def simplify_hdr(hdr_set: set[str], tracker_name: str | None = None) -> set[str]:
             """Simplify HDR terms to just HDR and DV."""
             simplified: set[str] = set()
             if any(h in hdr_set for h in {"HDR", "HDR10", "HDR10+"}):
@@ -961,13 +961,13 @@ async def normalize_filename(filename: str | MutableMapping[str, Any]) -> str:
 
 async def is_season_episode_match(
     filename: str,
-    target_season: Optional[str | int],
-    target_episode: Optional[str | int],
+    target_season: str | int | None,
+    target_episode: str | int | None,
 ) -> tuple[bool, bool]:
     return await DupeChecker.is_season_episode_match(filename, target_season, target_episode)
 
 
-async def refine_hdr_terms(hdr: Optional[str]) -> set[str]:
+async def refine_hdr_terms(hdr: str | None) -> set[str]:
     return await DupeChecker.refine_hdr_terms(hdr)
 
 
@@ -975,6 +975,6 @@ async def has_matching_hdr(
     file_hdr: set[str],
     target_hdr: set[str],
     meta: Meta,
-    tracker: Optional[str] = None,
+    tracker: str | None = None,
 ) -> bool:
     return await DupeChecker.has_matching_hdr(file_hdr, target_hdr, meta, tracker=tracker)

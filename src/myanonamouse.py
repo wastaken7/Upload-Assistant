@@ -5,7 +5,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -131,7 +131,7 @@ class MyAnonamouseManager:
 
         return metadata
 
-    async def search_by_id(self, torrent_id: str, base_dir: str = "", api_key: str = "", debug: bool = False) -> Optional[dict[str, Any]]:
+    async def search_by_id(self, torrent_id: str, base_dir: str = "", api_key: str = "", debug: bool = False) -> dict[str, Any] | None:
         """
         Search MyAnonamouse API by torrent ID.
         Returns a dict of metadata or None if not found/error.

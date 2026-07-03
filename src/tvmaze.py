@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import cli_ui
 import httpx
@@ -14,10 +14,10 @@ class TvmazeManager:
         self,
         filename: str,
         year: str,
-        imdbID: Optional[int | str],
-        tvdbID: Optional[int | str],
-        manual_date: Optional[str] = None,
-        tvmaze_manual: Optional[int | str] = None,
+        imdbID: int | str | None,
+        tvdbID: int | str | None,
+        manual_date: str | None = None,
+        tvmaze_manual: int | str | None = None,
         debug: bool = False,
         return_full_tuple: bool = False,
     ) -> int | tuple[int, int, int]:
@@ -153,7 +153,7 @@ class TvmazeManager:
         self,
         url: str,
         params: dict[str, Any],
-    ) -> Optional[dict[str, Any] | list[dict[str, Any]]]:
+    ) -> dict[str, Any] | list[dict[str, Any]] | None:
         """Sync function to make the request inside ThreadPoolExecutor."""
         try:
             async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -181,8 +181,8 @@ class TvmazeManager:
         tvmaze_id: int,
         season: int,
         episode: int,
-        meta: Optional[Meta] = None,
-    ) -> Optional[dict[str, Any]]:
+        meta: Meta | None = None,
+    ) -> dict[str, Any] | None:
         url = f"https://api.tvmaze.com/shows/{tvmaze_id}/episodebynumber"
         params = {
             "season": season,
@@ -290,7 +290,7 @@ class TvmazeManager:
             console.print(f"[red]TVMaze Error fetching TVMaze episode data: {e}[/red]")
             return None
 
-    async def get_tvmaze_episode_data_by_date(self, tvmaze_id: int, airdate: str) -> Optional[dict[str, Any]]:
+    async def get_tvmaze_episode_data_by_date(self, tvmaze_id: int, airdate: str) -> dict[str, Any] | None:
         url = f"https://api.tvmaze.com/shows/{tvmaze_id}/episodesbydate"
         params = {"date": airdate}
 

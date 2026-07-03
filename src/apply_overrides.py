@@ -3,7 +3,7 @@ import asyncio
 import json
 import traceback
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from src.args import Args
 from src.console import console
@@ -88,7 +88,7 @@ class ApplyOverrides:
 
         return meta
 
-    async def parse_tmdb_id(self, tmdb_id: Optional[Any], category: Optional[str] = None) -> tuple[Optional[str], int]:
+    async def parse_tmdb_id(self, tmdb_id: Any | None, category: str | None = None) -> tuple[str | None, int]:
         if tmdb_id is None:
             return category, 0
 

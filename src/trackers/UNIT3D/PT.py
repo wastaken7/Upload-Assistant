@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import os
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from src.console import console
 from src.meta import Meta
@@ -29,7 +29,7 @@ class PT(UNIT3D):
     async def get_type_id(
         self,
         meta: Meta,
-        type: Optional[str] = None,
+        type: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False
     ) -> dict[str, str]:
@@ -40,7 +40,7 @@ class PT(UNIT3D):
     async def get_resolution_id(
         self,
         meta: Meta,
-        resolution: Optional[str] = None,
+        resolution: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False
     ) -> dict[str, str]:

@@ -2,7 +2,7 @@
 import os
 import re
 import urllib.request
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -96,7 +96,7 @@ class TIK(UNIT3D):
     async def get_category_id(
         self,
         meta: Meta,
-        category: Optional[str] = None,
+        category: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False
     ) -> dict[str, str]:
@@ -136,7 +136,7 @@ class TIK(UNIT3D):
     async def get_type_id(
         self,
         meta: Meta,
-        type: Optional[str] = None,
+        type: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False
     ) -> dict[str, str]:
@@ -172,7 +172,7 @@ class TIK(UNIT3D):
     async def get_resolution_id(
         self,
         meta: Meta,
-        resolution: Optional[str] = None,
+        resolution: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False
     ) -> dict[str, str]:
@@ -415,7 +415,7 @@ class TIK(UNIT3D):
         edit_choice = cli_ui.ask_string("Enter 'e' to edit, or press Enter to keep it as is: ")
 
         if (edit_choice or "").lower() == 'e':
-            edited_description = cast(Optional[str], click.edit(description))  # pyrefly: ignore [bad-argument-type]
+            edited_description = cast(str | None, click.edit(description))  # pyrefly: ignore [bad-argument-type]
             if edited_description:
                 description = edited_description.strip()
             console.print(f"Final description after editing: {description}", markup=False)

@@ -5,7 +5,7 @@ import os
 import re
 import traceback
 from datetime import UTC, datetime
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -482,7 +482,7 @@ class TVC:
         )
         return
 
-    async def upload(self, meta: Meta) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> bool | None:
         common = COMMON(config=self.config)
 
         raw_images = meta.TVC_images_key if meta.TVC_images_key is not None else meta.get("image_list", [])

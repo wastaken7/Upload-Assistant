@@ -6,7 +6,6 @@ import shutil
 import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Optional
 
 import requests
 
@@ -81,7 +80,7 @@ def extract_linux(cli_archive: Path, lib_archive: Path, output_dir: Path) -> Non
         lib_dir.rmdir()
 
 
-def download_dvd_mediainfo(base_dir: str, debug: bool = False) -> Optional[str]:
+def download_dvd_mediainfo(base_dir: str, debug: bool = False) -> str | None:
     system = platform.system().lower()
     machine = platform.machine().lower()
 

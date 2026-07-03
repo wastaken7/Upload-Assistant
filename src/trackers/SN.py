@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import httpx
@@ -62,8 +61,8 @@ class SN:
             sub_cat_id = "6" if meta.tv_pack else "5"
             # todo need to do a check for docs and add as subcat
 
-        mi_dump: Optional[str]
-        bd_dump: Optional[str]
+        mi_dump: str | None
+        bd_dump: str | None
         if meta.bdinfo is not None:
             mi_dump = None
             async with aiofiles.open(

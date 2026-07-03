@@ -5,7 +5,7 @@ import os
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import guessit
 
@@ -13,10 +13,10 @@ from src.console import console
 from src.meta import Meta
 
 guessit_module: Any = cast(Any, guessit)
-GuessitFn = Callable[[str, Optional[dict[str, Any]]], dict[str, Any]]
+GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 
 
-def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
     return cast(dict[str, Any], guessit_module.guessit(value, options))
 
 
@@ -92,7 +92,7 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
     if not release_group and meta.is_disc:
         try:
             parsed = guessit_fn(video)
-            release_group = cast(Optional[str], parsed.get('release_group'))
+            release_group = cast(str | None, parsed.get('release_group'))
             if meta.debug:
                 console.print(f"Guessit match: {release_group}")
 

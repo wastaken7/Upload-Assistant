@@ -7,7 +7,7 @@ import os
 import re
 import ssl
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.error import URLError
 
 from tvdb_v4_official import TVDB
@@ -18,11 +18,11 @@ YEAR_PATTERN = re.compile(r'\((19\d\d|20[0-3]\d)\)')
 
 
 tvdb: TVDB | None = None
-_tvdb_init_error: Optional[Exception] = None
+_tvdb_init_error: Exception | None = None
 _tvdb_error_reported = False
 
 
-def _coerce_int(value: Any) -> Optional[int]:
+def _coerce_int(value: Any) -> int | None:
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -42,7 +42,7 @@ def _english_alias_names(aliases: list[dict[str, Any]]) -> list[str]:
 def _pick_eng_alias(
     aliases: list[dict[str, Any]],
     debug: bool = False,
-) -> Optional[str]:
+) -> str | None:
     if not aliases:
         return None
 
@@ -56,7 +56,7 @@ def _pick_eng_alias(
     return eng_alias
 
 
-def _extract_year_from_text(value: Any) -> Optional[str]:
+def _extract_year_from_text(value: Any) -> str | None:
     if not isinstance(value, (str, int)):
         return None
 
@@ -64,7 +64,7 @@ def _extract_year_from_text(value: Any) -> Optional[str]:
     return match.group(1) if match else None
 
 
-def _best_effort_series_year(series_info: Optional[dict[str, Any]]) -> Optional[str]:
+def _best_effort_series_year(series_info: dict[str, Any] | None) -> str | None:
     if not series_info:
         return None
 
@@ -75,10 +75,10 @@ def _series_translation_metadata(
     client: Any,
     series_id: int,
     aliases: list[dict[str, Any]],
-    _series_info: Optional[dict[str, Any]] = None,
+    _series_info: dict[str, Any] | None = None,
     debug: bool = False,
-) -> dict[str, Optional[str]]:
-    translation_name: Optional[str] = None
+) -> dict[str, str | None]:
+    translation_name: str | None = None
     translation_aliases: list[str] = []
 
     try:
@@ -114,7 +114,7 @@ def _series_translation_metadata(
     }
 
 
-def _get_tvdb_or_warn(config: Optional[dict[str, Any]] = None) -> Optional[TVDB]:
+def _get_tvdb_or_warn(config: dict[str, Any] | None = None) -> TVDB | None:
     global tvdb, _tvdb_error_reported, _tvdb_init_error
 
     if tvdb is not None:
@@ -176,9 +176,9 @@ class tvdb_data:
     async def search_tvdb_series(
         self,
         filename: str,
-        year: Optional[str] = None,
+        year: str | None = None,
         debug: bool = False,
-    ) -> tuple[Optional[list[dict[str, Any]]], Optional[int]]:
+    ) -> tuple[list[dict[str, Any]] | None, int | None]:
         if debug:
             console.print(f"filename for TVDB search: {filename} year: {year}")
         client = _get_tvdb_or_warn(self.config)
@@ -190,7 +190,7 @@ class tvdb_data:
         try:
             if results and len(results) > 0:
                 # Try to find the best match based on year
-                best_match: Optional[dict[str, Any]] = None
+                best_match: dict[str, Any] | None = None
                 search_year = year if year else ''
 
                 if search_year:
@@ -233,14 +233,14 @@ class tvdb_data:
     async def get_tvdb_episodes(
         self,
         series_id: int | str,
-        base_dir: Optional[str | bool] = None,
+        base_dir: str | bool | None = None,
         debug: bool = False,
-        season: Optional[int | str] = None,
-        episode: Optional[int | str] = None,
-        absolute_number: Optional[int | str] = None,
-        aired_date: Optional[str] = None,
-        original_language: Optional[str] = None,
-    ) -> tuple[Optional[dict[str, Any]], Optional[str]]:
+        season: int | str | None = None,
+        episode: int | str | None = None,
+        absolute_number: int | str | None = None,
+        aired_date: str | None = None,
+        original_language: str | None = None,
+    ) -> tuple[dict[str, Any] | None, str | None]:
         # Backward compat: older call sites used (series_id, debug)
         if isinstance(base_dir, bool) and debug is False:
             debug = base_dir
@@ -368,7 +368,7 @@ class tvdb_data:
             page = 0
             max_pages = 20  # Safety limit to prevent infinite loops
             pages_fetched = 0
-            series_slug: Optional[str] = None
+            series_slug: str | None = None
 
             while page < max_pages:
                 if debug and page > 0:
@@ -489,16 +489,16 @@ class tvdb_data:
 
     async def get_tvdb_by_external_id(
         self,
-        imdb: Optional[int | str],
-        tmdb: Optional[int | str],
+        imdb: int | str | None,
+        tmdb: int | str | None,
         debug: bool = False,
         tv_movie: bool = False,
-    ) -> tuple[Optional[int], Optional[str]]:
+    ) -> tuple[int | None, str | None]:
         client = _get_tvdb_or_warn(self.config)
         if client is None:
             return None, None
 
-        def _translated_series_name(series_id_value: Any, fallback: Any) -> Optional[str]:
+        def _translated_series_name(series_id_value: Any, fallback: Any) -> str | None:
             series_id_int = _coerce_int(series_id_value)
             fallback_name = str(fallback).strip() if fallback else None
             if series_id_int is None:
@@ -641,7 +641,7 @@ class tvdb_data:
         self,
         episode_id: int | str,
         debug: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         try:
             client = _get_tvdb_or_warn(self.config)
             if client is None:
@@ -678,18 +678,18 @@ class tvdb_data:
     async def get_specific_episode_data(
         self,
         data: Any,
-        season: Optional[int | str],
-        episode: Optional[int | str],
+        season: int | str | None,
+        episode: int | str | None,
         debug: bool = False,
-        aired_date: Optional[str] = None,
+        aired_date: str | None = None,
     ) -> tuple[
-        Optional[Any],
-        Optional[Any],
-        Optional[Any],
-        Optional[Any],
-        Optional[Any],
-        Optional[Any],
-        Optional[Any],
+        Any | None,
+        Any | None,
+        Any | None,
+        Any | None,
+        Any | None,
+        Any | None,
+        Any | None,
     ]:
         if debug:
             console.print("[yellow]Getting specific episode data from TVDB data[/yellow]")

@@ -8,7 +8,7 @@ import os
 import platform
 import re
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -136,7 +136,7 @@ class PTP:
         search_term: str,
         _search_file_folder: str,
         _meta: dict[str, Any],
-    ) -> tuple[Optional[int], Optional[int | str], Optional[str]]:
+    ) -> tuple[int | None, int | str | None, str | None]:
         headers = {
             "ApiUser": self.api_user,
             "api_key": self.api_key,
@@ -158,8 +158,8 @@ class PTP:
                 for movie in movies:
                     imdb_value = movie.get('ImdbId')
                     torrents = cast(list[dict[str, Any]], movie.get('Torrents', []) or [])
-                    ptp_torrent_id: Optional[int | str] = None
-                    ptp_torrent_hash: Optional[str] = None
+                    ptp_torrent_id: int | str | None = None
+                    ptp_torrent_hash: str | None = None
 
                     normalized_search = search_value or ''.lower()
                     if normalized_search:
@@ -193,7 +193,7 @@ class PTP:
             console.print(f'[red]An error occurred: {str(e)}[/red]')
             return None, None, None
 
-    async def get_imdb_from_torrent_id(self, ptp_torrent_id: int | str) -> tuple[Optional[int], Optional[str]]:
+    async def get_imdb_from_torrent_id(self, ptp_torrent_id: int | str) -> tuple[int | None, str | None]:
         params = {
             'torrentid': ptp_torrent_id
         }
@@ -271,7 +271,7 @@ class PTP:
 
         return imagelist
 
-    async def get_group_by_imdb(self, imdb: int | str) -> Optional[str]:
+    async def get_group_by_imdb(self, imdb: int | str) -> str | None:
         params = {
             'imdb': imdb,
         }
@@ -304,7 +304,7 @@ class PTP:
                 elif total_results == 1:
                     # Single result - use it
                     movie = response_data.get('Movies', [{}])[0]
-                    groupID: Optional[str] = str(movie.get('GroupId')) if movie.get('GroupId') is not None else None
+                    groupID: str | None = str(movie.get('GroupId')) if movie.get('GroupId') is not None else None
                     title = movie.get('Title', 'Unknown')
                     year = movie.get('Year', 'Unknown')
                     console.print(f"[green]Found single match for IMDb: [yellow]tt{imdb}[/yellow] -> Group ID: [yellow]{groupID}[/yellow][/green]")
@@ -552,7 +552,7 @@ class PTP:
 
         return image_url
 
-    def get_type(self, imdb_info: dict[str, Any], meta: Meta) -> Optional[str]:
+    def get_type(self, imdb_info: dict[str, Any], meta: Meta) -> str | None:
         ptpType = None
         if imdb_info['type'] is not None:
             imdbType = imdb_info.get('type', 'movie').lower()
@@ -620,7 +620,7 @@ class PTP:
                 codec = codec.replace("H.", "x")
         return codec
 
-    def get_resolution(self, meta: Meta) -> tuple[str, Optional[str]]:
+    def get_resolution(self, meta: Meta) -> tuple[str, str | None]:
         other_res = None
         res = meta.resolution if meta.resolution is not None else "OTHER"
         if (res == "OTHER" and meta.is_disc != "BDMV") or (meta.sd == 1 and meta.type == "WEBDL") or (meta.sd == 1 and meta.type == "DVDRIP"):
@@ -631,7 +631,7 @@ class PTP:
             res = meta.source or "".replace(" DVD", "")
         return res, other_res
 
-    def get_container(self, meta: Meta) -> Optional[str]:
+    def get_container(self, meta: Meta) -> str | None:
         container = None
         if meta.is_disc == "BDMV":
             container = "m2ts"
@@ -691,7 +691,7 @@ class PTP:
             sub_langs = [44]  # No Subtitle
         return sub_langs
 
-    def get_trumpable(self, sub_langs: list[int]) -> tuple[Optional[list[int]], list[int]]:
+    def get_trumpable(self, sub_langs: list[int]) -> tuple[list[int] | None, list[int]]:
         trumpable_values = {
             "English Hardcoded Subs (Full)": 4,
             "English Hardcoded Subs (Forced)": 50,
@@ -1320,8 +1320,8 @@ class PTP:
         self,
         meta: Meta,
         image_key: str,
-        image_list: Optional[list[dict[str, Any]]] = None,
-    ) -> Optional[str]:
+        image_list: list[dict[str, Any]] | None = None,
+    ) -> str | None:
         if image_list is None:
             console.print("[yellow]No image links to save.[/yellow]")
             return None
@@ -1389,7 +1389,7 @@ class PTP:
             Path(f"{meta.base_dir}/data/cookies").mkdir(parents=True, exist_ok=True)
         cookiefile = f"{meta.base_dir}/data/cookies/PTP.json"
         loggedIn = False
-        uploadresponse: Optional[httpx.Response] = None
+        uploadresponse: httpx.Response | None = None
         cookies: dict[str, str] = {}
         if os.path.exists(cookiefile):
             raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # pyright: ignore[reportPrivateUsage]
@@ -1465,7 +1465,7 @@ class PTP:
             loggedIn = True
         return loggedIn
 
-    async def fill_upload_form(self, groupID: Optional[int | str], meta: Meta) -> tuple[str, dict[str, Any]]:
+    async def fill_upload_form(self, groupID: int | str | None, meta: Meta) -> tuple[str, dict[str, Any]]:
         resolution, other_resolution = self.get_resolution(meta)
         await self.edit_desc(meta)
         file_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"

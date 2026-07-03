@@ -5,7 +5,7 @@ import sys
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import anitopy
 import cli_ui
@@ -17,10 +17,10 @@ from src.console import console
 
 anitopy_parse_fn: Any = cast(Any, anitopy).parse
 guessit_module: Any = cast(Any, guessit)
-GuessitFn = Callable[[str, Optional[dict[str, Any]]], dict[str, Any]]
+GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 
 
-def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
     return cast(dict[str, Any], guessit_module.guessit(value, options))
 
 
@@ -36,8 +36,8 @@ class ImdbManager:
 
     async def get_imdb_info_api(
         self,
-        imdbID: Optional[int | str],
-        manual_language: Optional[str | dict[str, Any]] = None,
+        imdbID: int | str | None,
+        manual_language: str | dict[str, Any] | None = None,
         debug: bool = False,
     ) -> dict[str, Any]:
         imdb_info: dict[str, Any] = {}
@@ -479,15 +479,15 @@ class ImdbManager:
     async def search_imdb(
         self,
         filename: str,
-        search_year: Optional[str | int],
+        search_year: str | int | None,
         quickie: bool = False,
-        category: Optional[str] = None,
+        category: str | None = None,
         debug: bool = False,
-        secondary_title: Optional[str] = None,
-        _path: Optional[str] = None,
-        untouched_filename: Optional[str] = None,
-        attempted: Optional[int] = 0,
-        duration: Optional[str | int] = None,
+        secondary_title: str | None = None,
+        _path: str | None = None,
+        untouched_filename: str | None = None,
+        attempted: int | None = 0,
+        duration: str | int | None = None,
         unattended: bool = False,
     ) -> int:
         search_results: list[dict[str, Any]] = []
@@ -501,11 +501,11 @@ class ImdbManager:
 
         async def run_imdb_search(
             filename: str,
-            search_year: Optional[str | int],
-            category: Optional[str] = None,
+            search_year: str | int | None,
+            category: str | None = None,
             debug: bool = False,
-            attempted: Optional[int] = 0,
-            duration: Optional[str | int] = None,
+            attempted: int | None = 0,
+            duration: str | int | None = None,
             wide_search: bool = False,
         ) -> list[dict[str, Any]]:
             search_results: list[dict[str, Any]] = []
@@ -898,7 +898,7 @@ class ImdbManager:
 
         return imdbID if imdbID else 0
 
-    async def get_imdb_from_episode(self, imdb_id: int | str, debug: bool = False) -> Optional[dict[str, Any]]:
+    async def get_imdb_from_episode(self, imdb_id: int | str, debug: bool = False) -> dict[str, Any] | None:
         if not imdb_id or imdb_id == 0:
             return None
 

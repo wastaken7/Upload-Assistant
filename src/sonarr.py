@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from collections.abc import Mapping
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import httpx
 
@@ -15,11 +15,11 @@ class SonarrManager:
 
     async def get_sonarr_data(
         self,
-        tvdb_id: Optional[int] = None,
-        filename: Optional[str] = None,
-        title: Optional[str] = None,
+        tvdb_id: int | None = None,
+        filename: str | None = None,
+        title: str | None = None,
         debug: bool = False,
-    ) -> Optional[ShowInfo]:
+    ) -> ShowInfo | None:
         if not any(key.startswith('sonarr_api_key') for key in self.default_config):
             console.print("[red]No Sonarr API keys are configured.[/red]")
             return None

@@ -8,7 +8,7 @@ import re
 import shlex
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional, TypeAlias, cast
+from typing import Any, TypeAlias, cast
 
 import cli_ui
 import click
@@ -39,7 +39,7 @@ async def _read_text_lines(path: str) -> list[str]:
 
 class QueueManager:
     @staticmethod
-    async def process_site_upload_queue(meta: Meta, base_dir: str) -> tuple[list[QueueItem], Optional[str]]:
+    async def process_site_upload_queue(meta: Meta, base_dir: str) -> tuple[list[QueueItem], str | None]:
         site_upload = meta.site_upload
         if not site_upload:
             return [], None
@@ -150,7 +150,7 @@ class QueueManager:
     @staticmethod
     async def gather_files_recursive(
         path: str | bytes,
-        allowed_extensions: Optional[Sequence[str]] = None,
+        allowed_extensions: Sequence[str] | None = None,
     ) -> list[str]:
         """
         Gather files and first-level subfolders.
@@ -196,8 +196,8 @@ class QueueManager:
     async def _process_scandir_entry(
         entry: os.DirEntry[str],
         normalized_path: str,
-        allowed_extensions_tuple: Optional[tuple[str, ...]],
-        allowed_extensions: Optional[Sequence[str]],
+        allowed_extensions_tuple: tuple[str, ...] | None,
+        allowed_extensions: Sequence[str] | None,
     ) -> list[str]:
         entry_paths: list[str] = []
         try:
@@ -230,7 +230,7 @@ class QueueManager:
         return entry_paths
 
     @staticmethod
-    async def should_include_directory(dir_path: str, allowed_extensions: Optional[Sequence[str]] = None) -> bool:
+    async def should_include_directory(dir_path: str, allowed_extensions: Sequence[str] | None = None) -> bool:
         """
         Check if a directory should be included in the queue.
         Returns True if the directory contains:
@@ -290,7 +290,7 @@ class QueueManager:
     async def resolve_queue_with_glob_or_split(
         path: str,
         paths: Sequence[str],
-        allowed_extensions: Optional[Sequence[str]] = None,
+        allowed_extensions: Sequence[str] | None = None,
     ) -> list[str]:
         """
         Handle glob patterns and split path resolution.
@@ -355,8 +355,8 @@ class QueueManager:
     @staticmethod
     async def display_queue(
         queue: Sequence[Any],
-        base_dir: Optional[str] = None,
-        queue_name: Optional[str] = None,
+        base_dir: str | None = None,
+        queue_name: str | None = None,
         save_to_log: bool = True,
     ) -> None:
         """Displays the queued files in markdown format and optionally saves them to a log file in the tmp directory."""
@@ -396,7 +396,7 @@ class QueueManager:
         meta: Meta,
         paths: Sequence[str],
         base_dir: str,
-    ) -> tuple[QueueList, Optional[str]]:
+    ) -> tuple[QueueList, str | None]:
         allowed_extensions = ['.mkv', '.mp4', '.ts']
         queue: list[Any] = []
 
@@ -702,7 +702,7 @@ class QueueManager:
         return queue, log_file
 
 
-async def process_site_upload_queue(meta: Meta, base_dir: str) -> tuple[list[QueueItem], Optional[str]]:
+async def process_site_upload_queue(meta: Meta, base_dir: str) -> tuple[list[QueueItem], str | None]:
     return await QueueManager.process_site_upload_queue(meta, base_dir)
 
 
@@ -724,14 +724,14 @@ async def load_processed_files(log_file: str) -> set[str]:
 
 async def gather_files_recursive(
     path: str | bytes,
-    allowed_extensions: Optional[Sequence[str]] = None,
+    allowed_extensions: Sequence[str] | None = None,
 ) -> list[str]:
     return await QueueManager.gather_files_recursive(path, allowed_extensions=allowed_extensions)
 
 
 async def should_include_directory(
     dir_path: str,
-    allowed_extensions: Optional[Sequence[str]] = None,
+    allowed_extensions: Sequence[str] | None = None,
 ) -> bool:
     return await QueueManager.should_include_directory(dir_path, allowed_extensions=allowed_extensions)
 
@@ -739,7 +739,7 @@ async def should_include_directory(
 async def resolve_queue_with_glob_or_split(
     path: str,
     paths: Sequence[str],
-    allowed_extensions: Optional[Sequence[str]] = None,
+    allowed_extensions: Sequence[str] | None = None,
 ) -> list[str]:
     return await QueueManager.resolve_queue_with_glob_or_split(path, paths, allowed_extensions=allowed_extensions)
 
@@ -750,8 +750,8 @@ async def extract_safe_file_locations(log_file: str) -> list[str]:
 
 async def display_queue(
     queue: Sequence[Any],
-    base_dir: Optional[str] = None,
-    queue_name: Optional[str] = None,
+    base_dir: str | None = None,
+    queue_name: str | None = None,
     save_to_log: bool = True,
 ) -> None:
     await QueueManager.display_queue(queue, base_dir=base_dir, queue_name=queue_name, save_to_log=save_to_log)
@@ -762,5 +762,5 @@ async def handle_queue(
     meta: Meta,
     paths: Sequence[str],
     base_dir: str,
-) -> tuple[QueueList, Optional[str]]:
+) -> tuple[QueueList, str | None]:
     return await QueueManager.handle_queue(path, meta, paths, base_dir)

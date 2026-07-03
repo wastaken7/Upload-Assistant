@@ -3,7 +3,7 @@ import json
 import os
 import re
 import sys
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import cli_ui
@@ -34,7 +34,7 @@ class VideoManager:
 
         return uhd
 
-    async def get_hdr(self, mi: Any, bdinfo: Optional[Any]) -> str:
+    async def get_hdr(self, mi: Any, bdinfo: Any | None) -> str:
         hdr = ""
         dv = ""
         if bdinfo is not None:  # Disks
@@ -350,7 +350,7 @@ class VideoManager:
                 type = "ENCODE"
         return type
 
-    async def is_3d(self, bdinfo: Optional[Any]) -> str:
+    async def is_3d(self, bdinfo: Any | None) -> str:
         if bdinfo is not None:
             if bdinfo['video'][0]['3d'] != "":
                 return "3D"
@@ -363,7 +363,7 @@ class VideoManager:
         sd = 1 if resolution in ("480i", "480p", "576i", "576p", "540p") else 0
         return sd
 
-    async def get_video_duration(self, meta: Meta) -> Optional[int]:
+    async def get_video_duration(self, meta: Meta) -> int | None:
         if meta.category in ("BOOK", "GAME"):
             return None
         if meta.is_disc != "BDMV" and meta.mediainfo.get("media", {}).get("track"):

@@ -5,7 +5,7 @@ import platform
 import re
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import aiofiles
@@ -700,9 +700,9 @@ class BJS:
         soup = BeautifulSoup(response.text, "html.parser")
 
         # Check if we were redirected to a details page (it contains class "main_column")
-        torrent_details_table: Optional[Tag] = soup.find("div", class_="main_column")
+        torrent_details_table: Tag | None = soup.find("div", class_="main_column")
         # Or if we remained on the search results page (it contains id "torrent_table")
-        torrent_search_table: Optional[Tag] = soup.find("table", id="torrent_table")
+        torrent_search_table: Tag | None = soup.find("table", id="torrent_table")
 
         if torrent_details_table:
             BJS.already_has_the_info = True
@@ -951,7 +951,7 @@ class BJS:
 
         return str(closest_option)
 
-    async def img_host(self, image_bytes: bytes, filename: str) -> Optional[str]:
+    async def img_host(self, image_bytes: bytes, filename: str) -> str | None:
         upload_url = f"{self.base_url}/ajax.php?action=screen_up"
         headers = {
             "Referer": f"{self.base_url}/upload.php",

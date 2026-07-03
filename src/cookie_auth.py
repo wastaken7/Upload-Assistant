@@ -7,7 +7,7 @@ import pickle  # nosec B403 - Only used for legacy cookie migration
 import re
 import stat
 import traceback
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import httpx
@@ -35,7 +35,7 @@ class CookieValidator:
         self.config = config
         self.common = COMMON(config)
 
-    async def load_session_cookies(self, meta: Meta, tracker: str) -> Optional[http.cookiejar.MozillaCookieJar]:
+    async def load_session_cookies(self, meta: Meta, tracker: str) -> http.cookiejar.MozillaCookieJar | None:
         cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{tracker}.txt")
         cookie_jar = http.cookiejar.MozillaCookieJar(cookie_file)
 
@@ -70,7 +70,7 @@ class CookieValidator:
 
         return cookie_jar
 
-    async def save_session_cookies(self, tracker: str, cookie_jar: Optional[http.cookiejar.MozillaCookieJar]) -> None:
+    async def save_session_cookies(self, tracker: str, cookie_jar: http.cookiejar.MozillaCookieJar | None) -> None:
         """Save updated cookies after a successful validation."""
         if not cookie_jar:
             console.print(f"{tracker}: Cookie jar not initialized, cannot save cookies.")
@@ -81,7 +81,7 @@ class CookieValidator:
         except Exception as e:
             console.print(f"{tracker}: Failed to update the cookie file: {e}")
 
-    async def get_ar_auth_key(self, meta: Meta, tracker: str) -> Optional[str]:
+    async def get_ar_auth_key(self, meta: Meta, tracker: str) -> str | None:
         """Retrieve the saved auth key for AR tracker."""
         cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{tracker}.txt")
         auth_file = cookie_file.replace('.txt', '_auth.txt')
@@ -326,7 +326,7 @@ class CookieValidator:
 
         return
 
-    async def find_html_token(self, tracker: str, token_pattern: str, response: str) -> Optional[str]:
+    async def find_html_token(self, tracker: str, token_pattern: str, response: str) -> str | None:
         """Find the auth token in a web page using a regular expression pattern."""
         auth_match = re.search(token_pattern, response)
         if not auth_match:
@@ -489,8 +489,8 @@ class CookieAuthUploader:
         success_status_code: str = "",
         error_text: str = "",
         success_text: str = "",
-        success_list: Optional[list[str]] = None,
-        additional_files: Optional[dict[str, Any]] = None,
+        success_list: list[str] | None = None,
+        additional_files: dict[str, Any] | None = None,
         hash_is_id: bool = False,
     ) -> bool:
         """
@@ -705,7 +705,7 @@ class CookieAuthUploader:
         success_text: str,
         error_text: str,
         response: httpx.Response,
-        success_list: Optional[list[str]] = None,
+        success_list: list[str] | None = None,
     ) -> bool:
         message = ["data error: The upload appears to have failed. It may have uploaded, go check."]
         if success_text:

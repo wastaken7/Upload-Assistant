@@ -18,7 +18,7 @@ import time
 import traceback
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from src.check_requirements import check_dependencies
 
@@ -212,9 +212,9 @@ _GREEN = "\033[92m" if _use_colors else ""
 _RESET = "\033[0m" if _use_colors else ""
 
 
-def _print_config_error(error_type: str, message: str, lineno: Optional[int] = None,
-                        text: Optional[str] = None, offset: Optional[int] = None,
-                        suggestion: Optional[str] = None) -> None:
+def _print_config_error(error_type: str, message: str, lineno: int | None = None,
+                        text: str | None = None, offset: int | None = None,
+                        suggestion: str | None = None) -> None:
     """Print a formatted config error message."""
     console.print(f"{_RED}{error_type} in config.py:{_RESET}", markup=False)
     if lineno:
@@ -244,7 +244,7 @@ if os.path.exists(_config_path):
         uploadscreens_manager = UploadScreensManager(config)
         use_discord = False
         discord_cfg_obj = config.get('DISCORD')
-        discord_config: Optional[dict[str, Any]] = cast(dict[str, Any], discord_cfg_obj) if isinstance(discord_cfg_obj, dict) else None
+        discord_config: dict[str, Any] | None = cast(dict[str, Any], discord_cfg_obj) if isinstance(discord_cfg_obj, dict) else None
         if discord_config is not None:
             use_discord = bool(discord_config.get('use_discord', False))
     except SyntaxError as e:
@@ -387,7 +387,7 @@ def update_oeimg_to_onlyimage() -> None:
         console.print("[yellow]No 'oeimg' or 'oeimg_api' found to update in config.py[/yellow]")
 
 
-async def validate_tracker_logins(meta: Meta, trackers: Optional[list[str]] = None) -> None:
+async def validate_tracker_logins(meta: Meta, trackers: list[str] | None = None) -> None:
     if 'tracker_status' not in meta:
         meta.tracker_status = {}
 
@@ -1152,7 +1152,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                     # If all relevant trackers share exactly one common approved host that the user has configured,
                     # and it's not the initially selected host, switch meta.imghost to that common host.
                     # If multiple common hosts exist, pick the first by config priority (img_host_1..img_host_9).
-                    allowed_hosts: Optional[list[str]] = None
+                    allowed_hosts: list[str] | None = None
                     if relevant_trackers:
                         try:
                             tracker_instances = {
@@ -1222,7 +1222,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                                 # Prefer the user-selected host if it's valid for all relevant trackers; otherwise
                                 # fall back to the first common configured host by config priority (img_host_1..img_host_9).
                                 current_img_host = str(meta.imghost or config["DEFAULT"].get("img_host_1") or "")
-                                preferred_host: Optional[str] = None
+                                preferred_host: str | None = None
 
                                 if common_configured_hosts and current_img_host not in common_configured_hosts:
                                     preferred_host = common_configured_hosts[0]
@@ -1452,7 +1452,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                 trackers_list = []
             trackers_upper = [str(t).strip().upper() for t in trackers_list if str(t).strip()]
 
-            base_piece_mb: Optional[int] = cast(Optional[int], meta.base_torrent_piece_mb)
+            base_piece_mb: int | None = cast(int | None, meta.base_torrent_piece_mb)
             if base_piece_mb is None and any(t in {"HDB", "MTV", "PTP"} for t in trackers_upper):
                 try:
                     torrent = await asyncio.to_thread(Torrent.read, torrent_path)
@@ -1521,7 +1521,7 @@ async def save_processed_file(log_file: str, file_path: str) -> None:
         await f.write(json.dumps(processed_files_clean, indent=4))
 
 
-def get_local_version(version_file: str) -> Optional[str]:
+def get_local_version(version_file: str) -> str | None:
     """Extracts the local version from the version.py file."""
     try:
         with open(version_file, encoding="utf-8") as f:
@@ -1537,7 +1537,7 @@ def get_local_version(version_file: str) -> Optional[str]:
         return None
 
 
-def get_remote_version(url: str) -> tuple[Optional[str], Optional[str]]:
+def get_remote_version(url: str) -> tuple[str | None, str | None]:
     """Fetches the latest version information from the remote repository."""
     try:
         response = requests.get(url, timeout=30)
@@ -1557,7 +1557,7 @@ def get_remote_version(url: str) -> tuple[Optional[str], Optional[str]]:
         return None, None
 
 
-def extract_changelog(content: str, to_version: str) -> Optional[str]:
+def extract_changelog(content: str, to_version: str) -> str | None:
     """Extracts the changelog entries between the specified versions."""
     # Try to find the to_version with 'v' prefix first (current format)
     patterns_to_try = [
@@ -1655,7 +1655,7 @@ async def do_the_thing(base_dir: str) -> None:
                 os.chmod(subdir_path, 0o700)
 
     bot: Any = None
-    connect_task: Optional[asyncio.Task[None]] = None
+    connect_task: asyncio.Task[None] | None = None
     meta = Meta()
     paths: list[str] = []
     for each in sys.argv[1:]:
@@ -1761,7 +1761,7 @@ async def do_the_thing(base_dir: str) -> None:
         from src.configvalidator import group_warnings, validate_config
 
         # Get active trackers from meta (parsed from command line) or fall back to config default
-        active_trackers: Optional[list[str]] = None
+        active_trackers: list[str] | None = None
         if meta.trackers:
             if isinstance(meta.trackers, str):
                 active_trackers = [t.strip().upper() for t in meta.trackers.split(",") if t.strip()]
@@ -1770,7 +1770,7 @@ async def do_the_thing(base_dir: str) -> None:
                 active_trackers = [str(t).strip().upper() for t in trackers_list if str(t).strip()]
 
         # Get active imghost from meta (parsed from command line)
-        active_imghost: Optional[str] = None
+        active_imghost: str | None = None
         if meta.imghost:
             imghost_val = meta.imghost.strip()
             if imghost_val:
@@ -2479,7 +2479,7 @@ async def process_cross_seeds(meta: Meta) -> None:
             console.print(f"[red]Cross-seed handling failed for {tracker}: {result}[/red]")
 
 
-async def get_mkbrr_path(meta: Meta, base_dir: Optional[str] = None) -> Optional[str]:
+async def get_mkbrr_path(meta: Meta, base_dir: str | None = None) -> str | None:
     try:
         resolved_base_dir = base_dir or os.path.abspath(os.path.dirname(__file__))
         mkbrr_path = await MkbrrBinaryManager.ensure_mkbrr_binary(resolved_base_dir, debug=meta.debug, version="v1.18.0")

@@ -4,7 +4,7 @@ import os
 import platform
 import re
 import zipfile
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import cli_ui
@@ -47,7 +47,7 @@ class BT:
         self.source_flag = 'BT'
         self.base_url = 'https://brasiltracker.org'
         self.torrent_url = f'{self.base_url}/torrents.php?id='
-        self.auth_token: Optional[str] = None
+        self.auth_token: str | None = None
         self.main_tmdb_data: dict[str, Any] = {}
         self.episode_tmdb_data: dict[str, Any] = {}
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
@@ -204,7 +204,7 @@ class BT:
 
         return True
 
-    async def get_type(self, meta: Meta) -> Optional[str]:
+    async def get_type(self, meta: Meta) -> str | None:
         if meta.anime:
             return '5'
 
@@ -378,7 +378,7 @@ class BT:
 
         return "Outros"
 
-    async def get_languages(self, _meta: Meta) -> Optional[str]:
+    async def get_languages(self, _meta: Meta) -> str | None:
         lang_code = self.main_tmdb_data.get('original_language')
 
         if not isinstance(lang_code, str) or not lang_code:

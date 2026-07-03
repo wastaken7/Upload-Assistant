@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import os
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from src.console import console
 
@@ -22,7 +22,7 @@ class Search:
             return [str(entry) for entry in config_list]
         return []
 
-    async def searchFile(self, filename: str) -> Optional[list[str]]:
+    async def searchFile(self, filename: str) -> list[str] | None:
         filename = filename.lower()
         files_total: list[str] = []
         if filename == "":
@@ -45,7 +45,7 @@ class Search:
             files_total.extend(files)
         return files_total
 
-    async def searchFolder(self, foldername: str) -> Optional[list[str]]:
+    async def searchFolder(self, foldername: str) -> list[str] | None:
         foldername = foldername.lower()
         folders_total: list[str] = []
         if foldername == "":

@@ -6,7 +6,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Optional, TypeAlias, cast
+from typing import Any, TypeAlias, cast
 from urllib.parse import urlparse
 
 import cli_ui
@@ -51,7 +51,7 @@ class TrackerMetaManager:
     async def check_images_concurrently(self, imagelist: Sequence[ImageDict], meta: Meta) -> list[ImageDict]:
         return await check_images_concurrently(imagelist, meta)
 
-    async def check_image_link(self, url: str, timeout: Optional[httpx.Timeout] = None) -> bool:
+    async def check_image_link(self, url: str, timeout: httpx.Timeout | None = None) -> bool:
         return await check_image_link(url, timeout)
 
     async def update_meta_with_unit3d_data(self, meta: Meta, tracker_data: Sequence[Any], tracker_name: str, skip_tracker_descriptions: bool = False) -> bool:
@@ -76,7 +76,7 @@ class TrackerMetaManager:
         )
 
     async def handle_image_list(
-        self, meta: Meta, tracker_name: str, valid_images: Optional[Sequence[ImageDict]] = None
+        self, meta: Meta, tracker_name: str, valid_images: Sequence[ImageDict] | None = None
     ) -> None:
         await handle_image_list(meta, tracker_name, valid_images)
 
@@ -99,7 +99,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
     unique_images: list[ImageDict] = []
 
     for img in imagelist:
-        img_url = cast(Optional[str], img.get('raw_url'))
+        img_url = cast(str | None, img.get('raw_url'))
         if img_url and img_url not in seen_urls:
             seen_urls.add(img_url)
             unique_images.append(img)
@@ -126,7 +126,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
     }
 
     # Get expected vertical resolution
-    expected_resolution_name = cast(Optional[str], meta.resolution)
+    expected_resolution_name = cast(str | None, meta.resolution)
     expected_vertical_resolution = resolution_map.get(expected_resolution_name or "")
 
     # If no valid resolution is found, skip processing
@@ -139,8 +139,8 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
 
     timeout = httpx.Timeout(15.0, connect=5.0, read=5.0)
 
-    async def check_and_collect(image_dict: ImageDict) -> Optional[ImageDict]:
-        img_url = cast(Optional[str], image_dict.get('raw_url'))
+    async def check_and_collect(image_dict: ImageDict) -> ImageDict | None:
+        img_url = cast(str | None, image_dict.get('raw_url'))
         if not img_url:
             return None
 
@@ -219,7 +219,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
     # Run image verification concurrently but with a limit to prevent too many simultaneous connections
     semaphore = asyncio.Semaphore(2)  # Limit concurrent requests to 2
 
-    async def bounded_check(image_dict: ImageDict) -> Optional[ImageDict]:
+    async def bounded_check(image_dict: ImageDict) -> ImageDict | None:
         async with semaphore:
             return await check_and_collect(image_dict)
 
@@ -239,7 +239,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
     return valid_images
 
 
-async def check_image_link(url: str, timeout: Optional[httpx.Timeout] = None) -> bool:
+async def check_image_link(url: str, timeout: httpx.Timeout | None = None) -> bool:
     # Handle when pixhost url points to web_url and convert to raw_url
     if url.startswith("https://pixhost.to/show/"):
         url = url.replace("https://pixhost.to/show/", "https://img1.pixhost.to/images/", 1)
@@ -313,7 +313,7 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
         if meta.debug:
             console.print("set Category:", meta.category)
 
-    imagelist_typed = cast(Optional[list[ImageDict]], imagelist)
+    imagelist_typed = cast(list[ImageDict] | None, imagelist)
     if imagelist_typed:  # Ensure imagelist is not empty before setting
         valid_images = await check_images_concurrently(imagelist_typed, meta)
         if valid_images:
@@ -346,7 +346,7 @@ async def update_metadata_from_tracker(
         ptp_imagelist: list[ImageDict] = []
         if meta.ptp is None:
             ptp_result = await tracker_instance.get_ptp_id_imdb(search_term, search_file_folder, meta)
-            imdb_id, ptp_torrent_id, meta.ext_torrenthash = cast(tuple[int, Optional[int], Optional[str]], ptp_result)
+            imdb_id, ptp_torrent_id, meta.ext_torrenthash = cast(tuple[int, int | None, str | None], ptp_result)
             if ptp_torrent_id:
                 if imdb_id:
                     console.print(f"[green]{tracker_name} IMDb ID found: tt{str(imdb_id).zfill(7)}[/green]")
@@ -395,7 +395,7 @@ async def update_metadata_from_tracker(
         else:
             ptp_torrent_id = cast(int, meta.ptp)
             ptp_imdb_result = await tracker_instance.get_imdb_from_torrent_id(ptp_torrent_id)
-            imdb_id, meta.ext_torrenthash = cast(tuple[int, Optional[str]], ptp_imdb_result)
+            imdb_id, meta.ext_torrenthash = cast(tuple[int, str | None], ptp_imdb_result)
             if imdb_id:
                 meta.imdb_id = imdb_id
                 if meta.debug:
@@ -436,7 +436,7 @@ async def update_metadata_from_tracker(
 
         if meta.bhd:
             imdb, tmdb = cast(
-                tuple[Optional[int], Optional[int]],
+                tuple[int | None, int | None],
                 await BtnIdManager.get_bhd_torrents(bhd_api, bhd_rss_key, meta, skip_tracker_descriptions=skip_tracker_descriptions, torrent_id=meta.bhd),
             )
         elif use_foldername:
@@ -444,7 +444,7 @@ async def update_metadata_from_tracker(
             folder_path = meta.path
             foldername = os.path.basename(folder_path) if folder_path else meta.uuid
             imdb, tmdb = cast(
-                tuple[Optional[int], Optional[int]],
+                tuple[int | None, int | None],
                 await BtnIdManager.get_bhd_torrents(bhd_api, bhd_rss_key, meta, skip_tracker_descriptions=skip_tracker_descriptions, foldername=foldername),
             )
         else:
@@ -452,7 +452,7 @@ async def update_metadata_from_tracker(
             filelist = cast(list[str], meta.filelist or [])
             filename = os.path.basename(filelist[0]) if filelist else None
             imdb, tmdb = cast(
-                tuple[Optional[int], Optional[int]],
+                tuple[int | None, int | None],
                 await BtnIdManager.get_bhd_torrents(bhd_api, bhd_rss_key, meta, skip_tracker_descriptions=skip_tracker_descriptions, filename=filename),
             )
 
@@ -529,7 +529,7 @@ async def update_metadata_from_tracker(
                                 else:
                                     console.print("[green]Keeping the original description.[/green]")
 
-                    image_list = cast(Optional[Sequence[ImageDict]], meta.image_list)
+                    image_list = cast(Sequence[ImageDict] | None, meta.image_list)
                     if image_list:
                         valid_images = await check_images_concurrently(image_list, meta)
                         if valid_images:
@@ -564,7 +564,7 @@ async def update_metadata_from_tracker(
                 if to_int(meta.imdb_id) != 0 or to_int(meta.tmdb_id) != 0:
                     console.print(f"[green]{tracker_name} data found: IMDb ID: {meta.imdb_id}, TMDb ID: {meta.tmdb_id}[/green]")
                     found_match = True
-                    image_list = cast(Optional[Sequence[ImageDict]], meta.image_list)
+                    image_list = cast(Sequence[ImageDict] | None, meta.image_list)
                     if image_list:
                         valid_images = await check_images_concurrently(image_list, meta)
                         if valid_images:
@@ -629,7 +629,7 @@ async def update_metadata_from_tracker(
             # Use get_info_from_torrent_id function if ID is found in meta
             hdb_info = await tracker_instance.get_info_from_torrent_id(meta[tracker_key])
             imdb, tvdb_id, hdb_name, meta.ext_torrenthash, meta.hdb_description = cast(
-                tuple[Optional[int], Optional[int], Optional[str], Optional[str], Optional[str]],
+                tuple[int | None, int | None, str | None, str | None, str | None],
                 hdb_info,
             )
 
@@ -640,7 +640,7 @@ async def update_metadata_from_tracker(
                 found_match = True
                 description_source = meta.hdb_description or ""
                 description, image_list = cast(
-                    tuple[Optional[str], list[ImageDict]],
+                    tuple[str | None, list[ImageDict]],
                     bbcode.clean_hdb_description(description_source),
                 )
                 if description and len(description) > 0 and not skip_tracker_descriptions:
@@ -668,7 +668,7 @@ async def update_metadata_from_tracker(
             # Use search_filename function if ID is not found in meta
             hdb_search = await tracker_instance.search_filename(search_term, search_file_folder, meta)
             imdb, tvdb_id, hdb_name, meta.ext_torrenthash, meta.hdb_description, tracker_id = cast(
-                tuple[Optional[int], Optional[int], Optional[str], Optional[str], Optional[str], Optional[int]],
+                tuple[int | None, int | None, str | None, str | None, str | None, int | None],
                 hdb_search,
             )
             meta.hdb_name = hdb_name
@@ -685,7 +685,7 @@ async def update_metadata_from_tracker(
                         found_match = True
                         description_source = meta.hdb_description or ""
                         description, image_list = cast(
-                            tuple[Optional[str], list[ImageDict]],
+                            tuple[str | None, list[ImageDict]],
                             bbcode.clean_hdb_description(description_source),
                         )
                         if description and len(description) > 0 and not skip_tracker_descriptions:
@@ -730,7 +730,7 @@ async def update_metadata_from_tracker(
                     meta.tvdb_id = tvdb_id if tvdb_id else meta.tvdb_id
                     description_source = meta.hdb_description or ""
                     description, image_list = cast(
-                        tuple[Optional[str], list[ImageDict]],
+                        tuple[str | None, list[ImageDict]],
                         bbcode.clean_hdb_description(description_source),
                     )
                     if description and len(description) > 0 and not skip_tracker_descriptions:
@@ -753,7 +753,7 @@ async def update_metadata_from_tracker(
     return meta, found_match
 
 
-async def handle_image_list(meta: Meta, tracker_name: str, valid_images: Optional[Sequence[ImageDict]] = None) -> None:
+async def handle_image_list(meta: Meta, tracker_name: str, valid_images: Sequence[ImageDict] | None = None) -> None:
     if meta.image_list:
         valid_count = len(valid_images) if valid_images is not None else 0
         console.print(f"[cyan]Selected the following {valid_count} valid images from {tracker_name}:")

@@ -5,7 +5,7 @@ import os
 import platform
 import subprocess
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 from pymediainfo import MediaInfo
@@ -38,7 +38,7 @@ def validate_file_path(file_path: str) -> str:
     return str(path)
 
 
-def setup_mediainfo_library(base_dir: str, debug: bool = False) -> Optional[dict[str, Any]]:
+def setup_mediainfo_library(base_dir: str, debug: bool = False) -> dict[str, Any] | None:
     system = platform.system().lower()
 
     if system == "windows":
@@ -416,7 +416,7 @@ async def exportInfo(
         os.chdir(os.path.dirname(video))
 
     if mediainfo_cmd and is_dvd:
-        result: Optional[subprocess.CompletedProcess[str]] = None
+        result: subprocess.CompletedProcess[str] | None = None
         try:
             # Validate and sanitize the video path
             safe_video_path = validate_file_path(video)
@@ -458,13 +458,13 @@ async def exportInfo(
         console.print("[bold green]MediaInfo Exported.")
 
     if mediainfo_cmd and is_dvd:
-        result: Optional[subprocess.CompletedProcess[str]] = None
+        result: subprocess.CompletedProcess[str] | None = None
         try:
             # Validate and sanitize the video path
             safe_video_path = validate_file_path(video)
             safe_mediainfo_cmd = validate_file_path(mediainfo_cmd)
             cmd = [safe_mediainfo_cmd, "--Output=JSON", safe_video_path]
-            result2: Optional[subprocess.CompletedProcess[str]] = None
+            result2: subprocess.CompletedProcess[str] | None = None
             result2 = cast(subprocess.CompletedProcess[str], await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30))
 
             if result2.returncode == 0 and result2.stdout:

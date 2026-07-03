@@ -8,7 +8,7 @@ import re
 import shutil
 import xml.etree.ElementTree as ET
 import zipfile
-from typing import Any, Optional
+from typing import Any
 
 from src.console import console
 
@@ -22,7 +22,7 @@ def extract_epub_metadata(epub_path: str, debug: bool = False) -> dict[str, Any]
     try:
         with zipfile.ZipFile(epub_path, "r") as z:
             # 1. Read META-INF/container.xml to find the .opf file path
-            rootfile_path: Optional[str] = None
+            rootfile_path: str | None = None
             try:
                 container_data = z.read("META-INF/container.xml")
                 root = ET.fromstring(container_data)
@@ -115,7 +115,7 @@ def extract_cbr_cbz_metadata(filepath: str, debug: bool = False) -> dict[str, An
         return metadata
 
     ext = os.path.splitext(filepath)[1].lower()
-    xml_data: Optional[bytes] = None
+    xml_data: bytes | None = None
 
     if ext == ".cbz" or zipfile.is_zipfile(filepath):
         try:
@@ -322,7 +322,7 @@ def extract_mobi_metadata(mobi_path: str, debug: bool = False) -> dict[str, Any]
     return metadata
 
 
-def validate_isbn_checksum(candidate: str) -> Optional[str]:
+def validate_isbn_checksum(candidate: str) -> str | None:
     """Validate and return cleaned ISBN-10 or ISBN-13 if valid, else None."""
     cleaned = re.sub(r"[- ]", "", candidate).upper()
 
@@ -341,7 +341,7 @@ def validate_isbn_checksum(candidate: str) -> Optional[str]:
     return None
 
 
-def extract_isbn_from_pdf(pdf_path: str, debug: bool = False) -> Optional[str]:
+def extract_isbn_from_pdf(pdf_path: str, debug: bool = False) -> str | None:
     """Search for and extract a valid ISBN from a PDF file using PyMuPDF (fitz)."""
     try:
         import fitz

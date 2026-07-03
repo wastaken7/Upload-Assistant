@@ -4,7 +4,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -15,7 +15,7 @@ google_color_str = "[#4285f4]G[/#4285f4][#ea4335]o[/#ea4335][#fbbc05]o[/#fbbc05]
 
 
 class GoogleBooksManager:
-    def _parse_volume_info(self, data: dict[str, Any], isbn: str, debug: bool = False) -> Optional[dict[str, Any]]:
+    def _parse_volume_info(self, data: dict[str, Any], isbn: str, debug: bool = False) -> dict[str, Any] | None:
         """
         Helper to parse raw Google Books API response data uniformly.
         """
@@ -99,7 +99,7 @@ class GoogleBooksManager:
         metadata["isbn"] = isbn
         return metadata
 
-    async def search_by_isbn(self, isbn: str, base_dir: str = "", api_key: str = "", debug: bool = False) -> Optional[dict[str, Any]]:
+    async def search_by_isbn(self, isbn: str, base_dir: str = "", api_key: str = "", debug: bool = False) -> dict[str, Any] | None:
         """
         Search Google Books API by ISBN.
         Returns a dict of metadata or None if not found/error.

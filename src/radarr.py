@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from collections.abc import Mapping
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import httpx
 
@@ -13,7 +13,7 @@ class RadarrManager:
         self.config = config
         self.default_config = cast(dict[str, Any], config.get('DEFAULT', {}))
 
-    async def get_radarr_data(self, tmdb_id: Optional[int] = None, filename: Optional[str] = None, debug: bool = False) -> Optional[MovieInfo]:
+    async def get_radarr_data(self, tmdb_id: int | None = None, filename: str | None = None, debug: bool = False) -> MovieInfo | None:
         if not any(key.startswith('radarr_api_key') for key in self.default_config):
             console.print("[red]No Radarr API keys are configured.[/red]")
             return None
@@ -99,7 +99,7 @@ class RadarrManager:
         console.print("[yellow]No Radarr instance returned valid movie data.[/yellow]")
         return None
 
-    async def extract_movie_data(self, radarr_data: Any, filename: Optional[str] = None) -> Optional[MovieInfo]:
+    async def extract_movie_data(self, radarr_data: Any, filename: str | None = None) -> MovieInfo | None:
         if not radarr_data or not isinstance(radarr_data, list):
             return {
                 "imdb_id": None,
@@ -119,7 +119,7 @@ class RadarrManager:
             }
 
         if filename:
-            movie: Optional[Mapping[str, Any]] = None
+            movie: Mapping[str, Any] | None = None
             for item in items:
                 movie_file = cast(Mapping[str, Any], item.get("movieFile", {}))
                 if movie_file.get("originalFilePath") == filename:

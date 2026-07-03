@@ -4,7 +4,7 @@ import sys
 import time
 import traceback
 from collections.abc import Mapping, Sequence
-from typing import Any, Optional, TypeAlias, cast
+from typing import Any, TypeAlias, cast
 
 import cli_ui
 
@@ -25,7 +25,7 @@ StatusDict: TypeAlias = dict[str, Any]
 async def check_mod_q_and_draft(
     tracker_class: Any,
     meta: Meta,
-) -> tuple[Optional[str], Optional[str], dict[str, Any]]:
+) -> tuple[str | None, str | None, dict[str, Any]]:
     tracker_capabilities = {
         'A4K': {'mod_q': True, 'draft': False},
         'AITHER': {'mod_q': True, 'draft': False},

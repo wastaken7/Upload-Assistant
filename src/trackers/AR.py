@@ -4,7 +4,7 @@ import json
 import os
 import re
 import urllib.parse
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import httpx
@@ -297,7 +297,7 @@ class AR:
             return dupes
 
 
-    async def get_auth_key(self, meta: Meta) -> Optional[str]:
+    async def get_auth_key(self, meta: Meta) -> str | None:
         """Retrieve the saved auth key from cookie_auth.py."""
         auth_key = await self.cookie_validator.get_ar_auth_key(meta, self.tracker)
         if auth_key:

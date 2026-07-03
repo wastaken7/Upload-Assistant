@@ -2,7 +2,7 @@
 import asyncio
 import os
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -111,7 +111,7 @@ class TTG:
             # 60 = TV Shows
         return type_id
 
-    async def upload(self, meta: Meta) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> bool | None:
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)

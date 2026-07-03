@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -28,7 +28,7 @@ class LT(UNIT3D):
     async def get_category_id(
         self,
         meta: Meta,
-        category: Optional[str] = None,
+        category: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False
     ) -> dict[str, str]:
@@ -83,7 +83,7 @@ class LT(UNIT3D):
 
         return {'category_id': category_id}
 
-    async def get_type_id(self, meta: Meta, type: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
             "DISC": "1",
             "REMUX": "2",

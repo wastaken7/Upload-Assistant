@@ -3,7 +3,7 @@
 Config validation helper for Upload Assistant.
 Validates the user's config.py against expected structure and types.
 """
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 # Required top-level sections
 REQUIRED_SECTIONS = ["DEFAULT", "TRACKERS"]
@@ -147,8 +147,8 @@ def _as_dict(value: Any) -> dict[str, Any]:
 
 def validate_config(
     config: Any,
-    active_trackers: Optional[list[str]] = None,
-    active_imghost: Optional[str] = None
+    active_trackers: list[str] | None = None,
+    active_imghost: str | None = None
 ) -> tuple[bool, list[str], list[ConfigValidationWarning]]:
     """
     Validate the config dictionary structure and types.

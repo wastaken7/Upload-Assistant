@@ -5,7 +5,7 @@ import os
 import platform
 import re
 from datetime import UTC, datetime
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import cli_ui
@@ -88,7 +88,7 @@ class ASC:
             self.episode_tmdb_data = ptbr_data.get("episode") or {}
             meta.episode_tmdb_data = self.episode_tmdb_data
 
-    async def get_container(self, meta: Meta) -> Optional[str]:
+    async def get_container(self, meta: Meta) -> str | None:
         if meta.category == "BOOK":
             filelist = meta.filelist or []
             file_path = filelist[0] if filelist else str(meta.path or "")
@@ -177,7 +177,7 @@ class ASC:
         else:
             return standard_map.get(meta.type or "", "0")
 
-    async def get_languages(self, meta: Meta) -> Optional[dict[str, str]]:
+    async def get_languages(self, meta: Meta) -> dict[str, str] | None:
         if meta.anime:
             type_ = "116" if meta.category == "MOVIE" else "118"
 
@@ -825,13 +825,13 @@ class ASC:
         name_search_tasks: list[asyncio.Task[dict[str, str]]] = []
 
         for release in releases:
-            def _has_details_link(href: Optional[str]) -> bool:
+            def _has_details_link(href: str | None) -> bool:
                 return bool(href and 'torrents-details.php?id=' in href)
 
             details_link_tag = release.find('a', href=_has_details_link)
             torrent_link_value = details_link_tag.get('href') if details_link_tag else None
             torrent_link = torrent_link_value if isinstance(torrent_link_value, str) else ''
-            def _has_size_text(text: Optional[str]) -> bool:
+            def _has_size_text(text: str | None) -> bool:
                 return bool(text and ('GB' in text.upper() or 'MB' in text.upper()))
 
             size_tag = release.find('span', text=_has_size_text, class_='badge-info')
@@ -912,10 +912,10 @@ class ASC:
     async def format_image(self, url: str | None) -> str:
         return f'[img]{url}[/img]' if isinstance(url, str) and url else ''
 
-    async def format_date(self, date_str: Optional[str]) -> str:
+    async def format_date(self, date_str: str | None) -> str:
         if not date_str or date_str == 'N/A':
             return 'N/A'
-        def _try_format(fmt: str) -> Optional[str]:
+        def _try_format(fmt: str) -> str | None:
             try:
                 return datetime.strptime(date_str, fmt).replace(tzinfo=UTC).strftime("%d/%m/%Y")
             except (ValueError, TypeError):
@@ -927,7 +927,7 @@ class ASC:
                 return formatted
         return date_str
 
-    async def media_info(self, meta: Meta) -> Optional[str]:
+    async def media_info(self, meta: Meta) -> str | None:
         if meta.is_disc == "BDMV":
             summary_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt"
             if os.path.exists(summary_path):

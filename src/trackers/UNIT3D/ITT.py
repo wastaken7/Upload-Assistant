@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any, Optional
+from typing import Any
 
 from src.console import console
 from src.languages import languages_manager
@@ -27,8 +27,8 @@ class ITT(UNIT3D):
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = []
 
-    async def get_type_name(self, meta: Meta) -> Optional[str]:
-        type_name: Optional[str] = None
+    async def get_type_name(self, meta: Meta) -> str | None:
+        type_name: str | None = None
 
         uuid_string = meta.basename_no_ext
         if uuid_string:
@@ -54,7 +54,7 @@ class ITT(UNIT3D):
     async def get_type_id(
         self,
         meta: Meta,
-        type: Optional[str] = None,
+        type: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False
     ) -> dict[str, str]:

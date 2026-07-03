@@ -6,7 +6,7 @@ import random
 import re
 from collections.abc import Mapping, MutableMapping, Sequence
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import cli_ui
 import httpx
@@ -22,23 +22,23 @@ Release = MutableMapping[str, Any]
 MovieLink = MutableMapping[str, Any]
 
 
-def _style_contains(style: Optional[str], token: str) -> bool:
+def _style_contains(style: str | None, token: str) -> bool:
     return bool(style and token in style)
 
 
-def _style_green(style: Optional[str]) -> bool:
+def _style_green(style: str | None) -> bool:
     return _style_contains(style, "color: green")
 
 
-def _style_gray(style: Optional[str]) -> bool:
+def _style_gray(style: str | None) -> bool:
     return _style_contains(style, "color: #999999")
 
 
-def _style_specs(style: Optional[str]) -> bool:
+def _style_specs(style: str | None) -> bool:
     return _style_contains(style, "font-size: 12px")
 
 
-async def search_bluray(meta: Meta) -> Optional[str]:
+async def search_bluray(meta: Meta) -> str | None:
     imdb_id_value = meta.imdb_id or 0
     imdb_id = f"tt{imdb_id_value:07d}"
     base_dir = meta.base_dir
@@ -46,7 +46,7 @@ async def search_bluray(meta: Meta) -> Optional[str]:
     url = f"https://www.blu-ray.com/search/?quicksearch=1&quicksearch_country=all&quicksearch_keyword={imdb_id}&section=theatrical"
     debug_filename = f"{base_dir}/tmp/{uuid}/debug_bluray_search_{imdb_id}.html"
 
-    response_text: Optional[str] = None
+    response_text: str | None = None
 
     try:
         if os.path.exists(debug_filename):
@@ -154,7 +154,7 @@ async def search_bluray(meta: Meta) -> Optional[str]:
     return response_text
 
 
-def extract_bluray_links(html_content: Optional[str]) -> Optional[list[MovieLink]]:
+def extract_bluray_links(html_content: str | None) -> list[MovieLink] | None:
     if not html_content:
         console.print("[red]No HTML content to extract links from[/red]")
         return None
@@ -321,7 +321,7 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
         return []
 
 
-async def extract_product_id(url: str, meta: Meta) -> Optional[str]:
+async def extract_product_id(url: str, meta: Meta) -> str | None:
     pattern = r'blu-ray\.com/.*?/(\d+)/'
     match = re.search(pattern, url)
 
@@ -875,7 +875,7 @@ def extract_cover_images(html_content: str) -> dict[str, str]:
     return cover_images
 
 
-def clean_image_url(url: Optional[str]) -> Optional[str]:
+def clean_image_url(url: str | None) -> str | None:
     if not url:
         return url
 
@@ -900,7 +900,7 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
     if meta.debug:
         console.print(f"[yellow]Fetching details for: {release['title']} - {release_url}[/yellow]")
 
-    response_text: Optional[str] = None
+    response_text: str | None = None
 
     try:
         import os
@@ -1000,7 +1000,7 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
         return release
 
 
-def extract_section(specs_td: Any, section_title: str) -> Optional[str]:
+def extract_section(specs_td: Any, section_title: str) -> str | None:
     section_span: Any = specs_td.find('span', class_='subheading', string=section_title)
     if not section_span:
         return None
@@ -1683,7 +1683,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
     return detailed_releases
 
 
-def map_country_to_region_code(country_name: str) -> Optional[str]:
+def map_country_to_region_code(country_name: str) -> str | None:
     country_map = {
         "Afghanistan": "AFG",
         "Albania": "ALB",

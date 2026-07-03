@@ -11,7 +11,7 @@ import traceback
 import urllib.parse
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Optional, TypedDict, cast
+from typing import Any, TypedDict, cast
 
 import httpx
 import qbittorrentapi
@@ -30,13 +30,13 @@ qbittorrent_locks: collections.defaultdict[tuple[str, int, str], asyncio.Lock] =
 class _CandidateEntry(TypedDict):
     path: str
     name: str
-    size: Optional[int]
+    size: int | None
     used: bool
 
 
 class _TorrentFileEntry(TypedDict):
     relative_path: str
-    length: Optional[int]
+    length: int | None
 
 
 class QbittorrentClientMixin:
@@ -51,8 +51,8 @@ class QbittorrentClientMixin:
     async def get_ptp_from_hash_qbit(self, meta: Meta, client: dict[str, Any], pathed: bool = False) -> Meta:
         proxy_url = client.get('qui_proxy_url')
         qbt_proxy_url = ""
-        qbt_client: Optional[qbittorrentapi.Client] = None
-        qbt_session: Optional[httpx.AsyncClient] = None
+        qbt_client: qbittorrentapi.Client | None = None
+        qbt_session: httpx.AsyncClient | None = None
 
         if proxy_url:
             qbt_proxy_url = proxy_url.rstrip('/')
@@ -259,7 +259,7 @@ class QbittorrentClientMixin:
                     console.print(f"[bold red]{operation_name} failed after {max_retries + 1} attempts (final timeout: {timeout}s)")
                     raise  # Re-raise the TimeoutError so caller can handle it
 
-    async def init_qbittorrent_client(self, client: dict[str, Any]) -> Optional[qbittorrentapi.Client]:
+    async def init_qbittorrent_client(self, client: dict[str, Any]) -> qbittorrentapi.Client | None:
         # Creates and logs into a qbittorrent client, with caching to avoid redundant logins
         # If login fails, returns None
         if client.get("qbit_api_key"):
@@ -315,10 +315,10 @@ class QbittorrentClientMixin:
         self,
         meta: Meta,
         client: dict[str, Any],
-        qbt_client: Optional[qbittorrentapi.Client] = None,
-        qbt_session: Optional[httpx.AsyncClient] = None,
-        proxy_url: Optional[str] = None,
-    ) -> Optional[str]:
+        qbt_client: qbittorrentapi.Client | None = None,
+        qbt_session: httpx.AsyncClient | None = None,
+        proxy_url: str | None = None,
+    ) -> str | None:
         trackers_config = cast(dict[str, Any], self.config.get('TRACKERS', {}))
         mtv_config_value = trackers_config.get('MTV', {})
         mtv_config = cast(dict[str, Any], mtv_config_value) if isinstance(mtv_config_value, dict) else {}
@@ -368,7 +368,7 @@ class QbittorrentClientMixin:
             os.makedirs(extracted_torrent_dir, exist_ok=True)
 
             # **Step 1: Find correct torrents using content_path**
-            best_match: Optional[dict[str, Any]] = None
+            best_match: dict[str, Any] | None = None
             matching_torrents: list[dict[str, Any]] = []
 
             try:
@@ -470,7 +470,7 @@ class QbittorrentClientMixin:
             # **Step 2: Extract and Save .torrent Files**
             processed_hashes: set[str] = set()
             best_match = None
-            torrent_hash: Optional[str] = None
+            torrent_hash: str | None = None
             for matching_torrent in matching_torrents:
                 try:
                     torrent_hash = str(matching_torrent['hash'])
@@ -548,7 +548,7 @@ class QbittorrentClientMixin:
                             torrent_data = Torrent.read(torrent_file_path)
                             piece_size = torrent_data.piece_size
                             best_piece_size_raw_value: Any = best_match.get('piece_size') if best_match else None
-                            best_piece_size: Optional[int] = best_piece_size_raw_value if isinstance(best_piece_size_raw_value, int) else None
+                            best_piece_size: int | None = best_piece_size_raw_value if isinstance(best_piece_size_raw_value, int) else None
                             if best_match is None or (best_piece_size is not None and piece_size < best_piece_size):
                                 best_match = {
                                     'hash': torrent_hash,
@@ -678,7 +678,7 @@ class QbittorrentClientMixin:
                             break
 
         # Find a linked folder that matches the drive
-        link_target: Optional[str] = None
+        link_target: str | None = None
         if platform.system() == "Windows":
             # Windows matching based on drive letters
             for folder in linked_folder:
@@ -1351,7 +1351,7 @@ class QbittorrentClientMixin:
         return tracker_patterns, tracker_priority
 
     async def _fetch_torrents(
-        self, proxy_url: str, qbt_proxy_url: str, qbt_session: Optional[httpx.AsyncClient], qbt_client: Optional[qbittorrentapi.Client], search_term: str, meta: Meta
+        self, proxy_url: str, qbt_proxy_url: str, qbt_session: httpx.AsyncClient | None, qbt_client: qbittorrentapi.Client | None, search_term: str, meta: Meta
     ) -> list[Any]:
         try:
             if proxy_url:
@@ -1422,8 +1422,8 @@ class QbittorrentClientMixin:
         tracker_priority: list[str],
         proxy_url: str,
         qbt_proxy_url: str,
-        qbt_session: Optional[httpx.AsyncClient],
-        qbt_client: Optional[qbittorrentapi.Client],
+        qbt_session: httpx.AsyncClient | None,
+        qbt_client: qbittorrentapi.Client | None,
         meta: Meta,
     ) -> list[dict[str, Any]]:
         matching_torrents: list[dict[str, Any]] = []
@@ -1555,13 +1555,13 @@ class QbittorrentClientMixin:
         torrent_hash: str,
         proxy_url: str,
         qbt_proxy_url: str,
-        qbt_session: Optional[httpx.AsyncClient],
-        qbt_client: Optional[qbittorrentapi.Client],
-        torrent_storage_dir: Optional[str],
+        qbt_session: httpx.AsyncClient | None,
+        qbt_client: qbittorrentapi.Client | None,
+        torrent_storage_dir: str | None,
         extracted_torrent_dir: str,
         meta: Meta,
         is_alternative: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         torrent_file_path = None
         prefix = "alternative " if is_alternative else ""
 
@@ -1614,8 +1614,8 @@ class QbittorrentClientMixin:
         client_config: dict[str, Any],
         proxy_url: str,
         qbt_proxy_url: str,
-        qbt_session: Optional[httpx.AsyncClient],
-        qbt_client: Optional[qbittorrentapi.Client],
+        qbt_session: httpx.AsyncClient | None,
+        qbt_client: qbittorrentapi.Client | None,
         meta: Meta,
     ) -> None:
         if not meta.base_torrent_created:
@@ -1795,8 +1795,8 @@ class QbittorrentClientMixin:
 
     async def _search_single_qbit_client(self, client_config: dict[str, Any], _content_path: str, meta: Meta, client_name: str) -> list[dict[str, Any]]:
         """Search a single qBittorrent client for matching torrents."""
-        qbt_session: Optional[httpx.AsyncClient] = None
-        qbt_client: Optional[qbittorrentapi.Client] = None
+        qbt_session: httpx.AsyncClient | None = None
+        qbt_client: qbittorrentapi.Client | None = None
         qbt_proxy_url = ""
         proxy_url = client_config.get("qui_proxy_url", "").strip()
         try:
@@ -2018,7 +2018,7 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
         console.print("[bold red]Unable to find source files for cross-seed linking")
         return False
 
-    def pick_candidate(filename: Optional[str], length: Optional[int]) -> tuple[Optional[str], Optional[str]]:
+    def pick_candidate(filename: str | None, length: int | None) -> tuple[str | None, str | None]:
         lower_name = (filename or '').lower()
 
         if lower_name:

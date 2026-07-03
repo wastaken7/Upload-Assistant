@@ -4,7 +4,7 @@ import json
 from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 DEFAULT_LEVEL = "access_denied"  # default: log only failed/denied attempts
 VALID_LEVELS = {"access_denied", "access", "disabled"}
@@ -75,7 +75,7 @@ class AccessLogger:
         # access_denied: only log non-success (failed) attempts
         return not success
 
-    def log(self, *, endpoint: str, method: str, remote_addr: Optional[str], username: Optional[str], success: bool, status: int, headers: Optional[dict[str, Any]] = None, details: Optional[str] = None) -> None:
+    def log(self, *, endpoint: str, method: str, remote_addr: str | None, username: str | None, success: bool, status: int, headers: dict[str, Any] | None = None, details: str | None = None) -> None:
         try:
             record: dict[str, Any] = {
                 "timestamp": datetime.now(UTC).isoformat(),

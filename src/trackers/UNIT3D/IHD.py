@@ -1,5 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import pycountry
 
@@ -31,7 +31,7 @@ class IHD(UNIT3D):
     async def get_category_id(
         self,
         meta: Meta,
-        category: Optional[str] = None,
+        category: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False
     ) -> dict[str, str]:
@@ -72,7 +72,7 @@ class IHD(UNIT3D):
     async def get_resolution_id(
         self,
         meta: Meta,
-        resolution: Optional[str] = None,
+        resolution: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False
     ) -> dict[str, str]:

@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlencode
 
 import aiofiles
@@ -169,7 +169,7 @@ class NBL:
         params["tags"] = [meta.resolution]
         params['per_page'] = 100
 
-        response: Optional[httpx.Response] = None
+        response: httpx.Response | None = None
         max_pages = int(self.config['TRACKERS'][self.tracker].get('search_max_pages', 10))
         async with httpx.AsyncClient(timeout=10.0) as client:
             for page in range(max_pages):

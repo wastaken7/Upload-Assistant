@@ -16,7 +16,6 @@ import os
 import string
 from contextlib import suppress
 from pathlib import Path
-from typing import Optional
 
 from argon2 import PasswordHasher
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -105,7 +104,7 @@ def get_config_dir() -> Path:
         return repo_dir
 
 
-_cached_session_secret: Optional[bytes] = None
+_cached_session_secret: bytes | None = None
 
 
 def load_session_secret() -> bytes:
@@ -279,7 +278,7 @@ def _generate_field_key() -> bytes:
     return token_bytes(32)
 
 
-def _pack_field(extras: dict, field: str, plaintext: Optional[str]) -> None:
+def _pack_field(extras: dict, field: str, plaintext: str | None) -> None:
     """Store a field under `extras['fields'][field]` with its own random key.
 
     Structure:
@@ -333,7 +332,7 @@ def _pack_field(extras: dict, field: str, plaintext: Optional[str]) -> None:
     extras["fields"] = fields
 
 
-def _unpack_field(extras: dict, field: str) -> Optional[str]:
+def _unpack_field(extras: dict, field: str) -> str | None:
     if not extras:
         return None
     fields = extras.get("fields") or {}
@@ -401,7 +400,7 @@ def create_user(username: str, password: str) -> None:
         os.chmod(path, 0o600)
 
 
-def load_user() -> Optional[dict]:
+def load_user() -> dict | None:
     path = _get_user_file()
     if not path.exists():
         return None
@@ -447,7 +446,7 @@ def load_user() -> Optional[dict]:
     return data
 
 
-def get_totp_secret() -> Optional[str]:
+def get_totp_secret() -> str | None:
     u = load_user()
     if not u:
         return None
@@ -460,7 +459,7 @@ def get_totp_secret() -> Optional[str]:
     return extras.get("totp_secret")
 
 
-def set_totp_secret(secret: Optional[str]) -> None:
+def set_totp_secret(secret: str | None) -> None:
     # Read raw file, update extras, re-encrypt
     path = _get_user_file()
     if path.exists():
@@ -603,7 +602,7 @@ def encrypt_bytes(aes_key: bytes, plaintext: bytes) -> str:
     return base64.b64encode(payload).decode("utf-8")
 
 
-def decrypt_bytes(aes_key: bytes, payload_b64: str) -> Optional[bytes]:
+def decrypt_bytes(aes_key: bytes, payload_b64: str) -> bytes | None:
     try:
         aes = AESGCM(aes_key)
         payload = base64.b64decode(payload_b64)
@@ -618,7 +617,7 @@ def encrypt_text(aes_key: bytes, text: str) -> str:
     return encrypt_bytes(aes_key, text.encode("utf-8"))
 
 
-def decrypt_text(aes_key: bytes, payload_b64: str) -> Optional[str]:
+def decrypt_text(aes_key: bytes, payload_b64: str) -> str | None:
     b = decrypt_bytes(aes_key, payload_b64)
     if b is None:
         return None

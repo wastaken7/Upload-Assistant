@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import uuid
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import httpx
 
@@ -88,10 +88,10 @@ class BtnIdManager:
         bhd_rss_key: str,
         meta: Meta,
         skip_tracker_descriptions: bool = False,
-        info_hash: Optional[str] = None,
-        filename: Optional[str] = None,
-        foldername: Optional[str] = None,
-        torrent_id: Optional[int] = None,
+        info_hash: str | None = None,
+        filename: str | None = None,
+        foldername: str | None = None,
+        torrent_id: int | None = None,
     ) -> tuple[int, int]:
         imdb = 0
         tmdb = 0
@@ -212,7 +212,7 @@ class BtnIdManager:
         return imdb, tmdb
 
     @staticmethod
-    async def parse_tmdb_id(tmdb_id: str, category: Optional[str]) -> tuple[Optional[str], int]:
+    async def parse_tmdb_id(tmdb_id: str, category: str | None) -> tuple[str | None, int]:
         """Parses TMDb ID, ensures correct formatting, and assigns category."""
         tmdb_id_str = tmdb_id.strip().lower()
 
@@ -240,10 +240,10 @@ async def get_bhd_torrents(
     bhd_rss_key: str,
     meta: Meta,
     skip_tracker_descriptions: bool = False,
-    info_hash: Optional[str] = None,
-    filename: Optional[str] = None,
-    foldername: Optional[str] = None,
-    torrent_id: Optional[int] = None,
+    info_hash: str | None = None,
+    filename: str | None = None,
+    foldername: str | None = None,
+    torrent_id: int | None = None,
 ) -> tuple[int, int]:
     return await BtnIdManager.get_bhd_torrents(
         bhd_api,
@@ -257,5 +257,5 @@ async def get_bhd_torrents(
     )
 
 
-async def parse_tmdb_id(tmdb_id: str, category: Optional[str] = None) -> tuple[Optional[str], int]:
+async def parse_tmdb_id(tmdb_id: str, category: str | None = None) -> tuple[str | None, int]:
     return await BtnIdManager.parse_tmdb_id(tmdb_id, category)

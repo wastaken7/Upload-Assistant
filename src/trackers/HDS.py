@@ -3,7 +3,7 @@ import glob
 import os
 import platform
 import re
-from typing import Any, Optional
+from typing import Any
 
 import aiofiles
 import httpx
@@ -205,7 +205,7 @@ class HDS:
 
         return 38
 
-    async def get_requests(self, meta: Meta) -> list[dict[str, Optional[str]]] | bool:
+    async def get_requests(self, meta: Meta) -> list[dict[str, str | None]] | bool:
         if not self.config["DEFAULT"].get("search_requests", False) and not meta.search_requests:
             return False
         else:
@@ -230,7 +230,7 @@ class HDS:
                 soup = BeautifulSoup(response_results_text, 'html.parser')
                 request_rows = soup.select('form[action="index.php?page=takedelreq"] table.lista tr')
 
-                results: list[dict[str, Optional[str]]] = []
+                results: list[dict[str, str | None]] = []
                 for row in request_rows:
                     if row.find('td', class_='header'):
                         continue

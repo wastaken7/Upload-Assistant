@@ -5,7 +5,7 @@ import io
 import os
 import re
 import sys
-from typing import Any, Optional
+from typing import Any
 
 import aiofiles
 import cli_ui
@@ -28,7 +28,7 @@ def normalize_version(version_str: str) -> str:
     return version_str
 
 
-def extract_version_from_text(text: str) -> Optional[str]:
+def extract_version_from_text(text: str) -> str | None:
     if not text:
         return None
 
@@ -61,7 +61,7 @@ def extract_version_from_text(text: str) -> Optional[str]:
     return None
 
 
-def extract_version_from_nfo(nfo_path: str) -> Optional[str]:
+def extract_version_from_nfo(nfo_path: str) -> str | None:
     try:
         content = ""
         try:
@@ -162,7 +162,7 @@ async def gather_game_prep(
     meta: Meta,
     videopath: str,
     base_dir: str,
-    config: Optional[dict[str, Any]] = None,
+    config: dict[str, Any] | None = None,
 ) -> None:
     """Query IGDB API for game metadata and populate meta in-place."""
     meta.category = "GAME"

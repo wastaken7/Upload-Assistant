@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import os
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 
@@ -190,7 +190,7 @@ class OE(UNIT3D):
     async def get_type_id(
         self,
         meta: Meta,
-        type: Optional[str] = None,
+        type: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False
     ) -> dict[str, str]:

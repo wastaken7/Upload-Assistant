@@ -8,7 +8,7 @@ import secrets
 import sys
 import unicodedata
 from collections.abc import Callable
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import bencodepy
@@ -217,12 +217,12 @@ class COMMON:
         self,
         meta: Meta,
         tracker: str,
-        headers: Optional[dict[str, str]] = None,
-        params: Optional[dict[str, str]] = None,
+        headers: dict[str, str] | None = None,
+        params: dict[str, str] | None = None,
         downurl: str = "",
         hash_is_id: bool = False,
         cross: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         path = f"{meta.base_dir}/tmp/{meta.uuid}/[{tracker}_cross].torrent" if cross else f"{meta.base_dir}/tmp/{meta.uuid}/[{tracker}].torrent"
         if downurl:
             try:
@@ -270,7 +270,7 @@ class COMMON:
         new_tracker: str | list[str],
         comment: str = "",
         hash_is_id: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Modifies the torrent file to include the tracker's announce URL, a comment, and a source flag.
         """
@@ -289,7 +289,7 @@ class COMMON:
             new_torrent.metainfo["info"]["source"] = source_flag
 
             # Calculate hash only when hash_is_id is True
-            torrent_hash: Optional[str] = None
+            torrent_hash: str | None = None
             if hash_is_id:
                 info_data = new_torrent.metainfo.get("info", {})
                 bencode_module = cast(Any, bencodepy)
@@ -327,7 +327,7 @@ class COMMON:
             info_hash = hashlib.sha1(info, usedforsecurity=False).hexdigest()  # SHA1 required for torrent info hash
         return info_hash
 
-    async def save_image_links(self, meta: Meta, image_key: str, image_list: Optional[list[dict[str, str]]]) -> Optional[str]:
+    async def save_image_links(self, meta: Meta, image_key: str, image_list: list[dict[str, str]] | None) -> str | None:
         if image_list is None:
             console.print("[yellow]No image links to save.[/yellow]")
             return None
@@ -511,12 +511,12 @@ class COMMON:
     async def prompt_user_for_id_selection(
         self,
         meta: Meta,
-        tmdb: Optional[str | int] = None,
-        imdb: Optional[str | int] = None,
-        tvdb: Optional[str | int] = None,
-        mal: Optional[str | int] = None,
-        filename: Optional[str | list[str]] = None,
-        tracker_name: Optional[str] = None,
+        tmdb: str | int | None = None,
+        imdb: str | int | None = None,
+        tvdb: str | int | None = None,
+        mal: str | int | None = None,
+        filename: str | list[str] | None = None,
+        tracker_name: str | None = None,
     ) -> bool:
         if not tracker_name:
             tracker_name = "Tracker"  # Fallback if tracker_name is not provided
@@ -634,19 +634,19 @@ class COMMON:
         torrent_url: str,
         search_url: str,
         meta: Meta,
-        id: Optional[str | int] = None,
-        file_name: Optional[str | list[str]] = None,
+        id: str | int | None = None,
+        file_name: str | list[str] | None = None,
         skip_tracker_descriptions: bool = False,
     ) -> tuple[
-        Optional[int],
-        Optional[int],
-        Optional[int],
-        Optional[int],
-        Optional[str],
-        Optional[str],
-        Optional[str],
+        int | None,
+        int | None,
+        int | None,
+        int | None,
+        str | None,
+        str | None,
+        str | None,
         list[dict[str, str]],
-        Optional[str | list[str]],
+        str | list[str] | None,
     ]:
         tmdb = imdb = tvdb = description = category = infohash = mal = files = None  # noqa F841
         imagelist: list[dict[str, str]] = []
@@ -820,7 +820,7 @@ class COMMON:
         params: dict[str, Any] = {}
         data: dict[str, Any] = {}
 
-        async def fetch_ptgen(client: httpx.AsyncClient, request_url: str, request_params: dict[str, Any]) -> Optional[dict[str, Any]]:
+        async def fetch_ptgen(client: httpx.AsyncClient, request_url: str, request_params: dict[str, Any]) -> dict[str, Any] | None:
             """Helper to fetch and parse ptgen response with error handling."""
             try:
                 response = await client.get(request_url, params=request_params, timeout=30.0)
@@ -984,7 +984,7 @@ class COMMON:
             # Patterns for matching sections and fields
             section_pattern = re.compile(r"^(General|Video|Audio|Text|Menu)(?:\s#\d+)?", re.IGNORECASE)
             parsed_data: dict[str, Any] = {"general": {}, "video": [], "audio": [], "text": []}
-            current_section: Optional[str] = None
+            current_section: str | None = None
             current_track: dict[str, str] = {}
 
             # Field lists based on PHP definitions
@@ -1129,7 +1129,7 @@ class COMMON:
             bbcode_output += "\n"
             return bbcode_output
 
-    async def get_bdmv_mediainfo(self, meta: Meta, remove: Optional[list[str]] = None, char_limit: int = 0) -> str:
+    async def get_bdmv_mediainfo(self, meta: Meta, remove: list[str] | None = None, char_limit: int = 0) -> str:
         """
         Generate and sanitize MediaInfo for BDMV discs.
 

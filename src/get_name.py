@@ -3,7 +3,7 @@ import os
 import re
 import sys
 from collections.abc import Callable, Sequence
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import anitopy
 import cli_ui
@@ -15,10 +15,10 @@ from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
 guessit_module: Any = cast(Any, guessit)
-GuessitFn = Callable[[str, Optional[dict[str, Any]]], dict[str, Any]]
+GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 
 
-def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
     return cast(dict[str, Any], guessit_module.guessit(value, options))
 
 TRACKER_DISC_REQUIREMENTS = {
@@ -358,12 +358,12 @@ class NameManager:
             name = name.replace(char, '-')
         return name
 
-    async def extract_title_and_year(self, meta: Meta, filename: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    async def extract_title_and_year(self, meta: Meta, filename: str) -> tuple[str | None, str | None, str | None]:
         basename = os.path.basename(filename)
         basename = os.path.splitext(basename)[0]
 
-        secondary_title: Optional[str] = None
-        year: Optional[str] = None
+        secondary_title: str | None = None
+        year: str | None = None
 
         # Check for AKA patterns first
         aka_patterns = [' AKA ', '.aka.', ' aka ', '.AKA.']
@@ -416,7 +416,7 @@ class NameManager:
         # lets do some subsplease handling
         if 'subsplease' in folder_name.lower():
             guess_data = guessit_fn(folder_name, {"excludes": ["country", "language"]})
-            parsed = cast(Optional[dict[str, Any]], cast(Any, anitopy).parse(cast(str, guess_data.get('title', ''))))
+            parsed = cast(dict[str, Any] | None, cast(Any, anitopy).parse(cast(str, guess_data.get('title', ''))))
             parsed_title = parsed.get('anime_title') if parsed else None
             if parsed_title:
                 return str(parsed_title), None, None
@@ -432,7 +432,7 @@ class NameManager:
         # Check for the specific pattern: year.year (e.g., "1970.2014")
         double_year_pattern = r'\b(18|19|20)\d{2}\.(18|19|20)\d{2}\b'
         double_year_match = re.search(double_year_pattern, folder_name)
-        actual_year: Optional[str] = None
+        actual_year: str | None = None
 
         if double_year_match:
             full_match = double_year_match.group(0)

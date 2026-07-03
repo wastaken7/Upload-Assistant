@@ -9,7 +9,7 @@ import os
 import re
 import time
 from collections.abc import Sequence
-from typing import Any, Optional, TypeAlias, cast
+from typing import Any, TypeAlias, cast
 
 import aiofiles
 import httpx
@@ -690,7 +690,7 @@ async def _upload_screens(
     default_config = config.get('DEFAULT', {})
     if 'image_list' not in meta:
         meta.image_list = []
-    upload_start_time: Optional[float] = None
+    upload_start_time: float | None = None
     if meta.debug:
         upload_start_time = time.time()
 
@@ -804,7 +804,7 @@ async def _upload_screens(
 
         async with semaphore:
             while retry_count <= max_retries:
-                future: Optional[asyncio.Task[dict[str, Any]]] = None
+                future: asyncio.Task[dict[str, Any]] | None = None
                 try:
                     future = asyncio.create_task(upload_image_task(task_args))
                     running_tasks.add(future)
@@ -960,9 +960,9 @@ async def imgbox_upload(
                         if not submission_data.get('success'):
                             console.print(f"[red]Error uploading to imgbox: [yellow]{submission_data.get('error')}[/yellow][/red]")
                         else:
-                            web_url = cast(Optional[str], submission_data.get('web_url'))
-                            img_url = cast(Optional[str], submission_data.get('thumbnail_url'))
-                            raw_url = cast(Optional[str], submission_data.get('image_url'))
+                            web_url = cast(str | None, submission_data.get('web_url'))
+                            img_url = cast(str | None, submission_data.get('thumbnail_url'))
+                            raw_url = cast(str | None, submission_data.get('image_url'))
                             if web_url and img_url and raw_url:
                                 image_dict: dict[str, str] = {
                                     'web_url': web_url,

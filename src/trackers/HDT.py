@@ -3,7 +3,7 @@ import glob
 import os
 import platform
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -29,7 +29,7 @@ class HDT:
         self.cookie_auth_uploader = CookieAuthUploader(config)
         self.tracker = 'HDT'
         self.source_flag = 'hd-torrents.org'
-        self.auth_token: Optional[str] = None
+        self.auth_token: str | None = None
 
         tracker_config = self.config.get('TRACKERS', {}).get(self.tracker, {})
         tracker_config_dict = cast(dict[str, Any], tracker_config) if isinstance(tracker_config, dict) else {}
@@ -162,7 +162,7 @@ class HDT:
             return False
         return True
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, Optional[str]]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, str | None]]:
         # Ensure we have valid credentials and auth_token before searching
         if not hasattr(self, 'auth_token') or not self.auth_token:
             credentials_valid = await self.validate_credentials(meta)
@@ -183,7 +183,7 @@ class HDT:
         else:
             params = {"csrfToken": self.secret_token, "search": meta.title, "category[]": await self.get_category_id(meta), "options": "3"}
 
-        results: list[dict[str, Optional[str]]] = []
+        results: list[dict[str, str | None]] = []
 
         response = await self.session.get(search_url, params=params)
         soup = BeautifulSoup(response.text, 'html.parser')

@@ -456,7 +456,7 @@ class AZTrackerBase:
             'languages[]': final_audio_ids
         }
 
-    async def img_host(self, _meta: Meta, referer: str, image_bytes: bytes, filename: str) -> Optional[str]:
+    async def img_host(self, _meta: Meta, referer: str, image_bytes: bytes, filename: str) -> str | None:
         upload_url = f'{self.base_url}/ajax/image/upload'
 
         headers = {
@@ -495,7 +495,7 @@ class AZTrackerBase:
             console.print(f'{self.tracker}: Exception when uploading {filename}: {e}', markup=False)
             return None
 
-    async def get_screenshots(self, meta: Meta) -> Optional[list[str]]:
+    async def get_screenshots(self, meta: Meta) -> list[str] | None:
         screenshot_dir = Path(meta.base_dir) / "tmp" / meta.uuid
         local_files = sorted(screenshot_dir.glob('*.png'))
         results: list[str] = []
@@ -568,7 +568,7 @@ class AZTrackerBase:
 
         return results
 
-    async def get_requests(self, meta: Meta) -> Optional[list[dict[str, Any]]]:
+    async def get_requests(self, meta: Meta) -> list[dict[str, Any]] | None:
         results: list[dict[str, Any]] = []
         if not self.config["DEFAULT"].get("search_requests", False) and not meta.search_requests:
             return results

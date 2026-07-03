@@ -8,7 +8,7 @@ import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
-from typing import Any, Optional
+from typing import Any
 from typing import cast as typing_cast
 
 import aiofiles
@@ -24,9 +24,9 @@ from src.imdb import imdb_manager
 from src.meta import Meta
 
 default_config: dict[str, Any] = {}
-tmdb_api_key: Optional[str] = None
+tmdb_api_key: str | None = None
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
-parser: Optional[Args] = None
+parser: Args | None = None
 
 
 def _apply_config(config: dict[str, Any]) -> None:
@@ -47,10 +47,10 @@ def _get_parser() -> Args:
 
 anitopy_parse_fn: Any = typing_cast(Any, anitopy).parse
 guessit_module: Any = typing_cast(Any, guessit)
-GuessitFn = Callable[[str, Optional[dict[str, Any]]], dict[str, Any]]
+GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 
 
-def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
     return typing_cast(dict[str, Any], guessit_module.guessit(value, options))
 
 # Module-level dict to store async locks for cache keys to prevent race conditions
@@ -67,14 +67,14 @@ class TmdbManager:
 
     async def get_tmdb_from_imdb(
         self,
-        imdb_id: Optional[str | int],
-        tvdb_id: Optional[int] = None,
-        search_year: Optional[str | int] = None,
-        filename: Optional[str] = None,
+        imdb_id: str | int | None,
+        tvdb_id: int | None = None,
+        search_year: str | int | None = None,
+        filename: str | None = None,
         debug: bool = False,
         mode: str = "discord",
-        category_preference: Optional[str] = None,
-        imdb_info: Optional[dict[str, Any]] = None,
+        category_preference: str | None = None,
+        imdb_info: dict[str, Any] | None = None,
     ) -> tuple[str, int | str, str, bool]:
         return await get_tmdb_from_imdb(
             imdb_id=imdb_id,
@@ -90,15 +90,15 @@ class TmdbManager:
     async def get_tmdb_id(
         self,
         filename: str,
-        search_year: Optional[str | int],
+        search_year: str | int | None,
         category: str | dict[str, Any],
-        untouched_filename: Optional[str] = "",
+        untouched_filename: str | None = "",
         attempted: int = 0,
         debug: bool = False,
-        secondary_title: Optional[str] = None,
-        path: Optional[str] = None,
-        final_attempt: Optional[bool] = None,
-        new_category: Optional[str] = None,
+        secondary_title: str | None = None,
+        path: str | None = None,
+        final_attempt: bool | None = None,
+        new_category: str | None = None,
         unattended: bool = False,
     ) -> tuple[int, str]:
         return await get_tmdb_id(
@@ -117,22 +117,22 @@ class TmdbManager:
 
     async def tmdb_other_meta(
         self,
-        tmdb_id: Optional[int],
-        path: Optional[str] = None,
-        search_year: Optional[str | int] = None,
-        category: Optional[str] = None,
-        imdb_id: Optional[int | str] = 0,
-        manual_language: Optional[str] = None,
+        tmdb_id: int | None,
+        path: str | None = None,
+        search_year: str | int | None = None,
+        category: str | None = None,
+        imdb_id: int | str | None = 0,
+        manual_language: str | None = None,
         anime: bool = False,
-        mal_manual: Optional[int] = None,
+        mal_manual: int | None = None,
         aka: str = '',
-        original_language: Optional[str] = None,
-        poster: Optional[str] = None,
+        original_language: str | None = None,
+        poster: str | None = None,
         debug: bool = False,
         mode: str = "discord",
-        tvdb_id: Optional[int] = 0,
+        tvdb_id: int | None = 0,
         quickie_search: bool = False,
-        filename: Optional[str] = None,
+        filename: str | None = None,
     ) -> dict[str, Any]:
         return await tmdb_other_meta(
             tmdb_id=tmdb_id,
@@ -156,7 +156,7 @@ class TmdbManager:
     async def get_keywords(self, tmdb_id: int, category: str) -> list[str]:
         return await get_keywords(tmdb_id=tmdb_id, category=category)
 
-    async def get_genres(self, response_data: Optional[dict[str, Any]]) -> dict[str, Any]:
+    async def get_genres(self, response_data: dict[str, Any] | None) -> dict[str, Any]:
         return await get_genres(response_data=response_data)
 
     async def get_directors(self, tmdb_id: int, category: str) -> list[str]:
@@ -172,7 +172,7 @@ class TmdbManager:
     async def get_romaji(
         self,
         tmdb_name: str,
-        mal: Optional[int],
+        mal: int | None,
         meta: Meta,
     ) -> tuple[str, int, str, str, int, str]:
         return await get_romaji(tmdb_name=tmdb_name, mal=mal, meta=meta)
@@ -181,7 +181,7 @@ class TmdbManager:
         self,
         mediainfo: dict[str, Any],
         meta: Meta,
-    ) -> tuple[str, int, Optional[int], Optional[int]]:
+    ) -> tuple[str, int, int | None, int | None]:
         category_value = str(meta.category or "MOVIE")
         is_disc = bool(meta.is_disc)
         tmdbid = meta.tmdb_id or 0
@@ -196,7 +196,7 @@ class TmdbManager:
             tvdbid=tvdbid,
         )
 
-    def extract_imdb_id(self, value: str) -> Optional[int]:
+    def extract_imdb_id(self, value: str) -> int | None:
         return extract_imdb_id(value=value)
 
     async def daily_to_tmdb_season_episode(
@@ -233,10 +233,10 @@ class TmdbManager:
         tmdb_id: int,
         category: str,
         debug: bool = False,
-        logo_languages: Optional[list[str] | str] = None,
-        TMDB_API_KEY: Optional[str] = None,
-        TMDB_BASE_URL: Optional[str] = None,
-        logo_json: Optional[dict[str, Any]] = None,
+        logo_languages: list[str] | str | None = None,
+        TMDB_API_KEY: str | None = None,
+        TMDB_BASE_URL: str | None = None,
+        logo_json: dict[str, Any] | None = None,
     ) -> str:
         _ = TMDB_API_KEY
         return await get_logo(
@@ -263,7 +263,7 @@ class TmdbManager:
             debug=debug,
         )
 
-    async def set_tmdb_metadata(self, meta: Meta, filename: Optional[str] = None) -> None:
+    async def set_tmdb_metadata(self, meta: Meta, filename: str | None = None) -> None:
         return await set_tmdb_metadata(meta=meta, filename=filename)
 
     async def get_tmdb_localized_data(
@@ -288,14 +288,14 @@ async def normalize_title(title: str) -> str:
 
 
 async def get_tmdb_from_imdb(
-    imdb_id: Optional[str | int],
-    tvdb_id: Optional[int] = None,
-    search_year: Optional[str | int] = None,
-    filename: Optional[str] = None,
+    imdb_id: str | int | None,
+    tvdb_id: int | None = None,
+    search_year: str | int | None = None,
+    filename: str | None = None,
     debug: bool = False,
     mode: str = "discord",
-    category_preference: Optional[str] = None,
-    imdb_info: Optional[dict[str, Any]] = None
+    category_preference: str | None = None,
+    imdb_info: dict[str, Any] | None = None
 ) -> tuple[str, int | str, str, bool]:
     """Fetches TMDb ID using IMDb or TVDb ID.
 
@@ -317,7 +317,7 @@ async def get_tmdb_from_imdb(
         params = {"api_key": tmdb_api_key, "external_source": source}
 
         async with httpx.AsyncClient() as client:
-            response: Optional[httpx.Response] = None
+            response: httpx.Response | None = None
             try:
                 response = await client.get(url, params=params, timeout=10)
                 response.raise_for_status()
@@ -415,15 +415,15 @@ async def get_tmdb_from_imdb(
 
 async def get_tmdb_id(
     filename: str,
-    search_year: Optional[str | int],
+    search_year: str | int | None,
     category: str | dict[str, Any],
-    untouched_filename: Optional[str] = "",
+    untouched_filename: str | None = "",
     attempted: int = 0,
     debug: bool = False,
-    secondary_title: Optional[str] = None,
-    path: Optional[str] = None,
-    final_attempt: Optional[bool] = None,
-    new_category: Optional[str] = None,
+    secondary_title: str | None = None,
+    path: str | None = None,
+    final_attempt: bool | None = None,
+    new_category: str | None = None,
     unattended: bool = False,
 ) -> tuple[int, str]:
     search_results: dict[str, Any] = {"results": []}
@@ -438,15 +438,15 @@ async def get_tmdb_id(
 
     async def search_tmdb_id(
         filename: str,
-        search_year: Optional[str | int],
+        search_year: str | int | None,
         category: str,
-        untouched_filename: Optional[str] = "",
+        untouched_filename: str | None = "",
         attempted: int = 0,
         debug: bool = False,
-        secondary_title: Optional[str] = None,
-        path: Optional[str] = None,
-        final_attempt: Optional[bool] = None,
-        new_category: Optional[str] = None,
+        secondary_title: str | None = None,
+        path: str | None = None,
+        final_attempt: bool | None = None,
+        new_category: str | None = None,
         unattended: bool = False,
     ) -> tuple[int, str]:
         _ = untouched_filename
@@ -976,22 +976,22 @@ async def get_tmdb_id(
 
 
 async def tmdb_other_meta(
-    tmdb_id: Optional[int],
-    path: Optional[str] = None,
-    search_year: Optional[str | int] = None,
-    category: Optional[str] = None,
-    imdb_id: Optional[int | str] = 0,
-    manual_language: Optional[str] = None,
+    tmdb_id: int | None,
+    path: str | None = None,
+    search_year: str | int | None = None,
+    category: str | None = None,
+    imdb_id: int | str | None = 0,
+    manual_language: str | None = None,
     anime: bool = False,
-    mal_manual: Optional[int] = None,
+    mal_manual: int | None = None,
     aka: str = '',
-    original_language: Optional[str] = None,
-    poster: Optional[str] = None,
+    original_language: str | None = None,
+    poster: str | None = None,
     debug: bool = False,
     mode: str = "discord",
-    tvdb_id: Optional[int] = 0,
+    tvdb_id: int | None = 0,
     quickie_search: bool = False,
-    filename: Optional[str] = None
+    filename: str | None = None
 ) -> dict[str, Any]:
     """
     Fetch metadata from TMDB for a movie or TV show.
@@ -1394,7 +1394,7 @@ async def get_keywords(tmdb_id: int, category: str) -> list[str]:
             return []
 
 
-async def get_genres(response_data: Optional[dict[str, Any]]) -> dict[str, Any]:
+async def get_genres(response_data: dict[str, Any] | None) -> dict[str, Any]:
     """Extract genres from TMDB response data"""
     if response_data is not None:
         tmdb_genres = response_data.get('genres', [])
@@ -1469,7 +1469,7 @@ async def get_anime(response: dict[str, Any], meta: Meta) -> tuple[int, str, boo
     return mal_id, alt_name, anime, demographic
 
 
-async def get_romaji(tmdb_name: str, mal: Optional[int], meta: Meta) -> tuple[str, int, str, str, int, str]:
+async def get_romaji(tmdb_name: str, mal: int | None, meta: Meta) -> tuple[str, int, str, str, int, str]:
     media: list[dict[str, Any]] = []
     demographic = 'Mina'  # Default to Mina if no tags are found
 
@@ -1593,7 +1593,7 @@ async def get_romaji(tmdb_name: str, mal: Optional[int], meta: Meta) -> tuple[st
     if media not in (None, []):
         result: dict[str, Any] = {'title': {}}
         difference: float = 0.0
-        best_match_with_season: Optional[dict[str, Any]] = None
+        best_match_with_season: dict[str, Any] | None = None
         best_season_diff = float('inf')
 
         for anime in media:
@@ -1662,9 +1662,9 @@ async def get_tmdb_imdb_from_mediainfo(
     category: str,
     is_disc: bool,
     tmdbid: int,
-    imdbid: Optional[int],
-    tvdbid: Optional[int],
-) -> tuple[str, int, Optional[int], Optional[int]]:
+    imdbid: int | None,
+    tvdbid: int | None,
+) -> tuple[str, int, int | None, int | None]:
     if not is_disc and mediainfo['media']['track'][0].get('extra'):
         extra = mediainfo['media']['track'][0]['extra']
         for each in extra:
@@ -1685,7 +1685,7 @@ async def get_tmdb_imdb_from_mediainfo(
     return category, tmdbid, imdbid, tvdbid
 
 
-def extract_imdb_id(value: str) -> Optional[int]:
+def extract_imdb_id(value: str) -> int | None:
     """Extract IMDb ID from various formats"""
     patterns = [
         r'/title/(tt\d+)',  # URL format
@@ -1917,10 +1917,10 @@ async def get_logo(
     tmdb_id: int,
     category: str,
     debug: bool = False,
-    logo_languages: Optional[list[str] | str] = None,
-    TMDB_API_KEY: Optional[str] = None,
-    TMDB_BASE_URL: Optional[str] = None,
-    logo_json: Optional[dict[str, Any]] = None,
+    logo_languages: list[str] | str | None = None,
+    TMDB_API_KEY: str | None = None,
+    TMDB_BASE_URL: str | None = None,
+    logo_json: dict[str, Any] | None = None,
 ) -> str:
     logo_path = ""
     if logo_languages and isinstance(logo_languages, str) and ',' in logo_languages:
@@ -2031,7 +2031,7 @@ async def get_tmdb_translations(
             return ""
 
 
-async def set_tmdb_metadata(meta: Meta, filename: Optional[str] = None) -> None:
+async def set_tmdb_metadata(meta: Meta, filename: str | None = None) -> None:
     if not meta.edit:
         # if we have these fields already, we probably got them from a multi id searching
         # and don't need to fetch them again

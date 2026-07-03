@@ -6,7 +6,7 @@ import os
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Optional, TypedDict, cast
+from typing import Any, TypedDict, cast
 
 from src.check_requirements import check_dependencies
 
@@ -25,7 +25,7 @@ ConfigComments = dict[str, list[str]]
 UnexpectedKey = tuple[str, ConfigDict, str]
 
 
-def read_example_config() -> tuple[Optional[ConfigDict], ConfigComments]:
+def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
     """Read the example config file and return its structure and comments"""
     example_path = Path("data/example_config.py")
     comments: ConfigComments = {}
@@ -98,7 +98,7 @@ def read_example_config() -> tuple[Optional[ConfigDict], ConfigComments]:
         return None, comments
 
 
-def load_existing_config() -> tuple[Optional[ConfigDict], Optional[Path]]:
+def load_existing_config() -> tuple[ConfigDict | None, Path | None]:
     """Load an existing config file if available"""
     config_paths = [
         Path("data/config.py"),
@@ -283,7 +283,7 @@ def get_user_input(
     default: str = "",
     is_password: bool = False,
     is_announce_url: bool = False,
-    existing_value: Optional[Any] = None,
+    existing_value: Any | None = None,
 ) -> str:
     """Get input from user with default value and optional existing value"""
     display = prompt
@@ -695,11 +695,11 @@ def configure_trackers(
 
 
 def configure_torrent_clients(
-    existing_clients: Optional[ConfigDict] = None,
-    example_clients: Optional[ConfigDict] = None,
-    default_client_name: Optional[str] = None,
-    config_comments: Optional[ConfigComments] = None,
-) -> tuple[ConfigDict, Optional[str]]:
+    existing_clients: ConfigDict | None = None,
+    example_clients: ConfigDict | None = None,
+    default_client_name: str | None = None,
+    config_comments: ConfigComments | None = None,
+) -> tuple[ConfigDict, str | None]:
     """
     Helper to configure the TORRENT_CLIENTS section.
     Returns a dict with the configured client(s) and the selected default client name.
@@ -884,7 +884,7 @@ def configure_discord(
     return discord_config
 
 
-def generate_config_file(config_data: ConfigDict, existing_path: Optional[Path] = None) -> bool:
+def generate_config_file(config_data: ConfigDict, existing_path: Path | None = None) -> bool:
     """Generate the config.py file from the config dictionary"""
     # Create output directory if it doesn't exist
     os.makedirs("data", exist_ok=True)

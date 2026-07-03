@@ -4,7 +4,7 @@ import copy
 import os
 import sys
 from collections.abc import Mapping
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import cli_ui
 from torf import Torrent
@@ -73,7 +73,7 @@ class TrackerStatusManager:
                     else:
                         cli_ui.error("Invalid IMDB ID format. Expected format: tt1234567")
 
-        async def process_single_tracker(tracker_name: str, shared_meta: Meta) -> tuple[str, dict[str, bool], Optional[str], Any]:
+        async def process_single_tracker(tracker_name: str, shared_meta: Meta) -> tuple[str, dict[str, bool], str | None, Any]:
             local_meta = copy.deepcopy(shared_meta)  # Ensure each task gets its own copy of meta
             local_tracker_status = {"banned": False, "skipped": False, "dupe": False, "upload": False, "other": False}
             display_name = None
@@ -313,7 +313,7 @@ class TrackerStatusManager:
         results = await asyncio.gather(*tasks)
 
         # Collect passed trackers and skip reasons
-        passed_trackers: list[tuple[str, Optional[str], Any]] = []
+        passed_trackers: list[tuple[str, str | None, Any]] = []
         dupe_trackers: list[str] = []
         skipped_trackers: list[str] = []
 

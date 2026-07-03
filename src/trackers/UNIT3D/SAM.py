@@ -1,5 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from typing import Any, Optional
+from typing import Any
 
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -51,7 +51,7 @@ class SAM(UNIT3D):
         cbr.tracker = self.tracker
         return await cbr.get_name(meta)
 
-    async def get_category_id(self, meta: Meta, category: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         cat_map = {
             "MOVIE": "1",
             "TV": "2",
@@ -83,7 +83,7 @@ class SAM(UNIT3D):
         category_id = cat_map.get(resolved_category, "0")
         return {"category_id": category_id}
 
-    async def get_type_id(self, meta: Meta, type: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
             "DISC": "1",
             "REMUX": "2",

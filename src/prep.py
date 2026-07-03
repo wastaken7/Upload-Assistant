@@ -1,5 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 from src.meta import Meta
 
@@ -147,7 +147,7 @@ class Prep:
         searchable = ", ".join(part for part in (keywords_str, combined_genres_str) if part)
         return any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", searchable, re.IGNORECASE) for keyword in adult_keywords)
 
-    async def get_cat(self, _video: str, meta: Meta) -> Optional[str]:
+    async def get_cat(self, _video: str, meta: Meta) -> str | None:
         if meta.manual_category:
             manual_category = meta.manual_category
             return manual_category.upper() if isinstance(manual_category, str) else None

@@ -7,7 +7,7 @@ import time
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import cli_ui
@@ -38,7 +38,7 @@ class TrackerDataManager:
     def get_tracker_config(self, tracker_name: str) -> Mapping[str, Any]:
         return self.trackers_config.get(tracker_name, MappingProxyType({}))
 
-    async def get_tracker_timestamps(self, base_dir: Optional[str] = None) -> dict[str, float]:
+    async def get_tracker_timestamps(self, base_dir: str | None = None) -> dict[str, float]:
         """Get tracker timestamps from the log file"""
         timestamp_file = os.path.join(f"{base_dir}", "data", "banned", "tracker_timestamps.json")
         try:
@@ -50,7 +50,7 @@ class TrackerDataManager:
             console.print(f"[yellow]Warning: Could not load tracker timestamps: {e}[/yellow]")
             return {}
 
-    async def save_tracker_timestamp(self, tracker_name: str, base_dir: Optional[str] = None, debug: bool = False) -> None:
+    async def save_tracker_timestamp(self, tracker_name: str, base_dir: str | None = None, debug: bool = False) -> None:
         """Save timestamp for when tracker was processed"""
         timestamp_file = os.path.join(f"{base_dir}", "data", "banned", "tracker_timestamps.json")
         try:
@@ -71,7 +71,7 @@ class TrackerDataManager:
     async def get_available_trackers(
         self,
         specific_trackers: list[str],
-        base_dir: Optional[str] = None,
+        base_dir: str | None = None,
         debug: bool = False,
     ) -> tuple[list[str], list[tuple[str, float]]]:
         """Get trackers that are available (60+ seconds since last processed)"""
@@ -98,9 +98,9 @@ class TrackerDataManager:
         self,
         _video: Any,
         meta: Meta,
-        search_term: Optional[str] = None,
-        search_file_folder: Optional[str] = None,
-        cat: Optional[str] = None,
+        search_term: str | None = None,
+        search_file_folder: str | None = None,
+        cat: str | None = None,
         skip_tracker_descriptions: bool = False,
     ) -> Meta:
         found_match = False

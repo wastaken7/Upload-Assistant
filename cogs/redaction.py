@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
 import re
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import aiofiles
 
@@ -31,9 +31,9 @@ class Redaction:
         """
         blocks: list[tuple[int, int]] = []
         stack: list[str] = []
-        start: Optional[int] = None
+        start: int | None = None
         in_string = False
-        string_char: Optional[str] = None
+        string_char: str | None = None
         escape = False
 
         for i, ch in enumerate(text):
@@ -71,7 +71,7 @@ class Redaction:
         return blocks
 
     @staticmethod
-    def redact_value(val: Any, sensitive_keys: Optional[set[str]] = None) -> Any:
+    def redact_value(val: Any, sensitive_keys: set[str] | None = None) -> Any:
         """Redact sensitive values, including passkeys in URLs and JSON substrings."""
         keys = sensitive_keys or SENSITIVE_KEYS
         if isinstance(val, str):
@@ -104,7 +104,7 @@ class Redaction:
         return val
 
     @staticmethod
-    def redact_private_info(data: Any, sensitive_keys: Optional[set[str]] = None) -> Any:
+    def redact_private_info(data: Any, sensitive_keys: set[str] | None = None) -> Any:
         """Recursively redact sensitive info in dicts/lists/strings containing JSON."""
         keys = sensitive_keys or SENSITIVE_KEYS
         if isinstance(data, dict):
@@ -166,7 +166,7 @@ def redact_value(val: Any) -> Any:
     return Redaction.redact_value(val)
 
 
-def redact_private_info(data: Any, sensitive_keys: Optional[set[str]] = None) -> Any:
+def redact_private_info(data: Any, sensitive_keys: set[str] | None = None) -> Any:
     return Redaction.redact_private_info(data, sensitive_keys)
 
 

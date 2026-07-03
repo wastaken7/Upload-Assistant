@@ -51,7 +51,7 @@ class UNIT3D:
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
-        params_list: Optional[ParamsList] = None
+        params_list: ParamsList | None = None
         category = meta.category
 
         # Ensure tracker_status keys exist before any potential writes
@@ -589,7 +589,7 @@ class UNIT3D:
             return f"API response: {error_msg}"
         return f"API response: {response_data}"
 
-    async def process_image_for_api(self, img_path: str, target_width: int, target_height: int) -> Optional[bytes]:
+    async def process_image_for_api(self, img_path: str, target_width: int, target_height: int) -> bytes | None:
         def _process():
             img_original = Image.open(img_path)
             width_orig, height_orig = img_original.size

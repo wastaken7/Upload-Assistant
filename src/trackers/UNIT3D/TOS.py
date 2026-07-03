@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-from typing import Any, Optional
+from typing import Any
 
 from src.console import console
 from src.meta import Meta
@@ -36,7 +36,7 @@ class TOS(UNIT3D):
     async def get_category_id(
         self,
         meta: Meta,
-        category: Optional[str] = None,
+        category: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
@@ -51,7 +51,7 @@ class TOS(UNIT3D):
     async def get_type_id(
         self,
         meta: Meta,
-        type: Optional[str] = None,
+        type: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:

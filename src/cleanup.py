@@ -9,7 +9,7 @@ import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Optional
+from typing import Any
 
 import psutil
 
@@ -24,9 +24,9 @@ IS_ANDROID = ('android' in platform.platform().lower() or
               'ANDROID_ROOT' in os.environ)
 
 running_subprocesses: set[subprocess.Popen[Any]] = set()
-thread_executor: Optional[ThreadPoolExecutor] = None
+thread_executor: ThreadPoolExecutor | None = None
 IS_MACOS = sys.platform == 'darwin'
-erase_key: Optional[str] = None
+erase_key: str | None = None
 
 
 class CleanupManager:

@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import os
 import traceback
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import httpx
@@ -106,8 +106,8 @@ class BHDTV:
                     console.print(Redaction.redact_private_info(data))
                     traceback.print_exc()
 
-            parsed_data: Optional[dict[str, Any]] = cast(Optional[dict[str, Any]], parsed) if isinstance(parsed, dict) else None
-            data_block: Optional[dict[str, Any]] = parsed_data.get('data') if parsed_data else None
+            parsed_data: dict[str, Any] | None = cast(dict[str, Any] | None, parsed) if isinstance(parsed, dict) else None
+            data_block: dict[str, Any] | None = parsed_data.get('data') if parsed_data else None
             if isinstance(data_block, dict) and 'view' in data_block:
                 my_announce_url = self.config['TRACKERS']['BHDTV'].get('my_announce_url')
                 if my_announce_url:

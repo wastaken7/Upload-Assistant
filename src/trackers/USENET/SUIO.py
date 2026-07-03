@@ -5,7 +5,7 @@ import hashlib
 import io
 import os
 import re
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import aiofiles
@@ -26,8 +26,8 @@ class SUIO:
         self.common = COMMON(config)
         self.tracker = "SUIO"
         self.is_usenet = True
-        self.upload_url: Optional[str] = None
-        self.torrent_url: Optional[str] = None
+        self.upload_url: str | None = None
+        self.torrent_url: str | None = None
         tracker_cfg = config.get("TRACKERS", {}).get(self.tracker, {})
         base_url = tracker_cfg.get("base_url", "").strip().rstrip("/")
         if base_url:
@@ -156,7 +156,7 @@ class SUIO:
         console.print(f"{self.tracker}: No audio languages found, setting to Auto ([red]0[/red])")
         return "0"
 
-    def _is_same_language(self, lang_str: str, orig_code: Optional[str]) -> bool:
+    def _is_same_language(self, lang_str: str, orig_code: str | None) -> bool:
         if not orig_code:
             return False
         lang_str = lang_str.lower().strip()
@@ -214,7 +214,7 @@ class SUIO:
         console.print(f"{self.tracker}: No audio languages found, setting to Auto ([red]0[/red])")
         return "0"  # Auto
 
-    async def _prepare_files(self, meta: Meta) -> Optional[dict[str, Any]]:
+    async def _prepare_files(self, meta: Meta) -> dict[str, Any] | None:
         nzb_path = meta.nzb_path
         if not nzb_path or not await self.common.check_nzb_file(self.tracker, meta):
             return None
@@ -303,7 +303,7 @@ class SUIO:
         }
         return data
 
-    async def upload(self, meta: Meta) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> bool | None:
         status_map = meta.tracker_status
         if self.tracker not in status_map:
             status_map[self.tracker] = {}

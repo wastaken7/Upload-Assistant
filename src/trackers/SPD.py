@@ -4,7 +4,7 @@ import glob
 import os
 import re
 import unicodedata
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import httpx
@@ -43,7 +43,7 @@ class SPD:
             timeout=30.0,
         )
 
-    async def get_cat_id(self, meta: Meta) -> Optional[str]:
+    async def get_cat_id(self, meta: Meta) -> str | None:
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
@@ -103,7 +103,7 @@ class SPD:
 
         return None
 
-    async def get_file_info(self, meta: Meta) -> tuple[Optional[str], Optional[str]]:
+    async def get_file_info(self, meta: Meta) -> tuple[str | None, str | None]:
         base_path = f"{meta.base_dir}/tmp/{meta.uuid}"
         if meta.bdinfo:
             async with aiofiles.open(
@@ -158,7 +158,7 @@ class SPD:
 
         return results
 
-    async def search_channel(self, meta: Meta) -> Optional[int]:
+    async def search_channel(self, meta: Meta) -> int | None:
         spd_channel = meta.spd_channel or self.config["TRACKERS"][self.tracker].get("channel", "")
 
         # if no channel is specified, use the default
@@ -257,7 +257,7 @@ class SPD:
             base64_encoded_data = base64.b64encode(binary_file_data)
             return base64_encoded_data.decode('utf-8')
 
-    async def get_nfo(self, meta: Meta) -> Optional[str]:
+    async def get_nfo(self, meta: Meta) -> str | None:
         nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
         nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
 
@@ -314,7 +314,7 @@ class SPD:
 
         return data
 
-    async def upload(self, meta: Meta) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> bool | None:
         data = await self.fetch_data(meta)
         tracker_status = meta.tracker_status
         tracker_status.setdefault(self.tracker, {})

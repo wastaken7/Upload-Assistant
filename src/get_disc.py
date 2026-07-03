@@ -2,7 +2,7 @@
 import itertools
 import os
 from collections.abc import Iterable
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 
@@ -69,7 +69,7 @@ class DiscInfoManager:
         discs = sorted(discs, key=lambda d: d["name"])
         return is_disc, videoloc, bdinfo, discs
 
-    async def get_dvd_size(self, discs: Iterable[Disc], manual_dvds: Optional[str]) -> str:
+    async def get_dvd_size(self, discs: Iterable[Disc], manual_dvds: str | None) -> str:
         sizes = [str(each["size"]) for each in discs]
         dvd_sizes: list[str] = []
 

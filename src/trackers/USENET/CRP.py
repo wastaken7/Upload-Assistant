@@ -2,7 +2,7 @@
 import glob
 import json
 import os
-from typing import Any, Optional
+from typing import Any
 
 import aiofiles
 import httpx
@@ -83,7 +83,7 @@ class CRP:
     async def get_name(self, meta: Meta) -> str:
         return meta.scene_name or meta.basename_no_ext
 
-    def get_iso_639_1(self, lang_name: str) -> Optional[str]:
+    def get_iso_639_1(self, lang_name: str) -> str | None:
         try:
             lang = langcodes.find(lang_name)
             if lang and lang.is_valid():
@@ -92,7 +92,7 @@ class CRP:
             pass
         return None
 
-    def get_source(self, meta: Meta) -> Optional[str]:
+    def get_source(self, meta: Meta) -> str | None:
         source = meta.source
         if not source:
             return None
@@ -109,7 +109,7 @@ class CRP:
             return "DVD"
         return source
 
-    async def _prepare_files(self, meta: Meta) -> Optional[dict[str, Any]]:
+    async def _prepare_files(self, meta: Meta) -> dict[str, Any] | None:
         nzb_path = meta.nzb_path
 
         if not nzb_path or not await self.common.check_nzb_file(self.tracker, meta):
@@ -250,7 +250,7 @@ class CRP:
 
         return data
 
-    async def upload(self, meta: Meta) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> bool | None:
         status_map = meta.tracker_status
         if self.tracker not in status_map:
             status_map[self.tracker] = {}

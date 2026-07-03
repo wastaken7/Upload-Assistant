@@ -3,7 +3,7 @@ import asyncio
 import os
 import random
 import re
-from typing import Any, Literal, Optional, cast
+from typing import Any, Literal, cast
 
 import aiofiles
 import certifi
@@ -262,7 +262,7 @@ class SHRI(UNIT3D):
     async def get_type_id(
         self,
         meta: Meta,
-        type: Optional[str] = None,
+        type: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
@@ -551,10 +551,10 @@ class SHRI(UNIT3D):
         detected_type = self._detect_type_from_technical_analysis(meta)
         return detected_type
 
-    def _get_italian_title(self, imdb_info: dict[str, Any]) -> Optional[str]:
+    def _get_italian_title(self, imdb_info: dict[str, Any]) -> str | None:
         """Extract Italian title from IMDb AKAs with priority"""
-        country_match: Optional[str] = None
-        language_match: Optional[str] = None
+        country_match: str | None = None
+        language_match: str | None = None
 
         akas_value = imdb_info.get("akas", [])
         akas = cast(list[dict[str, Any]], akas_value) if isinstance(akas_value, list) else []
@@ -838,7 +838,7 @@ class SHRI(UNIT3D):
         row3 = " ".join(screens[4:6]) + " \n" if len(screens) > 4 else ""
         return f"[center]{row1}{row2}{row3}[/center]"
 
-    async def _get_synthetic_mediainfo(self, meta: Meta) -> Optional[dict[str, Any]]:
+    async def _get_synthetic_mediainfo(self, meta: Meta) -> dict[str, Any] | None:
         """Extract formatted mediainfo from meta.json structure"""
 
         def safe_int(val: Any, default: int = 0) -> int:
@@ -1025,7 +1025,7 @@ class SHRI(UNIT3D):
         logo_url: str,
         summary: str,
         screens: str,
-        synthetic_mi: Optional[dict[str, Any]],
+        synthetic_mi: dict[str, Any] | None,
         category: str,
         meta: Meta,
     ) -> str:

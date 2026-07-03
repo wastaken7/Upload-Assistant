@@ -5,7 +5,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -15,7 +15,7 @@ openlibrary_color_str = "[#e1d8c1]OpenLibrary[/#e1d8c1]"
 
 
 class OpenLibraryManager:
-    async def get_author_name(self, author_key: str, client: httpx.AsyncClient, cache_dir: Optional[str], debug: bool = False) -> str:
+    async def get_author_name(self, author_key: str, client: httpx.AsyncClient, cache_dir: str | None, debug: bool = False) -> str:
         """Fetch author name from key like /authors/OL26320A."""
         author_id = author_key.split("/")[-1]
         author_cache_file = None
@@ -46,7 +46,7 @@ class OpenLibraryManager:
                 console.print(f"[yellow]Warning: Error fetching author name for {author_id}: {e}[/yellow]")
         return ""
 
-    async def search_by_work_id(self, work_id: str, base_dir: str = "", debug: bool = False) -> Optional[dict[str, Any]]:
+    async def search_by_work_id(self, work_id: str, base_dir: str = "", debug: bool = False) -> dict[str, Any] | None:
         """Search OpenLibrary by Work ID (e.g. OL45883W)."""
         work_id = work_id.strip()
         if not work_id:
@@ -144,7 +144,7 @@ class OpenLibraryManager:
 
         return None
 
-    async def search_by_isbn(self, isbn: str, base_dir: str = "", debug: bool = False) -> Optional[dict[str, Any]]:
+    async def search_by_isbn(self, isbn: str, base_dir: str = "", debug: bool = False) -> dict[str, Any] | None:
         """Search OpenLibrary by ISBN."""
         clean_isbn = re.sub(r"[-\s]", "", isbn)
         if not clean_isbn:

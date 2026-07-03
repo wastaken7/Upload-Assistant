@@ -4,7 +4,7 @@ import glob
 import json
 import os
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import quote, urlparse
 
 import aiofiles
@@ -34,7 +34,7 @@ class HDB:
         self.username = str(tracker_config_dict.get('username', '')).strip()
         self.passkey = str(tracker_config_dict.get('passkey', '')).strip()
         self.rehost_images = bool(tracker_config_dict.get('img_rehost', True))
-        self.signature: Optional[str] = None
+        self.signature: str | None = None
         self.banned_groups: list[str] = [""]
 
     async def get_type_category_id(self, meta: Meta) -> int:
@@ -226,7 +226,7 @@ class HDB:
 
         return hdb_name
 
-    async def upload(self, meta: Meta) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> bool | None:
         common = COMMON(config=self.config)
         await self.edit_desc(meta)
         hdb_name = await self.edit_name(meta)
@@ -602,9 +602,9 @@ class HDB:
 
         return
 
-    async def hdbimg_upload(self, meta: Meta) -> Optional[str]:
+    async def hdbimg_upload(self, meta: Meta) -> str | None:
         bbcode = ""
-        response: Optional[httpx.Response] = None
+        response: httpx.Response | None = None
         uploadSuccess = False
         sorted_group_indices: list[str] = []
         if meta.comparison:
@@ -836,7 +836,7 @@ class HDB:
             console.print(f"[red]HTTP Request failed: {e}")
             return None
 
-    async def get_info_from_torrent_id(self, hdb_id: int) -> tuple[Optional[int], Optional[int], Optional[str], Optional[str], Optional[str]]:
+    async def get_info_from_torrent_id(self, hdb_id: int) -> tuple[int | None, int | None, str | None, str | None, str | None]:
         hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = hdb_description = None
         url = "https://hdbits.org/api/torrents"
         data = {

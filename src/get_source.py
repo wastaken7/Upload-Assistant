@@ -4,7 +4,7 @@ import json
 import traceback
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import guessit
 
@@ -13,10 +13,10 @@ from src.exceptions import WeirdSystem
 from src.meta import Meta
 
 guessit_module: Any = cast(Any, guessit)
-GuessitFn = Callable[[str, Optional[dict[str, Any]]], dict[str, Any]]
+GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 
 
-def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
     return cast(dict[str, Any], guessit_module.guessit(value, options))
 
 

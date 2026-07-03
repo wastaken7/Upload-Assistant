@@ -5,7 +5,7 @@ import json
 import os
 import re
 from collections.abc import Iterable, Mapping
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -57,7 +57,7 @@ class RehostImagesManager:
         tracker: str,
         url_host_mapping: dict[str, str],
         img_host_index: int = 1,
-        approved_image_hosts: Optional[list[str]] = None,
+        approved_image_hosts: list[str] | None = None,
     ) -> tuple[list[dict[str, str]], bool, bool]:
         return await _check_hosts(
             meta,
@@ -75,9 +75,9 @@ class RehostImagesManager:
         meta: Meta,
         tracker: str,
         url_host_mapping: dict[str, str],
-        approved_image_hosts: Optional[list[str]] = None,
+        approved_image_hosts: list[str] | None = None,
         img_host_index: int = 1,
-        file: Optional[str] = None,
+        file: str | None = None,
     ) -> tuple[list[dict[str, str]], bool, bool]:
         return await _handle_image_upload(
             meta,
@@ -97,10 +97,10 @@ async def _check_hosts(
     tracker: str,
     url_host_mapping: dict[str, str],
     img_host_index: int = 1,
-    approved_image_hosts: Optional[list[str]] = None,
-    default_config: Optional[Mapping[str, Any]] = None,
-    takescreens_manager: Optional[TakeScreensManager] = None,
-    uploadscreens_manager: Optional[UploadScreensManager] = None,
+    approved_image_hosts: list[str] | None = None,
+    default_config: Mapping[str, Any] | None = None,
+    takescreens_manager: TakeScreensManager | None = None,
+    uploadscreens_manager: UploadScreensManager | None = None,
 ) -> tuple[list[dict[str, str]], bool, bool]:
     if default_config is None:
         raise ValueError("default_config is required")
@@ -275,12 +275,12 @@ async def _handle_image_upload(
     meta: Meta,
     tracker: str,
     url_host_mapping: dict[str, str],
-    approved_image_hosts: Optional[list[str]] = None,
+    approved_image_hosts: list[str] | None = None,
     img_host_index: int = 1,
-    file: Optional[str] = None,
-    default_config: Optional[Mapping[str, Any]] = None,
-    takescreens_manager: Optional[TakeScreensManager] = None,
-    uploadscreens_manager: Optional[UploadScreensManager] = None,
+    file: str | None = None,
+    default_config: Mapping[str, Any] | None = None,
+    takescreens_manager: TakeScreensManager | None = None,
+    uploadscreens_manager: UploadScreensManager | None = None,
 ) -> tuple[list[dict[str, str]], bool, bool]:
     if default_config is None:
         raise ValueError("default_config is required")

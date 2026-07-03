@@ -1,5 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import cli_ui
 
@@ -44,7 +44,7 @@ class TTR(UNIT3D):
             console.print("3 = Castellano Latino")
             return str(cli_ui.ask_string("Enter choice (1-3): "))
 
-        def get_spanish_type(lang_code: str) -> Optional[str]:
+        def get_spanish_type(lang_code: str) -> str | None:
             if not lang_code:
                 return None
             lang_code = lang_code.lower()

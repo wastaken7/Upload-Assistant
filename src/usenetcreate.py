@@ -8,7 +8,7 @@ import random
 import re
 import secrets
 import shutil
-from typing import Any, Optional
+from typing import Any
 
 import aiofiles
 import aiofiles.os
@@ -69,7 +69,7 @@ def get_dynamic_volume_size(total_bytes: int) -> str:
         return "1g"
 
 
-async def check_binary(binary_name: str, config_path: Optional[str] = None, meta: Optional[Meta] = None, path_7z: Optional[str] = None) -> str:
+async def check_binary(binary_name: str, config_path: str | None = None, meta: Meta | None = None, path_7z: str | None = None) -> str:
     """Ensure binary exists, returning the resolved path or raising FileNotFoundError."""
     path = config_path or binary_name
     resolved = shutil.which(path)
@@ -159,7 +159,7 @@ def parse_volume_size(vol_size: str) -> int:
     return 0
 
 
-async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, volume_size: Optional[str], total_size: int, debug: bool = False) -> None:
+async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, volume_size: str | None, total_size: int, debug: bool = False) -> None:
     """Execute 7z archiving/splitting with real-time volume progress monitoring."""
     redacted_cmd = []
     skip_next = False
@@ -234,7 +234,7 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
-async def run_par2_with_progress(cmd: list[str], cwd: Optional[str] = None, debug: bool = False) -> None:
+async def run_par2_with_progress(cmd: list[str], cwd: str | None = None, debug: bool = False) -> None:
     """Execute par2 c with real-time percentage progress parsing."""
     redacted_cmd = []
     skip_next = False
@@ -301,7 +301,7 @@ async def run_par2_with_progress(cmd: list[str], cwd: Optional[str] = None, debu
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
-async def run_nyuu_with_progress(cmd: list[str], cwd: Optional[str] = None, debug: bool = False) -> None:
+async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None, debug: bool = False) -> None:
     """Execute nyuu upload with real-time speed, ETA, and percentage progress parsing."""
     redacted_cmd = []
     skip_next = False
@@ -369,7 +369,7 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: Optional[str] = None, debu
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
-async def run_pesto_with_progress(cmd: list[str], cwd: Optional[str] = None, debug: bool = False) -> None:
+async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, debug: bool = False) -> None:
     """Execute pesto upload consuming its JSON event stream for progress reporting."""
     redacted_cmd = []
     skip_next = False
@@ -594,7 +594,7 @@ async def verify_nzb_has_password(nzb_path: str) -> bool:
     return False
 
 
-async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optional[str]:
+async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str | None:
     """
     Prepare files (7z + PAR2) and upload them to Usenet via nyuu or pesto.
     Returns the absolute path to the generated NZB file if successful.
@@ -691,10 +691,10 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
     uploader = str(usenet_cfg.get("usenet_uploader", "nyuu")).lower()
     use_pesto = uploader == "pesto"
 
-    path_7z: Optional[str] = None
-    path_par2: Optional[str] = None
-    path_nyuu: Optional[str] = None
-    path_pesto: Optional[str] = None
+    path_7z: str | None = None
+    path_par2: str | None = None
+    path_nyuu: str | None = None
+    path_pesto: str | None = None
 
     # 1. Resolve Binaries
     try:

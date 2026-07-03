@@ -2,7 +2,7 @@
 import base64
 import datetime
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import httpx
@@ -330,7 +330,7 @@ class RTF:
 
         return dupes
 
-    async def api_test(self, meta: Meta) -> Optional[bool]:
+    async def api_test(self, meta: Meta) -> bool | None:
         """Test if the stored API key is valid.
 
         RetroFlix API keys expire weekly, so this method validates the current key
@@ -366,7 +366,7 @@ class RTF:
             await self.generate_new_api(meta)
             return None
 
-    async def generate_new_api(self, meta: Meta) -> Optional[bool]:
+    async def generate_new_api(self, meta: Meta) -> bool | None:
         """Generate a new API key for RetroFlix tracker.
 
         Authenticates using username/password and retrieves a new API token,

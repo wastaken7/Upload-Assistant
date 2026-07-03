@@ -2,7 +2,7 @@
 import os
 import platform
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import httpx
@@ -314,7 +314,7 @@ class TL:
 
         return results
 
-    async def upload(self, meta: Meta) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> bool | None:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         if self.api_upload:
@@ -414,7 +414,7 @@ class TL:
 
         return data
 
-    async def cookie_upload(self, meta: Meta) -> Optional[bool]:
+    async def cookie_upload(self, meta: Meta) -> bool | None:
         await self.generate_description(meta)
         async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
             description_content = await f.read()

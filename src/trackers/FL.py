@@ -4,7 +4,7 @@ import glob
 import os
 import pickle  # nosec B403 - legacy cookie migration
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import cli_ui
@@ -33,8 +33,8 @@ class FL:
         fltools_raw = tracker_cfg.get('fltools', {})
         self.fltools: dict[str, Any] = cast(dict[str, Any], fltools_raw) if isinstance(fltools_raw, dict) else {}
         uploader_name_raw = tracker_cfg.get('uploader_name')
-        self.uploader_name: Optional[str] = str(uploader_name_raw) if uploader_name_raw else None
-        self.signature: Optional[str] = None
+        self.uploader_name: str | None = str(uploader_name_raw) if uploader_name_raw else None
+        self.signature: str | None = None
         self.banned_groups = [""]
 
         self.cookie_validator = CookieValidator(config)

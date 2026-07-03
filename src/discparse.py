@@ -9,7 +9,7 @@ import traceback
 from collections import OrderedDict, defaultdict
 from glob import glob
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import cli_ui
 import defusedxml.ElementTree as ET
@@ -28,7 +28,7 @@ PlaylistInfo = dict[str, Any]
 class DiscParse:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.mediainfo_config: Optional[dict[str, Any]] = None
+        self.mediainfo_config: dict[str, Any] | None = None
 
     def _calculate_playlist_score(self, playlist: PlaylistInfo) -> float:
         """Calculate weighted score for playlist selection.
@@ -76,7 +76,7 @@ class DiscParse:
 
         return score
 
-    def setup_mediainfo_for_dvd(self, base_dir: Optional[str], debug: bool = False) -> Optional[str]:
+    def setup_mediainfo_for_dvd(self, base_dir: str | None, debug: bool = False) -> str | None:
         """Setup MediaInfo binary for DVD processing using the complete setup from exportmi"""
         if self.mediainfo_config is None:
             if base_dir is None:
@@ -546,7 +546,7 @@ class DiscParse:
     Parse VIDEO_TS and get mediainfos
     """
 
-    async def get_dvdinfo(self, discs: list[dict[str, Any]], base_dir: Optional[str] = None, debug: bool = False) -> list[dict[str, Any]]:
+    async def get_dvdinfo(self, discs: list[dict[str, Any]], base_dir: str | None = None, debug: bool = False) -> list[dict[str, Any]]:
         mediainfo_binary = self.setup_mediainfo_for_dvd(base_dir, debug=debug)
 
         for each in discs:

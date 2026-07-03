@@ -7,7 +7,7 @@ import time
 import urllib.parse
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import httpx
 from bs4 import BeautifulSoup
@@ -32,7 +32,7 @@ class SceneManager:
             return ""
         return str(value)
 
-    async def is_scene(self, video: str, meta: Meta, imdb: Optional[int] = None, lower: bool = False) -> tuple[str, bool, Optional[int]]:
+    async def is_scene(self, video: str, meta: Meta, imdb: int | None = None, lower: bool = False) -> tuple[str, bool, int | None]:
         scene_start_time = 0.0
         if meta.debug:
             scene_start_time = time.time()

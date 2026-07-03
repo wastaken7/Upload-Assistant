@@ -18,7 +18,7 @@ import traceback
 from contextlib import suppress
 from datetime import datetime, timedelta, UTC
 from pathlib import Path
-from typing import Any, Literal, Optional, TypedDict, cast
+from typing import Any, Literal, TypedDict, cast
 
 import pyotp
 from flask import Flask, Response, g, jsonify, redirect, render_template, request, session, url_for
@@ -61,7 +61,7 @@ def _cfg_file_path(name: str) -> Path:
     return cfg_dir / name
 
 
-def _cfg_read(name: str) -> Optional[str]:
+def _cfg_read(name: str) -> str | None:
     p = _cfg_file_path(name)
     with contextlib.suppress(Exception):
         if p.exists():
@@ -218,7 +218,7 @@ def _rate_limit_key_func():
 
 
 # Encrypted session helpers --------------------------------------------------
-def _derive_aes_key() -> Optional[bytes]:
+def _derive_aes_key() -> bytes | None:
     try:
         return auth_mod.derive_aes_key(session_secret)
     except Exception:
@@ -499,10 +499,10 @@ _BROWSE_SEARCH_SEP_RE = re.compile(r'[\s.\-_]+')
 inproc_lock = threading.Lock()
 
 # Runtime browse roots (set by upload.py when starting web UI)
-_runtime_browse_roots: Optional[str] = None
+_runtime_browse_roots: str | None = None
 
 # Runtime flags and stored totp
-saved_totp_secret: Optional[str] = None
+saved_totp_secret: str | None = None
 
 # CSRF helpers ---------------------------------------------------------------
 def _verify_csrf_header() -> bool:
@@ -587,7 +587,7 @@ except Exception:
     saved_totp_secret = None
 
 # Persistent cookie key helpers -------------------------------------------------
-def _get_persistent_cookie_key() -> Optional[bytes]:
+def _get_persistent_cookie_key() -> bytes | None:
     """Return a bytes key used to HMAC-sign remember-me cookies.
     Attempt to read from keyring; if missing and not in Docker, generate and store one.
     """
@@ -621,7 +621,7 @@ def _persist_token_store(store: dict[str, Any]) -> None:
         auth_mod.set_api_tokens(store)
 
 
-def _create_api_token(username: str, label: str = "", persist: bool = True, token_value: Optional[str] = None) -> str:
+def _create_api_token(username: str, label: str = "", persist: bool = True, token_value: str | None = None) -> str:
     """Create a new API token. If `persist` is False, do not write the token store to durable storage.
     Optionally accept `token_value` to use an externally-provided token string when persisting.
     """
@@ -654,7 +654,7 @@ def _persist_existing_api_token(token: str, username: str, label: str = "") -> b
     return True
 
 
-def _verify_api_token(token: str) -> Optional[str]:
+def _verify_api_token(token: str) -> str | None:
     if not token:
         return None
     store = _load_token_store()
@@ -667,7 +667,7 @@ def _verify_api_token(token: str) -> Optional[str]:
     return str(info.get("user"))
 
 
-def _get_token_info(token: str) -> Optional[dict[str, Any]]:
+def _get_token_info(token: str) -> dict[str, Any] | None:
     """Return stored token info dict or None."""
     if not token:
         return None
@@ -710,7 +710,7 @@ def _validate_upload_assistant_args(args: list[str]) -> list[str]:
     return safe_args
 
 
-def _get_bearer_from_header() -> Optional[str]:
+def _get_bearer_from_header() -> str | None:
     auth_header = (request.headers.get("Authorization") or "").strip()
     if auth_header.lower().startswith("bearer "):
         return auth_header.split(None, 1)[1].strip()
@@ -733,7 +733,7 @@ def _list_api_tokens() -> dict[str, Any]:
     return _load_token_store()
 
 
-def _create_remember_token(username: str, days: int = 30) -> Optional[str]:
+def _create_remember_token(username: str, days: int = 30) -> str | None:
     key = _get_persistent_cookie_key()
     if not key:
         return None
@@ -744,7 +744,7 @@ def _create_remember_token(username: str, days: int = 30) -> Optional[str]:
     return f"{b64}|{sig}"
 
 
-def _verify_remember_token(token: str) -> Optional[str]:
+def _verify_remember_token(token: str) -> str | None:
     key = _get_persistent_cookie_key()
     if not key or not token:
         return None
@@ -849,7 +849,7 @@ active_processes: dict[str, ProcessInfo] = {}
 _ua_console_store: dict[int, dict[str, Any]] = {}
 
 
-def _debug_process_snapshot(session_id: Optional[str] = None) -> dict[str, Any]:
+def _debug_process_snapshot(session_id: str | None = None) -> dict[str, Any]:
     try:
         snapshot: dict[str, Any] = {
             "active_sessions": list(active_processes.keys()),
@@ -1204,7 +1204,7 @@ def _redact_sensitive(value: Any) -> Any:
     return value
 
 
-def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: Any, success: bool, error: Optional[str] = None) -> None:
+def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: Any, success: bool, error: str | None = None) -> None:
     """Append an audit record to data/config_audit.log.
 
     Uses UTC ISO timestamps and attempts to record the acting user and remote
@@ -1365,7 +1365,7 @@ def _replace_config_value_in_source(source: str, key_path: list[str], new_value:
         raise ValueError("Config assignment not found")
 
     current_dict = config_assign.value
-    target_node: Optional[ast.AST] = None
+    target_node: ast.AST | None = None
 
     for i, key in enumerate(key_path):
         found = False
@@ -1407,8 +1407,8 @@ def _replace_config_value_in_source(source: str, key_path: list[str], new_value:
     if not hasattr(target_node, "lineno") or not hasattr(target_node, "end_lineno"):
         raise ValueError("Unable to locate config value position")
 
-    lineno = cast(Optional[int], getattr(target_node, "lineno", None))
-    end_lineno = cast(Optional[int], getattr(target_node, "end_lineno", None))
+    lineno = cast(int | None, getattr(target_node, "lineno", None))
+    end_lineno = cast(int | None, getattr(target_node, "end_lineno", None))
     col_offset = cast(int, getattr(target_node, "col_offset", 0))
     end_col_offset = cast(int, getattr(target_node, "end_col_offset", 0))
     if lineno is None or end_lineno is None:
@@ -1486,7 +1486,7 @@ def _build_config_items(
     if isinstance(user_section, dict):
         merged_keys.extend([key for key in user_section if key not in example_section])
 
-    current_subsection: Optional[str] = None
+    current_subsection: str | None = None
     subsection_items: list[ConfigItem] = []
 
     def flush_subsection() -> None:
@@ -1555,7 +1555,7 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
     lines = source.splitlines()
     tree = ast.parse(source)
 
-    config_assign: Optional[ast.Assign] = None
+    config_assign: ast.Assign | None = None
     for node in tree.body:
         if isinstance(node, ast.Assign):
             for target in node.targets:
@@ -1643,7 +1643,7 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
             headers = sorted(find_headers(start_line, end_line, child_ranges), key=lambda h: h[0])
             key_entries.sort(key=lambda entry: entry[1])
             header_idx = 0
-            current_header: Optional[str] = None
+            current_header: str | None = None
             for key, lineno, _ in key_entries:
                 while header_idx < len(headers) and headers[header_idx][0] < lineno:
                     current_header = headers[header_idx][1]
@@ -1656,7 +1656,7 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
 
 
 def _resolve_user_path(
-    user_path: Optional[Any],
+    user_path: Any | None,
     *,
     require_exists: bool = True,
     require_dir: bool = False,
@@ -2445,7 +2445,7 @@ def config_options():
 
     # Determine config load status so the UI can warn the user
     # instead of silently showing defaults.
-    config_warning: Optional[str] = None
+    config_warning: str | None = None
     if not config_path.exists():
         config_warning = (
             "No config.py found — showing example defaults. "
@@ -3233,7 +3233,7 @@ def execute_command():
                         try:
                             orig_ask_string = _cli_ui.ask_string
 
-                            def wrapped_ask_string(*question: Any, default: Optional[str] = None) -> Optional[str]:
+                            def wrapped_ask_string(*question: Any, default: str | None = None) -> str | None:
                                 prompt = " ".join(str(q) for q in question)
                                 with contextlib.suppress(Exception):
                                     wrapped_print(prompt)

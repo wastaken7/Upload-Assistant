@@ -2,7 +2,7 @@
 import os
 import platform
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import cli_ui
@@ -189,7 +189,7 @@ class BHD:
         }.get(category_name, '1')
         return category_id
 
-    async def get_source(self, source: str) -> Optional[str]:
+    async def get_source(self, source: str) -> str | None:
         sources = {
             "Blu-ray": "Blu-ray",
             "BluRay": "Blu-ray",
@@ -368,7 +368,7 @@ class BHD:
         elif category == "TV":
             category = "TV"
         if meta.is_disc == "DVD":
-            type_id: Optional[str] = None
+            type_id: str | None = None
         else:
             type_id = await self.get_type(meta)
         data: dict[str, Any] = {"action": "search", "types": type_id, "categories": category}

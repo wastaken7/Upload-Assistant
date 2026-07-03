@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import platform
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import httpx
 from bs4 import BeautifulSoup
@@ -28,7 +28,7 @@ class PTS:
         self.base_url = "https://www.ptskit.org"
         self.torrent_url = "https://www.ptskit.org/details.php?id="
         self.announce = str(self.config['TRACKERS'][self.tracker]['announce_url'])
-        self.auth_token: Optional[str] = None
+        self.auth_token: str | None = None
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"}, timeout=60.0)
 
     async def validate_credentials(self, meta: Meta) -> bool:
@@ -36,7 +36,7 @@ class PTS:
         self.session.cookies = cast(Any, cookies)
         return cookies is not None
 
-    async def get_type(self, meta: Meta) -> Optional[str]:
+    async def get_type(self, meta: Meta) -> str | None:
         if meta.anime:
             return '407'
 
@@ -85,7 +85,7 @@ class PTS:
                 return False
         return True
 
-    async def search_existing(self, meta: Meta) -> Optional[list[str]]:
+    async def search_existing(self, meta: Meta) -> list[str] | None:
         search_url = f"{self.base_url}/torrents.php"
         params: dict[str, Any] = {"incldead": 1, "search": str(meta.imdb_info.get("imdbID", "")), "search_area": 4}
         found_items: list[str] = []

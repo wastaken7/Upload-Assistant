@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import os
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlparse, urlunparse
 
 import aiofiles
@@ -285,7 +285,7 @@ class MTEAM:
 
         return description
 
-    def get_category_id(self, meta: Meta) -> Optional[int]:
+    def get_category_id(self, meta: Meta) -> int | None:
         movie_sd = 401  # Movie/SD
         movie_hd = 419  # Movie/HD
         movie_dvdiso = 420  # Movie/DVDiSo

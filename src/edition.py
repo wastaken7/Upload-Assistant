@@ -2,7 +2,7 @@
 import os
 import re
 from collections.abc import Callable
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import guessit
 
@@ -11,14 +11,14 @@ from src.meta import Meta
 from src.region import get_distributor
 
 guessit_module: Any = cast(Any, guessit)
-GuessitFn = Callable[[str, Optional[dict[str, Any]]], dict[str, Any]]
+GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 
 
-def guessit_fn(value: str, options: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
     return cast(dict[str, Any], guessit_module.guessit(value, options))
 
 
-async def get_edition(video: str, bdinfo: Optional[dict[str, Any]], filelist: list[str], manual_edition: str | list[str], meta: Meta) -> tuple[str, str, bool]:
+async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[str], manual_edition: str | list[str], meta: Meta) -> tuple[str, str, bool]:
     edition = ""
     imdb_info = cast(dict[str, Any], meta.imdb_info)
     edition_details = cast(dict[str, dict[str, Any]], imdb_info.get('edition_details', {}))

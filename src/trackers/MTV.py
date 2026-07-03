@@ -4,7 +4,7 @@ import json
 import os
 import re
 import traceback
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import aiofiles.os
@@ -81,7 +81,7 @@ class MTV:
         )
         return
 
-    async def upload(self, meta: Meta) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> bool | None:
         common = COMMON(config=self.config)
         cookiefile = os.path.abspath(f"{meta.base_dir}/data/cookies/MTV.json")
         base_piece_mb = meta.base_torrent_piece_mb or 0
@@ -336,7 +336,7 @@ class MTV:
         }.get(resolution, '10')
         return resolution_id
 
-    async def get_cat_id(self, meta: Meta) -> Optional[int]:
+    async def get_cat_id(self, meta: Meta) -> int | None:
         if meta.category == "MOVIE":
             if meta.sd == 1:
                 return 2
@@ -717,7 +717,7 @@ class MTV:
                 try:
                     loop = asyncio.get_running_loop()
                     response_xml = await loop.run_in_executor(None, ET.fromstring, response.text)
-                    channel = cast(Optional[Any], response_xml.find("channel"))
+                    channel = cast(Any | None, response_xml.find("channel"))
                     if channel is None:
                         return dupes
                     for each in channel.findall("item"):

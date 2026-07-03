@@ -5,7 +5,7 @@ import re
 import shutil
 import urllib.parse
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import defusedxml.xmlrpc
 import httpx
@@ -33,11 +33,11 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             domain = domain.lower()
             return host == domain or host.endswith(f".{domain}")
 
-        def _last_path_id(path: str) -> Optional[str]:
+        def _last_path_id(path: str) -> str | None:
             match = re.search(r"/(\d+)$", path)
             return match.group(1) if match else None
 
-        def _query_id(query: str, key: str) -> Optional[str]:
+        def _query_id(query: str, key: str) -> str | None:
             values = urllib.parse.parse_qs(query).get(key)
             return values[0] if values else None
 
@@ -260,7 +260,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                         console.print(f"[cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
                 await asyncio.sleep(inject_delay)
 
-    async def find_existing_torrent(self, meta: Meta) -> Optional[str]:
+    async def find_existing_torrent(self, meta: Meta) -> str | None:
         # Determine piece size preferences
         trackers_config = cast(dict[str, Any], self.config.get('TRACKERS', {}))
         mtv_config = trackers_config.get('MTV', {})
@@ -336,15 +336,15 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         return None
 
     async def _search_single_client_for_torrent(
-        self, meta: Meta, client_name: str, prefer_small_pieces: bool, mtv_torrent: bool, piece_limit: bool, best_match: Optional[dict[str, Any]]
+        self, meta: Meta, client_name: str, prefer_small_pieces: bool, mtv_torrent: bool, piece_limit: bool, best_match: dict[str, Any] | None
     ) -> dict[str, Any] | str | None:
         """Search a single client for an existing torrent by hash or via API search (qbit only)."""
 
         client = self.config['TORRENT_CLIENTS'][client_name]
         torrent_client = client.get('torrent_client', '').lower()
         torrent_storage_dir = client.get('torrent_storage_dir')
-        qbt_client: Optional[qbittorrentapi.Client] = None
-        proxy_url: Optional[str] = None
+        qbt_client: qbittorrentapi.Client | None = None
+        proxy_url: str | None = None
 
         # Iterate through pre-specified hashes
         for hash_key in ['torrenthash', 'ext_torrenthash']:
@@ -418,7 +418,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         # Search the client if no pre-specified hash matches
         if torrent_client == 'qbit' and client.get('enable_search'):
-            qbt_session: Optional[httpx.AsyncClient] = None
+            qbt_session: httpx.AsyncClient | None = None
             try:
 
                 proxy_url = client.get('qui_proxy_url')
@@ -463,7 +463,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     if not os.path.exists(found_torrent_path):
                         console.print(f"[yellow]Exporting .torrent file from qBittorrent for hash: {found_hash}[/yellow]")
 
-                        torrent_file_content: Optional[bytes] = None
+                        torrent_file_content: bytes | None = None
 
                         try:
                             proxy_url = client.get('qui_proxy_url')
@@ -687,7 +687,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         return valid, torrent_path
 
-    async def remote_path_map(self, meta: Meta, torrent_client_name: Optional[str | dict[str, Any]] = None) -> tuple[str, str]:
+    async def remote_path_map(self, meta: Meta, torrent_client_name: str | dict[str, Any] | None = None) -> tuple[str, str]:
         if isinstance(torrent_client_name, dict):
             client_config: dict[str, Any] = torrent_client_name
         elif isinstance(torrent_client_name, str) and torrent_client_name:

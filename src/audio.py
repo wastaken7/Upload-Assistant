@@ -6,7 +6,7 @@ import re
 import traceback
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import cli_ui
 import langcodes
@@ -31,14 +31,14 @@ class AudioManager:
         self,
         mi: Mapping[str, Any],
         meta: Meta,
-        bdinfo: Optional[Mapping[str, Any]],
+        bdinfo: Mapping[str, Any] | None,
     ) -> tuple[str, str, bool]:
         return await _get_audio_v2(self.config, mi, meta, bdinfo)
 
 
 def determine_channel_count(
     channels: Any,
-    channel_layout: Optional[str],
+    channel_layout: str | None,
     additional: Any,
     format: Any,
 ) -> str:
@@ -63,7 +63,7 @@ def determine_channel_count(
     return fallback_channel_count(channels)
 
 
-def is_atmos_or_immersive_audio(additional: Any, format: Any, channel_layout: Optional[str]) -> bool:
+def is_atmos_or_immersive_audio(additional: Any, format: Any, channel_layout: str | None) -> bool:
     """Check if this is Dolby Atmos, DTS:X, or other immersive audio format."""
     atmos_indicators = [
         'JOC', 'Atmos', '16-ch', 'Atmos Audio',
@@ -111,7 +111,7 @@ def handle_atmos_channel_count(channels: int, channel_layout: str) -> str:
         return parse_channel_layout(channels, channel_layout)
 
 
-def parse_atmos_layout(channel_layout: Optional[str]) -> tuple[int, int, int]:
+def parse_atmos_layout(channel_layout: str | None) -> tuple[int, int, int]:
     """Parse channel layout to separate bed channels, LFE, and height channels."""
     if not channel_layout:
         return 0, 0, 0
@@ -209,7 +209,7 @@ async def _get_audio_v2(
     config: dict[str, Any],
     mi: Mapping[str, Any],
     meta: Meta,
-    bdinfo: Optional[Mapping[str, Any]],
+    bdinfo: Mapping[str, Any] | None,
 ) -> tuple[str, str, bool]:
     extra = ""
     dual = ""

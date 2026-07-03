@@ -1,5 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from typing import Any, Optional
+from typing import Any
 
 from src.console import console
 from src.meta import Meta
@@ -43,7 +43,7 @@ class LST(UNIT3D):
 
         return should_continue
 
-    async def get_category_id(self, meta: Meta, category: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {
             "MOVIE": "1",
             "TV": "2",
@@ -57,7 +57,7 @@ class LST(UNIT3D):
         resolved_category = category if category is not None and category != "" else meta.category
         return {"category_id": category_id.get(resolved_category, "0")}
 
-    async def get_type_id(self, meta: Meta, type: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
             "DISC": "1",
             "REMUX": "2",
@@ -114,7 +114,7 @@ class LST(UNIT3D):
 
         return data
 
-    async def get_edition(self, meta: Meta) -> Optional[int]:
+    async def get_edition(self, meta: Meta) -> int | None:
         edition_mapping = {
             'Alternative Cut': 12,
             'Collector\'s Edition': 1,

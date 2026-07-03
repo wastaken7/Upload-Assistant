@@ -3,7 +3,7 @@ import asyncio
 import os
 import traceback
 from collections import deque
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import httpx
 import qbittorrentapi
@@ -16,13 +16,13 @@ class Wait:
 
     def __init__(self, config: dict[str, Any]):
         self.config = config
-        self.proxy_url: Optional[str] = None
-        self.qbt_proxy_url: Optional[str] = None
-        self.qbt_session: Optional[httpx.AsyncClient] = None
-        self.qbt_client: Optional[qbittorrentapi.Client] = None
+        self.proxy_url: str | None = None
+        self.qbt_proxy_url: str | None = None
+        self.qbt_session: httpx.AsyncClient | None = None
+        self.qbt_client: qbittorrentapi.Client | None = None
         self.qbt_client = self._connect_qbittorrent()
 
-    def _connect_qbittorrent(self) -> Optional[qbittorrentapi.Client]:
+    def _connect_qbittorrent(self) -> qbittorrentapi.Client | None:
         config_map = self.config
         default_section = cast(dict[str, Any], config_map.get('DEFAULT', {}))
         clients_section = cast(dict[str, Any], config_map.get('TORRENT_CLIENTS', {}))
@@ -64,7 +64,7 @@ class Wait:
                 raise ValueError("qbit_url is not configured")
             port_value = client.get('qbit_port')
             if isinstance(port_value, (int, str)):
-                port: Optional[int | str] = port_value
+                port: int | str | None = port_value
             elif port_value is None:
                 port = None
             else:

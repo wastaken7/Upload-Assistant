@@ -2,7 +2,7 @@
 import asyncio
 import re
 from collections.abc import Awaitable
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import httpx
 from bs4 import BeautifulSoup
@@ -15,7 +15,7 @@ from src.tvdb import tvdb_data
 from src.tvmaze import tvmaze_manager
 
 
-def _coerce_int(value: Any) -> Optional[int]:
+def _coerce_int(value: Any) -> int | None:
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -59,14 +59,14 @@ class MetadataSearchingManager:
         self,
         filename: str,
         search_year: str,
-        imdb: Optional[int | str],
-        tmdb: Optional[int | str],
-        manual_date: Optional[str] = None,
-        tvmaze_manual: Optional[str] = None,
+        imdb: int | str | None,
+        tmdb: int | str | None,
+        manual_date: str | None = None,
+        tvmaze_manual: str | None = None,
         year: str = '',
         debug: bool = False,
         tv_movie: bool = False,
-    ) -> tuple[int, int, Optional[Any], str]:
+    ) -> tuple[int, int, Any | None, str]:
         return await get_tvmaze_tvdb(
             filename,
             search_year,
@@ -127,8 +127,8 @@ async def all_ids(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) -> M
         all_tasks.append(tvdb_episodes_task)
 
     # Add episode-specific tasks if this is a TV show with episodes
-    tvmaze_task_idx: Optional[int] = None
-    tmdb_task_idx: Optional[int] = None
+    tvmaze_task_idx: int | None = None
+    tmdb_task_idx: int | None = None
     if meta.category == "TV" and not meta.tv_pack and "season_int" in meta and "episode_int" in meta and meta.episode_int != 0:
 
         # Add TVMaze episode details task
@@ -617,15 +617,15 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
 async def get_tvmaze_tvdb(
     filename: str,
     search_year: str,
-    imdb: Optional[int | str],
-    tmdb: Optional[int | str],
+    imdb: int | str | None,
+    tmdb: int | str | None,
     tvdb_handler: Any,
-    manual_date: Optional[str] = None,
-    tvmaze_manual: Optional[str] = None,
+    manual_date: str | None = None,
+    tvmaze_manual: str | None = None,
     year: str = '',
     debug: bool = False,
     tv_movie: bool = False,
-) -> tuple[int, int, Optional[Any], str]:
+) -> tuple[int, int, Any | None, str]:
     tvdb_data = None
     tvmaze = 0
     tvdb = 0

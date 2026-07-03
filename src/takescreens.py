@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from collections.abc import Awaitable, Mapping
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import ffmpeg
 import psutil
@@ -69,7 +69,7 @@ def _apply_config(config: Mapping[str, Any]) -> None:
         desat = 10.0
 
 
-async def run_ffmpeg(command: Any) -> tuple[Optional[int], bytes, bytes]:
+async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
     # On Linux prefer bundled amd/arm binary when present; otherwise fall back to system ffmpeg.
     if platform.system() == 'Linux':
         base_dir = os.path.dirname(os.path.dirname(__file__))
@@ -155,7 +155,7 @@ async def disc_screenshots(
     sanitized_filename = await sanitize_filename(filename)
     length: float = 0.0
     file_path: str = ""
-    frame_rate: Optional[float] = None
+    frame_rate: float | None = None
     bdinfo_files = cast(list[dict[str, Any]], bdinfo.get('files', []))
     bdinfo_path = cast(str, bdinfo.get('path', ''))
     for each in bdinfo_files:
@@ -227,7 +227,7 @@ async def disc_screenshots(
     if meta.debug:
         console.print(f"Using {num_workers} worker(s) for {num_screens} image(s)")
 
-    capture_tasks: list[Awaitable[Optional[tuple[int, str]]]] = []
+    capture_tasks: list[Awaitable[tuple[int, str] | None]] = []
     capture_results: list[str] = []
     valid_results: list[str] = []
     remaining_retakes: list[str] = []
@@ -244,7 +244,7 @@ async def disc_screenshots(
 
         async def capture_disc_with_semaphore(
             index: int, file: str, ss_time: str, image_path: str, keyframe: str, loglevel: str, hdr_tonemap: bool, meta: Meta
-        ) -> Optional[tuple[int, str]]:
+        ) -> tuple[int, str] | None:
             async with semaphore:
                 return await capture_disc_task(index, file, ss_time, image_path, keyframe, loglevel, hdr_tonemap, meta)
 
@@ -383,7 +383,7 @@ async def disc_screenshots(
         await cleanup_manager.cleanup()
 
 
-async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str, keyframe: str, loglevel: str, hdr_tonemap: bool, meta: Meta) -> Optional[tuple[int, str]]:
+async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str, keyframe: str, loglevel: str, hdr_tonemap: bool, meta: Meta) -> tuple[int, str] | None:
     try:
         # Build filter chain
         vf_filters: list[str] = []
@@ -576,7 +576,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
     os.chdir(f"{meta.base_dir}/tmp/{meta.uuid}")
     voblength, _vob_index = await _is_vob_good(0, 0, num_screens)
     ss_times = await valid_ss_time([], num_screens, voblength, frame_rate, meta, retake=retry_cap)
-    capture_tasks: list[Awaitable[tuple[int, Optional[str]]]] = []
+    capture_tasks: list[Awaitable[tuple[int, str | None]]] = []
     existing_images_count = 0
     existing_image_paths: list[str] = []
 
@@ -624,7 +624,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
         # Create semaphore to limit concurrent tasks
         semaphore = asyncio.Semaphore(task_limit)
 
-        async def capture_dvd_with_semaphore(args: tuple[int, str, str, str, Meta, float, float, float, float]) -> tuple[int, Optional[str]]:
+        async def capture_dvd_with_semaphore(args: tuple[int, str, str, str, Meta, float, float, float, float]) -> tuple[int, str | None]:
             async with semaphore:
                 return await capture_dvd_screenshot(args)
 
@@ -638,7 +638,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
 
         capture_results: list[str] = []
         results = await asyncio.gather(*capture_tasks)
-        filtered_results: list[tuple[int, Optional[str]]] = list(results)
+        filtered_results: list[tuple[int, str | None]] = list(results)
 
         if len(filtered_results) != len(results):
             console.print(f"[yellow]Warning: {len(results) - len(filtered_results)} capture tasks returned invalid results.")
@@ -740,14 +740,14 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
         await cleanup_manager.cleanup()
 
 
-async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, float, float, float]) -> tuple[int, Optional[str]]:
+async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, float, float, float]) -> tuple[int, str | None]:
     index, input_file, image, seek_time_str, meta, width, height, w_sar, h_sar = task
     seek_time = float(seek_time_str)
 
     try:
         loglevel = "verbose" if meta.ffdebug else "quiet"
         media_info = MediaInfo.parse(input_file)
-        video_duration: Optional[float] = None
+        video_duration: float | None = None
         tracks: list[Any] = []
         tracks.extend(cast(list[Any], getattr(media_info, "tracks", [])))
         for track in tracks:
@@ -1062,7 +1062,7 @@ async def extract_epub_cover(epub_path: str, dest_path: str, confirmed_only: boo
                         return True
                     return href.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"))
 
-                def get_image_from_html(html_href: str) -> Optional[str]:
+                def get_image_from_html(html_href: str) -> str | None:
                     try:
                         html_zip_path = resolve_path(opf_dir, html_href)
                         zip_names = z.namelist()
@@ -1586,11 +1586,11 @@ async def screenshots(
     # Create semaphore to limit concurrent tasks
     semaphore = asyncio.Semaphore(num_workers)
 
-    async def capture_with_semaphore(args: tuple[int, str, float, str, float, float, float, float, str, bool, Meta]) -> Optional[tuple[int, Optional[str]]]:
+    async def capture_with_semaphore(args: tuple[int, str, float, str, float, float, float, float, str, bool, Meta]) -> tuple[int, str | None] | None:
         async with semaphore:
             return await capture_screenshot(args)
 
-    capture_tasks: list[Awaitable[Optional[tuple[int, Optional[str]]]]] = []
+    capture_tasks: list[Awaitable[tuple[int, str | None] | None]] = []
     for i in range(num_capture):
         image_index = existing_images_count + i
         image_path = os.path.abspath(f"{base_dir}/tmp/{folder_id}/{sanitized_filename}-{image_index}.png")
@@ -1607,8 +1607,8 @@ async def screenshots(
         for r in results:
             if isinstance(r, Exception):
                 console.print(f"[red]Screenshot capture exception: {r}[/red]")
-        capture_result_tuples: list[tuple[int, Optional[str]]] = [
-            cast(tuple[int, Optional[str]], r)
+        capture_result_tuples: list[tuple[int, str | None]] = [
+            cast(tuple[int, str | None], r)
             for r in results
             if isinstance(r, tuple)
         ]
@@ -1797,7 +1797,7 @@ async def screenshots(
     return valid_results if valid_results else None
 
 
-async def capture_screenshot(args: tuple[int, str, float, str, float, float, float, float, str, bool, Meta]) -> Optional[tuple[int, Optional[str]]]:
+async def capture_screenshot(args: tuple[int, str, float, str, float, float, float, float, str, bool, Meta]) -> tuple[int, str | None] | None:
     index, path, ss_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta = args
 
     try:
@@ -1922,7 +1922,7 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
                     console.print("[cyan]FFmpeg command: (unable to render command)[/cyan]", emoji=False)
 
             # --- Execute with retry/fallback if libplacebo fails ---
-            async def run_cmd(info_command: Any, timeout_sec: float) -> tuple[Optional[int], bytes, bytes]:
+            async def run_cmd(info_command: Any, timeout_sec: float) -> tuple[int | None, bytes, bytes]:
                 try:
                     return await asyncio.wait_for(run_ffmpeg(info_command), timeout=timeout_sec)
                 except TimeoutError:
@@ -2334,7 +2334,7 @@ async def libplacebo_warmup(path: str, meta: Meta, loglevel: str) -> None:
             console.print(f"[yellow]libplacebo warm-up failed: {e} (continuing)[/yellow]")
 
 
-async def get_image_host(meta: Meta) -> Optional[str]:
+async def get_image_host(meta: Meta) -> str | None:
     if meta.imghost is not None:
         host = meta.imghost
 
@@ -2362,7 +2362,7 @@ class TakeScreensManager:
         self.config = config
         _apply_config(config)
 
-    async def run_ffmpeg(self, command: Any) -> tuple[Optional[int], bytes, bytes]:
+    async def run_ffmpeg(self, command: Any) -> tuple[int | None, bytes, bytes]:
         return await run_ffmpeg(command)
 
     async def sanitize_filename(self, filename: str) -> str:
@@ -2396,7 +2396,7 @@ class TakeScreensManager:
 
     async def capture_disc_task(
         self, index: int, file: str, ss_time: str, image_path: str, keyframe: str, loglevel: str, hdr_tonemap: bool, meta: Meta
-    ) -> Optional[tuple[int, str]]:
+    ) -> tuple[int, str] | None:
         return await capture_disc_task(index, file, ss_time, image_path, keyframe, loglevel, hdr_tonemap, meta)
 
     async def dvd_screenshots(self, meta: Meta, disc_num: int, num_screens: int = 0, retry_cap: bool = False) -> None:
@@ -2405,7 +2405,7 @@ class TakeScreensManager:
     async def capture_dvd_screenshot(
             self,
             task: tuple[int, str, str, str, Meta, float, float, float, float]
-    ) -> tuple[int, Optional[str]]:
+    ) -> tuple[int, str | None]:
         return await capture_dvd_screenshot(task)
 
     async def screenshots(
@@ -2418,13 +2418,13 @@ class TakeScreensManager:
         num_screens: int = 0,
         force_screenshots: bool = False,
         manual_frames: str | list[int] | list[str] = "",
-    ) -> Optional[list[str]]:
+    ) -> list[str] | None:
         return await screenshots(path, filename, folder_id, base_dir, meta, num_screens, force_screenshots, manual_frames)
 
     async def capture_screenshot(
             self,
             args: tuple[int, str, float, str, float, float, float, float, str, bool, Meta]
-    ) -> Optional[tuple[int, Optional[str]]]:
+    ) -> tuple[int, str | None] | None:
         return await capture_screenshot(args)
 
     async def valid_ss_time(self, ss_times: list[str], num_screens: int, length: float, frame_rate: float, meta: Meta, retake: bool = False) -> list[str]:
@@ -2454,5 +2454,5 @@ class TakeScreensManager:
     async def libplacebo_warmup(self, path: str, meta: Meta, loglevel: str) -> None:
         await libplacebo_warmup(path, meta, loglevel)
 
-    async def get_image_host(self, meta: Meta) -> Optional[str]:
+    async def get_image_host(self, meta: Meta) -> str | None:
         return await get_image_host(meta)

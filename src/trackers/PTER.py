@@ -4,7 +4,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -35,7 +35,7 @@ class PTER:
         self.ptgen_api = str(config['TRACKERS']['PTER'].get('ptgen_api', '')).strip()
 
         self.ptgen_retry = 3
-        self.signature: Optional[str] = None
+        self.signature: str | None = None
         self.banned_groups: list[str] = [""]
 
         self.cookie_validator = CookieValidator(config)
@@ -233,7 +233,7 @@ class PTER:
             Path(f"{meta.base_dir}/data/cookies").mkdir(parents=True, exist_ok=True)
         cookiefile = f"{meta.base_dir}/data/cookies/Pterimg.json"
         logged_in = False
-        response: Optional[httpx.Response] = None
+        response: httpx.Response | None = None
         cookies: dict[str, str] = {}
         if os.path.exists(cookiefile):
             raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # pyright: ignore[reportPrivateUsage]
@@ -342,7 +342,7 @@ class PTER:
 
         return pter_name
 
-    async def is_zhongzi(self, meta: Meta) -> Optional[str]:
+    async def is_zhongzi(self, meta: Meta) -> str | None:
         if meta.is_disc != "BDMV":
             mi = meta.mediainfo
             media = cast(dict[str, Any], mi.get('media', {}))

@@ -2,7 +2,7 @@
 import os
 import re
 import sys
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import cli_ui
@@ -141,7 +141,7 @@ class LanguagesManager:
             'text': []
         }
 
-        current_section: Optional[str] = None
+        current_section: str | None = None
         current_track: dict[str, str] = {}
 
         lines = mediainfo_content.strip().split('\n')
@@ -234,7 +234,7 @@ class LanguagesManager:
                         audio_tracks = cast(list[dict[str, Any]], parsed_info.get('audio', []))
 
                         for track_index, audio_track in enumerate(audio_tracks, 1):
-                            language_found: Optional[str] = None
+                            language_found: str | None = None
 
                             # Skip commentary tracks
                             if "title" in audio_track and "commentary" in audio_track['title'].lower():
@@ -467,7 +467,7 @@ class LanguagesManager:
             return False
         return any('english' in lang.lower() for lang in languages)
 
-    def extract_language_from_title(self, title: Optional[str]) -> Optional[str]:
+    def extract_language_from_title(self, title: str | None) -> str | None:
         """Extract language from title field using langcodes library"""
         if not title:
             return None
@@ -482,7 +482,7 @@ class LanguagesManager:
 
         return None
 
-    def _find_language_name(self, word: str) -> Optional[str]:
+    def _find_language_name(self, word: str) -> str | None:
         try:
             lang = langcodes.find(word)
         except (LanguageTagError, LookupError):

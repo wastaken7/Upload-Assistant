@@ -12,7 +12,7 @@ import base64
 import os
 import re
 import sys
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 import langcodes
@@ -141,7 +141,7 @@ async def gather_book_prep(
     meta: Meta,
     videopath: str,
     base_dir: str,
-    config: Optional[dict[str, Any]] = None,
+    config: dict[str, Any] | None = None,
 ) -> None:
     """Set up BOOK/Audiobook category fields and extract embedded MediaInfo metadata.
 
@@ -680,7 +680,7 @@ async def get_audiobook_duration(filelist: list[str]) -> tuple[float, str]:
     return total_seconds, duration_formatted
 
 
-async def get_audiobook_bitrate(filelist: list[str]) -> Optional[int]:
+async def get_audiobook_bitrate(filelist: list[str]) -> int | None:
     """Calculate the average bitrate (in kbps) of a sample of audio files (max 5) in the file list using MediaInfo."""
     from pymediainfo import MediaInfo
 
@@ -693,7 +693,7 @@ async def get_audiobook_bitrate(filelist: list[str]) -> Optional[int]:
     if not audio_files:
         return None
 
-    def _get_file_bitrate(file_path: str) -> Optional[int]:
+    def _get_file_bitrate(file_path: str) -> int | None:
         try:
             if not os.path.isfile(file_path):
                 return None

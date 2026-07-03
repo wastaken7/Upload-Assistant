@@ -3,7 +3,7 @@ import asyncio
 import glob
 import os
 import platform
-from typing import Any, Optional
+from typing import Any
 
 import aiofiles
 import httpx
@@ -281,7 +281,7 @@ class FF:
 
         return "TVSeries"
 
-    def movie_source(self, _meta: Meta) -> Optional[str]:
+    def movie_source(self, _meta: Meta) -> str | None:
         # Possible values: "DVD", "DVDSCR", "Workprint", "TeleCine", "TeleSync", "CAM", "BluRay", "HD-DVD", "HDTV", "R5", "WebRIP"
         mapping = {
             "dvd": "DVD",
@@ -302,7 +302,7 @@ class FF:
         src = (self.video_source or "").strip().lower()
         return mapping.get(src)
 
-    def tv_source(self, _meta: Meta) -> Optional[str]:
+    def tv_source(self, _meta: Meta) -> str | None:
         # Possible values: "HDTV", "DSR", "PDTV", "TV", "DVD", "DvdScr", "BluRay", "WebRIP"
         mapping = {
             "hdtv": "HDTV",
@@ -320,7 +320,7 @@ class FF:
         src = (self.video_source or "").strip().lower()
         return mapping.get(src)
 
-    def anime_source(self, _meta: Meta) -> Optional[str]:
+    def anime_source(self, _meta: Meta) -> str | None:
         # Possible values: "DVD", "BluRay", "Anime Series", "HDTV"
         mapping = {
             "hdtv": "HDTV",
@@ -439,7 +439,7 @@ class FF:
             'anime_s_lang': anime_s_lang,
         }
 
-    async def get_poster(self, meta: Meta) -> Optional[tuple[str, bytes, str]]:
+    async def get_poster(self, meta: Meta) -> tuple[str, bytes, str] | None:
         poster_url = meta.poster
 
         poster_file = None

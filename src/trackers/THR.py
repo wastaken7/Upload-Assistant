@@ -6,7 +6,7 @@ import json
 import os
 import platform
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import cli_ui
@@ -34,7 +34,7 @@ class THR:
         self.password = str(config['TRACKERS']['THR'].get('password', ''))
         self.banned_groups = [""]
 
-    async def upload(self, meta: Meta) -> Optional[bool]:
+    async def upload(self, meta: Meta) -> bool | None:
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta)
@@ -103,7 +103,7 @@ class THR:
 
         if thr_upload_prompt is True:
             await asyncio.sleep(0.5)
-            response: Optional[httpx.Response] = None
+            response: httpx.Response | None = None
             try:
                 cookies = await self.login(meta)
 
@@ -296,7 +296,7 @@ class THR:
             }
             async with aiofiles.open(image, 'rb') as image_file:
                 file_bytes = await image_file.read()
-            response: Optional[httpx.Response] = None
+            response: httpx.Response | None = None
             response_data: dict[str, Any] = {}
             try:
                 async with httpx.AsyncClient(timeout=30.0) as image_client:
@@ -515,7 +515,7 @@ class THR:
 
         return page_dupes, has_next_page, next_page_number
 
-    async def login(self, meta) -> Optional[dict[str, Any]]:
+    async def login(self, meta) -> dict[str, Any] | None:
         console.print("[yellow]Logging in to THR...")
         url = 'https://www.torrenthr.org/takelogin.php'
 

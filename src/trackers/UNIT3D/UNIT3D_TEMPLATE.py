@@ -1,5 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from typing import Any, Optional
+from typing import Any
 
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -32,7 +32,7 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
     async def get_category_id(
         self,
         meta: Meta,
-        category: Optional[str] = None,
+        category: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
@@ -47,7 +47,7 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
     async def get_type_id(
         self,
         meta: Meta,
-        type: Optional[str] = None,
+        type: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
@@ -59,7 +59,7 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
     async def get_resolution_id(
         self,
         meta: Meta,
-        resolution: Optional[str] = None,
+        resolution: str | None = None,
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:

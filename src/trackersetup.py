@@ -6,7 +6,7 @@ import re
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import cli_ui
@@ -105,7 +105,7 @@ class TRACKER_SETUP:
     def __init__(self, config: dict[str, Any]):
         self.config: dict[str, Any] = config
 
-    def _create_tracker_instance(self, tracker: str) -> Optional[Any]:
+    def _create_tracker_instance(self, tracker: str) -> Any | None:
         tracker_class = tracker_class_map.get(tracker.upper())
         if tracker_class is None:
             return None
@@ -183,7 +183,7 @@ class TRACKER_SETUP:
 
         return valid_trackers
 
-    async def get_banned_groups(self, meta: Meta, tracker: str) -> Optional[str]:
+    async def get_banned_groups(self, meta: Meta, tracker: str) -> str | None:
         file_path = os.path.join(meta.base_dir, "data", "banned", f"{tracker}_banned_groups.json")
 
         tracker_instance = self._create_tracker_instance(tracker)
@@ -209,7 +209,7 @@ class TRACKER_SETUP:
         }
 
         all_data: list[JsonDict] = []
-        next_cursor: Optional[str] = None
+        next_cursor: str | None = None
 
         async with httpx.AsyncClient() as client:
             while True:
@@ -242,7 +242,7 @@ class TRACKER_SETUP:
                             meta_info = cast(JsonDict, meta_info_any)
 
                             # Check if there is a next page
-                            next_cursor_value = cast(Optional[str], meta_info.get('next_cursor'))
+                            next_cursor_value = cast(str | None, meta_info.get('next_cursor'))
                             next_cursor = next_cursor_value if next_cursor_value else None
                             if not next_cursor:
                                 break  # Exit loop if there are no more pages
@@ -490,7 +490,7 @@ class TRACKER_SETUP:
         except Exception as e:
             console.print(f"An error occurred: {e}")
 
-    async def get_torrent_claims(self, meta: Meta, tracker: str) -> Optional[bool]:
+    async def get_torrent_claims(self, meta: Meta, tracker: str) -> bool | None:
         file_path = os.path.join(meta.base_dir, "data", "banned", f"{tracker}_claimed_releases.json")
         tracker_instance = self._create_tracker_instance(tracker)
         if tracker_instance is None:
@@ -510,7 +510,7 @@ class TRACKER_SETUP:
         }
 
         all_data: list[JsonDict] = []
-        next_cursor: Optional[str] = None
+        next_cursor: str | None = None
 
         async with httpx.AsyncClient() as client:
             while True:
@@ -539,7 +539,7 @@ class TRACKER_SETUP:
                         meta_info = cast(JsonDict, meta_info_any)
 
                         # Check if there is a next page
-                        next_cursor = cast(Optional[str], meta_info.get('next_cursor'))
+                        next_cursor = cast(str | None, meta_info.get('next_cursor'))
                         if not next_cursor:
                             break  # Exit loop if there are no more pages
                     else:
@@ -1148,11 +1148,11 @@ class TRACKER_SETUP:
                 console.print(f"[bold green]TV pack upload detected, skipping comparison images for trump report on {tracker}[/bold green]")
             return True
 
-    async def get_tracker_trumps(self, meta: Meta, tracker: str, url: str, reported_torrent_id: str) -> tuple[list[JsonDict], Optional[int]]:
+    async def get_tracker_trumps(self, meta: Meta, tracker: str, url: str, reported_torrent_id: str) -> tuple[list[JsonDict], int | None]:
         if meta.debug:
             console.print(f"[bold green]Searching for trumps on {tracker}[/bold green]")
         requests: list[JsonDict] = []
-        status_code: Optional[int] = None
+        status_code: int | None = None
         headers = {
             'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
             'Accept': 'application/json'
@@ -1163,7 +1163,7 @@ class TRACKER_SETUP:
         }
 
         all_data: list[Any] = []
-        next_cursor: Optional[str] = None
+        next_cursor: str | None = None
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -1201,7 +1201,7 @@ class TRACKER_SETUP:
 
                             meta_info = cast(JsonDict, meta_info_any)
 
-                            next_cursor = cast(Optional[str], meta_info.get('next_cursor'))
+                            next_cursor = cast(str | None, meta_info.get('next_cursor'))
                             if not next_cursor:
                                 break  # Exit loop if there are no more pages
                             else:
@@ -1311,7 +1311,7 @@ class TRACKER_SETUP:
             if not meta.debug:
                 return False
             # Set fallback for debug mode so payload construction doesn't fail
-            trumping_torrent_id: Optional[str] = None
+            trumping_torrent_id: str | None = None
 
         if meta.tv_pack:
             message = f"{meta.ua_name} season pack trump"

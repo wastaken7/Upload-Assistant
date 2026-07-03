@@ -2,7 +2,7 @@
 import json
 import os
 import time
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -17,7 +17,7 @@ class IGDBAPI:
         self.token_file = os.path.join(base_dir, "tmp", "igdb_token.json") if base_dir else ""
         self.access_token = None
 
-    async def get_access_token(self) -> Optional[str]:
+    async def get_access_token(self) -> str | None:
         # Try loading cached token
         if self.token_file and os.path.exists(self.token_file):
             try:
@@ -52,7 +52,7 @@ class IGDBAPI:
             console.print(f"[red]IGDB: Twitch OAuth error: {e}[/red]")
         return None
 
-    async def search_game(self, title: str) -> Optional[list[dict[str, Any]]]:
+    async def search_game(self, title: str) -> list[dict[str, Any]] | None:
         import asyncio
         import re
         from pathlib import Path
@@ -107,7 +107,7 @@ class IGDBAPI:
             console.print(f"[red]IGDB: Search error: {e}[/red]")
         return None
 
-    async def fetch_game_by_id(self, igdb_id: str) -> Optional[dict[str, Any]]:
+    async def fetch_game_by_id(self, igdb_id: str) -> dict[str, Any] | None:
         import asyncio
         from pathlib import Path
 
@@ -173,7 +173,7 @@ class IGDBAPI:
             console.print(f"[red]IGDB: Fetch error: {e}[/red]")
         return None
 
-    async def fetch_game_by_steam_id(self, steam_id: str) -> Optional[dict[str, Any]]:
+    async def fetch_game_by_steam_id(self, steam_id: str) -> dict[str, Any] | None:
         import asyncio
         from pathlib import Path
 

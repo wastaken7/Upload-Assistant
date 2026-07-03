@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import unicodedata
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import aiofiles
 import httpx
@@ -69,7 +69,7 @@ class DC:
 
         return description
 
-    def get_category_id(self, meta: Meta) -> Optional[int]:
+    def get_category_id(self, meta: Meta) -> int | None:
         resolution = meta.resolution
         category = meta.category
         is_disc = meta.is_disc

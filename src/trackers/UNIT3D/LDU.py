@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import langcodes
 
@@ -29,7 +29,7 @@ class LDU(UNIT3D):
         self.torrent_url = f'{self.base_url}/torrents/'
         self.banned_groups = []
 
-    async def get_category_id(self, meta: Meta, category: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         genres = f"{', '.join(meta.keywords)} {meta.combined_genres}"
         adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy']
         sound_mixes_value = meta.imdb_info.get("sound_mixes", [])
@@ -101,7 +101,7 @@ class LDU(UNIT3D):
 
         return {'category_id': category_id}
 
-    async def get_type_id(self, meta: Meta, type: Optional[str] = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
             "DISC": "1",
             "REMUX": "2",
@@ -148,8 +148,8 @@ class LDU(UNIT3D):
         cat_id = (await self.get_category_id(meta))['category_id']
         non_eng = False
         non_eng_audio = False
-        iso_audio: Optional[str] = None
-        iso_subtitle: Optional[str] = None
+        iso_audio: str | None = None
+        iso_subtitle: str | None = None
         if str(meta.original_language) != "en":
             non_eng = True
         audio_languages_value = meta.audio_languages

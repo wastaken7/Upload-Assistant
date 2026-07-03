@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import re
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import cloudscraper
 
@@ -189,7 +189,7 @@ class EMUW(UNIT3D):
 
         return f"{hdr_prefix}{codec}".strip()
 
-    async def _get_original_language(self, meta: Meta) -> Optional[str]:
+    async def _get_original_language(self, meta: Meta) -> str | None:
         """Get the original language from existing metadata"""
         original_lang = None
 
