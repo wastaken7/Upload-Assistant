@@ -27,6 +27,25 @@ class SAM(UNIT3D):
         self.requests_url = f"{self.base_url}/api/requests/filter"
         self.banned_groups = []
 
+    async def get_resolution_id(self, meta: Meta, resolution: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        resolution_id = {
+            "4320p": "1",
+            "2160p": "2",
+            "1080p": "3",
+            "720p": "5",
+            "480p": "8",
+        }
+        if mapping_only:
+            return resolution_id
+        elif reverse:
+            return {v: k for k, v in resolution_id.items()}
+        elif resolution:
+            return {"resolution_id": resolution_id.get(resolution, "10")}
+        else:
+            meta_resolution = meta.resolution
+            resolved_id = resolution_id.get(meta_resolution, "10")
+            return {"resolution_id": resolved_id}
+
     async def get_name(self, meta: Meta) -> dict[str, str]:
         cbr = CBR(self.config)
         cbr.tracker = self.tracker
