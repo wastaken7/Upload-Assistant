@@ -1,5 +1,39 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
+__version__ = "v2.2"
+
+"""
+Changelog for version v2.2 (2026-07-03):
+
+## What's Changed
+* **Features & Improvements**:
+  * Added duplicate size tolerance checks.
+  * Add enhanced rich progress bar display for mkbrr.
+  * Added search caching support for book preparation.
+  * Added automatic stripping of brackets from book titles during book preparation.
+  * feat: enable pesto --check article verification and rework Usenet upload progress by @franzopl in https://github.com/wastaken7/Upload-Assistant/pull/43
+  * Updated tracker configurations and the config generator.
+  * Enhanced genre mapping to include untranslated genres.
+  * Added resolution ID mapping and retrieval method for SAM tracker.
+  * Cleaned up and modernized codebase to remove `Optional` type usage.
+"""
+
+__version__ = "v2.1"
+
+"""
+Changelog for version v2.1 (2026-07-02):
+
+## What's Changed
+* **Features & Improvements**:
+  * Added support for Lostimg image host and API integration.
+  * Added encode requirements for CBR tracker.
+  * Added `get_name` method to process and format media names with language support.
+  * Streamlined localized data loading in multiple tracker classes.
+* **Fixes**:
+  * Updated qBittorrent response handling for fetching torrent properties via proxy.
+  * Removed redundant `announce_url` and `api_key` checks.
+"""
+
 __version__ = "v2.0"
 
 """
