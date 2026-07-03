@@ -299,7 +299,9 @@ async def gather_book_prep(
                 # Clean the edition from the title if it's not a CLI override
                 if not cli_overrides["title"] and meta.title:
                     original_title = meta.title
-                    cleaned_title = re.sub(r'\s*[\(\[\{-]?\s*\b(unabridged|abridged)\b\s*[\)\]\}]?\s*', ' ', original_title, flags=re.IGNORECASE)
+                    # Remove brackets like [...] and their content
+                    cleaned_title = re.sub(r"\s*\[[^\]]*\]", "", original_title)
+                    cleaned_title = re.sub(r"\s*[\(\[\{-]?\s*\b(unabridged|abridged)\b\s*[\)\]\}]?\s*", " ", cleaned_title, flags=re.IGNORECASE)
                     cleaned_title = re.sub(r'\s+', ' ', cleaned_title).strip()
                     cleaned_title = cleaned_title.strip('-').strip()
                     meta.title = cleaned_title
