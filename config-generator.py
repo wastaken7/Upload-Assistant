@@ -220,6 +220,64 @@ def find_missing_keys(existing_config: ConfigDict, example_config: ConfigDict) -
     return missing_keys
 
 
+def autofill_missing_keys(config_data: ConfigDict, example_config: ConfigDict) -> None:
+    """Automatically fill in missing keys and sections from example config into config_data"""
+    for section, example_section in example_config.items():
+        if not isinstance(example_section, dict):
+            continue
+
+        if section == "TRACKERS":
+            if "TRACKERS" not in config_data:
+                config_data["TRACKERS"] = {"default_trackers": ""}
+
+            for tracker_name, tracker_settings in config_data["TRACKERS"].items():
+                if tracker_name == "default_trackers":
+                    continue
+                if isinstance(tracker_settings, dict) and tracker_name in example_section:
+                    example_tracker = example_section[tracker_name]
+                    if isinstance(example_tracker, dict):
+                        for key, value in example_tracker.items():
+                            if key not in tracker_settings:
+                                tracker_settings[key] = value
+                                console.print(f"[i] Added missing key '{key}' to tracker '{tracker_name}' with default value", markup=False)
+
+        elif section == "TORRENT_CLIENTS":
+            if "TORRENT_CLIENTS" not in config_data:
+                config_data["TORRENT_CLIENTS"] = {}
+
+            for client_name, client_settings in config_data["TORRENT_CLIENTS"].items():
+                if isinstance(client_settings, dict):
+                    # Try to find a matching template client from example config
+                    example_client = None
+                    if client_name in example_section:
+                        example_client = example_section[client_name]
+                    else:
+                        # Match by "torrent_client" property
+                        client_type = client_settings.get("torrent_client")
+                        if client_type:
+                            for _template_name, template_settings in example_section.values():
+                                if isinstance(template_settings, dict) and template_settings.get("torrent_client") == client_type:
+                                    example_client = template_settings
+                                    break
+
+                    if isinstance(example_client, dict):
+                        for key, value in example_client.items():
+                            if key not in client_settings:
+                                client_settings[key] = value
+                                console.print(f"[i] Added missing key '{key}' to torrent client '{client_name}' with default value", markup=False)
+
+        else:
+            # Static sections like DEFAULT, DISCORD, USENET, IMAGES, etc.
+            if section not in config_data:
+                config_data[section] = example_section.copy()
+                console.print(f"[i] Added missing section '{section}' with default values", markup=False)
+            else:
+                for key, value in example_section.items():
+                    if key not in config_data[section]:
+                        config_data[section][key] = value
+                        console.print(f"[i] Added missing key '{key}' to section '{section}' with default value", markup=False)
+
+
 def get_user_input(
     prompt: str,
     default: str = "",
@@ -962,6 +1020,9 @@ if __name__ == "__main__":
                 # Start with the existing config
                 config_data = existing_config.copy()
 
+                # Automatically add any missing keys/sections first so they are present in config_data
+                autofill_missing_keys(config_data, example_config)
+
                 # Ask about updating each main section separately
                 console.print("\n\n[i] Lets work on one section at a time.", markup=False)
                 console.print("", markup=False)
@@ -969,7 +1030,7 @@ if __name__ == "__main__":
                 # DEFAULT section
                 update_default = input("Do you want to update something in the DEFAULT section? (y/n): ").lower() == "y"
                 if update_default:
-                    existing_defaults = existing_config.get("DEFAULT", {})
+                    existing_defaults = config_data.get("DEFAULT", {})
                     example_defaults = example_config.get("DEFAULT", {})
                     config_data["DEFAULT"] = configure_default_section(existing_defaults, example_defaults, config_comments)
                     # Set default client name (if needed)
@@ -981,7 +1042,7 @@ if __name__ == "__main__":
                 # TRACKERS section
                 update_trackers = input("Do you want to update something in the TRACKERS section? (y/n): ").lower() == "y"
                 if update_trackers:
-                    existing_trackers = existing_config.get("TRACKERS", {})
+                    existing_trackers = config_data.get("TRACKERS", {})
                     example_trackers = example_config.get("TRACKERS", {})
                     config_data["TRACKERS"] = configure_trackers(existing_trackers, example_trackers, config_comments)
                 else:
@@ -992,7 +1053,7 @@ if __name__ == "__main__":
                 update_clients = input("\nDo you want to update something in the TORRENT_CLIENTS section? (y/n): ").lower() == "y"
                 if update_clients:
                     console.print("\n====== TORRENT CLIENT ======", markup=False)
-                    existing_clients = existing_config.get("TORRENT_CLIENTS", {})
+                    existing_clients = config_data.get("TORRENT_CLIENTS", {})
                     example_clients = example_config.get("TORRENT_CLIENTS", {})
                     default_client = config_data["DEFAULT"].get("default_torrent_client", None)
 
@@ -1011,97 +1072,21 @@ if __name__ == "__main__":
                 # DISCORD section update
                 update_discord = input("Do you want to update something in the DISCORD section? (y/n): ").lower() == "y"
                 if update_discord:
-                    existing_discord = existing_config.get("DISCORD", {})
+                    existing_discord = config_data.get("DISCORD", {})
                     example_discord = example_config.get("DISCORD", {})
                     config_data["DISCORD"] = configure_discord(existing_discord, example_discord, config_comments)
                 else:
                     console.print("[i] Keeping existing DISCORD section", markup=False)
                     console.print("", markup=False)
 
-                missing_discord_keys: list[str] = []
-                missing_default_keys: list[str] = []
-                if "DEFAULT" in example_config and "DEFAULT" in config_data:
-                    def find_missing_default_keys(example_section: ConfigDict, existing_section: ConfigDict, _path: str = "") -> None:
-                        for key in example_section:
-                            if key not in existing_section:
-                                missing_default_keys.append(key)
-                    find_missing_default_keys(cast(ConfigDict, example_config["DEFAULT"]), cast(ConfigDict, config_data["DEFAULT"]))
-
-                if missing_default_keys:
-                    console.print("\n\n[!] Your existing config is missing these keys from example-config:", markup=False)
-
-                    # Only prompt for the missing keys
-                    missing_defaults = {k: example_config["DEFAULT"][k] for k in missing_default_keys}
-                    # Use empty dict for existing values so only defaults are shown
-                    added_defaults = configure_default_section({}, missing_defaults, config_comments)
-                    config_data["DEFAULT"].update(added_defaults)
-
-                if "DISCORD" in example_config:
-                    if "DISCORD" not in config_data:
-                        # Entire DISCORD section is missing
-                        console.print("\n[!] DISCORD section is missing from your config", markup=False)
-                        add_discord = input("Do you want to add Discord configuration? (y/n): ").lower() == "y"
-                        if add_discord:
-                            example_discord = example_config.get("DISCORD", {})
-                            config_data["DISCORD"] = configure_discord({}, example_discord, config_comments)
-                        else:
-                            config_data["DISCORD"] = example_config["DISCORD"].copy()
-                    else:
-                        # Check for missing keys within DISCORD section
-                        def find_missing_discord_keys(example_section: ConfigDict, existing_section: ConfigDict) -> None:
-                            for key in example_section:
-                                if key not in existing_section:
-                                    missing_discord_keys.append(key)
-                        find_missing_discord_keys(cast(ConfigDict, example_config["DISCORD"]), cast(ConfigDict, config_data["DISCORD"]))
-
-                if missing_discord_keys:
-                    console.print(f"\n[!] Your DISCORD config is missing these keys: {', '.join(missing_discord_keys)}", markup=False)
-                    add_missing_discord = input("Do you want to configure the missing Discord settings? (y/n): ").lower() == "y"
-                    if add_missing_discord:
-                        missing_discord_config = {k: example_config["DISCORD"][k] for k in missing_discord_keys}
-                        added_discord = configure_discord({}, missing_discord_config, config_comments)
-                        config_data["DISCORD"].update(added_discord)
-                    else:
-                        for key in missing_discord_keys:
-                            config_data["DISCORD"][key] = example_config["DISCORD"][key]
-
                 # Generate the updated config file
                 generate_config_file(config_data, existing_path)
         else:
             existing_config = validate_config(existing_config, example_config)
             config_data = existing_config.copy()
-            missing_default_keys: list[str] = []
-            if "DEFAULT" in example_config and "DEFAULT" in config_data:
-                def find_missing_default_keys(example_section: ConfigDict, existing_section: ConfigDict, _path: str = "") -> None:
-                    for key in example_section:
-                        if key not in existing_section:
-                            missing_default_keys.append(key)
-                find_missing_default_keys(cast(ConfigDict, example_config["DEFAULT"]), cast(ConfigDict, config_data["DEFAULT"]))
 
-            if missing_default_keys:
-                console.print("\n[!] Your existing config is missing these keys from example-config:", markup=False)
-
-                # Only prompt for the missing keys
-                missing_defaults = {k: example_config["DEFAULT"][k] for k in missing_default_keys}
-                added_defaults = configure_default_section({}, missing_defaults, config_comments)
-                config_data["DEFAULT"].update(added_defaults)
-
-            if "DISCORD" not in config_data and "DISCORD" in example_config:
-                console.print("\n[!] DISCORD section is missing from your config", markup=False)
-                config_data["DISCORD"] = example_config["DISCORD"].copy()
-                console.print("[i] Added DISCORD section with default values", markup=False)
-            elif "DISCORD" in config_data and "DISCORD" in example_config:
-                # Check for missing DISCORD keys
-                missing_discord_keys: list[str] = []
-                for key in example_config["DISCORD"]:
-                    if key not in config_data["DISCORD"]:
-                        missing_discord_keys.append(key)
-
-                if missing_discord_keys:
-                    console.print(f"\n[!] Your DISCORD config is missing these keys: {', '.join(missing_discord_keys)}", markup=False)
-                    for key in missing_discord_keys:
-                        config_data["DISCORD"][key] = example_config["DISCORD"][key]
-                    console.print("[i] Added missing DISCORD keys with default values", markup=False)
+            # Automatically add any missing keys/sections from example config
+            autofill_missing_keys(config_data, example_config)
 
             # Generate the updated config file
             generate_config_file(config_data, existing_path)

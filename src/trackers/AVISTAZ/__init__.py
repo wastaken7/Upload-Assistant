@@ -506,7 +506,9 @@ class AZTrackerBase:
             :12
         ]  # minimum number of screenshots is 3, so we can allow up to 12 menu images
 
-        audio_spectrogram_links = [img.get("raw_url") for img in meta.spectrograms_images if img.get("raw_url")]
+        audio_spectrogram_links = (
+            [img.get("raw_url") for img in meta.spectrograms_images if img.get("raw_url")] if self.config["TRACKERS"][self.tracker].get("add_audio_spectrogram", False) else []
+        )
 
         async def upload_local_file(path: Path):
             async with aiofiles.open(path, 'rb') as f:
