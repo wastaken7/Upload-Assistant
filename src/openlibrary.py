@@ -51,7 +51,6 @@ class OpenLibraryManager:
         work_id = work_id.strip()
         if not work_id:
             return None
-
         cache_dir = None
         cache_file = None
         if base_dir:
@@ -64,6 +63,9 @@ class OpenLibraryManager:
                         cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
                         cached_data = json.loads(cache_content)
                         if cached_data:
+                            if cached_data.get("not_found"):
+                                console.print(f"{openlibrary_color_str}: Work match not found (cached): {work_id}")
+                                return None
                             console.print(f"{openlibrary_color_str}: Work match found (cached): {work_id}")
                             return cached_data
                     except Exception as ex:
@@ -89,46 +91,54 @@ class OpenLibraryManager:
                         subtitle = data.get("subtitle")
                         metadata["title"] = f"{title}: {subtitle}" if subtitle else title
 
-                    # Description
-                    desc_val = data.get("description")
-                    if desc_val:
-                        desc = desc_val.get("value", "") if isinstance(desc_val, dict) else str(desc_val)
-                        metadata["overview"] = re.sub(r"<[^>]+>", "", desc).strip()
+                        # Description
+                        desc_val = data.get("description")
+                        if desc_val:
+                            desc = desc_val.get("value", "") if isinstance(desc_val, dict) else str(desc_val)
+                            metadata["overview"] = re.sub(r"<[^>]+>", "", desc).strip()
 
-                    # Cover
-                    covers = data.get("covers")
-                    if covers and isinstance(covers, list) and covers[0] > 0:
-                        metadata["poster"] = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg"
+                        # Cover
+                        covers = data.get("covers")
+                        if covers and isinstance(covers, list) and covers[0] > 0:
+                            metadata["poster"] = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg"
 
-                    # Authors
-                    authors_list = data.get("authors", [])
-                    author_names = []
-                    for author_entry in authors_list:
-                        author_obj = author_entry.get("author")
-                        if author_obj and "key" in author_obj:
-                            author_name = await self.get_author_name(author_obj["key"], client, cache_dir, debug)
-                            if author_name:
-                                author_names.append(author_name)
-                    if author_names:
-                        metadata["author"] = ", ".join(author_names)
+                        # Authors
+                        authors_list = data.get("authors", [])
+                        author_names = []
+                        for author_entry in authors_list:
+                            author_obj = author_entry.get("author")
+                            if author_obj and "key" in author_obj:
+                                author_name = await self.get_author_name(author_obj["key"], client, cache_dir, debug)
+                                if author_name:
+                                    author_names.append(author_name)
+                        if author_names:
+                            metadata["author"] = ", ".join(author_names)
 
-                    # Subjects / Keywords
-                    subjects = data.get("subjects")
-                    if subjects and isinstance(subjects, list):
-                        metadata["keywords"] = metadata["genres"] = [str(s) for s in subjects[:10] if s]
+                        # Subjects / Keywords
+                        subjects = data.get("subjects")
+                        if subjects and isinstance(subjects, list):
+                            metadata["keywords"] = metadata["genres"] = [str(s) for s in subjects[:10] if s]
 
-                    metadata["openlibrary"] = work_id
+                        metadata["openlibrary"] = work_id
 
-                    if metadata and cache_file:
-                        try:
-                            await asyncio.to_thread(Path(cache_file).write_text, json.dumps(metadata, indent=4), encoding="utf-8")
-                        except Exception as ex:
-                            if debug:
-                                console.print(f"[yellow]Warning: Could not write cache for Work ID '{work_id}': {ex}[/yellow]")
+                        if cache_file:
+                            try:
+                                await asyncio.to_thread(Path(cache_file).write_text, json.dumps(metadata, indent=4), encoding="utf-8")
+                            except Exception as ex:
+                                if debug:
+                                    console.print(f"[yellow]Warning: Could not write cache for Work ID '{work_id}': {ex}[/yellow]")
 
-                    return metadata
+                        return metadata
+                    else:
+                        console.print(f"{openlibrary_color_str}: No metadata found for Work ID: {work_id}")
+                        if cache_file:
+                            with contextlib.suppress(Exception):
+                                await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
                 else:
                     console.print(f"{openlibrary_color_str}: API returned error status code {resp.status_code} for Work ID: {work_id}")
+                    if resp.status_code == 404 and cache_file:
+                        with contextlib.suppress(Exception):
+                            await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
         except Exception as e:
             console.print(f"{openlibrary_color_str}: Network or query error for Work ID {work_id}: {e}")
 
@@ -152,6 +162,9 @@ class OpenLibraryManager:
                         cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
                         cached_data = json.loads(cache_content)
                         if cached_data:
+                            if cached_data.get("not_found"):
+                                console.print(f"{openlibrary_color_str}: ISBN match not found (cached): {clean_isbn}")
+                                return None
                             console.print(f"{openlibrary_color_str}: ISBN match found (cached): {clean_isbn}")
                             return cached_data
                     except Exception as ex:
@@ -206,6 +219,11 @@ class OpenLibraryManager:
                                     with contextlib.suppress(Exception):
                                         await asyncio.to_thread(Path(cache_file).write_text, json.dumps(metadata, indent=4), encoding="utf-8")
                                 return metadata
+                            else:
+                                if cache_file:
+                                    with contextlib.suppress(Exception):
+                                        await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
+                                return None
                         else:
                             # Parse metadata directly from details if no work key
                             metadata = {}
@@ -214,37 +232,48 @@ class OpenLibraryManager:
                                 subtitle = details.get("subtitle")
                                 metadata["title"] = f"{title}: {subtitle}" if subtitle else title
 
-                            authors = details.get("authors", [])
-                            author_names = [a.get("name") for a in authors if a.get("name")]
-                            if author_names:
-                                metadata["author"] = ", ".join(author_names)
+                                authors = details.get("authors", [])
+                                author_names = [a.get("name") for a in authors if a.get("name")]
+                                if author_names:
+                                    metadata["author"] = ", ".join(author_names)
 
-                            publishers = details.get("publishers")
-                            if publishers and isinstance(publishers, list):
-                                metadata["publisher"] = ", ".join(publishers)
+                                publishers = details.get("publishers")
+                                if publishers and isinstance(publishers, list):
+                                    metadata["publisher"] = ", ".join(publishers)
 
-                            publish_date = details.get("publish_date")
-                            if publish_date:
-                                year_match = re.search(r"\b\d{4}\b", str(publish_date))
-                                if year_match:
-                                    year_str = year_match.group(0)
-                                    metadata["year"] = year_str
-                                    metadata["search_year"] = int(year_str)
+                                publish_date = details.get("publish_date")
+                                if publish_date:
+                                    year_match = re.search(r"\b\d{4}\b", str(publish_date))
+                                    if year_match:
+                                        year_str = year_match.group(0)
+                                        metadata["year"] = year_str
+                                        metadata["search_year"] = int(year_str)
 
-                            thumbnail_url = book_data.get("thumbnail_url")
-                            if thumbnail_url:
-                                metadata["poster"] = thumbnail_url.replace("-S.jpg", "-L.jpg")
+                                thumbnail_url = book_data.get("thumbnail_url")
+                                if thumbnail_url:
+                                    metadata["poster"] = thumbnail_url.replace("-S.jpg", "-L.jpg")
 
-                            metadata["isbn"] = clean_isbn
+                                metadata["isbn"] = clean_isbn
 
-                            if metadata and cache_file:
-                                with contextlib.suppress(Exception):
-                                    await asyncio.to_thread(Path(cache_file).write_text, json.dumps(metadata, indent=4), encoding="utf-8")
-                            return metadata
+                                if metadata and cache_file:
+                                    with contextlib.suppress(Exception):
+                                        await asyncio.to_thread(Path(cache_file).write_text, json.dumps(metadata, indent=4), encoding="utf-8")
+                                return metadata
+                            else:
+                                if cache_file:
+                                    with contextlib.suppress(Exception):
+                                        await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
+                                return None
                     else:
                         console.print(f"{openlibrary_color_str}: No items found for ISBN: {clean_isbn}")
+                        if cache_file:
+                            with contextlib.suppress(Exception):
+                                await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
                 else:
                     console.print(f"{openlibrary_color_str}: API returned error status code {resp.status_code} for ISBN: {clean_isbn}")
+                    if resp.status_code == 404 and cache_file:
+                        with contextlib.suppress(Exception):
+                            await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
         except Exception as e:
             console.print(f"{openlibrary_color_str}: Network or query error for ISBN {clean_isbn}: {e}")
 

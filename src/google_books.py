@@ -13,6 +13,7 @@ from src.console import console
 
 google_color_str = "[#4285f4]G[/#4285f4][#ea4335]o[/#ea4335][#fbbc05]o[/#fbbc05][#4285f4]g[/#4285f4][#34a853]l[/#34a853][#ea4335]e[/#ea4335] [#4285f4]Books[/#4285f4]"
 
+
 class GoogleBooksManager:
     def _parse_volume_info(self, data: dict[str, Any], isbn: str, debug: bool = False) -> Optional[dict[str, Any]]:
         """
@@ -119,12 +120,22 @@ class GoogleBooksManager:
                         cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
                         cached_data = json.loads(cache_content)
                         if cached_data:
-                            console.print(f"{google_color_str}: ISBN match found (cached): {clean_isbn}")
-
                             # Support backwards compatibility if cache is in the old parsed format
                             if "items" in cached_data or "totalItems" in cached_data:
-                                return self._parse_volume_info(cached_data, isbn, debug)
+                                if cached_data.get("totalItems", 0) == 0:
+                                    console.print(f"{google_color_str}: ISBN match not found (cached): {clean_isbn}")
+                                    return None
+                                parsed_meta = self._parse_volume_info(cached_data, isbn, debug)
+                                if parsed_meta:
+                                    console.print(f"{google_color_str}: ISBN match found (cached): {clean_isbn}")
+                                else:
+                                    console.print(f"{google_color_str}: ISBN match not found (cached): {clean_isbn}")
+                                return parsed_meta
                             else:
+                                if cached_data.get("not_found"):
+                                    console.print(f"{google_color_str}: ISBN match not found (cached): {clean_isbn}")
+                                    return None
+                                console.print(f"{google_color_str}: ISBN match found (cached): {clean_isbn}")
                                 return cached_data
                     except Exception as ex:
                         if debug:
@@ -147,28 +158,42 @@ class GoogleBooksManager:
                     total_items = data.get("totalItems", 0)
                     if total_items > 0 and "items" in data:
                         metadata = self._parse_volume_info(data, isbn, debug)
+                        # Save full response to cache since response was successful
+                        if cache_file:
+                            try:
+                                cache_content = json.dumps(data, indent=4)
+                                await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
+                                if debug:
+                                    console.print(f"{google_color_str}: Saved cache for ISBN: {clean_isbn}")
+                            except Exception as ex:
+                                if debug:
+                                    console.print(f"[yellow]Warning: Could not write cache for ISBN '{clean_isbn}': {ex}[/yellow]")
                         if metadata:
                             console.print(f"{google_color_str}: ISBN match found: {clean_isbn}")
-
-                            # Save full response to cache since response was successful
-                            if cache_file:
-                                try:
-                                    cache_content = json.dumps(data, indent=4)
-                                    await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
-                                    if debug:
-                                        console.print(f"{google_color_str}: Saved cache for ISBN: {clean_isbn}")
-                                except Exception as ex:
-                                    if debug:
-                                        console.print(f"[yellow]Warning: Could not write cache for ISBN '{clean_isbn}': {ex}[/yellow]")
-
-                            return metadata
+                        return metadata
                     else:
                         console.print(f"{google_color_str}: No items found for ISBN: {clean_isbn}")
+                        if cache_file:
+                            try:
+                                cache_content = json.dumps(data, indent=4)
+                                await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
+                                if debug:
+                                    console.print(f"{google_color_str}: Saved empty cache for ISBN: {clean_isbn}")
+                            except Exception as ex:
+                                if debug:
+                                    console.print(f"[yellow]Warning: Could not write cache for ISBN '{clean_isbn}': {ex}[/yellow]")
                 else:
                     if resp.status_code == 429:
                         console.print(f"{google_color_str}: Rate limited (Status 429) for ISBN: {clean_isbn}")
                     else:
                         console.print(f"{google_color_str}: API returned error status code {resp.status_code} for ISBN: {clean_isbn}")
+                        if resp.status_code == 404 and cache_file:
+                            try:
+                                cache_content = json.dumps({"not_found": True}, indent=4)
+                                await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
+                            except Exception as ex:
+                                if debug:
+                                    console.print(f"[yellow]Warning: Could not write cache for ISBN '{clean_isbn}': {ex}[/yellow]")
         except Exception as e:
             console.print(f"{google_color_str}: Network or query error for ISBN {clean_isbn}: {e}")
 
