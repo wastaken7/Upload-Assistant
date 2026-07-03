@@ -2737,6 +2737,19 @@ config = {
         # Uploader backend: "nyuu" (default) or "pesto"
         # pesto handles PAR2 and NZB password injection internally
         "usenet_uploader": "nyuu",
+        # pesto only: after posting, verify every article is retrievable on the
+        # server via STAT. Missing articles are reposted and reverified
+        # automatically; the upload is only considered successful (and the NZB
+        # kept) once every article is confirmed. Strongly recommended — without
+        # this, a "successfully posted" article can still be missing/unpropagated
+        # on the server, producing a broken NZB.
+        "pesto_check": True,
+        # Seconds to wait after the last article is posted before verifying (pesto --check-delay)
+        "pesto_check_delay": 30,
+        # Number of STAT attempts per article before marking it missing (pesto --check-retries)
+        "pesto_check_retries": 3,
+        # Parallel connections used for the verification pass (empty = same as "connections")
+        "pesto_check_connections": "",
         # Paths to binaries (defaults to looking in PATH, downloaded automatically if not found)
         # Available at: https://github.com/animetosho/nyuu
         "nyuu_path": "nyuu",

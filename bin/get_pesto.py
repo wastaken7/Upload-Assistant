@@ -22,7 +22,7 @@ class PestoBinaryManager:
     """Download Pesto binaries for the host architecture."""
 
     @staticmethod
-    async def ensure_pesto_binary(base_dir: str | Path, debug: bool, version: str = "v0.3.34") -> str:
+    async def ensure_pesto_binary(base_dir: str | Path, debug: bool, version: str = "v0.3.35") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         if debug:
