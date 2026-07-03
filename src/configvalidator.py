@@ -651,6 +651,11 @@ def _validate_usenet_section(usenet: dict[str, Any], is_usenet_active: bool = Fa
         "7z_path": (str,),
         "nzb_output_dir": (str,),
         "usenet_tmp_dir": (str,),
+        "usenet_uploader": (str,),
+        "pesto_check": (bool,),
+        "pesto_check_delay": (str, int),
+        "pesto_check_retries": (str, int),
+        "pesto_check_connections": (str, int),
     }
 
     for key, expected_types in usenet_key_types.items():
@@ -662,7 +667,7 @@ def _validate_usenet_section(usenet: dict[str, Any], is_usenet_active: bool = Fa
                 )
 
     # Validate numeric string values
-    for key in ["port", "connections", "par2_percentage"]:
+    for key in ["port", "connections", "par2_percentage", "pesto_check_delay", "pesto_check_retries", "pesto_check_connections"]:
         if key in usenet:
             value = usenet[key]
             if isinstance(value, str) and value.strip():

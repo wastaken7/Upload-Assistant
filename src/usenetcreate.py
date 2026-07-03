@@ -503,6 +503,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: Optional[str] = None, deb
                         attempt = event.get("attempt", 0)
                         max_attempts = event.get("max_attempts", 0)
                         delay = event.get("delay_secs", 0)
+                        check_wait_total = delay
                         if debug:
                             console.print(f"[cyan]Article check: retry {attempt}/{max_attempts} in {delay}s...[/cyan]")
                 except json.JSONDecodeError:
@@ -900,13 +901,13 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> Optio
         if usenet_cfg.get("pesto_check", True):
             cmd_pesto.append("--check")
             check_delay = usenet_cfg.get("pesto_check_delay")
-            if check_delay:
+            if check_delay is not None and str(check_delay).strip() != "":
                 cmd_pesto.extend(["--check-delay", str(check_delay)])
             check_retries = usenet_cfg.get("pesto_check_retries")
-            if check_retries:
+            if check_retries is not None and str(check_retries).strip() != "":
                 cmd_pesto.extend(["--check-retries", str(check_retries)])
             check_connections = usenet_cfg.get("pesto_check_connections")
-            if check_connections:
+            if check_connections is not None and str(check_connections).strip() != "":
                 cmd_pesto.extend(["--check-connections", str(check_connections)])
 
         cmd_pesto.extend(all_upload_files)
