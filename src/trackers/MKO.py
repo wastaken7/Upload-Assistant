@@ -803,8 +803,6 @@ class MKO:
             except TypeError, ValueError:
                 upload_height = 0
 
-            print(f"Resolution: {resolution}\n")
-            print(f"UPLOAD_HEIGHT: {upload_height}\n")
             if resolution >= upload_height:
                 console.print(f"[cyan]{self.tracker}:[/cyan] [bold red]Aborting: A better or equivalent Hidef release exists:[/bold red] {title}")
                 meta.skipping = self.tracker
