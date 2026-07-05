@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from src.book_prep import detect_newspaper, sanitize_book_author, sanitize_book_language
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
 
@@ -555,7 +555,7 @@ class Args:
 
         # Validation: require either path, site_upload, or webui
         if not parsed_args.get("path") and not parsed_args.get("site_upload") and not parsed_args.get("webui"):
-            console.print("[red]Error: Either a path must be provided, --site-upload must be specified, or --webui must be specified.[/red]")
+            logger.error("[red]Error: Either a path must be provided, --site-upload must be specified, or --webui must be specified.[/red]")
             parser.print_help()
             sys.exit(1)
 
@@ -604,8 +604,8 @@ class Args:
                             try:
                                 meta.ptp = urllib.parse.parse_qs(parsed.query)["torrentid"][0]
                             except Exception:
-                                console.print("[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid")
-                                console.print("[red]Continuing without -ptp")
+                                logger.info("[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid")
+                                logger.info("[red]Continuing without -ptp")
                         else:
                             meta.ptp = value2
                     elif key == "blu":
@@ -617,8 +617,8 @@ class Args:
                                     blupath = blupath[:-1]
                                 meta.blu = blupath.split("/")[-1]
                             except Exception:
-                                console.print("[red]Unable to parse id from url")
-                                console.print("[red]Continuing without --blu")
+                                logger.info("[red]Unable to parse id from url")
+                                logger.info("[red]Continuing without --blu")
                         else:
                             meta.blu = value2
                     elif key == "aither":
@@ -630,8 +630,8 @@ class Args:
                                     aitherpath = aitherpath[:-1]
                                 meta.aither = aitherpath.split("/")[-1]
                             except Exception:
-                                console.print("[red]Unable to parse id from url")
-                                console.print("[red]Continuing without --aither")
+                                logger.info("[red]Unable to parse id from url")
+                                logger.info("[red]Continuing without --aither")
                         else:
                             meta.aither = value2
                     elif key == "lst":
@@ -643,8 +643,8 @@ class Args:
                                     lstpath = lstpath[:-1]
                                 meta.lst = lstpath.split("/")[-1]
                             except Exception:
-                                console.print("[red]Unable to parse id from url")
-                                console.print("[red]Continuing without --lst")
+                                logger.info("[red]Unable to parse id from url")
+                                logger.info("[red]Continuing without --lst")
                         else:
                             meta.lst = value2
                     elif key == "openlibrary":
@@ -659,8 +659,8 @@ class Args:
                                 else:
                                     meta.openlibrary = path_parts[-1]
                             except Exception:
-                                console.print("[red]Unable to parse OpenLibrary ID from url")
-                                console.print("[red]Continuing without --openlibrary")
+                                logger.info("[red]Unable to parse OpenLibrary ID from url")
+                                logger.info("[red]Continuing without --openlibrary")
                         else:
                             meta.openlibrary = value2
                     elif key == "oe":
@@ -672,8 +672,8 @@ class Args:
                                     oepath = oepath[:-1]
                                 meta.oe = oepath.split("/")[-1]
                             except Exception:
-                                console.print("[red]Unable to parse id from url")
-                                console.print("[red]Continuing without --oe")
+                                logger.info("[red]Unable to parse id from url")
+                                logger.info("[red]Continuing without --oe")
                         else:
                             meta.oe = value2
                     elif key == "ulcx":
@@ -685,8 +685,8 @@ class Args:
                                     ulcxpath = ulcxpath[:-1]
                                 meta.ulcx = ulcxpath.split("/")[-1]
                             except Exception:
-                                console.print("[red]Unable to parse id from url")
-                                console.print("[red]Continuing without --ulcx")
+                                logger.info("[red]Unable to parse id from url")
+                                logger.info("[red]Continuing without --ulcx")
                         else:
                             meta.ulcx = value2
                     elif key == "hdb":
@@ -695,8 +695,8 @@ class Args:
                             try:
                                 meta.hdb = urllib.parse.parse_qs(parsed.query)["id"][0]
                             except Exception:
-                                console.print("[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid")
-                                console.print("[red]Continuing without -hdb")
+                                logger.info("[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid")
+                                logger.info("[red]Continuing without -hdb")
                         else:
                             meta.hdb = value2
 
@@ -706,8 +706,8 @@ class Args:
                             try:
                                 meta.btn = urllib.parse.parse_qs(parsed.query)["id"][0]
                             except Exception:
-                                console.print("[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid")
-                                console.print("[red]Continuing without -hdb")
+                                logger.info("[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid")
+                                logger.info("[red]Continuing without -hdb")
                         else:
                             meta.btn = value2
 
@@ -728,10 +728,10 @@ class Args:
                                 else:
                                     meta.bhd = bhdpath.split("/")[-1]
 
-                                console.print(f"[green]Parsed BHD torrent ID: {meta.bhd}")
+                                logger.info(f"[green]Parsed BHD torrent ID: {meta.bhd}")
                             except Exception as e:
-                                console.print(f"[red]Unable to parse id from url: {e}")
-                                console.print("[red]Continuing without --bhd")
+                                logger.info(f"[red]Unable to parse id from url: {e}")
+                                logger.info("[red]Continuing without --bhd")
                         else:
                             meta.bhd = value2
 
@@ -744,8 +744,8 @@ class Args:
                                     hunopath = hunopath[:-1]
                                 meta.huno = hunopath.split("/")[-1]
                             except Exception:
-                                console.print("[red]Unable to parse id from url")
-                                console.print("[red]Continuing without --huno")
+                                logger.info("[red]Unable to parse id from url")
+                                logger.info("[red]Continuing without --huno")
                         else:
                             meta.huno = value2
 
@@ -759,7 +759,7 @@ class Args:
                                 else:
                                     meta.steam_manual = value2
                             except Exception:
-                                console.print("[red]Unable to parse Steam ID from URL. Using raw value.[/red]")
+                                logger.info("[red]Unable to parse Steam ID from URL. Using raw value.[/red]")
                                 meta.steam_manual = value2
                         else:
                             meta.steam_manual = value2
@@ -889,8 +889,8 @@ class Args:
                 frames_str = str(manual_frames_value)
                 meta.manual_frames = [int(t.strip()) for t in frames_str.split(",") if t.strip()]
             except ValueError:
-                console.print("[red]Invalid format for manual_frames. Please provide a comma-separated list of integers.")
-                console.print(f"Processed manual_frames: {manual_frames_value}")
+                logger.info("[red]Invalid format for manual_frames. Please provide a comma-separated list of integers.")
+                logger.info(f"Processed manual_frames: {manual_frames_value}")
                 sys.exit(1)
         else:
             meta.manual_frames = None

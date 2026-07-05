@@ -12,7 +12,7 @@ import aiofiles
 import httpx
 from PIL import Image
 
-from src.console import console
+from src.console import console, logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -61,7 +61,7 @@ class UNIT3D:
 
         if not self.api_key:
             if not meta.debug:
-                console.print(
+                logger.info(
                     f"[bold red]{self.tracker}: Missing API key in config file. Skipping upload...[/bold red]"
                 )
             meta.skipping = f"{self.tracker}"
@@ -174,7 +174,7 @@ class UNIT3D:
                             }
                         dupes.append(result)
                 else:
-                    console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+                    logger.info(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
 
         return dupes
 
@@ -441,7 +441,7 @@ class UNIT3D:
                     if cover_bytes:
                         files["torrent-cover"] = ("cover.jpg", cover_bytes, "image/jpeg")
                 except Exception as e:
-                    console.print(f"[yellow]Failed to process cover: {e}[/yellow]")
+                    logger.info(f"[yellow]Failed to process cover: {e}[/yellow]")
 
             banner_path = meta.banner_path
             if banner_path and os.path.exists(banner_path):
@@ -450,7 +450,7 @@ class UNIT3D:
                     if banner_bytes:
                         files["torrent-banner"] = ("banner.jpg", banner_bytes, "image/jpeg")
                 except Exception as e:
-                    console.print(f"[yellow]Failed to process banner: {e}[/yellow]")
+                    logger.info(f"[yellow]Failed to process banner: {e}[/yellow]")
 
         return files
 
@@ -488,7 +488,7 @@ class UNIT3D:
                         if not response_data.get("success"):
                             error_msg = response_data.get("message", "Unknown error")
                             meta.tracker_status[self.tracker]["status_message"] = f"API error: {error_msg}"
-                            console.print(f"[yellow]Upload to {self.tracker} failed: {error_msg}[/yellow]")
+                            logger.info(f"[yellow]Upload to {self.tracker} failed: {error_msg}[/yellow]")
                             return False
 
                         meta.tracker_status[self.tracker]["status_message"] = await self.process_response_data(response_data)
@@ -517,7 +517,7 @@ class UNIT3D:
                     else:
                         # Retry other HTTP errors
                         if attempt < max_retries - 1:
-                            console.print(
+                            logger.info(
                                 f"[yellow]{self.tracker}: HTTP {e.response.status_code} error, retrying in {retry_delay} seconds... (attempt {attempt + 1}/{max_retries})[/yellow]"
                             )
                             await asyncio.sleep(retry_delay)
@@ -532,7 +532,7 @@ class UNIT3D:
                 except httpx.TimeoutException:
                     if attempt < max_retries - 1:
                         timeout = timeout * 1.5  # Increase timeout by 50% for next retry
-                        console.print(
+                        logger.info(
                             f"[yellow]{self.tracker}: Request timed out, retrying in {retry_delay} seconds with {timeout}s timeout... (attempt {attempt + 1}/{max_retries})[/yellow]"
                         )
                         await asyncio.sleep(retry_delay)
@@ -542,7 +542,7 @@ class UNIT3D:
                         return False  # Timeout after all retries
                 except httpx.RequestError as e:
                     if attempt < max_retries - 1:
-                        console.print(
+                        logger.info(
                             f"[yellow]{self.tracker}: Request error, retrying in {retry_delay} seconds... (attempt {attempt + 1}/{max_retries})[/yellow]"
                         )
                         await asyncio.sleep(retry_delay)
@@ -554,8 +554,8 @@ class UNIT3D:
                     meta.tracker_status[self.tracker]["status_message"] = f"data error: Invalid JSON response from {self.tracker}. Error: {e}"
                     return False  # JSON parsing error
         else:
-            console.print(f"[cyan]{self.tracker} Request Data:")
-            console.print(data)
+            logger.info(f"[cyan]{self.tracker} Request Data:")
+            logger.info(data)
             meta.tracker_status[self.tracker]["status_message"] = f"Debug mode enabled, not uploading: {self.tracker}."
             await self.common.create_torrent_for_upload(
                 meta,
@@ -575,7 +575,7 @@ class UNIT3D:
             if match:
                 torrent_id = match.group(1)
         except (IndexError, KeyError):
-            console.print("Could not parse torrent_id from response data.")
+            logger.info("Could not parse torrent_id from response data.")
         return torrent_id
 
     async def process_response_data(self, response_data: dict[str, Any]) -> str:

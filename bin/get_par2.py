@@ -10,7 +10,7 @@ import aiofiles
 import httpx
 
 try:
-    from src.console import console
+    from src.console import console, logger
 except ImportError:
     class SimpleConsole:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
@@ -26,8 +26,7 @@ class Par2BinaryManager:
     async def ensure_par2_binary(base_dir: str | Path, debug: bool, version: str = "v1.4.0") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
-        if debug:
-            console.print(f"[blue]PAR2: Detected system: {system}, architecture: {machine}[/blue]")
+        logger.debug(f"[blue]PAR2: Detected system: {system}, architecture: {machine}[/blue]")
 
         # Strip 'v' from version for URLs if needed, but the tag is v1.4.0, while filenames have 1.4.0
         v_num = version.lstrip("v")
@@ -70,11 +69,10 @@ class Par2BinaryManager:
         binary_valid = binary_exists and binary_executable
 
         if version_path.exists() and version_path.is_file() and binary_valid:
-            if debug:
-                console.print("[blue]PAR2 binary is up to date[/blue]")
+            logger.debug("[blue]PAR2 binary is up to date[/blue]")
             return str(binary_path)
 
-        console.print("[yellow]Binary 'par2' not found. Attempting to download automatically...[/yellow]")
+        logger.info("[yellow]Binary 'par2' not found. Attempting to download automatically...[/yellow]")
 
         # Cleanup old files
         if binary_path.exists():
@@ -83,8 +81,7 @@ class Par2BinaryManager:
             os.remove(version_path)
 
         download_url = f"https://github.com/animetosho/par2cmdline-turbo/releases/download/{version}/{file_pattern}"
-        if debug:
-            console.print(f"[blue]PAR2 Download URL: {download_url}[/blue]")
+        logger.debug(f"[blue]PAR2 Download URL: {download_url}[/blue]")
 
         try:
             async with (
@@ -97,8 +94,7 @@ class Par2BinaryManager:
                     async for chunk in response.aiter_bytes(chunk_size=8192):
                         await f.write(chunk)
 
-            if debug:
-                console.print(f"[green]Downloaded PAR2 package: {file_pattern}[/green]")
+            logger.debug(f"[green]Downloaded PAR2 package: {file_pattern}[/green]")
 
             try:
                 with zipfile.ZipFile(temp_file, "r") as zip_ref:

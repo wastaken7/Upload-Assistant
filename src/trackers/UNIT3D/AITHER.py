@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
-from src.console import console
+from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -36,7 +36,7 @@ class AITHER(UNIT3D):
             return False
 
         if meta.valid_mi is False:
-            console.print(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
+            logger.info(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
             return False
 
         return should_continue

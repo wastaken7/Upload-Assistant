@@ -2,7 +2,7 @@
 import re
 from typing import Any
 
-from src.console import console
+from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -151,11 +151,11 @@ class ITT(UNIT3D):
         try:
             itt_name = ' '.join(itt_name.split())
         except Exception:
-            console.print("[bold red]Unable to generate name. Please re-run and correct any of the following args if needed.")
-            console.print(f"--category [yellow]{meta.category}")
-            console.print(f"--type [yellow]{meta.type}")
-            console.print(f"--source [yellow]{meta.source}")
-            console.print("[bold green]If you specified type, try also specifying source")
+            logger.info("[bold red]Unable to generate name. Please re-run and correct any of the following args if needed.")
+            logger.info(f"--category [yellow]{meta.category}")
+            logger.info(f"--type [yellow]{meta.type}")
+            logger.info(f"--source [yellow]{meta.source}")
+            logger.info("[bold green]If you specified type, try also specifying source")
 
             exit()
         name_notag = itt_name
@@ -185,7 +185,7 @@ class ITT(UNIT3D):
         if not await self.common.check_language_requirements(
             meta, self.tracker, languages_to_check=italian_languages, check_audio=True
         ):
-            console.print(
+            logger.info(
                 "Upload Rules: https://itatorrents.xyz/wikis/5"
             )
             return False

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import httpx
 
-from src.console import console
+from src.console import logger
 
 
 class FfmpegBinaryManager:
@@ -24,7 +24,7 @@ class FfmpegBinaryManager:
         """
         # Use platform.system() for a well-typed string
         system = platform.system().lower()
-        console.print(f"[blue]Detected system: {system}[/blue]")
+        logger.info(f"[blue]Detected system: {system}[/blue]")
 
         if 'linux' not in system:
             raise Exception(f"This script is for Docker/Linux only, detected: {system}")
@@ -39,7 +39,7 @@ class FfmpegBinaryManager:
             try:
                 arch_dir = ff_root / arch
                 arch_dir.mkdir(parents=True, exist_ok=True)
-                console.print(f"[blue]Downloading ffmpeg for arch {arch} from {url}[/blue]")
+                logger.info(f"[blue]Downloading ffmpeg for arch {arch} from {url}[/blue]")
 
                 temp_archive = arch_dir / f"ffmpeg_{arch}.tar.xz"
                 with httpx.Client(timeout=60.0, follow_redirects=True) as client, client.stream('GET', url, timeout=60.0) as response:
@@ -48,7 +48,7 @@ class FfmpegBinaryManager:
                         for chunk in response.iter_bytes(chunk_size=8192):
                             f.write(chunk)
 
-                console.print(f"[green]Downloaded {temp_archive.name}[/green]")
+                logger.info(f"[green]Downloaded {temp_archive.name}[/green]")
 
                 # Extract into a temporary directory to avoid polluting target
                 with tempfile.TemporaryDirectory(dir=str(arch_dir)) as extract_dir:
@@ -59,7 +59,7 @@ class FfmpegBinaryManager:
                             for member in members:
                                 # Prevent absolute paths and traversal
                                 if os.path.isabs(member.name) or '..' in Path(member.name).parts:
-                                    console.print(f"[yellow]Skipping unsafe member: {member.name}[/yellow]")
+                                    logger.info(f"[yellow]Skipping unsafe member: {member.name}[/yellow]")
                                     continue
                                 tar_ref.extract(member, path=extract_dir)
 
@@ -74,18 +74,18 @@ class FfmpegBinaryManager:
                                 break
 
                         if not found:
-                            console.print(f"[red]ffmpeg binary not found inside archive for {arch}[/red]")
+                            logger.info(f"[red]ffmpeg binary not found inside archive for {arch}[/red]")
                             results[arch] = False
                         else:
                             target_path = arch_dir / 'ffmpeg'
                             shutil.move(found, target_path)
                             # Ensure executable
                             target_path.chmod(target_path.stat().st_mode | 0o111)
-                            console.print(f"[green]Installed ffmpeg for {arch} at: {target_path}[/green]")
+                            logger.info(f"[green]Installed ffmpeg for {arch} at: {target_path}[/green]")
                             results[arch] = True
 
                     except tarfile.TarError as e:
-                        console.print(f"[red]Failed to extract archive for {arch}: {e}[/red]")
+                        logger.error(f"[red]Failed to extract archive for {arch}: {e}[/red]")
                         results[arch] = False
 
                 # Clean up archive file
@@ -93,15 +93,15 @@ class FfmpegBinaryManager:
                     temp_archive.unlink()
 
             except (httpx.RequestError, httpx.HTTPStatusError) as e:
-                console.print(f"[red]Failed to download ffmpeg for {arch}: {e}[/red]")
+                logger.error(f"[red]Failed to download ffmpeg for {arch}: {e}[/red]")
                 results[arch] = False
 
         # Summarize
         for a, ok in results.items():
             if ok:
-                console.print(f"[green]ffmpeg {a} ready[/green]")
+                logger.info(f"[green]ffmpeg {a} ready[/green]")
             else:
-                console.print(f"[yellow]ffmpeg {a} missing or failed to install[/yellow]")
+                logger.info(f"[yellow]ffmpeg {a} missing or failed to install[/yellow]")
 
         return str(ff_root)
 

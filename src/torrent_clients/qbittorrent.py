@@ -18,7 +18,7 @@ import qbittorrentapi
 from torf import Torrent
 
 from cogs.redaction import Redaction
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.torrentcreate import TorrentCreator
 
@@ -73,7 +73,7 @@ class QbittorrentClientMixin:
         if not isinstance(info_hash_v1, str) or not info_hash_v1:
             return meta
         if meta.debug:
-            console.print(f"[cyan]Searching for infohash: {info_hash_v1}")
+            logger.debug(f"[cyan]Searching for infohash: {info_hash_v1}")
 
         class TorrentInfo:
             def __init__(self, properties_data: dict[str, Any]) -> None:
@@ -93,11 +93,11 @@ class QbittorrentClientMixin:
                 if response.status_code == 200:
                     torrent_properties = response.json()
                     if meta.debug:
-                        console.print(f"[cyan]Retrieved torrent properties via proxy for hash: {info_hash_v1}")
+                        logger.debug(f"[cyan]Retrieved torrent properties via proxy for hash: {info_hash_v1}")
 
                     torrents = [TorrentInfo(torrent_properties)]
                 else:
-                    console.print(f"[bold red]Failed to get torrent properties via proxy: {response.status_code}")
+                    logger.info(f"[bold red]Failed to get torrent properties via proxy: {response.status_code}")
                     if qbt_session is not None:
                         await qbt_session.aclose()
                     return meta
@@ -111,19 +111,19 @@ class QbittorrentClientMixin:
                         initial_timeout=14.0
                     )
                     if meta.debug:
-                        console.print(f"[cyan]Retrieved torrent properties via client for hash: {info_hash_v1}")
+                        logger.debug(f"[cyan]Retrieved torrent properties via client for hash: {info_hash_v1}")
 
                     torrents = [TorrentInfo(torrent_properties)]
                 except Exception as e:
-                    console.print(f"[yellow]Failed to get properties: {e}")
+                    logger.info(f"[yellow]Failed to get properties: {e}")
                     return meta
         except TimeoutError:
-            console.print("[bold red]Getting torrents list timed out after retries")
+            logger.info("[bold red]Getting torrents list timed out after retries")
             if qbt_session:
                 await qbt_session.aclose()
             return meta
         except Exception as e:
-            console.print(f"[bold red]Error getting torrents list: {e}")
+            logger.info(f"[bold red]Error getting torrents list: {e}")
             if qbt_session:
                 await qbt_session.aclose()
             return meta
@@ -154,7 +154,7 @@ class QbittorrentClientMixin:
                     cast(list[dict[str, Any]], torrent_comments).append(comment_data)
 
                     if meta.debug:
-                        console.print(f"[cyan]Stored comment for torrent: {comment[:100]}...")
+                        logger.debug(f"[cyan]Stored comment for torrent: {comment[:100]}...")
 
                     tracker_ids: dict[str, str] = self._extract_tracker_ids_from_comment(comment)
                     meta.update(tracker_ids)
@@ -162,10 +162,10 @@ class QbittorrentClientMixin:
                     if tracker_ids:
                         for tracker in tracker_ids:
                             if meta.get(tracker):
-                                console.print(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
+                                logger.info(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
 
                     if meta.torrent_comments and meta.debug:
-                        console.print(f"[green]Stored {len(meta.torrent_comments)} torrent comments for later use")
+                        logger.info(f"[green]Stored {len(meta.torrent_comments)} torrent comments for later use")
 
                     if not pathed:
                         torrent_storage_dir = client.get('torrent_storage_dir')
@@ -173,7 +173,7 @@ class QbittorrentClientMixin:
                             # Export .torrent file
                             torrent_hash = getattr(torrent, 'infohash_v1', '')
                             if meta.debug:
-                                console.print(f"[cyan]Exporting .torrent file for hash: {torrent_hash}")
+                                logger.debug(f"[cyan]Exporting .torrent file for hash: {torrent_hash}")
 
                             try:
                                 if proxy_url:
@@ -184,7 +184,7 @@ class QbittorrentClientMixin:
                                     if response.status_code == 200:
                                         torrent_file_content = response.content
                                     else:
-                                        console.print(f"[red]Failed to export torrent via proxy: {response.status_code}")
+                                        logger.error(f"[red]Failed to export torrent via proxy: {response.status_code}")
                                         continue
                                 else:
                                     if qbt_client is None:
@@ -203,25 +203,25 @@ class QbittorrentClientMixin:
                                 valid, _ = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, 'qbit', client)
                                 if not valid:
                                     if meta.debug:
-                                        console.print(f"[bold red]Validation failed for {torrent_file_path}")
+                                        logger.debug(f"[bold red]Validation failed for {torrent_file_path}")
                                     os.remove(torrent_file_path)  # Remove invalid file
                                 else:
                                     await TorrentCreator.create_base_from_existing_torrent(torrent_file_path, meta.base_dir, meta.uuid)
                             except TimeoutError:
-                                console.print(f"[bold red]Failed to export .torrent for {torrent_hash} after retries")
+                                logger.info(f"[bold red]Failed to export .torrent for {torrent_hash} after retries")
 
                         found = True
                         break
             except Exception as e:
                 if qbt_session:
                     await qbt_session.aclose()
-                console.print(f"[bold red]Error processing torrent {getattr(torrent, 'name', 'Unknown')}: {e}")
+                logger.info(f"[bold red]Error processing torrent {getattr(torrent, 'name', 'Unknown')}: {e}")
                 if meta.debug:
-                    console.print(f"[bold red]Traceback: {traceback.format_exc()}")
+                    logger.debug(f"[bold red]Traceback: {traceback.format_exc()}")
                 continue
 
         if not found:
-            console.print("[bold red]Matching site torrent with the specified infohash_v1 not found.")
+            logger.info("[bold red]Matching site torrent with the specified infohash_v1 not found.")
 
         if qbt_session:
             await qbt_session.aclose()
@@ -249,14 +249,14 @@ class QbittorrentClientMixin:
             try:
                 result = await asyncio.wait_for(operation_func(), timeout=timeout)
                 if attempt > 0:
-                    console.print(f"[green]{operation_name} succeeded on attempt {attempt + 1}")
+                    logger.info(f"[green]{operation_name} succeeded on attempt {attempt + 1}")
                 return result
             except TimeoutError:
                 if attempt < max_retries:
-                    console.print(f"[yellow]{operation_name} timed out after {timeout}s (attempt {attempt + 1}/{max_retries + 1}), retrying...")
+                    logger.info(f"[yellow]{operation_name} timed out after {timeout}s (attempt {attempt + 1}/{max_retries + 1}), retrying...")
                     await asyncio.sleep(1)  # Brief pause before retry
                 else:
-                    console.print(f"[bold red]{operation_name} failed after {max_retries + 1} attempts (final timeout: {timeout}s)")
+                    logger.info(f"[bold red]{operation_name} failed after {max_retries + 1} attempts (final timeout: {timeout}s)")
                     raise  # Re-raise the TimeoutError so caller can handle it
 
     async def init_qbittorrent_client(self, client: dict[str, Any]) -> qbittorrentapi.Client | None:
@@ -280,13 +280,13 @@ class QbittorrentClientMixin:
                 try:
                     await self.retry_qbt_operation(lambda: asyncio.to_thread(qbt_client.app_version), "qBittorrent API Key verification")
                 except TimeoutError:
-                    console.print("[bold red]Connection to qBittorrent timed out after retries")
+                    logger.info("[bold red]Connection to qBittorrent timed out after retries")
                     return None
                 except qbittorrentapi.APIConnectionError:
-                    console.print("[bold red]Failed to connect to qBittorrent - check host/port/API Key")
+                    logger.info("[bold red]Failed to connect to qBittorrent - check host/port/API Key")
                     return None
                 except Exception as e:
-                    console.print(f"[bold red]Failed to verify qBittorrent API Key: {e}")
+                    logger.info(f"[bold red]Failed to verify qBittorrent API Key: {e}")
                     return None
             else:
                 qbt_client = qbittorrentapi.Client(
@@ -299,13 +299,13 @@ class QbittorrentClientMixin:
                 try:
                     await self.retry_qbt_operation(lambda: asyncio.to_thread(qbt_client.auth_log_in), "qBittorrent login")
                 except TimeoutError:
-                    console.print("[bold red]Connection to qBittorrent timed out after retries")
+                    logger.info("[bold red]Connection to qBittorrent timed out after retries")
                     return None
                 except qbittorrentapi.LoginFailed:
-                    console.print("[bold red]Failed to login to qBittorrent - incorrect credentials")
+                    logger.info("[bold red]Failed to login to qBittorrent - incorrect credentials")
                     return None
                 except qbittorrentapi.APIConnectionError:
-                    console.print("[bold red]Failed to connect to qBittorrent - check host/port")
+                    logger.info("[bold red]Failed to connect to qBittorrent - check host/port")
                     return None
 
             qbittorrent_cached_clients[client_key] = qbt_client
@@ -324,13 +324,13 @@ class QbittorrentClientMixin:
         mtv_config = cast(dict[str, Any], mtv_config_value) if isinstance(mtv_config_value, dict) else {}
         prefer_small_pieces = bool(mtv_config.get('prefer_mtv_torrent', False))
         if meta.debug:
-            console.print("[green]Searching qBittorrent for an existing .torrent")
+            logger.debug("[green]Searching qBittorrent for an existing .torrent")
 
         torrent_storage_dir = client.get('torrent_storage_dir')
         extracted_torrent_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
 
         if not extracted_torrent_dir or extracted_torrent_dir.strip() == "tmp/":
-            console.print("[bold red]Invalid extracted torrent directory path. Check `meta.base_dir` and `meta.uuid`.")
+            logger.info("[bold red]Invalid extracted torrent directory path. Check `meta.base_dir` and `meta.uuid`.")
             return None
 
         created_session = False
@@ -351,17 +351,17 @@ class QbittorrentClientMixin:
                     created_session = True
 
             except qbittorrentapi.LoginFailed:
-                console.print("[bold red]INCORRECT QBIT LOGIN CREDENTIALS")
+                logger.info("[bold red]INCORRECT QBIT LOGIN CREDENTIALS")
                 return None
             except qbittorrentapi.APIConnectionError:
-                console.print("[bold red]APIConnectionError: INCORRECT HOST/PORT")
+                logger.info("[bold red]APIConnectionError: INCORRECT HOST/PORT")
                 return None
 
             if proxy_url and qbt_session is None:
-                console.print("[bold red]Proxy URL configured but session was not created")
+                logger.info("[bold red]Proxy URL configured but session was not created")
                 return None
             if not proxy_url and qbt_client is None:
-                console.print("[bold red]qBittorrent client is not initialized")
+                logger.info("[bold red]qBittorrent client is not initialized")
                 return None
 
             # Ensure extracted torrent directory exists
@@ -374,7 +374,7 @@ class QbittorrentClientMixin:
             try:
                 if proxy_url:
                     if qbt_session is None:
-                        console.print("[bold red]Proxy session not initialized")
+                        logger.info("[bold red]Proxy session not initialized")
                         return None
                     qbt_proxy_url = proxy_url.rstrip('/')
                     search_term = meta.uuid.replace("[", ".").replace("]", ".")
@@ -392,7 +392,7 @@ class QbittorrentClientMixin:
                     url = self._build_proxy_search_url(qbt_proxy_url, search_term, qui_filters)
 
                     if meta.debug:
-                        console.print(f"[cyan]Searching qBittorrent via proxy: {Redaction.redact_private_info(url)}...")
+                        logger.debug(f"[cyan]Searching qBittorrent via proxy: {Redaction.redact_private_info(url)}...")
 
                     response = await qbt_session.get(url)
                     if response.status_code == 200:
@@ -410,21 +410,21 @@ class QbittorrentClientMixin:
 
                         if meta.debug:
                             if torrents_data:
-                                console.print(f"[cyan]qBittorrent proxy search returned {len(torrents_data)} torrents for '{search_term}'")
+                                logger.debug(f"[cyan]qBittorrent proxy search returned {len(torrents_data)} torrents for '{search_term}'")
                             else:
-                                console.print("[cyan]No matching torrents found via proxy search")
+                                logger.debug("[cyan]No matching torrents found via proxy search")
 
                         torrents = self._build_mock_torrents(torrents_data)
                     else:
                         if response.status_code == 404:
                             if meta.debug:
-                                console.print(f"[yellow]No torrents found via proxy search for '[green]{search_term}' [yellow]Maybe tracker errors?")
+                                logger.debug(f"[yellow]No torrents found via proxy search for '[green]{search_term}' [yellow]Maybe tracker errors?")
                         else:
-                            console.print(f"[bold red]Failed to get torrents list via proxy: {response.status_code}")
+                            logger.info(f"[bold red]Failed to get torrents list via proxy: {response.status_code}")
                         return None
                 else:
                     if qbt_client is None:
-                        console.print("[bold red]qBittorrent client not initialized")
+                        logger.info("[bold red]qBittorrent client not initialized")
                         return None
                     torrents = await self.retry_qbt_operation(
                         lambda: asyncio.to_thread(qbt_client.torrents_info),
@@ -432,10 +432,10 @@ class QbittorrentClientMixin:
                         initial_timeout=14.0
                     )
             except TimeoutError:
-                console.print("[bold red]Getting torrents list timed out after retries")
+                logger.info("[bold red]Getting torrents list timed out after retries")
                 return None
             except Exception as e:
-                console.print(f"[bold red]Error getting torrents list: {e}")
+                logger.info(f"[bold red]Error getting torrents list: {e}")
                 return None
 
             torrent_count = 0
@@ -450,22 +450,22 @@ class QbittorrentClientMixin:
                     continue
 
                 if meta.debug:
-                    console.print(f"[cyan]Matched Torrent: {torrent.hash}")
-                    console.print(f"Name: {torrent.name}")
-                    console.print(f"Save Path: {torrent.save_path}")
-                    console.print(f"Content Path: {torrent_path}")
+                    logger.debug(f"[cyan]Matched Torrent: {torrent.hash}")
+                    logger.debug(f"Name: {torrent.name}")
+                    logger.debug(f"Save Path: {torrent.save_path}")
+                    logger.debug(f"Content Path: {torrent_path}")
 
                 matching_torrents.append({'hash': torrent.hash, 'name': torrent.name})
 
             if meta.debug:
-                console.print(f"[cyan]DEBUG: Checked {torrent_count} total torrents in qBittorrent[/cyan]")
+                logger.debug(f"[cyan]DEBUG: Checked {torrent_count} total torrents in qBittorrent[/cyan]")
             if not matching_torrents:
                 if meta.debug:
-                    console.print("[yellow]No matching torrents found in qBittorrent.")
+                    logger.debug("[yellow]No matching torrents found in qBittorrent.")
                 return None
 
             if meta.debug:
-                console.print(f"[green]Total Matching Torrents: {len(matching_torrents)}")
+                logger.debug(f"[green]Total Matching Torrents: {len(matching_torrents)}")
 
             # **Step 2: Extract and Save .torrent Files**
             processed_hashes: set[str] = set()
@@ -480,7 +480,7 @@ class QbittorrentClientMixin:
                     processed_hashes.add(torrent_hash)
 
                 except Exception as e:
-                    console.print(f"[bold red]Unexpected error while handling torrent{f' {torrent_hash}' if torrent_hash else ''}: {e}")
+                    logger.error(f"[bold red]Unexpected error while handling torrent{f' {torrent_hash}' if torrent_hash else ''}: {e}")
                     torrent_hash = None
 
                 if not torrent_hash:
@@ -490,17 +490,17 @@ class QbittorrentClientMixin:
                 if torrent_storage_dir:
                     torrent_file_path = os.path.join(torrent_storage_dir, f"{torrent_hash}.torrent")
                     if not os.path.exists(torrent_file_path):
-                        console.print(f"[yellow]Torrent file not found in storage directory: {torrent_file_path}")
+                        logger.info(f"[yellow]Torrent file not found in storage directory: {torrent_file_path}")
                         continue
                 else:
                     # **Fetch from qBittorrent API if no `torrent_storage_dir`**
                     if meta.debug:
-                        console.print(f"[cyan]Exporting .torrent file for {torrent_hash}")
+                        logger.debug(f"[cyan]Exporting .torrent file for {torrent_hash}")
 
                     torrent_file_content = None
                     if proxy_url:
                         if qbt_session is None:
-                            console.print("[bold red]Proxy session not initialized")
+                            logger.info("[bold red]Proxy session not initialized")
                             continue
                         qbt_proxy_url = proxy_url.rstrip('/')
                         try:
@@ -509,12 +509,12 @@ class QbittorrentClientMixin:
                             if response.status_code == 200:
                                 torrent_file_content = response.content
                             else:
-                                console.print(f"[red]Failed to export torrent via proxy: {response.status_code}")
+                                logger.error(f"[red]Failed to export torrent via proxy: {response.status_code}")
                         except Exception as e:
-                            console.print(f"[red]Error exporting torrent via proxy: {e}")
+                            logger.error(f"[red]Error exporting torrent via proxy: {e}")
                     else:
                         if qbt_client is None:
-                            console.print("[bold red]qBittorrent client not initialized")
+                            logger.info("[bold red]qBittorrent client not initialized")
                             continue
                         torrent_file_content = await self.retry_qbt_operation(
                             lambda qbt_client=qbt_client, torrent_hash=torrent_hash: asyncio.to_thread(
@@ -528,16 +528,16 @@ class QbittorrentClientMixin:
 
                         await asyncio.to_thread(Path(torrent_file_path).write_bytes, torrent_file_content)
                         if meta.debug:
-                            console.print(f"[green]Successfully saved .torrent file: {torrent_file_path}")
+                            logger.debug(f"[green]Successfully saved .torrent file: {torrent_file_path}")
                     else:
-                        console.print(f"[bold red]Failed to export .torrent for {torrent_hash} after retries")
+                        logger.info(f"[bold red]Failed to export .torrent for {torrent_hash} after retries")
                         continue  # Skip this torrent if unable to fetch
 
                 # **Validate the .torrent file**
                 try:
                     valid, torrent_path = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, 'qbit', client)
                 except Exception as e:
-                    console.print(f"[bold red]Error validating torrent {torrent_hash}: {e}")
+                    logger.info(f"[bold red]Error validating torrent {torrent_hash}: {e}")
                     valid = False
                     torrent_path = None
 
@@ -555,26 +555,26 @@ class QbittorrentClientMixin:
                                     'torrent_path': torrent_path if torrent_path else torrent_file_path,
                                     'piece_size': piece_size
                                 }
-                                console.print(f"[green]Updated best match: {best_match}")
+                                logger.info(f"[green]Updated best match: {best_match}")
                         except Exception as e:
-                            console.print(f"[bold red]Error reading torrent data for {torrent_hash}: {e}")
+                            logger.info(f"[bold red]Error reading torrent data for {torrent_hash}: {e}")
                             continue
                     else:
                         # If `prefer_small_pieces` is False, return first valid torrent
                         if meta.debug:
-                            console.print(f"[green]Returning first valid torrent: {torrent_hash}")
+                            logger.debug(f"[green]Returning first valid torrent: {torrent_hash}")
                         return torrent_hash
                 else:
                     if meta.debug:
-                        console.print(f"[bold red]{torrent_hash} failed validation")
+                        logger.debug(f"[bold red]{torrent_hash} failed validation")
                     os.remove(torrent_file_path)
 
             # **Return the best match if `prefer_small_pieces` is enabled**
             if best_match:
-                console.print(f"[green]Using best match torrent with hash: {best_match['hash']}")
+                logger.info(f"[green]Using best match torrent with hash: {best_match['hash']}")
                 result = str(best_match['hash']) if 'hash' in best_match else None
             else:
-                console.print("[yellow]No valid torrents found.")
+                logger.info("[yellow]No valid torrents found.")
                 result = None
 
             return result
@@ -608,20 +608,20 @@ class QbittorrentClientMixin:
 
         if not src:
             error_msg = "[red]No source path found in meta."
-            console.print(f"[bold red]{error_msg}")
+            logger.info(f"[bold red]{error_msg}")
             raise ValueError(error_msg)
 
         # Determine linking method
         linking_method = client.get('linking')  # "symlink", "hardlink", or None
         if meta.debug:
-            console.print("Linking method:", linking_method)
+            logger.debug(f"Linking method: {linking_method}")
         use_symlink = linking_method == "symlink"
         use_hardlink = linking_method == "hardlink"
 
         # Get linked folder for this drive
         linked_folder = self._coerce_str_list(client.get('linked_folder', []))
         if meta.debug:
-            console.print(f"Linked folders: {linked_folder}")
+            logger.debug(f"Linked folders: {linked_folder}")
 
         # Determine drive letter (Windows) or root (Linux)
         src_drive: str
@@ -652,7 +652,7 @@ class QbittorrentClientMixin:
                             mounted_volumes.append(mount_point)
             except Exception as e:
                 if meta.debug:
-                    console.print(f"[yellow]Error getting mount points: {str(e)}")
+                    logger.debug(f"[yellow]Error getting mount points: {str(e)}")
 
             # Sort mount points by length (descending) to find most specific match first
             mounted_volumes.sort(key=len, reverse=True)
@@ -662,7 +662,7 @@ class QbittorrentClientMixin:
                 if src.startswith(mount_point):
                     src_drive = mount_point
                     if meta.debug:
-                        console.print(f"[cyan]Found mount point: {mount_point} for path: {src}")
+                        logger.debug(f"[cyan]Found mount point: {mount_point} for path: {src}")
                     break
 
             # If we couldn't find a specific mount point, fall back to linked folder matching
@@ -706,19 +706,19 @@ class QbittorrentClientMixin:
                     if os.path.exists(potential_match):
                         link_target = potential_match
                         if meta.debug:
-                            console.print(f"[cyan]Found sibling mount point linked folder: {link_target}")
+                            logger.debug(f"[cyan]Found sibling mount point linked folder: {link_target}")
                         break
 
         if meta.debug:
-            console.print(f"Source drive: {src_drive}")
-            console.print(f"Link target: {link_target}")
+            logger.debug(f"Source drive: {src_drive}")
+            logger.debug(f"Link target: {link_target}")
         # If using symlinks and no matching drive folder, allow any available one
         if use_symlink and not link_target and linked_folder:
             link_target = linked_folder[0]
 
         if (use_symlink or use_hardlink) and not link_target:
             error_msg = f"No suitable linked folder found for drive {src_drive}"
-            console.print(f"[bold red]{error_msg}")
+            logger.info(f"[bold red]{error_msg}")
             raise ValueError(error_msg)
 
         tracker_dir = None
@@ -744,14 +744,14 @@ class QbittorrentClientMixin:
 
             allow_fallback = client.get('allow_fallback', True)
             if not linking_success and allow_fallback:
-                console.print(f"[yellow]Using original path without linking: {src}")
+                logger.info(f"[yellow]Using original path without linking: {src}")
                 use_hardlink = False
                 use_symlink = False
             elif not linking_success:
-                console.print("[bold red]Linking failed and fallback is disabled; aborting qBittorrent add")
+                logger.info("[bold red]Linking failed and fallback is disabled; aborting qBittorrent add")
                 return
         elif cross:
-            console.print("[yellow]Cross seed requested, but no linking method is configured. Proceeding with original path naming.")
+            logger.info("[yellow]Cross seed requested, but no linking method is configured. Proceeding with original path naming.")
 
         proxy_url = client.get('qui_proxy_url')
         qbt_client = None
@@ -772,7 +772,7 @@ class QbittorrentClientMixin:
                 qbt_client = potential_qbt_client
 
         if meta.debug:
-            console.print("[bold yellow]Adding and rechecking torrent")
+            logger.debug("[bold yellow]Adding and rechecking torrent")
 
         # Apply remote pathing to `tracker_dir` before assigning `save_path`
         if use_symlink or use_hardlink:
@@ -807,15 +807,15 @@ class QbittorrentClientMixin:
             save_path += '/'
 
         if meta.debug:
-            console.print(f"[cyan]Original path: {path}")
-            console.print(f"[cyan]Mapped save path: {save_path}")
+            logger.debug(f"[cyan]Original path: {path}")
+            logger.debug(f"[cyan]Mapped save path: {save_path}")
 
         # Automatic management
         auto_management = False
         if not use_symlink and not use_hardlink:
             am_config = client.get('automatic_management_paths', '')
             if meta.debug:
-                console.print(f"AM Config: {am_config}")
+                logger.debug(f"AM Config: {am_config}")
             if isinstance(am_config, list):
                 for each in self._coerce_str_list(am_config):
                     if os.path.normpath(each).lower() in os.path.normpath(path).lower():
@@ -828,9 +828,9 @@ class QbittorrentClientMixin:
         qbt_category = client["qbit_cross_cat"] if cross and client.get("qbit_cross_cat") else client.get("qbit_cat") if not meta.qbit_cat else meta.qbit_cat
         content_layout = client.get('content_layout', 'Original')
         if meta.debug:
-            console.print("qbt_category:", qbt_category)
-            console.print(f"Content Layout: {content_layout}")
-            console.print(f"[bold yellow]qBittorrent save path: {save_path}")
+            logger.debug(f"qbt_category: {qbt_category}")
+            logger.debug(f"Content Layout: {content_layout}")
+            logger.debug(f"[bold yellow]qBittorrent save path: {save_path}")
 
         if cross:
             skip_checking = True
@@ -869,12 +869,12 @@ class QbittorrentClientMixin:
                 if tag:
                     data['tags'] = tag
                 if meta.debug:
-                    console.print(f"[cyan]POSTing to {Redaction.redact_private_info(qbt_proxy_url)}/api/v2/torrents/add with data: savepath={save_path}, autoTMM={auto_management}, skip_checking={skip_checking}, paused={paused_on_add}, contentLayout={content_layout}, category={qbt_category}, tags={tag}")
+                    logger.debug(f"[cyan]POSTing to {Redaction.redact_private_info(qbt_proxy_url)}/api/v2/torrents/add with data: savepath={save_path}, autoTMM={auto_management}, skip_checking={skip_checking}, paused={paused_on_add}, contentLayout={content_layout}, category={qbt_category}, tags={tag}")
 
                 response = await qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/add",
                                                   data=data, files=files)
                 if response.status_code != 200:
-                    console.print(f"[bold red]Failed to add torrent via proxy: {response.status_code}")
+                    logger.info(f"[bold red]Failed to add torrent via proxy: {response.status_code}")
                     await qbt_session.aclose()
                     return
             else:
@@ -894,12 +894,12 @@ class QbittorrentClientMixin:
                     initial_timeout=14.0
                 )
         except (TimeoutError, qbittorrentapi.APIConnectionError):
-            console.print("[bold red]Failed to add torrent to qBittorrent")
+            logger.info("[bold red]Failed to add torrent to qBittorrent")
             if qbt_session:
                 await qbt_session.aclose()
             return
         except Exception as e:
-            console.print(f"[bold red]Error adding torrent: {e}")
+            logger.info(f"[bold red]Error adding torrent: {e}")
             if qbt_session:
                 await qbt_session.aclose()
             return
@@ -917,7 +917,7 @@ class QbittorrentClientMixin:
                         torrents_info = response.json()
                         if len(torrents_info) > 0:
                             if meta.debug:
-                                console.print(f"[green]Found {tracker} torrent in qBittorrent.")
+                                logger.debug(f"[green]Found {tracker} torrent in qBittorrent.")
                             break
                     else:
                         pass  # Continue waiting
@@ -938,7 +938,7 @@ class QbittorrentClientMixin:
                 pass  # Continue waiting
             await asyncio.sleep(1)
         else:
-            console.print("[red]Torrent addition timed out.")
+            logger.info("[red]Torrent addition timed out.")
             if qbt_session:
                 await qbt_session.aclose()
             return
@@ -951,12 +951,12 @@ class QbittorrentClientMixin:
                     response = await qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/start", data={"hashes": torrent.infohash})
                     if response.status_code == 404:
                         if meta.debug:
-                            console.print("[cyan]Start endpoint returned 404, trying legacy resume endpoint (pre-v5.0.0)...")
+                            logger.debug("[cyan]Start endpoint returned 404, trying legacy resume endpoint (pre-v5.0.0)...")
                         resume_response = await qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/resume", data={"hashes": torrent.infohash})
                         if resume_response.status_code != 200:
-                            console.print(f"[yellow]Failed to resume torrent via proxy (resume): {resume_response.status_code}")
+                            logger.info(f"[yellow]Failed to resume torrent via proxy (resume): {resume_response.status_code}")
                     elif response.status_code != 200:
-                        console.print(f"[yellow]Failed to resume torrent via proxy: {response.status_code}")
+                        logger.info(f"[yellow]Failed to resume torrent via proxy: {response.status_code}")
                 else:
                     if qbt_client is None:
                         raise RuntimeError("qbt_client cannot be None")
@@ -965,21 +965,21 @@ class QbittorrentClientMixin:
                         "Resume torrent"
                     )
             except TimeoutError:
-                console.print("[yellow]Failed to resume torrent after retries")
+                logger.info("[yellow]Failed to resume torrent after retries")
             except Exception as e:
-                console.print(f"[yellow]Error resuming torrent: {e}")
+                logger.info(f"[yellow]Error resuming torrent: {e}")
 
         if tracker in client.get("super_seed_trackers", []) and not cross:
             try:
                 if meta.debug:
-                    console.print(f"{tracker}: Setting super-seed mode.")
+                    logger.debug(f"{tracker}: Setting super-seed mode.")
                 if proxy_url:
                     if qbt_session is None:
                         raise RuntimeError("qbt_session cannot be None")
                     response = await qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/setSuperSeeding",
                                                       data={'hashes': torrent.infohash, "value": "true"})
                     if response.status_code != 200:
-                        console.print(f"{tracker}: Failed to set super-seed via proxy: {response.status_code}")
+                        logger.info(f"{tracker}: Failed to set super-seed via proxy: {response.status_code}")
                 else:
                     if qbt_client is None:
                         raise RuntimeError("qbt_client cannot be None")
@@ -989,9 +989,9 @@ class QbittorrentClientMixin:
                         initial_timeout=10.0
                     )
             except TimeoutError:
-                console.print(f"{tracker}: Super-seed request timed out")
+                logger.info(f"{tracker}: Super-seed request timed out")
             except Exception as e:
-                console.print(f"{tracker}: Super-seed error: {e}")
+                logger.info(f"{tracker}: Super-seed error: {e}")
 
         if meta.debug:
             try:
@@ -1003,11 +1003,11 @@ class QbittorrentClientMixin:
                     if response.status_code == 200:
                         info = response.json()
                         if info:
-                            console.print(f"[cyan]Actual qBittorrent save path: {info[0].get('save_path', 'Unknown')}")
+                            logger.debug(f"[cyan]Actual qBittorrent save path: {info[0].get('save_path', 'Unknown')}")
                         else:
-                            console.print("[yellow]No torrent info returned from proxy")
+                            logger.debug("[yellow]No torrent info returned from proxy")
                     else:
-                        console.print(f"[yellow]Failed to get torrent info via proxy: {response.status_code}")
+                        logger.debug(f"[yellow]Failed to get torrent info via proxy: {response.status_code}")
                 else:
                     if qbt_client is None:
                         raise RuntimeError("qbt_client should not be None")
@@ -1017,16 +1017,16 @@ class QbittorrentClientMixin:
                         initial_timeout=10.0
                     )
                     if info:
-                        console.print(f"[cyan]Actual qBittorrent save path: {info[0].save_path}")
+                        logger.debug(f"[cyan]Actual qBittorrent save path: {info[0].save_path}")
                     else:
-                        console.print("[yellow]No torrent info returned from qBittorrent")
+                        logger.debug("[yellow]No torrent info returned from qBittorrent")
             except TimeoutError:
-                console.print("[yellow]Failed to get torrent info for debug after retries")
+                logger.debug("[yellow]Failed to get torrent info for debug after retries")
             except Exception as e:
-                console.print(f"[yellow]Error getting torrent info for debug: {e}")
+                logger.debug(f"[yellow]Error getting torrent info for debug: {e}")
 
         if meta.debug:
-            console.print(f"Added to: {save_path}")
+            logger.debug(f"Added to: {save_path}")
 
         if qbt_session:
             await qbt_session.aclose()
@@ -1041,22 +1041,22 @@ class QbittorrentClientMixin:
                 if exact_matches:
                     meta.infohash = exact_matches[0]["hash"]
                     if meta.debug:
-                        console.print(f"[green]Found exact torrent match with hash: {meta.infohash}")
+                        logger.debug(f"[green]Found exact torrent match with hash: {meta.infohash}")
 
             else:
                 if meta.debug:
-                    console.print("[yellow]No matching torrents for the path found in qBittorrent[/yellow]")
+                    logger.debug("[yellow]No matching torrents for the path found in qBittorrent[/yellow]")
 
         except TimeoutError:
             raise
         except Exception as e:
-            console.print(f"[red]Error searching for torrents: {str(e)}[/red]")
-            console.print(f"[dim]{traceback.format_exc()}[/dim]")
+            logger.error(f"[red]Error searching for torrents: {str(e)}[/red]")
+            logger.info(f"[dim]{traceback.format_exc()}[/dim]")
 
     async def find_qbit_torrents_by_path(self, content_path: str, meta: Meta) -> list[dict[str, Any]]:
         start_time = time.time()
         if meta.debug:
-            console.print(f"[yellow]Searching for torrents in qBittorrent for path: {content_path}[/yellow]")
+            logger.debug(f"[yellow]Searching for torrents in qBittorrent for path: {content_path}[/yellow]")
         try:
             trackers_config = cast(dict[str, Any], self.config.get('TRACKERS', {}))
             mtv_config_value = trackers_config.get('MTV', {})
@@ -1093,9 +1093,9 @@ class QbittorrentClientMixin:
 
             if not clients_to_search:
                 if meta.debug:
-                    console.print("[yellow]No clients configured for searching")
+                    logger.debug("[yellow]No clients configured for searching")
                     end_time = time.time()
-                    console.print(f"Searching qBittorrent client data processed in {end_time - start_time:.2f} seconds")
+                    logger.debug(f"Searching qBittorrent client data processed in {end_time - start_time:.2f} seconds")
                 return []
 
             all_matching_torrents: list[dict[str, Any]] = []
@@ -1103,18 +1103,18 @@ class QbittorrentClientMixin:
                 client_config = self.config['TORRENT_CLIENTS'].get(client_name)
                 if not client_config:
                     if meta.debug:
-                        console.print(f"[yellow]Client {client_name} not found in config")
+                        logger.debug(f"[yellow]Client {client_name} not found in config")
                     continue
 
                 torrent_client_type = client_config.get('torrent_client')
 
                 if torrent_client_type != 'qbit':
                     if meta.debug:
-                        console.print(f"[yellow]Client {client_name} is not qBittorrent")
+                        logger.debug(f"[yellow]Client {client_name} is not qBittorrent")
                     continue
 
                 if meta.debug:
-                    console.print(f"[cyan]Searching qBittorrent client: {client_name}")
+                    logger.debug(f"[cyan]Searching qBittorrent client: {client_name}")
 
                 torrents = await self._search_single_qbit_client(client_config, content_path, meta, client_name)
 
@@ -1136,11 +1136,11 @@ class QbittorrentClientMixin:
 
                     if should_stop:
                         if meta.debug:
-                            console.print("[green]Stopping search after finding preferred torrent")
+                            logger.debug("[green]Stopping search after finding preferred torrent")
                         break
                 else:
                     if meta.debug:
-                        console.print(f"[yellow]No matches in client {client_name}")
+                        logger.debug(f"[yellow]No matches in client {client_name}")
 
             # Deduplicate by hash (in case same torrent exists in multiple clients)
             seen_hashes: set[str] = set()
@@ -1161,23 +1161,23 @@ class QbittorrentClientMixin:
                         using_proxy = True
                         break
                 if not using_proxy:
-                    console.print(f"[yellow]qBittorrent search took {duration:.1f} seconds. For faster searches, consider configuring 'qui_proxy_url' in your config.[/yellow]")
+                    logger.info(f"[yellow]qBittorrent search took {duration:.1f} seconds. For faster searches, consider configuring 'qui_proxy_url' in your config.[/yellow]")
 
             if meta.debug:
                 if len(all_matching_torrents) != len(unique_torrents):
-                    console.print(f"[cyan]Deduplicated {len(all_matching_torrents)} torrents to {len(unique_torrents)} unique torrents")
-                console.print(f"Searching qBittorrent client data processed in {duration:.2f} seconds")
+                    logger.debug(f"[cyan]Deduplicated {len(all_matching_torrents)} torrents to {len(unique_torrents)} unique torrents")
+                logger.debug(f"Searching qBittorrent client data processed in {duration:.2f} seconds")
 
             return unique_torrents
 
         except TimeoutError:
             raise
         except Exception as e:
-            console.print(f"[bold red]Error finding torrents: {str(e)}")
+            logger.info(f"[bold red]Error finding torrents: {str(e)}")
             if meta.debug:
-                console.print(traceback.format_exc())
+                logger.debug(traceback.format_exc())
                 end_time = time.time()
-                console.print(f"Searching qBittorrent client data processed in {end_time - start_time:.2f} seconds")
+                logger.debug(f"Searching qBittorrent client data processed in {end_time - start_time:.2f} seconds")
             return []
 
     def _build_proxy_search_url(self, qbt_proxy_url: str, search_term: str, qui_filters: dict[str, list[str]]) -> str:
@@ -1372,7 +1372,7 @@ class QbittorrentClientMixin:
                 url = self._build_proxy_search_url(qbt_proxy_url, search_term, qui_filters)
 
                 if meta.debug:
-                    console.print(f"[cyan]Searching qBittorrent via proxy: {Redaction.redact_private_info(url)}...")
+                    logger.debug(f"[cyan]Searching qBittorrent via proxy: {Redaction.redact_private_info(url)}...")
 
                 response = await qbt_session.get(url)
                 if response.status_code == 200:
@@ -1391,28 +1391,28 @@ class QbittorrentClientMixin:
 
                     if meta.debug:
                         if torrents_data:
-                            console.print(f"[cyan]qBittorrent proxy search returned {len(torrents_data)} torrents for '{search_term}'")
+                            logger.debug(f"[cyan]qBittorrent proxy search returned {len(torrents_data)} torrents for '{search_term}'")
                         else:
-                            console.print("[cyan]No matching torrents found via proxy search")
+                            logger.debug("[cyan]No matching torrents found via proxy search")
 
                     return self._build_mock_torrents(torrents_data)
                 else:
                     if response.status_code == 404:
                         if meta.debug:
-                            console.print(f"[yellow]No torrents found via proxy search for '[green]{search_term}' [yellow]Maybe tracker errors?")
+                            logger.debug(f"[yellow]No torrents found via proxy search for '[green]{search_term}' [yellow]Maybe tracker errors?")
                     else:
                         if meta.debug:
-                            console.print(f"[bold red]Failed to get torrents list via proxy: {response.status_code}")
+                            logger.debug(f"[bold red]Failed to get torrents list via proxy: {response.status_code}")
                     return []
             else:
                 if qbt_client is None:
                     return []
                 return await self.retry_qbt_operation(lambda: asyncio.to_thread(qbt_client.torrents_info), "Get torrents list", initial_timeout=14.0)
         except TimeoutError:
-            console.print("[bold red]Getting torrents list timed out after retries")
+            logger.info("[bold red]Getting torrents list timed out after retries")
             return []
         except Exception as e:
-            console.print(f"[bold red]Error getting torrents list: {e}")
+            logger.info(f"[bold red]Error getting torrents list: {e}")
             return []
 
     async def _process_torrent_matches(
@@ -1434,7 +1434,7 @@ class QbittorrentClientMixin:
                 torrent_name = torrent.name
                 if not torrent_name:
                     if meta.debug:
-                        console.print("[yellow]Skipping torrent with missing name attribute")
+                        logger.debug("[yellow]Skipping torrent with missing name attribute")
                     continue
 
                 if not self._torrent_name_matches(torrent_name, meta):
@@ -1448,7 +1448,7 @@ class QbittorrentClientMixin:
                 try:
                     if proxy_url and not torrent.comment:
                         if meta.debug:
-                            console.print(f"[cyan]Fetching torrent properties via proxy for torrent: {torrent.name}")
+                            logger.debug(f"[cyan]Fetching torrent properties via proxy for torrent: {torrent.name}")
                         if qbt_session is None:
                             raise RuntimeError("qbt_session should not be None")
                         response = await qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/properties", params={"hash": torrent.hash})
@@ -1457,7 +1457,7 @@ class QbittorrentClientMixin:
                             torrent.comment = torrent_properties.get("comment", "")
                         else:
                             if meta.debug:
-                                console.print(f"[yellow]Failed to get properties for torrent {torrent.name} via proxy: {response.status_code}")
+                                logger.debug(f"[yellow]Failed to get properties for torrent {torrent.name} via proxy: {response.status_code}")
                             continue
                     elif not proxy_url:
                         if qbt_client is None:
@@ -1468,11 +1468,11 @@ class QbittorrentClientMixin:
                         )
                 except (TimeoutError, qbittorrentapi.APIError):
                     if meta.debug:
-                        console.print(f"[yellow]Failed to get trackers for torrent {torrent.name} after retries")
+                        logger.debug(f"[yellow]Failed to get trackers for torrent {torrent.name} after retries")
                     continue
                 except Exception as e:
                     if meta.debug:
-                        console.print(f"[yellow]Error getting trackers for torrent {torrent.name}: {e}")
+                        logger.debug(f"[yellow]Error getting trackers for torrent {torrent.name}: {e}")
                     continue
 
                 if proxy_url:
@@ -1499,13 +1499,13 @@ class QbittorrentClientMixin:
                             if status_code == 2:
                                 has_working_tracker = True
                                 if meta.debug:
-                                    console.print(f"[green]Tracker working: {url[:15]} - {status_text}")
+                                    logger.debug(f"[green]Tracker working: {url[:15]} - {status_text}")
                             else:
                                 display_tracker.get("msg", "")
 
                     except qbittorrentapi.APIError as e:
                         if meta.debug:
-                            console.print(f"[red]Error fetching trackers for torrent {torrent.name}: {e}")
+                            logger.debug(f"[red]Error fetching trackers for torrent {torrent.name}: {e}")
                         continue
 
                 torrent_comments = meta.torrent_comments
@@ -1538,14 +1538,14 @@ class QbittorrentClientMixin:
                     meta.found_tracker_match = True
 
                 if meta.debug:
-                    console.print(f"[cyan]Stored comment for torrent: {torrent.comment[:100]}...")
+                    logger.debug(f"[cyan]Stored comment for torrent: {torrent.comment[:100]}...")
 
                 torrent_comments.append(match_info)
                 matching_torrents.append(match_info)
 
             except Exception as e:
                 if meta.debug:
-                    console.print(f"[yellow]Error processing torrent {torrent.name}: {str(e)}")
+                    logger.debug(f"[yellow]Error processing torrent {torrent.name}: {str(e)}")
                 continue
 
         return matching_torrents
@@ -1570,16 +1570,16 @@ class QbittorrentClientMixin:
             if os.path.exists(potential_path):
                 torrent_file_path = potential_path
                 if meta.debug:
-                    console.print(f"[cyan]Found existing {prefix}.torrent file: {torrent_file_path}")
+                    logger.debug(f"[cyan]Found existing {prefix}.torrent file: {torrent_file_path}")
 
         if not torrent_file_path:
             if meta.debug:
-                console.print(f"[cyan]Exporting {prefix}.torrent file for hash: {torrent_hash}")
+                logger.debug(f"[cyan]Exporting {prefix}.torrent file for hash: {torrent_hash}")
 
             torrent_file_content = None
             if proxy_url:
                 if qbt_session is None:
-                    console.print("[bold red]Proxy session not initialized")
+                    logger.info("[bold red]Proxy session not initialized")
                     return None
                 qbt_proxy_url = proxy_url.rstrip("/")
                 try:
@@ -1587,12 +1587,12 @@ class QbittorrentClientMixin:
                     if response.status_code == 200:
                         torrent_file_content = response.content
                     else:
-                        console.print(f"[red]Failed to export {prefix}torrent via proxy: {response.status_code}")
+                        logger.error(f"[red]Failed to export {prefix}torrent via proxy: {response.status_code}")
                 except Exception as e:
-                    console.print(f"[red]Error exporting {prefix}torrent via proxy: {e}")
+                    logger.error(f"[red]Error exporting {prefix}torrent via proxy: {e}")
             else:
                 if qbt_client is None:
-                    console.print("[bold red]qBittorrent client not initialized")
+                    logger.info("[bold red]qBittorrent client not initialized")
                     return None
                 torrent_file_content = await self.retry_qbt_operation(
                     lambda: asyncio.to_thread(qbt_client.torrents_export, torrent_hash=torrent_hash), f"Export {prefix}torrent {torrent_hash}"
@@ -1602,9 +1602,9 @@ class QbittorrentClientMixin:
                 torrent_file_path = os.path.join(extracted_torrent_dir, f"{torrent_hash}.torrent")
                 await asyncio.to_thread(Path(torrent_file_path).write_bytes, torrent_file_content)
                 if meta.debug:
-                    console.print(f"[green]Exported {prefix}.torrent file to: {torrent_file_path}")
+                    logger.debug(f"[green]Exported {prefix}.torrent file to: {torrent_file_path}")
             else:
-                console.print(f"[bold red]Failed to export {prefix}.torrent for {torrent_hash} after retries")
+                logger.info(f"[bold red]Failed to export {prefix}.torrent for {torrent_hash} after retries")
 
         return torrent_file_path
 
@@ -1666,9 +1666,9 @@ class QbittorrentClientMixin:
                             if is_better_match:
                                 piece_size_best_match = {"hash": torrent_hash, "torrent_path": torrent_path if torrent_path else torrent_file_path, "piece_size": piece_size}
                                 if meta.debug:
-                                    console.print(f"[green]Updated best match: {piece_size_best_match}")
+                                    logger.debug(f"[green]Updated best match: {piece_size_best_match}")
                         except Exception as e:
-                            console.print(f"[bold red]Error reading torrent data for {torrent_hash}: {e}")
+                            logger.info(f"[bold red]Error reading torrent data for {torrent_hash}: {e}")
                             if os.path.exists(torrent_file_path) and torrent_file_path.startswith(extracted_torrent_dir):
                                 os.remove(torrent_file_path)
                     else:
@@ -1676,26 +1676,26 @@ class QbittorrentClientMixin:
                         try:
                             await TorrentCreator.create_base_from_existing_torrent(torrent_file_path, meta.base_dir, meta.uuid)
                             if meta.debug:
-                                console.print(f"[green]Created BASE.torrent from first valid torrent: {torrent_hash}")
+                                logger.debug(f"[green]Created BASE.torrent from first valid torrent: {torrent_hash}")
                             meta.base_torrent_created = True
                             meta.hash_used = torrent_hash
                             found_valid_torrent = True
                         except Exception as e:
-                            console.print(f"[bold red]Error creating BASE.torrent: {e}")
+                            logger.info(f"[bold red]Error creating BASE.torrent: {e}")
                 else:
                     if meta.debug:
-                        console.print(f"[bold red]{torrent_hash} failed validation")
+                        logger.debug(f"[bold red]{torrent_hash} failed validation")
                     if os.path.exists(torrent_file_path) and torrent_file_path.startswith(extracted_torrent_dir):
                         os.remove(torrent_file_path)
 
                     # If first torrent fails validation, continue to try other matches
                     if not found_valid_torrent and meta.debug:
-                        console.print("[yellow]First torrent failed validation, trying other torrent matches...")
+                        logger.info("[yellow]First torrent failed validation, trying other torrent matches...")
 
             # Try other matches if the best match isn't valid or if we need to find all valid torrents for piece preference
             if not found_valid_torrent or (use_piece_preference and not piece_size_best_match):
                 if meta.debug:
-                    console.print("[yellow]Trying other torrent matches...")
+                    logger.debug("[yellow]Trying other torrent matches...")
                 for torrent_match in matching_torrents[1:]:  # Skip the first one since we already tried it
                     alt_torrent_hash = torrent_match["hash"]
                     alt_torrent_file_path = await self._export_torrent_file(
@@ -1732,42 +1732,42 @@ class QbittorrentClientMixin:
                                             "piece_size": piece_size,
                                         }
                                         if meta.debug:
-                                            console.print(f"[green]Updated best match: {piece_size_best_match}")
+                                            logger.debug(f"[green]Updated best match: {piece_size_best_match}")
                                 except Exception as e:
-                                    console.print(f"[bold red]Error reading torrent data for {alt_torrent_hash}: {e}")
+                                    logger.info(f"[bold red]Error reading torrent data for {alt_torrent_hash}: {e}")
                             else:
                                 # If piece preference is disabled, return first valid torrent
                                 try:
                                     await TorrentCreator.create_base_from_existing_torrent(alt_torrent_file_path, meta.base_dir, meta.uuid)
                                     if meta.debug:
-                                        console.print(f"[green]Created BASE.torrent from alternative torrent {alt_torrent_hash}")
+                                        logger.debug(f"[green]Created BASE.torrent from alternative torrent {alt_torrent_hash}")
                                     meta.infohash = alt_torrent_hash
                                     meta.base_torrent_created = True
                                     meta.hash_used = alt_torrent_hash
                                     found_valid_torrent = True
                                     break
                                 except Exception as e:
-                                    console.print(f"[bold red]Error creating BASE.torrent for alternative: {e}")
+                                    logger.info(f"[bold red]Error creating BASE.torrent for alternative: {e}")
                         else:
                             if meta.debug:
-                                console.print(f"[bold red]{alt_torrent_hash} failed validation")
+                                logger.debug(f"[bold red]{alt_torrent_hash} failed validation")
                             if os.path.exists(alt_torrent_file_path) and alt_torrent_file_path.startswith(extracted_torrent_dir):
                                 os.remove(alt_torrent_file_path)
 
                 if not found_valid_torrent:
                     if meta.debug:
-                        console.print("[bold red]No valid torrents found after checking all matches, falling back to a best match if preference is set")
+                        logger.debug("[bold red]No valid torrents found after checking all matches, falling back to a best match if preference is set")
                     meta.we_checked_them_all = True
 
             # **Return the best match if piece preference is enabled**
             if use_piece_preference and piece_size_best_match and not found_valid_torrent:
                 try:
                     preference_type = "MTV preference" if prefer_small_pieces else "16 MiB piece limit"
-                    console.print(f"[green]Using best match torrent ({preference_type}) with hash: {piece_size_best_match['hash']}")
+                    logger.info(f"[green]Using best match torrent ({preference_type}) with hash: {piece_size_best_match['hash']}")
                     await TorrentCreator.create_base_from_existing_torrent(piece_size_best_match["torrent_path"], meta.base_dir, meta.uuid)
                     if meta.debug:
                         piece_size_mib = piece_size_best_match["piece_size"] / 1024 / 1024
-                        console.print(f"[green]Created BASE.torrent from best match torrent: {piece_size_best_match['hash']} (piece size: {piece_size_mib:.1f} MiB)")
+                        logger.debug(f"[green]Created BASE.torrent from best match torrent: {piece_size_best_match['hash']} (piece size: {piece_size_mib:.1f} MiB)")
                     meta.infohash = piece_size_best_match["hash"]
                     meta.base_torrent_created = True
                     meta.hash_used = piece_size_best_match["hash"]
@@ -1783,9 +1783,9 @@ class QbittorrentClientMixin:
                         # Found a torrent but it doesn't meet the constraint
                         meta.found_preferred_piece_size = None
                 except Exception as e:
-                    console.print(f"[bold red]Error creating BASE.torrent from best match: {e}")
+                    logger.info(f"[bold red]Error creating BASE.torrent from best match: {e}")
             elif use_piece_preference and not piece_size_best_match:
-                console.print("[yellow]No preferred torrents found matching piece size preferences.")
+                logger.info("[yellow]No preferred torrents found matching piece size preferences.")
                 meta.we_checked_them_all = True
                 meta.found_preferred_piece_size = None
 
@@ -1809,7 +1809,7 @@ class QbittorrentClientMixin:
                     qbt_proxy_url = proxy_url.rstrip("/")
 
                 except Exception as e:
-                    console.print(f"[bold red]Failed to connect to qBittorrent proxy: {e}")
+                    logger.info(f"[bold red]Failed to connect to qBittorrent proxy: {e}")
                     return []
             else:
                 potential_qbt_client = await self.init_qbittorrent_client(client_config)
@@ -1840,26 +1840,26 @@ class QbittorrentClientMixin:
                             if tracker.get("id") and tracker.get("tracker_id"):
                                 meta[tracker["id"]] = tracker["tracker_id"]
                                 if meta.debug:
-                                    console.print(f"[bold cyan]Found {tracker['id'].upper()} ID: {tracker['tracker_id']} in torrent comment")
+                                    logger.debug(f"[bold cyan]Found {tracker['id'].upper()} ID: {tracker['tracker_id']} in torrent comment")
 
                     await self._process_base_torrent_creation(matching_torrents, client_config, proxy_url, qbt_proxy_url, qbt_session, qbt_client, meta)
 
             # Display results summary
             if meta.debug:
                 if matching_torrents:
-                    console.print(f"[green]Found {len(matching_torrents)} matching torrents in {client_name}")
-                    console.print(f"[green]Torrents with working trackers: {sum(1 for t in matching_torrents if t.get('has_working_tracker', False))}")
+                    logger.debug(f"[green]Found {len(matching_torrents)} matching torrents in {client_name}")
+                    logger.debug(f"[green]Torrents with working trackers: {sum(1 for t in matching_torrents if t.get('has_working_tracker', False))}")
                 else:
-                    console.print(f"[yellow]No matching torrents found in {client_name}")
+                    logger.debug(f"[yellow]No matching torrents found in {client_name}")
 
             return matching_torrents
 
         except TimeoutError:
             raise
         except Exception as e:
-            console.print(f"[bold red]Error finding torrents in {client_name}: {str(e)}")
+            logger.info(f"[bold red]Error finding torrents in {client_name}: {str(e)}")
             if meta.debug:
-                console.print(traceback.format_exc())
+                logger.debug(traceback.format_exc())
             return []
         finally:
             if qbt_session is not None:
@@ -1889,10 +1889,10 @@ async def match_tracker_url(tracker_urls: list[str], meta: Meta) -> None:
                 if pattern in tracker:
                     found_ids.add(tracker_id.upper())
                     if meta.debug:
-                        console.print(f"[bold cyan]Matched {tracker_id.upper()} in tracker URL: {Redaction.redact_private_info(tracker)}")
+                        logger.debug(f"[bold cyan]Matched {tracker_id.upper()} in tracker URL: {Redaction.redact_private_info(tracker)}")
                     if tracker_id.upper() == 'PTP' and 'passthepopcorn.me' in tracker and tracker.startswith('http://'):
-                        console.print("[red]Found PTP announce URL using plaintext HTTP.\n")
-                        console.print(
+                        logger.info("[red]Found PTP announce URL using plaintext HTTP.\n")
+                        logger.info(
                             "[red]PTP is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PTP/forums.php?page=1&action=viewthread&threadid=46663"
                         )
 
@@ -1904,7 +1904,7 @@ async def match_tracker_url(tracker_urls: list[str], meta: Meta) -> None:
         if tracker_id not in remove_trackers:
             remove_trackers.append(tracker_id)
     if meta.debug:
-        console.print(f"[bold cyan]Storing matched tracker IDs for later removal: {remove_trackers}")
+        logger.debug(f"[bold cyan]Storing matched tracker IDs for later removal: {remove_trackers}")
 
 
 async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str, use_hardlink: bool) -> bool:
@@ -1916,7 +1916,7 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
     raw_torrent_name = info.get('name.utf-8') or info.get('name') or getattr(torrent, 'name', None)
     torrent_name = str(raw_torrent_name) if raw_torrent_name else None
     if not torrent_name:
-        console.print("[bold red]Cross-seed torrent is missing an info name; cannot build link structure")
+        logger.info("[bold red]Cross-seed torrent is missing an info name; cannot build link structure")
         return False
 
     multi_file = bool(info.get('files'))
@@ -2015,7 +2015,7 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
         })
 
     if not unique_candidates:
-        console.print("[bold red]Unable to find source files for cross-seed linking")
+        logger.info("[bold red]Unable to find source files for cross-seed linking")
         return False
 
     def pick_candidate(filename: str | None, length: int | None) -> tuple[str | None, str | None]:
@@ -2060,34 +2060,32 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
         tracker_root = os.path.abspath(tracker_dir)
         try:
             if os.path.commonpath([tracker_root, os.path.abspath(dest_file_path)]) != tracker_root:
-                console.print(f"[bold red]Refusing to create link outside tracker directory: {dest_file_path}")
+                logger.info(f"[bold red]Refusing to create link outside tracker directory: {dest_file_path}")
                 return False
         except ValueError:
-            console.print(f"[bold red]Refusing to create link outside tracker directory: {dest_file_path}")
+            logger.info(f"[bold red]Refusing to create link outside tracker directory: {dest_file_path}")
             return False
 
         source_file, match_reason = pick_candidate(os.path.basename(relative_path), torrent_file.get('length'))
         if not source_file:
-            console.print(f"[bold red]Failed to map cross-seed file: {relative_path}")
+            logger.info(f"[bold red]Failed to map cross-seed file: {relative_path}")
             return False
-        if match_reason == 'fallback' and debug:
-            console.print(f"[yellow]Cross-seed mapping fallback used for: {relative_path}")
+        if match_reason == 'fallback':
+            logger.debug(f"[yellow]Cross-seed mapping fallback used for: {relative_path}")
 
         dest_parent = os.path.dirname(dest_file_path)
         if dest_parent:
             await asyncio.to_thread(os.makedirs, dest_parent, exist_ok=True)
         if await asyncio.to_thread(os.path.exists, dest_file_path):
-            if debug:
-                console.print(f"[yellow]Cross-seed link already exists, keeping: {dest_file_path}")
+            logger.debug(f"[yellow]Cross-seed link already exists, keeping: {dest_file_path}")
             continue
 
         linked = await async_link_directory(source_file, dest_file_path, use_hardlink=use_hardlink, debug=debug)
         if not linked:
-            console.print(f"[bold red]Linking failed for cross-seed file: {relative_path}")
+            logger.info(f"[bold red]Linking failed for cross-seed file: {relative_path}")
             return False
 
-    if debug:
-        console.print(f"[green]Prepared cross-seed link tree at {os.path.join(tracker_dir, torrent_name) if multi_file else tracker_dir}")
+    logger.debug(f"[green]Prepared cross-seed link tree at {os.path.join(tracker_dir, torrent_name) if multi_file else tracker_dir}")
     return True
 
 
@@ -2098,8 +2096,7 @@ async def async_link_directory(src: str, dst: str, use_hardlink: bool = True, de
 
         # Check if destination already exists
         if await asyncio.to_thread(os.path.exists, dst):
-            if debug:
-                console.print(f"[yellow]Skipping linking, path already exists: {dst}")
+            logger.debug(f"[yellow]Skipping linking, path already exists: {dst}")
             return True
 
         # Handle file linking
@@ -2107,11 +2104,10 @@ async def async_link_directory(src: str, dst: str, use_hardlink: bool = True, de
             if use_hardlink:
                 try:
                     await asyncio.to_thread(os.link, src, dst)
-                    if debug:
-                        console.print(f"[green]Hard link created: {dst} -> {src}")
+                    logger.debug(f"[green]Hard link created: {dst} -> {src}")
                     return True
                 except OSError as e:
-                    console.print(f"[yellow]Hard link failed: {e}")
+                    logger.info(f"[yellow]Hard link failed: {e}")
                     return False
             else:  # Use symlink
                 try:
@@ -2120,11 +2116,10 @@ async def async_link_directory(src: str, dst: str, use_hardlink: bool = True, de
                     else:
                         await asyncio.to_thread(os.symlink, src, dst)
 
-                    if debug:
-                        console.print(f"[green]Symbolic link created: {dst} -> {src}")
+                    logger.debug(f"[green]Symbolic link created: {dst} -> {src}")
                     return True
                 except OSError as e:
-                    console.print(f"[yellow]Symlink failed: {e}")
+                    logger.info(f"[yellow]Symlink failed: {e}")
                     return False
 
         # Handle directory linking
@@ -2156,11 +2151,11 @@ async def async_link_directory(src: str, dst: str, use_hardlink: bool = True, de
                 def _try_hardlink(src_path: str, dst_path: str, rel_path: str) -> bool:
                     try:
                         os.link(src_path, dst_path)
-                        if debug and rel_path == os.path.relpath(all_items[0][0], src):
-                            console.print(f"[green]Hard link created for file: {dst_path} -> {src_path}")
+                        if rel_path == os.path.relpath(all_items[0][0], src):
+                            logger.debug(f"[green]Hard link created for file: {dst_path} -> {src_path}")
                         return True
                     except OSError as e:
-                        console.print(f"[yellow]Hard link failed for file {rel_path}: {e}")
+                        logger.info(f"[yellow]Hard link failed for file {rel_path}: {e}")
                         return False
 
                 # Create hardlinks for all files
@@ -2179,13 +2174,12 @@ async def async_link_directory(src: str, dst: str, use_hardlink: bool = True, de
                     else:
                         await asyncio.to_thread(os.symlink, src, dst)
 
-                    if debug:
-                        console.print(f"[green]Symbolic link created: {dst} -> {src}")
+                    logger.debug(f"[green]Symbolic link created: {dst} -> {src}")
                     return True
                 except OSError as e:
-                    console.print(f"[yellow]Symlink failed: {e}")
+                    logger.info(f"[yellow]Symlink failed: {e}")
                     return False
 
     except Exception as e:
-        console.print(f"[bold red]Error during linking: {e}")
+        logger.info(f"[bold red]Error during linking: {e}")
         return False

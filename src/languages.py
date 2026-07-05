@@ -10,7 +10,7 @@ import langcodes
 from langcodes.tag_parser import LanguageTagError
 
 from src.cleanup import cleanup_manager
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
 
@@ -29,13 +29,13 @@ class LanguagesManager:
         try:
             bd_summary_file = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt"
             if not os.path.exists(bd_summary_file):
-                console.print(f"[yellow]BD_SUMMARY_00.txt not found at {bd_summary_file}[/yellow]")
+                logger.info(f"[yellow]BD_SUMMARY_00.txt not found at {bd_summary_file}[/yellow]")
                 return {}
 
             async with aiofiles.open(bd_summary_file, encoding='utf-8') as f:
                 content = await f.read()
         except Exception as e:
-            console.print(f"[red]Error reading BD_SUMMARY file: {e}[/red]")
+            logger.error(f"[red]Error reading BD_SUMMARY file: {e}[/red]")
             return {}
 
         parsed_data: dict[str, Any] = {
@@ -131,7 +131,7 @@ class LanguagesManager:
             else:
                 return {}
         except Exception as e:
-            console.print(f"[red]Error reading MEDIAINFO file: {e}[/red]")
+            logger.error(f"[red]Error reading MEDIAINFO file: {e}[/red]")
             return {}
 
         parsed_data: dict[str, Any] = {
@@ -239,7 +239,7 @@ class LanguagesManager:
                             # Skip commentary tracks
                             if "title" in audio_track and "commentary" in audio_track['title'].lower():
                                 if meta.debug:
-                                    console.print(f"Skipping commentary track: {audio_track['title']}")
+                                    logger.debug(f"Skipping commentary track: {audio_track['title']}")
                                 continue
 
                             if 'language' in audio_track:
@@ -247,11 +247,11 @@ class LanguagesManager:
 
                             if not language_found and 'title' in audio_track:
                                 if meta.debug:
-                                    console.print(f"Attempting to extract language from title: {audio_track['title']}")
+                                    logger.debug(f"Attempting to extract language from title: {audio_track['title']}")
                                 title_language = self.extract_language_from_title(audio_track['title'])
                                 if title_language:
                                     language_found = title_language
-                                    console.print(f"Extracted language: {title_language}")
+                                    logger.info(f"Extracted language: {title_language}")
 
                             if language_found:
                                 audio_languages.append(language_found)
@@ -264,14 +264,14 @@ class LanguagesManager:
 
                         if not found_any_language:
                             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                                console.print("No audio language/s found for the following tracks:")
+                                logger.info("No audio language/s found for the following tracks:")
                                 for track_info in tracks_without_language:
-                                    console.print(f"  - {track_info}")
-                                console.print("You must enter (comma-separated) languages")
+                                    logger.info(f"  - {track_info}")
+                                logger.info("You must enter (comma-separated) languages")
                                 try:
                                     audio_lang = cli_ui.ask_string('for all audio tracks, eg: English, Spanish:')
                                 except EOFError:
-                                    console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                                    logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                                     await cleanup_manager.cleanup()
                                     cleanup_manager.reset_terminal()
                                     sys.exit(1)
@@ -310,14 +310,14 @@ class LanguagesManager:
 
                             if tracks_without_language:
                                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                                    console.print("No subtitle language/s found for the following tracks:")
+                                    logger.info("No subtitle language/s found for the following tracks:")
                                     for track_info in tracks_without_language:
-                                        console.print(f"  - {track_info}")
-                                    console.print("You must enter (comma-separated) languages")
+                                        logger.info(f"  - {track_info}")
+                                    logger.info("You must enter (comma-separated) languages")
                                     try:
                                         subtitle_lang = cli_ui.ask_string('for all subtitle tracks, eg: English, Spanish:')
                                     except EOFError:
-                                        console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                                        logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                                         await cleanup_manager.cleanup()
                                         cleanup_manager.reset_terminal()
                                         sys.exit(1)
@@ -345,7 +345,7 @@ class LanguagesManager:
                                 try:
                                     hc_lang = cli_ui.ask_string("What language/s are the hardcoded subtitles?")
                                 except EOFError:
-                                    console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                                    logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                                     await cleanup_manager.cleanup()
                                     cleanup_manager.reset_terminal()
                                     sys.exit(1)
@@ -363,7 +363,7 @@ class LanguagesManager:
                             meta.no_subs = True
 
             except Exception as e:
-                console.print(f"[red]Error processing mediainfo languages: {e}[/red]")
+                logger.error(f"[red]Error processing mediainfo languages: {e}[/red]")
 
             meta.language_checked = True
             return None
@@ -382,7 +382,7 @@ class LanguagesManager:
                 if commentary_tracks:
                     for track in commentary_tracks:
                         if meta.debug:
-                            console.print(f"Skipping commentary track: {track}")
+                            logger.debug(f"Skipping commentary track: {track}")
                         audio_tracks.remove(track)
                 audio_languages_ordered: list[str] = self._dedupe_preserve_order(existing_audio_languages)
                 audio_language_set: set[str] = set(audio_languages_ordered)
@@ -409,13 +409,13 @@ class LanguagesManager:
                     lang = track.get("language", "")
                     if bitrate_num is not None and bitrate_num < 258 and lang and lang in audio_language_set and len(lang) > 1 and not meta.bluray_audio_skip:
                         if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                            console.print(f"Audio track '{lang}' has a bitrate of {bitrate_num} kbps. Probably commentary and should be removed.")
+                            logger.info(f"Audio track '{lang}' has a bitrate of {bitrate_num} kbps. Probably commentary and should be removed.")
                             try:
                                 if cli_ui.ask_yes_no(f"Remove '{lang}' from audio languages?", default=True):
                                     audio_language_set.discard(lang)
                                     audio_languages_ordered = [item for item in audio_languages_ordered if item != lang]
                             except EOFError:
-                                console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                                logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                                 await cleanup_manager.cleanup()
                                 cleanup_manager.reset_terminal()
                                 sys.exit(1)
@@ -429,7 +429,7 @@ class LanguagesManager:
                 if sub_commentary_tracks:
                     for track in sub_commentary_tracks:
                         if meta.debug:
-                            console.print(f"Skipping commentary subtitle track: {track}")
+                            logger.debug(f"Skipping commentary subtitle track: {track}")
                         subtitle_tracks.remove(track)
                 subtitle_languages_ordered: list[str] = self._dedupe_preserve_order(existing_subtitle_languages)
                 subtitle_language_set: set[str] = set(subtitle_languages_ordered)
@@ -449,7 +449,7 @@ class LanguagesManager:
 
                 meta.audio_languages = audio_languages_ordered
             except Exception as e:
-                console.print(f"[red]Error processing BDInfo languages: {e}[/red]")
+                logger.error(f"[red]Error processing BDInfo languages: {e}[/red]")
 
             meta.language_checked = True
             return None

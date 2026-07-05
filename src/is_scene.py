@@ -13,7 +13,7 @@ import httpx
 from bs4 import BeautifulSoup
 from bs4.element import AttributeValueList
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
 
@@ -75,14 +75,14 @@ class SceneManager:
                         search_text = await asyncio.to_thread(Path(search_cache_file).read_text, encoding='utf-8')
                         response_json = json.loads(search_text)
                         if meta.debug:
-                            console.print(f"[cyan]SRRDB: Using cached search for {base}")
+                            logger.debug(f"[cyan]SRRDB: Using cached search for {base}")
                     except Exception:
                         response_json = None
 
                 if response_json is None:
                     url = f"https://api.srrdb.com/v1/search/r:{quoted_base}"
                     if meta.debug:
-                        console.print("Using SRRDB url", url)
+                        logger.debug(f"Using SRRDB url: {url}")
                     try:
                         response = await client.get(url, timeout=30.0)
                         if response.status_code == 200:
@@ -91,7 +91,7 @@ class SceneManager:
                             search_text = json.dumps(response_json)
                             await asyncio.to_thread(Path(search_cache_file).write_text, search_text, encoding='utf-8')
                     except Exception as e:
-                        console.print(f"[yellow]SRRDB: Search request failed: {e}")
+                        logger.info(f"[yellow]SRRDB: Search request failed: {e}")
 
                 if response_json and int(response_json.get('resultsCount', 0)) > 0:
                     first_result = response_json['results'][0]
@@ -155,14 +155,14 @@ class SceneManager:
                                     meta.nfo = True
                                     meta.auto_nfo = True
                                     if meta.debug:
-                                        console.print(f"[green]NFO downloaded to {nfo_file_path}")
+                                        logger.debug(f"[green]NFO downloaded to {nfo_file_path}")
                                 else:
-                                    console.print("[yellow]NFO file not available for download.")
+                                    logger.info("[yellow]NFO file not available for download.")
                         except Exception as e:
-                            console.print("[yellow]Failed to download NFO file:", e)
+                            logger.info(f"[yellow]Failed to download NFO file: {e}")
                 else:
                     if meta.debug and response_json:
-                        console.print("[yellow]SRRDB: No match found")
+                        logger.info("[yellow]SRRDB: No match found")
 
             elif not scene and lower:
                 release_name: str = ""
@@ -174,7 +174,7 @@ class SceneManager:
                     url = f"https://api.srrdb.com/v1/search/start:{name}/group:{tag}"
 
                     if meta.debug:
-                        console.print("Using SRRDB url", url)
+                        logger.debug(f"Using SRRDB url: {url}")
 
                     try:
                         response = await client.get(url, timeout=10.0)
@@ -202,43 +202,43 @@ class SceneManager:
                                                 await asyncio.to_thread(Path(nfo_file_path).write_bytes, nfo_response.content)
                                                 meta.nfo = True
                                                 meta.auto_nfo = True
-                                                console.print(f"[green]NFO downloaded to {nfo_file_path}")
+                                                logger.info(f"[green]NFO downloaded to {nfo_file_path}")
                                         else:
                                             meta.nfo = True
                                             meta.auto_nfo = True
                                     except Exception as e:
-                                        console.print("[yellow]Failed to download NFO file:", e)
+                                        logger.info(f"[yellow]Failed to download NFO file: {e}")
 
                             return release_name, True, imdb
                         else:
                             if meta.debug:
-                                console.print("[yellow]SRRDB: No match found with lower/tag search")
+                                logger.debug("[yellow]SRRDB: No match found with lower/tag search")
                             return video, scene, imdb
 
                     except Exception as e:
-                        console.print(f"[yellow]SRRDB search failed: {e}")
+                        logger.info(f"[yellow]SRRDB search failed: {e}")
                         return video, scene, imdb
                 else:
                     if meta.debug:
-                        console.print("[yellow]SRRDB: Missing name or tag for lower/tag search")
+                        logger.debug("[yellow]SRRDB: Missing name or tag for lower/tag search")
                     return video, scene, imdb
 
         check_predb = bool(self.default_config.get('check_predb', False))
         if not scene and check_predb:
             if meta.debug:
-                console.print("[yellow]SRRDB: No scene match found, checking predb")
+                logger.debug("[yellow]SRRDB: No scene match found, checking predb")
             scene = await self.predb_check(meta, video)
 
         if meta.debug:
             scene_end_time = time.time()
-            console.print(f"Scene data processed in {scene_end_time - scene_start_time:.2f} seconds")
+            logger.debug(f"Scene data processed in {scene_end_time - scene_start_time:.2f} seconds")
 
         return video, scene, imdb
 
     async def predb_check(self, meta: Meta, video: str) -> bool:
         url = f"https://predb.pw/search.php?search={urllib.parse.quote(os.path.basename(video))}"
         if meta.debug:
-            console.print("Using predb url", url)
+            logger.debug(f"Using predb url: {url}")
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(url, timeout=10.0)
@@ -257,11 +257,11 @@ class SceneManager:
                                 continue
                             release_name = release_attr.lower()
                             if meta.debug:
-                                console.print(f"[yellow]Predb: Checking {release_name} against {video_base}")
+                                logger.debug(f"[yellow]Predb: Checking {release_name} against {video_base}")
                             if release_name == video_base:
                                 found = True
                                 meta.scene_name = release_attr
-                                console.print("[green]Predb: Match found")
+                                logger.info("[green]Predb: Match found")
                                 # The 4th <td> contains the group
                                 if len(tds) >= 4:
                                     group_a = tds[3].find('a')
@@ -270,15 +270,15 @@ class SceneManager:
                                         meta.tag = f"-{group}" if group and not group.startswith("-") else group
                                 return True
                 if not found:
-                    console.print("[yellow]Predb: No match found")
+                    logger.info("[yellow]Predb: No match found")
                     return False
             else:
-                console.print(f"[red]Predb: Error {response.status_code} while checking")
+                logger.info(f"[red]Predb: Error {response.status_code} while checking")
                 return False
         except httpx.RequestError as e:
-            console.print(f"[red]Predb: Request failed: {e}")
+            logger.info(f"[red]Predb: Request failed: {e}")
             return False
         except Exception as e:
-            console.print(f"[yellow]Predb error: {e}")
+            logger.info(f"[yellow]Predb error: {e}")
             return False
         return False

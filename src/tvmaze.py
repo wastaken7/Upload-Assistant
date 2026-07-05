@@ -5,7 +5,7 @@ from typing import Any, cast
 import cli_ui
 import httpx
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
 
@@ -26,16 +26,15 @@ class TvmazeManager:
         - If `return_full_tuple=True`, returns `(tvmaze_id, imdbID, tvdbID)`.
         - Otherwise, only returns `tvmaze_id`.
         """
-        if debug:
-            console.print(
-                f"[cyan]Searching TVMaze for TVDB {tvdbID} or IMDB {imdbID} or {filename} ({year}) and returning {return_full_tuple}.[/cyan]"
-            )
+        logger.debug(
+            f"[cyan]Searching TVMaze for TVDB {tvdbID} or IMDB {imdbID} or {filename} ({year}) and returning {return_full_tuple}.[/cyan]"
+        )
         # Convert TVDB ID to integer
         if isinstance(tvdbID, (int, str)) and tvdbID not in ('', '0'):
             try:
                 tvdbID = int(tvdbID)
             except (ValueError, TypeError):
-                console.print(f"[red]Error: tvdbID is not a valid integer. Received: {tvdbID}[/red]")
+                logger.error(f"[red]Error: tvdbID is not a valid integer. Received: {tvdbID}[/red]")
                 tvdbID = 0
         else:
             tvdbID = 0
@@ -49,7 +48,7 @@ class TvmazeManager:
             else:
                 imdbID = 0
         except (ValueError, TypeError):
-            console.print(f"[red]Error: imdbID is not a valid integer. Received: {imdbID}[/red]")
+            logger.error(f"[red]Error: imdbID is not a valid integer. Received: {imdbID}[/red]")
             imdbID = 0
 
         # If manual selection has been provided, return it directly
@@ -58,7 +57,7 @@ class TvmazeManager:
                 tvmaze_id = int(tvmaze_manual)
                 return (tvmaze_id, imdbID, tvdbID) if return_full_tuple else tvmaze_id
             except (ValueError, TypeError):
-                console.print(f"[red]Error: tvmaze_manual is not a valid integer. Received: {tvmaze_manual}[/red]")
+                logger.error(f"[red]Error: tvmaze_manual is not a valid integer. Received: {tvmaze_manual}[/red]")
                 tvmaze_id = 0
                 return (tvmaze_id, imdbID, tvdbID) if return_full_tuple else tvmaze_id
 
@@ -98,26 +97,25 @@ class TvmazeManager:
                 unique_results.append(show)
 
         if not unique_results:
-            if debug:
-                console.print("[yellow]No TVMaze results found.[/yellow]")
+            logger.debug("[yellow]No TVMaze results found.[/yellow]")
             return (tvmaze_id, imdbID, tvdbID) if return_full_tuple else tvmaze_id
 
         # Manual selection process
         if manual_date is not None:
-            console.print("[bold]Search results:[/bold]")
+            logger.info("[bold]Search results:[/bold]")
             for idx, show in enumerate(unique_results):
-                console.print(
+                logger.info(
                     f"[bold red]{idx + 1}[/bold red]. [green]{show.get('name', 'Unknown')} (TVmaze ID:[/green] [bold red]{show['id']}[/bold red])"
                 )
-                console.print(f"[yellow]   Premiered: {show.get('premiered', 'Unknown')}[/yellow]")
-                console.print(f"   Externals: {json.dumps(show.get('externals', {}), indent=2)}")
+                logger.info(f"[yellow]   Premiered: {show.get('premiered', 'Unknown')}[/yellow]")
+                logger.info(f"   Externals: {json.dumps(show.get('externals', {}), indent=2)}")
 
             while True:
                 try:
                     choice_raw = cli_ui.ask_string(f"Enter the number of the correct show (1-{len(unique_results)}) or 0 to skip: ")
                     choice = int((choice_raw or "").strip())
                     if choice == 0:
-                        console.print("Skipping selection.")
+                        logger.info("Skipping selection.")
                         break
                     if 1 <= choice <= len(unique_results):
                         selected_show = unique_results[choice - 1]
@@ -128,25 +126,24 @@ class TvmazeManager:
                             new_tvdb_id = selected_show['externals']['thetvdb']
                             if new_tvdb_id:
                                 tvdbID = int(new_tvdb_id)
-                                console.print(f"[green]Updated TVDb ID to: {tvdbID}[/green]")
-                        console.print(f"Selected show: {selected_show.get('name')} (TVmaze ID: {tvmaze_id})")
+                                logger.info(f"[green]Updated TVDb ID to: {tvdbID}[/green]")
+                        logger.info(f"Selected show: {selected_show.get('name')} (TVmaze ID: {tvmaze_id})")
                         break
                     else:
-                        console.print(f"Invalid choice. Please choose a number between 1 and {len(unique_results)}, or 0 to skip.")
+                        logger.info(f"Invalid choice. Please choose a number between 1 and {len(unique_results)}, or 0 to skip.")
                 except ValueError:
-                    console.print("Invalid input. Please enter a number.")
+                    logger.info("Invalid input. Please enter a number.")
         else:
             selected_show = unique_results[0]
             tvmaze_id = int(selected_show['id'])
-            if debug:
-                console.print(f"[cyan]Automatically selected show: {selected_show.get('name')} (TVmaze ID: {tvmaze_id})[/cyan]")
+            logger.debug(f"[cyan]Automatically selected show: {selected_show.get('name')} (TVmaze ID: {tvmaze_id})[/cyan]")
 
-        if debug and return_full_tuple:
-            console.print(
+        if return_full_tuple:
+            logger.debug(
                 f"[cyan]Returning TVmaze ID: {tvmaze_id} (type: {type(tvmaze_id).__name__}), IMDb ID: {imdbID} (type: {type(imdbID).__name__}), TVDB ID: {tvdbID} (type: {type(tvdbID).__name__})[/cyan]"
             )
-        elif debug:
-            console.print(f"[cyan]Returning TVmaze ID: {tvmaze_id} (type: {type(tvmaze_id).__name__})[/cyan]")
+        else:
+            logger.debug(f"[cyan]Returning TVmaze ID: {tvmaze_id} (type: {type(tvmaze_id).__name__})[/cyan]")
         return (tvmaze_id, imdbID, tvdbID) if return_full_tuple else tvmaze_id
 
     async def _make_tvmaze_request(
@@ -171,9 +168,9 @@ class TvmazeManager:
                     return None
                 return None
         except httpx.HTTPStatusError as e:
-            console.print(f"[ERROR] TVmaze API error: {e.response.status_code}", markup=False)
+            logger.info(f"[ERROR] TVmaze API error: {e.response.status_code}", extra={"markup": False})
         except httpx.RequestError as e:
-            console.print(f"[ERROR] Network error while accessing TVmaze: {e}", markup=False)
+            logger.info(f"[ERROR] Network error while accessing TVmaze: {e}", extra={"markup": False})
         return cast(dict[str, Any], {})
 
     async def get_tvmaze_episode_data(
@@ -228,12 +225,12 @@ class TvmazeManager:
 
                     return result
                 else:
-                    console.print(f"[yellow]No episode data found for S{season:02d}E{episode:02d}[/yellow]")
+                    logger.info(f"[yellow]No episode data found for S{season:02d}E{episode:02d}[/yellow]")
                     return None
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404 and meta is not None:
-                console.print("[yellow]Episode not found using season/episode, trying date-based lookup...[/yellow]")
+                logger.info("[yellow]Episode not found using season/episode, trying date-based lookup...[/yellow]")
 
                 # Try to get airdate from meta data
                 airdate = None
@@ -244,7 +241,7 @@ class TvmazeManager:
                     if isinstance(manual_date, str):
                         airdate = manual_date
                     if meta.debug:
-                        console.print(f"[cyan]Using manual_date: {airdate}[/cyan]")
+                        logger.debug(f"[cyan]Using manual_date: {airdate}[/cyan]")
 
                 # Second priority: find airdate from tvdb_episode_data using tvdb_episode_id
                 elif meta and meta.tvdb_episode_id and meta.tvdb_episode_data:
@@ -266,28 +263,28 @@ class TvmazeManager:
                             if isinstance(ep_airdate, str):
                                 airdate = ep_airdate
                                 if meta.debug:
-                                    console.print(f"[cyan]Found airdate from TVDB episode data: {airdate}[/cyan]")
+                                    logger.debug(f"[cyan]Found airdate from TVDB episode data: {airdate}[/cyan]")
                                 break
 
                     if not airdate and meta.debug:
-                        console.print(f"[yellow]Could not find airdate for TVDB episode ID {tvdb_episode_id}[/yellow]")
+                        logger.info(f"[yellow]Could not find airdate for TVDB episode ID {tvdb_episode_id}[/yellow]")
 
                 # Try date-based lookup if we have an airdate
                 if isinstance(airdate, str) and airdate:
                     if meta.debug:
-                        console.print(f"[cyan]Attempting TVMaze lookup by date: {airdate}[/cyan]")
+                        logger.debug(f"[cyan]Attempting TVMaze lookup by date: {airdate}[/cyan]")
                     return await self.get_tvmaze_episode_data_by_date(tvmaze_id, airdate)
                 else:
                     if meta.debug:
-                        console.print("[yellow]No airdate available for fallback lookup[/yellow]")
+                        logger.debug("[yellow]No airdate available for fallback lookup[/yellow]")
                     return None
             else:
                 return None
         except httpx.RequestError as e:
-            console.print(f"[red]TVMaze Request error occurred: {e}[/red]")
+            logger.info(f"[red]TVMaze Request error occurred: {e}[/red]")
             return None
         except Exception as e:
-            console.print(f"[red]TVMaze Error fetching TVMaze episode data: {e}[/red]")
+            logger.info(f"[red]TVMaze Error fetching TVMaze episode data: {e}[/red]")
             return None
 
     async def get_tvmaze_episode_data_by_date(self, tvmaze_id: int, airdate: str) -> dict[str, Any] | None:
@@ -336,17 +333,17 @@ class TvmazeManager:
 
                     return result
                 else:
-                    console.print(f"[yellow]No episode data found for date {airdate}[/yellow]")
+                    logger.info(f"[yellow]No episode data found for date {airdate}[/yellow]")
                     return None
 
         except httpx.HTTPStatusError as e:
-            console.print(f"[red]TVMaze HTTP error occurred in episodesbydate: {e.response.status_code} - {e.response.text}[/red]")
+            logger.info(f"[red]TVMaze HTTP error occurred in episodesbydate: {e.response.status_code} - {e.response.text}[/red]")
             return None
         except httpx.RequestError as e:
-            console.print(f"[red]TVMaze Request error occurred in episodesbydate: {e}[/red]")
+            logger.info(f"[red]TVMaze Request error occurred in episodesbydate: {e}[/red]")
             return None
         except Exception as e:
-            console.print(f"[red]TVMaze Error fetching TVMaze episode data by date: {e}[/red]")
+            logger.info(f"[red]TVMaze Error fetching TVMaze episode data by date: {e}[/red]")
             return None
 
 

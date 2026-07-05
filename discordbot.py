@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="discord.p
 import discord
 from discord.ext import commands
 
-from src.console import console
+from src.console import logger
 
 
 async def run(config: Mapping[str, Any]) -> None:
@@ -82,26 +82,24 @@ class Bot(commands.Bot):
         for extension in cogs:
             try:
                 await self.load_extension(f'cogs.{extension}')
-                console.print(f'loaded {extension}', markup=False)
+                logger.info(f"loaded {extension}", extra={"markup": False})
             except Exception as e:
-                error = f'{extension}\n {type(e).__name__} : {e}'
-                console.print(f'failed to load extension {error}', markup=False)
-            console.print('-' * 10, markup=False)
+                error = f"{extension}\n {type(e).__name__} : {e}"
+                logger.info(f"failed to load extension {error}", extra={"markup": False})
+            logger.info("-" * 10, extra={"markup": False})
 
     async def on_ready(self) -> None:
         """
         This event is called every time the bot connects or resumes connection.
         """
-        console.print('-' * 10, markup=False)
+        logger.info("-" * 10, extra={"markup": False})
         self.app_info = await self.application_info()
         user = self.user
         if user is None:
-            console.print('[red]Discord client user unavailable[/red]')
+            logger.info("[red]Discord client user unavailable[/red]")
             return
-        console.print(f'Logged in as: {user.name}\n'
-              f'Using discord.py version: {discord.__version__}\n'
-              f'Owner: {self.app_info.owner}\n', markup=False)
-        console.print('-' * 10, markup=False)
+        logger.info(f"Logged in as: {user.name}\nUsing discord.py version: {discord.__version__}\nOwner: {self.app_info.owner}\n", extra={"markup": False})
+        logger.info("-" * 10, extra={"markup": False})
         channel = self.get_channel(int(self.config['DISCORD']['discord_channel_id']))
         if channel and isinstance(channel, discord.abc.Messageable):
             await channel.send(f'{user.name} is now online')
@@ -143,8 +141,7 @@ class DiscordNotifier:
         if only_unattended and not unattended:
             return False
         if not bot or not hasattr(bot, 'is_ready') or not bot.is_ready():
-            if debug:
-                console.print("[yellow]Discord bot not ready - skipping notifications")
+            logger.debug("[yellow]Discord bot not ready - skipping notifications")
             return False
 
         try:
@@ -152,14 +149,13 @@ class DiscordNotifier:
             channel = bot.get_channel(channel_id)
             if channel and isinstance(channel, discord.abc.Messageable):
                 await channel.send(message)
-                if debug:
-                    console.print(f"[green]Discord notification sent: {message}")
+                logger.debug(f"[green]Discord notification sent: {message}")
                 return True
             else:
-                console.print("[yellow]Discord channel not found")
+                logger.info("[yellow]Discord channel not found")
                 return False
         except Exception as e:
-            console.print(f"[yellow]Discord notification error: {e}")
+            logger.info(f"[yellow]Discord notification error: {e}")
             return False
 
     @staticmethod
@@ -218,7 +214,7 @@ class DiscordNotifier:
                 await channel.send(message)
                 return True
         except Exception as e:
-            console.print(f"[yellow]Discord notification error: {e}")
+            logger.info(f"[yellow]Discord notification error: {e}")
 
         return False
 

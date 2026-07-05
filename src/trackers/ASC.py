@@ -13,7 +13,7 @@ import httpx
 from bs4 import BeautifulSoup
 from pymediainfo import MediaInfo
 
-from src.console import console
+from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
@@ -634,7 +634,7 @@ class ASC:
                 filename = first_content.strip() if isinstance(first_content, str) else first_content.get_text(strip=True)
 
         except Exception as e:
-            console.print(f'[bold red]Falha ao obter nome do arquivo para ID {torrent_id}: {e}[/bold red]')
+            logger.info(f'[bold red]Falha ao obter nome do arquivo para ID {torrent_id}: {e}[/bold red]')
 
         return {
             'name': filename,
@@ -768,11 +768,11 @@ class ASC:
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK" and meta.source_size <= 1024 * 1024:
-            console.print(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
             return False
 
         if meta.category not in ("BOOK", "GAME") and not meta.imdb_id and not meta.anime:
-            console.print(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
             return False
 
         return True
@@ -963,7 +963,7 @@ class ASC:
                         layout_dict = json.loads(cache)
                         return layout_dict
                 except (OSError, json.JSONDecodeError):
-                    console.print(f"{self.tracker}: [yellow]Failed to read cached layout data.[/yellow]")
+                    logger.info(f"{self.tracker}: [yellow]Failed to read cached layout data.[/yellow]")
 
             try:
                 response = await self.session.post(url, data=payload, timeout=20)
@@ -976,7 +976,7 @@ class ASC:
                         async with aiofiles.open(cache_path, "w", encoding="utf-8") as f:
                             await f.write(json.dumps(layout_dict))
                     except Exception as e:
-                        console.print(f"{self.tracker}: [red]Failed to cache layout data: {e}[/red]")
+                        logger.error(f"{self.tracker}: [red]Failed to cache layout data: {e}[/red]")
 
                 return layout_dict
             except Exception:
@@ -1100,14 +1100,14 @@ class ASC:
                         message += f"[bold green]Nome:[/bold green] {r['Name']}\n"
                         message += f"[bold green]Recompensa:[/bold green] {r['Reward']}\n"
                         message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
-                    console.print(message)
+                    logger.info(message)
 
                 return results
 
             except Exception as e:
-                console.print(f'[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]')
+                logger.info(f'[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]')
                 import traceback
-                console.print(traceback.format_exc())
+                logger.info(traceback.format_exc())
                 return []
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
@@ -1227,7 +1227,7 @@ class ASC:
 
     async def upload(self, meta: Meta) -> bool:
         if meta.category == "BOOK" and meta.source_size <= 1024 * 1024:
-            console.print(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
             return False
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar is not None:
@@ -1266,7 +1266,7 @@ class ASC:
 
     async def auto_approval(self, meta: Meta) -> None:
         if meta.debug:
-            console.print(
+            logger.debug(
                 f'{self.tracker}: Debug mode, skipping automatic approval.'
             )
         else:
@@ -1276,21 +1276,21 @@ class ASC:
                 approval_response = await self.session.get(approval_url, timeout=30)
                 approval_response.raise_for_status()
             except Exception as e:
-                console.print(f'{self.tracker}: [bold red]Error during automatic approval attempt: {e}[/bold red]')
+                logger.info(f'{self.tracker}: [bold red]Error during automatic approval attempt: {e}[/bold red]')
 
     async def get_approval(self, meta: Meta) -> bool:
         if not self.config['TRACKERS'][self.tracker].get('uploader_status', False):
             return False
 
         if meta.modq:
-            console.print(f'{self.tracker}: Sending to the moderation queue.')
+            logger.info(f'{self.tracker}: Sending to the moderation queue.')
             return False
 
         return True
 
     async def set_internal_flag(self, meta: Meta) -> None:
         if meta.debug:
-            console.print(
+            logger.debug(
                 f'{self.tracker}: [bold yellow]Debug mode, skipping setting internal flag.[/bold yellow]'
             )
         else:
@@ -1304,5 +1304,5 @@ class ASC:
                 response.raise_for_status()
 
             except Exception as e:
-                console.print(f'{self.tracker}: [bold red]Error setting internal flag: {e}[/bold red]')
+                logger.info(f'{self.tracker}: [bold red]Error setting internal flag: {e}[/bold red]')
                 return

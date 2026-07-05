@@ -17,7 +17,7 @@ from langcodes import Language
 from pymediainfo import MediaInfo
 
 from bin.get_playlist import MplsParser
-from src.console import console
+from src.console import logger
 from src.exportmi import setup_mediainfo_library
 from src.meta import Meta
 
@@ -119,11 +119,11 @@ class DiscParse:
                 playlists_path = os.path.join(path, "PLAYLIST")
 
                 if not os.path.exists(playlists_path):
-                    console.print(f"[bold red]PLAYLIST directory not found for disc {path}")
+                    logger.info(f"[bold red]PLAYLIST directory not found for disc {path}")
                     continue
 
                 if meta.debug:
-                    console.print(f"[cyan]Parsing playlists from: {playlists_path}")
+                    logger.debug(f"[cyan]Parsing playlists from: {playlists_path}")
 
                 def _load_mpls(mpls_path: str) -> tuple[Any, Any]:
                     with open(mpls_path, "rb") as mpls_file:
@@ -141,7 +141,7 @@ class DiscParse:
 
                     mpls_path = os.path.join(playlists_path, file_name)
                     if meta.debug:
-                        console.print(f"[cyan]Processing playlist: {file_name}")
+                        logger.debug(f"[cyan]Processing playlist: {file_name}")
 
                     try:
                         _, playlist_data = await asyncio.to_thread(_load_mpls, mpls_path)
@@ -154,11 +154,11 @@ class DiscParse:
                         play_items = getattr(playlist_data, "play_items", None)
                         if not play_items:
                             if meta.debug:
-                                console.print(f"[yellow]  No play_items found in {file_name}")
+                                logger.debug(f"[yellow]  No play_items found in {file_name}")
                             continue
 
                         if meta.debug:
-                            console.print(f"[cyan]  Found {len(play_items)} play items in {file_name}")
+                            logger.debug(f"[cyan]  Found {len(play_items)} play items in {file_name}")
 
                         for item in play_items:
                             intime = getattr(item, "intime", None)
@@ -180,13 +180,13 @@ class DiscParse:
                                     file_sizes[m2ts_file] = size
                                     total_play_items += 1
                                 elif meta.debug:
-                                    console.print(f"[yellow]    Missing m2ts file: {clip_name}.m2ts")
+                                    logger.info(f"[yellow]    Missing m2ts file: {clip_name}.m2ts")
                             except AttributeError as e:
-                                console.print(f"[bold red]Error accessing clip information for item in {file_name}: {e}")
+                                logger.info(f"[bold red]Error accessing clip information for item in {file_name}: {e}")
 
                         if not file_sizes:
                             if meta.debug:
-                                console.print(f"[yellow]  No m2ts files found for {file_name}")
+                                logger.debug(f"[yellow]  No m2ts files found for {file_name}")
                             continue
 
                         items = [{"file": file, "size": file_sizes[file]} for file in file_counts]
@@ -202,14 +202,14 @@ class DiscParse:
                         if meta.debug:
                             duplicates = [f for f, c in file_counts.items() if c > 1]
                             if duplicates:
-                                console.print(f"[green]  ✓ Added {file_name}: {duration:.1f}s, {len(file_sizes)} unique files ({len(duplicates)} files repeated), {total_size // (1024 * 1024)} MB total")
+                                logger.debug(f"[green]  ✓ Added {file_name}: {duration:.1f}s, {len(file_sizes)} unique files ({len(duplicates)} files repeated), {total_size // (1024 * 1024)} MB total")
                             else:
-                                console.print(f"[green]  ✓ Added {file_name}: {duration:.1f}s, {len(items)} unique files, {total_size // (1024 * 1024)} MB total")
+                                logger.debug(f"[green]  ✓ Added {file_name}: {duration:.1f}s, {len(items)} unique files, {total_size // (1024 * 1024)} MB total")
                     except Exception as e:
-                        console.print(f"[bold red]Error parsing playlist {mpls_path}: {e}")
+                        logger.info(f"[bold red]Error parsing playlist {mpls_path}: {e}")
 
                 if not valid_playlists:
-                    console.print(f"[bold red]No playlists found for disc {path}")
+                    logger.info(f"[bold red]No playlists found for disc {path}")
                     continue
 
                 scored_playlists = [(p, self._calculate_playlist_score(p)) for p in valid_playlists]
@@ -218,22 +218,22 @@ class DiscParse:
 
                 if use_largest or (meta.unattended and not meta.unattended_confirm):
                     best_playlist, best_score = scored_playlists[0]
-                    console.print(f"[yellow]Auto-selecting best playlist using weighted scoring: {best_playlist['file']} ({best_score:.2f})")
+                    logger.info(f"[yellow]Auto-selecting best playlist using weighted scoring: {best_playlist['file']} ({best_score:.2f})")
                     selected_playlists = [best_playlist]
                 else:
                     if len(top_playlists) == 1:
-                        console.print("[yellow]Only one playlist found. Automatically selecting.")
+                        logger.info("[yellow]Only one playlist found. Automatically selecting.")
                         selected_playlists = top_playlists
                     else:
                         while True:
-                            console.print("[bold green]Available top playlists (by score):")
+                            logger.info("[bold green]Available top playlists (by score):")
                             for idx, playlist in enumerate(top_playlists):
                                 duration_str = f"{int(playlist['duration'] // 3600)}h {int((playlist['duration'] % 3600) // 60)}m {int(playlist['duration'] % 60)}s"
                                 items_str = ', '.join(f"{os.path.basename(item['file'])} ({item['size'] // (1024 * 1024)} MB)" for item in playlist['items'])
                                 score = self._calculate_playlist_score(playlist)
-                                console.print(f"[{idx}] {playlist['file']} - {duration_str} - score {score:.2f} - {items_str}")
+                                logger.info(f"[{idx}] {playlist['file']} - {duration_str} - score {score:.2f} - {items_str}")
 
-                            console.print("[bold yellow]Enter playlist numbers separated by commas, 'ALL' to select all, or press Enter to select the top-scoring playlist:")
+                            logger.info("[bold yellow]Enter playlist numbers separated by commas, 'ALL' to select all, or press Enter to select the top-scoring playlist:")
                             user_input_raw = cli_ui.ask_string("Select playlists: ")
                             user_input = (user_input_raw or "").strip().lower()
 
@@ -249,12 +249,12 @@ class DiscParse:
                                     selected_playlists = [top_playlists[idx] for idx in selected_indices if 0 <= idx < len(top_playlists)]
                                     if selected_playlists:
                                         break
-                                    console.print("[bold red]No valid selections. Please try again.")
+                                    logger.info("[bold red]No valid selections. Please try again.")
                                 except ValueError:
-                                    console.print("[bold red]Invalid input. Please try again.")
+                                    logger.info("[bold red]Invalid input. Please try again.")
 
                 for idx, playlist in enumerate(selected_playlists):
-                    console.print(f"[bold green]Scanning playlist {playlist['file']} with duration {int(playlist['duration'] // 3600)} hours {int((playlist['duration'] % 3600) // 60)} minutes {int(playlist['duration'] % 60)} seconds")
+                    logger.info(f"[bold green]Scanning playlist {playlist['file']} with duration {int(playlist['duration'] // 3600)} hours {int((playlist['duration'] % 3600) // 60)} minutes {int(playlist['duration'] % 60)} seconds")
                     playlist_number = playlist['file'].replace(".mpls", "")
                     playlist_report_path = os.path.join(save_dir, f"Disc{i + 1}_{playlist_number}_FULL.txt")
 
@@ -294,7 +294,7 @@ class DiscParse:
                                 elif shutil.which("BDInfo"):
                                     bdinfo_executable = ["BDInfo", path, '-m', playlist['file'], save_dir]
                                 else:
-                                    console.print(f"[bold red]BDInfo not found. Please download bdinfo and place it under {base_dir}/bin/bdinfo/ or install a system bdinfo/BDInfo binary[/bold red]")
+                                    logger.info(f"[bold red]BDInfo not found. Please download bdinfo and place it under {base_dir}/bin/bdinfo/ or install a system bdinfo/BDInfo binary[/bold red]")
                                     continue
 
                             if bdinfo_executable:
@@ -304,7 +304,7 @@ class DiscParse:
                                 await proc.wait()
 
                                 if proc.returncode != 0:
-                                    console.print(f"[bold red]BDInfo failed with return code {proc.returncode}[/bold red]")
+                                    logger.info(f"[bold red]BDInfo failed with return code {proc.returncode}[/bold red]")
                                     continue
 
                                 # Rename the output to playlist_report_path
@@ -315,14 +315,14 @@ class DiscParse:
                                         bdinfo_text = playlist_report_path  # Update bdinfo_text to the renamed file
                                         break
                         except Exception as e:
-                            console.print(f"[bold red]Error scanning playlist {playlist['file']}: {e}")
+                            logger.info(f"[bold red]Error scanning playlist {playlist['file']}: {e}")
                             continue
 
                     # Process the BDInfo report in the while True loop
                     while True:
                         try:
                             if not os.path.exists(bdinfo_text):
-                                console.print(f"[bold red]No valid BDInfo file found for playlist {playlist_number}.")
+                                logger.info(f"[bold red]No valid BDInfo file found for playlist {playlist_number}.")
                                 break
 
                             text = await asyncio.to_thread(Path(bdinfo_text).read_text, encoding="utf-8", errors="replace")
@@ -357,18 +357,18 @@ class DiscParse:
                             # Prompt user for custom edition if conditions are met
                             if len(selected_playlists) > 1:
                                 current_label = bdinfo.get('label', f"Playlist {idx}")
-                                console.print(f"[bold yellow]Current label for playlist {playlist['file']}: {current_label}")
+                                logger.info(f"[bold yellow]Current label for playlist {playlist['file']}: {current_label}")
 
                                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                                    console.print("[bold green]You can create a custom Edition for this playlist.")
+                                    logger.info("[bold green]You can create a custom Edition for this playlist.")
                                     user_input_raw = cli_ui.ask_string(f"Enter a new Edition title for playlist {playlist['file']} (or press Enter to keep the current label): ")
                                     user_input = (user_input_raw or "").strip()
                                     if user_input:
                                         bdinfo['edition'] = user_input
                                         selected_playlists[idx]['edition'] = user_input
-                                        console.print(f"[bold green]Edition updated to: {bdinfo['edition']}")
+                                        logger.info(f"[bold green]Edition updated to: {bdinfo['edition']}")
                                 else:
-                                    console.print("[bold yellow]Unattended mode: Custom edition not added.")
+                                    logger.info("[bold yellow]Unattended mode: Custom edition not added.")
 
                             # Save to discs array
                             if idx == 0:
@@ -395,13 +395,13 @@ class DiscParse:
                                     discs[i]['all_valid_playlists'] = simplified_playlists
 
                                     if meta.debug:
-                                        console.print(f"[cyan]Stored {len(simplified_playlists)} unique playlists by duration (from {len(valid_playlists)} total)")
+                                        logger.debug(f"[cyan]Stored {len(simplified_playlists)} unique playlists by duration (from {len(valid_playlists)} total)")
                             else:
                                 discs[i][f'summary_{idx}'] = bd_summary_cleaned
                                 discs[i][f'bdinfo_{idx}'] = bdinfo
 
                         except Exception:
-                            console.print(traceback.format_exc())
+                            logger.info(traceback.format_exc())
                             await asyncio.sleep(5)
                             continue
                         break
@@ -442,7 +442,7 @@ class DiscParse:
                 bdinfo_files.append(m2ts)
 
             except Exception as e:
-                console.print(f"Failed to process bdinfo line: {line} -> {e}", markup=False)
+                logger.info(f"Failed to process bdinfo line: {line} -> {e}", extra={"markup": False})
 
         return bdinfo_files
 
@@ -581,15 +581,15 @@ class DiscParse:
                             if process.returncode == 0 and stdout:
                                 vob_set_mi = stdout.decode()
                             else:
-                                console.print(f"[yellow]Specialized MediaInfo failed for {ifo_file}, falling back to standard[/yellow]")
+                                logger.info(f"[yellow]Specialized MediaInfo failed for {ifo_file}, falling back to standard[/yellow]")
                                 if stderr:
-                                    console.print(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
+                                    logger.info(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
                                 vob_set_mi = MediaInfo.parse(ifo_file, output='JSON')
                         else:
                             vob_set_mi = MediaInfo.parse(ifo_file, output='JSON')
 
                     except Exception as e:
-                        console.print(f"[yellow]Error with DVD MediaInfo binary for JSON: {str(e)}")
+                        logger.info(f"[yellow]Error with DVD MediaInfo binary for JSON: {str(e)}")
                         # Fall back to standard MediaInfo
                         vob_set_mi = MediaInfo.parse(ifo_file, output='JSON')
 
@@ -599,15 +599,15 @@ class DiscParse:
                     if len(tracks) > 1:
                         vob_set_duration = tracks[1].get('Duration', "Unknown")
                     else:
-                        console.print("Warning: Expected track[1] is missing.")
+                        logger.warning("Warning: Expected track[1] is missing.")
                         vob_set_duration = "Unknown"
 
                 except Exception as e:
-                    console.print(f"Error processing VOB set: {e}")
+                    logger.info(f"Error processing VOB set: {e}")
                     vob_set_duration = "Unknown"
 
                 if vob_set_duration == "Unknown" or not vob_set_duration.replace('.', '', 1).isdigit():
-                    console.print(f"Skipping VOB set due to invalid duration: {vob_set_duration}")
+                    logger.info(f"Skipping VOB set due to invalid duration: {vob_set_duration}")
                     continue
 
                 # If the duration of the new vob set > main set by more than 10%, it's the new main set
@@ -640,14 +640,14 @@ class DiscParse:
                         if process.returncode == 0 and stdout:
                             vob_mi_output = stdout.decode().replace('\r\n', '\n')
                         else:
-                            console.print("[yellow]Specialized MediaInfo failed for VOB, falling back[/yellow]")
+                            logger.info("[yellow]Specialized MediaInfo failed for VOB, falling back[/yellow]")
                             if stderr:
-                                console.print(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
+                                logger.info(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
                             vob_mi_output = MediaInfo.parse(vob_basename, output='STRING', full=False).replace('\r\n', '\n')
                     else:
                         vob_mi_output = MediaInfo.parse(vob_basename, output='STRING', full=False).replace('\r\n', '\n')
                 except Exception as e:
-                    console.print(f"[yellow]Error with DVD MediaInfo binary for VOB: {str(e)}")
+                    logger.info(f"[yellow]Error with DVD MediaInfo binary for VOB: {str(e)}")
                     vob_mi_output = MediaInfo.parse(vob_basename, output='STRING', full=False).replace('\r\n', '\n')
 
                 # Store VOB mediainfo (same output for both keys)
@@ -667,21 +667,21 @@ class DiscParse:
                         if process.returncode == 0 and stdout:
                             ifo_mi_output = stdout.decode().replace('\r\n', '\n')
                         else:
-                            console.print("[yellow]Specialized MediaInfo failed for IFO, falling back[/yellow]")
+                            logger.info("[yellow]Specialized MediaInfo failed for IFO, falling back[/yellow]")
                             if stderr:
-                                console.print(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
+                                logger.info(f"[red]MediaInfo stderr: {stderr.decode()}[/red]")
                             ifo_mi_output = MediaInfo.parse(ifo_basename, output='STRING', full=False).replace('\r\n', '\n')
                     else:
                         ifo_mi_output = MediaInfo.parse(ifo_basename, output='STRING', full=False).replace('\r\n', '\n')
                 except Exception as e:
-                    console.print(f"[yellow]Error with DVD MediaInfo binary for IFO: {str(e)}")
+                    logger.info(f"[yellow]Error with DVD MediaInfo binary for IFO: {str(e)}")
                     ifo_mi_output = MediaInfo.parse(ifo_basename, output='STRING', full=False).replace('\r\n', '\n')
 
                 each['ifo_mi'] = ifo_mi_output
                 each['ifo_mi_full'] = ifo_mi_output
 
             except Exception as e:
-                console.print(f"[yellow]Error using DVD MediaInfo binary, falling back to standard: {e}")
+                logger.info(f"[yellow]Error using DVD MediaInfo binary, falling back to standard: {e}")
                 # Fallback to standard MediaInfo using basenames
                 vob_mi_output = MediaInfo.parse(vob_basename, output='STRING', full=False).replace('\r\n', '\n')
                 ifo_mi_output = MediaInfo.parse(ifo_basename, output='STRING', full=False).replace('\r\n', '\n')
@@ -711,7 +711,7 @@ class DiscParse:
                 playlist_path = os.path.join(meta.path, "ADV_OBJ")
                 xpl_files = glob(f"{playlist_path}/*.xpl")
                 if meta.debug:
-                    console.print(f"Found {xpl_files} in {playlist_path}")
+                    logger.debug(f"Found {xpl_files} in {playlist_path}")
 
                 if not xpl_files:
                     raise FileNotFoundError(f"No .xpl files found in {playlist_path}")
@@ -742,7 +742,7 @@ class DiscParse:
 
                 selected_playlists: list[dict[str, Any]] = []
                 if use_largest:
-                    console.print("[yellow]Auto-selecting the largest playlist based on size.")
+                    logger.info("[yellow]Auto-selecting the largest playlist based on size.")
                     selected_playlists = [
                         max(
                             valid_playlists,
@@ -750,7 +750,7 @@ class DiscParse:
                         )
                     ]
                 elif meta.unattended and not meta.unattended_confirm:
-                    console.print("[yellow]Unattended mode: Auto-selecting the largest playlist.")
+                    logger.info("[yellow]Unattended mode: Auto-selecting the largest playlist.")
                     selected_playlists = [
                         max(
                             valid_playlists,
@@ -760,7 +760,7 @@ class DiscParse:
                 else:
                     # Allow user to select playlists
                     while True:
-                        console.print("[cyan]Available playlists:")
+                        logger.info("[cyan]Available playlists:")
                         for idx, playlist in enumerate(valid_playlists, start=1):
                             duration = playlist.get("titleDuration", "Unknown")
                             title_number = playlist.get("titleNumber", "")
@@ -774,7 +774,7 @@ class DiscParse:
                                 additional_info.append(f"[yellow]Description:[/yellow] {description}")
                             additional_info.append(f"[yellow]Size:[/yellow] {total_size / (1024 * 1024):.2f} MB")
                             additional_info_str = ", ".join(additional_info)
-                            console.print(f"{idx}: Duration: {duration} Playlist: {title_number}" + (f" ({additional_info_str})" if additional_info else ""))
+                            logger.info(f"{idx}: Duration: {duration} Playlist: {title_number}" + (f" ({additional_info_str})" if additional_info else ""))
 
                         user_input_raw = cli_ui.ask_string("Enter the number of the playlist you want to select: ")
                         user_input = (user_input_raw or "").strip()
@@ -787,7 +787,7 @@ class DiscParse:
                             selected_playlists = [valid_playlists[i] for i in selected_indices]
                             break  # Exit the loop when valid input is provided
                         except (ValueError, IndexError):
-                            console.print("[red]Invalid input. Please try again.")
+                            logger.info("[red]Invalid input. Please try again.")
 
                 # Extract the .EVO files from the selected playlists
                 primary_clips: list[dict[str, Any]] = []
@@ -854,9 +854,9 @@ class DiscParse:
                         description = audio_track.get("description", "")
 
                         # Debugging: Print the current audio track information
-                        console.print(f"[Debug] Processing Audio Track: {track_number}")
-                        console.print(f"        Language: {language}")
-                        console.print(f"        Langcode: {langcode}")
+                        logger.info(f"[Debug] Processing Audio Track: {track_number}")
+                        logger.info(f"        Language: {language}")
+                        logger.info(f"        Langcode: {langcode}")
 
                         # Find the corresponding "Audio #X" block in MediaInfo
                         found_block = False
@@ -864,7 +864,7 @@ class DiscParse:
                             # console.print(mediainfo_blocks)
                             if re.match(rf"^\s*Audio #\s*{track_number}\b.*", block):  # Match the correct Audio # block
                                 found_block = True
-                                console.print(f"[Debug] Found matching MediaInfo block for Audio Track {track_number}.")
+                                logger.info(f"[Debug] Found matching MediaInfo block for Audio Track {track_number}.")
 
                                 # Check if Language is already present
                                 if language and not re.search(rf"Language\s+:\s+{re.escape(language)}", block):
@@ -886,13 +886,13 @@ class DiscParse:
                                             + block[line_end:]  # Rest of the block
                                         )
                                         mediainfo_blocks[i] = updated_block
-                                        console.print(f"[Debug] Updated MediaInfo Block for Audio Track {track_number}:")
-                                        console.print(updated_block)
+                                        logger.info(f"[Debug] Updated MediaInfo Block for Audio Track {track_number}:")
+                                        logger.info(updated_block)
                                 break  # Stop processing once the correct block is modified
 
                         # Debugging: Log if no matching block was found
                         if not found_block:
-                            console.print(f"[Debug] No matching MediaInfo block found for Audio Track {track_number}.")
+                            logger.info(f"[Debug] No matching MediaInfo block found for Audio Track {track_number}.")
 
                     # Add subtitle track languages to the correct "Text #X" block
                     subtitle_tracks = selected_playlist.get("subtitleTracks", [])
@@ -902,16 +902,16 @@ class DiscParse:
                         langcode = subtitle_track.get("langcode", "")
 
                         # Debugging: Print current subtitle track info
-                        console.print(f"[Debug] Processing Subtitle Track: {track_number}")
-                        console.print(f"        Language: {language}")
-                        console.print(f"        Langcode: {langcode}")
+                        logger.info(f"[Debug] Processing Subtitle Track: {track_number}")
+                        logger.info(f"        Language: {language}")
+                        logger.info(f"        Langcode: {langcode}")
 
                         # Find the corresponding "Text #X" block
                         found_block = False
                         for i, block in enumerate(mediainfo_blocks):
                             if re.match(rf"^\s*Text #\s*{track_number}\b", block):  # Match the correct Text # block
                                 found_block = True
-                                console.print(f"[Debug] Found matching MediaInfo block for Subtitle Track {track_number}.")
+                                logger.info(f"[Debug] Found matching MediaInfo block for Subtitle Track {track_number}.")
 
                                 # Insert Language details if not already present
                                 if language and not re.search(rf"Language\s+:\s+{re.escape(language)}", block):
@@ -933,13 +933,13 @@ class DiscParse:
                                             + block[insertion_point:]  # Rest of the block
                                         )
                                         mediainfo_blocks[i] = updated_block
-                                        console.print(f"[Debug] Updated MediaInfo Block for Subtitle Track {track_number}:")
-                                        console.print(updated_block)
+                                        logger.info(f"[Debug] Updated MediaInfo Block for Subtitle Track {track_number}:")
+                                        logger.info(updated_block)
                                 break  # Stop processing once the correct block is modified
 
                         # Debugging: Log if no matching block was found
                         if not found_block:
-                            console.print(f"[Debug] No matching MediaInfo block found for Subtitle Track {track_number}.")
+                            logger.info(f"[Debug] No matching MediaInfo block found for Subtitle Track {track_number}.")
 
                     # Rejoin the modified MediaInfo blocks
                     modified_mediainfo = "\n\n".join(mediainfo_blocks)
@@ -952,12 +952,12 @@ class DiscParse:
                 meta.HDDVD_PLAYLIST = selected_playlist
 
             except (FileNotFoundError, ValueError, ET.ParseError) as e:
-                console.print(f"Playlist processing failed: {e}. Falling back to largest EVO file detection.")
+                logger.info(f"Playlist processing failed: {e}. Falling back to largest EVO file detection.")
 
                 # Fallback to largest .EVO file
                 files = glob("*.EVO")
                 if not files:
-                    console.print("No EVO files found in the directory.")
+                    logger.info("No EVO files found in the directory.")
                     continue
 
                 size = 0
@@ -1118,7 +1118,7 @@ class DiscParse:
                 titles.append(title_data)
 
         except ET.ParseError as e:
-            console.print(f"Error parsing XPL file: {e}", markup=False)
+            logger.info(f"Error parsing XPL file: {e}", extra={"markup": False})
         return titles
 
     def timecode_to_seconds(self, timecode: str) -> int:

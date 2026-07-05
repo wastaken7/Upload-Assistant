@@ -5,7 +5,7 @@ from typing import Any
 import aiofiles
 import httpx
 
-from src.console import console
+from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
@@ -59,7 +59,7 @@ class HUNO(UNIT3D):
 
         # No WEBRIPs allowed
         if meta.type == "WEBRIP":
-            console.print(f"{self.tracker}: [bold red]WEB-RIP is not allowed, skipping upload.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]WEB-RIP is not allowed, skipping upload.[/bold red]")
             return False
 
         # Check language requirements
@@ -67,12 +67,12 @@ class HUNO(UNIT3D):
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
         audio_languages = meta.audio_languages
         if not audio_languages:
-            console.print(f"{self.tracker}: [bold red]No audio languages found, skipping upload.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]No audio languages found, skipping upload.[/bold red]")
             return False
 
         # Check if mediainfo is valid
         if not meta.valid_mi_settings:
-            console.print(f"{self.tracker}: [bold red]No encoding settings in mediainfo, skipping upload.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]No encoding settings in mediainfo, skipping upload.[/bold red]")
             return False
 
         # Check if x265 or HEVC is used
@@ -86,15 +86,15 @@ class HUNO(UNIT3D):
                         crf_match = re.search(r"crf[ =:]+([\d.]+)", encoding_settings, re.IGNORECASE)
                         if crf_match:
                             if meta.debug:
-                                console.print(f"Found CRF value: {crf_match.group(1)}")
+                                logger.debug(f"Found CRF value: {crf_match.group(1)}")
                             crf_value = float(crf_match.group(1))
                             if crf_value > 22:
                                 if not meta.unattended:
-                                    console.print(f"CRF value too high: {crf_value} for HUNO")
+                                    logger.info(f"CRF value too high: {crf_value} for HUNO")
                                 return False
                         else:
                             if meta.debug:
-                                console.print("No CRF value found in encoding settings.")
+                                logger.debug("No CRF value found in encoding settings.")
                             bit_rate = track.get("BitRate")
                             if bit_rate and "Animation" not in meta.genre:
                                 try:
@@ -107,7 +107,7 @@ class HUNO(UNIT3D):
 
                                     if bit_rate_kbps < 3000:
                                         if not meta.unattended:
-                                            console.print(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for HUNO")
+                                            logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for HUNO")
                                         return False
 
         return should_continue
@@ -274,15 +274,15 @@ class HUNO(UNIT3D):
 
         api_token = str(self.config["TRACKERS"][self.tracker].get("api_key", ""))
         if not api_token:
-            console.print(f"[bold red]{self.tracker}: Missing API key in config.[/bold red]")
+            logger.info(f"[bold red]{self.tracker}: Missing API key in config.[/bold red]")
             meta.skipping = self.tracker
             return False
 
         url = f"{self.upload_url}?api_token={api_token}"
 
         if meta.debug:
-            console.print(f"[cyan]{self.tracker} Request Data:")
-            console.print(data)
+            logger.debug(f"[cyan]{self.tracker} Request Data:")
+            logger.debug(data)
             status_dict["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}_DEBUG", f"{self.tracker}_DEBUG", announce_url="https://fake.tracker")
             return True
@@ -306,15 +306,15 @@ class HUNO(UNIT3D):
                 else:
                     error_msg = response_json.get("message", "Unknown error")
                     status_dict["status_message"] = f"data error: API error: {error_msg}"
-                    console.print(f"[yellow]Upload to {self.tracker} failed: {error_msg}[/yellow]")
+                    logger.info(f"[yellow]Upload to {self.tracker} failed: {error_msg}[/yellow]")
                     return False
 
         except httpx.HTTPStatusError as e:
             msg = f"HTTP {e.response.status_code} - {e.response.text}"
             status_dict["status_message"] = f"data error: {msg}"
-            console.print(f"[bold red]{self.tracker} Upload error: {msg}[/bold red]")
+            logger.info(f"[bold red]{self.tracker} Upload error: {msg}[/bold red]")
             return False
         except Exception as e:
             status_dict["status_message"] = f"data error: {e}"
-            console.print(f"[bold red]{self.tracker} Upload unexpected error: {e}[/bold red]")
+            logger.info(f"[bold red]{self.tracker} Upload unexpected error: {e}[/bold red]")
             return False

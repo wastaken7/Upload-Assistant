@@ -15,7 +15,7 @@ import rarfile
 from bs4 import BeautifulSoup
 from langcodes.tag_parser import LanguageTagError
 
-from src.console import console
+from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder, html_to_bbcode
@@ -188,7 +188,7 @@ class BT:
                 builder = DescriptionBuilder(self.tracker, self.config)
                 has_install_notes = await builder.get_user_description(meta)
                 if not has_install_notes:
-                    console.print(
+                    logger.info(
                         f"{self.tracker}: [red]Installation notes are required for PC game uploads. "
                         "Please provide them using [bold]-df[/bold] (path/to/file.txt) or [bold]-pb[/bold] (link to raw text).[/red]"
                     )
@@ -199,7 +199,7 @@ class BT:
         if not is_book and not is_game:
             imdb_info: dict[str, Any] = meta.imdb_info
             if not imdb_info.get("imdbID") and not meta.anime:
-                console.print(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
                 return False
 
         return True
@@ -686,7 +686,7 @@ class BT:
         if auth_match:
             BT.secret_token = auth_match.group(1)
         else:
-            console.print(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
             meta.skipping = f"{self.tracker}"
             return dupes
 
@@ -807,10 +807,10 @@ class BT:
                 async with aiofiles.open(info_file_path, encoding='utf-8') as f:
                     return await f.read()
             except Exception as e:
-                console.print(f'[bold red]Erro ao ler o arquivo de info em {info_file_path}: {e}[/bold red]')
+                logger.info(f'[bold red]Erro ao ler o arquivo de info em {info_file_path}: {e}[/bold red]')
                 return ''
         else:
-            console.print(f'[bold red]Arquivo de info não encontrado: {info_file_path}[/bold red]')
+            logger.info(f'[bold red]Arquivo de info não encontrado: {info_file_path}[/bold red]')
             return ''
 
     async def get_edition(self, meta: Meta) -> str:

@@ -9,7 +9,7 @@ import aiofiles
 import httpx
 
 try:
-    from src.console import console
+    from src.console import console, logger
 except ImportError:
     class SimpleConsole:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
@@ -25,8 +25,7 @@ class PestoBinaryManager:
     async def ensure_pesto_binary(base_dir: str | Path, debug: bool, version: str = "v0.3.35") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
-        if debug:
-            console.print(f"[blue]Pesto: Detected system: {system}, architecture: {machine}[/blue]")
+        logger.debug(f"[blue]Pesto: Detected system: {system}, architecture: {machine}[/blue]")
 
         platform_map: dict[str, dict[str, dict[str, str]]] = {
             "windows": {
@@ -58,11 +57,10 @@ class PestoBinaryManager:
         binary_valid = binary_exists and binary_executable
 
         if version_path.exists() and version_path.is_file() and binary_valid:
-            if debug:
-                console.print("[blue]Pesto binary is up to date[/blue]")
+            logger.debug("[blue]Pesto binary is up to date[/blue]")
             return str(binary_path)
 
-        console.print("[yellow]Binary 'pesto' not found. Attempting to download automatically...[/yellow]")
+        logger.info("[yellow]Binary 'pesto' not found. Attempting to download automatically...[/yellow]")
 
         # Cleanup old files
         if binary_path.exists():
@@ -71,8 +69,7 @@ class PestoBinaryManager:
             os.remove(version_path)
 
         download_url = f"https://github.com/franzopl/pesto/releases/download/{version}/{file_pattern}"
-        if debug:
-            console.print(f"[blue]Pesto Download URL: {download_url}[/blue]")
+        logger.debug(f"[blue]Pesto Download URL: {download_url}[/blue]")
 
         try:
             async with (
@@ -85,8 +82,7 @@ class PestoBinaryManager:
                     async for chunk in response.aiter_bytes(chunk_size=8192):
                         await f.write(chunk)
 
-            if debug:
-                console.print(f"[green]Downloaded Pesto package: {file_pattern}[/green]")
+            logger.debug(f"[green]Downloaded Pesto package: {file_pattern}[/green]")
 
             # Pesto has raw binaries, just move it to target location
             shutil.move(str(temp_file), str(binary_path))

@@ -8,7 +8,7 @@ import aiofiles
 import httpx
 
 from cogs.redaction import Redaction
-from src.console import console
+from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.tmdb import TmdbManager
@@ -93,12 +93,12 @@ class MTEAM:
                     message += f"[bold green]Name:[/bold green] {r['Name']}\n"
                     message += f"[bold green]Reward:[/bold green] {r['Reward']}\n"
                     message += f"[bold green]Link:[/bold green] {r['Link']}\n\n"
-                console.print(message)
+                logger.info(message)
 
             return requests
 
         except Exception as e:
-            console.print(f"{self.tracker}: [bold red]Error searching for requests with title {meta.title}: {e}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Error searching for requests with title {meta.title}: {e}[/bold red]")
             return requests
 
     async def mediainfo(self, meta: Meta) -> str:
@@ -163,7 +163,7 @@ class MTEAM:
             return info
 
         except Exception as e:
-            console.print(f"Error fetching Douban info: {e}")
+            logger.info(f"Error fetching Douban info: {e}")
             return info
 
     async def mteam_standard_desc(self, meta: Meta):
@@ -211,7 +211,7 @@ class MTEAM:
             return "\n".join(desc)
 
         # Fallback
-        console.print(f"{self.tracker}: Douban information is unavailable, using an alternative English version for the description.")
+        logger.info(f"{self.tracker}: Douban information is unavailable, using an alternative English version for the description.")
         imdb = meta.imdb_info
 
         tmdb_poster_path = meta.tmdb_poster or "".strip()
@@ -326,13 +326,13 @@ class MTEAM:
 
         imdb_id = meta.imdb_info.get("imdbID")
         if not imdb_id:
-            console.print(f"{self.tracker}: [bold yellow]IMDb ID not found in metadata, skipping upload.[/bold yellow]")
+            logger.info(f"{self.tracker}: [bold yellow]IMDb ID not found in metadata, skipping upload.[/bold yellow]")
             return False
 
         # Upscaled Content
         uuid: str = meta.uuid
         if "upscale" in uuid.lower() and "upscale" not in meta.title:
-            console.print(f"{self.tracker}: Uploading upscaled files created by converting low-bitrate videos to high-bitrate versions might be prohibited.")
+            logger.info(f"{self.tracker}: Uploading upscaled files created by converting low-bitrate videos to high-bitrate versions might be prohibited.")
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 user_input = self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ")
                 if not user_input:
@@ -342,7 +342,7 @@ class MTEAM:
 
         # Screenshots
         if meta.screens < 3:
-            console.print(f"{self.tracker}: [bold yellow]At least 3 screenshots are required for video uploads. Skipping upload.[/bold yellow]")
+            logger.info(f"{self.tracker}: [bold yellow]At least 3 screenshots are required for video uploads. Skipping upload.[/bold yellow]")
             return False
 
         # LGBT Content
@@ -351,7 +351,7 @@ class MTEAM:
         combined_list = [item.strip() for item in genres.split(",") if item.strip()]
         lgbt_keywords = ["lgbt", "queer", "lgbtq", "lgbtqia", "transgender", "trans", "gay", "lesbian", "bisexual", "pansexual", "non-binary", "homoerotic"]
         if any(kw in combined_list for kw in lgbt_keywords):
-            console.print(
+            logger.info(
                 f"{self.tracker}: [bold yellow]LGBT content detected. Please ensure the cover photo does not contain depictions of genitalia per tracker rules.[/bold yellow]"
             )
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
@@ -371,7 +371,7 @@ class MTEAM:
         standard = self.get_standard(meta)
 
         if not imdb_id:
-            console.print(f"{self.tracker}: [bold yellow]Cannot perform search on {self.tracker}: IMDb ID not found in metadata.[/bold yellow]")
+            logger.info(f"{self.tracker}: [bold yellow]Cannot perform search on {self.tracker}: IMDb ID not found in metadata.[/bold yellow]")
             return dupes
 
         api_url = f"{self.api_base_url}/torrent/search"
@@ -387,7 +387,7 @@ class MTEAM:
         res_json = response.json()
 
         if res_json.get("code") != "0":
-            console.print(f"[bold red]API Error: {res_json.get('message')}[/bold red]")
+            logger.info(f"[bold red]API Error: {res_json.get('message')}[/bold red]")
             return dupes
 
         torrents = res_json.get("data", {}).get("data", [])
@@ -431,7 +431,7 @@ class MTEAM:
             return bdinfo
 
         except Exception as e:
-            console.print(f"{self.tracker}: Error fetching BDinfo: {e}")
+            logger.info(f"{self.tracker}: Error fetching BDinfo: {e}")
             return ""
 
     def get_standard(self, meta: Meta) -> int:
@@ -456,7 +456,7 @@ class MTEAM:
         elif meta.sd:
             return sd
         else:
-            console.print(f"{self.tracker}: Unknown or unsupported resolution '{resolution}', defaulting to 1080p.")
+            logger.info(f"{self.tracker}: Unknown or unsupported resolution '{resolution}', defaulting to 1080p.")
             return _1080p
 
     def get_videocodec(self, meta: Meta) -> int:
@@ -484,7 +484,7 @@ class MTEAM:
         elif codec in ("vp8", "vp9"):
             return vp8_9
         else:
-            console.print(f"{self.tracker}: Unknown or unsupported video codec '{codec}', defaulting to x264.")
+            logger.info(f"{self.tracker}: Unknown or unsupported video codec '{codec}', defaulting to x264.")
             return x264
 
     def get_audiocodec(self, meta: Meta) -> int:
@@ -513,7 +513,7 @@ class MTEAM:
         elif "truehd" in codec:
             return true_hd
         else:
-            console.print(f"{self.tracker}: Unknown or unsupported audio codec '{codec}', defaulting to AC3.")
+            logger.info(f"{self.tracker}: Unknown or unsupported audio codec '{codec}', defaulting to AC3.")
             return ac3
 
     async def fetch_data(self, meta: Meta) -> dict[str, Any]:
@@ -588,7 +588,7 @@ class MTEAM:
                             downurl=final_download_url,
                         )
                         return True
-                    console.print(f"{self.tracker}: Failed to get download URL from API response.")
+                    logger.info(f"{self.tracker}: Failed to get download URL from API response.")
                     meta.tracker_status[self.tracker]["status_message"] = "Failed to get download URL from API response"
                     return False
                 else:
@@ -611,8 +611,8 @@ class MTEAM:
                 return False
 
         else:
-            console.print("[cyan]M-Team Request Data:")
-            console.print(Redaction.redact_private_info(data))
+            logger.info("[cyan]M-Team Request Data:")
+            logger.info(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading"
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success

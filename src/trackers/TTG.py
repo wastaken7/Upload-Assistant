@@ -11,7 +11,7 @@ import httpx
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 
-from src.console import console
+from src.console import console, logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa #F405
 from src.meta import Meta
@@ -168,8 +168,8 @@ class TTG:
 
         # Submit
         if meta.debug:
-            console.print(url)
-            console.print(data)
+            logger.debug(url)
+            logger.debug(data)
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
@@ -196,15 +196,15 @@ class TTG:
                 await self.download_new_torrent(torrent_id, torrent_path)
                 return True
             else:
-                console.print(data)
-                console.print("\n\n")
+                logger.info(data)
+                logger.info("\n\n")
                 raise UploadException(f"Upload to TTG Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa #F405
 
     async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
         cookiefile = os.path.abspath(f"{meta.base_dir}/data/cookies/TTG.json")
         if not os.path.exists(cookiefile):
-            console.print("[bold red]Cookie file not found: TTG.json")
+            logger.info("[bold red]Cookie file not found: TTG.json")
             return []
         cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
 
@@ -230,7 +230,7 @@ class TTG:
                         if release:
                             dupes.append(release.group(3))
             else:
-                console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+                logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
             await asyncio.sleep(0.5)
 
@@ -243,7 +243,7 @@ class TTG:
             await self.login(cookiefile)
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
-            console.print('[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.')
+            logger.error('[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.')
             recreate = cli_ui.ask_yes_no("Log in again and create new session?")
             if recreate is True:
                 if os.path.exists(cookiefile):
@@ -263,8 +263,8 @@ class TTG:
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
                 resp = await client.get(url=url)
                 if meta.debug:
-                    console.print('[cyan]Cookies:')
-                    console.print(resp.url)
+                    logger.debug('[cyan]Cookies:')
+                    logger.debug(resp.url)
                 return resp.text.find('''<a href="/logout.php">Logout</a>''') != -1
         else:
             return False
@@ -295,13 +295,13 @@ class TTG:
                 response = await client.post(two_factor_url, data=two_factor_data)
                 await asyncio.sleep(0.5)
             if str(response.url).endswith('my.php'):
-                console.print('[green]Successfully logged into TTG')
+                logger.info('[green]Successfully logged into TTG')
                 self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # type: ignore[reportPrivateUsage]
             else:
-                console.print('[bold red]Something went wrong')
+                logger.info('[bold red]Something went wrong')
                 await asyncio.sleep(1)
-                console.print(response.text)
-                console.print(response.url)
+                logger.info(response.text)
+                logger.info(response.url)
         return
 
     async def edit_desc(self, meta: Meta) -> None:
@@ -385,5 +385,5 @@ class TTG:
             async with aiofiles.open(torrent_path, "wb") as tor:
                 await tor.write(r.content)
         else:
-            console.print("[red]There was an issue downloading the new .torrent from TTG")
-            console.print(r.text)
+            logger.info("[red]There was an issue downloading the new .torrent from TTG")
+            logger.info(r.text)

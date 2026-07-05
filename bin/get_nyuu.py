@@ -11,7 +11,7 @@ import aiofiles
 import httpx
 
 try:
-    from src.console import console
+    from src.console import console, logger
 except ImportError:
     class SimpleConsole:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
@@ -32,8 +32,7 @@ class NyuuBinaryManager:
     ) -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
-        if debug:
-            console.print(f"[blue]Nyuu: Detected system: {system}, architecture: {machine}[/blue]")
+        logger.debug(f"[blue]Nyuu: Detected system: {system}, architecture: {machine}[/blue]")
 
         platform_map: dict[str, dict[str, dict[str, str]]] = {
             "windows": {
@@ -74,11 +73,10 @@ class NyuuBinaryManager:
         binary_valid = binary_exists and binary_executable
 
         if version_path.exists() and version_path.is_file() and binary_valid:
-            if debug:
-                console.print("[blue]Nyuu binary is up to date[/blue]")
+            logger.debug("[blue]Nyuu binary is up to date[/blue]")
             return str(binary_path)
 
-        console.print("[yellow]Binary 'nyuu' not found. Attempting to download automatically...[/yellow]")
+        logger.info("[yellow]Binary 'nyuu' not found. Attempting to download automatically...[/yellow]")
 
         # Cleanup old files
         if binary_path.exists():
@@ -87,8 +85,7 @@ class NyuuBinaryManager:
             os.remove(version_path)
 
         download_url = f"https://github.com/animetosho/Nyuu/releases/download/{version}/{file_pattern}"
-        if debug:
-            console.print(f"[blue]Nyuu Download URL: {download_url}[/blue]")
+        logger.debug(f"[blue]Nyuu Download URL: {download_url}[/blue]")
 
         try:
             async with (
@@ -101,8 +98,7 @@ class NyuuBinaryManager:
                     async for chunk in response.aiter_bytes(chunk_size=8192):
                         await f.write(chunk)
 
-            if debug:
-                console.print(f"[green]Downloaded Nyuu package: {file_pattern}[/green]")
+            logger.debug(f"[green]Downloaded Nyuu package: {file_pattern}[/green]")
 
             if file_pattern.endswith(".7z"):
                 if not path_7z:

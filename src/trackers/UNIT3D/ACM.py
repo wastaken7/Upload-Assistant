@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
@@ -34,7 +34,7 @@ class ACM(UNIT3D):
 
         origin_country = meta.origin_country
         if origin_country and any(country not in asia for country in origin_country):
-            console.print(f"{self.tracker}: Origin country is not Asian, skipping upload...")
+            logger.info(f"{self.tracker}: Origin country is not Asian, skipping upload...")
             return False
 
         return True

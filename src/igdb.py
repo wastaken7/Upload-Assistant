@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from src.console import console
+from src.console import logger
 
 
 class IGDBAPI:
@@ -47,9 +47,9 @@ class IGDBAPI:
                             json.dump({"access_token": self.access_token, "expires_at": expires_at}, f)
                     return self.access_token
                 else:
-                    console.print(f"[red]IGDB: Failed to authenticate with Twitch API. Status: {resp.status_code}[/red]")
+                    logger.info(f"[red]IGDB: Failed to authenticate with Twitch API. Status: {resp.status_code}[/red]")
         except Exception as e:
-            console.print(f"[red]IGDB: Twitch OAuth error: {e}[/red]")
+            logger.info(f"[red]IGDB: Twitch OAuth error: {e}[/red]")
         return None
 
     async def search_game(self, title: str) -> list[dict[str, Any]] | None:
@@ -71,7 +71,7 @@ class IGDBAPI:
                         cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
                         cached_data = json.loads(cache_content)
                         if cached_data is not None:
-                            console.print(f"[cyan]IGDB: Using cached search results for '{title}'[/cyan]")
+                            logger.info(f"[cyan]IGDB: Using cached search results for '{title}'[/cyan]")
                             return cached_data
                     except Exception:
                         pass
@@ -102,9 +102,9 @@ class IGDBAPI:
                             pass
                     return data
                 else:
-                    console.print(f"[red]IGDB: API request failed. Status: {resp.status_code}, Body: {resp.text}[/red]")
+                    logger.info(f"[red]IGDB: API request failed. Status: {resp.status_code}, Body: {resp.text}[/red]")
         except Exception as e:
-            console.print(f"[red]IGDB: Search error: {e}[/red]")
+            logger.info(f"[red]IGDB: Search error: {e}[/red]")
         return None
 
     async def fetch_game_by_id(self, igdb_id: str) -> dict[str, Any] | None:
@@ -113,7 +113,7 @@ class IGDBAPI:
 
         igdb_id_str = igdb_id.strip()
         if not igdb_id_str.isdigit():
-            console.print(f"[red]IGDB: Invalid ID '{igdb_id}'[/red]")
+            logger.info(f"[red]IGDB: Invalid ID '{igdb_id}'[/red]")
             return None
 
         # Check local cache first (games details level)
@@ -128,7 +128,7 @@ class IGDBAPI:
                         cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
                         cached_data = json.loads(cache_content)
                         if cached_data is not None:
-                            console.print(f"[cyan]IGDB: Using cached game details for ID '{igdb_id_str}'[/cyan]")
+                            logger.info(f"[cyan]IGDB: Using cached game details for ID '{igdb_id_str}'[/cyan]")
                             return cached_data
                     except Exception:
                         pass
@@ -166,11 +166,11 @@ class IGDBAPI:
                                 pass
                         return game_data
                     else:
-                        console.print(f"[red]IGDB: No game found with ID {igdb_id_str}[/red]")
+                        logger.info(f"[red]IGDB: No game found with ID {igdb_id_str}[/red]")
                 else:
-                    console.print(f"[red]IGDB: API request failed. Status: {resp.status_code}, Body: {resp.text}[/red]")
+                    logger.info(f"[red]IGDB: API request failed. Status: {resp.status_code}, Body: {resp.text}[/red]")
         except Exception as e:
-            console.print(f"[red]IGDB: Fetch error: {e}[/red]")
+            logger.info(f"[red]IGDB: Fetch error: {e}[/red]")
         return None
 
     async def fetch_game_by_steam_id(self, steam_id: str) -> dict[str, Any] | None:
@@ -179,7 +179,7 @@ class IGDBAPI:
 
         steam_id_str = steam_id.strip()
         if not steam_id_str.isdigit():
-            console.print(f"[red]IGDB: Invalid Steam ID '{steam_id}'[/red]")
+            logger.info(f"[red]IGDB: Invalid Steam ID '{steam_id}'[/red]")
             return None
 
         # Check local cache first (using steam id as cache key)
@@ -194,7 +194,7 @@ class IGDBAPI:
                         cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
                         cached_data = json.loads(cache_content)
                         if cached_data is not None:
-                            console.print(f"[cyan]IGDB: Using cached game details for Steam ID: {steam_id_str}[/cyan]")
+                            logger.info(f"[cyan]IGDB: Using cached game details for Steam ID: {steam_id_str}[/cyan]")
                             return cached_data
                     except Exception:
                         pass
@@ -227,11 +227,11 @@ class IGDBAPI:
                                 pass
                         return game_data
                     else:
-                        console.print(f"[red]IGDB: No game found with Steam ID {steam_id_str}[/red]")
+                        logger.info(f"[red]IGDB: No game found with Steam ID {steam_id_str}[/red]")
                 else:
-                    console.print(f"[red]IGDB: API request failed. Status: {resp.status_code}, Body: {resp.text}[/red]")
+                    logger.info(f"[red]IGDB: API request failed. Status: {resp.status_code}, Body: {resp.text}[/red]")
         except Exception as e:
-            console.print(f"[red]IGDB: Steam Fetch error: {e}[/red]")
+            logger.info(f"[red]IGDB: Steam Fetch error: {e}[/red]")
         return None
 
     async def cache_game_details(self, game_data: dict[str, Any]) -> None:

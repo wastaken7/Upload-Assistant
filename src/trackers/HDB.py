@@ -12,7 +12,7 @@ import httpx
 from unidecode import unidecode
 
 from src.bbcode import BBCODE
-from src.console import console
+from src.console import console, logger
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
 from src.torrentcreate import TorrentCreator
@@ -175,7 +175,7 @@ class HDB:
         if "Atmos" in audio:
             tags.append(5)
         if meta.silent is True:
-            console.print('[yellow]zxx audio track found, suggesting you tag as silent')  # 57
+            logger.info('[yellow]zxx audio track found, suggesting you tag as silent')  # 57
 
         # Video Metadata
         # HDR10, HDR10+, Dolby Vision, 10-bit,
@@ -237,10 +237,10 @@ class HDB:
 
         for each in (cat_id, codec_id, medium_id):
             if each == 0:
-                console.print("[bold red]Something didn't map correctly, or this content is not allowed on HDB")
+                logger.info("[bold red]Something didn't map correctly, or this content is not allowed on HDB")
                 return
         if "Dual-Audio" in meta.audio and not (meta.anime or not meta.is_disc):
-            console.print("[bold red]Dual-Audio Encodes are not allowed for non-anime and non-disc content")
+            logger.info("[bold red]Dual-Audio Encodes are not allowed for non-anime and non-disc content")
             return
 
         async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as desc_file:
@@ -251,7 +251,7 @@ class HDB:
 
         # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
         if base_piece_mb > 16 and not meta.nohash:
-            console.print("[red]Piece size is OVER 16M and does not work on HDB. Generating a new .torrent")
+            logger.info("[red]Piece size is OVER 16M and does not work on HDB. Generating a new .torrent")
             hdb_config = self.config.get('TRACKERS', {}).get('HDB', {})
             hdb_config_dict = cast(dict[str, Any], hdb_config) if isinstance(hdb_config, dict) else {}
             tracker_url = str(hdb_config_dict.get('announce_url', "https://fake.tracker")).strip()
@@ -314,8 +314,8 @@ class HDB:
         url = "https://hdbits.org/upload/upload"
         # Submit
         if meta.debug:
-            console.print(url)
-            console.print(data)
+            logger.debug(url)
+            logger.debug(data)
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
@@ -334,9 +334,9 @@ class HDB:
                     await self.download_new_torrent(id, torrent_file_path)
                 return True
             else:
-                console.print(data)
-                console.print("\n\n")
-                console.print(up.text)
+                logger.info(data)
+                logger.info("\n\n")
+                logger.info(up.text)
                 raise UploadException(f"Upload to HDB Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
@@ -361,8 +361,8 @@ class HDB:
         has_valid_ids = (meta.category == "TV" and meta.tvdb_id == 0 and meta.imdb_id == 0) or (meta.category == "MOVIE" and meta.imdb_id == 0)
 
         if has_valid_ids:
-            console.print("[yellow]No IMDb or TVDB ID found, trying other options...")
-            console.print("[yellow]Double check that the upload does not already exist...")
+            logger.info("[yellow]No IMDb or TVDB ID found, trying other options...")
+            logger.info("[yellow]Double check that the upload does not already exist...")
             if meta.filename:
                 search_terms.append(meta.filename)
             if meta.aka:
@@ -391,12 +391,12 @@ class HDB:
                             }
                             dupes.append(result)
                 else:
-                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+                    logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
             return dupes
 
         # Otherwise, search for each term
         for search_term in search_terms:
-            console.print(f"[yellow]Searching HDB for: {search_term}")
+            logger.info(f"[yellow]Searching HDB for: {search_term}")
             data['search'] = search_term
 
             async with httpx.AsyncClient(timeout=5.0) as client:
@@ -416,14 +416,14 @@ class HDB:
                             }
                             dupes.append(result)
                 else:
-                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+                    logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
         return dupes
 
     async def validate_credentials(self, meta: Meta) -> bool:
         vcookie = await self.validate_cookies(meta)
         if vcookie is not True:
-            console.print('[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.')
+            logger.error('[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.')
             return False
         return True
 
@@ -437,7 +437,7 @@ class HDB:
                 resp = await client.get(url=url)
             return resp.text.find('''<a href="/logout.php">Logout</a>''') != -1
         else:
-            console.print("[bold red]Missing Cookie File. (data/cookies/HDB.txt)")
+            logger.info("[bold red]Missing Cookie File. (data/cookies/HDB.txt)")
             return False
 
     async def download_new_torrent(self, id: str, torrent_path: str) -> None:
@@ -545,7 +545,7 @@ class HDB:
         desc_parts.append(desc)
 
         if self.rehost_images is True:
-            console.print("[green]Rehosting Images...")
+            logger.info("[green]Rehosting Images...")
             hdbimg_bbcode = await self.hdbimg_upload(meta)
             if hdbimg_bbcode is not None:
                 if meta.comparison:
@@ -610,10 +610,10 @@ class HDB:
         if meta.comparison:
             comparison_path = meta.comparison
             if not comparison_path or not os.path.isdir(comparison_path):
-                console.print(f"[red]Comparison path not found: {comparison_path}")
+                logger.info(f"[red]Comparison path not found: {comparison_path}")
                 return None
 
-            console.print(f"[green]Uploading comparison images from {comparison_path} to HDB Image Host")
+            logger.info(f"[green]Uploading comparison images from {comparison_path} to HDB Image Host")
 
             group_images: dict[str, list[str]] = {}
             max_images_per_group = 0
@@ -683,9 +683,9 @@ class HDB:
                 )
 
             if meta.debug:
-                console.print("[cyan]Images will be uploaded in this order:")
+                logger.debug("[cyan]Images will be uploaded in this order:")
                 for i, path in enumerate(all_image_files):
-                    console.print(f"[cyan]{i}: {os.path.basename(path)}")
+                    logger.debug(f"[cyan]{i}: {os.path.basename(path)}")
         else:
             thumb_size = 'w300'
             screenshot_dir = f"{meta.base_dir}/tmp/{meta.uuid}"
@@ -710,7 +710,7 @@ class HDB:
 
         # At this point, all_image_files contains paths to all images we want to upload
         if not all_image_files:
-            console.print("[red]No images found for upload")
+            logger.info("[red]No images found for upload")
             return None
 
         url = "https://img.hdbits.org/upload_api.php"
@@ -725,7 +725,7 @@ class HDB:
             upload_count = min(len(all_image_files), upload_count)
 
         if meta.debug:
-            console.print(f"[cyan]Uploading {upload_count} images to HDB Image Host")
+            logger.debug(f"[cyan]Uploading {upload_count} images to HDB Image Host")
 
         upload_files: dict[str, tuple[str, bytes, str]] = {}
         for i in range(upload_count):
@@ -736,18 +736,18 @@ class HDB:
                     file_bytes = await file_handle.read()
                 upload_files[f'images_files[{i}]'] = (filename, file_bytes, 'image/png')
                 if meta.debug:
-                    console.print(f"[cyan]Added file {filename} as images_files[{i}]")
+                    logger.debug(f"[cyan]Added file {filename} as images_files[{i}]")
             except (OSError, ValueError) as e:
-                console.print(f"[red]Failed to open {file_path}: {e}")
+                logger.error(f"[red]Failed to open {file_path}: {e}")
                 continue
 
         try:
             if not upload_files:
-                console.print("[red]No files to upload")
+                logger.info("[red]No files to upload")
                 return None
 
             if meta.debug:
-                console.print(f"[green]Uploading {len(upload_files)} images to HDB...")
+                logger.debug(f"[green]Uploading {len(upload_files)} images to HDB...")
 
             uploadSuccess = True
             if meta.comparison:
@@ -777,7 +777,7 @@ class HDB:
                     chunks.append(current_chunk)
 
                 if meta.debug:
-                    console.print(f"[cyan]Split into {len(chunks)} chunks based on 100 MiB limit")
+                    logger.debug(f"[cyan]Split into {len(chunks)} chunks based on 100 MiB limit")
 
                 # Upload each chunk
                 for chunk_idx, chunk in enumerate(chunks):
@@ -787,22 +787,22 @@ class HDB:
 
                     if meta.debug:
                         chunk_size_mb = sum(os.path.getsize(all_image_files[int(key.split('[')[1].split(']')[0])]) for key, _ in chunk) / (1024 * 1024)
-                        console.print(f"[cyan]Uploading chunk {chunk_idx + 1}/{len(chunks)} ({len(fileList)} images, {chunk_size_mb:.2f} MiB)")
+                        logger.debug(f"[cyan]Uploading chunk {chunk_idx + 1}/{len(chunks)} ({len(fileList)} images, {chunk_size_mb:.2f} MiB)")
 
                     async with httpx.AsyncClient(timeout=30.0) as client:
                         response = await client.post(url, data=data, files=fileList)
                     if response.status_code == 200:
-                        console.print(f"[green]Chunk {chunk_idx + 1}/{len(chunks)} upload successful!")
+                        logger.info(f"[green]Chunk {chunk_idx + 1}/{len(chunks)} upload successful!")
                         bbcode += response.text
                     else:
-                        console.print(f"[red]Chunk {chunk_idx + 1}/{len(chunks)} upload failed with status code {response.status_code}")
+                        logger.info(f"[red]Chunk {chunk_idx + 1}/{len(chunks)} upload failed with status code {response.status_code}")
                         uploadSuccess = False
                         break
             else:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = await client.post(url, data=data, files=upload_files)
                 if response.status_code == 200:
-                    console.print("[green]Upload successful!")
+                    logger.info("[green]Upload successful!")
                     bbcode = response.text
                 else:
                     uploadSuccess = False
@@ -823,17 +823,17 @@ class HDB:
                     bbcode = formatted_bbcode
 
                     if meta.debug:
-                        console.print(f"[cyan]Response formatted with {num_groups} images per line")
+                        logger.debug(f"[cyan]Response formatted with {num_groups} images per line")
 
                 return bbcode
             else:
                 if response is None:
-                    console.print("[red]Upload failed without a response")
+                    logger.info("[red]Upload failed without a response")
                 else:
-                    console.print(f"[red]Upload failed with status code {response.status_code}")
+                    logger.info(f"[red]Upload failed with status code {response.status_code}")
                 return None
         except httpx.RequestError as e:
-            console.print(f"[red]HTTP Request failed: {e}")
+            logger.info(f"[red]HTTP Request failed: {e}")
             return None
 
     async def get_info_from_torrent_id(self, hdb_id: int) -> tuple[int | None, int | None, str | None, str | None, str | None]:
@@ -863,12 +863,12 @@ class HDB:
                 else:
                     status_code = response_json.get('status', 'unknown')
                     message = response_json.get('message', 'No error message provided')
-                    console.print(f"[red]API returned error status {status_code}: {message}[/red]")
+                    logger.info(f"[red]API returned error status {status_code}: {message}[/red]")
 
         except httpx.RequestError as e:
-            console.print(f"[red]Request error: {e}[/red]")
+            logger.info(f"[red]Request error: {e}[/red]")
         except Exception as e:
-            console.print(f"[red]Unexpected error: {e}[/red]")
+            logger.error(f"[red]Unexpected error: {e}[/red]")
             console.print_exception()
 
         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description
@@ -900,13 +900,13 @@ class HDB:
                         "limit": 100,
                         "search": bd_summary  # Using the Disc Title for search with uuid fallback
                     }
-                    console.print(f"[green]Searching HDB for title: [bold yellow]{bd_summary}[/bold yellow]")
+                    logger.info(f"[green]Searching HDB for title: [bold yellow]{bd_summary}[/bold yellow]")
                     # console.print(f"[yellow]Using this data: {data}")
                 else:
                     return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 
             except FileNotFoundError:
-                console.print(f"[red]Error: File not found at {bd_summary_path}[/red]")
+                logger.error(f"[red]Error: File not found at {bd_summary_path}[/red]")
                 return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 
         else:  # Handling non-disc case
@@ -916,7 +916,7 @@ class HDB:
                 "limit": 100,
                 "file_in_torrent": os.path.basename(search_term)
             }
-            console.print(f"[green]Searching HDB for file: [bold yellow]{os.path.basename(search_term)}[/bold yellow]")
+            logger.info(f"[green]Searching HDB for file: [bold yellow]{os.path.basename(search_term)}[/bold yellow]")
             # console.print(f"[yellow]Using this data: {data}")
 
         try:
@@ -928,7 +928,7 @@ class HDB:
                     # console.print(f"[green]HDB API response: {response_json}[/green]")
 
                     if 'data' not in response_json:
-                        console.print(f"[red]Error: 'data' key not found or empty in HDB API response. Full response: {response_json}[/red]")
+                        logger.error(f"[red]Error: 'data' key not found or empty in HDB API response. Full response: {response_json}[/red]")
                         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
 
                     for each in response_json['data']:
@@ -939,20 +939,20 @@ class HDB:
                         hdb_id = each.get('id', None)
                         hdb_description = each.get('descr')
 
-                        console.print(f'[bold green]Matched release with HDB ID: [yellow]https://hdbits.org/details.php?id={hdb_id}[/yellow][/bold green]')
+                        logger.info(f'[bold green]Matched release with HDB ID: [yellow]https://hdbits.org/details.php?id={hdb_id}[/yellow][/bold green]')
 
                         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 
-                    console.print('[yellow]No data found in the HDB API response[/yellow]')
+                    logger.info('[yellow]No data found in the HDB API response[/yellow]')
 
                 except (ValueError, KeyError, TypeError) as e:
                     console.print_exception()
-                    console.print(f"[red]Failed to parse HDB API response. Error: {str(e)}[/red]")
+                    logger.error(f"[red]Failed to parse HDB API response. Error: {str(e)}[/red]")
             else:
-                console.print(f"[red]Failed to get info from HDB. Status code: {response.status_code}, Reason: {response.reason_phrase}[/red]")
+                logger.error(f"[red]Failed to get info from HDB. Status code: {response.status_code}, Reason: {response.reason_phrase}[/red]")
 
         except httpx.RequestError as e:
-            console.print(f"[red]Request error: {str(e)}[/red]")
+            logger.info(f"[red]Request error: {str(e)}[/red]")
 
-        console.print('[yellow]Could not find a matching release on HDB[/yellow]')
+        logger.info('[yellow]Could not find a matching release on HDB[/yellow]')
         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id

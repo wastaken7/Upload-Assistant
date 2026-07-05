@@ -8,7 +8,7 @@ from typing import Any, cast
 
 import guessit
 
-from src.console import console
+from src.console import logger
 from src.exceptions import WeirdSystem
 from src.meta import Meta
 
@@ -30,7 +30,7 @@ async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta,
             mi = json.loads(mi_text)
         except Exception:
             if meta.debug:
-                console.print("No mediainfo.json")
+                logger.debug("No mediainfo.json")
     try:
         if meta.manual_source:
             source = str(meta.manual_source)
@@ -91,7 +91,7 @@ async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta,
         if source == "Ultra HDTV":
             source = "UHDTV"
     except Exception:
-        console.print(traceback.format_exc())
+        logger.info(traceback.format_exc())
         source = "BluRay"
 
     return source, type

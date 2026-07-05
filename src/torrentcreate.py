@@ -21,7 +21,7 @@ import torf
 from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn
 from torf import Torrent
 
-from src.console import console
+from src.console import console, logger
 from src.meta import Meta
 
 PIECE_SIZE_MIN = 32 * 1024  # 32 KiB
@@ -120,8 +120,8 @@ class TorrentCreator:
             max_size = 134217728  # 128 MiB default maximum
 
         if meta.debug:
-            console.print(f"Content size: {total_size / (1024 * 1024):.2f} MiB")
-            console.print(f"Max size: {max_size}")
+            logger.debug(f"Content size: {total_size / (1024 * 1024):.2f} MiB")
+            logger.debug(f"Max size: {max_size}")
 
         total_size_mib = total_size / (1024 * 1024)
 
@@ -161,8 +161,8 @@ class TorrentCreator:
         # Calculate number of pieces for debugging
         num_pieces = math.ceil(total_size / piece_size)
         if meta.debug:
-            console.print(f"Selected piece size: {piece_size / 1024:.2f} KiB")
-            console.print(f"Number of pieces: {num_pieces}")
+            logger.debug(f"Selected piece size: {piece_size / 1024:.2f} KiB")
+            logger.debug(f"Number of pieces: {num_pieces}")
 
         return piece_size
 
@@ -201,7 +201,7 @@ class TorrentCreator:
         if cls._create_torrent_semaphore.locked():
             wait_started = time.time()
             if meta.debug:
-                console.print("[yellow]Waiting for create_torrent slot...[/yellow]")
+                logger.debug("[yellow]Waiting for create_torrent slot...[/yellow]")
 
         async with cls._create_torrent_semaphore:
             cls._create_torrent_inflight += 1
@@ -210,7 +210,7 @@ class TorrentCreator:
                 if wait_started is not None:
                     waited = time.time() - wait_started
                     wait_msg = f" (waited {waited:.2f}s)"
-                console.print(f"[cyan]create_torrent start | in-flight={cls._create_torrent_inflight}{wait_msg}[/cyan]")
+                logger.debug(f"[cyan]create_torrent start | in-flight={cls._create_torrent_inflight}{wait_msg}[/cyan]")
 
             try:
                 if not piece_size:
@@ -230,10 +230,10 @@ class TorrentCreator:
                     include = []
                     exclude = []
                 elif meta.keep_folder:
-                    console.print("--keep-folder was specified. Using complete folder for torrent creation.")
+                    logger.info("--keep-folder was specified. Using complete folder for torrent creation.")
                     # specific nfo catch for certain trackers. BASE catch should prevent unintentional inclusion by default
                     if meta.keep_nfo and "BASE" not in output_filename:
-                        console.print("--keep-nfo was specified. Including NFO files in torrent.")
+                        logger.info("--keep-nfo was specified. Including NFO files in torrent.")
                         include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
                         exclude = ["*.*", "*sample.mkv"]
                         meta.mkbrr = False
@@ -244,7 +244,7 @@ class TorrentCreator:
 
                 elif meta.isdir:
                     if meta.keep_nfo and not meta.is_disc and "BASE" not in output_filename:
-                        console.print("--keep-nfo was specified. Including NFO files in torrent.")
+                        logger.info("--keep-nfo was specified. Including NFO files in torrent.")
                         include = ["*.mkv", "*.mp4", "*.ts", "*.nfo"]
                         exclude = ["*.*", "*sample.mkv"]
                         meta.mkbrr = False
@@ -308,9 +308,9 @@ class TorrentCreator:
                                 power = min(27, max(16, math.floor(math.log2(max_size_bytes))))
 
                                 cmd.extend(["-l", str(power)])
-                                console.print(f"[yellow]Setting mkbrr piece length to 2^{power} ({(2**power) / (1024 * 1024):.2f} MiB)")
+                                logger.info(f"[yellow]Setting mkbrr piece length to 2^{power} ({(2**power) / (1024 * 1024):.2f} MiB)")
                             except ValueError, TypeError:
-                                console.print("[yellow]Warning: Invalid max_piece_size value, using default piece length")
+                                logger.warning("[yellow]Warning: Invalid max_piece_size value, using default piece length")
 
                         if not piece_size and not tracker_url and not any(tracker in meta.trackers for tracker in ["HDB", "PTP", "MTV"]):
                             cmd.extend(["-m", "27"])
@@ -324,7 +324,7 @@ class TorrentCreator:
 
                         cmd.extend(["-o", output_path])
                         if meta.debug:
-                            console.print(f"[cyan]mkbrr cmd: {cmd}")
+                            logger.debug(f"[cyan]mkbrr cmd: {cmd}")
 
                         # Run mkbrr subprocess in thread to avoid blocking
                         def run_mkbrr() -> int:
@@ -374,7 +374,7 @@ class TorrentCreator:
 
                                     # Detect final output line
                                     if "Wrote" in line and ".torrent" in line and meta.debug:
-                                        console.print(f"[bold cyan]{line}")  # Print the final torrent file creation message
+                                        logger.info(f"[bold cyan]{line}")  # Print the final torrent file creation message
 
                                 # Clean up progress bar at the end
                                 progress.update(task, completed=total_pieces)
@@ -386,22 +386,22 @@ class TorrentCreator:
 
                         # Verify the torrent was actually created
                         if result != 0:
-                            console.print(f"[bold red]mkbrr exited with non-zero status code: {result}")
+                            logger.info(f"[bold red]mkbrr exited with non-zero status code: {result}")
                             raise RuntimeError(f"mkbrr exited with status code {result}")
 
                         if not os.path.exists(output_path):
-                            console.print("[bold red]mkbrr did not create a torrent file!")
+                            logger.info("[bold red]mkbrr did not create a torrent file!")
                             raise FileNotFoundError(f"Expected torrent file {output_path} was not created")
                         else:
                             return output_path
 
                     except subprocess.CalledProcessError as e:
-                        console.print(f"[bold red]Error creating torrent with mkbrr: {e}")
-                        console.print("[yellow]Falling back to CustomTorrent method")
+                        logger.info(f"[bold red]Error creating torrent with mkbrr: {e}")
+                        logger.info("[yellow]Falling back to CustomTorrent method")
                         meta.mkbrr = False
                     except Exception as e:
-                        console.print(f"[bold red]Error using mkbrr: {str(e)}")
-                        console.print("[yellow]Falling back to CustomTorrent method")
+                        logger.info(f"[bold red]Error using mkbrr: {str(e)}")
+                        logger.info("[yellow]Falling back to CustomTorrent method")
                         meta.mkbrr = False
                 overall_start_time = time.time()
 
@@ -451,14 +451,14 @@ class TorrentCreator:
                 torrent_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/{output_filename}.torrent"
                 torrent_file_size = os.path.getsize(torrent_file_path) / 1024
                 if meta.debug:
-                    console.print()
-                    console.print(f"[bold green]torrent created in {formatted_time}")
-                    console.print(f"[green]Torrent file size: {torrent_file_size:.2f} KB")
+                    logger.debug("")
+                    logger.debug(f"[bold green]torrent created in {formatted_time}")
+                    logger.debug(f"[green]Torrent file size: {torrent_file_size:.2f} KB")
                 return torrent
             finally:
                 cls._create_torrent_inflight -= 1
                 if meta.debug:
-                    console.print(f"[cyan]create_torrent end | in-flight={cls._create_torrent_inflight}[/cyan]")
+                    logger.debug(f"[cyan]create_torrent end | in-flight={cls._create_torrent_inflight}[/cyan]")
 
     @staticmethod
     def torf_cb(torrent: Torrent, _filepath: str, pieces_done: int, pieces_total: int) -> None:

@@ -18,7 +18,7 @@ from bs4 import BeautifulSoup
 
 import bbcode
 from cogs.redaction import Redaction
-from src.console import console
+from src.console import console, logger
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
@@ -114,7 +114,7 @@ class AZTrackerBase:
         for attempt in range(2):
             try:
                 if attempt == 1:
-                    console.print(f'{self.tracker}: Trying to search again by ID after adding to media to database...\n')
+                    logger.info(f'{self.tracker}: Trying to search again by ID after adding to media to database...\n')
                     await asyncio.sleep(5)  # Small delay to ensure the DB has been updated
 
                 data: dict[str, Any] = {}
@@ -138,26 +138,26 @@ class AZTrackerBase:
                 if match:
                     self.media_code = str(match['id'])
                     if attempt == 1:
-                        console.print(f"{self.tracker}: [green]Found new ID at:[/green] {self.base_url}/{meta.category.lower()}/{self.media_code}")
+                        logger.info(f"{self.tracker}: [green]Found new ID at:[/green] {self.base_url}/{meta.category.lower()}/{self.media_code}")
                     return True
 
             except Exception as e:
-                console.print(f'{self.tracker}: Error while trying to fetch media code in attempt {attempt + 1}: {e}')
+                logger.info(f'{self.tracker}: Error while trying to fetch media code in attempt {attempt + 1}: {e}')
                 break
 
             if attempt == 0 and not self.media_code:
-                console.print(f"\n{self.tracker}: The media [[yellow]IMDB:{imdb_id}[/yellow]] [[blue]TMDB:{tmdb_id}[/blue]] appears to be missing from the site's database.")
+                logger.info(f"\n{self.tracker}: The media [[yellow]IMDB:{imdb_id}[/yellow]] [[blue]TMDB:{tmdb_id}[/blue]] appears to be missing from the site's database.")
                 if cli_ui.ask_yes_no(f"{self.tracker}: Do you want to add it to the site database?\n"):
                     added_successfully = await self.add_media_to_db(meta, title, category, imdb_id, tmdb_id)
                     if not added_successfully:
-                        console.print(f'{self.tracker}: Failed to add media. Aborting.')
+                        logger.info(f'{self.tracker}: Failed to add media. Aborting.')
                         break
                 else:
-                    console.print(f'{self.tracker}: User chose not to add media. Aborting.')
+                    logger.info(f'{self.tracker}: User chose not to add media. Aborting.')
                     break
 
         if not self.media_code:
-            console.print(f'{self.tracker}: Unable to get media code.')
+            logger.info(f'{self.tracker}: Unable to get media code.')
 
         return bool(self.media_code)
 
@@ -182,22 +182,22 @@ class AZTrackerBase:
         }
 
         try:
-            console.print(f'{self.tracker}: Trying to add to database...')
+            logger.info(f'{self.tracker}: Trying to add to database...')
             response = await self.session.post(url, data=data, headers=headers)
             if response.status_code == 302:
-                console.print(f'{self.tracker}: The attempt to add the media to the database appears to have been successful..')
+                logger.info(f'{self.tracker}: The attempt to add the media to the database appears to have been successful..')
                 return True
             else:
-                console.print(f'{self.tracker}: Error adding media to the database. Status: {response.status_code}')
+                logger.info(f'{self.tracker}: Error adding media to the database. Status: {response.status_code}')
                 failure_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]Failed_DB_attempt.html"
                 os.makedirs(os.path.dirname(failure_path), exist_ok=True)
                 async with aiofiles.open(failure_path, 'w', encoding='utf-8') as f:
                     await f.write(response.text)
-                console.print(f'The server response was saved to {failure_path} for analysis.')
+                logger.info(f'The server response was saved to {failure_path} for analysis.')
                 return False
 
         except Exception as e:
-            console.print(f'{self.tracker}: Exception when trying to add media to the database: {e}')
+            logger.info(f'{self.tracker}: Exception when trying to add media to the database: {e}')
             return False
 
     async def validate_credentials(self, meta: Meta):
@@ -217,7 +217,7 @@ class AZTrackerBase:
         if self.config['TRACKERS'][self.tracker].get('check_for_rules', True):
             warnings = self.rules(meta)
             if warnings:
-                console.print(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n{warnings}")
+                logger.info(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n{warnings}")
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                     if not cli_ui.ask_yes_no('Do you want to continue anyway?', default=False):
                         return False
@@ -226,7 +226,7 @@ class AZTrackerBase:
 
         if meta.type not in ["WEBDL"] and self.tracker == "PHD" and meta.tag in ["FGT", "EVO"]:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print(f"[bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
+                logger.info(f"[bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
                 if not cli_ui.ask_yes_no('Do you want to upload anyway?', default=False):
                     return False
             else:
@@ -237,7 +237,7 @@ class AZTrackerBase:
             self.session.cookies = cookie_jar
 
         if not await self.get_media_code(meta):
-            console.print(f"{self.tracker}: This media is not registered, please add it to the database by following this link: {self.base_url}/add/{meta.category.lower()}")
+            logger.info(f"{self.tracker}: This media is not registered, please add it to the database by following this link: {self.base_url}/add/{meta.category.lower()}")
             return False
 
         return True
@@ -344,15 +344,15 @@ class AZTrackerBase:
                 if pre_tag:
                     return pre_tag.get_text("\n", strip=True)
 
-            console.print(f'[yellow]{self.tracker}: MediaInfo/BDInfo block not found at {torrent_link}[/yellow]')
+            logger.info(f'[yellow]{self.tracker}: MediaInfo/BDInfo block not found at {torrent_link}[/yellow]')
             return ''
 
         except httpx.HTTPStatusError as e:
-            console.print(f'[red]{self.tracker}: HTTP error {e.response.status_code} from {torrent_link}[/red]')
+            logger.info(f'[red]{self.tracker}: HTTP error {e.response.status_code} from {torrent_link}[/red]')
         except httpx.RequestError as e:
-            console.print(f'[red]{self.tracker}: Request failed to {torrent_link}. {e}[/red]')
+            logger.info(f'[red]{self.tracker}: Request failed to {torrent_link}. {e}[/red]')
         except Exception as e:
-            console.print(f'[red]{self.tracker}: Unexpected error parsing {torrent_link}. {e}[/red]')
+            logger.error(f'[red]{self.tracker}: Unexpected error parsing {torrent_link}. {e}[/red]')
 
         return ''
 
@@ -433,8 +433,8 @@ class AZTrackerBase:
                             missing_audio_languages.append(track)
 
                 if missing_audio_languages:
-                    console.print('No audio language/s found.')
-                    console.print('You must enter (comma-separated) languages for all audio tracks, eg: English, Spanish: ')
+                    logger.info('No audio language/s found.')
+                    logger.info('You must enter (comma-separated) languages for all audio tracks, eg: English, Spanish: ')
                     user_input_raw = cli_ui.ask_string('[bold yellow]Enter languages: [/bold yellow]')
                     user_input = (user_input_raw or "").strip()
                     langs = [lang.strip() for lang in user_input.split(',')]
@@ -444,9 +444,9 @@ class AZTrackerBase:
                             audio_ids.add(target_id)
 
             except FileNotFoundError:
-                console.print(f"Warning: MediaInfo.json not found for uuid {meta.uuid}. No languages will be processed.", markup=False)
+                logger.warning(f"Warning: MediaInfo.json not found for uuid {meta.uuid}. No languages will be processed.", extra={"markup": False})
             except (json.JSONDecodeError, KeyError, TypeError) as e:
-                console.print(f"Error processing MediaInfo.json for uuid {meta.uuid}: {e}", markup=False)
+                logger.info(f"Error processing MediaInfo.json for uuid {meta.uuid}: {e}", extra={"markup": False})
 
         final_subtitle_ids = sorted(subtitle_ids)
         final_audio_ids = sorted(audio_ids)
@@ -486,13 +486,13 @@ class AZTrackerBase:
                     return str(image_id)
                 else:
                     error_message = json_data.get('error', 'Unknown image host error.')
-                    console.print(f'{self.tracker}: Error uploading {filename}: {error_message}', markup=False)
+                    logger.info(f'{self.tracker}: Error uploading {filename}: {error_message}', extra={"markup": False})
                     return None
             else:
-                console.print(f'{self.tracker}: Error uploading {filename}: Status {response.status_code} - {response.text}', markup=False)
+                logger.info(f'{self.tracker}: Error uploading {filename}: Status {response.status_code} - {response.text}', extra={"markup": False})
                 return None
         except Exception as e:
-            console.print(f'{self.tracker}: Exception when uploading {filename}: {e}', markup=False)
+            logger.info(f'{self.tracker}: Exception when uploading {filename}: {e}', extra={"markup": False})
             return None
 
     async def get_screenshots(self, meta: Meta) -> list[str] | None:
@@ -523,13 +523,13 @@ class AZTrackerBase:
                 filename = os.path.basename(urlparse(url).path) or 'screenshot.png'
                 return await self.img_host(meta, self.tracker, image_bytes, filename)
             except Exception as e:
-                console.print(f'Failed to process screenshot from URL {url}: {e}', markup=False)
+                logger.info(f'Failed to process screenshot from URL {url}: {e}', extra={"markup": False})
                 return None
 
         # Upload menu images
         for url in disc_menu_links:
             if not url.lower().endswith('.png'):
-                console.print(f"{self.tracker}: Skipping non-PNG menu image: {url}")
+                logger.info(f"{self.tracker}: Skipping non-PNG menu image: {url}")
             else:
                 result = await upload_remote_file(url)
                 if result:
@@ -560,7 +560,7 @@ class AZTrackerBase:
         if remaining_slots > 0 and audio_spectrogram_links:
             for url in audio_spectrogram_links[:remaining_slots]:
                 if not url.lower().endswith(".png"):
-                    console.print(f"{self.tracker}: Skipping non-PNG audio spectrogram image: {url}")
+                    logger.info(f"{self.tracker}: Skipping non-PNG audio spectrogram image: {url}")
                 else:
                     result = await upload_remote_file(url)
                     if result:
@@ -616,12 +616,12 @@ class AZTrackerBase:
                         message += f"[bold green]Name:[/bold green] {r['Name']}\n"
                         message += f"[bold green]Reward:[/bold green] {r['Reward']}\n"
                         message += f"[bold green]Link:[/bold green] {r['Link']}\n\n"
-                    console.print(message)
+                    logger.info(message)
 
                 return results
 
             except Exception as e:
-                console.print(f'{self.tracker}: An error occurred while fetching requests: {e}')
+                logger.info(f'{self.tracker}: An error occurred while fetching requests: {e}')
                 return results
 
     async def fetch_tag_id(self, word: str) -> int:
@@ -647,7 +647,7 @@ class AZTrackerBase:
                         return 0
 
         except Exception as e:
-            console.print(f"An unexpected error occurred while processing the tag '{word}': {e}", markup=False)
+            logger.info(f"An unexpected error occurred while processing the tag '{word}': {e}", extra={"markup": False})
 
         return 0
 
@@ -717,11 +717,11 @@ class AZTrackerBase:
             flags=re.DOTALL
         )
         if amount > 0:
-            console.print(f'{self.tracker}: Deleted from description: {amount} NFO section.')
+            logger.info(f'{self.tracker}: Deleted from description: {amount} NFO section.')
 
         processed_desc, amount = re.subn(r'http[s]?://\S+|www\.\S+', '', processed_desc)
         if amount > 0:
-            console.print(f'{self.tracker}: Deleted from description: {amount} link(s).')
+            logger.info(f'{self.tracker}: Deleted from description: {amount} link(s).')
 
         bbcode_tags_pattern = r'\[/?(size|align|left|center|right|img|table|tr|td|spoiler|url)[^\]]*\]'
         processed_desc, amount = re.subn(
@@ -731,7 +731,7 @@ class AZTrackerBase:
             flags=re.IGNORECASE
         )
         if amount > 0:
-            console.print(f'{self.tracker}: Deleted from description: {amount} BBCode tag(s).')
+            logger.info(f'{self.tracker}: Deleted from description: {amount} BBCode tag(s).')
 
         render_html = getattr(bbcode, 'render_html', None)
         final_html_desc = cast(Callable[[str], str], render_html)(processed_desc) if callable(render_html) else cast(Any, bbcode).Parser().format(processed_desc)
@@ -774,8 +774,8 @@ class AZTrackerBase:
 
                     match = re.search(r'/(\d+)$', redirect_url)
                     if not match:
-                        console.print(f"{self.tracker}: Could not extract 'task_id' from redirect URL: {redirect_url}")
-                        console.print(f'{self.tracker}: The cookie appears to be expired or invalid.')
+                        logger.info(f"{self.tracker}: Could not extract 'task_id' from redirect URL: {redirect_url}")
+                        logger.info(f'{self.tracker}: The cookie appears to be expired or invalid.')
                         meta.skipping = f"{self.tracker}"
                         return {}
 
@@ -802,7 +802,7 @@ class AZTrackerBase:
                 return {}
 
         else:
-            console.print(data)
+            logger.info(data)
             status_message = 'Debug mode enabled, not uploading.'
 
         meta.tracker_status[self.tracker]["status_message"] = status_message
@@ -1015,7 +1015,7 @@ class AZTrackerBase:
                 })
 
             except Exception as e:
-                console.print(f'{self.tracker}: An unexpected error occurred while uploading: {e}')
+                logger.info(f'{self.tracker}: An unexpected error occurred while uploading: {e}')
 
         return data
 
@@ -1089,8 +1089,8 @@ class AZTrackerBase:
                     return False
 
             else:
-                console.print(f"[cyan]{self.tracker} Request Data:")
-                console.print(Redaction.redact_private_info(data))
+                logger.info(f"[cyan]{self.tracker} Request Data:")
+                logger.info(Redaction.redact_private_info(data))
                 meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
                 await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
                 return True

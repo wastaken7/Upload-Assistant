@@ -4,7 +4,7 @@ from typing import Any
 
 import cli_ui
 
-from src.console import console
+from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
@@ -57,14 +57,14 @@ class STC(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         if str(meta.category) != "TV":
             if not meta.unattended:
-                console.print(f'[bold red]Only TV uploads allowed at {self.tracker}.[/bold red]')
+                logger.info(f'[bold red]Only TV uploads allowed at {self.tracker}.[/bold red]')
             return False
 
         genres = f"{', '.join(meta.keywords)} {meta.combined_genres}"
         adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy', 'hentai', 'adult animation', 'softcore']
         if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
             if not meta.unattended or (bool(meta.unattended) and meta.unattended_confirm):
-                console.print(f'[bold red]Porn is not allowed at {self.tracker}.[/bold red]')
+                logger.info(f'[bold red]Porn is not allowed at {self.tracker}.[/bold red]')
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:

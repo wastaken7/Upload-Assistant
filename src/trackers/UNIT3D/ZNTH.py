@@ -1,6 +1,6 @@
 from typing import Any
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
@@ -29,10 +29,10 @@ class ZNTH(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK":
             if not meta.isbn and not meta.asin:
-                console.print(f"{self.tracker}: [bold red]ISBN or ASIN is required for books. Skipping upload...[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]ISBN or ASIN is required for books. Skipping upload...[/bold red]")
                 return False
             if meta.audiobook and not meta.narrator:
-                console.print(f"{self.tracker}: [bold red]Narrator is required for audiobooks. Skipping upload...[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Narrator is required for audiobooks. Skipping upload...[/bold red]")
                 return False
 
         return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)

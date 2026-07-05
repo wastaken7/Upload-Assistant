@@ -12,7 +12,7 @@ import cli_ui
 import httpx
 from PIL import Image
 
-from src.console import console
+from src.console import logger
 from src.igdb import IGDBAPI
 from src.meta import Meta
 
@@ -125,7 +125,7 @@ def resolve_game_filelist(
                 filelist.extend(os.path.abspath(os.path.join(root, file)))
         filelist = sorted(filelist)
         if not filelist:
-            console.print("[bold red]No game files found!")
+            logger.info("[bold red]No game files found!")
             sys.exit(1)
 
         exe_files = [f for f in filelist if f.lower().endswith(".exe")]
@@ -187,7 +187,7 @@ async def gather_game_prep(
 
     if meta.game_version:
         version = normalize_version(meta.game_version)
-        console.print(f"[green]Game version (manual override): {version}[/green]")
+        logger.info(f"[green]Game version (manual override): {version}[/green]")
     else:
         # Attempt to extract from directory name first
         if path_to_check:
@@ -196,7 +196,7 @@ async def gather_game_prep(
                 folder_name = os.path.basename(search_dir)
                 version = extract_version_from_text(folder_name)
                 if version and meta.debug:
-                    console.print(f"[green]Game version extracted from directory name: {version}[/green]")
+                    logger.info(f"[green]Game version extracted from directory name: {version}[/green]")
 
         # Attempt to extract from .nfo file if not found in directory name
         if not version:
@@ -219,7 +219,7 @@ async def gather_game_prep(
             for nfo_path in nfo_files:
                 version = extract_version_from_nfo(nfo_path)
                 if version:
-                    console.print(f"[green]Game version extracted from NFO file ({os.path.basename(nfo_path)}): {version}[/green]")
+                    logger.info(f"[green]Game version extracted from NFO file ({os.path.basename(nfo_path)}): {version}[/green]")
                     break
 
     if version:
@@ -239,7 +239,7 @@ async def gather_game_prep(
         client_secret = os.environ.get("TWITCH_CLIENT_SECRET", "").strip()
 
     if not client_id or not client_secret:
-        console.print("[bold red]Warning: Twitch Client ID or Secret is not configured. Game metadata search will be skipped.[/bold red]")
+        logger.warning("[bold red]Warning: Twitch Client ID or Secret is not configured. Game metadata search will be skipped.[/bold red]")
         return
 
     # Use title in meta (cleaned folder/file name) or extract from videopath
@@ -265,7 +265,7 @@ async def gather_game_prep(
         title_query = re.sub(r"\s+", " ", title_query).strip()
 
     if not title_query:
-        console.print("[bold red]Warning: Could not determine game title for metadata search.[/bold red]")
+        logger.warning("[bold red]Warning: Could not determine game title for metadata search.[/bold red]")
         return
 
     # Keep track of manual CLI/correction overrides
@@ -320,30 +320,30 @@ async def gather_game_prep(
                 if match:
                     detected_steam_id = match.group(1)
                     if meta.debug:
-                        console.print(f"[green]Auto-detected Steam ID {detected_steam_id} from NFO file.[/green]")
+                        logger.debug(f"[green]Auto-detected Steam ID {detected_steam_id} from NFO file.[/green]")
                     break
             except Exception as e:
                 if meta.debug:
-                    console.print(f"[yellow]Debug: Error reading NFO {nfo_path}: {e}[/yellow]")
+                    logger.debug(f"[yellow]Debug: Error reading NFO {nfo_path}: {e}[/yellow]")
 
         if detected_steam_id:
             steam_manual = detected_steam_id
             meta.steam_manual = detected_steam_id
 
     if igdb_manual:
-        console.print(f"[cyan]Fetching IGDB metadata for ID: {igdb_manual}...[/cyan]")
+        logger.info(f"[cyan]Fetching IGDB metadata for ID: {igdb_manual}...[/cyan]")
         selected_game = await igdb.fetch_game_by_id(igdb_manual)
         if not selected_game:
-            console.print(f"[yellow]IGDB: No game found with manual ID '{igdb_manual}'. Falling back to search.[/yellow]")
+            logger.info(f"[yellow]IGDB: No game found with manual ID '{igdb_manual}'. Falling back to search.[/yellow]")
     elif steam_manual:
         selected_game = await igdb.fetch_game_by_steam_id(steam_manual)
         if not selected_game:
-            console.print(f"[yellow]IGDB: No game found with Steam ID '{steam_manual}'. Falling back to search.[/yellow]")
+            logger.info(f"[yellow]IGDB: No game found with Steam ID '{steam_manual}'. Falling back to search.[/yellow]")
 
     if not selected_game:
         results = await igdb.search_game(title_query)
         if not results:
-            console.print(f"[yellow]IGDB: No games found matching '{title_query}'[/yellow]")
+            logger.info(f"[yellow]IGDB: No games found matching '{title_query}'[/yellow]")
             return
 
         # Choose the correct game
@@ -371,11 +371,11 @@ async def gather_game_prep(
                     idx = choices.index(choice)
                     selected_game = results[idx]
             except KeyboardInterrupt:
-                console.print("[yellow]Selection cancelled. Skipping IGDB metadata.[/yellow]")
+                logger.info("[yellow]Selection cancelled. Skipping IGDB metadata.[/yellow]")
                 return
 
     if not selected_game:
-        console.print("[yellow]Skipped IGDB metadata selection.[/yellow]")
+        logger.info("[yellow]Skipped IGDB metadata selection.[/yellow]")
         return
 
     # Cache selected game details
@@ -430,11 +430,11 @@ async def gather_game_prep(
                     img = Image.open(io.BytesIO(response.content))
                     img.save(poster_png_path, "PNG")
                     meta.cover_path = poster_png_path
-                    console.print("[green]IGDB: Cover downloaded and saved to POSTER.png[/green]")
+                    logger.info("[green]IGDB: Cover downloaded and saved to POSTER.png[/green]")
                 else:
-                    console.print(f"[yellow]IGDB: Failed to download cover. Status: {response.status_code}[/yellow]")
+                    logger.info(f"[yellow]IGDB: Failed to download cover. Status: {response.status_code}[/yellow]")
         except Exception as e:
-            console.print(f"[yellow]IGDB: Failed to save cover as POSTER.png: {e}[/yellow]")
+            logger.info(f"[yellow]IGDB: Failed to save cover as POSTER.png: {e}[/yellow]")
 
     # Genres
     genres = [g.get("name") for g in selected_game.get("genres", []) if g.get("name")]
@@ -527,11 +527,11 @@ async def gather_game_prep(
                     break
         if detected_platform:
             meta.platform = detected_platform
-            console.print(f"[green]Game platform auto-detected from folder/file name: {detected_platform}[/green]")
+            logger.info(f"[green]Game platform auto-detected from folder/file name: {detected_platform}[/green]")
         elif len(platforms) == 1:
             meta.platform = platforms[0]
             if meta.debug:
-                console.print(f"[green]Game platform set to: {platforms[0]}[/green]")
+                logger.debug(f"[green]Game platform set to: {platforms[0]}[/green]")
 
     # Companies
     developers = []
@@ -632,7 +632,7 @@ async def gather_game_prep(
                             if recommended:
                                 meta.requirements_recommended = recommended
         except Exception as e:
-            console.print(f"[yellow]Steam: Error fetching app details: {e}[/yellow]")
+            logger.info(f"[yellow]Steam: Error fetching app details: {e}[/yellow]")
 
     # Extract Screenshots from IGDB
     igdb_screenshots = selected_game.get("screenshots", [])
@@ -661,9 +661,9 @@ async def gather_game_prep(
                 async with aiofiles.open(image_data_file, "w", encoding="utf-8") as img_file:
                     await img_file.write(json.dumps(image_data, indent=4))
                 if meta.debug:
-                    console.print(f"[green]IGDB: Saved {len(image_list)} screenshots to image_data.json[/green]")
+                    logger.debug(f"[green]IGDB: Saved {len(image_list)} screenshots to image_data.json[/green]")
             except Exception as e:
-                console.print(f"[yellow]IGDB: Failed to save screenshots to image_data.json: {e}[/yellow]")
+                logger.info(f"[yellow]IGDB: Failed to save screenshots to image_data.json: {e}[/yellow]")
 
     meta.igdb_id = selected_game.get("id", 0)
 
@@ -677,4 +677,4 @@ async def gather_game_prep(
         meta.console_game = False
 
     if meta.debug:
-        console.print(f"[green]IGDB metadata successfully retrieved for game: {meta.title}[/green]")
+        logger.debug(f"[green]IGDB metadata successfully retrieved for game: {meta.title}[/green]")

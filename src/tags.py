@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import guessit
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
 guessit_module: Any = cast(Any, guessit)
@@ -35,7 +35,7 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
             matched_anime = True
             release_group = anime_match.group(1)
             if meta.debug:
-                console.print(f"Anime regex match: {release_group}")
+                logger.debug(f"Anime regex match: {release_group}")
     if (not meta.anime or not matched_anime) and meta.is_disc != "BDMV":
         # Non-anime pattern: group at the end after last hyphen, avoiding resolutions and numbers
         if os.path.isdir(video):
@@ -86,7 +86,7 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
             if not meta.scene and release_group and len(release_group) > 12:
                 release_group = None
             if meta.debug:
-                console.print(f"Non-anime regex match: {release_group}")
+                logger.debug(f"Non-anime regex match: {release_group}")
 
     # If regex patterns didn't work, fall back to guessit
     if not release_group and meta.is_disc:
@@ -94,10 +94,10 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
             parsed = guessit_fn(video)
             release_group = cast(str | None, parsed.get('release_group'))
             if meta.debug:
-                console.print(f"Guessit match: {release_group}")
+                logger.debug(f"Guessit match: {release_group}")
 
         except Exception as e:
-            console.print(f"Error while parsing group tag: {e}")
+            logger.info(f"Error while parsing group tag: {e}")
             release_group = None
 
     # BDMV validation
@@ -141,7 +141,7 @@ async def tag_override(meta: Meta) -> Meta:
                     else:
                         meta[key] = value.get(key)
     except Exception as e:
-        console.print(f"Error while loading tags.json: {e}")
+        logger.info(f"Error while loading tags.json: {e}")
         return meta
     return meta
 

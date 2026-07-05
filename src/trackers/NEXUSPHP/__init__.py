@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 from bs4 import BeautifulSoup
 
-from src.console import console
+from src.console import console, logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -56,7 +56,7 @@ class NEXUSPHP:
 
     async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
         if not self.announce_url:
-            console.print(f"[red]Announce URL is not set for {self.tracker}[/red]", markup=True)
+            logger.info(f"[red]Announce URL is not set for {self.tracker}[/red]", extra={"markup": True})
             meta.skipping = self.tracker
             return []
 
@@ -144,7 +144,7 @@ class NEXUSPHP:
             return ""
 
         except Exception as e:
-            console.print(f"Error getting BDInfo for torrent {torrent_id}: {e}", markup=False)
+            logger.info(f"Error getting BDInfo for torrent {torrent_id}: {e}", extra={"markup": False})
             return ""
 
     async def validate_credentials(self, meta: Meta) -> bool:

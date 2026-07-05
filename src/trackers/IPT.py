@@ -8,7 +8,7 @@ import bencodepy
 import httpx
 from bs4 import BeautifulSoup
 
-from src.console import console
+from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -369,7 +369,7 @@ class IPT:
             size_gb = total_size / (1024**3)
             return size_gb >= 8
         except Exception as e:
-            console.print(f"[bold red]Error reading torrent file for size check on {self.tracker}: {e}[/bold red]")
+            logger.info(f"[bold red]Error reading torrent file for size check on {self.tracker}: {e}[/bold red]")
             return False
 
     async def get_data(self, meta: Meta):

@@ -16,7 +16,7 @@ import pycountry
 from bs4 import BeautifulSoup, Tag
 from langcodes.tag_parser import LanguageTagError
 
-from src.console import console
+from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder
@@ -75,7 +75,7 @@ class BJS:
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK":
             if meta.book_language_iso != "por":
-                console.print(f"{self.tracker}: [red]Only books in Portuguese are allowed.[/red]")
+                logger.info(f"{self.tracker}: [red]Only books in Portuguese are allowed.[/red]")
                 return False
             return True
 
@@ -86,14 +86,14 @@ class BJS:
                 builder = DescriptionBuilder(self.tracker, self.config)
                 has_install_notes = await builder.get_user_description(meta)
                 if not has_install_notes:
-                    console.print(
+                    logger.info(
                         f"{self.tracker}: [red]Installation notes are required for PC game uploads. "
                         "Please provide them using [bold]-df[/bold] (path/to/file.txt) or [bold]-pb[/bold] (link to raw text).[/red]"
                     )
                     return False
 
             if meta.scene and meta.container in ("rar", "zip", "7z", "tar", "gz"):
-                console.print(f"{self.tracker}: [red]Skipping upload: Scene games must be unpacked (Rule 5.4.1.1).[/red]")
+                logger.info(f"{self.tracker}: [red]Skipping upload: Scene games must be unpacked (Rule 5.4.1.1).[/red]")
                 return False
 
             return True
@@ -645,7 +645,7 @@ class BJS:
 
         if category in ("TV", "MOVIE"):
             if not dict(meta.imdb_info).get("imdbID"):
-                console.print(f"{self.tracker}: [bold red]IMDb ID not found in metadata. Skipping duplicate check.[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]IMDb ID not found in metadata. Skipping duplicate check.[/bold red]")
                 return dupes
 
             params = {
@@ -693,7 +693,7 @@ class BJS:
         if auth_match:
             BJS.secret_token = auth_match.group(1)
         else:
-            console.print(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
             meta.skipping = f"{self.tracker}"
             return dupes
 
@@ -969,11 +969,11 @@ class BJS:
             if data.get("url") and str(data.get("url", "")).startswith("http"):
                 img_url = str(data.get("url", "")).replace("\\/", "/")
             else:
-                console.print(f"{self.tracker}: [bold red]The image host appears to be down.[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]The image host appears to be down.[/bold red]")
 
             return img_url
         except Exception as e:
-            console.print(f"Exceção no upload de {filename}: {e}", markup=False)
+            logger.info(f"Exceção no upload de {filename}: {e}", extra={"markup": False})
             return None
 
     async def get_cover(self, meta: Meta):
@@ -982,7 +982,7 @@ class BJS:
         if category in ("MOVIE", "TV"):
             cover_path = self.main_tmdb_data.get("poster_path") or meta.tmdb_poster
             if not cover_path:
-                console.print("Nenhum poster_path encontrado nos dados do TMDB.", markup=False)
+                logger.info("Nenhum poster_path encontrado nos dados do TMDB.", extra={"markup": False})
                 return None
 
             cover_tmdb_url = f"https://image.tmdb.org/t/p/w500{cover_path}"
@@ -997,13 +997,13 @@ class BJS:
 
                 return await self.img_host(image_bytes, filename)
             except Exception as e:
-                console.print(f"{self.tracker}: Falha ao processar pôster da URL {cover_tmdb_url}: {e}", markup=False)
+                logger.info(f"{self.tracker}: Falha ao processar pôster da URL {cover_tmdb_url}: {e}", extra={"markup": False})
                 return None
 
         if category in ("BOOK", "GAME"):
             cover_path = meta.cover_path
             if not cover_path or not await self.common.path_exists(cover_path):
-                console.print("Nenhum cover_path válido encontrado.", markup=False)
+                logger.info("Nenhum cover_path válido encontrado.", extra={"markup": False})
                 return None
 
             try:
@@ -1013,7 +1013,7 @@ class BJS:
 
                 return await self.img_host(image_bytes, filename)
             except Exception as e:
-                console.print(f"{self.tracker}: Falha ao ler ou enviar capa {cover_path}: {e}", markup=False)
+                logger.info(f"{self.tracker}: Falha ao ler ou enviar capa {cover_path}: {e}", extra={"markup": False})
                 return None
 
     async def get_screenshots(self, meta: Meta) -> list[str]:
@@ -1035,7 +1035,7 @@ class BJS:
                 filename = os.path.basename(urlparse(url).path) or "screenshot.png"
                 return await self.img_host(image_bytes, filename)
             except Exception as e:
-                console.print(f"Failed to process screenshot from URL {url}: {e}", markup=False)
+                logger.info(f"Failed to process screenshot from URL {url}: {e}", extra={"markup": False})
                 return None
 
         results: list[str] = []
@@ -1285,15 +1285,15 @@ class BJS:
                         message += f"[bold green]Qualidade:[/bold green] {r['Quality']}\n"
                         message += f"[bold green]Recompensa:[/bold green] {r['Reward']}\n"
                         message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
-                    console.print(message)
+                    logger.info(message)
 
                 return results
 
             except Exception as e:
-                console.print(f"[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
+                logger.info(f"[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
                 import traceback
 
-                console.print(traceback.format_exc())
+                logger.info(traceback.format_exc())
                 return results
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
@@ -1557,7 +1557,7 @@ class BJS:
             return overview
 
         if not BJS.already_has_the_info:
-            console.print(f"{self.tracker}: [bold red]Sinopse não encontrada no TMDb. Por favor, insira manualmente.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Sinopse não encontrada no TMDb. Por favor, insira manualmente.[/bold red]")
             user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f'"{self.tracker}: [green]Digite a sinopse:[/green]"')
             user_input = (user_input_raw or "").strip()
             if user_input:

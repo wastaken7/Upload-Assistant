@@ -5,7 +5,7 @@ from typing import Any
 import transmission_rpc
 from torf import Torrent
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
 
@@ -21,10 +21,10 @@ class TransmissionClientMixin:
                 path=client.get('transmission_path', "/transmission/rpc")
             )
         except Exception as e:
-            console.print(f"[bold red]Unable to connect to transmission: {e}")
+            logger.info(f"[bold red]Unable to connect to transmission: {e}")
             return
 
-        console.print("Connected to Transmission")
+        logger.info("Connected to Transmission")
         # Remote path mount
         if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():
             path = path.replace(local_path, remote_path)
@@ -46,4 +46,4 @@ class TransmissionClientMixin:
         )
 
         if meta.debug:
-            console.print(f"[cyan]Path: {path}")
+            logger.debug(f"[cyan]Path: {path}")

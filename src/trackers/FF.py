@@ -9,7 +9,7 @@ import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
-from src.console import console
+from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
@@ -62,11 +62,11 @@ class FF:
             "login": "Login"
         }
 
-        console.print(f"{self.tracker}: Trying to login...", markup=False)
+        logger.info(f"{self.tracker}: Trying to login...", extra={"markup": False})
         response = await self.session.post(login_url, data=payload)
 
         if response.status_code == 302:
-            console.print(f"{self.tracker}: Login Successful!", markup=False)
+            logger.info(f"{self.tracker}: Login Successful!", extra={"markup": False})
 
             async with aiofiles.open(cookie_file, "w") as f:
                 await f.write("# Netscape HTTP Cookie File\n")
@@ -80,9 +80,9 @@ class FF:
                     name = cookie.name
                     value = cookie.value
                     await f.write(f"{domain}\t{include_subdomains}\t{path}\t{secure}\t{expires}\t{name}\t{value}\n")
-            console.print(f"{self.tracker}: Saving the cookie file...", markup=False)
+            logger.info(f"{self.tracker}: Saving the cookie file...", extra={"markup": False})
         else:
-            console.print(f"{self.tracker}: Login failed. Status code: {response.status_code}", markup=False)
+            logger.info(f"{self.tracker}: Login failed. Status code: {response.status_code}", extra={"markup": False})
 
     async def search_existing(self, meta: Meta) -> list[str]:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -168,12 +168,12 @@ class FF:
                         message += f"[bold green]Name:[/bold green] {r['Name']}\n"
                         message += f"[bold green]Reward:[/bold green] {r['Reward']}\n"
                         message += f"[bold green]Link:[/bold green] {r['Link']}\n\n"
-                    console.print(message)
+                    logger.info(message)
 
                 return results
 
             except Exception as e:
-                console.print(f"An error occurred while fetching requests: {e}", markup=False)
+                logger.info(f"An error occurred while fetching requests: {e}", extra={"markup": False})
                 return []
 
     async def generate_description(self, meta: Meta) -> str:

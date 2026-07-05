@@ -7,7 +7,7 @@ from typing import Any, cast
 import httpx
 from bs4 import BeautifulSoup
 
-from src.console import console
+from src.console import logger
 from src.imdb import imdb_manager
 from src.meta import Meta
 from src.tmdb import TmdbManager
@@ -89,7 +89,7 @@ class MetadataSearchingManager:
 
 async def all_ids(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) -> Meta:
     if meta.debug:
-        console.print("[yellow]Starting metadata retrieval with all IDs present[/yellow]")
+        logger.debug("[yellow]Starting metadata retrieval with all IDs present[/yellow]")
     # Create a list of all tasks to run in parallel
     all_tasks: list[Awaitable[Any]] = [
         # Core metadata tasks
@@ -150,20 +150,20 @@ async def all_ids(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) -> M
         episode_int = _coerce_int(meta.episode_int)
         if tmdb_id is not None and season_int is not None and episode_int is not None:
             tmdb_task_idx = len(all_tasks)
-            all_tasks.append(tmdb_manager.get_episode_details(tmdb_id, season_int, episode_int, debug=meta.debug))
+            all_tasks.append(tmdb_manager.get_episode_details(tmdb_id, season_int, episode_int))
     elif meta.category == "TV" and meta.tv_pack and "season_int" in meta:
         # For TV packs, we might want to get season details instead
         tmdb_id = _coerce_int(meta.tmdb_id)
         season_int = _coerce_int(meta.season_int)
         if tmdb_id is not None and season_int is not None:
             tmdb_task_idx = len(all_tasks)
-            all_tasks.append(tmdb_manager.get_season_details(tmdb_id, season_int, debug=meta.debug))
+            all_tasks.append(tmdb_manager.get_season_details(tmdb_id, season_int))
 
     # Execute all tasks in parallel
     try:
         results: list[Any] = await asyncio.gather(*all_tasks, return_exceptions=True)
     except Exception as e:
-        console.print(f"[red]Error occurred while gathering tasks: {e}[/red]")
+        logger.error(f"[red]Error occurred while gathering tasks: {e}[/red]")
         return meta
 
     tmdb_metadata: Any = None
@@ -172,24 +172,24 @@ async def all_ids(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) -> M
     try:
         tmdb_metadata, imdb_info = results[0:2]
     except Exception as e:
-        console.print(f"[red]Error occurred while processing core metadata: {e}[/red]")
+        logger.error(f"[red]Error occurred while processing core metadata: {e}[/red]")
     result_index = 2  # Start processing episode data from this index
 
     # Process TMDB metadata
     if not isinstance(tmdb_metadata, Exception) and tmdb_metadata:
         meta.update(tmdb_metadata)
     else:
-        console.print("[yellow]Warning: Could not get TMDB metadata")
+        logger.warning("[yellow]Warning: Could not get TMDB metadata")
 
     # Process IMDB info
     if isinstance(imdb_info, dict):
         meta.imdb_info = imdb_info
 
     elif isinstance(imdb_info, Exception):
-        console.print(f"[red]IMDb API call failed: {imdb_info}[/red]")
+        logger.info(f"[red]IMDb API call failed: {imdb_info}[/red]")
         meta.imdb_info = meta.imdb_info  # Keep previous IMDb info if it exists
     else:
-        console.print("[red]Unexpected IMDb response, setting imdb_info to empty.[/red]")
+        logger.info("[red]Unexpected IMDb response, setting imdb_info to empty.[/red]")
         meta.imdb_info = {}
 
     # Process TVDB episodes data if it was requested for TV category
@@ -211,9 +211,9 @@ async def all_ids(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) -> M
                 _apply_tvdb_series_metadata(meta, episodes_data, series_name)
                 meta.we_checked_tvdb = True
             else:
-                console.print(f"[yellow]Unexpected TVDb data format: {tvdb_episode_data!r}[/yellow]")
+                logger.info(f"[yellow]Unexpected TVDb data format: {tvdb_episode_data!r}[/yellow]")
         elif isinstance(tvdb_episode_data, Exception):
-            console.print(f"[yellow]TVDb episode data retrieval failed: {tvdb_episode_data}[/yellow]")
+            logger.info(f"[yellow]TVDb episode data retrieval failed: {tvdb_episode_data}[/yellow]")
 
     # Process episode data if this is a TV show
     if meta.category == "TV" and not meta.tv_pack and meta.episode_int != 0:
@@ -224,7 +224,7 @@ async def all_ids(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) -> M
                 meta.tvmaze_episode_data = tvmaze_episode_data
                 meta.we_asked_tvmaze = True
             elif isinstance(tvmaze_episode_data, Exception):
-                console.print(f"[yellow]TVMaze episode data retrieval failed: {tvmaze_episode_data}")
+                logger.info(f"[yellow]TVMaze episode data retrieval failed: {tvmaze_episode_data}")
 
         # Process TMDb episode data
         if tmdb_task_idx is not None:
@@ -233,7 +233,7 @@ async def all_ids(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) -> M
                 meta.tmdb_episode_data = tmdb_episode_data
                 meta.we_checked_tmdb = True
             elif isinstance(tmdb_episode_data, Exception):
-                console.print(f"[yellow]TMDb episode data retrieval failed: {tmdb_episode_data}")
+                logger.info(f"[yellow]TMDb episode data retrieval failed: {tmdb_episode_data}")
 
     elif meta.category == "TV" and meta.tv_pack and "season_int" in meta:
         # Process TMDb season data for TV packs
@@ -243,14 +243,14 @@ async def all_ids(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) -> M
                 meta.tmdb_season_data = tmdb_season_data
                 meta.we_checked_tmdb = True
             elif isinstance(tmdb_season_data, Exception):
-                console.print(f"[yellow]TMDb season data retrieval failed: {tmdb_season_data}[/yellow]")
+                logger.info(f"[yellow]TMDb season data retrieval failed: {tmdb_season_data}[/yellow]")
 
     return meta
 
 
 async def imdb_tmdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_manager: TmdbManager) -> Meta:
     if meta.debug:
-        console.print("[yellow]IMDb, TMDb, and TVDb IDs are all present[/yellow]")
+        logger.debug("[yellow]IMDb, TMDb, and TVDb IDs are all present[/yellow]")
     # Core metadata tasks that run in parallel
     tasks: list[Any] = [
         tmdb_manager.tmdb_other_meta(
@@ -305,7 +305,7 @@ async def imdb_tmdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_mana
             season_int = _coerce_int(meta.season_int)
             episode_int = _coerce_int(meta.episode_int)
             if tmdb_id is not None and season_int is not None and episode_int is not None:
-                tmdb_episode_task = tmdb_manager.get_episode_details(tmdb_id, season_int, episode_int, debug=meta.debug)
+                tmdb_episode_task = tmdb_manager.get_episode_details(tmdb_id, season_int, episode_int)
                 tasks.append(tmdb_episode_task)
 
         if meta.tv_pack and "season_int" in meta:
@@ -313,7 +313,7 @@ async def imdb_tmdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_mana
             tmdb_id = _coerce_int(meta.tmdb_id)
             season_int = _coerce_int(meta.season_int)
             if tmdb_id is not None and season_int is not None:
-                tmdb_season_task = tmdb_manager.get_season_details(tmdb_id, season_int, debug=meta.debug)
+                tmdb_season_task = tmdb_manager.get_season_details(tmdb_id, season_int)
                 tasks.append(tmdb_season_task)
 
     # Execute all tasks in parallel
@@ -327,7 +327,7 @@ async def imdb_tmdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_mana
         if not isinstance(tmdb_metadata, Exception) and tmdb_metadata:
             meta.update(tmdb_metadata)
         else:
-            console.print(f"[yellow]TMDb metadata retrieval failed: {tmdb_metadata}[/yellow]")
+            logger.info(f"[yellow]TMDb metadata retrieval failed: {tmdb_metadata}[/yellow]")
 
     if len(results) > result_index:
         imdb_info = results[result_index]
@@ -336,10 +336,10 @@ async def imdb_tmdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_mana
             meta.imdb_info = imdb_info
 
         elif isinstance(imdb_info, Exception):
-            console.print(f"[red]IMDb API call failed: {imdb_info}[/red]")
+            logger.info(f"[red]IMDb API call failed: {imdb_info}[/red]")
             meta.imdb_info = meta.imdb_info
         else:
-            console.print("[red]Unexpected IMDb response, setting imdb_info to empty.[/red]")
+            logger.info("[red]Unexpected IMDb response, setting imdb_info to empty.[/red]")
             meta.imdb_info = {}
 
     if meta.category == "TV" and len(results) > result_index:
@@ -349,7 +349,7 @@ async def imdb_tmdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_mana
         if isinstance(tvmaze_id, int):
             meta.tvmaze_id = tvmaze_id
         elif isinstance(tvmaze_id, Exception):
-            console.print(f"[yellow]TVMaze ID retrieval failed: {tvmaze_id}[/yellow]")
+            logger.info(f"[yellow]TVMaze ID retrieval failed: {tvmaze_id}[/yellow]")
             meta.tvmaze_id = 0
 
     if meta.category == "TV":
@@ -370,9 +370,9 @@ async def imdb_tmdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_mana
                     _apply_tvdb_series_metadata(meta, episodes_data, series_name)
                     meta.we_checked_tvdb = True
                 else:
-                    console.print(f"[yellow]Unexpected TVDb data format: {tvdb_episode_data!r}[/yellow]")
+                    logger.info(f"[yellow]Unexpected TVDb data format: {tvdb_episode_data!r}[/yellow]")
             elif isinstance(tvdb_episode_data, Exception):
-                console.print(f"[yellow]TVDb episode data retrieval failed: {tvdb_episode_data}[/yellow]")
+                logger.info(f"[yellow]TVDb episode data retrieval failed: {tvdb_episode_data}[/yellow]")
 
         # Process TMDb episode data only if we added that task
         if not meta.tv_pack and "season_int" in meta and "episode_int" in meta and meta.episode_int != 0 and len(results) > result_index:
@@ -384,7 +384,7 @@ async def imdb_tmdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_mana
                 meta.we_checked_tmdb = True
 
             elif isinstance(tmdb_episode_data, Exception):
-                console.print(f"[yellow]TMDb episode data retrieval failed: {tmdb_episode_data}[/yellow]")
+                logger.info(f"[yellow]TMDb episode data retrieval failed: {tmdb_episode_data}[/yellow]")
 
         # Process TMDb season data for TV packs
         elif meta.tv_pack and "season_int" in meta and len(results) > result_index:
@@ -396,14 +396,14 @@ async def imdb_tmdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_mana
                 meta.we_checked_tmdb = True
 
             elif isinstance(tmdb_season_data, Exception):
-                console.print(f"[yellow]TMDb season data retrieval failed: {tmdb_season_data}[/yellow]")
+                logger.info(f"[yellow]TMDb season data retrieval failed: {tmdb_season_data}[/yellow]")
 
     return meta
 
 
 async def imdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_manager: TmdbManager) -> Meta:
     if meta.debug:
-        console.print("[yellow]Both IMDb and TVDB IDs are present[/yellow]")
+        logger.debug("[yellow]Both IMDb and TVDB IDs are present[/yellow]")
     tasks: list[Any] = [
         tmdb_manager.get_tmdb_from_imdb(
             meta.imdb_id,
@@ -449,10 +449,10 @@ async def imdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_manager: 
         meta.imdb_info = imdb_info_result
 
     elif isinstance(imdb_info_result, Exception):
-        console.print(f"[red]IMDb API call failed: {imdb_info_result}[/red]")
+        logger.info(f"[red]IMDb API call failed: {imdb_info_result}[/red]")
         meta.imdb_info = meta.imdb_info  # Keep previous IMDb info if it exists
     else:
-        console.print("[red]Unexpected IMDb response, setting imdb_info to empty.[/red]")
+        logger.info("[red]Unexpected IMDb response, setting imdb_info to empty.[/red]")
         meta.imdb_info = {}
 
     # Process TVDB episodes data if it was requested
@@ -471,9 +471,9 @@ async def imdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_manager: 
                 _apply_tvdb_series_metadata(meta, episodes_data, series_name)
                 meta.we_checked_tvdb = True
             else:
-                console.print(f"[yellow]Unexpected TVDb data format: {tvdb_episode_data!r}[/yellow]")
+                logger.info(f"[yellow]Unexpected TVDb data format: {tvdb_episode_data!r}[/yellow]")
         elif isinstance(tvdb_episode_data, Exception):
-            console.print(f"[yellow]TVDb episode data retrieval failed: {tvdb_episode_data}[/yellow]")
+            logger.info(f"[yellow]TVDb episode data retrieval failed: {tvdb_episode_data}[/yellow]")
 
     return meta
 
@@ -523,12 +523,12 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
             season_int = _coerce_int(meta.season_int)
             episode_int = _coerce_int(meta.episode_int)
             if tmdb_id is not None and season_int is not None and episode_int is not None:
-                coroutines.append(tmdb_manager.get_episode_details(tmdb_id, season_int, episode_int, debug=meta.debug))
+                coroutines.append(tmdb_manager.get_episode_details(tmdb_id, season_int, episode_int))
         elif meta.tv_pack and "season_int" in meta:
             tmdb_id = _coerce_int(meta.tmdb_id)
             season_int = _coerce_int(meta.season_int)
             if tmdb_id is not None and season_int is not None:
-                coroutines.append(tmdb_manager.get_season_details(tmdb_id, season_int, debug=meta.debug))
+                coroutines.append(tmdb_manager.get_season_details(tmdb_id, season_int))
 
     # Gather results
     results: list[Any] = await asyncio.gather(*coroutines, return_exceptions=True)
@@ -537,10 +537,10 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
     # Process the results
     if isinstance(results[0], Exception):
         error_msg = f"TMDB metadata retrieval failed: {str(results[0])}"
-        console.print(f"[bold red]{error_msg}[/bold red]")
+        logger.info(f"[bold red]{error_msg}[/bold red]")
     elif not results[0]:  # Check if the result is empty (empty dict)
         error_msg = f"Failed to retrieve essential metadata from TMDB ID: {meta.tmdb_id}"
-        console.print(f"[bold red]{error_msg}[/bold red]")
+        logger.info(f"[bold red]{error_msg}[/bold red]")
     else:
         tmdb_metadata = results[0]
 
@@ -555,10 +555,10 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
         meta.imdb_info = imdb_info_result
 
     elif isinstance(imdb_info_result, Exception):
-        console.print(f"[red]IMDb API call failed: {imdb_info_result}[/red]")
+        logger.info(f"[red]IMDb API call failed: {imdb_info_result}[/red]")
         meta.imdb_info = meta.imdb_info  # Keep previous IMDb info if it exists
     else:
-        console.print("[red]Unexpected IMDb response, setting imdb_info to empty.[/red]")
+        logger.info("[red]Unexpected IMDb response, setting imdb_info to empty.[/red]")
         meta.imdb_info = {}
 
     # Process TVMaze results if it was included
@@ -581,14 +581,14 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
                 if not meta.tvdb_id and isinstance(tvdb_id, int) and tvdb_id > 0:
                     meta.tvdb_id = tvdb_id
                     if meta.debug:
-                        console.print(f"[green]Set TVDb ID from TVMaze: {tvdb_id}[/green]")
+                        logger.debug(f"[green]Set TVDb ID from TVMaze: {tvdb_id}[/green]")
             elif isinstance(tvmaze_result, int):
                 meta.tvmaze_id = tvmaze_result
             elif isinstance(tvmaze_result, Exception):
-                console.print(f"[red]TVMaze API call failed: {tvmaze_result}[/red]")
+                logger.info(f"[red]TVMaze API call failed: {tvmaze_result}[/red]")
                 meta.tvmaze_id = 0  # Set default value if an exception occurred
             else:
-                console.print(f"[yellow]Unexpected TVMaze result type: {tvmaze_result!r}[/yellow]")
+                logger.info(f"[yellow]Unexpected TVMaze result type: {tvmaze_result!r}[/yellow]")
                 meta.tvmaze_id = 0
 
         # Process TMDb episode details if they were included
@@ -600,7 +600,7 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
                     meta.we_checked_tmdb = True
 
                 elif isinstance(episode_details_result, Exception):
-                    console.print(f"[red]TMDb episode details API call failed: {episode_details_result}[/red]")
+                    logger.info(f"[red]TMDb episode details API call failed: {episode_details_result}[/red]")
         else:
             if 'season_int' in meta and len(results) > 3:
                 season_details_result = results[3]
@@ -609,7 +609,7 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
                     meta.we_checked_tmdb = True
 
                 elif isinstance(season_details_result, Exception):
-                    console.print(f"[red]TMDb season details API call failed: {season_details_result}[/red]")
+                    logger.info(f"[red]TMDb season details API call failed: {season_details_result}[/red]")
 
     return meta
 
@@ -630,8 +630,7 @@ async def get_tvmaze_tvdb(
     tvmaze = 0
     tvdb = 0
     tvdb_name = ""
-    if debug:
-        console.print("[yellow]Finding both TVMaze and TVDb IDs[/yellow]")
+    logger.debug("[yellow]Finding both TVMaze and TVDb IDs[/yellow]")
     # Core metadata tasks that run in parallel
     tasks: list[Awaitable[Any]] = [
         tvmaze_manager.search_tvmaze(
@@ -664,30 +663,30 @@ async def get_tvmaze_tvdb(
     elif isinstance(tvmaze_result, int):
         tvmaze = tvmaze_result
     elif isinstance(tvmaze_result, Exception):
-        console.print(f"[red]TVMaze API call failed: {tvmaze_result}[/red]")
+        logger.info(f"[red]TVMaze API call failed: {tvmaze_result}[/red]")
         tvmaze = 0  # Set default value if an exception occurred
     else:
-        console.print(f"[yellow]Unexpected TVMaze result type: {type(tvmaze_result)}[/yellow]")
+        logger.info(f"[yellow]Unexpected TVMaze result type: {type(tvmaze_result)}[/yellow]")
         tvmaze = 0
 
     # Process TVDb results if we added that task
     if (imdb and imdb != 0) or (tmdb and tmdb != 0):
         tvdb_result = results[1] if len(results) > 1 else None
         if isinstance(tvdb_result, Exception):
-            console.print(f"[yellow]TVDb lookup failed: {tvdb_result}[/yellow]")
+            logger.info(f"[yellow]TVDb lookup failed: {tvdb_result}[/yellow]")
             tvdb = 0
         elif isinstance(tvdb_result, tuple) and len(tvdb_result) == 2:
             tvdb_id, tvdb_name = tvdb_result
             tvdb = tvdb_id if tvdb_id is not None else 0
             tvdb_name = tvdb_name if isinstance(tvdb_name, str) else ""
-            if debug and tvdb_name:
-                console.print(f"[green]Got TVDb series name: {tvdb_name}[/green]")
+            if tvdb_name:
+                logger.debug(f"[green]Got TVDb series name: {tvdb_name}[/green]")
         elif isinstance(tvdb_result, int):
             # Backward compatibility for old return format
             tvdb = tvdb_result
         else:
             if tvdb_result is not None:
-                console.print(f"[yellow]Unexpected TVDb lookup result type: {type(tvdb_result)}[/yellow]")
+                logger.info(f"[yellow]Unexpected TVDb lookup result type: {type(tvdb_result)}[/yellow]")
             tvdb = 0
     elif len(results) > 1:
         tvdb_result = results[1]
@@ -702,21 +701,19 @@ async def get_tvmaze_tvdb(
                 series_id_int = _coerce_int(series_id) if series_id is not None else None
                 if series_id_int is not None:
                     tvdb = series_id_int
-                    if debug:
-                        console.print(f"[green]Got TVDb series ID: {series_id}[/green]")
+                    logger.debug(f"[green]Got TVDb series ID: {series_id}[/green]")
                 if series_results:
                     tvdb_data = series_results
             else:
-                console.print(f"[yellow]Unexpected TVDb result format: {tvdb_result}[/yellow]")
+                logger.info(f"[yellow]Unexpected TVDb result format: {tvdb_result}[/yellow]")
         elif isinstance(tvdb_result, Exception):
-            console.print(f"[yellow]TVDb series data retrieval failed: {tvdb_result}[/yellow]")
+            logger.info(f"[yellow]TVDb series data retrieval failed: {tvdb_result}[/yellow]")
 
     if not tvdb and tvmaze and isinstance(tvmaze_result, tuple):
         tvmaze_tuple = cast(tuple[Any, Any, Any], tvmaze_result)
         if len(tvmaze_tuple) == 3:
             tvdb = tvmaze_tuple[2] if isinstance(tvmaze_tuple[2], int) else 0
-    if debug:
-        console.print(f"[blue]TVMaze ID: {tvmaze} | TVDb ID: {tvdb}[/blue]")
+    logger.debug(f"[blue]TVMaze ID: {tvmaze} | TVDb ID: {tvdb}[/blue]")
 
     return tvmaze, tvdb, tvdb_data, tvdb_name
 
@@ -755,7 +752,7 @@ async def get_tv_data(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) 
                     meta.tvdb_episode_data, meta.season_int, meta.episode_int, debug=meta.debug, aired_date=meta.daily_episode_title
                 )
             except Exception as e:
-                console.print(f"[red]Error fetching TVDb episode data: {e}[/red]")
+                logger.error(f"[red]Error fetching TVDb episode data: {e}[/red]")
 
         tvdb_episode_name = meta.tvdb_episode_name
         if isinstance(tvdb_episode_name, str):
@@ -810,18 +807,18 @@ async def get_tv_data(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) 
                 episode = _coerce_int(meta.episode_int)
                 season = _coerce_int(meta.tvdb_season_int)
                 if meta.debug:
-                    console.print(f"[yellow]Using absolute episode number from TVDb: {episode}[/yellow]")
-                    console.print(f"[yellow]Using matching season number from TVDb: {season}[/yellow]")
+                    logger.debug(f"[yellow]Using absolute episode number from TVDb: {episode}[/yellow]")
+                    logger.debug(f"[yellow]Using matching season number from TVDb: {season}[/yellow]")
             else:
                 episode = _coerce_int(meta.episode_int)
                 season = _coerce_int(meta.season_int)
             if meta.debug:
-                console.print("[yellow]Fetching TMDb episode metadata...")
+                logger.debug("[yellow]Fetching TMDb episode metadata...")
             episode_details: dict[str, Any] = {}
             if not meta.tmdb_episode_data:
                 tmdb_id = _coerce_int(meta.tmdb_id)
                 if tmdb_id is not None and season is not None and episode is not None:
-                    episode_details_result = await tmdb_manager.get_episode_details(tmdb_id, season, episode, debug=meta.debug)
+                    episode_details_result = await tmdb_manager.get_episode_details(tmdb_id, season, episode)
                     if episode_details_result:
                         episode_details = episode_details_result
             else:
@@ -835,8 +832,8 @@ async def get_tv_data(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) 
                     meta.auto_episode_title = None
                 else:
                     meta.auto_episode_title = episode_name
-            if meta.overview_meta is None and episode_details.get("overview") is not None:
-                meta.overview_meta = episode_details.get("overview", None)
+            if not meta.overview_meta and episode_details.get("overview") is not None:
+                meta.overview_meta = episode_details.get("overview", "")
 
     elif meta.tv_pack:
         if not meta.we_checked_tvdb and meta.tvdb_id:
@@ -867,7 +864,7 @@ async def get_tv_data(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) 
                     meta.tvdb_episode_data, meta.season_int, meta.episode_int, debug=meta.debug, aired_date=meta.daily_episode_title
                 )
             except Exception as e:
-                console.print(f"[red]Error fetching TVDb episode data: {e}[/red]")
+                logger.error(f"[red]Error fetching TVDb episode data: {e}[/red]")
 
         tvdb_episode_id = meta.tvdb_episode_id
         if tvdb_episode_id is not None:
@@ -878,7 +875,7 @@ async def get_tv_data(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) 
 
 async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) -> Meta:
     if meta.debug:
-        console.print("[yellow]Gathering TVDb and TVMaze episode data[/yellow]")
+        logger.debug("[yellow]Gathering TVDb and TVMaze episode data[/yellow]")
 
     tasks: list[Awaitable[Any]] = []
     task_map = {}  # Track which tasks we added
@@ -886,7 +883,7 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
     # Add TVMaze episode data task
     if meta.tvmaze_id:
         if meta.debug:
-            console.print("[yellow]Fetching TVMaze episode data...[/yellow]")
+            logger.debug("[yellow]Fetching TVMaze episode data...[/yellow]")
         tvmaze_id = _coerce_int(meta.tvmaze_id)
         season_int = _coerce_int(meta.season_int)
         episode_int = _coerce_int(meta.episode_int)
@@ -903,7 +900,7 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
     # Add TVDb episode data task
     if meta.tvdb_id:
         if meta.debug:
-            console.print("[yellow]Fetching TVDb episode data...[/yellow]")
+            logger.debug("[yellow]Fetching TVDb episode data...[/yellow]")
         tasks.append(
             tvdb_handler.get_tvdb_episodes(
                 meta.tvdb_id,
@@ -919,12 +916,12 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
 
     if meta.tmdb_id:
         if meta.debug:
-            console.print("[yellow]Fetching TMDb episode data...[/yellow]")
+            logger.debug("[yellow]Fetching TMDb episode data...[/yellow]")
         tmdb_id = _coerce_int(meta.tmdb_id)
         season_int = _coerce_int(meta.season_int)
         episode_int = _coerce_int(meta.episode_int)
         if tmdb_id is not None and season_int is not None and episode_int is not None:
-            tasks.append(tmdb_manager.get_episode_details(tmdb_id, season_int, episode_int, debug=meta.debug))
+            tasks.append(tmdb_manager.get_episode_details(tmdb_id, season_int, episode_int))
             task_map['tmdb'] = len(tasks) - 1
 
     if not tasks:
@@ -940,9 +937,9 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
             meta.we_asked_tvmaze = True
 
             if meta.debug:
-                console.print("[green]TVMaze episode data retrieved successfully.[/green]")
+                logger.debug("[green]TVMaze episode data retrieved successfully.[/green]")
         elif isinstance(tvmaze_episode_data, Exception):
-            console.print(f"[yellow]TVMaze episode data retrieval failed: {tvmaze_episode_data}[/yellow]")
+            logger.info(f"[yellow]TVMaze episode data retrieval failed: {tvmaze_episode_data}[/yellow]")
 
     # Process TVDB results
     if 'tvdb' in task_map:
@@ -960,13 +957,13 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
                 meta.we_checked_tvdb = True
                 if meta.debug and isinstance(tvdb_episode_data, list):
                     tvdb_episode_list = tvdb_episode_data
-                    console.print(f"[green]TVDb episodes list retrieved with {len(tvdb_episode_list)} episodes[/green]")
+                    logger.info(f"[green]TVDb episodes list retrieved with {len(tvdb_episode_list)} episodes[/green]")
             else:
-                console.print(f"[yellow]Unexpected TVDb episodes result format: {tvdb_episodes_result}[/yellow]")
+                logger.info(f"[yellow]Unexpected TVDb episodes result format: {tvdb_episodes_result}[/yellow]")
             if tvdb_name and meta.debug:
-                console.print(f"[green]TVDb series name: {tvdb_name}[/green]")
+                logger.info(f"[green]TVDb series name: {tvdb_name}[/green]")
         elif isinstance(tvdb_episodes_result, Exception):
-            console.print(f"[yellow]TVDb episode data retrieval failed: {tvdb_episodes_result}[/yellow]")
+            logger.info(f"[yellow]TVDb episode data retrieval failed: {tvdb_episodes_result}[/yellow]")
 
     # Process TMDb episode details results
     if 'tmdb' in task_map:
@@ -975,9 +972,9 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
             meta.tmdb_episode_data = tmdb_episode_data
             meta.we_checked_tmdb = True
             if meta.debug:
-                console.print("[green]TMDb episode data retrieved successfully.[/green]")
+                logger.debug("[green]TMDb episode data retrieved successfully.[/green]")
         elif isinstance(tmdb_episode_data, Exception):
-            console.print(f"[yellow]TMDb episode data retrieval failed: {tmdb_episode_data}[/yellow]")
+            logger.info(f"[yellow]TMDb episode data retrieval failed: {tmdb_episode_data}[/yellow]")
     return meta
 
 
@@ -986,11 +983,11 @@ async def get_douban_id(meta) -> int:
     try:
         douban_manual = int(meta.douban_manual or 0)
     except (ValueError, TypeError):
-        console.print("[bold yellow]Invalid douban_manual value, ignoring.[/bold yellow]")
+        logger.info("[bold yellow]Invalid douban_manual value, ignoring.[/bold yellow]")
         douban_manual = 0
 
     if douban_manual:
-        console.print(f"Using manual Douban ID: {douban_manual}")
+        logger.info(f"Using manual Douban ID: {douban_manual}")
         return douban_manual
 
     imdb_id = meta.imdb_info.get("imdbID")
@@ -1017,10 +1014,10 @@ async def get_douban_id(meta) -> int:
                     douban_id = int(match.group(1))
                     return douban_id
 
-        console.print(f"[bold yellow]No Douban ID found for IMDb ID {imdb_id}.[/bold yellow]")
+        logger.info(f"[bold yellow]No Douban ID found for IMDb ID {imdb_id}.[/bold yellow]")
         return douban_id
 
     except Exception as e:
-        console.print(f"[bold yellow]Failed to fetch Douban ID for IMDb ID {imdb_id}: {e}[/bold yellow]")
+        logger.info(f"[bold yellow]Failed to fetch Douban ID for IMDb ID {imdb_id}: {e}[/bold yellow]")
         return douban_id
 

@@ -6,7 +6,7 @@ from typing import Any
 from deluge_client import DelugeRPCClient
 from torf import Torrent
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
 
@@ -16,7 +16,7 @@ class DelugeClientMixin:
         # deluge_client = LocalDelugeRPCClient()
         deluge_client.connect()
         if deluge_client.connected:
-            console.print("Connected to Deluge")
+            logger.info("Connected to Deluge")
             # Remote path mount
             if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():
                 path = path.replace(local_path, remote_path)
@@ -26,6 +26,6 @@ class DelugeClientMixin:
 
             deluge_client.call('core.add_torrent_file', torrent_path, base64.b64encode(torrent.dump()), {'download_location': path, 'seed_mode': True})
             if meta.debug:
-                console.print(f"[cyan]Path: {path}")
+                logger.debug(f"[cyan]Path: {path}")
         else:
-            console.print("[bold red]Unable to connect to deluge")
+            logger.info("[bold red]Unable to connect to deluge")

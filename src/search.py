@@ -2,7 +2,7 @@
 import os
 from typing import Any, cast
 
-from src.console import console
+from src.console import logger
 
 
 class Search:
@@ -26,13 +26,13 @@ class Search:
         filename = filename.lower()
         files_total: list[str] = []
         if filename == "":
-            console.print("nothing entered")
+            logger.info("nothing entered")
             return None
         words = filename.split()
 
         async def search_file(search_dir: str) -> list[str]:
             files_total_search: list[str] = []
-            console.print(f"Searching {search_dir}")
+            logger.info(f"Searching {search_dir}")
             for root, _dirs, files in os.walk(search_dir, topdown=False):
                 for name in files:
                     if not name.endswith('.nfo'):
@@ -49,12 +49,12 @@ class Search:
         foldername = foldername.lower()
         folders_total: list[str] = []
         if foldername == "":
-            console.print("nothing entered")
+            logger.info("nothing entered")
             return None
         words = foldername.split()
 
         async def search_dir(search_dir: str) -> list[str]:
-            console.print(f"Searching {search_dir}")
+            logger.info(f"Searching {search_dir}")
             folders_total_search: list[str] = []
             for root, dirs, _files in os.walk(search_dir, topdown=False):
 

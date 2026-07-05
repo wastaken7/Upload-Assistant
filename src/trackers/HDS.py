@@ -9,7 +9,7 @@ import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
-from src.console import console
+from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -65,14 +65,14 @@ class HDS:
                 signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=2]{meta.ua_signature}[/size][/url][/center]",
             )
         except Exception as e:
-            console.print(f"Error generating description: {e}")
+            logger.info(f"Error generating description: {e}")
             description = ""
 
         return description
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.resolution not in ["2160p", "1080p", "1080i", "720p"]:
-            console.print(f"{self.tracker}: The resolution must be at least 720p, skipping the upload...")
+            logger.info(f"{self.tracker}: The resolution must be at least 720p, skipping the upload...")
             return False
         return True
 
@@ -86,7 +86,7 @@ class HDS:
 
         imdb_id = str(meta.imdb)
         if imdb_id == '0':
-            console.print(f'IMDb ID not found, cannot search for duplicates on {self.tracker}.')
+            logger.info(f'IMDb ID not found, cannot search for duplicates on {self.tracker}.')
             return dupes
 
         search_url = f"{self.base_url}/index.php"
@@ -109,7 +109,7 @@ class HDS:
             response.raise_for_status()
             parts = response.text.split("Show/Hide Categories", 1)
             if len(parts) < 2:
-                console.print(f"[bold yellow]{self.tracker}: Unexpected page structure on page {current_page}, stopping search[/bold yellow]")
+                logger.info(f"[bold yellow]{self.tracker}: Unexpected page structure on page {current_page}, stopping search[/bold yellow]")
                 break
             relevant_html = parts[1]
             soup = BeautifulSoup(relevant_html, "html.parser")
@@ -155,7 +155,7 @@ class HDS:
                 break
 
 
-        console.print(f"[bold green]Found {len(dupes)} duplicates on {self.tracker}[/bold green]")
+        logger.info(f"[bold green]Found {len(dupes)} duplicates on {self.tracker}[/bold green]")
         return dupes
 
     async def get_category_id(self, meta: Meta) -> int:
@@ -254,12 +254,12 @@ class HDS:
                     for r in results:
                         message += f"[bold green]Name:[/bold green] {r['Name']}\n"
                         message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
-                    console.print(message)
+                    logger.info(message)
 
                 return results
 
             except Exception as e:
-                console.print(f'An error occurred while fetching requests: {e}', markup=False)
+                logger.info(f'An error occurred while fetching requests: {e}', extra={"markup": False})
                 return []
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:

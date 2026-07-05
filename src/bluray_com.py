@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from bs4.element import AttributeValueList
 from rich.console import Console
 
+from src.console import logger
 from src.meta import Meta
 
 console = Console()
@@ -51,19 +52,19 @@ async def search_bluray(meta: Meta) -> str | None:
     try:
         if os.path.exists(debug_filename):
             if meta.debug:
-                console.print(f"[green]Found existing file for {imdb_id}[/green]")
+                logger.debug(f"[green]Found existing file for {imdb_id}[/green]")
             response_text = await asyncio.to_thread(Path(debug_filename).read_text, encoding="utf-8")
 
             if response_text and "No index" not in response_text:
                 return response_text
             else:
-                console.print("[yellow]Cached file exists but appears to be invalid, will fetch fresh data[/yellow]")
+                logger.info("[yellow]Cached file exists but appears to be invalid, will fetch fresh data[/yellow]")
     except Exception as e:
-        console.print(f"[yellow]Error reading cached file: {str(e)}[/yellow]")
+        logger.info(f"[yellow]Error reading cached file: {str(e)}[/yellow]")
 
     # If we're here, we need to make a request
     if meta.debug:
-        console.print(f"[dim]Search URL: {url}[/dim]")
+        logger.debug(f"[dim]Search URL: {url}[/dim]")
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -88,11 +89,11 @@ async def search_bluray(meta: Meta) -> str | None:
         try:
             delay = random.uniform(1, 3)  # nosec B311 - Rate limiting delay, not cryptographic
             if meta.debug:
-                console.print(f"[dim]Waiting {delay:.2f} seconds before request (attempt {retry_count + 1}/{max_retries + 1})...[/dim]")
+                logger.debug(f"[dim]Waiting {delay:.2f} seconds before request (attempt {retry_count + 1}/{max_retries + 1})...[/dim]")
             await asyncio.sleep(delay)
 
             if meta.debug:
-                console.print(f"[yellow]Sending request to blu-ray.com (attempt {retry_count + 1}/{max_retries + 1})...[/yellow]")
+                logger.debug(f"[yellow]Sending request to blu-ray.com (attempt {retry_count + 1}/{max_retries + 1})...[/yellow]")
             async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
                 response = await client.get(url, headers=headers)
 
@@ -103,52 +104,52 @@ async def search_bluray(meta: Meta) -> str | None:
                         debug_path = Path(base_dir) / "tmp" / uuid / f"debug_bluray_search_{imdb_id}.html"
                         await asyncio.to_thread(debug_path.write_text, response_text, encoding="utf-8")
                         if meta.debug:
-                            console.print(f"[dim]Saved search response to debug_bluray_search_{imdb_id}.html[/dim]")
+                            logger.debug(f"[dim]Saved search response to debug_bluray_search_{imdb_id}.html[/dim]")
                     except Exception as e:
-                        console.print(f"[dim]Could not save debug file: {str(e)}[/dim]")
+                        logger.info(f"[dim]Could not save debug file: {str(e)}[/dim]")
 
                     break
 
                 elif "No index" in response.text:
-                    console.print(f"[red]Blocked by blu-ray.com (Anti-scraping protection) (attempt {retry_count + 1}/{max_retries + 1})[/red]")
-                    console.print(f"[dim]Response preview: {response.text[:150]}...[/dim]")
+                    logger.info(f"[red]Blocked by blu-ray.com (Anti-scraping protection) (attempt {retry_count + 1}/{max_retries + 1})[/red]")
+                    logger.info(f"[dim]Response preview: {response.text[:150]}...[/dim]")
 
                     # use less retries for blocked requests since it's probably just borked
                     if retry_count < 2:
                         backoff_time *= 2
-                        console.print(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
+                        logger.info(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
                         await asyncio.sleep(backoff_time)
                         retry_count += 1
                     else:
-                        console.print("[red]Maximum retries reached, giving up on search[/red]")
+                        logger.info("[red]Maximum retries reached, giving up on search[/red]")
                         break
                 else:
-                    console.print(f"[red]Failed with status code: {response.status_code} (attempt {retry_count + 1}/{max_retries + 1})[/red]")
+                    logger.error(f"[red]Failed with status code: {response.status_code} (attempt {retry_count + 1}/{max_retries + 1})[/red]")
 
                     if retry_count < max_retries:
                         backoff_time *= 2
                         if meta.debug:
-                            console.print(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
+                            logger.debug(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
                         await asyncio.sleep(backoff_time)
                         retry_count += 1
                     else:
-                        console.print("[red]Maximum retries reached, giving up on search[/red]")
+                        logger.info("[red]Maximum retries reached, giving up on search[/red]")
                         break
 
         except httpx.RequestError as e:
-            console.print(f"[red]HTTP request error when accessing {url} (attempt {retry_count + 1}/{max_retries + 1}): {str(e)}[/red]")
+            logger.info(f"[red]HTTP request error when accessing {url} (attempt {retry_count + 1}/{max_retries + 1}): {str(e)}[/red]")
             if retry_count < max_retries:
                 backoff_time *= 2
                 if meta.debug:
-                    console.print(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
+                    logger.debug(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
                 await asyncio.sleep(backoff_time)
                 retry_count += 1
             else:
-                console.print("[red]Maximum retries reached, giving up on search[/red]")
+                logger.info("[red]Maximum retries reached, giving up on search[/red]")
                 break
 
     if not response_text:
-        console.print("[red]Failed to retrieve search results after all attempts[/red]")
+        logger.error("[red]Failed to retrieve search results after all attempts[/red]")
         return None
 
     return response_text
@@ -156,7 +157,7 @@ async def search_bluray(meta: Meta) -> str | None:
 
 def extract_bluray_links(html_content: str | None) -> list[MovieLink] | None:
     if not html_content:
-        console.print("[red]No HTML content to extract links from[/red]")
+        logger.info("[red]No HTML content to extract links from[/red]")
         return None
 
     results: list[MovieLink] = []
@@ -179,8 +180,8 @@ def extract_bluray_links(html_content: str | None) -> list[MovieLink] | None:
                 title = title_div.text.strip() if title_div else "Unknown Title"
                 year = year_div.text.strip() if year_div else "Unknown Year"
 
-                console.print(f"[green]Found movie: {title} ({year})[/green]")
-                console.print(f"[dim]URL: {releases_url}[/dim]")
+                logger.info(f"[green]Found movie: {title} ({year})[/green]")
+                logger.info(f"[dim]URL: {releases_url}[/dim]")
 
                 results.append({
                     'title': title,
@@ -188,19 +189,19 @@ def extract_bluray_links(html_content: str | None) -> list[MovieLink] | None:
                     'releases_url': releases_url
                 })
             else:
-                console.print("[red]Movie div doesn't have a valid link[/red]")
+                logger.info("[red]Movie div doesn't have a valid link[/red]")
 
         return results
 
     except Exception as e:
-        console.print(f"[red]Error parsing HTML: {str(e)}[/red]")
+        logger.error(f"[red]Error parsing HTML: {str(e)}[/red]")
         console.print_exception()
         return None
 
 
 async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Release]:
     if not html_content:
-        console.print("[red]No HTML content to extract release info from[/red]")
+        logger.info("[red]No HTML content to extract release info from[/red]")
         return []
 
     matching_releases: list[Release] = []
@@ -212,13 +213,13 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
     release_type_debug = "DVD" if is_dvd else "Blu-ray"
 
     if is_3d:
-        console.print("[blue]Looking for 3D Blu-ray releases[/blue]")
+        logger.info("[blue]Looking for 3D Blu-ray releases[/blue]")
     elif is_4k:
-        console.print("[blue]Looking for 4K/UHD Blu-ray releases[/blue]")
+        logger.info("[blue]Looking for 4K/UHD Blu-ray releases[/blue]")
     elif is_dvd:
-        console.print("[blue]Looking for DVD releases[/blue]")
+        logger.info("[blue]Looking for DVD releases[/blue]")
     else:
-        console.print("[blue]Looking for standard Blu-ray releases[/blue]")
+        logger.info("[blue]Looking for standard Blu-ray releases[/blue]")
 
     try:
         base_dir = meta.base_dir
@@ -226,9 +227,9 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
         debug_path = Path(base_dir) / "tmp" / uuid / f"debug_bluray_{release_type}.html"
         await asyncio.to_thread(debug_path.write_text, html_content, encoding="utf-8")
         if meta.debug:
-            console.print(f"[dim]Saved releases response to debug_bluray_{release_type}.html[/dim]")
+            logger.debug(f"[dim]Saved releases response to debug_bluray_{release_type}.html[/dim]")
     except Exception as e:
-        console.print(f"[dim]Could not save debug file: {str(e)}[/dim]")
+        logger.info(f"[dim]Could not save debug file: {str(e)}[/dim]")
 
     try:
         soup: Any = BeautifulSoup(html_content, 'lxml')
@@ -239,7 +240,7 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
             selected_sections = list(soup.find_all('h3', string=re.compile(r'Blu-ray Editions|4K Blu-ray Editions|3D Blu-ray Editions')))
 
         if meta.debug:
-            console.print(f"[blue]Found {len(selected_sections)} {release_type_debug} section(s)[/blue]")
+            logger.debug(f"[blue]Found {len(selected_sections)} {release_type_debug} section(s)[/blue]")
         filtered_sections: list[Any] = []
         for section in selected_sections:
             section_title = section.text
@@ -248,29 +249,29 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
             if is_3d and '3D Blu-ray Editions' in section_title:
                 filtered_sections.append(section)
                 if meta.debug:
-                    console.print(f"[green]Including 3D section: {section_title}[/green]")
+                    logger.debug(f"[green]Including 3D section: {section_title}[/green]")
             elif is_4k and '4K Blu-ray Editions' in section_title:
                 filtered_sections.append(section)
                 if meta.debug:
-                    console.print(f"[green]Including 4K section: {section_title}[/green]")
+                    logger.debug(f"[green]Including 4K section: {section_title}[/green]")
             elif is_dvd and 'DVD Editions' in section_title:
                 filtered_sections.append(section)
                 if meta.debug:
-                    console.print(f"[green]Including DVD section: {section_title}[/green]")
+                    logger.debug(f"[green]Including DVD section: {section_title}[/green]")
             elif not is_3d and not is_4k and 'Blu-ray Editions' in section_title and '3D Blu-ray Editions' not in section_title and '4K Blu-ray Editions' not in section_title:
                 filtered_sections.append(section)
                 if meta.debug:
-                    console.print(f"[green]Including standard Blu-ray section: {section_title}[/green]")
+                    logger.debug(f"[green]Including standard Blu-ray section: {section_title}[/green]")
 
         # If no sections match our filter criteria, use all sections
         if not filtered_sections:
-            console.print("[yellow]No sections match exact media type, using all available sections[/yellow]")
+            logger.info("[yellow]No sections match exact media type, using all available sections[/yellow]")
             filtered_sections = selected_sections
 
         for _section_idx, section in enumerate(filtered_sections, 1):
             parent_tr: Any = section.find_parent('tr')
             if not parent_tr:
-                console.print(f"[red]Could not find parent tr for {release_type_debug} section[/red]")
+                logger.info(f"[red]Could not find parent tr for {release_type_debug} section[/red]")
                 continue
 
             release_links: list[Any] = []
@@ -295,7 +296,7 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
                     if release_id_match:
                         release_id = release_id_match.group(2)
                         if meta.debug:
-                            console.print(f"[green]Found release ID: {release_id}[/green]")
+                            logger.debug(f"[green]Found release ID: {release_id}[/green]")
 
                         matching_releases.append({
                             'title': title,
@@ -306,17 +307,17 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
                             'release_id': release_id
                         })
                     else:
-                        console.print(f"[red]Could not extract release ID from URL: {release_url}[/red]")
+                        logger.info(f"[red]Could not extract release ID from URL: {release_url}[/red]")
 
                 except Exception as e:  # noqa: PERF203
-                    console.print(f"[red]Error processing release: {str(e)}[/red]")
+                    logger.error(f"[red]Error processing release: {str(e)}[/red]")
                     console.print_exception()
 
-        console.print(f"[green]Found {len(matching_releases)} potential matching releases[/green]")
+        logger.info(f"[green]Found {len(matching_releases)} potential matching releases[/green]")
         return matching_releases
 
     except Exception as e:
-        console.print(f"[red]Error parsing Blu-ray release HTML: {str(e)}[/red]")
+        logger.error(f"[red]Error parsing Blu-ray release HTML: {str(e)}[/red]")
         console.print_exception()
         return []
 
@@ -328,44 +329,44 @@ async def extract_product_id(url: str, meta: Meta) -> str | None:
     if match:
         product_id = match.group(1)
         if meta.debug:
-            console.print(f"[green]Successfully extracted product ID: {product_id}[/green]")
+            logger.debug(f"[green]Successfully extracted product ID: {product_id}[/green]")
         return product_id
 
-    console.print(f"[red]Could not extract product ID from URL: {url}[/red]")
+    logger.info(f"[red]Could not extract product ID from URL: {url}[/red]")
     return None
 
 
 async def get_bluray_releases(meta: Meta) -> list[Release]:
-    console.print("[blue]===== Starting blu-ray.com release search =====[/blue]")
+    logger.info("[blue]===== Starting blu-ray.com release search =====[/blue]")
     imdb_id_value = meta.imdb_id or 0
-    console.print(f"[blue]Movie: {(meta.uuid if meta.uuid is not None else 'Unknown')}, IMDB ID: tt{imdb_id_value:07d}[/blue]")
+    logger.info(f"[blue]Movie: {(meta.uuid if meta.uuid is not None else 'Unknown')}, IMDB ID: tt{imdb_id_value:07d}[/blue]")
 
     html_content = await search_bluray(meta)
 
     if not html_content:
-        console.print("[red]Failed to get search results from blu-ray.com[/red]")
+        logger.error("[red]Failed to get search results from blu-ray.com[/red]")
         return []
 
     movie_links = extract_bluray_links(html_content) or []
 
     if not movie_links:
         if meta.debug:
-            console.print(f"[red]No movies found for IMDB ID: tt{meta.imdb_id:07d}[/red]")
+            logger.debug(f"[red]No movies found for IMDB ID: tt{meta.imdb_id:07d}[/red]")
         return []
 
     matching_releases: list[Release] = []
 
     for idx, movie in enumerate(movie_links, 1):
         if meta.debug:
-            console.print(f"[blue]Processing movie {idx}/{len(movie_links)}: {movie['title']} ({movie['year']})[/blue]")
+            logger.debug(f"[blue]Processing movie {idx}/{len(movie_links)}: {movie['title']} ({movie['year']})[/blue]")
         releases_url = movie['releases_url']
         product_id = await extract_product_id(releases_url, meta)
         if not product_id:
-            console.print(f"[red]Could not extract product ID from {releases_url}[/red]")
+            logger.info(f"[red]Could not extract product ID from {releases_url}[/red]")
             continue
 
         ajax_url = f"https://www.blu-ray.com/products/menu_ajax.php?p={product_id}&c=20&action=showreleasesall"
-        console.print(f"[dim]Releases URL: {ajax_url}[/dim]")
+        logger.info(f"[dim]Releases URL: {ajax_url}[/dim]")
 
         is_3d = meta.three_d.lower() == "yes"
         resolution = meta.resolution.lower()
@@ -376,7 +377,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
         try:
             if os.path.exists(release_debug_filename):
                 if meta.debug:
-                    console.print(f"[green]Found existing release data for product ID {product_id}[/green]")
+                    logger.debug(f"[green]Found existing release data for product ID {product_id}[/green]")
                 response_text = await asyncio.to_thread(Path(release_debug_filename).read_text, encoding="utf-8")
 
                 if response_text and "No index" not in response_text:
@@ -389,14 +390,14 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
                     matching_releases.extend(movie_releases)
                     continue
                 else:
-                    console.print("[yellow]Cached file exists but appears to be invalid, will fetch fresh data[/yellow]")
+                    logger.info("[yellow]Cached file exists but appears to be invalid, will fetch fresh data[/yellow]")
         except Exception as e:
-            console.print(f"[yellow]Error reading cached file: {str(e)}[/yellow]")
+            logger.info(f"[yellow]Error reading cached file: {str(e)}[/yellow]")
 
         # If we're here, we need to make a request
         delay = random.uniform(2, 4)  # nosec B311 - Rate limiting delay, not cryptographic
         if meta.debug:
-            console.print(f"[dim]Waiting {delay:.2f} seconds before request...[/dim]")
+            logger.debug(f"[dim]Waiting {delay:.2f} seconds before request...[/dim]")
         await asyncio.sleep(delay)
 
         headers = {
@@ -426,67 +427,69 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
                                 release['movie_title'] = movie['title']
                                 release['movie_year'] = movie['year']
 
-                            console.print(f"[green]Found {len(movie_releases)} matching releases for this movie[/green]")
+                            logger.info(f"[green]Found {len(movie_releases)} matching releases for this movie[/green]")
                             matching_releases.extend(movie_releases)
                             break
                         elif "No index" in response.text:
-                            console.print(f"[red]Blocked by blu-ray.com when accessing {ajax_url} (attempt {retry_count + 1}/{max_retries + 1})[/red]")
+                            logger.info(f"[red]Blocked by blu-ray.com when accessing {ajax_url} (attempt {retry_count + 1}/{max_retries + 1})[/red]")
                             if retry_count < max_retries:
                                 backoff_time *= 2
-                                console.print(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
+                                logger.info(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
                                 await asyncio.sleep(backoff_time)
                                 retry_count += 1
                             else:
-                                console.print("[red]Maximum retries reached, giving up on this URL[/red]")
+                                logger.info("[red]Maximum retries reached, giving up on this URL[/red]")
                                 break
                         else:
-                            console.print(f"[red]Failed to get release information from {ajax_url}, status code: {response.status_code} (attempt {retry_count + 1}/{max_retries + 1})[/red]")
+                            logger.error(
+                                f"[red]Failed to get release information from {ajax_url}, status code: {response.status_code} (attempt {retry_count + 1}/{max_retries + 1})[/red]"
+                            )
                             if retry_count < max_retries:
                                 backoff_time *= 2
-                                console.print(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
+                                logger.info(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
                                 await asyncio.sleep(backoff_time)
                                 retry_count += 1
                             else:
-                                console.print("[red]Maximum retries reached, giving up on this URL[/red]")
+                                logger.info("[red]Maximum retries reached, giving up on this URL[/red]")
                                 break
 
                 except httpx.RequestError as e:
-                    console.print(f"[red]HTTP request error when accessing {ajax_url} (attempt {retry_count + 1}/{max_retries + 1}): {str(e)}[/red]")
+                    logger.info(f"[red]HTTP request error when accessing {ajax_url} (attempt {retry_count + 1}/{max_retries + 1}): {str(e)}[/red]")
                     if retry_count < max_retries:
                         backoff_time *= 2
-                        console.print(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
+                        logger.info(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
                         await asyncio.sleep(backoff_time)
                         retry_count += 1
                     else:
-                        console.print("[red]Maximum retries reached, giving up on this URL[/red]")
+                        logger.info("[red]Maximum retries reached, giving up on this URL[/red]")
                         break
 
         except Exception as e:
-            console.print(f"[red]Error fetching release details from {ajax_url}: {str(e)}[/red]")
+            logger.error(f"[red]Error fetching release details from {ajax_url}: {str(e)}[/red]")
             console.print_exception()
 
-    console.print("[yellow]===== BluRay.com search results summary =====[/yellow]")
+    logger.info("[yellow]===== BluRay.com search results summary =====[/yellow]")
 
     if matching_releases:
         if not meta.unattended or (meta.unattended and meta.unattended_confirm):
             for idx, release in enumerate(matching_releases, 1):
-                console.print(f"[green]{idx}. {release['movie_title']} ({release['movie_year']}):[/green]")
-                console.print(f"   [blue]Title: {release['title']}[/blue]")
-                console.print(f"   [blue]Country: {release['country']}[/blue]")
-                console.print(f"   [blue]Publisher: {release['publisher']}[/blue]")
-                console.print(f"   [blue]Price: {release['price']}[/blue]")
-                console.print(f"   [dim]URL: {release['url']}[/dim]")
+                logger.info(f"[green]{idx}. {release['movie_title']} ({release['movie_year']}):[/green]")
+                logger.info(f"   [blue]Title: {release['title']}[/blue]")
+                logger.info(f"   [blue]Country: {release['country']}[/blue]")
+                logger.info(f"   [blue]Publisher: {release['publisher']}[/blue]")
+                logger.info(f"   [blue]Price: {release['price']}[/blue]")
+                logger.info(f"   [dim]URL: {release['url']}[/dim]")
 
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print()
-                console.print("[green]Release Selection")
-                console.print("[green]=======================================")
-                console.print("[dim]Please select a release to use for region and distributor information:")
-                console.print("[dim]Enter release number, 'a' for all releases, or 'n' to skip")
-                console.print("[dim]Selecting all releases will search every release for more information...")
-                console.print("[dim]More releases will require more time to process")
+                logger.info("")
+                logger.info("[green]Release Selection")
+                logger.info("[green]=======================================")
+                logger.info("[dim]Please select a release to use for region and distributor information:")
+                logger.info("[dim]Enter release number, 'a' for all releases, or 'n' to skip")
+                logger.info("[dim]Selecting all releases will search every release for more information...")
+                logger.info("[dim]More releases will require more time to process")
             else:
-                console.print("[yellow]Unattended mode - selecting all releases")
+                logger.info("[yellow]Unattended mode - selecting all releases")
 
             while True:
                 try:  # noqa: PERF203
@@ -513,7 +516,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
                                 cli_ui.info(f"Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}")
 
                                 if meta.use_bluray_images:
-                                    console.print("[yellow]Fetching release details to get cover images...[/yellow]")
+                                    logger.info("[yellow]Fetching release details to get cover images...[/yellow]")
                                     selected_release = await fetch_release_details(selected_release, meta)
 
                                     if 'cover_images' in selected_release and selected_release['cover_images']:
@@ -529,7 +532,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
                 except (KeyboardInterrupt, EOFError) as exc:  # noqa: PERF203
                     raise SystemExit("Selection cancelled by user") from exc
         else:
-            console.print("[yellow]Unattended mode - selecting all releases")
+            logger.info("[yellow]Unattended mode - selecting all releases")
             detailed_releases = await process_all_releases(matching_releases, meta)
             return detailed_releases
 
@@ -546,9 +549,9 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
         debug_text = json.dumps(debug_payload, indent=2)
         await asyncio.to_thread(Path(debug_filename).write_text, debug_text, encoding="utf-8")
         if meta.debug:
-            console.print(f"[dim]Saved results to {debug_filename}[/dim]")
+            logger.debug(f"[dim]Saved results to {debug_filename}[/dim]")
     except Exception as e:
-        console.print(f"[dim]Could not save debug results: {str(e)}[/dim]")
+        logger.info(f"[dim]Could not save debug results: {str(e)}[/dim]")
 
     return matching_releases
 
@@ -559,7 +562,7 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
         specs_td: Any = soup.find('td', width="228px", style=_style_specs)
 
         if not specs_td:
-            console.print("[red]Could not find specs section on the release page[/red]")
+            logger.info("[red]Could not find specs section on the release page[/red]")
             return release
 
         specs: dict[str, Any] = {
@@ -577,13 +580,13 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
             if codec_match:
                 specs['video']['codec'] = codec_match.group(1).strip()
                 if meta.debug:
-                    console.print(f"[blue]Video Codec: {specs['video']['codec']}[/blue]")
+                    logger.debug(f"[blue]Video Codec: {specs['video']['codec']}[/blue]")
 
             resolution_match = re.search(r'Resolution: ([^<\n]+)', video_section)
             if resolution_match:
                 specs['video']['resolution'] = resolution_match.group(1).strip()
                 if meta.debug:
-                    console.print(f"[blue]Resolution: {specs['video']['resolution']}[/blue]")
+                    logger.debug(f"[blue]Resolution: {specs['video']['resolution']}[/blue]")
 
         # Parse audio section
         audio_section = extract_section(specs_td, 'Audio')
@@ -592,7 +595,7 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
             if not audio_div:
                 audio_div = specs_td.find('div', id='shortaudio')
                 if meta.debug:
-                    console.print("[dim]Using shortaudio because longaudio wasn't found[/dim]")
+                    logger.debug("[dim]Using shortaudio because longaudio wasn't found[/dim]")
             if audio_div:
                 audio_html = str(audio_div)
                 audio_html = re.sub(r'<br\s*/?>', '\n', audio_html)
@@ -644,9 +647,9 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
 
                 specs['audio'] = audio_lines
                 if meta.debug:
-                    console.print(f"[blue]Audio Tracks: {len(audio_lines)} found[/blue]")
+                    logger.debug(f"[blue]Audio Tracks: {len(audio_lines)} found[/blue]")
                     for track in audio_lines:
-                        console.print(f"[dim]  - {track}[/dim]")
+                        logger.debug(f"[dim]  - {track}[/dim]")
 
         # Parse subtitle section
         subtitle_section = extract_section(specs_td, 'Subtitles')
@@ -655,14 +658,14 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
             if not subs_div:
                 subs_div = specs_td.find('div', id='shortsubs')
                 if meta.debug:
-                    console.print("[dim]Using shortsubs because longsubs wasn't found[/dim]")
+                    logger.debug("[dim]Using shortsubs because longsubs wasn't found[/dim]")
             if subs_div:
                 subtitle_text = subs_div.get_text().strip()
                 subtitle_text = re.sub(r'\s*\(less\)\s*', '', subtitle_text)
                 subtitles = [s.strip() for s in re.split(r',|\n', subtitle_text) if s.strip()]
                 specs['subtitles'] = subtitles
                 if meta.debug:
-                    console.print(f"[blue]Subtitles: {', '.join(subtitles)}[/blue]")
+                    logger.debug(f"[blue]Subtitles: {', '.join(subtitles)}[/blue]")
 
         # Parse disc section
         disc_section = extract_section(specs_td, 'Discs')
@@ -671,11 +674,11 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
             if disc_type_match:
                 specs['discs']['type'] = disc_type_match.group(1).strip()
                 if meta.debug:
-                    console.print(f"[blue]Disc Type: {specs['discs']['type']}[/blue]")
+                    logger.debug(f"[blue]Disc Type: {specs['discs']['type']}[/blue]")
 
             disc_count_match = re.search(r'Single disc \(1 ([^)]+)\)|(One|Two|Three|Four|Five|\d+)[ -]disc set(?:\s*\(([^)]+)\))?', disc_section)
             if meta.debug:
-                console.print(f"[dim]Disc Count Match: {disc_count_match}[/dim]")
+                logger.debug(f"[dim]Disc Count Match: {disc_count_match}[/dim]")
             if disc_count_match:
                 if disc_count_match.group(1):
                     specs['discs']['count'] = 1
@@ -691,7 +694,7 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
                     if disc_count_match.group(3):
                         bd_format_match = re.search(r'(\d+\s*BD-\d+|\d+\s*BD)', disc_count_match.group(3))
                         if meta.debug:
-                            console.print(f"[dim]BD Format Match: {bd_format_match}[/dim]")
+                            logger.debug(f"[dim]BD Format Match: {bd_format_match}[/dim]")
                         if bd_format_match:
                             specs['discs']['format'] = bd_format_match.group(1).strip()
                         else:
@@ -711,33 +714,33 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
                 specs['playback']['region'] = region_match.group(1).strip()
                 specs['playback']['region_notes'] = region_match.group(2).strip() if region_match.group(2) else ""
                 if meta.debug:
-                    console.print(f"[blue]Region: {specs['playback']['region']}[/blue]")
+                    logger.debug(f"[blue]Region: {specs['playback']['region']}[/blue]")
                 if specs["playback"]["region_notes"] and meta.debug:
-                    console.print(f"[dim]Region Notes: {specs['playback']['region_notes']}[/dim]")
+                    logger.info(f"[dim]Region Notes: {specs['playback']['region_notes']}[/dim]")
 
         if meta.use_bluray_images:
             cover_images = extract_cover_images(response_text)
             if cover_images:
                 release['cover_images'] = cover_images
                 if meta.debug:
-                    console.print(f"[green]Found {len(cover_images)} cover images:[/green]")
+                    logger.debug(f"[green]Found {len(cover_images)} cover images:[/green]")
                     for img_type, url in cover_images.items():
-                        console.print(f"[dim]  - {img_type}: {url}[/dim]")
+                        logger.debug(f"[dim]  - {img_type}: {url}[/dim]")
 
         release['specs'] = specs
         if meta.debug:
-            console.print(f"[green]Successfully parsed details for {release['title']}[/green]")
+            logger.debug(f"[green]Successfully parsed details for {release['title']}[/green]")
         return release
 
     except Exception as e:
-        console.print(f"[red]Error parsing release details: {str(e)}[/red]")
+        logger.error(f"[red]Error parsing release details: {str(e)}[/red]")
         console.print_exception()
         return release
 
 
 async def download_cover_images(meta: Meta) -> bool:
     if "cover_images" not in meta or not meta.cover_images:
-        console.print("[yellow]No cover images to download[/yellow]")
+        logger.info("[yellow]No cover images to download[/yellow]")
         return False
 
     temp_dir = f"{meta.base_dir}/tmp/{meta.uuid}"
@@ -756,27 +759,27 @@ async def download_cover_images(meta: Meta) -> bool:
                     for cover in covers_list:
                         if cover.get("release_url") == meta.release_url:
                             if meta.debug:
-                                console.print(f"[green]Found existing cover images for this release URL: {meta.release_url}[/green]")
+                                logger.debug(f"[green]Found existing cover images for this release URL: {meta.release_url}[/green]")
                             matching_release = True
                             return True
 
             if not matching_release:
                 if meta.debug:
-                    console.print(f"[yellow]Existing covers.json found but none match current release URL: {meta.release_url}[/yellow]")
-                    console.print("[yellow]Deleting outdated covers.json file[/yellow]")
+                    logger.debug(f"[yellow]Existing covers.json found but none match current release URL: {meta.release_url}[/yellow]")
+                    logger.debug("[yellow]Deleting outdated covers.json file[/yellow]")
                 os.remove(reuploaded_images_path)
 
         except Exception as e:
-            console.print(f"[red]Error reading covers.json: {str(e)}[/red]")
+            logger.error(f"[red]Error reading covers.json: {str(e)}[/red]")
             try:
                 os.remove(reuploaded_images_path)
                 if meta.debug:
-                    console.print("[yellow]Deleted potentially corrupted covers.json file[/yellow]")
+                    logger.debug("[yellow]Deleted potentially corrupted covers.json file[/yellow]")
             except Exception as delete_error:
-                console.print(f"[red]Failed to delete corrupted covers.json: {str(delete_error)}[/red]")
+                logger.error(f"[red]Failed to delete corrupted covers.json: {str(delete_error)}[/red]")
 
     downloaded_images: dict[str, str] = {}
-    console.print("[blue]Downloading cover images...[/blue]")
+    logger.info("[blue]Downloading cover images...[/blue]")
 
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
         cover_images = cast(Mapping[str, str], meta.cover_images)
@@ -785,24 +788,24 @@ async def download_cover_images(meta: Meta) -> bool:
             local_filename = f"{temp_dir}/cover_{img_type}{file_ext}"
 
             try:
-                console.print(f"[dim]Downloading {img_type} cover from {url}[/dim]")
+                logger.info(f"[dim]Downloading {img_type} cover from {url}[/dim]")
                 response = await client.get(url)
 
                 if response.status_code == 200:
                     await asyncio.to_thread(Path(local_filename).write_bytes, response.content)
                     downloaded_images[img_type] = local_filename
-                    console.print(f"[green]✓[/green] Downloaded {img_type} cover to {local_filename}")
+                    logger.info(f"[green]✓[/green] Downloaded {img_type} cover to {local_filename}")
                 else:
-                    console.print(f"[red]Failed to download {img_type} cover: HTTP {response.status_code}[/red]")
+                    logger.error(f"[red]Failed to download {img_type} cover: HTTP {response.status_code}[/red]")
             except Exception as e:
-                console.print(f"[red]Error downloading {img_type} cover: {str(e)}[/red]")
+                logger.error(f"[red]Error downloading {img_type} cover: {str(e)}[/red]")
 
     if downloaded_images:
         meta.downloaded_cover_images = downloaded_images
-        console.print(f"[green]Successfully downloaded {len(downloaded_images)} cover images[/green]")
+        logger.info(f"[green]Successfully downloaded {len(downloaded_images)} cover images[/green]")
         return True
     else:
-        console.print("[yellow]No cover images were downloaded[/yellow]")
+        logger.info("[yellow]No cover images were downloaded[/yellow]")
         return False
 
 
@@ -898,7 +901,7 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
     release_id = release.get('release_id', '0000000')
     debug_filename = f"{meta.base_dir}/tmp/{meta.uuid}/debug_release_{release_id}.html"
     if meta.debug:
-        console.print(f"[yellow]Fetching details for: {release['title']} - {release_url}[/yellow]")
+        logger.debug(f"[yellow]Fetching details for: {release['title']} - {release_url}[/yellow]")
 
     response_text: str | None = None
 
@@ -906,20 +909,20 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
         import os
         if os.path.exists(debug_filename):
             if meta.debug:
-                console.print(f"[green]Found existing debug file for release ID {release_id}[/green]")
+                logger.debug(f"[green]Found existing debug file for release ID {release_id}[/green]")
             response_text = await asyncio.to_thread(Path(debug_filename).read_text, encoding="utf-8")
 
             if response_text and "No index" not in response_text:
                 return await parse_release_details(response_text, release, meta)
             else:
-                console.print("[yellow]Cached file exists but appears to be invalid, will fetch fresh data[/yellow]")
+                logger.info("[yellow]Cached file exists but appears to be invalid, will fetch fresh data[/yellow]")
     except Exception as e:
-        console.print(f"[yellow]Error reading cached file: {str(e)}[/yellow]")
+        logger.info(f"[yellow]Error reading cached file: {str(e)}[/yellow]")
 
     # If we're here, we need to make a request
     delay = random.uniform(2, 4)  # nosec B311 - Rate limiting delay, not cryptographic
     if meta.debug:
-        console.print(f"[dim]Waiting {delay:.2f} seconds before request...[/dim]")
+        logger.debug(f"[dim]Waiting {delay:.2f} seconds before request...[/dim]")
     await asyncio.sleep(delay)
 
     headers = {
@@ -941,7 +944,7 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
     while retry_count <= max_retries:
         try:
             if meta.debug:
-                console.print(f"[yellow]Sending request to {release_url} (attempt {retry_count + 1}/{max_retries + 1})...[/yellow]")
+                logger.debug(f"[yellow]Sending request to {release_url} (attempt {retry_count + 1}/{max_retries + 1})...[/yellow]")
 
             async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                 response = await client.get(release_url, headers=headers)
@@ -954,46 +957,46 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
                         debug_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"debug_release_{release_id}.html"
                         await asyncio.to_thread(debug_path.write_text, response_text, encoding="utf-8")
                         if meta.debug:
-                            console.print(f"[dim]Saved release page to debug_release_{release_id}.html[/dim]")
+                            logger.debug(f"[dim]Saved release page to debug_release_{release_id}.html[/dim]")
                     except Exception as e:
-                        console.print(f"[dim]Could not save debug file: {str(e)}[/dim]")
+                        logger.info(f"[dim]Could not save debug file: {str(e)}[/dim]")
 
                     break
 
                 elif "No index" in response.text:
-                    console.print(f"[red]Blocked by blu-ray.com when accessing {release_url} (attempt {retry_count + 1}/{max_retries + 1})[/red]")
+                    logger.info(f"[red]Blocked by blu-ray.com when accessing {release_url} (attempt {retry_count + 1}/{max_retries + 1})[/red]")
                     if retry_count < 2:
                         backoff_time *= 2
-                        console.print(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
+                        logger.info(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
                         await asyncio.sleep(backoff_time)
                         retry_count += 1
                     else:
-                        console.print("[red]Maximum retries reached, giving up on this release[/red]")
+                        logger.info("[red]Maximum retries reached, giving up on this release[/red]")
                         break
                 else:
-                    console.print(f"[red]Failed to get release details, status code: {response.status_code} (attempt {retry_count + 1}/{max_retries + 1})[/red]")
+                    logger.error(f"[red]Failed to get release details, status code: {response.status_code} (attempt {retry_count + 1}/{max_retries + 1})[/red]")
                     if retry_count < max_retries:
                         backoff_time *= 2
-                        console.print(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
+                        logger.info(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
                         await asyncio.sleep(backoff_time)
                         retry_count += 1
                     else:
-                        console.print("[red]Maximum retries reached, giving up on this release[/red]")
+                        logger.info("[red]Maximum retries reached, giving up on this release[/red]")
                         break
 
         except httpx.RequestError as e:
-            console.print(f"[red]HTTP request error when accessing {release_url} (attempt {retry_count + 1}/{max_retries + 1}): {str(e)}[/red]")
+            logger.info(f"[red]HTTP request error when accessing {release_url} (attempt {retry_count + 1}/{max_retries + 1}): {str(e)}[/red]")
             if retry_count < max_retries:
                 backoff_time *= 2
-                console.print(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
+                logger.info(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
                 await asyncio.sleep(backoff_time)
                 retry_count += 1
             else:
-                console.print("[red]Maximum retries reached, giving up on this release[/red]")
+                logger.info("[red]Maximum retries reached, giving up on this release[/red]")
                 break
 
     if not response_text:
-        console.print("[red]Failed to retrieve release details after all attempts[/red]")
+        logger.error("[red]Failed to retrieve release details after all attempts[/red]")
         return release
     else:
         release = await parse_release_details(response_text, release, meta)
@@ -1028,13 +1031,13 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
         return []
 
     if meta.debug:
-        console.print()
-        console.print("Processing Local Details")
-        console.print("----------------------------")
+        logger.debug("")
+        logger.debug("Processing Local Details")
+        logger.debug("----------------------------")
 
     disc_count = len(meta.discs)
     if meta.debug:
-        console.print(f"[dim]Local disc count from meta: {disc_count}")
+        logger.debug(f"[dim]Local disc count from meta: {disc_count}")
 
     meta_video_specs: dict[str, Any] = {}
     meta_audio_specs: list[dict[str, Any]] = []
@@ -1048,13 +1051,13 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
             codec = meta_video_specs.get('codec', '')
             resolution = meta_video_specs.get('res', '')
             if meta.debug:
-                console.print(f"[dim]Local video: {codec} {resolution}")
+                logger.debug(f"[dim]Local video: {codec} {resolution}")
 
         if 'audio' in bdinfo and bdinfo['audio']:
             meta_audio_specs = bdinfo['audio']
             for track in meta_audio_specs:
                 if meta.debug:
-                    console.print(f"[dim]Local audio: {track.get('language', '')} {track.get('codec', '')} {track.get('channels', '')} {track.get('bitrate', '')}")
+                    logger.debug(f"[dim]Local audio: {track.get('language', '')} {track.get('codec', '')} {track.get('channels', '')} {track.get('bitrate', '')}")
 
         bd_summary_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt"
         filtered_languages: list[str] = []
@@ -1062,8 +1065,8 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
 
         if os.path.exists(bd_summary_path):
             if meta.debug:
-                console.print(f"[blue]Opening BD_SUMMARY file: {bd_summary_path}[/blue]")
-                console.print("[dim]Stripping extremely small subtitle tracks from bdinfo[/dim]")
+                logger.debug(f"[blue]Opening BD_SUMMARY file: {bd_summary_path}[/blue]")
+                logger.debug("[dim]Stripping extremely small subtitle tracks from bdinfo[/dim]")
             try:
                 summary_text = await asyncio.to_thread(Path(bd_summary_path).read_text, encoding="utf-8")
                 lines = summary_text.splitlines()
@@ -1089,30 +1092,30 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                                 filtered_languages.append(language.lower())
                                 meta_subtitles.append(language)  # Add to meta_subtitles directly
                                 if meta.debug:
-                                    console.print(f"[green]✓ Keeping subtitle: {language} ({bitrate} kbps)[/green]")
+                                    logger.debug(f"[green]✓ Keeping subtitle: {language} ({bitrate} kbps)[/green]")
                             else:
                                 if meta.debug:
-                                    console.print(f"[red]✗ Discarding subtitle due to size: {language} ({bitrate} kbps)[/red]")
+                                    logger.debug(f"[red]✗ Discarding subtitle due to size: {language} ({bitrate} kbps)[/red]")
 
                 if meta_subtitles:
                     if meta.debug:
-                        console.print(f"[blue]Added subtitle languages: {', '.join(meta_subtitles)}[/blue]")
+                        logger.debug(f"[blue]Added subtitle languages: {', '.join(meta_subtitles)}[/blue]")
                 else:
-                    console.print("[yellow]No valid subtitles found to add.[/yellow]")
+                    logger.info("[yellow]No valid subtitles found to add.[/yellow]")
 
             except Exception as e:
-                console.print(f"[red]Error reading BD_SUMMARY file: {str(e)}[/red]")
+                logger.error(f"[red]Error reading BD_SUMMARY file: {str(e)}[/red]")
         else:
-            console.print(f"[red]BD_SUMMARY file not found: {bd_summary_path}[/red]")
+            logger.info(f"[red]BD_SUMMARY file not found: {bd_summary_path}[/red]")
 
     detailed_releases: list[Release] = []
     for idx, release in enumerate(releases, 1):
-        console.print(f"[cyan]Processing release {idx}/{len(releases)}: {release['title']} ({release['country']})")
+        logger.info(f"[cyan]Processing release {idx}/{len(releases)}: {release['title']} ({release['country']})")
         detailed_release = await fetch_release_details(release, meta)
         detailed_releases.append(detailed_release)
 
     if meta.debug:
-        console.print()
+        logger.debug("")
         cli_ui.info_section("Processing Complete")
     cli_ui.info(f"Successfully processed {len(detailed_releases)} releases")
 
@@ -1120,7 +1123,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
 
     def log_and_print(message: str, log_list: list[str]) -> None:
         if meta.debug:
-            console.print(message)
+            logger.debug(message)
         log_list.append(message)
 
     if detailed_releases:
@@ -1128,7 +1131,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
         for idx, release in enumerate(detailed_releases, 1):
             release_logs: list[str] = []
             if meta.debug:
-                console.print(f"\n[bold blue]=== Release {idx}/{len(detailed_releases)}: {release['title']} ({release['country']}) ===[/bold blue]")
+                logger.debug(f"\n[bold blue]=== Release {idx}/{len(detailed_releases)}: {release['title']} ({release['country']}) ===[/bold blue]")
             log_and_print(f"[blue]Release URL: {release['url']}[/blue]", release_logs)
             score = 100.0
 
@@ -1511,7 +1514,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                 if 'cover_images' in best_release:
                     meta.cover_images = best_release["cover_images"]
                     await download_cover_images(meta)
-                console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
+                logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
 
             elif len(scored_releases) == 1:
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
@@ -1528,18 +1531,18 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                                 if 'cover_images' in close_matches[0]:
                                     meta.cover_images = close_matches[0]["cover_images"]
                                     await download_cover_images(meta)
-                                console.print(f"[yellow]Set region code to: {region_code}, distributor to: {close_matches[0]['publisher'].upper()}")
+                                logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {close_matches[0]['publisher'].upper()}")
                                 break
                             elif user_input == 'n':
                                 cli_ui.warning("No release selected.")
                                 detailed_releases = []
                                 break
                             else:
-                                console.print("[red]Invalid input. Please enter 'y' or 'n'.[/red]")
+                                logger.info("[red]Invalid input. Please enter 'y' or 'n'.[/red]")
                         except ValueError:
-                            console.print("[red]Invalid input. Please enter 'y' or 'n'.[/red]")
+                            logger.info("[red]Invalid input. Please enter 'y' or 'n'.[/red]")
                         except KeyboardInterrupt:
-                            console.print("[red]Operation cancelled.[/red]")
+                            logger.info("[red]Operation cancelled.[/red]")
                             break
                 elif best_score > bluray_single_score:
                     cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
@@ -1550,27 +1553,27 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                     if 'cover_images' in best_release:
                         meta.cover_images = best_release["cover_images"]
                         await download_cover_images(meta)
-                    console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
+                    logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
                 else:
                     cli_ui.warning(f"No suitable release found. Best match was {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                     detailed_releases = []
 
             elif len(close_matches) > 1:
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    console.print("[yellow]Multiple releases are within 40 points of the best match. Please confirm which release to use:[/yellow]")
+                    logger.info("[yellow]Multiple releases are within 40 points of the best match. Please confirm which release to use:[/yellow]")
                     # Check if any close match has generic format or missing specs
                     any_generic_format = any(r.get('_generic_format', False) for r in close_matches)
                     any_specs_missing = any(r.get('_specs_missing', False) for r in close_matches)
                     if any_generic_format:
-                        console.print("[red]Note: Generic BD format found, please confirm the release.[/red]")
+                        logger.info("[red]Note: Generic BD format found, please confirm the release.[/red]")
                     if any_specs_missing:
-                        console.print("[red]Note: Missing specs in release, please confirm the release.[/red]")
+                        logger.info("[red]Note: Missing specs in release, please confirm the release.[/red]")
                     for idx, release in enumerate(close_matches, 1):
                         score = next(score for score, r in scored_releases if r == release)
-                        console.print(f"{idx}. [blue]{release['title']} ({release['country']})[/blue] - Score: {score:.1f}/100")
+                        logger.info(f"{idx}. [blue]{release['title']} ({release['country']})[/blue] - Score: {score:.1f}/100")
 
                     while True:
-                        console.print("Enter the number of the release to use, 'p' to print logs for a release, or 'n' to skip:")
+                        logger.info("Enter the number of the release to use, 'p' to print logs for a release, or 'n' to skip:")
                         user_input_raw = cli_ui.ask_string("Selection: ")
                         user_input = (user_input_raw or "").strip().lower()
                         if user_input == 'n':
@@ -1585,16 +1588,16 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                                     selected_release = close_matches[release_idx - 1]
                                     for logged_release, release_logs in logs:
                                         if logged_release == selected_release:
-                                            console.print(f"[yellow]Logs for release: {logged_release['title']} ({logged_release['country']})[/yellow]")
+                                            logger.info(f"[yellow]Logs for release: {logged_release['title']} ({logged_release['country']})[/yellow]")
                                             for log in release_logs:
-                                                console.print(log)
+                                                logger.info(log)
                                             break
                                 else:
-                                    console.print(f"[red]Invalid selection. Please enter a number between 1 and {len(close_matches)}.[/red]")
+                                    logger.info(f"[red]Invalid selection. Please enter a number between 1 and {len(close_matches)}.[/red]")
                             except ValueError:
-                                console.print("[red]Invalid input. Please enter a valid number.[/red]")
+                                logger.info("[red]Invalid input. Please enter a valid number.[/red]")
                             except KeyboardInterrupt:
-                                console.print("[red]Operation cancelled.[/red]")
+                                logger.info("[red]Operation cancelled.[/red]")
                                 break
                         else:
                             try:
@@ -1609,14 +1612,14 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                                     if 'cover_images' in selected_release:
                                         meta.cover_images = selected_release["cover_images"]
                                         await download_cover_images(meta)
-                                    console.print(f"[yellow]Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}[/yellow]")
+                                    logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}[/yellow]")
                                     break
                                 else:
-                                    console.print(f"[red]Invalid selection. Please enter a number between 1 and {len(close_matches)}.[/red]")
+                                    logger.info(f"[red]Invalid selection. Please enter a number between 1 and {len(close_matches)}.[/red]")
                             except ValueError:
-                                console.print("[red]Invalid input. Please enter a number or 'n'.[/red]")
+                                logger.info("[red]Invalid input. Please enter a number or 'n'.[/red]")
                             except KeyboardInterrupt:
-                                console.print("[red]Operation cancelled.[/red]")
+                                logger.info("[red]Operation cancelled.[/red]")
                                 break
                 elif best_score > bluray_score:
                     cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
@@ -1627,20 +1630,20 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                     if 'cover_images' in best_release:
                         meta.cover_images = best_release["cover_images"]
                         await download_cover_images(meta)
-                    console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
+                    logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
                 else:
                     cli_ui.warning(f"No suitable release found. Best match was {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                     detailed_releases = []
 
             else:
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    console.print("[red]This is the probably the best match, but it is not a perfect match.[/red]")
-                    console.print("[yellow]All other releases have a score at least 40 points lower.")
+                    logger.info("[red]This is the probably the best match, but it is not a perfect match.[/red]")
+                    logger.info("[yellow]All other releases have a score at least 40 points lower.")
                     for logged_release, release_logs in logs:
                         if logged_release == best_release:
-                            console.print(f"[yellow]Logs for release: {logged_release['title']} ({logged_release['country']})[/yellow]")
+                            logger.info(f"[yellow]Logs for release: {logged_release['title']} ({logged_release['country']})[/yellow]")
                             for log in release_logs:
-                                console.print(log)
+                                logger.info(log)
                     while True:
                         user_input_raw = cli_ui.ask_string("Do you want to use this release? (y/n): ")
                         user_input = (user_input_raw or "").strip().lower()
@@ -1653,18 +1656,18 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                                 if 'cover_images' in best_release:
                                     meta.cover_images = best_release["cover_images"]
                                     await download_cover_images(meta)
-                                console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
+                                logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
                                 break
                             elif user_input == 'n':
                                 cli_ui.warning("No release selected.")
                                 detailed_releases = []
                                 break
                             else:
-                                console.print("[red]Invalid input. Please enter 'y' or 'n'.[/red]")
+                                logger.info("[red]Invalid input. Please enter 'y' or 'n'.[/red]")
                         except ValueError:
-                            console.print("[red]Invalid input. Please enter 'y' or 'n'.[/red]")
+                            logger.info("[red]Invalid input. Please enter 'y' or 'n'.[/red]")
                         except KeyboardInterrupt:
-                            console.print("[red]Operation cancelled.[/red]")
+                            logger.info("[red]Operation cancelled.[/red]")
                             break
                 elif best_score > bluray_score:
                     cli_ui.info(f"Best match: {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
@@ -1675,7 +1678,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                     if 'cover_images' in best_release:
                         meta.cover_images = best_release["cover_images"]
                         await download_cover_images(meta)
-                    console.print(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
+                    logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
                 else:
                     cli_ui.warning(f"No suitable release found. Best match was {best_release['title']} ({best_release['country']}) with score {best_score:.1f}/100")
                     detailed_releases = []

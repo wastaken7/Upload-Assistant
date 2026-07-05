@@ -10,7 +10,7 @@ import cli_ui
 import guessit
 
 from src.cleanup import cleanup_manager
-from src.console import console
+from src.console import console, logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
@@ -40,8 +40,8 @@ class NameManager:
             for tracker in trackers_to_remove:
                 if tracker in meta.trackers:
                     if meta.unattended:
-                        console.print()
-                        console.print(f"[yellow]Removing tracker {tracker} due to missing distributor/region info.[/yellow]")
+                        logger.info("")
+                        logger.info(f"[yellow]Removing tracker {tracker} due to missing distributor/region info.[/yellow]")
                     meta.trackers.remove(tracker)
             if distributor and 'SKIPPED' not in distributor:
                 meta.distributor = distributor
@@ -188,11 +188,11 @@ class NameManager:
         try:
             name = ' '.join(name.split())
         except Exception:
-            console.print("[bold red]Unable to generate name. Please re-run and correct any of the following args if needed.")
-            console.print(f"--category [yellow]{meta.category}")
-            console.print(f"--type [yellow]{meta.type}")
-            console.print(f"--source [yellow]{meta.source}")
-            console.print("[bold green]If you specified type, try also specifying source")
+            logger.info("[bold red]Unable to generate name. Please re-run and correct any of the following args if needed.")
+            logger.info(f"--category [yellow]{meta.category}")
+            logger.info(f"--type [yellow]{meta.type}")
+            logger.info(f"--source [yellow]{meta.source}")
+            logger.info("[bold green]If you specified type, try also specifying source")
 
             exit()
         name_notag = name
@@ -412,7 +412,7 @@ class NameManager:
 
         folder_name = os.path.basename(meta.uuid) if meta.uuid else ""
         if meta.debug:
-            console.print(f"[cyan]Extracting title and year from folder name: {folder_name}[/cyan]")
+            logger.debug(f"[cyan]Extracting title and year from folder name: {folder_name}[/cyan]")
         # lets do some subsplease handling
         if 'subsplease' in folder_name.lower():
             guess_data = guessit_fn(folder_name, {"excludes": ["country", "language"]})
@@ -441,7 +441,7 @@ class NameManager:
             second_year = years[1]
 
             if meta.debug:
-                console.print(f"[cyan]Found double year pattern: {full_match}, using {second_year} as year[/cyan]")
+                logger.debug(f"[cyan]Found double year pattern: {full_match}, using {second_year} as year[/cyan]")
 
             modified_folder_name = folder_name.replace(full_match, first_year)
             year_match = None
@@ -611,9 +611,9 @@ class NameManager:
             if not distributor_id:
                 distributor_name = await self._prompt_for_field(meta, "Distributor", strictest['distributor'] == 'mandatory')
                 if distributor_name and distributor_name != "SKIPPED":
-                    console.print(f"Looking up distributor ID for: {distributor_name}")
+                    logger.info(f"Looking up distributor ID for: {distributor_name}")
                     distributor_id = await self.common.unit3d_distributor_ids(distributor_name)
-                    console.print(f"Found distributor ID: {distributor_id}")
+                    logger.info(f"Found distributor ID: {distributor_id}")
 
             for tracker in active_trackers:
                 requirements = TRACKER_DISC_REQUIREMENTS.get(tracker, {})
@@ -633,7 +633,7 @@ class NameManager:
             value = cli_ui.ask_string(prompt)
             return value.upper() if value else "SKIPPED"
         except EOFError:
-            console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+            logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
             await cleanup_manager.cleanup()
             cleanup_manager.reset_terminal()
             sys.exit(1)

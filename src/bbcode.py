@@ -5,7 +5,7 @@ import re
 import urllib.parse
 from typing import Any
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
 # Bold - KEEP
@@ -159,7 +159,7 @@ class BBCODE:
                     f.write(framestor_desc)
                 finally:
                     f.close()
-            console.print(f"[green]FraMeSToR NFO saved to {nfo_file_path}")
+            logger.info(f"[green]FraMeSToR NFO saved to {nfo_file_path}")
             meta.nfo = True
             meta.bhd_nfo = True
 
@@ -207,7 +207,7 @@ class BBCODE:
             desc = desc.strip('\n')
 
             if desc.replace('\n', '').strip() == '':
-                console.print("[yellow]Description is empty after cleaning.")
+                logger.info("[yellow]Description is empty after cleaning.")
                 return "", imagelist
 
             description = f"[code]{desc}[/code]"

@@ -10,7 +10,7 @@ import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
-from src.console import console
+from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -158,7 +158,7 @@ class HDT:
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.resolution not in ["2160p", "1080p", "1080i", "720p"]:
-            console.print(f"{self.tracker}: The resolution must be at least 720p, skipping the upload...")
+            logger.info(f"{self.tracker}: The resolution must be at least 720p, skipping the upload...")
             return False
         return True
 
@@ -167,7 +167,7 @@ class HDT:
         if not hasattr(self, 'auth_token') or not self.auth_token:
             credentials_valid = await self.validate_credentials(meta)
             if not credentials_valid:
-                console.print(f'[bold red]{self.tracker}: Failed to validate credentials for search.')
+                logger.info(f'[bold red]{self.tracker}: Failed to validate credentials for search.')
                 return []
 
         search_url = f'{self.base_url}/torrents.php?'

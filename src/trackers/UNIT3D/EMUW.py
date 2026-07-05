@@ -5,7 +5,7 @@ from typing import Any, cast
 
 import cloudscraper
 
-from src.console import console
+from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.tmdb import TmdbManager
@@ -115,9 +115,7 @@ class EMUW(UNIT3D):
         tmdb_id_raw = meta.tmdb
         tmdb_id = int(tmdb_id_raw) if isinstance(tmdb_id_raw, (int, str)) and str(tmdb_id_raw).isdigit() else 0
         if not spanish_title and tmdb_id:
-            spanish_title = await self.tmdb_manager.get_tmdb_translations(
-                tmdb_id=tmdb_id, category=str(meta.category if meta.category is not None else "MOVIE"), target_language="es", debug=meta.debug
-            )
+            spanish_title = await self.tmdb_manager.get_tmdb_translations(tmdb_id=tmdb_id, category=meta.category, target_language="es")
 
         # Use Spanish title if configured
         use_spanish_title = self.config['TRACKERS'][self.tracker].get('use_spanish_title', False)
@@ -471,7 +469,7 @@ class EMUW(UNIT3D):
 
         api_key = str(self.config['TRACKERS'][self.tracker].get('api_key', '')).strip()
         if not api_key:
-            console.print(f'[bold red]{self.tracker}: Missing API key in config file. Skipping...[/bold red]')
+            logger.info(f'[bold red]{self.tracker}: Missing API key in config file. Skipping...[/bold red]')
             meta.skipping = self.tracker
             return dupes
 
@@ -576,15 +574,15 @@ class EMUW(UNIT3D):
                             }
                         dupes.append(result)
             except Exception as json_error:
-                console.print(f"[red]Failed to parse JSON: {json_error}")
+                logger.error(f"[red]Failed to parse JSON: {json_error}")
 
         elif response.status_code == 403:
-            console.print(f"[red]Cloudflare protection blocked API access to {self.tracker}")
+            logger.info(f"[red]Cloudflare protection blocked API access to {self.tracker}")
         elif response.status_code == 429:
-            console.print(f"[yellow]Rate limited by {self.tracker}, waiting 60s...")
+            logger.info(f"[yellow]Rate limited by {self.tracker}, waiting 60s...")
             await asyncio.sleep(60)
         else:
-            console.print(f"[yellow]Unexpected status code: {response.status_code}")
+            logger.info(f"[yellow]Unexpected status code: {response.status_code}")
 
 
         return dupes

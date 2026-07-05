@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
 PLAYLIST_VARIATION_PATTERN = re.compile(r"/\s*DN\s*-\d+dB", re.IGNORECASE)
@@ -104,9 +104,8 @@ def compare_bdinfo(meta: Meta, entry: dict[str, Any], tracker_name: str) -> tupl
         if prefix in stats:
             stats[prefix] += 1
 
-
-    console.print(f"\n[bold yellow]RELEASE:[/bold yellow] {release_name}", soft_wrap=True)
-    console.print("[dim]Comparison Details:[/dim]\n", soft_wrap=True)
+    logger.info(f"\n[bold yellow]RELEASE:[/bold yellow] {release_name}")
+    logger.info("[dim]Comparison Details:[/dim]\n")
 
     comparison_results.sort(key=sorting_priority)
 
@@ -120,11 +119,11 @@ def compare_bdinfo(meta: Meta, entry: dict[str, Any], tracker_name: str) -> tupl
         label = "YOURS" if prefix == "- " else "DUPE" if prefix == "+ " else "MATCH"
         symbol = prefix.strip() or " "
 
-        console.print(f"[{style}][{symbol}] {label.ljust(10)}: {content}[/{style}]", soft_wrap=True)
+        logger.info(f"[{style}][{symbol}] {label.ljust(10)}: {content}[/{style}]")
 
     warning_message = generate_warning(release_name, duplicate_content, has_detected_changes)
     if has_detected_changes and tracker_name in ["LST", "AITHER"]:
-        console.print(f"[green]{tracker_name} allows uploads for different BD discs.[/green]")
+        logger.info(f"[green]{tracker_name} allows uploads for different BD discs.[/green]")
 
     add_val = f"+{stats['+ ']}".ljust(3)
     rem_val = f"-{stats['- ']}".ljust(3)

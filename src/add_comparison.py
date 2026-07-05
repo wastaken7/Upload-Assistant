@@ -10,7 +10,7 @@ from typing import Any, cast
 
 import cli_ui
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.uploadscreens import UploadScreensManager
 
@@ -51,7 +51,7 @@ class ComparisonManager:
                 else:
                     raise ValueError("Invalid comparison data format: must be a dict of dicts or a list of dicts")
                 if self.meta.debug:
-                    console.print(f"[cyan]Loading previously saved comparison data from {comparison_data_file}")
+                    logger.debug(f"[cyan]Loading previously saved comparison data from {comparison_data_file}")
                 self.meta.comparison_groups = saved_comparison_data
 
                 comparison_index = self.meta.comparison_index
@@ -72,7 +72,7 @@ class ComparisonManager:
                             urls_to_add = cast(list[dict[str, Any]], group_data.get('urls', []))
                             found = True
                         else:
-                            console.print(f"[yellow]Comparison index '{comparison_index_str}' not found in saved data; available keys: {list(saved_comparison_data.keys())}[/yellow]")
+                            logger.info(f"[yellow]Comparison index '{comparison_index_str}' not found in saved data; available keys: {list(saved_comparison_data.keys())}[/yellow]")
                     else:
                         try:
                             idx = int(comparison_index_str)
@@ -81,13 +81,13 @@ class ComparisonManager:
                                 urls_to_add = cast(list[dict[str, Any]], list_item.get('urls', []))
                                 found = True
                             else:
-                                console.print(f"[yellow]Comparison index '{comparison_index_str}' out of range; valid range: 0-{len(saved_comparison_data) - 1}[/yellow]")
+                                logger.info(f"[yellow]Comparison index '{comparison_index_str}' out of range; valid range: 0-{len(saved_comparison_data) - 1}[/yellow]")
                         except ValueError:
-                            console.print(f"[yellow]Comparison index '{comparison_index_str}' is not a valid integer for list data[/yellow]")
+                            logger.info(f"[yellow]Comparison index '{comparison_index_str}' is not a valid integer for list data[/yellow]")
 
                     if found and urls_to_add:
                         if self.meta.debug:
-                            console.print(f"[cyan]Adding {len(urls_to_add)} images from comparison group {comparison_index_str} to image_list")
+                            logger.debug(f"[cyan]Adding {len(urls_to_add)} images from comparison group {comparison_index_str} to image_list")
                         image_list = self.meta.image_list
                         self.meta.image_list = image_list
                         for url_info in urls_to_add:
@@ -96,7 +96,7 @@ class ComparisonManager:
 
                 return saved_comparison_data
             except Exception as e:
-                console.print(f"[yellow]Error loading saved comparison data: {e}")
+                logger.info(f"[yellow]Error loading saved comparison data: {e}")
 
         files: list[str] = [f for f in os.listdir(comparison_path) if f.lower().endswith('.png')]
         pattern = re.compile(r"(\d+)-(\d+)-(.+)\.png", re.IGNORECASE)
@@ -131,7 +131,7 @@ class ComparisonManager:
             group_files: list[str] = [f for _, f in group]
             custom_img_list: list[str] = [os.path.join(comparison_path, filename) for filename in group_files]
             upload_meta = self.meta.copy()
-            console.print(f"[cyan]Uploading comparison group {second} with files: {group_files}")
+            logger.info(f"[cyan]Uploading comparison group {second} with files: {group_files}")
 
             upload_result, _ = await self.uploadscreens_manager.upload_screens(
                 upload_meta, len(custom_img_list), img_host_num, 0, len(custom_img_list), custom_img_list, {}
@@ -154,14 +154,14 @@ class ComparisonManager:
 
         comparison_index = self.meta.comparison_index
         if comparison_index is None:
-            console.print("[red]No comparison index provided. Please specify a comparison index matching the input file.")
+            logger.info("[red]No comparison index provided. Please specify a comparison index matching the input file.")
             while True:
                 cli_input = cli_ui.ask_string("Enter comparison index number: ") or ""
                 try:
                     comparison_index = str(int(cli_input.strip()))
                     break
                 except Exception:
-                    console.print(f"[red]Invalid comparison index: {cli_input.strip()}")
+                    logger.info(f"[red]Invalid comparison index: {cli_input.strip()}")
         comparison_index_str = str(comparison_index).strip() if comparison_index is not None else ""
         if comparison_index_str and comparison_index_str in meta_comparisons:
             if 'image_list' not in self.meta:
@@ -169,7 +169,7 @@ class ComparisonManager:
 
             urls_to_add = cast(list[dict[str, Any]], meta_comparisons[comparison_index_str].get('urls', []))
             if self.meta.debug:
-                console.print(f"[cyan]Adding {len(urls_to_add)} images from comparison group {comparison_index_str} to image_list")
+                logger.debug(f"[cyan]Adding {len(urls_to_add)} images from comparison group {comparison_index_str} to image_list")
 
             image_list = self.meta.image_list
             self.meta.image_list = image_list
@@ -183,8 +183,8 @@ class ComparisonManager:
             comparison_json = json.dumps(meta_comparisons, indent=4)
             await asyncio.to_thread(Path(comparison_data_file).write_text, comparison_json)
             if self.meta.debug:
-                console.print(f"[cyan]Saved comparison data to {comparison_data_file}")
+                logger.debug(f"[cyan]Saved comparison data to {comparison_data_file}")
         except Exception as e:
-            console.print(f"[yellow]Failed to save comparison data: {e}")
+            logger.info(f"[yellow]Failed to save comparison data: {e}")
 
         return meta_comparisons

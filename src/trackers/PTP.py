@@ -19,7 +19,7 @@ from pymediainfo import MediaInfo
 
 from cogs.redaction import Redaction
 from src.bbcode import BBCODE
-from src.console import console
+from src.console import console, logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
@@ -45,9 +45,9 @@ class PTP:
         self.api_key = config["TRACKERS"]["PTP"].get("api_key", "").strip()
         announce_url = config['TRACKERS']['PTP'].get('announce_url', '').strip()
         if announce_url and announce_url.startswith('http://'):
-            console.print("[red]PTP announce URL is using plaintext HTTP.\n")
-            console.print("[red]PTP is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PTP/forums.php?page=1&action=viewthread&threadid=46663")
-            console.print("[yellow]Modifying the url to use HTTPS. Update your config file to avoid this message in the future.")
+            logger.info("[red]PTP announce URL is using plaintext HTTP.\n")
+            logger.info("[red]PTP is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PTP/forums.php?page=1&action=viewthread&threadid=46663")
+            logger.info("[yellow]Modifying the url to use HTTPS. Update your config file to avoid this message in the future.")
             self.announce_url = announce_url.replace('http://', 'https://').replace(':2710', '')
         else:
             self.announce_url = announce_url
@@ -113,20 +113,20 @@ class PTP:
             tag_clean = meta.tag.strip().lower()
             banned_groups_lower = {g.lower() for g in self.banned_groups}
             if tag_clean in banned_groups_lower:
-                console.print(f"[red]{self.tracker}: Release group {meta.tag} is banned. Skipping upload.[/red]")
+                logger.info(f"[red]{self.tracker}: Release group {meta.tag} is banned. Skipping upload.[/red]")
                 return False
 
         if not self.api_user:
-            console.print(f"[red]{self.tracker}: API User is missing in config. Skipping upload.[/red]")
+            logger.info(f"[red]{self.tracker}: API User is missing in config. Skipping upload.[/red]")
             return False
 
         if not self.username or not self.password:
-            console.print(f"[red]{self.tracker}: Username or Password is missing in config. Skipping upload.[/red]")
+            logger.info(f"[red]{self.tracker}: Username or Password is missing in config. Skipping upload.[/red]")
             return False
 
         passkey_match = re.match(r"https?://please\.passthepopcorn\.me:?\d*/(.+)/announce", self.announce_url)
         if not passkey_match:
-            console.print(f"[red]{self.tracker}: Failed to extract passkey from PTP announce URL. Skipping upload.[/red]")
+            logger.info(f"[red]{self.tracker}: Failed to extract passkey from PTP announce URL. Skipping upload.[/red]")
             return False
 
         return True
@@ -178,19 +178,19 @@ class PTP:
                     if imdb_value:
                         return int(imdb_value or 0), ptp_torrent_id, ptp_torrent_hash
 
-                console.print(f'[yellow]Could not find any release matching [bold yellow]{search_value}[/bold yellow] on PTP')
+                logger.info(f'[yellow]Could not find any release matching [bold yellow]{search_value}[/bold yellow] on PTP')
                 return None, None, None
 
             elif response.status_code in [400, 401, 403]:
-                console.print("[bold red]PTP Error: 400/401/403 - Invalid request or authentication failed[/bold red]")
+                logger.info("[bold red]PTP Error: 400/401/403 - Invalid request or authentication failed[/bold red]")
                 return None, None, None
             elif response.status_code == 503:
-                console.print("[bold yellow]PTP Unavailable (503)")
+                logger.info("[bold yellow]PTP Unavailable (503)")
                 return None, None, None
             else:
                 return None, None, None
         except Exception as e:
-            console.print(f'[red]An error occurred: {str(e)}[/red]')
+            logger.info(f'[red]An error occurred: {str(e)}[/red]')
             return None, None, None
 
     async def get_imdb_from_torrent_id(self, ptp_torrent_id: int | str) -> tuple[int | None, str | None]:
@@ -212,10 +212,10 @@ class PTP:
                         ptp_infohash = torrent.get('InfoHash', None)
                 return imdb_id, ptp_infohash
             elif response.status_code in [400, 401, 403]:
-                console.print(response.text)
+                logger.info(response.text)
                 return None, None
             elif response.status_code == 503:
-                console.print("[bold yellow]PTP Unavailable (503)")
+                logger.info("[bold yellow]PTP Unavailable (503)")
                 return None, None
             else:
                 return None, None
@@ -229,7 +229,7 @@ class PTP:
         }
         headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
         url = 'https://passthepopcorn.me/torrents.php'
-        console.print(f"[yellow]Requesting description from {url} with ID {ptp_torrent_id}")
+        logger.info(f"[yellow]Requesting description from {url} with ID {ptp_torrent_id}")
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url, params=params, headers=headers)
         await asyncio.sleep(1)
@@ -242,12 +242,12 @@ class PTP:
         desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
 
         if not meta.skip_tracker_descriptions:
-            console.print("[bold green]Successfully grabbed description from PTP")
-            console.print(f"Description after cleaning:\n{desc[:1000]}...", markup=False)  # Show first 1000 characters for brevity
+            logger.info("[bold green]Successfully grabbed description from PTP")
+            logger.info(f"Description after cleaning:\n{desc[:1000]}...", extra={"markup": False})  # Show first 1000 characters for brevity
 
             if not meta.skipit and not meta.unattended:
                 # Allow user to edit or discard the description
-                console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                 edit_choice = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
 
                 if (edit_choice or "").lower() == 'e':
@@ -256,12 +256,12 @@ class PTP:
                         desc = edited_description.strip()
                         meta.description = desc
                         meta.saved_description = True
-                    console.print(f"[green]Final description after editing:[/green] {desc}")
+                    logger.info(f"[green]Final description after editing:[/green] {desc}")
                 elif (edit_choice or "").lower() == 'd':
                     desc = None
-                    console.print("[yellow]Description discarded.[/yellow]")
+                    logger.info("[yellow]Description discarded.[/yellow]")
                 else:
-                    console.print("[green]Keeping the original description.[/green]")
+                    logger.info("[green]Keeping the original description.[/green]")
                     meta.description = desc
                     meta.saved_description = True
             else:
@@ -282,24 +282,24 @@ class PTP:
         await asyncio.sleep(1)
         try:
             if response.status_code != 200:
-                console.print(f"[red]PTP group lookup failed with HTTP {response.status_code}[/red]")
+                logger.info(f"[red]PTP group lookup failed with HTTP {response.status_code}[/red]")
                 if response.text:
-                    console.print(f"[red]Response body (truncated): {response.text[:200]}[/red]")
+                    logger.info(f"[red]Response body (truncated): {response.text[:200]}[/red]")
                 return None
 
             try:
                 response_data = response.json()
             except json.JSONDecodeError:
                 content_type = response.headers.get("content-type", "unknown")
-                console.print(f"[red]PTP group lookup returned non-JSON content (content-type: {content_type})[/red]")
+                logger.info(f"[red]PTP group lookup returned non-JSON content (content-type: {content_type})[/red]")
                 if response.text:
-                    console.print(f"[red]Response body (truncated): {response.text[:200]}[/red]")
+                    logger.info(f"[red]Response body (truncated): {response.text[:200]}[/red]")
                 return None
 
             if response_data.get('TotalResults'):  # Search results page
                 total_results = int(response_data.get('TotalResults', 0))
                 if total_results == 0:
-                    console.print(f"[yellow]No results found for IMDb: tt{imdb}[/yellow]")
+                    logger.info(f"[yellow]No results found for IMDb: tt{imdb}[/yellow]")
                     return None
                 elif total_results == 1:
                     # Single result - use it
@@ -307,12 +307,12 @@ class PTP:
                     groupID: str | None = str(movie.get('GroupId')) if movie.get('GroupId') is not None else None
                     title = movie.get('Title', 'Unknown')
                     year = movie.get('Year', 'Unknown')
-                    console.print(f"[green]Found single match for IMDb: [yellow]tt{imdb}[/yellow] -> Group ID: [yellow]{groupID}[/yellow][/green]")
-                    console.print(f"[green]Title: [yellow]{title}[/yellow] ([yellow]{year}[/yellow])")
+                    logger.info(f"[green]Found single match for IMDb: [yellow]tt{imdb}[/yellow] -> Group ID: [yellow]{groupID}[/yellow][/green]")
+                    logger.info(f"[green]Title: [yellow]{title}[/yellow] ([yellow]{year}[/yellow])")
                     return groupID
                 else:
                     # Multiple results - let user choose
-                    console.print(f"[yellow]Found {total_results} matches for IMDb: tt{imdb}[/yellow]")
+                    logger.info(f"[yellow]Found {total_results} matches for IMDb: tt{imdb}[/yellow]")
                     movies = cast(list[dict[str, Any]], response_data.get('Movies', []))
                     choices: list[str] = []
                     for _i, movie in enumerate(movies):
@@ -327,7 +327,7 @@ class PTP:
                     try:
                         selected = cli_ui.ask_choice("Select the correct movie:", choices=choices)
                         if selected == "Skip - Don't use any of these matches":
-                            console.print("[yellow]User chose to skip all matches[/yellow]")
+                            logger.info("[yellow]User chose to skip all matches[/yellow]")
                             return None
 
                         # Match selection directly to movie data to avoid index issues from cli_ui sorting
@@ -340,22 +340,22 @@ class PTP:
                                 groupID = str(group_id)
                                 break
 
-                        console.print(f"[green]User selected: Group ID [yellow]{groupID}[/yellow][/green]")
+                        logger.info(f"[green]User selected: Group ID [yellow]{groupID}[/yellow][/green]")
                         return groupID
 
                     except KeyboardInterrupt:
-                        console.print("[yellow]Selection cancelled by user[/yellow]")
+                        logger.info("[yellow]Selection cancelled by user[/yellow]")
                         return None
             elif response_data.get("Page") == "Browse":  # No Releases on Site with ID
                 return None
             elif response_data.get('Page') == "Details":  # Group Found
                 groupID = response_data.get('GroupId')
-                console.print(f"[green]Matched IMDb: [yellow]tt{imdb}[/yellow] to Group ID: [yellow]{groupID}[/yellow][/green]")
-                console.print(f"[green]Title: [yellow]{response_data.get('Name')}[/yellow] ([yellow]{response_data.get('Year')}[/yellow])")
+                logger.info(f"[green]Matched IMDb: [yellow]tt{imdb}[/yellow] to Group ID: [yellow]{groupID}[/yellow][/green]")
+                logger.info(f"[green]Title: [yellow]{response_data.get('Name')}[/yellow] ([yellow]{response_data.get('Year')}[/yellow])")
                 return str(groupID) if groupID is not None else None
         except Exception:
-            console.print("[red]An error has occurred trying to find a group ID")
-            console.print("[red]Please check that the site is online and your ApiUser/api_key values are correct")
+            logger.info("[red]An error has occurred trying to find a group ID")
+            logger.info("[red]Please check that the site is online and your ApiUser/api_key values are correct")
             return None
 
         return None
@@ -452,10 +452,10 @@ class PTP:
                         if torrent.get('Quality') == quality and quality is not None
                     )
                 except ValueError:
-                    console.print("[red]Failed to parse JSON response from API.")
+                    logger.error("[red]Failed to parse JSON response from API.")
                 return existing
             else:
-                console.print(f"[bold red]HTTP request failed with status code {response.status_code}")
+                logger.info(f"[bold red]HTTP request failed with status code {response.status_code}")
 
         return []
 
@@ -476,7 +476,7 @@ class PTP:
             ptpimg_ext = response[0]['ext']
             img_url = f"https://ptpimg.me/{ptpimg_code}.{ptpimg_ext}"
         except Exception:
-            console.print("[red]PTPIMG image rehost failed")
+            logger.info("[red]PTPIMG image rehost failed")
             img_url = image_url
             # img_url = ptpimg_upload(image_url, ptpimg_api)
         return img_url
@@ -548,7 +548,7 @@ class PTP:
                 if isinstance(uploaded_url, str) and uploaded_url:
                     return uploaded_url
         except Exception as e:
-            console.print(f"[red]PTP poster rehost to {selected_host} failed: {e}")
+            logger.info(f"[red]PTP poster rehost to {selected_host} failed: {e}")
 
         return image_url
 
@@ -845,7 +845,7 @@ class PTP:
         multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
         if multi_screens < 2:
             multi_screens = 2
-            console.print("[yellow]PTP requires at least 2 screenshots for multi disc/file content, overriding config")
+            logger.info("[yellow]PTP requires at least 2 screenshots for multi disc/file content, overriding config")
 
         image_list_value: Any = (meta.PTP_images_key if "PTP_images_key" in meta else meta.image_list) if not meta.skip_imghost_upload else []
         image_list = cast(list[dict[str, Any]], image_list_value) if isinstance(image_list_value, list) else []
@@ -878,11 +878,11 @@ class PTP:
                                 if host_key in self.approved_image_hosts:
                                     images_to_keep.append(img)
                                 elif meta.debug:
-                                    console.print(f"[yellow]Filtering out image from non-approved host: {hostname}[/yellow]")
+                                    logger.info(f"[yellow]Filtering out image from non-approved host: {hostname}[/yellow]")
                             except Exception:
                                 # If URL parsing fails, skip this image
                                 if meta.debug:
-                                    console.print(f"[yellow]Could not parse URL: {raw_url}[/yellow]")
+                                    logger.debug(f"[yellow]Could not parse URL: {raw_url}[/yellow]")
                                 continue
 
                         if images_to_keep:
@@ -897,7 +897,7 @@ class PTP:
                     for key_name in keys_to_remove:
                         del pack_images_data['keys'][key_name]
                         if meta.debug:
-                            console.print(f"[yellow]Removed key '{key_name}' - no approved image hosts[/yellow]")
+                            logger.debug(f"[yellow]Removed key '{key_name}' - no approved image hosts[/yellow]")
 
                     # Recalculate total count
                     keys = cast(dict[str, Any], pack_images_data.get('keys', {}))
@@ -906,13 +906,13 @@ class PTP:
                     if pack_images_data.get('total_count', 0) < 3:
                         pack_images_data = {}  # Invalidate if less than 3 images total
                         if meta.debug:
-                            console.print("[yellow]Invalidating pack images - less than 3 approved images total[/yellow]")
+                            logger.debug("[yellow]Invalidating pack images - less than 3 approved images total[/yellow]")
                     else:
                         if meta.debug:
-                            console.print(f"[green]Loaded previously uploaded images from {pack_images_file}")
-                            console.print(f"[blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]")
+                            logger.debug(f"[green]Loaded previously uploaded images from {pack_images_file}")
+                            logger.debug(f"[blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]")
             except Exception as e:
-                console.print(f"[yellow]Warning: Could not load pack image data: {str(e)}[/yellow]")
+                logger.warning(f"[yellow]Warning: Could not load pack image data: {str(e)}[/yellow]")
 
         desc = io.StringIO()
         discs = cast(list[dict[str, Any]], meta.discs)
@@ -941,7 +941,7 @@ class PTP:
                         desc.write(tonemapped_header)
                         desc.write("\n\n")
                 except Exception as e:
-                    console.print(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
+                    logger.warning(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
                 for img_index in range(len(images[: meta.screens])):
                     raw_url = str(image_list[img_index].get('raw_url', ''))
                     desc.write(f"[img]{raw_url}[/img]\n")
@@ -975,7 +975,7 @@ class PTP:
                         saved_images = cast(list[dict[str, Any]], pack_images_data['keys'][new_images_key]['images'])
                         if saved_images:
                             if meta.debug:
-                                console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                                logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                             meta[new_images_key] = []
                             for img in saved_images:
@@ -990,7 +990,7 @@ class PTP:
                         # Use the summary corresponding to the current bdinfo
                         desc.write(f"[mediainfo]{summary}[/mediainfo]\n\n")
                         if meta.debug:
-                            console.print("[yellow]Using original uploaded images for first disc")
+                            logger.debug("[yellow]Using original uploaded images for first disc")
                         for img in meta[new_images_key]:
                             raw_url = str(img.get('raw_url', ''))
                             desc.write(f"[img]{raw_url}[/img]\n")
@@ -1008,7 +1008,7 @@ class PTP:
                                     meta, f"PLAYLIST_{i}", bdinfo, meta.uuid, meta.base_dir, use_vs, [], meta.ffdebug, multi_screens, True
                                 )
                             except Exception as e:
-                                console.print(f"Error during BDMV screenshot capture: {e}", markup=False)
+                                logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
                             new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"PLAYLIST_{i}-*.png"))]
                         uploaded_images: list[dict[str, Any]] = []
                         if new_screens and not meta.skip_imghost_upload:
@@ -1050,7 +1050,7 @@ class PTP:
                                 desc.write(tonemapped_header)
                                 desc.write("\n\n")
                         except Exception as e:
-                            console.print(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
+                            logger.warning(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
                         for img_index in range(min(multi_screens, len(image_list))):
                             raw_url = str(image_list[img_index].get('raw_url', ''))
                             desc.write(f"[img]{raw_url}[/img]\n")
@@ -1066,7 +1066,7 @@ class PTP:
                             saved_images = cast(list[dict[str, Any]], pack_images_data['keys'][new_images_key]['images'])
                             if saved_images:
                                 if meta.debug:
-                                    console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                                    logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
@@ -1090,7 +1090,7 @@ class PTP:
                                         meta, f"FILE_{i}", each["bdinfo"], meta.uuid, meta.base_dir, meta.vapoursynth, [], meta.ffdebug, multi_screens, True
                                     )
                                 except Exception as e:
-                                    console.print(f"Error during BDMV screenshot capture: {e}", markup=False)
+                                    logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
                             new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"FILE_{i}-*.png"))]
                             uploaded_images: list[dict[str, Any]] = []
                             if new_screens and not meta.skip_imghost_upload:
@@ -1137,7 +1137,7 @@ class PTP:
                             saved_images = pack_images_data['keys'][new_images_key]['images']
                             if saved_images:
                                 if meta.debug:
-                                    console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                                    logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
@@ -1159,7 +1159,7 @@ class PTP:
                                 try:
                                     await self.takescreens_manager.dvd_screenshots(meta, i, multi_screens, True)
                                 except Exception as e:
-                                    console.print(f"Error during DVD screenshot capture: {e}", markup=False)
+                                    logger.info(f"Error during DVD screenshot capture: {e}", extra={"markup": False})
                             new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"{meta.discs[i]['name']}-*.png"))]
                             uploaded_images: list[dict[str, Any]] = []
                             if new_screens and not meta.skip_imghost_upload:
@@ -1221,7 +1221,7 @@ class PTP:
                     desc.write(tonemapped_header)
                     desc.write("\n\n")
             except Exception as e:
-                console.print(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
+                logger.warning(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
 
             for img_index in range(len(images[: meta.screens])):
                 raw_url = image_list[img_index]['raw_url']
@@ -1248,7 +1248,7 @@ class PTP:
                             desc.write(tonemapped_header)
                             desc.write("\n\n")
                     except Exception as e:
-                        console.print(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
+                        logger.warning(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
                     for img_index in range(min(multi_screens, len(image_list))):
                         raw_url = image_list[img_index]['raw_url']
                         desc.write(f"[img]{raw_url}[/img]\n")
@@ -1267,7 +1267,7 @@ class PTP:
                         saved_images = pack_images_data['keys'][new_images_key]['images']
                         if saved_images:
                             if meta.debug:
-                                console.print(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                                logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                             meta[new_images_key] = []
                             for img in saved_images:
@@ -1289,7 +1289,7 @@ class PTP:
                             try:
                                 await self.takescreens_manager.screenshots(file, f"FILE_{i}", meta.uuid, meta.base_dir, meta, multi_screens, True, "")
                             except Exception as e:
-                                console.print(f"Error during generic screenshot capture: {e}", markup=False)
+                                logger.info(f"Error during generic screenshot capture: {e}", extra={"markup": False})
                         new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"FILE_{i}-*.png"))]
                         if new_screens and not meta.skip_imghost_upload:
                             uploaded_images, _ = await self.uploadscreens_manager.upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts)
@@ -1323,7 +1323,7 @@ class PTP:
         image_list: list[dict[str, Any]] | None = None,
     ) -> str | None:
         if image_list is None:
-            console.print("[yellow]No image links to save.[/yellow]")
+            logger.info("[yellow]No image links to save.[/yellow]")
             return None
 
         output_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
@@ -1338,7 +1338,7 @@ class PTP:
                     content = await f.read()
                     existing_data = cast(dict[str, Any], json.loads(content)) if content.strip() else {}
             except Exception as e:
-                console.print(f"[yellow]Warning: Could not load existing image data: {str(e)}[/yellow]")
+                logger.warning(f"[yellow]Warning: Could not load existing image data: {str(e)}[/yellow]")
 
         # Create data structure if it doesn't exist yet
         if not existing_data:
@@ -1376,12 +1376,12 @@ class PTP:
                 await f.write(json.dumps(existing_data, indent=2))
 
             if meta.debug:
-                console.print(f"[green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
-                console.print(f"[blue]  - JSON: {output_file}[/blue]")
+                logger.debug(f"[green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
+                logger.debug(f"[blue]  - JSON: {output_file}[/blue]")
 
             return output_file
         except Exception as e:
-            console.print(f"[bold red]Error saving image links: {e}[/bold red]")
+            logger.info(f"[bold red]Error saving image links: {e}[/bold red]")
             return None
 
     async def get_AntiCsrfToken(self, meta: Meta) -> str:
@@ -1403,12 +1403,12 @@ class PTP:
                         AntiCsrfToken = token_match.group(1)
                         return AntiCsrfToken
             # Cookies are expired/invalid — discard them so the login POST is clean
-            console.print("[yellow]PTP session expired. Clearing cookies and re-authenticating.")
+            logger.info("[yellow]PTP session expired. Clearing cookies and re-authenticating.")
             cookies = {}
             with contextlib.suppress(OSError):
                 os.remove(cookiefile)
         else:
-            console.print("[yellow]PTP Cookies not found. Creating new session.")
+            logger.info("[yellow]PTP Cookies not found. Creating new session.")
 
         passkey_match = re.match(r"https?://please\.passthepopcorn\.me:?\d*/(.+)/announce", self.announce_url)
         if not passkey_match:
@@ -1458,7 +1458,7 @@ class PTP:
     async def validate_login(self, response: httpx.Response) -> bool:
         loggedIn = False
         if response.text.find("""<a href="login.php?act=recover">""") != -1:
-            console.print("Looks like you are not logged in to PTP. Probably due to the bad user name, password, or expired session.")
+            logger.info("Looks like you are not logged in to PTP. Probably due to the bad user name, password, or expired session.")
         elif "Your popcorn quota has been reached, come back later!" in response.text:
             raise LoginException("Your PTP request/popcorn quota has been reached, try again later")  # noqa F405
         else:
@@ -1475,7 +1475,7 @@ class PTP:
             async with aiofiles.open(file_path, encoding="utf-8") as f:
                 desc = await f.read()
         except OSError as e:
-            console.print(f"File error: {e}", markup=False)
+            logger.info(f"File error: {e}", extra={"markup": False})
         ptp_subtitles = self.get_subtitles(meta)
         no_audio_found = False
         english_audio = False
@@ -1494,15 +1494,15 @@ class PTP:
             mediainfo = meta.mediainfo
             audio_tracks = [track for track in mediainfo.get("media", {}).get("track", []) if track.get("@type") == "Audio"]
             if meta.debug:
-                console.print(f"[Debug] Found {len(audio_tracks)} audio tracks")
+                logger.debug(f"[Debug] Found {len(audio_tracks)} audio tracks")
 
             if not audio_tracks:
                 no_audio_found = True
-                console.print("[yellow]No audio tracks found in mediainfo")
+                logger.info("[yellow]No audio tracks found in mediainfo")
             else:
                 first_language = str(audio_tracks[0].get("Language", "")).lower()
                 if meta.debug:
-                    console.print(f"[Debug] First audio track language: {first_language}")
+                    logger.debug(f"[Debug] First audio track language: {first_language}")
 
                 if not first_language:
                     no_audio_found = True
@@ -1537,8 +1537,8 @@ class PTP:
                 ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
 
         if meta.debug:
-            console.print("ptp_trumpable", ptp_trumpable)
-            console.print("ptp_subtitles", ptp_subtitles)
+            logger.debug(f"ptp_trumpable: {ptp_trumpable}")
+            logger.debug(f"ptp_subtitles: {ptp_subtitles}")
         data: dict[str, Any] = {
             "submit": "true",
             "remaster_year": "",
@@ -1599,7 +1599,7 @@ class PTP:
                 if not cover_input:
                     continue
                 if not cover_input.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
-                    console.print("[red]Cover URL must end with .jpg, .jpeg, .png, or .webp")
+                    logger.info("[red]Cover URL must end with .jpg, .jpeg, .png, or .webp")
                     continue
                 cover = await self.rehost_poster_to_selected_host(meta, cover_input)
             new_data = {
@@ -1614,8 +1614,8 @@ class PTP:
                 new_data["year"] = meta.manual_year
             while new_data["tags"] == "":
                 if (meta.mode if meta.mode is not None else "discord") == "cli":
-                    console.print('[yellow]Unable to match any tags')
-                    console.print("Valid tags can be found on the PTP upload form")
+                    logger.info('[yellow]Unable to match any tags')
+                    logger.info("Valid tags can be found on the PTP upload form")
                     new_data["tags"] = console.input("Please enter at least one tag. Comma separated (action, animation, short):")
             data.update(new_data)
             imdb_info = cast(dict[str, Any], meta.imdb_info)
@@ -1642,7 +1642,7 @@ class PTP:
 
         # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
         if base_piece_mb > 16 and not meta.nohash:
-            console.print("[red]Piece size is OVER 16M and does not work on PTP. Generating a new .torrent")
+            logger.info("[red]Piece size is OVER 16M and does not work on PTP. Generating a new .torrent")
             tracker_url = self.announce_url.strip() if self.announce_url else "https://fake.tracker"
             piece_size = 16
             torrent_create = f"[{self.tracker}]"
@@ -1686,7 +1686,7 @@ class PTP:
             cookies = {name: str(data.get('value', '')) for name, data in raw_cookies.items()}
             async with httpx.AsyncClient(cookies=cookies, timeout=60.0, follow_redirects=True) as client:
                 response = await client.post(url=url, data=data, headers=headers, files=files)
-            console.print(f"[cyan]{response.url}")
+            logger.info(f"[cyan]{response.url}")
             responsetext = response.text
             # If the response contains our announce URL, then we are on the upload page and the upload wasn't successful.
             if responsetext.find(self.announce_url) != -1:

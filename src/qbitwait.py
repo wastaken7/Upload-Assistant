@@ -8,7 +8,7 @@ from typing import Any, cast
 import httpx
 import qbittorrentapi
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
 
@@ -97,7 +97,7 @@ class Wait:
         if not self.proxy_url and not self.qbt_client:
             raise Exception("[ERROR] qBittorrent is not configured.")
 
-        console.print(f"Waiting for torrent {infohash} to complete...", markup=False)
+        logger.info(f"Waiting for torrent {infohash} to complete...", extra={"markup": False})
 
         if self.proxy_url:
             self.qbt_session = httpx.AsyncClient()
@@ -114,7 +114,7 @@ class Wait:
                         torrents_data = cast(list[dict[str, Any]], response.json())
                         target_torrent = torrents_data[0] if torrents_data else None
                     else:
-                        console.print(f"[ERROR] Failed to get torrent info via proxy: {response.status_code}", markup=False)
+                        logger.info(f"[ERROR] Failed to get torrent info via proxy: {response.status_code}", extra={"markup": False})
                         break
                 else:
                     if self.qbt_client is None:
@@ -129,13 +129,13 @@ class Wait:
                     else:
                         state_value = getattr(target_torrent, 'state', None)
                     state_str = str(state_value) if state_value is not None else 'unknown'
-                    console.print(f"[DEBUG] Torrent {infohash} state: {state_str}", markup=False)
+                    logger.info(f"[DEBUG] Torrent {infohash} state: {state_str}", extra={"markup": False})
 
                     if state_str in {'pausedUP', 'seeding', 'completed', 'stalledUP', 'uploading'}:
-                        console.print(f"[INFO] Torrent {infohash} has completed!", markup=False)
+                        logger.info(f"[INFO] Torrent {infohash} has completed!", extra={"markup": False})
                         return
                 else:
-                    console.print(f"[ERROR] Torrent with hash {infohash} not found!", markup=False)
+                    logger.info(f"[ERROR] Torrent with hash {infohash} not found!", extra={"markup": False})
                     break
 
                 await asyncio.sleep(check_interval)
@@ -148,7 +148,7 @@ class Wait:
             return False
 
         if threshold_kb <= 0 or wait_time <= 0:
-            console.print("[yellow]Bandwidth control enabled but threshold or time is 0. Skipping bandwidth check.[/yellow]")
+            logger.info("[yellow]Bandwidth control enabled but threshold or time is 0. Skipping bandwidth check.[/yellow]")
             return False
 
         threshold_bytes = threshold_kb * 1024
@@ -170,8 +170,8 @@ class Wait:
                         data = response.json()
                         up_speed = int(data.get("up_info_speed", 0))
                     else:
-                        console.print(f"[ERROR] Failed to get transfer info via proxy: {response.status_code}", markup=False)
-                        console.print("[yellow]Retrying in 10 seconds...[/yellow]", markup=False)
+                        logger.info(f"[ERROR] Failed to get transfer info via proxy: {response.status_code}", extra={"markup": False})
+                        logger.info("[yellow]Retrying in 10 seconds...[/yellow]", extra={"markup": False})
                         await asyncio.sleep(10)
                         continue
                 else:
@@ -188,20 +188,21 @@ class Wait:
                 total_seconds = current_samples * check_interval
                 avg_speed_color = "green" if avg_speed <= threshold_bytes else "red"
                 if current_samples >= max_samples and avg_speed <= threshold_bytes:
-                    console.print(
-                        f"[yellow]Average speed of [{avg_speed_color}]{avg_speed_kbs:.0f}/{threshold_kb:.0f}[/{avg_speed_color}] KB/s in the last {total_seconds} seconds. [/yellow]"
+                    logger.info(
+                        f"[yellow]Average speed of [{avg_speed_color}]{avg_speed_kbs:.0f}/{threshold_kb:.0f}[/{avg_speed_color}] KB/s in the last {total_seconds} seconds. [/yellow]",
+                        extra={"highlighter": None},
                     )
                     break
                 else:
-                    console.print(
+                    logger.info(
                         f"[yellow]Average speed of [{avg_speed_color}]{avg_speed_kbs:.0f}[/{avg_speed_color}]/[green]{threshold_kb:.0f}[/green] KB/s in the last {total_seconds} seconds. [/yellow]",
-                        end="\r",
+                        extra={"highlighter": None},
                     )
 
                 await asyncio.sleep(check_interval)
             return True
         except Exception as e:
-            console.print(f"\n[red]Error checking bandwidth: {e}[/red]")
+            logger.error(f"\n[red]Error checking bandwidth: {e}[/red]")
             return False
         finally:
             if self.proxy_url and self.qbt_session:
@@ -210,12 +211,12 @@ class Wait:
 
     async def select_and_recheck_best_torrent(self, meta: Meta, path: str, check_interval: int = 5) -> bool:
         if not self.proxy_url and not self.qbt_client:
-            console.print("[red]qBittorrent is not configured.[/red]")
+            logger.info("[red]qBittorrent is not configured.[/red]")
             return False
 
         torrent_comments = meta.torrent_comments
         if not isinstance(torrent_comments, list):
-            console.print("[red]No torrent comments found in metadata[/red]")
+            logger.info("[red]No torrent comments found in metadata[/red]")
             return False
         torrent_comments_list: list[dict[str, Any]] = [
             cast(dict[str, Any], tc)
@@ -225,7 +226,7 @@ class Wait:
 
         target_path = path
         if not target_path:
-            console.print("[red]No target path available for matching torrents[/red]")
+            logger.info("[red]No target path available for matching torrents[/red]")
             return False
 
         matching_torrents: list[dict[str, Any]] = []
@@ -247,7 +248,7 @@ class Wait:
                     matching_torrents.append(tc)
 
             if not matching_torrents:
-                console.print("[yellow]No matching torrents with working trackers found in qBittorrent[/yellow]")
+                logger.info("[yellow]No matching torrents with working trackers found in qBittorrent[/yellow]")
                 return True
 
             matching_torrents.sort(key=lambda x: int(x.get('seeders', 0) or 0), reverse=True)
@@ -255,10 +256,10 @@ class Wait:
 
             best_hash = best_torrent.get('hash')
             if not isinstance(best_hash, str):
-                console.print("[red]Best torrent is missing a valid hash[/red]")
+                logger.info("[red]Best torrent is missing a valid hash[/red]")
                 return False
             torrent_hash = best_hash.lower()
-            console.print(
+            logger.info(
                 f"[green]Selected best torrent: {best_torrent.get('name')} with {best_torrent.get('seeders', 0)} seeders[/green]"
                 f"[yellow] Tracker: {str(best_torrent.get('trackers', 'unknown'))[:20]}[/yellow]"
             )
@@ -270,34 +271,34 @@ class Wait:
             # Recheck the torrent
             if self.proxy_url:
                 if self.qbt_session is None:
-                    console.print("[bold red]qbt_session is not initialized")
+                    logger.info("[bold red]qbt_session is not initialized")
                     return False
                 if self.qbt_proxy_url is None:
-                    console.print("[bold red]Proxy URL is not configured correctly")
+                    logger.info("[bold red]Proxy URL is not configured correctly")
                     return False
                 response = await self.qbt_session.post(f"{self.qbt_proxy_url}/api/v2/torrents/recheck", data={"hashes": torrent_hash})
                 if response.status_code != 200:
-                    console.print(f"[bold red]Failed to recheck torrent via proxy: {response.status_code}")
+                    logger.info(f"[bold red]Failed to recheck torrent via proxy: {response.status_code}")
                     return False
             else:
                 if self.qbt_client is None:
-                    console.print("[bold red]qbt_client is not initialized")
+                    logger.info("[bold red]qbt_client is not initialized")
                     return False
                 self.qbt_client.torrents_recheck(torrent_hashes=torrent_hash)
 
             await asyncio.sleep(3)
         except Exception as e:
-            console.print(f"[bold red]Failed to recheck torrent: {e}")
+            logger.info(f"[bold red]Failed to recheck torrent: {e}")
             return False
 
         try:
             while True:
                 if self.proxy_url:
                     if self.qbt_session is None:
-                        console.print("[bold red]qbt_session is not initialized")
+                        logger.info("[bold red]qbt_session is not initialized")
                         return False
                     if self.qbt_proxy_url is None:
-                        console.print("[bold red]Proxy URL is not configured correctly")
+                        logger.info("[bold red]Proxy URL is not configured correctly")
                         return False
                     response = await self.qbt_session.get(f"{self.qbt_proxy_url}/api/v2/torrents/info", params={"hashes": torrent_hash})
                     if response.status_code == 200:
@@ -314,11 +315,11 @@ class Wait:
                         else:
                             raise Exception("No torrents found in response")
                     else:
-                        console.print(f"[bold red]Failed to get torrent info via proxy: {response.status_code}")
+                        logger.info(f"[bold red]Failed to get torrent info via proxy: {response.status_code}")
                         return False
                 else:
                     if self.qbt_client is None:
-                        console.print("[bold red]qbt_client is not initialized")
+                        logger.info("[bold red]qbt_client is not initialized")
                         return False
                     torrent_list_raw = cast(Any, self.qbt_client.torrents_info(hashes=torrent_hash))
                     if torrent_list_raw is None:
@@ -337,10 +338,10 @@ class Wait:
                     state_str = str(state) if state is not None else 'unknown'
                     progress_float = float(progress or 0)
 
-                console.print(f"\r[INFO] Torrent is at {progress_float * 100:.2f}% progress of {state_str}...", end='', markup=False)
+                logger.info(f"\r[INFO] Torrent is at {progress_float * 100:.2f}% progress of {state_str}...", extra={"markup": False})
 
                 if state_str not in ('checkingUP', 'checkingDL', 'checkingResumeData'):
-                    console.print("", markup=False)
+                    logger.info("", extra={"markup": False})
                     break
 
                 await asyncio.sleep(check_interval)
@@ -348,10 +349,10 @@ class Wait:
             # Get final torrent info
             if self.proxy_url:
                 if self.qbt_session is None:
-                    console.print("[bold red]qbt_session is not initialized")
+                    logger.info("[bold red]qbt_session is not initialized")
                     return False
                 if self.qbt_proxy_url is None:
-                    console.print("[bold red]Proxy URL is not configured correctly")
+                    logger.info("[bold red]Proxy URL is not configured correctly")
                     return False
                 response = await self.qbt_session.get(f"{self.qbt_proxy_url}/api/v2/torrents/info", params={"hashes": torrent_hash})
                 if response.status_code == 200:
@@ -363,11 +364,11 @@ class Wait:
                     else:
                         raise Exception("No torrents found in response")
                 else:
-                    console.print(f"[bold red]Failed to get final torrent info via proxy: {response.status_code}")
+                    logger.info(f"[bold red]Failed to get final torrent info via proxy: {response.status_code}")
                     return False
             else:
                 if self.qbt_client is None:
-                    console.print("[bold red]qbt_client is not initialized")
+                    logger.info("[bold red]qbt_client is not initialized")
                     return False
                 torrent_list_raw = cast(Any, self.qbt_client.torrents_info(hashes=torrent_hash))
                 if torrent_list_raw is None:
@@ -384,17 +385,17 @@ class Wait:
                 final_state = getattr(torrent, 'state', 'unknown')
                 final_progress = float(getattr(torrent, 'progress', 0) or 0)
 
-            console.print(f"[green]Recheck completed. State: {final_state}, Progress: {final_progress*100:.2f}%[/green]")
+            logger.info(f"[green]Recheck completed. State: {final_state}, Progress: {final_progress*100:.2f}%[/green]")
             meta.we_rechecked_torrent = True
 
             if final_state not in {'pausedUP', 'seeding', 'completed', 'stalledUP', 'uploading'}:
-                console.print("[yellow]Torrent needs to download missing data. Waiting for completion...[/yellow]")
+                logger.info("[yellow]Torrent needs to download missing data. Waiting for completion...[/yellow]")
                 await self.wait_for_completion(torrent_hash, check_interval)
 
             return True
 
         except Exception as e:
-            console.print(f"[bold red]Error while waiting for recheck: {e}")
+            logger.info(f"[bold red]Error while waiting for recheck: {e}")
             traceback.print_exc()
             return False
         finally:

@@ -8,7 +8,7 @@ import aiofiles
 import cli_ui
 import httpx
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
@@ -139,14 +139,14 @@ class BHD:
                     response = await client.post(url=url, files=files, data=data, headers=headers)
                     response_json = cast(dict[str, Any], response.json())
                     if int(response_json['status_code']) == 0:
-                        console.print(f"[red]{response_json['status_message']}")
+                        logger.info(f"[red]{response_json['status_message']}")
                         if response_json['status_message'].startswith('Invalid imdb_id'):
-                            console.print('[yellow]RETRYING UPLOAD')
+                            logger.info('[yellow]RETRYING UPLOAD')
                             data['imdb_id'] = 1
                             response = await client.post(url=url, files=files, data=data, headers=headers)
                             response_json = cast(dict[str, Any], response.json())
                         elif response_json['status_message'].startswith('Invalid name value'):
-                            console.print(f"[bold yellow]Submitted Name: {bhd_name}")
+                            logger.info(f"[bold yellow]Submitted Name: {bhd_name}")
 
                     if 'status_message' in response_json:
                         match = re.search(r"https://beyond-hd\.me/torrent/download/.*\.(\d+)\.", response_json['status_message'])
@@ -166,8 +166,8 @@ class BHD:
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: {e}"
                 return False
         else:
-            console.print("[cyan]BHD Request Data:")
-            console.print(data)
+            logger.info("[cyan]BHD Request Data:")
+            logger.info(data)
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True
@@ -177,7 +177,7 @@ class BHD:
                 await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.config['TRACKERS'][self.tracker].get('announce_url'), details_link)
                 return True
             except Exception as e:
-                console.print(f"Error while editing the torrent file: {e}")
+                logger.info(f"Error while editing the torrent file: {e}")
                 return False
         else:
             return False
@@ -303,7 +303,7 @@ class BHD:
                     await desc.write(tonemapped_header)
                     await desc.write("\n\n")
             except Exception as e:
-                console.print(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
+                logger.warning(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
             images = cast(list[dict[str, Any]], meta.get(f"{self.tracker}_images_key") or meta.image_list or [])
             if len(images) > 0:
                 await desc.write("[align=center]")
@@ -330,7 +330,7 @@ class BHD:
             "-rpg", "-w4nk3r", "-irobot", "-beyondhd"
         )):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print("[bold red]This is an internal BHD release, skipping upload[/bold red]")
+                logger.info("[bold red]This is an internal BHD release, skipping upload[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -339,16 +339,16 @@ class BHD:
                 return False
 
         if not meta.valid_mi_settings:
-            console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
+            logger.info(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
             return False
 
         if meta.type in ["REMUX", "ENCODE", "WEBDL", "WEBRIP"] and meta.container not in ["mkv", "mp4"]:
-            console.print(f"[bold red]Container '{meta.container}' is not allowed for {meta.type}. Only MKV and MP4 are permitted. Skipping upload.[/bold red]")
+            logger.info(f"[bold red]Container '{meta.container}' is not allowed for {meta.type}. Only MKV and MP4 are permitted. Skipping upload.[/bold red]")
             return False
 
         if meta.type not in ["WEBDL"] and meta.tag and any(x in meta.tag for x in ["EVO"]):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print(f"[bold red]Group {meta.tag} is only allowed for raw type content at BHD[/bold red]")
+                logger.info(f"[bold red]Group {meta.tag} is only allowed for raw type content at BHD[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -408,9 +408,9 @@ class BHD:
                             result['download'] = each.get('download_url', None)
                         dupes.append(result)
                 else:
-                    console.print(f"[bold red]BHD failed to search torrents. API Error: {response_data.get('message', 'Unknown Error')}")
+                    logger.info(f"[bold red]BHD failed to search torrents. API Error: {response_data.get('message', 'Unknown Error')}")
             else:
-                console.print(f"[bold red]BHD HTTP request failed. Status: {response.status_code}")
+                logger.info(f"[bold red]BHD HTTP request failed. Status: {response.status_code}")
 
         return dupes
 

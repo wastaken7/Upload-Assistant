@@ -6,7 +6,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from io import BytesIO
 from pathlib import Path
-from typing import Any, TypeAlias, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import cli_ui
@@ -16,7 +16,7 @@ from PIL import Image
 
 from src.bbcode import BBCODE
 from src.btnid import BtnIdManager
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackersetup import api_trackers
@@ -26,7 +26,7 @@ config: dict[str, Any] = {}
 default_config: Mapping[str, Any] = {}
 trackers_config: Mapping[str, Any] = {}
 
-ImageDict: TypeAlias = dict[str, Any]
+type ImageDict = dict[str, Any]
 
 
 expected_images = 0
@@ -105,10 +105,10 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
             unique_images.append(img)
         elif img_url:
             if meta.debug:
-                console.print(f"[yellow]Removing duplicate image URL: {img_url}[/yellow]")
+                logger.debug(f"[yellow]Removing duplicate image URL: {img_url}[/yellow]")
 
     if len(unique_images) < len(imagelist) and meta.debug:
-        console.print(f"[yellow]Removed {len(imagelist) - len(unique_images)} duplicate images from the list.[/yellow]")
+        logger.info(f"[yellow]Removed {len(imagelist) - len(unique_images)} duplicate images from the list.[/yellow]")
 
     # Map fixed resolution names to vertical resolutions
     resolution_map = {
@@ -131,7 +131,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
 
     # If no valid resolution is found, skip processing
     if expected_vertical_resolution is None:
-        console.print("[red]Meta resolution is invalid or missing. Skipping all images.[/red]")
+        logger.info("[red]Meta resolution is invalid or missing. Skipping all images.[/red]")
         return []
 
     # Function to check each image's URL, host, and log resolution
@@ -174,7 +174,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
                                     upper_bound = expected_vertical_resolution * (1.30 if meta.is_disc == "DVD" else 1.00)
 
                                     if not (lower_bound <= vertical_resolution <= upper_bound):
-                                        console.print(
+                                        logger.info(
                                             f"[red]Image {img_url} resolution ({vertical_resolution}p) "
                                             f"is outside the allowed range ({int(lower_bound)}-{int(upper_bound)}p). Skipping.[/red]"
                                         )
@@ -185,35 +185,35 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
                                     image_filename = os.path.join(save_directory, os.path.basename(img_url))
                                     await asyncio.to_thread(Path(image_filename).write_bytes, image_content)
 
-                                    console.print(f"Saved {img_url} as {image_filename}")
+                                    logger.info(f"Saved {img_url} as {image_filename}")
 
                                     meta.image_sizes[img_url] = len(image_content)
 
                                     if meta.debug:
-                                        console.print(
+                                        logger.debug(
                                             f"Valid image {img_url} with resolution {image.width}x{image.height} "
                                             f"and size {len(image_content) / 1024:.2f} KiB"
                                         )
                                     return image_dict
                                 except Exception as e:
-                                    console.print(f"[red]Failed to process image {img_url}: {e}")
+                                    logger.error(f"[red]Failed to process image {img_url}: {e}")
                                     return None
                             else:
-                                console.print(f"[red]Failed to fetch image {img_url}. Status: {response.status_code}. Skipping.")
+                                logger.error(f"[red]Failed to fetch image {img_url}. Status: {response.status_code}. Skipping.")
                                 return None
                         except TimeoutError:
-                            console.print(f"[red]Timeout downloading image: {img_url}")
+                            logger.info(f"[red]Timeout downloading image: {img_url}")
                             return None
                         except httpx.HTTPError as e:
-                            console.print(f"[red]Client error downloading image: {img_url} - {e}")
+                            logger.info(f"[red]Client error downloading image: {img_url} - {e}")
                             return None
                 except Exception as e:
-                    console.print(f"[red]Session error for image: {img_url} - {e}")
+                    logger.info(f"[red]Session error for image: {img_url} - {e}")
                     return None
             else:
                 return None
         except Exception as e:
-            console.print(f"[red]Error checking image: {img_url} - {e}")
+            logger.error(f"[red]Error checking image: {img_url} - {e}")
             return None
 
     # Run image verification concurrently but with a limit to prevent too many simultaneous connections
@@ -228,7 +228,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
     try:
         results = await asyncio.gather(*tasks, return_exceptions=False)
     except Exception as e:
-        console.print(f"[red]Error during image processing: {e}")
+        logger.error(f"[red]Error during image processing: {e}")
         results = []
 
     # Collect valid images and limit to amount set in config
@@ -260,22 +260,22 @@ async def check_image_link(url: str, timeout: httpx.Timeout | None = None) -> bo
                             image.verify()  # This will check if the image is broken
                             return True
                         except (OSError, SyntaxError) as e:
-                            console.print(f"[red]Image verification failed (corrupt image): {url} {e}[/red]")
+                            logger.info(f"[red]Image verification failed (corrupt image): {url} {e}[/red]")
                             return False
                     else:
-                        console.print(f"[red]Content type is not an image: {url}[/red]")
+                        logger.info(f"[red]Content type is not an image: {url}[/red]")
                         return False
                 else:
-                    console.print(f"[red]Failed to retrieve image: {url} (status code: {response.status_code})[/red]")
+                    logger.error(f"[red]Failed to retrieve image: {url} (status code: {response.status_code})[/red]")
                     return False
             except TimeoutError:
-                console.print(f"[red]Timeout checking image link: {url}[/red]")
+                logger.info(f"[red]Timeout checking image link: {url}[/red]")
                 return False
             except Exception as e:
-                console.print(f"[red]Exception occurred while checking image: {url} - {str(e)}[/red]")
+                logger.info(f"[red]Exception occurred while checking image: {url} - {str(e)}[/red]")
                 return False
     except Exception as e:
-        console.print(f"[red]Session creation failed for: {url} - {str(e)}[/red]")
+        logger.info(f"[red]Session creation failed for: {url} - {str(e)}[/red]")
         return False
 
 
@@ -285,19 +285,19 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
     if tmdb:
         meta.tmdb_id = tmdb
         if meta.debug:
-            console.print("set TMDB ID:", meta.tmdb_id)
+            logger.debug(f"set TMDB ID: {meta.tmdb_id}")
     if imdb:
         meta.imdb_id = int(imdb)
         if meta.debug:
-            console.print("set IMDB ID:", meta.imdb_id)
+            logger.debug(f"set IMDB ID: {meta.imdb_id}")
     if tvdb:
         meta.tvdb_id = tvdb
         if meta.debug:
-            console.print("set TVDB ID:", meta.tvdb_id)
+            logger.debug(f"set TVDB ID: {meta.tvdb_id}")
     if mal:
         meta.mal_id = mal
         if meta.debug:
-            console.print("set MAL ID:", meta.mal_id)
+            logger.debug(f"set MAL ID: {meta.mal_id}")
     if desc and not skip_tracker_descriptions:
         meta.description = desc
         meta.saved_description = True
@@ -311,7 +311,7 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
         elif "TV" in cat_upper:
             meta.category = "TV"
         if meta.debug:
-            console.print("set Category:", meta.category)
+            logger.debug(f"set Category: {meta.category}")
 
     imagelist_typed = cast(list[ImageDict] | None, imagelist)
     if imagelist_typed:  # Ensure imagelist is not empty before setting
@@ -325,7 +325,7 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
         meta[f'{tracker_name.lower()}_filename'] = filename
 
     if meta.debug:
-        console.print(f"[green]{tracker_name} data successfully updated in meta[/green]")
+        logger.debug(f"[green]{tracker_name} data successfully updated in meta[/green]")
     return True
 
 
@@ -349,7 +349,7 @@ async def update_metadata_from_tracker(
             imdb_id, ptp_torrent_id, meta.ext_torrenthash = cast(tuple[int, int | None, str | None], ptp_result)
             if ptp_torrent_id:
                 if imdb_id:
-                    console.print(f"[green]{tracker_name} IMDb ID found: tt{str(imdb_id).zfill(7)}[/green]")
+                    logger.info(f"[green]{tracker_name} IMDb ID found: tt{str(imdb_id).zfill(7)}[/green]")
 
                 if not meta.unattended:
                     if await prompt_user_for_confirmation("Do you want to use this ID data from PTP?"):
@@ -389,7 +389,7 @@ async def update_metadata_from_tracker(
                             meta.image_list = valid_images
             else:
                 if meta.debug:
-                    console.print("[yellow]Skipping PTP as no match found[/yellow]")
+                    logger.debug("[yellow]Skipping PTP as no match found[/yellow]")
                 found_match = False
 
         else:
@@ -399,7 +399,7 @@ async def update_metadata_from_tracker(
             if imdb_id:
                 meta.imdb_id = imdb_id
                 if meta.debug:
-                    console.print(f"[green]IMDb ID found: tt{str(meta.imdb_id).zfill(7)}[/green]")
+                    logger.debug(f"[green]IMDb ID found: tt{str(meta.imdb_id).zfill(7)}[/green]")
                 found_match = True
                 meta.skipit = True
                 if not skip_tracker_descriptions or meta.keep_images:
@@ -411,9 +411,9 @@ async def update_metadata_from_tracker(
                     valid_images = await check_images_concurrently(ptp_imagelist, meta)
                     if valid_images:
                         meta.image_list = valid_images
-                        console.print("[green]PTP images added to metadata.[/green]")
+                        logger.info("[green]PTP images added to metadata.[/green]")
             else:
-                console.print(f"[yellow]Could not find IMDb ID using PTP ID: {ptp_torrent_id}[/yellow]")
+                logger.info(f"[yellow]Could not find IMDb ID using PTP ID: {ptp_torrent_id}[/yellow]")
                 found_match = False
 
     elif tracker_name == "BHD":
@@ -430,14 +430,14 @@ async def update_metadata_from_tracker(
             bhd_rss_key = None
 
         if not bhd_api or not bhd_rss_key:
-            console.print("[red]BHD API or RSS key not found. Please check your configuration.[/red]")
+            logger.info("[red]BHD API or RSS key not found. Please check your configuration.[/red]")
             return meta, False
         use_foldername = bool(meta.is_disc) or meta.keep_folder is True or meta.isdir is True
 
         if meta.bhd:
             imdb, tmdb = cast(
                 tuple[int | None, int | None],
-                await BtnIdManager.get_bhd_torrents(bhd_api, bhd_rss_key, meta, skip_tracker_descriptions=skip_tracker_descriptions, torrent_id=meta.bhd),
+                await BtnIdManager.get_bhd_torrents(bhd_api, bhd_rss_key, meta, skip_tracker_descriptions=skip_tracker_descriptions, torrent_id=int(meta.bhd)),
             )
         elif use_foldername:
             # Use folder name from path if available, fall back to UUID
@@ -458,7 +458,7 @@ async def update_metadata_from_tracker(
 
         if to_int(imdb) != 0 or to_int(tmdb) != 0:
             if not meta.unattended:
-                console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TMDb ID: {tmdb}[/green]")
+                logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TMDb ID: {tmdb}[/green]")
                 if await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
                     found_match = True
                     meta.imdb_id = to_int(imdb, to_int(meta.imdb_id))
@@ -466,11 +466,11 @@ async def update_metadata_from_tracker(
                     description_value = meta.description
                     if isinstance(description_value, str) and description_value:
                         description = description_value
-                        console.print("[bold green]Successfully grabbed description from BHD")
-                        console.print(f"Description after cleaning:\n{description[:1000]}...", markup=False)
+                        logger.info("[bold green]Successfully grabbed description from BHD")
+                        logger.info(f"Description after cleaning:\n{description[:1000]}...", extra={"markup": False})
 
                         if not meta.skipit:
-                            console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                            logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                             edit_choice = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
 
                             if (edit_choice or "").lower() == 'e':
@@ -480,13 +480,13 @@ async def update_metadata_from_tracker(
                                     desc = edited_description.strip()
                                     meta.description = desc
                                     meta.saved_description = True
-                                console.print(f"[green]Final description after editing:[/green] {meta.description}", markup=False)
+                                logger.info(f"[green]Final description after editing:[/green] {meta.description}", extra={"markup": False})
                             elif (edit_choice or "").lower() == 'd':
                                 meta.description = ""
                                 meta.image_list = []
-                                console.print("[yellow]Description discarded.[/yellow]")
+                                logger.info("[yellow]Description discarded.[/yellow]")
                             else:
-                                console.print("[green]Keeping the original description.[/green]")
+                                logger.info("[green]Keeping the original description.[/green]")
                                 meta.description = description
                                 meta.saved_description = True
                         else:
@@ -497,9 +497,9 @@ async def update_metadata_from_tracker(
                             nfo_file_path = os.path.join(meta.base_dir, "tmp", meta.uuid, "bhd.nfo")
                             if os.path.exists(nfo_file_path):
                                 nfo_content = await asyncio.to_thread(Path(nfo_file_path).read_text, encoding="utf-8")
-                                console.print("[bold green]Successfully grabbed FraMeSToR description")
-                                console.print(f"Description content:\n{nfo_content[:1000]}...", markup=False)
-                                console.print("[cyan]Do you want to discard or keep the description?[/cyan]")
+                                logger.info("[bold green]Successfully grabbed FraMeSToR description")
+                                logger.info(f"Description content:\n{nfo_content[:1000]}...", extra={"markup": False})
+                                logger.info("[cyan]Do you want to discard or keep the description?[/cyan]")
                                 edit_choice = cli_ui.ask_string("Enter 'd' to discard, or press Enter to keep it as is: ")
 
                                 if (edit_choice or "").lower() == 'd':
@@ -513,21 +513,21 @@ async def update_metadata_from_tracker(
                                         for attempt in range(3):
                                             try:
                                                 os.remove(nfo_file_path)
-                                                console.print("[yellow]NFO file successfully deleted.[/yellow]")
+                                                logger.info("[yellow]NFO file successfully deleted.[/yellow]")
                                                 break
                                             except Exception as e:
                                                 if attempt < 2:
-                                                    console.print(f"[yellow]Attempt {attempt+1}: Could not delete file, retrying in 1 second...[/yellow]")
+                                                    logger.info(f"[yellow]Attempt {attempt+1}: Could not delete file, retrying in 1 second...[/yellow]")
                                                     await asyncio.sleep(1)
                                                 else:
-                                                    console.print(f"[red]Failed to delete BHD NFO file after 3 attempts: {e}[/red]")
+                                                    logger.error(f"[red]Failed to delete BHD NFO file after 3 attempts: {e}[/red]")
                                     except Exception as e:
-                                        console.print(f"[red]Error during file cleanup: {e}[/red]")
+                                        logger.error(f"[red]Error during file cleanup: {e}[/red]")
                                     meta.nfo = False
                                     meta.bhd_nfo = False
-                                    console.print("[yellow]Description discarded.[/yellow]")
+                                    logger.info("[yellow]Description discarded.[/yellow]")
                                 else:
-                                    console.print("[green]Keeping the original description.[/green]")
+                                    logger.info("[green]Keeping the original description.[/green]")
 
                     image_list = cast(Sequence[ImageDict] | None, meta.image_list)
                     if image_list:
@@ -539,7 +539,7 @@ async def update_metadata_from_tracker(
                             meta.image_list = []
 
                 else:
-                    console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
+                    logger.info(f"[yellow]{tracker_name} data discarded.[/yellow]")
                     meta[tracker_key] = None
                     meta.imdb_id = meta.imdb_id if meta.imdb_id else 0
                     meta.tmdb_id = meta.tmdb_id if meta.tmdb_id else 0
@@ -555,14 +555,14 @@ async def update_metadata_from_tracker(
                         try:
                             os.remove(nfo_file_path)
                         except Exception as e:
-                            console.print(f"[red]Failed to delete BHD NFO file: {e}[/red]")
+                            logger.error(f"[red]Failed to delete BHD NFO file: {e}[/red]")
                     found_match = False
             else:
                 # Only treat as match if we actually got valid IDs
                 meta.imdb_id = to_int(imdb, to_int(meta.imdb_id))
                 meta.tmdb_id = to_int(tmdb, to_int(meta.tmdb_id))
                 if to_int(meta.imdb_id) != 0 or to_int(meta.tmdb_id) != 0:
-                    console.print(f"[green]{tracker_name} data found: IMDb ID: {meta.imdb_id}, TMDb ID: {meta.tmdb_id}[/green]")
+                    logger.info(f"[green]{tracker_name} data found: IMDb ID: {meta.imdb_id}, TMDb ID: {meta.tmdb_id}[/green]")
                     found_match = True
                     image_list = cast(Sequence[ImageDict] | None, meta.image_list)
                     if image_list:
@@ -573,17 +573,17 @@ async def update_metadata_from_tracker(
                             meta.image_list = []
                 else:
                     if meta.debug:
-                        console.print(f"[yellow]{tracker_name} returned invalid IDs (both 0), not using as match[/yellow]")
+                        logger.debug(f"[yellow]{tracker_name} returned invalid IDs (both 0), not using as match[/yellow]")
                     found_match = False
         else:
             if meta.debug:
-                console.print(f"[yellow]{tracker_name} returned invalid IDs (both 0)[/yellow]")
+                logger.debug(f"[yellow]{tracker_name} returned invalid IDs (both 0)[/yellow]")
             found_match = False
 
     elif tracker_name in api_trackers:
         if meta.get(tracker_key) is not None:
             if meta.debug:
-                console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
+                logger.debug(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
             tracker_data = cast(
                 Sequence[Any],
                 await COMMON(config).unit3d_torrent_info(
@@ -597,7 +597,7 @@ async def update_metadata_from_tracker(
             )
         else:
             if meta.debug:
-                console.print(f"[yellow]No ID found in meta for {tracker_name}, searching by file name[/yellow]")
+                logger.debug(f"[yellow]No ID found in meta for {tracker_name}, searching by file name[/yellow]")
             tracker_data = cast(
                 Sequence[Any],
                 await COMMON(config).unit3d_torrent_info(
@@ -612,19 +612,19 @@ async def update_metadata_from_tracker(
 
         if any(item not in [None, 0] for item in tracker_data[:3]):  # Check for valid tmdb, imdb, or tvdb
             if meta.debug:
-                console.print(f"[green]Valid data found on {tracker_name}[/green]")
+                logger.debug(f"[green]Valid data found on {tracker_name}[/green]")
             selected = await update_meta_with_unit3d_data(meta, tracker_data, tracker_name, skip_tracker_descriptions)
             found_match = selected
         else:
             if meta.debug:
-                console.print(f"[yellow]No valid data found on {tracker_name}[/yellow]")
+                logger.debug(f"[yellow]No valid data found on {tracker_name}[/yellow]")
             found_match = False
 
     elif tracker_name == "HDB":
         bbcode = BBCODE()
         if meta.hdb is not None:
             meta[manual_key] = meta[tracker_key]
-            console.print(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
+            logger.info(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
 
             # Use get_info_from_torrent_id function if ID is found in meta
             hdb_info = await tracker_instance.get_info_from_torrent_id(meta[tracker_key])
@@ -644,11 +644,11 @@ async def update_metadata_from_tracker(
                     bbcode.clean_hdb_description(description_source),
                 )
                 if description and len(description) > 0 and not skip_tracker_descriptions:
-                    console.print(f"Description content:\n{description[:500]}...", markup=False)
+                    logger.info(f"Description content:\n{description[:500]}...", extra={"markup": False})
                     meta.description = description
                     meta.saved_description = True
                 else:
-                    console.print("[yellow]HDB description empty[/yellow]")
+                    logger.info("[yellow]HDB description empty[/yellow]")
                 if image_list and meta.keep_images:
                     valid_images = await check_images_concurrently(image_list, meta)
                     if valid_images:
@@ -657,13 +657,13 @@ async def update_metadata_from_tracker(
                 else:
                     meta.image_list = []
 
-                console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDB Name: {meta.hdb_name}[/green]")
+                logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDB Name: {meta.hdb_name}[/green]")
             else:
-                console.print(f"[yellow]{tracker_name} data not found for ID: {meta[tracker_key]}[/yellow]")
+                logger.info(f"[yellow]{tracker_name} data not found for ID: {meta[tracker_key]}[/yellow]")
                 found_match = False
         else:
             if meta.debug:
-                console.print("[yellow]No ID found in meta for HDB, searching by file name[/yellow]")
+                logger.debug("[yellow]No ID found in meta for HDB, searching by file name[/yellow]")
 
             # Use search_filename function if ID is not found in meta
             hdb_search = await tracker_instance.search_filename(search_term, search_file_folder, meta)
@@ -677,9 +677,9 @@ async def update_metadata_from_tracker(
 
             if imdb or tvdb_id or meta.hdb_description:
                 if not meta.unattended:
-                    console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDB Name: {meta.hdb_name}[/green]")
+                    logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDB Name: {meta.hdb_name}[/green]")
                     if await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
-                        console.print(f"[green]{tracker_name} data retained.[/green]")
+                        logger.info(f"[green]{tracker_name} data retained.[/green]")
                         meta.imdb_id = imdb if imdb else meta.imdb_id
                         meta.tvdb_id = tvdb_id if tvdb_id else meta.tvdb_id
                         found_match = True
@@ -689,9 +689,9 @@ async def update_metadata_from_tracker(
                             bbcode.clean_hdb_description(description_source),
                         )
                         if description and len(description) > 0 and not skip_tracker_descriptions:
-                            console.print("[bold green]Successfully grabbed description from HDB")
-                            console.print(f"HDB Description content:\n{description[:1000]}.....", markup=False)
-                            console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                            logger.info("[bold green]Successfully grabbed description from HDB")
+                            logger.info(f"HDB Description content:\n{description[:1000]}.....", extra={"markup": False})
+                            logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                             edit_choice_raw = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
                             edit_choice = (edit_choice_raw or "").strip().lower()
 
@@ -702,23 +702,23 @@ async def update_metadata_from_tracker(
                                     description = edited_description.strip()
                                     meta.description = description
                                     meta.saved_description = True
-                                console.print(f"[green]Final description after editing:[/green] {description}", markup=False)
+                                logger.info(f"[green]Final description after editing:[/green] {description}", extra={"markup": False})
                             elif edit_choice.lower() == 'd':
                                 meta.hdb_description = ""
-                                console.print("[yellow]Description discarded.[/yellow]")
+                                logger.info("[yellow]Description discarded.[/yellow]")
                             else:
-                                console.print("[green]Keeping the original description.[/green]")
+                                logger.info("[green]Keeping the original description.[/green]")
                                 meta.description = description
                                 meta.saved_description = True
                         else:
-                            console.print("[yellow]HDB description empty[/yellow]")
+                            logger.info("[yellow]HDB description empty[/yellow]")
                         if image_list and meta.keep_images:
                             valid_images = await check_images_concurrently(image_list, meta)
                             if valid_images:
                                 meta.image_list = valid_images
                                 await handle_image_list(meta, tracker_name, valid_images)
                     else:
-                        console.print(f"[yellow]{tracker_name} data discarded.[/yellow]")
+                        logger.info(f"[yellow]{tracker_name} data discarded.[/yellow]")
                         meta[tracker_key] = None
                         meta.tvdb_id = meta.tvdb_id if meta.tvdb_id else 0
                         meta.imdb_id = meta.imdb_id if meta.imdb_id else 0
@@ -734,7 +734,7 @@ async def update_metadata_from_tracker(
                         bbcode.clean_hdb_description(description_source),
                     )
                     if description and len(description) > 0 and not skip_tracker_descriptions:
-                        console.print(f"HDB Description content:\n{description[:500]}.....", markup=False)
+                        logger.info(f"HDB Description content:\n{description[:500]}.....", extra={"markup": False})
                         meta.description = description
                         meta.saved_description = True
                     if image_list and meta.keep_images:
@@ -742,7 +742,7 @@ async def update_metadata_from_tracker(
                         if valid_images:
                             meta.image_list = valid_images
                             await handle_image_list(meta, tracker_name, valid_images)
-                    console.print(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDB Name: {hdb_name}[/green]")
+                    logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDB Name: {hdb_name}[/green]")
                     found_match = True
             else:
                 meta.hdb_name = None
@@ -756,9 +756,9 @@ async def update_metadata_from_tracker(
 async def handle_image_list(meta: Meta, tracker_name: str, valid_images: Sequence[ImageDict] | None = None) -> None:
     if meta.image_list:
         valid_count = len(valid_images) if valid_images is not None else 0
-        console.print(f"[cyan]Selected the following {valid_count} valid images from {tracker_name}:")
+        logger.info(f"[cyan]Selected the following {valid_count} valid images from {tracker_name}:")
         for img in meta.image_list:
-            console.print(f"Image:[green]'{img.get('img_url')}'[/green]")
+            logger.info(f"Image:[green]'{img.get('img_url')}'[/green]")
 
         if meta.unattended:
             keep_images = True
@@ -775,11 +775,11 @@ async def handle_image_list(meta: Meta, tracker_name: str, valid_images: Sequenc
                         os.remove(png_file)
 
                     if png_files:
-                        console.print(f"[yellow]Successfully deleted {len(png_files)} image files.[/yellow]")
+                        logger.info(f"[yellow]Successfully deleted {len(png_files)} image files.[/yellow]")
                     else:
-                        console.print("[yellow]No image files found to delete.[/yellow]")
+                        logger.info("[yellow]No image files found to delete.[/yellow]")
                 except Exception as e:
-                    console.print(f"[red]Failed to delete image files: {e}[/red]")
-                console.print(f"[yellow]Images discarded from {tracker_name}.")
+                    logger.error(f"[red]Failed to delete image files: {e}[/red]")
+                logger.info(f"[yellow]Images discarded from {tracker_name}.")
             else:
-                console.print(f"[green]Images retained from {tracker_name}.")
+                logger.info(f"[green]Images retained from {tracker_name}.")

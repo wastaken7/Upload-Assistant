@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import httpx
 
-from src.console import console
+from src.console import logger
 
 ShowInfo = dict[str, Any]
 
@@ -21,7 +21,7 @@ class SonarrManager:
         debug: bool = False,
     ) -> ShowInfo | None:
         if not any(key.startswith('sonarr_api_key') for key in self.default_config):
-            console.print("[red]No Sonarr API keys are configured.[/red]")
+            logger.info("[red]No Sonarr API keys are configured.[/red]")
             return None
 
         # Try each Sonarr instance until we get valid data
@@ -50,8 +50,7 @@ class SonarrManager:
             api_key = api_key_value.strip()
             base_url = base_url_value.strip().rstrip('/')
 
-            if debug:
-                console.print(f"[blue]Trying Sonarr instance {instance_index if instance_index > 0 else 'default'}[/blue]")
+            logger.debug(f"[blue]Trying Sonarr instance {instance_index if instance_index > 0 else 'default'}[/blue]")
 
             # Build the appropriate URL
             if tvdb_id:
@@ -67,9 +66,8 @@ class SonarrManager:
                 "Content-Type": "application/json"
             }
 
-            if debug:
-                console.print(f"[green]TVDB ID {tvdb_id}[/green]")
-                console.print(f"[blue]Sonarr URL:[/blue] {url}")
+            logger.debug(f"[green]TVDB ID {tvdb_id}[/green]")
+            logger.debug(f"[blue]Sonarr URL:[/blue] {url}")
 
             try:
                 async with httpx.AsyncClient() as client:
@@ -78,31 +76,30 @@ class SonarrManager:
                     if response.status_code == 200:
                         data = response.json()
 
-                        if debug:
-                            console.print(f"[blue]Sonarr Response Status:[/blue] {response.status_code}")
-                            console.print(f"[blue]Sonarr Response Data:[/blue] {data}")
+                        logger.debug(f"[blue]Sonarr Response Status:[/blue] {response.status_code}")
+                        logger.debug(f"[blue]Sonarr Response Data:[/blue] {data}")
 
                         # Check if we got valid data by trying to extract show info
                         show_data: ShowInfo = await self.extract_show_data(data)
 
                         if show_data and (show_data.get("tvdb_id") or show_data.get("imdb_id") or show_data.get("tmdb_id")):
-                            console.print(f"[green]Found valid show data from Sonarr instance {instance_index if instance_index > 0 else 'default'}[/green]")
+                            logger.info(f"[green]Found valid show data from Sonarr instance {instance_index if instance_index > 0 else 'default'}[/green]")
                             return show_data
                     else:
-                        console.print(f"[yellow]Failed to fetch from Sonarr instance {instance_index if instance_index > 0 else 'default'}: {response.status_code} - {response.text}[/yellow]")
+                        logger.info(f"[yellow]Failed to fetch from Sonarr instance {instance_index if instance_index > 0 else 'default'}: {response.status_code} - {response.text}[/yellow]")
 
             except httpx.TimeoutException:
-                console.print(f"[red]Timeout when fetching from Sonarr instance {instance_index if instance_index > 0 else 'default'}[/red]")
+                logger.info(f"[red]Timeout when fetching from Sonarr instance {instance_index if instance_index > 0 else 'default'}[/red]")
             except httpx.RequestError as e:
-                console.print(f"[red]Error fetching from Sonarr instance {instance_index if instance_index > 0 else 'default'}: {e}[/red]")
+                logger.error(f"[red]Error fetching from Sonarr instance {instance_index if instance_index > 0 else 'default'}: {e}[/red]")
             except Exception as e:
-                console.print(f"[red]Unexpected error with Sonarr instance {instance_index if instance_index > 0 else 'default'}: {e}[/red]")
+                logger.error(f"[red]Unexpected error with Sonarr instance {instance_index if instance_index > 0 else 'default'}: {e}[/red]")
 
             # Move to the next instance
             instance_index += 1
 
         # If we got here, no instances provided valid data
-        console.print("[yellow]No Sonarr instance returned valid show data.[/yellow]")
+        logger.info("[yellow]No Sonarr instance returned valid show data.[/yellow]")
         return None
 
     async def extract_show_data(self, sonarr_data: Any) -> ShowInfo:

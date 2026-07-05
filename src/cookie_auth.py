@@ -16,7 +16,7 @@ from bs4.element import AttributeValueList
 from rich.panel import Panel
 from rich.table import Table
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
@@ -42,26 +42,26 @@ class CookieValidator:
         try:
             cookie_jar.load(ignore_discard=True, ignore_expires=True)
         except http.cookiejar.LoadError as e:
-            console.print(f"{tracker}: Failed to load the cookie file: {e}")
-            console.print(f"{tracker}: Please ensure the cookie file is in the correct format (Netscape).")
+            logger.info(f"{tracker}: Failed to load the cookie file: {e}")
+            logger.info(f"{tracker}: Please ensure the cookie file is in the correct format (Netscape).")
             return None
         except FileNotFoundError:
             # Attempt automatic login for AR tracker
             if tracker == 'AR':
-                console.print(f"{tracker}: [yellow]Cookie file not found. Attempting automatic login...[/yellow]")
+                logger.info(f"{tracker}: [yellow]Cookie file not found. Attempting automatic login...[/yellow]")
                 if await self.ar_login(meta, tracker, cookie_file):
                     # Try loading the newly created cookie file
                     try:
                         cookie_jar.load(ignore_discard=True, ignore_expires=True)
                         return cookie_jar
                     except Exception as e:
-                        console.print(f"{tracker}: Failed to load cookies after login: {e}")
+                        logger.info(f"{tracker}: Failed to load cookies after login: {e}")
                         return None
                 else:
-                    console.print(f"{tracker}: Automatic login failed.")
+                    logger.info(f"{tracker}: Automatic login failed.")
                     return None
 
-            console.print(
+            logger.info(
                 f"{tracker}: [red]Cookie file not found.[/red]\n"
                 f"{tracker}: You must first log in through your usual browser and export the cookies to: [yellow]{cookie_file}[/yellow]\n"
                 f'{tracker}: Cookies can be exported using browser extensions like "cookies.txt" (Firefox) or "Get cookies.txt LOCALLY" (Chrome).'
@@ -73,13 +73,13 @@ class CookieValidator:
     async def save_session_cookies(self, tracker: str, cookie_jar: http.cookiejar.MozillaCookieJar | None) -> None:
         """Save updated cookies after a successful validation."""
         if not cookie_jar:
-            console.print(f"{tracker}: Cookie jar not initialized, cannot save cookies.")
+            logger.info(f"{tracker}: Cookie jar not initialized, cannot save cookies.")
             return
 
         try:
             cookie_jar.save(ignore_discard=True, ignore_expires=True)
         except Exception as e:
-            console.print(f"{tracker}: Failed to update the cookie file: {e}")
+            logger.info(f"{tracker}: Failed to update the cookie file: {e}")
 
     async def get_ar_auth_key(self, meta: Meta, tracker: str) -> str | None:
         """Retrieve the saved auth key for AR tracker."""
@@ -94,7 +94,7 @@ class CookieValidator:
                     if auth_key:
                         return auth_key
             except Exception as e:
-                console.print(f"{tracker}: Error reading auth key: {e}")
+                logger.info(f"{tracker}: Error reading auth key: {e}")
 
         return None
 
@@ -104,7 +104,7 @@ class CookieValidator:
         password = self.config['TRACKERS'][tracker].get('password', '').strip()
 
         if not username or not password:
-            console.print(f"{tracker}: Username or password not configured in config.")
+            logger.info(f"{tracker}: Username or password not configured in config.")
             return False
 
         base_url = 'https://alpharatio.cc'
@@ -125,21 +125,21 @@ class CookieValidator:
                 response = await client.post(login_url, data=login_data)
 
                 if response.status_code != 200:
-                    console.print(f"{tracker}: Login failed with status code {response.status_code}")
+                    logger.info(f"{tracker}: Login failed with status code {response.status_code}")
                     return False
 
                 # Check for login success by looking for error indicators
                 if 'login.php?act=recover' in response.text or 'Forgot your password' in response.text:
-                    console.print(f"{tracker}: [red]Login failed. Please check your username and password.[/red]")
+                    logger.info(f"{tracker}: [red]Login failed. Please check your username and password.[/red]")
                     if meta.debug:
                         failure_path = await self.common.save_html_file(meta, tracker, response.text, "Failed_Login")
-                        console.print(f"{tracker}: Login response saved to [yellow]{failure_path}[/yellow] for debugging.")
+                        logger.debug(f"{tracker}: Login response saved to [yellow]{failure_path}[/yellow] for debugging.")
                     return False
 
                 # Validate we're logged in by checking the torrents page
                 test_response = await client.get(f'{base_url}/torrents.php')
                 if test_response.status_code == 200 and 'login.php?act=recover' not in test_response.text:
-                    console.print(f"{tracker}: [green]Login successful![/green]")
+                    logger.info(f"{tracker}: [green]Login successful![/green]")
 
                     # Extract auth key from the response page
                     auth_key = None
@@ -150,7 +150,7 @@ class CookieValidator:
                         auth_match = re.search(r'auth=([^&]+)', href)
                         if auth_match:
                             auth_key = auth_match.group(1)
-                            console.print(f"{tracker}: [green]Auth key extracted successfully[/green]")
+                            logger.info(f"{tracker}: [green]Auth key extracted successfully[/green]")
 
                     # Save cookies in Netscape format
                     os.makedirs(os.path.dirname(cookie_file), exist_ok=True)
@@ -186,30 +186,30 @@ class CookieValidator:
                                 break
 
                     cookie_jar.save(ignore_discard=True, ignore_expires=True)
-                    console.print(f"{tracker}: [green]Cookies saved to {cookie_file}[/green]")
+                    logger.info(f"{tracker}: [green]Cookies saved to {cookie_file}[/green]")
 
                     # Save auth key to a separate file if found
                     if auth_key:
                         auth_file = cookie_file.replace('.txt', '_auth.txt')
                         async with aiofiles.open(auth_file, 'w', encoding='utf-8') as f:
                             await f.write(auth_key)
-                        console.print(f"{tracker}: [green]Auth key saved to {auth_file}[/green]")
+                        logger.info(f"{tracker}: [green]Auth key saved to {auth_file}[/green]")
 
                     return True
 
-                console.print(f"{tracker}: [red]Login validation failed.[/red]")
+                logger.info(f"{tracker}: [red]Login validation failed.[/red]")
                 return False
 
         except httpx.TimeoutException:
-            console.print(f"{tracker}: Connection timed out. The site may be down or unreachable.")
+            logger.info(f"{tracker}: Connection timed out. The site may be down or unreachable.")
             return False
         except httpx.ConnectError:
-            console.print(f"{tracker}: Failed to connect. The site may be down or your connection is blocked.")
+            logger.info(f"{tracker}: Failed to connect. The site may be down or your connection is blocked.")
             return False
         except Exception as e:
-            console.print(f"{tracker}: Login error: {e}")
+            logger.info(f"{tracker}: Login error: {e}")
             if meta.debug:
-                console.print(traceback.format_exc())
+                logger.debug(traceback.format_exc())
             return False
 
     async def cookie_validation(
@@ -287,38 +287,38 @@ class CookieValidator:
                 return True
 
         except httpx.ConnectTimeout:
-            console.print(f"{tracker}: Connection timeout. Server took too long to respond.")
+            logger.info(f"{tracker}: Connection timeout. Server took too long to respond.")
         except httpx.ReadTimeout:
-            console.print(f"{tracker}: Read timeout. Data transfer stopped prematurely.")
+            logger.info(f"{tracker}: Read timeout. Data transfer stopped prematurely.")
         except httpx.ConnectError:
-            console.print(f"{tracker}: Connection failed. Check URL, port, and network status.")
+            logger.info(f"{tracker}: Connection failed. Check URL, port, and network status.")
         except httpx.ProxyError:
-            console.print(f"{tracker}: Proxy error. Failed to connect via proxy.")
+            logger.info(f"{tracker}: Proxy error. Failed to connect via proxy.")
         except httpx.DecodingError:
-            console.print(
+            logger.info(
                 f"{tracker}: Decoding failed. Response content is not valid (e.g., unexpected encoding)."
             )
         except httpx.TooManyRedirects:
-            console.print(f"{tracker}: Too many redirects. Request exceeded the maximum redirect limit.")
+            logger.info(f"{tracker}: Too many redirects. Request exceeded the maximum redirect limit.")
         except httpx.HTTPStatusError as e:
             status_code = str(e.response.status_code)
             reason = e.response.reason_phrase if e.response.reason_phrase else "Unknown Reason"
             url = e.request.url
-            console.print(f"{tracker}: HTTP status error {status_code}: {reason} for {url}")
+            logger.info(f"{tracker}: HTTP status error {status_code}: {reason} for {url}")
         except httpx.RequestError as e:
-            console.print(f"{tracker}: General request error: {e}")
+            logger.info(f"{tracker}: General request error: {e}")
         except Exception as e:
-            console.print(f"{tracker}: Unexpected validation error: {e}")
+            logger.info(f"{tracker}: Unexpected validation error: {e}")
 
         return False
 
     async def handle_validation_failure(self, meta: Meta, tracker: str, text: str) -> None:
-        console.print(
+        logger.info(
             f"{tracker}: Validation failed. The cookie appears to be expired or invalid.\n"
             f"{tracker}: Please log in through your usual browser and export the cookies again."
         )
         failure_path = await self.common.save_html_file(meta, tracker, text, "Failed_Login")
-        console.print(
+        logger.info(
             f"The web page has been saved to [yellow]{failure_path}[/yellow] for analysis.\n"
             "[red]Do not share this file publicly[/red], as it may contain confidential information such as passkeys, IP address, e-mail, etc.\n"
             "You can open this file in a web browser to see what went wrong.\n"
@@ -330,7 +330,7 @@ class CookieValidator:
         """Find the auth token in a web page using a regular expression pattern."""
         auth_match = re.search(token_pattern, response)
         if not auth_match:
-            console.print(
+            logger.info(
                 f"{tracker}: The required token could not be found in the page's HTML. Pattern used: {token_pattern}\n"
                 f"{tracker}: This can happen if the site HTML has changed or if the login failed silently."
             )
@@ -359,10 +359,10 @@ class CookieValidator:
             os.chmod(cookiefile, stat.S_IRUSR | stat.S_IWUSR)
 
         except OSError as e:
-            console.print(f"[red]Error with cookie file operations: {e}[/red]")
+            logger.error(f"[red]Error with cookie file operations: {e}[/red]")
             raise
         except (TypeError, ValueError) as e:
-            console.print(f"[red]Error encoding cookies to JSON: {e}[/red]")
+            logger.error(f"[red]Error encoding cookies to JSON: {e}[/red]")
             raise
 
     def _load_cookies_secure(self, session: Any, cookiefile: str, tracker: str) -> None:
@@ -376,7 +376,7 @@ class CookieValidator:
         for potential_pickle in [pickle_file, legacy_pickle_file]:
             if os.path.exists(potential_pickle) and not os.path.exists(cookiefile):
                 try:
-                    console.print(f"[yellow]Migrating legacy cookie file from {potential_pickle} to {cookiefile}[/yellow]")
+                    logger.info(f"[yellow]Migrating legacy cookie file from {potential_pickle} to {cookiefile}[/yellow]")
 
                     # Load the pickle file
                     with open(potential_pickle, 'rb') as f:
@@ -407,10 +407,10 @@ class CookieValidator:
 
                         # Migration verified successful - delete the old pickle file
                         os.remove(potential_pickle)
-                        console.print(f"[green]Successfully migrated cookies to JSON format and removed legacy file {potential_pickle}[/green]")
+                        logger.info(f"[green]Successfully migrated cookies to JSON format and removed legacy file {potential_pickle}[/green]")
 
                     except (OSError, json.JSONDecodeError) as verify_error:
-                        console.print(f"[red]Migration verification failed: {verify_error}. Keeping original file {potential_pickle}[/red]")
+                        logger.info(f"[red]Migration verification failed: {verify_error}. Keeping original file {potential_pickle}[/red]")
                         # Remove the potentially corrupted JSON file
                         if os.path.exists(cookiefile):
                             os.remove(cookiefile)
@@ -419,13 +419,13 @@ class CookieValidator:
                     break
 
                 except Exception as e:
-                    console.print(f"[red]Error migrating cookie file {potential_pickle}: {e}[/red]")
+                    logger.error(f"[red]Error migrating cookie file {potential_pickle}: {e}[/red]")
                     # Continue to try next potential file or load JSON normally
                     continue
 
             elif os.path.exists(potential_pickle) and os.path.exists(cookiefile):
                 os.remove(potential_pickle)
-                console.print(f"[yellow]Removed legacy cookie file {potential_pickle}. Using JSON file.[/yellow]")
+                logger.info(f"[yellow]Removed legacy cookie file {potential_pickle}. Using JSON file.[/yellow]")
 
         # Load cookies from JSON file
         try:
@@ -448,10 +448,10 @@ class CookieValidator:
                 )
 
         except OSError as e:
-            console.print(f"[red]Error reading cookie file: {e}[/red]")
+            logger.error(f"[red]Error reading cookie file: {e}[/red]")
             raise
         except json.JSONDecodeError as e:
-            console.print(f"[red]Error decoding JSON from cookie file: {e}[/red]")
+            logger.error(f"[red]Error decoding JSON from cookie file: {e}[/red]")
             raise
 
     def _load_cookies_dict_secure(self, cookiefile: str) -> dict[str, Any]:
@@ -461,10 +461,10 @@ class CookieValidator:
                 cookie_dict = json.load(f)
             return cast(dict[str, Any], cookie_dict)
         except OSError as e:
-            console.print(f"[red]Error reading cookie file: {e}[/red]")
+            logger.error(f"[red]Error reading cookie file: {e}[/red]")
             raise
         except json.JSONDecodeError as e:
-            console.print(f"[red]Error decoding JSON from cookie file: {e}[/red]")
+            logger.error(f"[red]Error decoding JSON from cookie file: {e}[/red]")
             raise
 
 
@@ -628,12 +628,12 @@ class CookieAuthUploader:
                     else:
                         table_data.add_row(key, str(v))
 
-                console.print(table_data, justify="center", markup=False)
+                logger.info(table_data,  justify="center", extra={"markup": False})
             else:
                 data_panel = Panel(str(data), title=f"{tracker}: Form Data - DO NOT SHARE THIS", border_style="blue")
-                console.print(data_panel, justify="center")
+                logger.info(data_panel, justify="center")
         except Exception as e:
-            console.print(f"Error displaying form data: {e}")
+            logger.info(f"Error displaying form data: {e}")
             raise
 
     async def load_torrent_file(

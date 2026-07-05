@@ -9,7 +9,7 @@ import aiofiles
 import cli_ui
 import click
 
-from src.console import console
+from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.UNIT3D import UNIT3D
@@ -34,7 +34,7 @@ class TIK(UNIT3D):
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if not meta.is_disc:
-            console.print("[red]Only disc-based content allowed at TIK")
+            logger.info("[red]Only disc-based content allowed at TIK")
             return False
 
         return True
@@ -156,7 +156,7 @@ class TIK(UNIT3D):
         }
 
         if not disctype:
-            console.print("[red]You must specify a --disctype")
+            logger.info("[red]You must specify a --disctype")
             # Raise an exception since we can't proceed without disctype
             raise ValueError("disctype is required for TIK tracker but was not provided")
 
@@ -196,7 +196,7 @@ class TIK(UNIT3D):
         if meta.description_link or meta.description_file:
             desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)
 
-            console.print(f'Custom Description Link/File Path: {desc}', markup=False)
+            logger.info(f'Custom Description Link/File Path: {desc}', extra={"markup": False})
             return {'description': desc}
 
         discs = cast(list[dict[str, Any]], meta.discs)
@@ -221,10 +221,10 @@ class TIK(UNIT3D):
         # Check if either poster.jpg or poster.png already exists
         if os.path.exists(poster_jpg_path):
             poster_path = poster_jpg_path
-            console.print("[green]Cover already exists as poster.jpg, skipping download.[/green]")
+            logger.info("[green]Cover already exists as poster.jpg, skipping download.[/green]")
         elif os.path.exists(poster_png_path):
             poster_path = poster_png_path
-            console.print("[green]Cover already exists as poster.png, skipping download.[/green]")
+            logger.info("[green]Cover already exists as poster.png, skipping download.[/green]")
         else:
             # No poster file exists, download the poster image
             poster_path = poster_jpg_path  # Default to saving as poster.jpg
@@ -233,14 +233,14 @@ class TIK(UNIT3D):
                 if parsed_url.scheme not in ('http', 'https'):
                     raise ValueError(f"Invalid URL scheme: {parsed_url.scheme}")
                 urllib.request.urlretrieve(poster_url, poster_path)  # nosec B310
-                console.print(f"[green]Cover downloaded to {poster_path}[/green]")
+                logger.info(f"[green]Cover downloaded to {poster_path}[/green]")
             except Exception as e:
-                console.print(f"[red]Error downloading poster: {e}[/red]")
+                logger.error(f"[red]Error downloading poster: {e}[/red]")
 
         # Upload the downloaded or existing poster image once
         if os.path.exists(poster_path):
             try:
-                console.print("Uploading standard poster to image host....")
+                logger.info("Uploading standard poster to image host....")
                 new_poster_url, _ = await self.uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [poster_path], {})
 
                 # Ensure that the new poster URL is assigned only once
@@ -248,9 +248,9 @@ class TIK(UNIT3D):
                 if len(poster_urls) > 0:
                     poster_url = str(poster_urls[0].get('raw_url', poster_url))
             except Exception as e:
-                console.print(f"[red]Error uploading poster: {e}[/red]")
+                logger.error(f"[red]Error uploading poster: {e}[/red]")
         else:
-            console.print("[red]Cover file not found, cannot upload.[/red]")
+            logger.info("[red]Cover file not found, cannot upload.[/red]")
 
         # Generate the description text
         desc_text: list[str] = []
@@ -410,17 +410,17 @@ class TIK(UNIT3D):
         description = ''.join(desc_text)
 
         # Ask user if they want to edit or keep the description
-        console.print(f"Current description: {description}", markup=False)
-        console.print("[cyan]Do you want to edit or keep the description?[/cyan]")
+        logger.info(f"Current description: {description}", extra={"markup": False})
+        logger.info("[cyan]Do you want to edit or keep the description?[/cyan]")
         edit_choice = cli_ui.ask_string("Enter 'e' to edit, or press Enter to keep it as is: ")
 
         if (edit_choice or "").lower() == 'e':
             edited_description = cast(str | None, click.edit(description))  # pyrefly: ignore [bad-argument-type]
             if edited_description:
                 description = edited_description.strip()
-            console.print(f"Final description after editing: {description}", markup=False)
+            logger.info(f"Final description after editing: {description}", extra={"markup": False})
         else:
-            console.print("[green]Keeping the original description.[/green]")
+            logger.info("[green]Keeping the original description.[/green]")
 
         # Write the final description to the file
         async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as desc_file:

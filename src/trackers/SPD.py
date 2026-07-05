@@ -10,7 +10,7 @@ import aiofiles
 import httpx
 
 from cogs.redaction import Redaction
-from src.console import console
+from src.console import console, logger
 from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 from src.meta import Meta
@@ -153,7 +153,7 @@ class SPD:
                     })
             return results
         else:
-            console.print(f'[bold red]HTTP request failed. Status: {response.status_code}')
+            logger.info(f'[bold red]HTTP request failed. Status: {response.status_code}')
 
 
         return results
@@ -192,18 +192,18 @@ class SPD:
 
                     if channel_id and tag:
                         if tag != spd_channel:
-                            console.print(f'[{self.tracker}]: Unable to find a matching channel based on your input. Please check if you entered it correctly.')
+                            logger.info(f'[{self.tracker}]: Unable to find a matching channel based on your input. Please check if you entered it correctly.')
                             return
                         else:
                             return int(channel_id)
                     else:
-                        console.print(f'[{self.tracker}]: Could not find the channel ID. Please check if you entered it correctly.')
+                        logger.info(f'[{self.tracker}]: Could not find the channel ID. Please check if you entered it correctly.')
 
                 else:
-                    console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+                    logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
         except Exception as e:
-            console.print(f"[bold red]Unexpected error: {e}")
+            logger.error(f"[bold red]Unexpected error: {e}")
             console.print_exception()
 
     async def edit_desc(self, meta: Meta) -> str:
@@ -382,8 +382,8 @@ class SPD:
                 return False
 
         else:
-            console.print("[cyan]SPD Request Data:")
-            console.print(Redaction.redact_private_info(data))
+            logger.info("[cyan]SPD Request Data:")
+            logger.info(Redaction.redact_private_info(data))
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success

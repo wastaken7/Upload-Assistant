@@ -3,7 +3,7 @@ import os
 import re
 from typing import Any, cast
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
@@ -118,7 +118,7 @@ class PT(UNIT3D):
             except FileNotFoundError:
                 pass
             except Exception as e:
-                console.print(f"ERRO: Falha ao processar MediaInfo para verificar áudio Português: {e}", markup=False)
+                logger.info(f"ERRO: Falha ao processar MediaInfo para verificar áudio Português: {e}", extra={"markup": False})
 
         return 1 if found_portuguese_audio else 0
 
@@ -168,7 +168,7 @@ class PT(UNIT3D):
             except FileNotFoundError:
                 pass
             except Exception as e:
-                console.print(f"ERRO: Falha ao processar MediaInfo para verificar legenda Português: {e}", markup=False)
+                logger.info(f"ERRO: Falha ao processar MediaInfo para verificar legenda Português: {e}", extra={"markup": False})
 
         return 1 if found_portuguese_subtitle else 0
 

@@ -15,7 +15,7 @@ import requests
 import tmdbsimple as tmdb
 
 from src.bbcode import BBCODE
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
@@ -358,7 +358,7 @@ class TVC:
 
             await asyncio.to_thread(_write)
         except OSError as e:
-            console.print(f"[yellow]Warning: Failed to write description file: {e}[/yellow]")
+            logger.warning(f"[yellow]Warning: Failed to write description file: {e}[/yellow]")
 
     async def get_cat_id(self, genres: list[str]) -> str:
         """
@@ -503,7 +503,7 @@ class TVC:
             content = await self.read_file(f"{meta.base_dir}/tmp/{meta.uuid}/MediaInfo.json")
             mi = cast(dict[str, Any], json.loads(content))
         except (FileNotFoundError, json.JSONDecodeError) as e:
-            console.print(f"[yellow]Warning: Could not load MediaInfo.json: {e}")
+            logger.warning(f"[yellow]Warning: Could not load MediaInfo.json: {e}")
             mi = {}
 
         cat_id = await self.get_cat_id(meta.genres) if meta.category == "TV" else "44"
@@ -534,7 +534,7 @@ class TVC:
         desc = await self.edit_desc(meta, self.tracker, self.signature, image_list)
 
         if not desc:
-            console.print(f"[yellow]Warning: DESCRIPTION.txt file not found at {descfile_path}")
+            logger.warning(f"[yellow]Warning: DESCRIPTION.txt file not found at {descfile_path}")
             desc = ""
 
         # Naming logic
@@ -688,8 +688,8 @@ class TVC:
                 return False
 
         else:
-            console.print("[cyan]TVC Request Data:")
-            console.print(data)
+            logger.info("[cyan]TVC Request Data:")
+            logger.info(data)
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
@@ -754,10 +754,10 @@ class TVC:
         if meta.category == "MOVIE":
             # Everything movie-specific is already handled
             if meta.debug and meta.tmdb is not None:
-                console.print("[yellow]Fetching TMDb movie details[/yellow]")
+                logger.info("[yellow]Fetching TMDb movie details[/yellow]")
                 movie = tmdb.Movies(meta.tmdb)
                 response = cast(Any, movie).info()
-                console.print(f"[cyan]DEBUG: Movie data: {response}[/cyan]")
+                logger.info(f"[cyan]DEBUG: Movie data: {response}[/cyan]")
             return {}
 
         elif meta.category == "TV":
@@ -826,10 +826,10 @@ class TVC:
                         meta.episodes = episodes
 
             except (requests.exceptions.RequestException, KeyError, TypeError) as e:
-                console.print(f"[yellow]Expected error while fetching TV episode/season info: {e}")
-                console.print(traceback.format_exc())
+                logger.info(f"[yellow]Expected error while fetching TV episode/season info: {e}")
+                logger.info(traceback.format_exc())
 
-                console.print(
+                logger.info(
                     f"Unable to get episode information, Make sure episode {meta.season}{meta.episode} exists in TMDB.\n"
                     f"https://www.themoviedb.org/tv/{meta.tmdb}/season/{meta.season_int}"
                 )
@@ -845,7 +845,7 @@ class TVC:
     async def get_additional_checks(self, meta: Meta) -> bool:
         # UHD, Discs, remux and non-1080p HEVC are not allowed on TVC.
         if meta.resolution == "2160p" or (meta.is_disc or "REMUX" in str(meta.type)) or (meta.video_codec == "HEVC" and meta.resolution != "1080p"):
-            console.print("[bold red]No UHD, Discs, Remuxes or non-1080p HEVC allowed at TVC[/bold red]")
+            logger.info("[bold red]No UHD, Discs, Remuxes or non-1080p HEVC allowed at TVC[/bold red]")
             return False
         return True
 
@@ -853,8 +853,8 @@ class TVC:
         # Search on TVCUK has been DISABLED due to issues, but we can still skip uploads based on criteria
         dupes: list[dict[str, Any]] = []
 
-        console.print("[red]Cannot search for dupes on TVC at this time.[/red]")
-        console.print("[red]Please make sure you are not uploading duplicates.")
+        logger.info("[red]Cannot search for dupes on TVC at this time.[/red]")
+        logger.info("[red]Please make sure you are not uploading duplicates.")
         await asyncio.sleep(2)
 
         return dupes

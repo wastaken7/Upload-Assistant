@@ -10,7 +10,7 @@ import aiofiles
 import httpx
 
 try:
-    from src.console import console
+    from src.console import console, logger
 except ImportError:
     class SimpleConsole:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
@@ -26,8 +26,7 @@ class SevenZipBinaryManager:
     async def ensure_7z_binary(base_dir: str | Path, debug: bool, version: str = "26.01") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
-        if debug:
-            console.print(f"[blue]7-Zip: Detected system: {system}, architecture: {machine}[/blue]")
+        logger.debug(f"[blue]7-Zip: Detected system: {system}, architecture: {machine}[/blue]")
 
         platform_map: dict[str, dict[str, dict[str, str]]] = {
             "windows": {
@@ -71,11 +70,10 @@ class SevenZipBinaryManager:
         binary_valid = binary_exists and binary_executable
 
         if version_path.exists() and version_path.is_file() and binary_valid:
-            if debug:
-                console.print("[blue]7-Zip binary is up to date[/blue]")
+            logger.debug("[blue]7-Zip binary is up to date[/blue]")
             return str(binary_path)
 
-        console.print("[yellow]Binary '7z' not found. Attempting to download automatically...[/yellow]")
+        logger.info("[yellow]Binary '7z' not found. Attempting to download automatically...[/yellow]")
 
         # Cleanup old files
         if binary_path.exists():
@@ -84,8 +82,7 @@ class SevenZipBinaryManager:
             os.remove(version_path)
 
         download_url = f"https://github.com/ip7z/7zip/releases/download/{version}/{file_pattern}"
-        if debug:
-            console.print(f"[blue]7-Zip Download URL: {download_url}[/blue]")
+        logger.debug(f"[blue]7-Zip Download URL: {download_url}[/blue]")
 
         try:
             async with (
@@ -98,8 +95,7 @@ class SevenZipBinaryManager:
                     async for chunk in response.aiter_bytes(chunk_size=8192):
                         await f.write(chunk)
 
-            if debug:
-                console.print(f"[green]Downloaded 7-Zip package: {file_pattern}[/green]")
+            logger.debug(f"[green]Downloaded 7-Zip package: {file_pattern}[/green]")
 
             if file_pattern.endswith(".exe"):
                 # Windows 7zr.exe is a raw executable

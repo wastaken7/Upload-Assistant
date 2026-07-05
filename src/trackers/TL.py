@@ -8,7 +8,7 @@ import aiofiles
 import httpx
 
 from cogs.redaction import Redaction
-from src.console import console
+from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -53,7 +53,7 @@ class TL:
 
         cookie_path = os.path.abspath(cookies_file)
         if not os.path.exists(cookie_path):
-            console.print(f"[bold red]'{self.tracker}' Cookies not found at: {cookie_path}[/bold red]")
+            logger.info(f"[bold red]'{self.tracker}' Cookies not found at: {cookie_path}[/bold red]")
             return False
 
         self.session.cookies.update(await self.common.parseCookieFile(cookies_file))
@@ -63,20 +63,20 @@ class TL:
                 response = await self.session.get('https://www.torrentleech.org/torrents/browse/index', timeout=10)
                 if response.status_code == 301 and 'torrents/browse' in str(response.url):
                     if meta.debug:
-                        console.print(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
+                        logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
                     return True
             elif not force:
                 response = await self.session.get(self.http_upload_url, timeout=10)
                 if response.status_code == 200 and 'torrents/upload' in str(response.url):
                     if meta.debug:
-                        console.print(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
+                        logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
                     return True
             else:
-                console.print(f"[bold red]Login to '{self.tracker}' with cookies failed. Please check your cookies.[/bold red]")
+                logger.info(f"[bold red]Login to '{self.tracker}' with cookies failed. Please check your cookies.[/bold red]")
                 return False
 
         except httpx.RequestError as e:
-            console.print(f"[bold red]Error while validating credentials for '{self.tracker}': {e}[/bold red]")
+            logger.info(f"[bold red]Error while validating credentials for '{self.tracker}': {e}[/bold red]")
             return False
 
         return False
@@ -239,7 +239,7 @@ class TL:
         if not login:
             meta.skipping = "TL"
             if meta.debug:
-                console.print(f"[bold red]Skipping upload to '{self.tracker}' as login failed.[/bold red]")
+                logger.debug(f"[bold red]Skipping upload to '{self.tracker}' as login failed.[/bold red]")
             return []
         cat_id = self.get_category(meta)
 
@@ -310,7 +310,7 @@ class TL:
                     })
 
         except Exception as e:
-            console.print(f"[bold red]Error searching for duplicates on {self.tracker} ({url}): {e}[/bold red]")
+            logger.info(f"[bold red]Error searching for duplicates on {self.tracker} ({url}): {e}[/bold red]")
 
         return results
 
@@ -381,8 +381,8 @@ class TL:
                 return True
 
         else:
-            console.print("[cyan]TL Request Data:")
-            console.print(Redaction.redact_private_info(data))
+            logger.info("[cyan]TL Request Data:")
+            logger.info(Redaction.redact_private_info(data))
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
         return False
@@ -428,8 +428,8 @@ class TL:
         data = await self.get_cookie_upload_data(meta)
 
         if meta.debug:
-            console.print("[cyan]TL Request Data:")
-            console.print(Redaction.redact_private_info(data))
+            logger.debug("[cyan]TL Request Data:")
+            logger.debug(Redaction.redact_private_info(data))
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
         else:
@@ -455,7 +455,7 @@ class TL:
                 else:
                     meta.tracker_status[self.tracker]["status_message"] = "data error - Upload failed: No success redirect found."
                     failure_path = await self.common.save_html_file(meta, self.tracker, response.text, "Failed_Upload")
-                    console.print(f"{self.tracker}: Failed upload. The HTML response saved to {failure_path}")
+                    logger.info(f"{self.tracker}: Failed upload. The HTML response saved to {failure_path}")
                     return False
 
             except httpx.RequestError as e:

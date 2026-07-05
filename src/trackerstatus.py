@@ -11,7 +11,7 @@ from torf import Torrent
 
 from src.cleanup import cleanup_manager
 from src.clients import Clients
-from src.console import console
+from src.console import logger
 from src.dupe_checking import DupeChecker
 from src.imdb import imdb_manager
 from src.meta import Meta
@@ -51,7 +51,7 @@ class TrackerStatusManager:
                     try:
                         imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567) or press Enter to skip uploading to trackers requiring it:")
                     except EOFError:
-                        console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                        logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                         await cleanup_manager.cleanup()
                         cleanup_manager.reset_terminal()
                         sys.exit(1)
@@ -115,7 +115,7 @@ class TrackerStatusManager:
                             if not is_valid_book_language(str(val), str(iso)):
                                 book_missing.append(f)
                     if book_missing:
-                        console.print(f"[yellow]{tracker_name}: Skipping upload because required BOOK fields are missing: {', '.join(book_missing)}[/yellow]")
+                        logger.info(f"[yellow]{tracker_name}: Skipping upload because required BOOK fields are missing: {', '.join(book_missing)}[/yellow]")
                         local_tracker_status["skipped"] = True
 
                 # Check for missing required GAME fields in unattended mode
@@ -127,7 +127,7 @@ class TrackerStatusManager:
                         if not val or str(val).strip().lower() in ("", "none", "null") or f == "platform" and "," in str(val):
                             game_missing.append(f)
                     if game_missing:
-                        console.print(f"[yellow]{tracker_name}: Skipping upload because required GAME fields are missing: {', '.join(game_missing)}[/yellow]")
+                        logger.info(f"[yellow]{tracker_name}: Skipping upload because required GAME fields are missing: {', '.join(game_missing)}[/yellow]")
                         local_tracker_status["skipped"] = True
 
                 if not local_tracker_status['banned'] and not local_tracker_status['skipped']:
@@ -155,7 +155,7 @@ class TrackerStatusManager:
                                 if local_meta["tracker_status"][tracker_name].get("other", False):
                                     local_tracker_status["other"] = True
                             except Exception as e:
-                                console.print(f"[bold red]Error searching for duplicates on {tracker_name}: {e}[/bold red]")
+                                logger.info(f"[bold red]Error searching for duplicates on {tracker_name}: {e}[/bold red]")
                                 if local_meta.get("unattended", False):
                                     local_tracker_status["skipped"] = True
                                     local_meta.skipping = tracker_name
@@ -173,7 +173,7 @@ class TrackerStatusManager:
                                             local_meta.skipping = tracker_name
                                             dupes = []
                                     except EOFError:
-                                        console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                                        logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                                         await cleanup_manager.cleanup()
                                         cleanup_manager.reset_terminal()
                                         sys.exit(1)
@@ -199,7 +199,7 @@ class TrackerStatusManager:
                                     meta.ptp_groupID = groupID
                                 dupes = cast(list[Any], await ptp.search_existing(groupID or "", cast(dict[str, Any], local_meta)))
                             except Exception as e:
-                                console.print(f"[bold red]Error searching for duplicates on {tracker_name}: {e}[/bold red]")
+                                logger.info(f"[bold red]Error searching for duplicates on {tracker_name}: {e}[/bold red]")
                                 if local_meta.get("unattended", False):
                                     local_tracker_status["skipped"] = True
                                     local_meta.skipping = tracker_name
@@ -214,7 +214,7 @@ class TrackerStatusManager:
                                             local_meta.skipping = tracker_name
                                             dupes = []
                                     except EOFError:
-                                        console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                                        logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                                         await cleanup_manager.cleanup()
                                         cleanup_manager.reset_terminal()
                                         sys.exit(1)
@@ -229,8 +229,8 @@ class TrackerStatusManager:
                         meta.initial_dupes[tracker_name] = copy.deepcopy(dupes)
 
                     if tracker_name == "ASC" and (meta.anon if meta.anon is not None else "false"):
-                        console.print("PT: [yellow]Aviso: Você solicitou um upload anônimo, mas o ASC não suporta essa opção.[/yellow][red] O envio não será anônimo.[/red]")
-                        console.print("EN: [yellow]Warning: You requested an anonymous upload, but ASC does not support this option.[/yellow][red] The upload will not be anonymous.[/red]")
+                        logger.info("PT: [yellow]Aviso: Você solicitou um upload anônimo, mas o ASC não suporta essa opção.[/yellow][red] O envio não será anônimo.[/red]")
+                        logger.warning("EN: [yellow]Warning: You requested an anonymous upload, but ASC does not support this option.[/yellow][red] The upload will not be anonymous.[/red]")
 
                     if ('skipping' not in local_meta or local_meta['skipping'] is None) and not local_tracker_status['skipped']:
                         dupes = cast(list[Any], await dupe_checker.filter_dupes(dupes, local_meta, tracker_name))
@@ -276,16 +276,16 @@ class TrackerStatusManager:
                             if not os.path.exists(torrent_path):
                                 check_torrent = await client.find_existing_torrent(cast(dict[str, Any], local_meta))
                                 if check_torrent:
-                                    console.print(f"[yellow]Existing torrent found on {check_torrent}[yellow]")
+                                    logger.info(f"[yellow]Existing torrent found on {check_torrent}[yellow]")
                                     await TorrentCreator.create_base_from_existing_torrent(check_torrent, local_meta['base_dir'], local_meta['uuid'])
                                     torrent = Torrent.read(torrent_path)
                                     if torrent.piece_size > 8388608:
-                                        console.print("[yellow]No existing torrent found with piece size lesser than 8MB[yellow]")
+                                        logger.info("[yellow]No existing torrent found with piece size lesser than 8MB[yellow]")
                                         local_tracker_status['skipped'] = True
                             elif os.path.exists(torrent_path):
                                 torrent = Torrent.read(torrent_path)
                                 if torrent.piece_size > 8388608:
-                                    console.print("[yellow]Existing torrent found with piece size greater than 8MB[yellow]")
+                                    logger.info("[yellow]Existing torrent found with piece size greater than 8MB[yellow]")
                                     local_tracker_status['skipped'] = True
 
                 # Determine name change for display during interactive prompt
@@ -308,7 +308,7 @@ class TrackerStatusManager:
 
         searching_trackers: list[str] = [name for name in meta.trackers if name in tracker_class_map]
         if searching_trackers:
-            console.print(f"[yellow]Searching for existing torrents on: {', '.join(searching_trackers)}...")
+            logger.info(f"[yellow]Searching for existing torrents on: {', '.join(searching_trackers)}...")
         tasks = [process_single_tracker(tracker_name, meta) for tracker_name in meta.trackers]
         results = await asyncio.gather(*tasks)
 
@@ -329,9 +329,9 @@ class TrackerStatusManager:
                 passed_trackers.append((tracker_name, display_name, tracker_class))
 
         if skipped_trackers:
-            console.print(f"[red]Skipped due to specific tracker conditions: [bold yellow]{', '.join(skipped_trackers)}[/bold yellow].")
+            logger.info(f"[red]Skipped due to specific tracker conditions: [bold yellow]{', '.join(skipped_trackers)}[/bold yellow].")
         if dupe_trackers:
-            console.print(f"[red]Found potential dupes on: [bold yellow]{', '.join(dupe_trackers)}[/bold yellow].")
+            logger.info(f"[red]Found potential dupes on: [bold yellow]{', '.join(dupe_trackers)}[/bold yellow].\n")
 
         # Now handle the confirmation/upload decisions
         if meta.unattended:
@@ -341,7 +341,7 @@ class TrackerStatusManager:
                 successful_trackers += 1
                 passed_names.append(tracker_name)
             if passed_names:
-                console.print(f"[bold blue]{', '.join(passed_names)}[/bold blue]: [bold green]no potential dupes found.[/bold green]")
+                logger.info(f"[bold blue]{', '.join(passed_names)}[/bold blue]: [bold green]no potential dupes found.[/bold green]")
         else:
             # Attended mode
             prompt_trackers = [tracker_name for tracker_name, _display_name, _tracker_class in passed_trackers if tracker_name not in ("MANUAL", "USENET")]
@@ -349,17 +349,17 @@ class TrackerStatusManager:
             if not meta.get("debug", False) and prompt_trackers:
                 if len(prompt_trackers) == 1:
                     tracker_name = prompt_trackers[0]
-                    console.print(f"\n[bold blue]{tracker_name}:[/bold blue] [green]no potential dupes found.[/green]")
+                    logger.info(f"[bold blue]{tracker_name}:[/bold blue] [green]no potential dupes found.[/green]")
                     prompt_msg = "Enter 'y' to upload, or press enter to skip uploading:"
                 else:
-                    console.print(f"\n[bold blue]{', '.join(prompt_trackers)}:[/bold blue] [green]no potential dupes found.[/green]")
+                    logger.info(f"[bold blue]{', '.join(prompt_trackers)}:[/bold blue] [green]no potential dupes found.[/green]")
                     prompt_msg = "Enter 'y' to upload to all, or press enter to skip uploading:"
 
                 try:
                     edit_choice = cli_ui.ask_string(prompt_msg)
                     upload_all = (edit_choice or "").lower() == "y"
                 except EOFError:
-                    console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                    logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()
                     cleanup_manager.reset_terminal()
                     sys.exit(1)
@@ -381,16 +381,16 @@ class TrackerStatusManager:
                     successful_trackers += 1
 
         if meta.debug:
-            console.print("\n[bold]Tracker Processing Summary:[/bold]")
+            logger.debug("\n[bold]Tracker Processing Summary:[/bold]")
             for t_name, status in tracker_status.items():
                 banned_status = 'Yes' if status['banned'] else 'No'
                 skipped_status = 'Yes' if status['skipped'] else 'No'
                 dupe_status = 'Yes' if status['dupe'] else 'No'
                 upload_status = 'Yes' if status['upload'] else 'No'
-                console.print(f"Tracker: {t_name} | Banned: {banned_status} | Skipped: {skipped_status} | Dupe: {dupe_status} | [yellow]Upload:[/yellow] {upload_status}")
-            console.print(f"\n[bold]Trackers Passed all Checks:[/bold] {successful_trackers}")
-            console.print("", markup=False)
-            console.print("[bold red]DEBUG MODE does not upload to sites")
+                logger.debug(f"Tracker: {t_name} | Banned: {banned_status} | Skipped: {skipped_status} | Dupe: {dupe_status} | [yellow]Upload:[/yellow] {upload_status}")
+            logger.debug(f"\n[bold]Trackers Passed all Checks:[/bold] {successful_trackers}")
+            logger.debug("", extra={"markup": False})
+            logger.debug("[bold red]DEBUG MODE does not upload to sites")
 
         meta.tracker_status = tracker_status
         return successful_trackers

@@ -1,7 +1,9 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import contextlib
+import logging
 
 from rich.console import Console
+from rich.logging import RichHandler
 from rich.text import Text
 
 
@@ -51,4 +53,28 @@ def ansi_to_html(ansi_chunk: str, width: int = 120) -> str:
 # Create a shared Console instance used throughout the project.
 # Force terminal mode so that when other processes import `src.console.console`
 # they will emit ANSI color codes to stdout even when not attached to a real TTY.
-console = Console(force_terminal=True, soft_wrap=True)
+console = Console(force_terminal=True)
+
+# Configure logger integrated with Rich console
+logger = logging.getLogger("UploadAssistant")
+logger.setLevel(logging.INFO)
+
+# Load configuration settings for the RichHandler
+try:
+    from data.config import config
+
+    config_default = config.get("DEFAULT", {}) if isinstance(config, dict) else {}
+except ImportError:
+    config_default = {}
+
+# RichHandler captures logs and outputs them using our shared console instance.
+# We enable markup=True to preserve Rich color formatting like [yellow], [red], etc.
+rich_handler = RichHandler(
+    console=console,
+    show_time=bool(config_default.get("console_show_time", False)),
+    show_level=bool(config_default.get("console_show_level", False)),
+    show_path=bool(config_default.get("console_show_path", False)),
+    markup=bool(config_default.get("console_markup", True)),
+)
+rich_handler.setFormatter(logging.Formatter("%(message)s"))
+logger.addHandler(rich_handler)

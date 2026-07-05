@@ -10,7 +10,7 @@ from typing import Any, cast
 import aiofiles
 from pymediainfo import MediaInfo
 
-from src.console import console
+from src.console import logger
 from src.exceptions import NoAudioMediaError
 from src.meta import Meta
 
@@ -44,16 +44,14 @@ def setup_mediainfo_library(base_dir: str, debug: bool = False) -> dict[str, Any
     if system == "windows":
         cli_path = os.path.join(base_dir, "bin", "MI", "windows", "MediaInfo.exe")
         if os.path.exists(cli_path):
-            if debug:
-                console.print(f"[blue]Windows MediaInfo CLI: {cli_path} (found)[/blue]")
+            logger.debug(f"[blue]Windows MediaInfo CLI: {cli_path} (found)[/blue]")
             return {
                 "cli": cli_path,
                 "lib": None,  # Windows uses CLI only
                 "lib_dir": None,
             }
         else:
-            if debug:
-                console.print(f"[yellow]Windows MediaInfo CLI: {cli_path} (not found)[/yellow]")
+            logger.debug(f"[yellow]Windows MediaInfo CLI: {cli_path} (not found)[/yellow]")
             return None
 
     elif system == "linux":
@@ -64,9 +62,8 @@ def setup_mediainfo_library(base_dir: str, debug: bool = False) -> dict[str, Any
         cli_available = os.path.exists(mediainfo_cli)
         lib_available = os.path.exists(mediainfo_lib)
 
-        if debug:
-            console.print(f"[blue]MediaInfo CLI binary: {mediainfo_cli} ({'found' if cli_available else 'not found'})[/blue]")
-            console.print(f"[blue]MediaInfo library: {mediainfo_lib} ({'found' if lib_available else 'not found'})[/blue]")
+        logger.debug(f"[blue]MediaInfo CLI binary: {mediainfo_cli} ({'found' if cli_available else 'not found'})[/blue]")
+        logger.debug(f"[blue]MediaInfo library: {mediainfo_lib} ({'found' if lib_available else 'not found'})[/blue]")
 
         if lib_available:
             # Set library directory for LD_LIBRARY_PATH
@@ -76,8 +73,7 @@ def setup_mediainfo_library(base_dir: str, debug: bool = False) -> dict[str, Any
                     os.environ["LD_LIBRARY_PATH"] = f"{lib_dir}:{current_ld_path}"
                 else:
                     os.environ["LD_LIBRARY_PATH"] = lib_dir
-                if debug:
-                    console.print(f"[blue]Updated LD_LIBRARY_PATH to include: {lib_dir}[/blue]")
+                logger.debug(f"[blue]Updated LD_LIBRARY_PATH to include: {lib_dir}[/blue]")
 
         return {"cli": mediainfo_cli if cli_available else None, "lib": mediainfo_lib if lib_available else None, "lib_dir": lib_dir}
     return None
@@ -373,8 +369,7 @@ async def exportInfo(
     mediainfo_config = None
 
     if is_dvd:
-        if debug:
-            console.print("[bold yellow]DVD detected, using specialized MediaInfo...")
+        logger.debug("[bold yellow]DVD detected, using specialized MediaInfo...")
 
         current_platform = platform.system().lower()
 
@@ -391,27 +386,21 @@ async def exportInfo(
                             cast(Any, MediaInfo)._library_file = mediainfo_config["lib"]
 
                         test_parse = MediaInfo.can_parse()
-                        if debug:
-                            console.print(f"[green]Configured specialized MediaInfo library (can_parse: {test_parse})[/green]")
+                        logger.debug(f"[green]Configured specialized MediaInfo library (can_parse: {test_parse})[/green]")
 
-                        if not test_parse and debug:
-                            console.print("[yellow]Library test failed, may fall back to system MediaInfo[/yellow]")
+                        if not test_parse:
+                            logger.debug("[yellow]Library test failed, may fall back to system MediaInfo[/yellow]")
 
                     except Exception as e:
-                        if debug:
-                            console.print(f"[yellow]Could not configure specialized library: {e}[/yellow]")
+                        logger.debug(f"[yellow]Could not configure specialized library: {e}[/yellow]")
                 else:
-                    if debug:
-                        console.print("[yellow]MediaInfo library not available[/yellow]")
+                    logger.debug("[yellow]MediaInfo library not available[/yellow]")
             else:
-                if debug:
-                    console.print("[yellow]No specialized MediaInfo components found, using system MediaInfo[/yellow]")
+                logger.debug("[yellow]No specialized MediaInfo components found, using system MediaInfo[/yellow]")
         else:
-            if debug:
-                console.print(f"[yellow]DVD processing on {current_platform} not supported with specialized MediaInfo[/yellow]")
+            logger.debug(f"[yellow]DVD processing on {current_platform} not supported with specialized MediaInfo[/yellow]")
 
-    if debug:
-        console.print("[bold yellow]Exporting MediaInfo...")
+    logger.debug("[bold yellow]Exporting MediaInfo...")
     if not isdir:
         os.chdir(os.path.dirname(video))
 
@@ -430,18 +419,18 @@ async def exportInfo(
                 raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout, result.stderr)
 
         except subprocess.TimeoutExpired:
-            console.print("[bold red]Specialized MediaInfo timed out (30s) - falling back to standard MediaInfo[/bold red]")
+            logger.info("[bold red]Specialized MediaInfo timed out (30s) - falling back to standard MediaInfo[/bold red]")
             media_info = MediaInfo.parse(video, output="STRING", full=False)
         except ValueError as e:
-            console.print(f"[bold red]Path validation error: {e}[/bold red]")
-            console.print("[bold yellow]Falling back to standard MediaInfo for text...")
+            logger.info(f"[bold red]Path validation error: {e}[/bold red]")
+            logger.info("[bold yellow]Falling back to standard MediaInfo for text...")
             media_info = MediaInfo.parse(video, output="STRING", full=False)
         except (subprocess.CalledProcessError, Exception) as e:
-            console.print(f"[bold red]Error getting text from specialized MediaInfo: {e}")
-            if debug and result is not None:
-                console.print(f"[red]Subprocess stderr: {result.stderr}[/red]")
-                console.print(f"[red]Subprocess returncode: {result.returncode}[/red]")
-            console.print("[bold yellow]Falling back to standard MediaInfo for text...")
+            logger.info(f"[bold red]Error getting text from specialized MediaInfo: {e}")
+            if result is not None:
+                logger.debug(f"[red]Subprocess stderr: {result.stderr}[/red]")
+                logger.debug(f"[red]Subprocess returncode: {result.returncode}[/red]")
+            logger.info("[bold yellow]Falling back to standard MediaInfo for text...")
             media_info = MediaInfo.parse(video, output="STRING", full=False)
     else:
         media_info = MediaInfo.parse(video, output="STRING", full=False)
@@ -454,8 +443,7 @@ async def exportInfo(
         await export.write(filtered_media_info.replace(video, os.path.basename(video)))
     async with aiofiles.open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO_CLEANPATH.txt", "w", newline="", encoding="utf-8") as export_cleanpath:
         await export_cleanpath.write(filtered_media_info.replace(video, os.path.basename(video)))
-    if debug:
-        console.print("[bold green]MediaInfo Exported.")
+    logger.debug("[bold green]MediaInfo Exported.")
 
     if mediainfo_cmd and is_dvd:
         result: subprocess.CompletedProcess[str] | None = None
@@ -474,22 +462,22 @@ async def exportInfo(
                 raise subprocess.CalledProcessError(result2.returncode, cmd, result2.stdout, result2.stderr)
 
         except ValueError as e:
-            console.print(f"[bold red]Path validation error: {e}[/bold red]")
-            console.print("[bold yellow]Falling back to standard MediaInfo for JSON...")
+            logger.info(f"[bold red]Path validation error: {e}[/bold red]")
+            logger.info("[bold yellow]Falling back to standard MediaInfo for JSON...")
             media_info_json = MediaInfo.parse(video, output="JSON")
             media_info_dict = json.loads(media_info_json)
         except subprocess.TimeoutExpired:
-            console.print("[bold red]Specialized MediaInfo timed out (30s) - falling back to standard MediaInfo[/bold red]")
+            logger.info("[bold red]Specialized MediaInfo timed out (30s) - falling back to standard MediaInfo[/bold red]")
             media_info_json = MediaInfo.parse(video, output="JSON")
             media_info_dict = json.loads(media_info_json)
         except (subprocess.CalledProcessError, json.JSONDecodeError, Exception) as e:
-            console.print(f"[bold red]Error getting JSON from specialized MediaInfo: {e}")
-            if debug and result2 is not None:
-                console.print(f"[red]Subprocess stderr: {result2.stderr}[/red]")
-                console.print(f"[red]Subprocess returncode: {result2.returncode}[/red]")
+            logger.info(f"[bold red]Error getting JSON from specialized MediaInfo: {e}")
+            if result2 is not None:
+                logger.debug(f"[red]Subprocess stderr: {result2.stderr}[/red]")
+                logger.debug(f"[red]Subprocess returncode: {result2.returncode}[/red]")
                 if result2.stdout:
-                    console.print(f"[red]Subprocess stdout preview: {result2.stdout[:200]}...[/red]")
-            console.print("[bold yellow]Falling back to standard MediaInfo for JSON...[/bold yellow]")
+                    logger.debug(f"[red]Subprocess stdout preview: {result2.stdout[:200]}...[/red]")
+            logger.info("[bold yellow]Falling back to standard MediaInfo for JSON...[/bold yellow]")
             media_info_json = MediaInfo.parse(video, output="JSON")
             media_info_dict = json.loads(media_info_json)
     else:
@@ -501,8 +489,7 @@ async def exportInfo(
 
     async with aiofiles.open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", "w", encoding="utf-8") as export:
         await export.write(json.dumps(filtered_info, indent=4))
-        if debug:
-            console.print(f"[green]JSON file written to: {base_dir}/tmp/{folder_id}/MediaInfo.json[/green]")
+        logger.debug(f"[green]JSON file written to: {base_dir}/tmp/{folder_id}/MediaInfo.json[/green]")
 
     async with aiofiles.open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", encoding="utf-8") as f:
         mi = cast(dict[str, Any], json.loads(await f.read()))
@@ -512,31 +499,27 @@ async def exportInfo(
         # Reset MediaInfo library file to default (Linux only)
         if hasattr(MediaInfo, "_library_file"):
             cast(Any, MediaInfo)._library_file = None
-        if debug:
-            console.print("[blue]Reset MediaInfo library configuration[/blue]")
+        logger.debug("[blue]Reset MediaInfo library configuration[/blue]")
 
     return mi
 
 
 def validate_mediainfo(meta: Meta, debug: bool, settings: bool = False) -> bool:
     if not any(str(f).lower().endswith(".mkv") for f in meta.filelist):
-        if debug:
-            console.print(f"[yellow]Skipping {meta.path} (not an .mkv file)[/yellow]")
+        logger.debug(f"[yellow]Skipping {meta.path} (not an .mkv file)[/yellow]")
         return True
 
     unique_id = None
     valid_settings = False
 
-    if debug:
-        console.print("[cyan]Validating MediaInfo")
+    logger.debug("[cyan]Validating MediaInfo")
 
     mediainfo_data = meta.mediainfo
 
     if "media" in mediainfo_data and "track" in mediainfo_data["media"]:
         tracks = mediainfo_data["media"]["track"]
-        if debug:
-            track_names = [str(track.get("@type", "Unknown")) for track in tracks]
-            console.print(f"[cyan]MediaInfo tracks: {', '.join(track_names)}[/cyan]")
+        track_names = [str(track.get("@type", "Unknown")) for track in tracks]
+        logger.debug(f"[cyan]MediaInfo tracks: {', '.join(track_names)}[/cyan]")
         has_audio = any(track.get("@type", "") == "Audio" for track in tracks)
 
         if not has_audio:
@@ -549,23 +532,20 @@ def validate_mediainfo(meta: Meta, debug: bool, settings: bool = False) -> bool:
                 encoding_settings = track.get("Encoded_Library_Settings")
                 if encoding_settings and encoding_settings != {} and str(encoding_settings).strip():
                     valid_settings = True
-                    if debug:
-                        console.print(f"[green]Found encoding settings: {encoding_settings}[/green]")
+                    logger.debug(f"[green]Found encoding settings: {encoding_settings}[/green]")
                     break
 
             elif not settings and track_type == "General":
                 unique_id_value = track.get("UniqueID")
                 if unique_id_value and unique_id_value != {} and str(unique_id_value).strip():
                     unique_id = str(unique_id_value)
-                    if debug:
-                        console.print(f"[green]Found Unique ID: {unique_id}[/green]")
+                    logger.debug(f"[green]Found Unique ID: {unique_id}[/green]")
                     break
 
-    if debug:
-        if settings and not valid_settings:
-            console.print("[yellow]Mediainfo failed validation (no encoding settings)[/yellow]")
-        elif not settings and not unique_id:
-            console.print("[yellow]Mediainfo failed validation (no unique ID)[/yellow]")
+    if settings and not valid_settings:
+        logger.debug("[yellow]Mediainfo failed validation (no encoding settings)[/yellow]")
+    elif not settings and not unique_id:
+        logger.debug("[yellow]Mediainfo failed validation (no unique ID)[/yellow]")
 
     return valid_settings if settings else bool(unique_id)
 
@@ -578,11 +558,11 @@ async def get_conformance_error(meta: Meta) -> bool:
                 return True
             except ValueError:
                 if meta.debug:
-                    console.print(f"[red]Unexpected value: {general_track['extra']['ConformanceErrors']}[/red]")
+                    logger.debug(f"[red]Unexpected value: {general_track['extra']['ConformanceErrors']}[/red]")
                 return True
         else:
             if meta.debug:
-                console.print("[green]No Conformance errors found in MediaInfo General track[/green]")
+                logger.debug("[green]No Conformance errors found in MediaInfo General track[/green]")
             return False
     else:
         return False
