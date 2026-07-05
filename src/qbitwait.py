@@ -8,7 +8,7 @@ from typing import Any, cast
 import httpx
 import qbittorrentapi
 
-from src.console import logger
+from src.console import console, logger
 from src.meta import Meta
 
 
@@ -188,15 +188,14 @@ class Wait:
                 total_seconds = current_samples * check_interval
                 avg_speed_color = "green" if avg_speed <= threshold_bytes else "red"
                 if current_samples >= max_samples and avg_speed <= threshold_bytes:
-                    logger.info(
-                        f"[yellow]Average speed of [{avg_speed_color}]{avg_speed_kbs:.0f}/{threshold_kb:.0f}[/{avg_speed_color}] KB/s in the last {total_seconds} seconds. [/yellow]",
-                        extra={"highlighter": None},
+                    console.print(
+                        f"[yellow]Average speed of [{avg_speed_color}]{avg_speed_kbs:.0f}/{threshold_kb:.0f}[/{avg_speed_color}] KB/s in the last {total_seconds} seconds. [/yellow]"
                     )
                     break
                 else:
-                    logger.info(
+                    console.print(
                         f"[yellow]Average speed of [{avg_speed_color}]{avg_speed_kbs:.0f}[/{avg_speed_color}]/[green]{threshold_kb:.0f}[/green] KB/s in the last {total_seconds} seconds. [/yellow]",
-                        extra={"highlighter": None},
+                        end="\r",
                     )
 
                 await asyncio.sleep(check_interval)

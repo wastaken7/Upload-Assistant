@@ -112,7 +112,7 @@ async def process_trackers(
                     if duration and isinstance(duration, (int, float)):
                         color = "#21ff00" if duration < 5 else "#9fd600" if duration < 10 else "#cfaa00" if duration < 15 else "#f17100" if duration < 20 else "#ff0000"
                         message += f" [[{color}]{duration:.2f}s[/{color}]]"
-                logger.info(message)
+                logger.info(message, extra={"highlighter": None})
         except Exception as e:
             logger.error(f"[red]Error printing {tracker} result: {e}[/red]")
 

@@ -645,7 +645,7 @@ class UploadHelper:
             else:
                 logger.info(f"[bold]Base Name:[/bold] {meta.name}\n", extra={"highlighter": None})
 
-            confirm = (cli_ui.ask_string("Is this correct? (y/N)", default="n") or "").strip().lower() == "y"
+            confirm = cli_ui.ask_yes_no("Is this correct?")
             logger.info("")
 
             if confirm:
