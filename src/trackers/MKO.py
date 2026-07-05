@@ -69,6 +69,7 @@ class MKO:
         self.source_flag = ""
         self.base_url = "https://makingoff.org/forum"
         self.index_url = "https://indice.makingoff.org/"
+        self.torrent_url = ""
         self.banned_groups: list[str] = []
 
         # Cache for the resolved PT-BR display title, keyed by meta.uuid.
