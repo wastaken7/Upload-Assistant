@@ -96,6 +96,7 @@ This branch introduces new media categories and automation features not present 
 | LongPT | LPT | MOVIE, TV |
 | LST | LST | MOVIE, TV, BOOK |
 | Luminarr | LUME | MOVIE, TV |
+| MakingOff | MKO | MOVIE |
 | MidnightScene | MS | MOVIE, TV |
 | MoreThanTV | MTV | MOVIE, TV |
 | M-Team | MTEAM | MOVIE, TV |

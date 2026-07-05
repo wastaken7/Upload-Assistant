@@ -1,5 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
+import contextlib
 import ntpath
 import os
 import re
@@ -1260,6 +1261,106 @@ async def finalize_metadata(
             str(meta.path or ""),
         )
         meta.hdr = await video_manager.get_hdr(mi_data, bdinfo)
+
+        # Extract video bitrate
+        meta.video_bitrate = None
+        if meta.is_disc == "BDMV":
+            bd_data = bdinfo
+            if not bd_data and meta.discs:
+                bd_data = meta.discs[0].get("bdinfo", {})
+            if not bd_data and meta.bdinfo:
+                bd_data = meta.bdinfo
+            if bd_data and bd_data.get("video"):
+                raw_bitrate = bd_data["video"][0].get("bitrate")
+                if raw_bitrate:
+                    match = re.search(r"\d+", str(raw_bitrate).replace(".", "").replace(",", ""))
+                    if match:
+                        meta.video_bitrate = int(match.group())
+        else:
+            if mi_data and mi_data.get("media", {}).get("track"):
+                tracks = mi_data["media"]["track"]
+                video_track = next((track for track in tracks if track.get("@type") == "Video"), None)
+                if video_track:
+                    raw_bitrate = video_track.get("BitRate") or video_track.get("NominalBitRate") or video_track.get("BitRate_Maximum")
+                    if not raw_bitrate or isinstance(raw_bitrate, dict):
+                        general_track = next((track for track in tracks if track.get("@type") == "General"), None)
+                        if general_track:
+                            raw_bitrate = general_track.get("OverallBitRate")
+                    if raw_bitrate and not isinstance(raw_bitrate, dict):
+                        with contextlib.suppress(ValueError, TypeError):
+                            meta.video_bitrate = int(raw_bitrate) // 1000
+
+        # Extract audio bitrate
+        meta.audio_bitrate = None
+        if meta.is_disc == "BDMV":
+            bd_data = bdinfo
+            if not bd_data and meta.discs:
+                bd_data = meta.discs[0].get("bdinfo", {})
+            if not bd_data and meta.bdinfo:
+                bd_data = meta.bdinfo
+            if bd_data and bd_data.get("audio"):
+                raw_bitrate = bd_data["audio"][0].get("bitrate")
+                if raw_bitrate:
+                    match = re.search(r"\d+", str(raw_bitrate).replace(".", "").replace(",", ""))
+                    if match:
+                        meta.audio_bitrate = int(match.group())
+        else:
+            if mi_data and mi_data.get("media", {}).get("track"):
+                tracks = mi_data["media"]["track"]
+                audio_track = next((track for track in tracks if track.get("@type") == "Audio"), None)
+                if audio_track:
+                    raw_bitrate = audio_track.get("BitRate") or audio_track.get("NominalBitRate") or audio_track.get("BitRate_Maximum")
+                    if raw_bitrate and not isinstance(raw_bitrate, dict):
+                        with contextlib.suppress(ValueError, TypeError):
+                            meta.audio_bitrate = int(raw_bitrate) // 1000
+
+        # Extract frame rate
+        meta.frame_rate = None
+        if meta.is_disc == "BDMV":
+            bd_data = bdinfo
+            if not bd_data and meta.discs:
+                bd_data = meta.discs[0].get("bdinfo", {})
+            if not bd_data and meta.bdinfo:
+                bd_data = meta.bdinfo
+            if bd_data and bd_data.get("video"):
+                raw_fps = bd_data["video"][0].get("fps")
+                if raw_fps:
+                    match = re.search(r"\d+(\.\d+)?", str(raw_fps))
+                    if match:
+                        with contextlib.suppress(ValueError, TypeError):
+                            meta.frame_rate = float(match.group())
+        else:
+            if mi_data and mi_data.get("media", {}).get("track"):
+                tracks = mi_data["media"]["track"]
+                video_track = next((track for track in tracks if track.get("@type") == "Video"), None)
+                if video_track:
+                    raw_fps = video_track.get("FrameRate")
+                    if not raw_fps or isinstance(raw_fps, dict):
+                        general_track = next((track for track in tracks if track.get("@type") == "General"), None)
+                        if general_track:
+                            raw_fps = general_track.get("FrameRate")
+                    if raw_fps and not isinstance(raw_fps, dict):
+                        with contextlib.suppress(ValueError, TypeError):
+                            meta.frame_rate = float(raw_fps)
+
+        # Extract video resolution width/height
+        meta.video_width = None
+        meta.video_height = None
+        if meta.is_disc == "BDMV":
+            if meta.resolution:
+                resolution_str = meta.resolution
+                with contextlib.suppress(ValueError, TypeError):
+                    h = int(resolution_str.lower().replace("p", "").replace("i", ""))
+                    meta.video_height = h
+                    meta.video_width = round((16 / 9) * h)
+        else:
+            if mi_data and mi_data.get("media", {}).get("track"):
+                tracks = mi_data["media"]["track"]
+                video_track = next((track for track in tracks if track.get("@type") == "Video"), None)
+                if video_track:
+                    with contextlib.suppress(ValueError, TypeError):
+                        meta.video_width = int(float(video_track.get("Width", 0)))
+                        meta.video_height = int(float(video_track.get("Height", 0)))
 
         meta.distributor = await get_distributor(meta.distributor)
         if meta.distributor is None:

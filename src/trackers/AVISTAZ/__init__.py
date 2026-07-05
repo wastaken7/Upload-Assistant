@@ -52,30 +52,6 @@ class AZTrackerBase:
         meta = meta
         return ''
 
-    def get_resolution(self, meta: Meta) -> str:
-        resolution = ''
-        width, height = None, None
-
-        try:
-            if meta.is_disc == "BDMV":
-                resolution_str = meta.resolution
-                height_num = int(resolution_str.lower().replace('p', '').replace('i', ''))
-                height = str(height_num)
-                width = str(round((16 / 9) * height_num))
-            else:
-                tracks = meta.mediainfo.get("media", {}).get("track", [])
-                if len(tracks) > 1:
-                    video_mi = tracks[1]
-                    width = video_mi.get('Width')
-                    height = video_mi.get('Height')
-        except (ValueError, TypeError, KeyError, IndexError):
-            return ''
-
-        if width and height:
-            resolution = f'{width}x{height}'
-
-        return resolution
-
     def get_video_quality(self, meta: Meta) -> str:
         resolution: str = meta.resolution
 
@@ -980,7 +956,7 @@ class AZTrackerBase:
             "qqfile": "",
             "rip_type_id": self.get_rip_type(meta),
             "video_quality_id": self.get_video_quality(meta),
-            "video_resolution": self.get_resolution(meta),
+            "video_resolution": f"{meta.video_width}x{meta.video_height}",
             "movie_id": self.media_code,
             "languages[]": lang_info.get("languages[]"),
             "subtitles[]": lang_info.get("subtitles[]"),
