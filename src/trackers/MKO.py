@@ -1238,7 +1238,7 @@ class HIPBClient:
         try:
             with open(torrent_path, "rb") as f:
                 data = f.read()
-            filename = torrent_path.split("/")[-1]
+            filename = os.path.basename(torrent_path)
             resp = await self._session.post(
                 url,
                 files={"FILE_UPLOAD": (filename, data, "application/x-bittorrent")},
@@ -1435,7 +1435,6 @@ class MKO:
         self.base_url = "https://makingoff.org/forum"
         self.index_url = "https://indice.makingoff.org/"
         self.banned_groups: list[str] = []
-        
 
         # Cache for the resolved PT-BR display title, keyed by meta.uuid.
         self._display_title_cache: dict[str, str] = {}
@@ -1658,7 +1657,7 @@ class MKO:
                 if not any(f"({y})" in title for y in (year_int - 1, year_int, year_int + 1)):
                     console.print(
                         f"[cyan]{self.tracker}:[/cyan] [yellow]Skipping: different year in existing release:[/yellow] {title}"
-                    )                
+                    )
                     continue
 
             # Uploading SD while a Hidef exists → block immediately.
