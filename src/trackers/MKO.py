@@ -5,6 +5,7 @@ import secrets
 import urllib.parse
 from html.entities import codepoint2name
 from typing import Any
+import shutil
 
 import aiofiles
 import httpx
@@ -1215,6 +1216,13 @@ class MKO:
         )
         torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
 
+        # Creates a copy of the torrent with the media filename,
+        # this one should be attached to the topic.
+        release_name = meta.basename_no_ext or meta.name or meta.uuid
+        release_filename = release_name.replace(" ", ".")
+        named_torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/{release_filename}.torrent"
+        shutil.copy2(torrent_path, named_torrent_path)
+
         if meta.debug:
             topic_title = await self.get_topic_title(meta)
             post_body = await self.generate_description(meta)
@@ -1250,7 +1258,7 @@ class MKO:
             meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to retrieve IPB session tokens."
             return False
 
-        if not await self.upload_attachment(torrent_path, session_id, attach_post_key, forum_id):
+        if not await self.upload_attachment(named_torrent_path, session_id, attach_post_key, forum_id):
             meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to upload .torrent attachment."
             return False
 
