@@ -1515,6 +1515,8 @@ config = {
                 """,
             "member_id": "",
             "pass_hash": "",
+            # Set this to True if you want to allow external subtitles to be included in the upload
+            "allow_ext_subtitles": True,
         },
         "MS":{
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
