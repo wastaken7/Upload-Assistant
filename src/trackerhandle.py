@@ -4,7 +4,7 @@ import sys
 import time
 import traceback
 from collections.abc import Mapping, Sequence
-from typing import Any, TypeAlias, cast
+from typing import Any, cast
 
 import cli_ui
 
@@ -20,7 +20,7 @@ from src.trackers.PTP import PTP
 from src.trackers.THR import THR
 from src.trackersetup import TRACKER_SETUP
 
-StatusDict: TypeAlias = dict[str, Any]
+type StatusDict = dict[str, Any]
 
 
 async def check_mod_q_and_draft(
@@ -410,7 +410,7 @@ async def process_trackers(
         results = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
 
         # Log any exceptions that occurred
-        for (tracker, _), result in zip(tasks, results):
+        for (tracker, _), result in zip(tasks, results, strict=False):
             if isinstance(result, Exception):
                 logger.info(f"[red]{tracker} encountered an error: {result}[/red]")
                 if meta.debug:

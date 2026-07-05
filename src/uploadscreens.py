@@ -9,7 +9,7 @@ import os
 import re
 import time
 from collections.abc import Sequence
-from typing import Any, TypeAlias, cast
+from typing import Any, cast
 
 import aiofiles
 import httpx
@@ -18,7 +18,7 @@ import pyimgbox
 from src.console import logger
 from src.meta import Meta
 
-ImageDict: TypeAlias = dict[str, Any]
+type ImageDict = dict[str, Any]
 
 
 class UploadScreensManager:

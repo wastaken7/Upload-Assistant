@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 from bs4 import BeautifulSoup
 
-from src.console import console, logger
+from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta

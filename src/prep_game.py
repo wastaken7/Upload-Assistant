@@ -200,10 +200,7 @@ async def gather_game_prep(
 
         # Attempt to extract from .nfo file if not found in directory name
         if not version:
-            nfo_files = []
-            for f in meta.filelist:
-                if f.lower().endswith(".nfo"):
-                    nfo_files.append(f)
+            nfo_files = [f for f in meta.filelist if f.lower().endswith(".nfo")]
             if path_to_check:
                 search_dir = path_to_check if os.path.isdir(path_to_check) else os.path.dirname(path_to_check)
                 if os.path.isdir(search_dir):

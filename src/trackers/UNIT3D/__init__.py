@@ -6,13 +6,13 @@ import json
 import os
 import platform
 import re
-from typing import Any, Optional
+from typing import Any
 
 import aiofiles
 import httpx
 from PIL import Image
 
-from src.console import console, logger
+from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.COMMON import COMMON

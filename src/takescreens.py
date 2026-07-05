@@ -1137,7 +1137,7 @@ async def extract_epub_cover(epub_path: str, dest_path: str, confirmed_only: boo
 
                 # 6. First image item in manifest
                 if not cover_zip_path and not confirmed_only:
-                    for item_id, item in manifest_items.items():
+                    for item in manifest_items.values():
                         if is_image_item(item["href"], item["media-type"]):
                             cover_zip_path = resolve_path(opf_dir, item["href"])
                             break
@@ -1536,7 +1536,7 @@ async def screenshots(
         meta.frame_info_map = {}
 
         # Create a mapping from time to frame info using preserved indices
-        for (orig_idx, _), info in zip(frame_info_tasks_with_idx, frame_info_results):
+        for (orig_idx, _), info in zip(frame_info_tasks_with_idx, frame_info_results, strict=False):
             meta.frame_info_map[ss_times[orig_idx]] = info
 
         if meta.debug:

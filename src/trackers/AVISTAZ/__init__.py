@@ -8,7 +8,7 @@ import re
 import uuid
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Any, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -18,7 +18,7 @@ from bs4 import BeautifulSoup
 
 import bbcode
 from cogs.redaction import Redaction
-from src.console import console, logger
+from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager

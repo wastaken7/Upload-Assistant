@@ -2412,7 +2412,6 @@ async def process_cross_seeds(meta: Meta) -> None:
     except (TypeError, ValueError):
         concurrency_limit = 8
     semaphore = asyncio.Semaphore(max(1, concurrency_limit))
-    debug = meta.debug
 
     async def handle_cross_seed(tracker: str) -> None:
         cross_seed_key = f'{tracker}_cross_seed'

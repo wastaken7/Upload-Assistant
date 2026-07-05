@@ -4,6 +4,7 @@ import os
 import time
 from typing import Any
 
+import aiofiles
 import httpx
 
 from src.console import logger
@@ -21,8 +22,9 @@ class IGDBAPI:
         # Try loading cached token
         if self.token_file and os.path.exists(self.token_file):
             try:
-                with open(self.token_file, encoding="utf-8") as f:
-                    cached = json.load(f)
+                async with aiofiles.open(self.token_file, encoding="utf-8") as f:
+                    content = await f.read()
+                    cached = json.loads(content)
                 if cached.get("expires_at", 0) > time.time() + 300:
                     self.access_token = cached.get("access_token")
                     return self.access_token
@@ -43,8 +45,8 @@ class IGDBAPI:
 
                     if self.token_file:
                         os.makedirs(os.path.dirname(self.token_file), exist_ok=True)
-                        with open(self.token_file, "w", encoding="utf-8") as f:
-                            json.dump({"access_token": self.access_token, "expires_at": expires_at}, f)
+                        async with aiofiles.open(self.token_file, "w", encoding="utf-8") as f:
+                            await f.write(json.dumps({"access_token": self.access_token, "expires_at": expires_at}))
                     return self.access_token
                 else:
                     logger.info(f"[red]IGDB: Failed to authenticate with Twitch API. Status: {resp.status_code}[/red]")

@@ -8,7 +8,7 @@ import re
 import shlex
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, TypeAlias, cast
+from typing import Any, cast
 
 import cli_ui
 import click
@@ -16,8 +16,8 @@ import click
 from src.console import logger
 from src.meta import Meta
 
-QueueItem: TypeAlias = dict[str, Any]
-QueueList: TypeAlias = list[str] | list[QueueItem]
+type QueueItem = dict[str, Any]
+type QueueList = list[str] | list[QueueItem]
 
 
 async def _read_json_file(path: str) -> Any:

@@ -831,15 +831,10 @@ def clean_translator_from_author(author: str) -> tuple[str, str]:
         r"([A-Z][A-Za-zÀ-ÿ]+(?:\s+[A-Z][A-Za-zÀ-ÿ]+)*)"
     )
 
-    translators = []
-
-    # Find all matches for pattern1 to extract translator name(s)
-    for match in re.finditer(pattern1, normalized, flags=re.IGNORECASE):
-        translators.append(match.group(1).strip())
+    translators = [match.group(1).strip() for match in re.finditer(pattern1, normalized, flags=re.IGNORECASE)]
 
     # Find all matches for pattern2 to extract translator name(s)
-    for match in re.finditer(pattern2, normalized, flags=re.IGNORECASE):
-        translators.append(match.group(1).strip())
+    translators.extend(match.group(1).strip() for match in re.finditer(pattern2, normalized, flags=re.IGNORECASE))
 
     # Apply pattern 1
     normalized, count1 = re.subn(pattern1, "", normalized, flags=re.IGNORECASE)
