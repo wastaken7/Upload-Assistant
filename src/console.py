@@ -1,6 +1,9 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import contextlib
+import contextvars
 import logging
+import os
+import re
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -78,3 +81,70 @@ rich_handler = RichHandler(
 )
 rich_handler.setFormatter(logging.Formatter("%(message)s"))
 logger.addHandler(rich_handler)
+
+
+# Context variable to hold the path to the current release's log file (e.g. /tmp/<uuid>/upload.log)
+current_release_log_path = contextvars.ContextVar("current_release_log_path", default=None)
+
+
+class LogFileFormatter(logging.Formatter):
+    def __init__(self, fmt: str = "[%(asctime)s] %(levelname)s: %(message)s", datefmt: str = "%Y-%m-%d %H:%M:%S") -> None:
+        super().__init__(fmt, datefmt)
+        self.console = Console(color_system=None, width=150)
+        self.ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+    def format(self, record: logging.LogRecord) -> str:
+        # Format the record normally first
+        formatted = super().format(record)
+
+        # Strip ANSI escape sequences
+        formatted = self.ansi_escape.sub("", formatted)
+
+        # Strip Rich markup using Console
+        with contextlib.suppress(Exception):
+            formatted = self.console.render_str(formatted).plain
+
+        return formatted
+
+
+class DynamicFileHandler(logging.Handler):
+    def __init__(self, formatter=None) -> None:
+        super().__init__()
+        if formatter:
+            self.setFormatter(formatter)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            # Check if write_log is enabled in config. Use lazy lookup to support reload
+            try:
+                from data.config import config
+
+                write_log = bool(config.get("DEFAULT", {}).get("write_log", False))
+            except Exception:
+                write_log = False
+
+            if not write_log:
+                return
+
+            log_path = current_release_log_path.get()
+            if not log_path:
+                return
+
+            # Format message
+            msg = self.format(record)
+
+            # Ensure target directory exists
+            log_dir = os.path.dirname(log_path)
+            if log_dir and not os.path.exists(log_dir):
+                os.makedirs(log_dir, exist_ok=True)
+
+            # Append message to file
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(msg + "\n")
+        except Exception:
+            self.handleError(record)
+
+
+# Add the dynamic file handler to UploadAssistant logger
+dynamic_file_handler = DynamicFileHandler(LogFileFormatter())
+logger.addHandler(dynamic_file_handler)

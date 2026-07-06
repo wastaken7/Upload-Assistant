@@ -47,6 +47,10 @@ config = {
         # Enable rich markup parsing in console logs
         "console_markup": True,
 
+        # File logging configuration
+        # Set true to save a plain text log file of the upload flow in each release's tmp folder
+        "write_log": False,
+
         # Debug configuration
         # Set true to enable debug mode globally (same as running with --debug)
         "debug": False,

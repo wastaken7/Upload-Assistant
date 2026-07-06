@@ -42,7 +42,7 @@ from src.audio_spectrogram import process_audio_spectrograms
 from src.book_prep import _resolve_book_language, detect_newspaper, is_valid_book_language
 from src.cleanup import cleanup_manager
 from src.clients import Clients
-from src.console import console, logger
+from src.console import console, current_release_log_path, logger
 from src.disc_menus import process_disc_menus
 from src.dupe_checking import DupeChecker
 from src.get_desc import gen_desc
@@ -1443,7 +1443,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
             if isinstance(raw_trackers, str):
                 trackers_list = [raw_trackers]
             elif isinstance(raw_trackers, list):
-                trackers_list = [str(t) for t in raw_trackers if t.strip()]
+                trackers_list = [(t) for t in raw_trackers if t.strip()]
             else:
                 trackers_list = []
             trackers_upper = [str(t).strip().upper() for t in trackers_list if str(t).strip()]
@@ -1723,7 +1723,7 @@ async def do_the_thing(base_dir: str) -> None:
             elif not browse_roots and meta.path:
                 # Use the path from command line as browse roots
                 path_value = meta.path
-                browse_roots = ",".join(str(p) for p in path_value) if isinstance(path_value, list) else str(path_value)
+                browse_roots = ",".join(str(p) for p in path_value) if isinstance(path_value, list) else (path_value)
             if not browse_roots:
                 raise SystemExit("No browse roots specified. Please set UA_BROWSE_ROOTS environment variable or provide explicit paths.")
 
@@ -1775,7 +1775,7 @@ async def do_the_thing(base_dir: str) -> None:
                 active_trackers = [t.strip().upper() for t in meta.trackers.split(",") if t.strip()]
             elif isinstance(meta.trackers, list):
                 trackers_list = meta.trackers
-                active_trackers = [str(t).strip().upper() for t in trackers_list if str(t).strip()]
+                active_trackers = [(t).strip().upper() for t in trackers_list if (t).strip()]
 
         # Get active imghost from meta (parsed from command line)
         active_imghost: str | None = None
@@ -1814,7 +1814,7 @@ async def do_the_thing(base_dir: str) -> None:
         if not meta.path:
             exit(0)
 
-        path = cast(str, meta.path)
+        path = meta.path
         path = os.path.abspath(path)
         if path.endswith('"'):
             path = path[:-1]
@@ -1845,6 +1845,7 @@ async def do_the_thing(base_dir: str) -> None:
             bot = None
             current_item_path: str = ""
             tmp_path = ""
+            current_release_log_path.set(None)
             try:
                 meta = base_meta.copy()
 
@@ -1873,7 +1874,7 @@ async def do_the_thing(base_dir: str) -> None:
                             if option_strings and not any(arg == opt or arg.startswith(opt + "=") for opt in option_strings for arg in args_list):
                                 meta[key] = val
 
-                    path = cast(str, meta.path or "")
+                    path = meta.path or ""
                     current_item_path = cast(str, queue_item.get("line") or path or "")
                     meta.item_args = args_list
                 else:
@@ -1895,6 +1896,7 @@ async def do_the_thing(base_dir: str) -> None:
 
                 # Ensure tmp subdirectory exists with secure permissions
                 ensure_secure_tmp_subdir(tmp_path)
+                current_release_log_path.set(os.path.join(tmp_path, "upload.log"))
 
                 if meta.delete_tmp and os.path.exists(tmp_path):
                     try:
@@ -2068,12 +2070,12 @@ async def do_the_thing(base_dir: str) -> None:
                 if successful_trackers < skip_uploading_int and not meta.debug:
                     logger.info(f"[red]Not enough successful trackers ({successful_trackers}/{skip_uploading_int}). No uploads being processed.[/red]")
                 else:
-                    trackers_upper = [str(t).upper() for t in meta.trackers]
+                    trackers_upper = [(t).upper() for t in meta.trackers]
                     # Partition trackers into torrent trackers and Usenet indexers
                     torrent_trackers = []
                     usenet_trackers = []
                     for tracker in meta.trackers:
-                        t_upper = str(tracker).upper().strip()
+                        t_upper = (tracker).upper().strip()
                         if t_upper == "USENET":
                             continue
                         if t_upper in tracker_class_map:
@@ -2261,6 +2263,7 @@ async def do_the_thing(base_dir: str) -> None:
             await cleanup_manager.cleanup()
             gc.collect()
             cleanup_manager.reset_terminal()
+        current_release_log_path.set(None)
 
     except Exception as e:
         logger.info(f"[bold red]An unexpected error occurred: {e}")
@@ -2270,6 +2273,7 @@ async def do_the_thing(base_dir: str) -> None:
         cleanup_manager.reset_terminal()
 
     finally:
+        current_release_log_path.set(None)
         if bot is not None:
             await bot.close()
         if connect_task is not None:
