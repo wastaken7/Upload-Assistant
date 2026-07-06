@@ -1,11 +1,36 @@
 from typing import Any
 
+import langcodes
+
 from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
+
+
+def _iso_639_1_code(iso3: str, name: str) -> str:
+    """Return the uppercase language code (e.g. 'EN') for a book language, or '' if unavailable."""
+    source = iso3 or name
+    if not source:
+        return ""
+    try:
+        lang = langcodes.get(iso3) if iso3 else langcodes.find(name)
+        code = lang.language or ""
+    except Exception:
+        return ""
+    return code.upper() if len(code) == 2 else ""
+
+
+def _is_misc(meta: Meta) -> bool:
+    """True when a BOOK upload is a comic/manga/magazine/newspaper. ZNTH's Misc category, not an ebook/audiobook."""
+    return bool(meta.comic or meta.manga or meta.magazine or meta.newspaper)
+
+
+def _book_format(meta: Meta) -> str:
+    """The book's uppercased format token (file extension), e.g. 'EPUB', 'PDF', 'M4B'."""
+    return str(meta.type or meta.container or "").strip().upper().lstrip(".")
 
 
 class ZNTH(UNIT3D):
@@ -27,12 +52,20 @@ class ZNTH(UNIT3D):
         self.banned_groups: list[str] = []
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if meta.category == "BOOK":
+        if meta.category == "BOOK" and not _is_misc(meta):
             if not meta.isbn and not meta.asin:
-                logger.info(f"{self.tracker}: [bold red]ISBN or ASIN is required for books. Skipping upload...[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]ISBN or ASIN is required for ebooks and audiobooks. Skipping upload...[/bold red]")
                 return False
-            if meta.audiobook and not meta.narrator:
-                logger.info(f"{self.tracker}: [bold red]Narrator is required for audiobooks. Skipping upload...[/bold red]")
+            book_format = _book_format(meta)
+            if meta.audiobook:
+                if not meta.narrator:
+                    logger.info(f"{self.tracker}: [bold red]Narrator is required for audiobooks. Skipping upload...[/bold red]")
+                    return False
+                if book_format not in ("MP3", "FLAC", "M4B"):
+                    logger.info(f"{self.tracker}: [bold red]Audiobooks must be MP3, FLAC, or M4B. Skipping upload...[/bold red]")
+                    return False
+            elif book_format not in ("EPUB", "PDF", "MOBI", "AZW3", "DJVU"):
+                logger.info(f"{self.tracker}: [bold red]Ebooks must be EPUB, PDF, MOBI, AZW3, or DJVU. Skipping upload...[/bold red]")
                 return False
 
         return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
@@ -42,46 +75,33 @@ class ZNTH(UNIT3D):
         audiobook = meta.audiobook
 
         if category == "BOOK":
-            author = meta.author or "".strip()
-            title = meta.title or meta.name or "".strip()
+            # Comics / manga / magazines / newspapers are Misc on ZNTH, not books.
+            if _is_misc(meta):
+                return {"name": meta.name}
+
+            author = (meta.author or "").strip()
+            title = (meta.title or meta.name or "").strip()
             year = str(meta.year) if meta.year is not None else ""
-            format_val = str(meta.type or meta.container or "").strip().upper()
-            tag = meta.tag or "".strip().lstrip("-")
-
-            # Determine source/retail
-            source = meta.source or "".strip().upper()
-            manual_source = str(meta.manual_source or "").strip().upper()
-            if manual_source in ("RETAIL", "SCAN", "HYBRID"):
-                source = manual_source
-
-            if source not in ("RETAIL", "SCAN", "HYBRID"):
-                filename_lower = (meta.basename_no_ext + " " + meta.title).lower()
-                if "scan" in filename_lower:
-                    source = "SCAN"
-                elif "hybrid" in filename_lower:
-                    source = "HYBRiD"
-                elif "retail" in filename_lower:
-                    source = "RETAiL"
-                else:
-                    ext = format_val.upper()
-                    source = "SCAN" if ext == "PDF" else "RETAiL"
-
-            is_retail = source in ("RETAIL", "RETAiL") or "retail" in meta.basename_no_ext.lower()
+            format_val = _book_format(meta)
+            tag = (meta.tag or "").strip().lstrip("-")
 
             if audiobook:
-                # AudioBook Naming
-                # Required: Author - Name Year Format ISBN-Tag
-                # Recommended: Author - Name Year Format Bitrate ISBN Retail-Tag
-                lossy_formats = ["MP3", "AAC", "OPUS", "VORBIS", "M4B", "M4A", "OGG"]
-                bitrate_val = ""
-                if format_val in lossy_formats:
-                    bitrate = meta.audiobook_bitrate
-                    if bitrate:
-                        bitrate_val = f"{bitrate}kbps"
+                # AudioBook: Author - Title (Year) LANG [Edition] {Narrator} [Source] [Container] Codec Bitrate
+                language = _iso_639_1_code(meta.book_language_iso, meta.book_language)
+                edition = str(meta.manual_edition or meta.edition or "").strip()
+                narrator = (meta.narrator or "").strip()
+                source = (str(meta.manual_source or "").strip() or str(meta.source or "").strip() or "WEB").upper()
 
-                book_id = meta.isbn or meta.asin
+                audio_map = {
+                    "FLAC": ("", "FLAC"),
+                    "MP3": ("", "MP3"),
+                    "M4B": ("M4B", "AAC"),
+                }
+                container, codec = audio_map.get(format_val, ("", format_val))
 
-                parts = []
+                bitrate_val = f"{meta.audiobook_bitrate}kbps" if meta.audiobook_bitrate else ""
+
+                parts: list[str] = []
                 if author:
                     parts.append(author)
                 if title:
@@ -89,36 +109,51 @@ class ZNTH(UNIT3D):
                         parts.append("-")
                     parts.append(title)
                 if year:
-                    parts.append(year)
-                if format_val:
-                    parts.append(format_val)
+                    parts.append(f"({year})")
+                if language:
+                    parts.append(language)
+                if edition:
+                    parts.append(edition)
+                if narrator:
+                    parts.append(f"{{{narrator}}}")
+                if source:
+                    parts.append(f"[{source}]")
+                if container:
+                    parts.append(container)
+                if codec:
+                    parts.append(codec)
                 if bitrate_val:
                     parts.append(bitrate_val)
-                if book_id:
-                    parts.append(book_id)
-                if is_retail:
-                    parts.append("Retail")
 
                 base_name = " ".join(parts)
                 base_name = " ".join(base_name.split())
                 znth_name = f"{base_name}-{tag}" if tag else base_name
 
             else:
-                # eBook Naming
-                # Required: Author - Name Year Format ISBN
-                # Additional: Author - Name Year Edition Format ISBN Retail Scan OCR
+                # eBook: Author - Title [Year] [Edition] Format [Retail]
                 edition = str(meta.manual_edition or meta.edition or "").strip()
                 if edition:
                     edition_lower = edition.lower()
                     if "1st" in edition_lower or "first" in edition_lower:
                         edition = ""
-                    else:
-                        if not any(x in edition_lower for x in ["edition", "ed.", "ed"]):
-                            edition = f"{edition} Edition"
+                    elif not any(x in edition_lower for x in ["edition", "ed.", "ed"]):
+                        edition = f"{edition} Edition"
 
-                isbn_val = meta.isbn or "".strip()
-                is_scan = source == "SCAN" or "scan" in meta.basename_no_ext.lower() or "scan" in meta.title.lower()
-                is_ocr = bool(meta.ocr) or "ocr" in meta.basename_no_ext.lower() or "ocr" in meta.title.lower()
+                source = str(meta.source or "").strip().upper()
+                manual_source = str(meta.manual_source or "").strip().upper()
+                if manual_source in ("RETAIL", "SCAN", "HYBRID"):
+                    source = manual_source
+                if source not in ("RETAIL", "SCAN", "HYBRID"):
+                    filename_lower = (meta.basename_no_ext + " " + meta.title).lower()
+                    if "scan" in filename_lower:
+                        source = "SCAN"
+                    elif "hybrid" in filename_lower:
+                        source = "HYBRID"
+                    elif "retail" in filename_lower:
+                        source = "RETAIL"
+                    else:
+                        source = "SCAN" if format_val == "PDF" else "RETAIL"
+                is_retail = source == "RETAIL" or "retail" in meta.basename_no_ext.lower()
 
                 parts = []
                 if author:
@@ -133,14 +168,8 @@ class ZNTH(UNIT3D):
                     parts.append(edition)
                 if format_val:
                     parts.append(format_val)
-                if isbn_val:
-                    parts.append(isbn_val)
                 if is_retail:
                     parts.append("Retail")
-                if is_scan:
-                    parts.append("Scan")
-                if is_ocr:
-                    parts.append("OCR")
 
                 base_name = " ".join(parts)
                 base_name = " ".join(base_name.split())
@@ -167,6 +196,7 @@ class ZNTH(UNIT3D):
             "TV": "2",
             "AUDIOBOOK": "7",
             "BOOK": "6",
+            "MISC": "9",
             "GAME": "3",
         }
         if mapping_only:
@@ -179,6 +209,8 @@ class ZNTH(UNIT3D):
             meta_category = meta.category
             if meta.audiobook:
                 meta_category = "AUDIOBOOK"
+            elif _is_misc(meta):
+                meta_category = "MISC"
             resolved_id = category_id.get(meta_category, "0")
             return {"category_id": resolved_id}
 
@@ -191,9 +223,12 @@ class ZNTH(UNIT3D):
             "HDTV": "6",
             "ENCODE": "3",
             "DVDRIP": "11",
+            "FLAC": "7",
+            "MP3": "8",
+            "EPUB": "9",
+            "M4B": "10",
+            "PDF": "19",
             "OTHER": "16",
-            "AUDIOBOOK": "10",
-            "BOOK": "9",
         }
         if mapping_only:
             return type_id
@@ -208,13 +243,20 @@ class ZNTH(UNIT3D):
             if isinstance(meta_type, str):
                 meta_type = meta_type.upper().strip().lstrip(".")
 
-            resolved_id = type_id.get(meta_type or "", "0")
-
             if category == "GAME":
                 resolved_id = "16"
-            elif meta.audiobook:
-                resolved_id = "10"
             elif category == "BOOK":
-                resolved_id = "9"
+                resolved_id = type_id.get(meta_type or "", "16")
+            else:
+                resolved_id = type_id.get(meta_type or "", "0")
 
             return {"type_id": resolved_id}
+
+    async def get_additional_data(self, meta: Meta) -> dict[str, str]:
+        data: dict[str, str] = {}
+        if meta.category == "BOOK" and not _is_misc(meta):
+            if meta.isbn:
+                data["isbn"] = str(meta.isbn)
+            if meta.asin:
+                data["asin"] = str(meta.asin)
+        return data
