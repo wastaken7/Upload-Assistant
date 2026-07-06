@@ -235,24 +235,8 @@ class ASC:
         return 'S_legenda'
 
     async def get_resolution(self, meta: Meta) -> dict[str, str]:
-        width = ''
-        height = ''
-        if meta.is_disc == "BDMV":
-            resolution_str = meta.resolution
-            try:
-                height_num = int(resolution_str.lower().replace('p', '').replace('i', ''))
-                height = str(height_num)
-
-                width_num = round((16 / 9) * height_num)
-                width = str(width_num)
-            except (ValueError, TypeError):
-                pass
-
-        else:
-            video_mi = meta.mediainfo["media"]["track"][1]
-            width = video_mi['Width']
-            height = video_mi['Height']
-
+        width = str(meta.video_width) if meta.video_width is not None else ''
+        height = str(meta.video_height) if meta.video_height is not None else ''
         return {
             'width': width,
             'height': height

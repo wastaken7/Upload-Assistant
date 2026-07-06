@@ -846,6 +846,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
             "LDU",
             "LPT",
             "LT",
+            "MKO",
             "OE",
             "PTCAFE",
             "PTGTK",

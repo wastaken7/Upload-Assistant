@@ -624,8 +624,7 @@ class PTP:
         other_res = None
         res = meta.resolution if meta.resolution is not None else "OTHER"
         if (res == "OTHER" and meta.is_disc != "BDMV") or (meta.sd == 1 and meta.type == "WEBDL") or (meta.sd == 1 and meta.type == "DVDRIP"):
-            video_mi = meta.mediainfo["media"]["track"][1]
-            other_res = f"{video_mi['Width']}x{video_mi['Height']}"
+            other_res = f"{meta.video_width}x{meta.video_height}" if meta.video_width and meta.video_height else None
             res = "Other"
         if meta.is_disc == "DVD":
             res = meta.source or "".replace(" DVD", "")

@@ -36,6 +36,7 @@ from src.trackers.HDS import HDS
 from src.trackers.HDT import HDT
 from src.trackers.IPT import IPT
 from src.trackers.IS import IS
+from src.trackers.MKO import MKO
 from src.trackers.MTEAM import MTEAM
 from src.trackers.MTV import MTV
 from src.trackers.NBL import NBL
@@ -1423,6 +1424,7 @@ tracker_class_map: dict[str, type[Any]] = {
     "LST": LST,
     "LT": LT,
     "LUME": LUME,
+    "MKO": MKO,
     "MS": MS,
     "MTEAM": MTEAM,
     "MTV": MTV,
@@ -1541,6 +1543,7 @@ http_trackers = {
     "IS",
     "LAJIDUI",
     "LPT",
+    "MKO",
     "MTV",
     "PHD",
     "PTCAFE",

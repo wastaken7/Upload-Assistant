@@ -26,6 +26,7 @@ class Meta:
     asin: str = ""
     ask_dupe: bool = False
     dupe_size_difference_tolerance: float | None = None
+    audio_bitrate: int | None = None
     audio_languages: list[str] | None = field(default_factory=list)
     audio_spectrogram_tracks: str | None = None
     audio_spectrogram: bool | None = None
@@ -448,9 +449,12 @@ class Meta:
     valid_mi_settings: bool | None = None
     valid_mi: bool | None = None
     vapoursynth: bool = False
+    video_bitrate: int | None = None
     video_codec: str = ""
     video_duration: int | None = 0
     video_encode: str = ""
+    video_height: int | None = None
+    video_width: int | None = None
     video: str = ""
     we_are_uploading: bool = False
     we_asked_tvmaze: bool = False

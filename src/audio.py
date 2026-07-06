@@ -513,6 +513,7 @@ def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_origi
         "LAJIDUI",
         "LCD",
         "LPT",
+        "MKO",
         "PTCAFE",
         "PTFANS",
         "PTGTK",
