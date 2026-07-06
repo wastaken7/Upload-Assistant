@@ -8,6 +8,7 @@ import aiofiles
 import cli_ui
 import httpx
 
+from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
@@ -62,7 +63,7 @@ class BHD:
     async def upload(self, meta: Meta) -> bool:
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
-        cat_id = await self.get_cat_id(str(meta.category))
+        cat_id = await self.get_cat_id(meta.category)
         source_id = await self.get_source(str(meta.source))
         type_id = await self.get_type(meta)
         draft = await self.get_live(meta)
@@ -167,7 +168,7 @@ class BHD:
                 return False
         else:
             logger.info("[cyan]BHD Request Data:")
-            logger.info(data)
+            logger.info(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True

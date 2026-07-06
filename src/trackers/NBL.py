@@ -8,6 +8,7 @@ import aiofiles
 import cli_ui
 import httpx
 
+from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -70,7 +71,7 @@ class NBL:
         data: dict[str, Any] = {
             "action": "upload",
             "api_key": self.api_key,
-            "tvmazeid": int(meta.tvmaze_id),
+            "tvmazeid": "" if not meta.tvmaze_id else int(meta.tvmaze_id),
             "mediainfo": mi_dump,
             "category": await self.get_cat_id(meta),
             "ignoredupes": "1",
@@ -101,7 +102,7 @@ class NBL:
                     return False
             else:
                 logger.info("[cyan]NBL Request Data:")
-                logger.info(data)
+                logger.info(Redaction.redact_private_info(data))
                 meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
                 await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
                 return True  # Debug mode - simulated success
@@ -160,7 +161,7 @@ class NBL:
             params["season"] = season_int
 
         if int(meta.tvmaze_id or 0) != 0:
-            params["tvmaze"] = int(meta.tvmaze_id)
+            params["tvmaze"] = meta.tvmaze_id
         elif meta.imdb_id or 0 != 0:
             params["imdb"] = meta.imdb_id
         else:

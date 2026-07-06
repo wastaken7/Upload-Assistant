@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 from bs4.element import AttributeValueList
 from unidecode import unidecode
 
+from cogs.redaction import Redaction
 from src.bbcode import BBCODE
 from src.console import console, logger
 from src.meta import Meta
@@ -58,7 +59,7 @@ class THR:
 
         mi_file: bytes = b""
 
-        if str(meta.is_disc) == "BDMV":
+        if (meta.is_disc) == "BDMV":
             mi_file = b""
             # bd_file = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", 'r', encoding='utf-8'
         else:
@@ -82,7 +83,7 @@ class THR:
         files: dict[str, tuple[str, Any]] = {
             'tfile': (f'{torrent_name}.torrent', tfile)
         }
-        imdb_info = cast(dict[str, Any], meta.imdb_info)
+        imdb_info = meta.imdb_info
         payload: dict[str, Any] = {
             "name": thr_name,
             "descr": desc,
@@ -94,7 +95,7 @@ class THR:
             "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})"
         }
         # If pronfo fails, put mediainfo into THR parser
-        if str(meta.is_disc) != "BDMV":
+        if (meta.is_disc) != "BDMV":
             files['nfo'] = ("MEDIAINFO.txt", mi_file)
         if subs:
             payload['subs[]'] = tuple(subs)
@@ -150,7 +151,7 @@ class THR:
                 return False
         else:
             logger.info("[cyan]THR Request Data:")
-            logger.info(payload)
+            logger.info(Redaction.redact_private_info(payload))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
@@ -160,8 +161,8 @@ class THR:
     async def get_cat_id(self, meta: Meta) -> str:
         genres = str(meta.genres).lower()
         keywords = str(meta.keywords).lower()
-        category = str(meta.category)
-        is_disc = str(meta.is_disc)
+        category = meta.category
+        is_disc = meta.is_disc
         sd = int(meta.sd or 0)
         cat = '17'
 
@@ -183,7 +184,7 @@ class THR:
     def get_subtitles(self, meta: Meta) -> list[int]:
         subs: list[int] = []
         sub_langs: list[str] = []
-        if str(meta.is_disc) != "BDMV":
+        if (meta.is_disc) != "BDMV":
             with open(f"{meta.base_dir}/tmp/{meta.uuid}/MediaInfo.json", encoding="utf-8") as f:
                 mi = cast(dict[str, Any], json.load(f))
             tracks = cast(list[dict[str, Any]], cast(dict[str, Any], mi.get('media', {})).get('track', []))
@@ -222,7 +223,7 @@ class THR:
         desc_parts: list[str] = []
         tag_value = meta.tag
         tag = "" if not tag_value else f" / {tag_value[1:]}"
-        res = str(meta.source) if str(meta.is_disc) == "DVD" else meta.resolution
+        res = str(meta.source) if (meta.is_disc) == "DVD" else meta.resolution
         desc_parts.append("[quote=Info]")
         year_str = str(meta.year) if meta.year is not None else ""
         name_aka = f"{meta.title} {meta.aka} {year_str}"
@@ -231,12 +232,12 @@ class THR:
         desc_parts.append(f"Name: {' '.join(name_aka.split())}\n\n")
         desc_parts.append(f"Overview: {meta.overview}\n\n")
         desc_parts.append(f"{res} / {meta.type}{tag}\n\n")
-        category = str(meta.category)
+        category = meta.category
         desc_parts.append(f"Category: {category}\n")
         if meta.tmdb:
             desc_parts.append(f"TMDB: https://www.themoviedb.org/{category.lower()}/{meta.tmdb}\n")
         if meta.imdb_id or 0 != 0:
-            imdb_info = cast(dict[str, Any], meta.imdb_info)
+            imdb_info = meta.imdb_info
             desc_parts.append(f"IMDb: {str(imdb_info.get('imdb_url', ''))}\n")
         if meta.tvdb_id or 0 != 0:
             desc_parts.append(f"TVDB: https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series\n")
@@ -329,7 +330,7 @@ class THR:
             await asyncio.sleep(1)
 
         desc_parts.append("[align=center]")
-        if str(meta.is_disc) == "BDMV":
+        if (meta.is_disc) == "BDMV":
             async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt") as bd_file:
                 desc_parts.append(f"[nfo]{await bd_file.read()}[/nfo]")
         elif self.config['TRACKERS']['THR'].get('pronfo_api_key'):
@@ -377,7 +378,7 @@ class THR:
         dupes: list[str] = []
 
         if not imdb_id:
-            logger.info("[red]No IMDb ID available for search", style="bold red")
+            logger.info("[red]No IMDb ID available for search")
             return dupes
 
         cookies = await self.login(meta)

@@ -8,6 +8,7 @@ import aiofiles
 import httpx
 import langcodes
 
+from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -45,7 +46,7 @@ class CRP:
         if meta.anime:
             return "5070"
 
-        category = str(meta.category or "").upper()
+        category = meta.category.upper()
         resolution = meta.resolution.lower()
 
         uhd_resolutions = {"2160p", "4320p", "8640p"}
@@ -230,7 +231,7 @@ class CRP:
         tmdb_id = meta.tmdb_id
         if tmdb_id and str(tmdb_id).isdigit() and tmdb_id > 0:
             data["tmdb_id"] = str(tmdb_id)
-            tmdb_type = str(meta.category or "").lower()
+            tmdb_type = meta.category.lower()
             if tmdb_type in ("movie", "tv"):
                 data["tmdb_type"] = tmdb_type
 
@@ -276,7 +277,7 @@ class CRP:
             logger.debug(f"URL: {self.upload_url}")
             logger.debug(f"Category ID: {self.get_category_id(meta)}")
             logger.debug("Fields:")
-            logger.debug(data)
+            logger.debug(Redaction.redact_private_info(data))
             logger.debug("Files:")
             logger.debug({k: v[0] for k, v in files.items()})
 

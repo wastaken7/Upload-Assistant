@@ -12,6 +12,7 @@ import httpx
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 
+from cogs.redaction import Redaction
 from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa E403
@@ -101,7 +102,7 @@ class PTER:
 
     async def get_type_category_id(self, meta: Meta) -> str:
         cat_id = "EXIT"
-        category = str(meta.category)
+        category = meta.category
 
         if category == 'MOVIE':
             cat_id = '401'
@@ -383,10 +384,7 @@ class PTER:
         async with aiofiles.open(torrent_path, 'rb') as torrentFile:
             torrent_bytes = await torrentFile.read()
         filelist = meta.filelist
-        if len(filelist) == 1:
-            torrentFileName = unidecode(os.path.basename(str(meta.video)).replace(" ", "."))
-        else:
-            torrentFileName = unidecode(os.path.basename(str(meta.path)).replace(" ", "."))
+        torrentFileName = unidecode(os.path.basename(meta.video).replace(" ", ".")) if len(filelist) == 1 else unidecode(os.path.basename(str(meta.path)).replace(" ", "."))
         files = {
             'file': (f"{torrentFileName}.torrent", torrent_bytes, "application/x-bittorent"),
         }
@@ -422,7 +420,7 @@ class PTER:
         # Submit
         if meta.debug:
             logger.debug(url)
-            logger.debug(data)
+            logger.debug(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success

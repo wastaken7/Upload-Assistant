@@ -12,6 +12,7 @@ import aiofiles
 import httpx
 from PIL import Image
 
+from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -74,7 +75,7 @@ class SUIO:
 
 
     def get_category_id(self, meta: Meta) -> str:
-        category = str(meta.category or "").upper()
+        category = meta.category.upper()
         resolution = meta.resolution.lower()
         uhd_resolutions = {"2160p", "4320p", "8640p"}
         hd_resolutions = {"1080p", "1080i", "720p", "1440p"}
@@ -328,7 +329,7 @@ class SUIO:
             logger.debug(f"[cyan]{self.tracker} Upload (DEBUG MODE):[/cyan]")
             logger.debug(f"User: {username}")
             logger.debug("Fields:")
-            logger.debug(data)
+            logger.debug(Redaction.redact_private_info(data))
             logger.debug("Files:")
             logger.debug({k: v[0] for k, v in files.items()})
             status_dict["status_message"] = "Debug mode enabled, skipping upload."

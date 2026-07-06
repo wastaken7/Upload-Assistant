@@ -51,7 +51,7 @@ class SN:
             demographic = meta.demographic if meta.demographic is not None else "Mina"
             sub_cat_id = demographics_map.get(demographic, sub_cat_id)
 
-        category = str(meta.category)
+        category = meta.category
         if category == 'MOVIE':
             cat_id = '1'
             # sub cat is source so using source to get
@@ -139,7 +139,7 @@ class SN:
                     return False
             except Exception:
                 logger.error("[red]Error! It may have uploaded, go check")
-                logger.info(data)
+                logger.info(Redaction.redact_private_info(data))
                 console.print_exception()
                 return False
         else:
@@ -188,7 +188,7 @@ class SN:
 
         # Determine search parameters based on metadata
         imdb_id = meta.imdb_id or 0
-        category = str(meta.category)
+        category = meta.category
         title = meta.title
         if imdb_id == 0:
             if category == 'TV':

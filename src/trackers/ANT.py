@@ -10,6 +10,7 @@ import aiofiles
 import cli_ui
 import httpx
 
+from cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -272,7 +273,7 @@ class ANT:
                         return False
             else:
                 logger.info("[cyan]ANT Request Data:")
-                logger.info(data)
+                logger.info(Redaction.redact_private_info(data))
                 meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
                 await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
                 return True

@@ -14,6 +14,7 @@ import httpx
 import requests
 import tmdbsimple as tmdb
 
+from cogs.redaction import Redaction
 from src.bbcode import BBCODE
 from src.console import logger
 from src.meta import Meta
@@ -689,7 +690,7 @@ class TVC:
 
         else:
             logger.info("[cyan]TVC Request Data:")
-            logger.info(data)
+            logger.info(Redaction.redact_private_info(data))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."

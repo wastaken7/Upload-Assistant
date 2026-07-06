@@ -7,6 +7,7 @@ from typing import Any, cast
 import aiofiles
 import httpx
 
+from cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -179,7 +180,7 @@ class RTF:
             debug_data = json_data.copy()
             if 'file' in debug_data and debug_data['file']:
                 debug_data['file'] = f"{str(debug_data['file'])[:10]}..."
-            logger.info(debug_data)
+            logger.info(Redaction.redact_private_info(debug_data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
@@ -190,7 +191,7 @@ class RTF:
             return False
 
         year_value = meta.year
-        year = int(year_value) if (isinstance(year_value, int) or (isinstance(year_value, str) and year_value.isdigit())) else None
+        year = (year_value) if (isinstance(year_value, int) or (isinstance(year_value, str) and year_value.isdigit())) else None
         # Collect all possible years from different sources
         years: list[int] = []
 

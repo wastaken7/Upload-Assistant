@@ -5,6 +5,7 @@ from typing import Any
 import aiofiles
 import httpx
 
+from cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
@@ -282,7 +283,7 @@ class HUNO(UNIT3D):
 
         if meta.debug:
             logger.debug(f"[cyan]{self.tracker} Request Data:")
-            logger.debug(data)
+            logger.debug(Redaction.redact_private_info(data))
             status_dict["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}_DEBUG", f"{self.tracker}_DEBUG", announce_url="https://fake.tracker")
             return True

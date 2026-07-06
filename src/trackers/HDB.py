@@ -11,6 +11,7 @@ import aiofiles
 import httpx
 from unidecode import unidecode
 
+from cogs.redaction import Redaction
 from src.bbcode import BBCODE
 from src.console import console, logger
 from src.exceptions import *  # noqa F403
@@ -315,7 +316,7 @@ class HDB:
         # Submit
         if meta.debug:
             logger.debug(url)
-            logger.debug(data)
+            logger.debug(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success

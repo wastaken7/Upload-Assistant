@@ -12,6 +12,7 @@ import aiofiles
 import httpx
 from PIL import Image
 
+from cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -555,7 +556,7 @@ class UNIT3D:
                     return False  # JSON parsing error
         else:
             logger.info(f"[cyan]{self.tracker} Request Data:")
-            logger.info(data)
+            logger.info(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = f"Debug mode enabled, not uploading: {self.tracker}."
             await self.common.create_torrent_for_upload(
                 meta,

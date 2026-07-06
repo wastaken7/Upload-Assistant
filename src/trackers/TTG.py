@@ -11,6 +11,7 @@ import httpx
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 
+from cogs.redaction import Redaction
 from src.console import console, logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa #F405
@@ -51,7 +52,7 @@ class TTG:
     async def get_type_id(self, meta: Meta) -> int:
         type_id = 0
         lang = str(meta.original_language).upper()
-        category = str(meta.category)
+        category = meta.category
         resolution = meta.resolution
         if meta.category == "MOVIE":
             # 51 = DVDRip
@@ -140,10 +141,7 @@ class TTG:
         filelist = meta.filelist
         async with aiofiles.open(torrent_path, 'rb') as torrent_file:
             torrent_bytes = await torrent_file.read()
-        if len(filelist) == 1:
-            torrentFileName = unidecode(os.path.basename(str(meta.video)).replace(" ", "."))
-        else:
-            torrentFileName = unidecode(os.path.basename(str(meta.path)).replace(" ", "."))
+        torrentFileName = unidecode(os.path.basename(meta.video).replace(" ", ".")) if len(filelist) == 1 else unidecode(os.path.basename(str(meta.path)).replace(" ", "."))
         async with aiofiles.open(mi_path, encoding='utf-8') as mi_dump:
             mi_text = await mi_dump.read()
         files = {
@@ -169,7 +167,7 @@ class TTG:
         # Submit
         if meta.debug:
             logger.debug(url)
-            logger.debug(data)
+            logger.debug(Redaction.redact_private_info(data))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."

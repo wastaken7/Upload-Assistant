@@ -13,6 +13,7 @@ import httpx
 import pyotp
 from defusedxml import ElementTree as ET
 
+from cogs.redaction import Redaction
 from src.console import console, logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -214,7 +215,7 @@ class MTV:
             if 'auth' in debug_data:
                 auth_value = str(debug_data.get('auth', ''))
                 debug_data['auth'] = f"{auth_value[:3]}..." if len(auth_value) > 3 else '***'
-            logger.info(debug_data)
+            logger.info(Redaction.redact_private_info(debug_data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
@@ -253,7 +254,7 @@ class MTV:
         if meta.imdb_id != 0:
             description += str(meta.imdb_info.get("imdb_url", ""))
         if meta.tmdb:
-            description += f"\nhttps://www.themoviedb.org/{str(meta.category.lower())}/{str(meta.tmdb)}"
+            description += f"\nhttps://www.themoviedb.org/{(meta.category.lower())}/{str(meta.tmdb)}"
         if meta.tvdb_id != 0:
             description += f"\nhttps://www.thetvdb.com/?id={str(meta.tvdb_id)}"
         if meta.tvmaze_id != 0:
@@ -308,7 +309,7 @@ class MTV:
             mtv_name = os.path.splitext(mtv_name)[0]
 
         tag_value = meta.tag
-        tag_lower = tag_value.lower()
+        tag_lower = "" if not tag_value else tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
         if tag_value == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
@@ -374,7 +375,7 @@ class MTV:
                 "MIXED": "11",
                 "Unknown": "12",
                 "ENCODE": "7",
-            }.get(meta.type, "0")
+            }.get(meta.type or "", "0")
         return type_id
 
     async def get_origin_id(self, meta: Meta) -> str:
@@ -411,7 +412,7 @@ class MTV:
         tags.extend(
             each
             for each in ["remux", "WEB.DL", "WEBRip", "HDTV", "BluRay", "DVD", "HDDVD"]
-            if (each.lower().replace(".", "") in str(meta.type or "").lower()) or (each.lower().replace("-", "") in meta.source or "")
+            if (each.lower().replace(".", "") in (meta.type or "").lower()) or (each.lower().replace("-", "") in (meta.source or ""))
         )
         # series tags
         if meta.category == "TV":
@@ -449,7 +450,7 @@ class MTV:
         tags.append(video_codec.replace('AVC', 'h264').replace('HEVC', 'h265').replace('-', ''))
 
         # Group Tags
-        if meta.tag != "":
+        if meta.tag:
             tags.append(f"{meta.tag[1:].replace(' ', '.')}.release")
         else:
             tags.append('NOGRP.release')
@@ -668,13 +669,13 @@ class MTV:
 
         disallowed_keywords = {'xxx', 'erotic', 'porn'}
         disallowed_genres = {'adult', 'erotica'}
-        keywords_list = [str(item) for item in meta.keywords]
+        keywords_list = list(meta.keywords)
         genres_value = meta.combined_genres
         genres_list: list[str] = []
         if isinstance(genres_value, list):
-            genres_list.extend([str(item) for item in genres_value])
+            genres_list.extend(list(genres_value))
         else:
-            genres_list.append(str(genres_value))
+            genres_list.append(genres_value)
         keywords_lower = {k.lower() for k in keywords_list if k}
         genres_lower = {g.lower() for g in genres_list if g}
         if any(keyword in keywords_lower for keyword in disallowed_keywords) or any(genre in genres_lower for genre in disallowed_genres):

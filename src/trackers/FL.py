@@ -12,6 +12,7 @@ import httpx
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 
+from cogs.redaction import Redaction
 from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
@@ -95,7 +96,7 @@ class FL:
         fl_name = fl_name.replace(meta.aka, "")
         imdb_info = meta.imdb_info
         if isinstance(imdb_info, dict):
-            imdb_info_dict = cast(dict[str, Any], imdb_info)
+            imdb_info_dict = imdb_info
             title = meta.title
             imdb_aka = str(imdb_info_dict.get('aka', ''))
             if imdb_aka:
@@ -188,7 +189,7 @@ class FL:
         if imdb_id_value.isdigit() and int(imdb_id_value) != 0:
             data["imdbid"] = meta.imdb
             imdb_info = meta.imdb_info
-            imdb_info_dict = cast(dict[str, Any], imdb_info) if isinstance(imdb_info, dict) else {}
+            imdb_info_dict = imdb_info if isinstance(imdb_info, dict) else {}
             data['description'] = imdb_info_dict.get('genres', '')
         if self.uploader_name not in ("", None) and not self._is_true(self.config['TRACKERS'][self.tracker].get('anon', "False")):
             data['epenis'] = self.uploader_name
@@ -205,7 +206,7 @@ class FL:
         # Submit
         if meta.debug:
             logger.debug(url)
-            logger.debug(data)
+            logger.debug(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success

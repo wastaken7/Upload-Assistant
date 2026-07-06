@@ -778,7 +778,7 @@ class AZTrackerBase:
                 return {}
 
         else:
-            logger.info(data)
+            logger.info(Redaction.redact_private_info(data))
             status_message = 'Debug mode enabled, not uploading.'
 
         meta.tracker_status[self.tracker]["status_message"] = status_message
@@ -912,9 +912,9 @@ class AZTrackerBase:
             "DVD Remux": "17",
         }
 
-        source_type = str(meta.type or "").strip().lower()
+        source_type = (meta.type or "").strip().lower()
         source = meta.source or "".strip().lower()
-        is_disc = str(meta.is_disc or "").strip().lower()
+        is_disc = (meta.is_disc or "").strip().lower()
 
         html_label = ""
 
