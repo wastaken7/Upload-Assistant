@@ -104,7 +104,7 @@ async def check_binary(binary_name: str, config_path: str | None = None, meta: M
 
 
 
-async def run_command_with_logging(cmd: list[str], description: str, debug: bool = False) -> None:
+async def run_command_with_logging(cmd: list[str], description: str) -> None:
     """Execute a shell command asynchronously and log its output in debug mode."""
     # Redact sensitive info (like password/username) in the printed command
     redacted_cmd = []
@@ -157,7 +157,7 @@ def parse_volume_size(vol_size: str) -> int:
     return 0
 
 
-async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, volume_size: str | None, total_size: int, debug: bool = False) -> None:
+async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, volume_size: str | None, total_size: int) -> None:
     """Execute 7z archiving/splitting with real-time volume progress monitoring."""
     redacted_cmd = []
     skip_next = False
@@ -231,7 +231,7 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
-async def run_par2_with_progress(cmd: list[str], cwd: str | None = None, debug: bool = False) -> None:
+async def run_par2_with_progress(cmd: list[str], cwd: str | None = None) -> None:
     """Execute par2 c with real-time percentage progress parsing."""
     redacted_cmd = []
     skip_next = False
@@ -297,7 +297,7 @@ async def run_par2_with_progress(cmd: list[str], cwd: str | None = None, debug: 
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
-async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None, debug: bool = False) -> None:
+async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None) -> None:
     """Execute nyuu upload with real-time speed, ETA, and percentage progress parsing."""
     redacted_cmd = []
     skip_next = False
@@ -364,7 +364,7 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None, debug: 
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
-async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, debug: bool = False) -> None:
+async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> None:
     """Execute pesto upload consuming its JSON event stream for progress reporting."""
     redacted_cmd = []
     skip_next = False
@@ -509,7 +509,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, debug:
         await process.wait()
 
         if process.returncode != 0:
-            if check_missing_count:
+            if check_missing_count > 0:
                 logger.info(f"[red]Pesto could not confirm {check_missing_count} article(s) on the server after reposting — the NZB is incomplete and will be discarded.[/red]")
             logger.error(f"[red]Error running Pesto Uploader (exit code {process.returncode}):[/red]")
             stderr_str = "".join(stderr_accum)
@@ -777,7 +777,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 async with aiofiles.open(mock_7z, "wb") as f:
                     await f.write(b"mock 7z volume content")
             else:
-                await run_7z_with_progress(cmd_7z, usenet_dir, archive_name, volume_size, total_size, debug=is_debug)
+                await run_7z_with_progress(cmd_7z, usenet_dir, archive_name, volume_size, total_size)
         else:
             logger.info("[cyan]Copying single file for upload...[/cyan]")
             dest_file = os.path.join(usenet_dir, os.path.basename(input_path))
@@ -809,7 +809,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 async with aiofiles.open(mock_par2, "wb") as f:
                     await f.write(b"mock par2 content")
             else:
-                await run_par2_with_progress(cmd_par2, cwd=usenet_dir, debug=is_debug)
+                await run_par2_with_progress(cmd_par2, cwd=usenet_dir)
 
     # 4. Poster / From header
     random_poster = usenet_cfg.get("random_poster", True)
@@ -914,7 +914,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 await f.write(mock_nzb_content)
         else:
             try:
-                await run_pesto_with_progress(cmd_pesto, cwd=usenet_dir, debug=is_debug)
+                await run_pesto_with_progress(cmd_pesto, cwd=usenet_dir)
             except Exception:
                 # pesto writes the NZB to --out before it knows the post-check
                 # verification failed, so a failed run can still leave a
@@ -951,7 +951,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
                 await f.write(mock_nzb_content)
         else:
-            await run_nyuu_with_progress(cmd_nyuu, cwd=usenet_dir, debug=is_debug)
+            await run_nyuu_with_progress(cmd_nyuu, cwd=usenet_dir)
 
         # nyuu doesn't inject the password into the NZB — do it manually
         if archive_password and await aiofiles.ospath.exists(nzb_file):

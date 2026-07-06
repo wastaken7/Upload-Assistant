@@ -261,6 +261,9 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 await asyncio.sleep(inject_delay)
 
     async def find_existing_torrent(self, meta: Meta) -> str | None:
+        if meta.get("skip_auto_torrent", False):
+            return None
+
         # Determine piece size preferences
         trackers_config = cast(dict[str, Any], self.config.get('TRACKERS', {}))
         mtv_config = trackers_config.get('MTV', {})
