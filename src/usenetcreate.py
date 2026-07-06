@@ -601,7 +601,10 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     archive_password = usenet_cfg.get("archive_password")
     if archive_password:
         if str(archive_password).lower() == "random":
-            archive_password = secrets.token_urlsafe(16)
+            while True:
+                archive_password = secrets.token_urlsafe(16)
+                if not archive_password.startswith("-"):
+                    break
             if meta.debug:
                 logger.debug(f"[cyan]Generated random Usenet archive password: {archive_password}[/cyan]")
         else:
