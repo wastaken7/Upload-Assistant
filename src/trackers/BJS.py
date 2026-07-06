@@ -501,16 +501,23 @@ class BJS:
             return meta.title, ""
 
         if meta.category in ("TV", "MOVIE"):
-            original_title = meta.title
+            original_title = meta.imdb_info.get("title") or meta.title
             brazilian_title = ""
 
             if BJS.database_title:
                 original_title = BJS.database_title
 
             main_tmdb_data = meta.tmdb_localized_data.get("pt-BR", {}).get("main") or {}
-            original_name_title = main_tmdb_data.get("original_name") or main_tmdb_data.get("original_title")
             tmdb_title = main_tmdb_data.get("name") or main_tmdb_data.get("title")
-            if tmdb_title and tmdb_title != meta.title and (not original_name_title or original_name_title != tmdb_title):
+
+            original_titles_to_compare = (
+                meta.title,
+                meta.imdb_info.get("title"),
+                main_tmdb_data.get("original_name"),
+                main_tmdb_data.get("original_title"),
+            )
+
+            if tmdb_title and (tmdb_title not in original_titles_to_compare):
                 brazilian_title = tmdb_title
 
             return original_title, brazilian_title
@@ -577,6 +584,9 @@ class BJS:
 
     async def get_tags(self, meta: Meta) -> str:
         """Map genres from meta.genres or TMDB to Portuguese tags."""
+        if BJS.already_has_the_info:
+            return ""
+
         matched_tags: list[str] = []
 
         genres_list = meta.genres or meta.keywords or []
@@ -1543,7 +1553,7 @@ class BJS:
         if imdbid:
             return imdbid
 
-        category = str(meta.category).upper()
+        category = (meta.category).upper()
         tmdb_id = meta.tmdb_id
 
         if category in ["MOVIE", "TV"] and tmdb_id:
@@ -1552,18 +1562,18 @@ class BJS:
         return ""
 
     async def get_overview(self) -> str:
+        if BJS.already_has_the_info:
+            return ""
+
         overview = self.main_tmdb_data.get("overview", "")
         if isinstance(overview, str) and overview.strip():
             return overview
 
-        if not BJS.already_has_the_info:
-            logger.info(f"{self.tracker}: [bold red]Sinopse não encontrada no TMDb. Por favor, insira manualmente.[/bold red]")
-            user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f'"{self.tracker}: [green]Digite a sinopse:[/green]"')
-            user_input = (user_input_raw or "").strip()
-            if user_input:
-                return user_input
-            return "N/A"
-
+        logger.info(f"{self.tracker}: [bold red]Sinopse não encontrada no TMDb. Por favor, insira manualmente.[/bold red]")
+        user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f'"{self.tracker}: [green]Digite a sinopse:[/green]"')
+        user_input = (user_input_raw or "").strip()
+        if user_input:
+            return user_input
         return "N/A"
 
     def check_data(self, meta: Meta, data: dict[str, Any]) -> str:
