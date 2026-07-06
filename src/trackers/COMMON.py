@@ -20,7 +20,7 @@ from langcodes import tag_parser
 from torf import Torrent
 
 from src.bbcode import BBCODE
-from src.console import console
+from src.console import console, logger
 from src.exportmi import exportInfo
 from src.languages import languages_manager
 from src.meta import Meta
@@ -267,8 +267,8 @@ class COMMON:
                 return None
 
             except Exception as e:
-                console.print(f"[yellow]Warning: Could not download torrent file: {str(e)}[/yellow]")
-                console.print("[yellow]Download manually from the tracker.[/yellow]")
+                logger.warning(f"[yellow]Warning: Could not download torrent file: {str(e)}[/yellow]")
+                logger.info("[yellow]Download manually from the tracker.[/yellow]")
                 return None
 
         return None
@@ -291,7 +291,7 @@ class COMMON:
             new_torrent = await loop.run_in_executor(None, Torrent.read, path)
             if isinstance(new_tracker, list):
                 if not new_tracker:
-                    console.print(f"[red]Error: Empty tracker list provided for {tracker}. Cannot create torrent.[/red]")
+                    logger.error(f"[red]Error: Empty tracker list provided for {tracker}. Cannot create torrent.[/red]")
                     return None
                 new_torrent.metainfo["announce"] = new_tracker[0]
                 new_torrent.metainfo["announce-list"] = [new_tracker]
@@ -340,7 +340,7 @@ class COMMON:
 
     async def save_image_links(self, meta: Meta, image_key: str, image_list: list[dict[str, str]] | None) -> str | None:
         if image_list is None:
-            console.print("[yellow]No image links to save.[/yellow]")
+            logger.info("[yellow]No image links to save.[/yellow]")
             return None
 
         output_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
@@ -359,7 +359,7 @@ class COMMON:
                         if isinstance(parsed, dict):
                             loaded_data = cast(dict[str, Any], parsed)
                         else:
-                            console.print("[yellow]Warning: Existing image data has invalid schema, reinitializing.[/yellow]")
+                            logger.warning("[yellow]Warning: Existing image data has invalid schema, reinitializing.[/yellow]")
 
                     # Validate schema: must have 'keys' as dict and 'total_count' as int
                     if (
@@ -368,7 +368,7 @@ class COMMON:
                     ):
                         existing_data = loaded_data
             except (json.JSONDecodeError, OSError) as e:
-                console.print(f"[yellow]Warning: Could not load existing image data: {str(e)}[/yellow]")
+                logger.warning(f"[yellow]Warning: Could not load existing image data: {str(e)}[/yellow]")
 
         # Create data structure if it doesn't exist or was invalid
         if not existing_data:
@@ -421,12 +421,12 @@ class COMMON:
                 await f.write(json.dumps(existing_data, indent=2))
 
             if meta.debug:
-                console.print(f"[green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
-                console.print(f"[blue]  - JSON: {output_file}[/blue]")
+                logger.debug(f"[green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
+                logger.debug(f"[blue]  - JSON: {output_file}[/blue]")
 
             return output_file
         except Exception as e:
-            console.print(f"[bold red]Error saving image links: {e}[/bold red]")
+            logger.info(f"[bold red]Error saving image links: {e}[/bold red]")
             return None
 
     async def unit3d_region_ids(self, region: str = "", reverse: bool = False, region_id: int = 0) -> str:
@@ -537,18 +537,18 @@ class COMMON:
             # console.print(f"[cyan]Found IMDb ID: https://www.imdb.com/title/tt{imdb}[/cyan]")
 
         if any([tmdb, imdb, tvdb, mal]):
-            console.print(f"[cyan]Found the following IDs on {tracker_name}:")
+            logger.info(f"[cyan]Found the following IDs on {tracker_name}:")
             if tmdb:
-                console.print(f"TMDb ID: {tmdb}")
+                logger.info(f"TMDb ID: {tmdb}")
             if imdb:
-                console.print(f"IMDb ID: https://www.imdb.com/title/tt{imdb}")
+                logger.info(f"IMDb ID: https://www.imdb.com/title/tt{imdb}")
             if tvdb:
-                console.print(f"TVDb ID: {tvdb}")
+                logger.info(f"TVDb ID: {tvdb}")
             if mal:
-                console.print(f"MAL ID: {mal}")
+                logger.info(f"MAL ID: {mal}")
 
         if filename:
-            console.print(f"Filename: {filename}")  # Ensure filename is printed if available
+            logger.info(f"Filename: {filename}")  # Ensure filename is printed if available
 
         if not meta.unattended:
             selection = input(f"Do you want to use these IDs from {tracker_name}? (Y/n): ").strip().lower()
@@ -574,14 +574,14 @@ class COMMON:
                 response = await client.get(url=url, params=params)
                 json_response = response.json()
         except (httpx.RequestError, httpx.TimeoutException) as e:
-            console.print(f"[yellow]Request error in unit3d_region_distributor: {e}[/yellow]")
+            logger.info(f"[yellow]Request error in unit3d_region_distributor: {e}[/yellow]")
             return
         except ValueError:
             return
         try:
             data: list[dict[str, Any]] | str = json_response.get('data', [])
             if data == "404":
-                console.print("[yellow]No data found (404). Returning None.[/yellow]")
+                logger.info("[yellow]No data found (404). Returning None.[/yellow]")
                 return
             if data and isinstance(data, list):
                 attributes = data[0].get('attributes', {})
@@ -590,8 +590,8 @@ class COMMON:
                 distributor_id = attributes.get('distributor_id', 0)
 
                 if meta.debug:
-                    console.print(f"[blue]Region ID: {region_id}[/blue]")
-                    console.print(f"[blue]Distributor ID: {distributor_id}[/blue]")
+                    logger.debug(f"[blue]Region ID: {region_id}[/blue]")
+                    logger.debug(f"[blue]Distributor ID: {distributor_id}[/blue]")
 
                 # use reverse to reverse map the id to the name
                 if not meta.region and region_id:
@@ -599,7 +599,7 @@ class COMMON:
                     if region_name:
                         meta.region = region_name
                         if meta.debug:
-                            console.print(f"[green]Mapped region_id {region_id} to '{region_name}'[/green]")
+                            logger.debug(f"[green]Mapped region_id {region_id} to '{region_name}'[/green]")
 
                 # use reverse to reverse map the id to the name
                 if not meta.distributor and distributor_id:
@@ -607,7 +607,7 @@ class COMMON:
                     if distributor_name:
                         meta.distributor = distributor_name
                         if meta.debug:
-                            console.print(f"[green]Mapped distributor_id {distributor_id} to '{distributor_name}'[/green]")
+                            logger.debug(f"[green]Mapped distributor_id {distributor_id} to '{distributor_name}'[/green]")
                 return
 
             else:
@@ -618,25 +618,25 @@ class COMMON:
                     distributor_id = attributes.get('distributor_id')
 
                     if meta.debug:
-                        console.print(f"[blue]Region ID: {region_id}[/blue]")
-                        console.print(f"[blue]Distributor ID: {distributor_id}[/blue]")
+                        logger.debug(f"[blue]Region ID: {region_id}[/blue]")
+                        logger.debug(f"[blue]Distributor ID: {distributor_id}[/blue]")
 
                     if not meta.region and region_id:
                         region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                         if region_name:
                             meta.region = region_name
                             if meta.debug:
-                                console.print(f"[green]Mapped region_id {region_id} to '{region_name}'[/green]")
+                                logger.debug(f"[green]Mapped region_id {region_id} to '{region_name}'[/green]")
 
                     if not meta.distributor and distributor_id:
                         distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                         if distributor_name:
                             meta.distributor = distributor_name
                             if meta.debug:
-                                console.print(f"[green]Mapped distributor_id {distributor_id} to '{distributor_name}'[/green]")
+                                logger.debug(f"[green]Mapped distributor_id {distributor_id} to '{distributor_name}'[/green]")
         except Exception as e:
             console.print_exception()
-            console.print(f"[yellow]Invalid Response from {tracker} API. Error: {str(e)}[/yellow]")
+            logger.info(f"[yellow]Invalid Response from {tracker} API. Error: {str(e)}[/yellow]")
             return
 
     async def unit3d_torrent_info(
@@ -671,25 +671,25 @@ class COMMON:
         if file_name:
             params['file_name'] = file_name  # Add file_name to params
             if meta.debug:
-                console.print(f"[green]Searching {tracker} by file name: [bold yellow]{file_name}[/bold yellow]")
+                logger.debug(f"[green]Searching {tracker} by file name: [bold yellow]{file_name}[/bold yellow]")
             url = search_url
         elif id:
             url = f"{torrent_url}{id}"
             if meta.debug:
-                console.print(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow] via {url}")
+                logger.debug(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow] via {url}")
         else:
             if meta.debug:
-                console.print("[red]No ID or file name provided for search.[/red]")
+                logger.debug("[red]No ID or file name provided for search.[/red]")
             return None, None, None, None, None, None, None, [], None
 
         # Make the GET request with proper encoding handled by 'params'
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                console.print(f"Searching for information on [bold cyan]{tracker}[/bold cyan]")
+                logger.info(f"Searching for information on [bold cyan]{tracker}[/bold cyan]")
                 response = await client.get(url=url, params=params)
                 json_response = response.json()
         except (httpx.RequestError, httpx.TimeoutException) as e:
-            console.print(f"[yellow]Request error in unit3d_torrent_info: {e}[/yellow]")
+            logger.info(f"[yellow]Request error in unit3d_torrent_info: {e}[/yellow]")
             return None, None, None, None, None, None, None, [], None
         except ValueError:
             return None, None, None, None, None, None, None, [], None
@@ -698,7 +698,7 @@ class COMMON:
             # Handle response when searching by file name (which might return a 'data' array)
             data: list[dict[str, Any]] | str = json_response.get('data', [])
             if data == "404":
-                console.print("[yellow]No data found (404). Returning None.[/yellow]")
+                logger.info("[yellow]No data found (404). Returning None.[/yellow]")
                 return None, None, None, None, None, None, None, [], None
 
             if data and isinstance(data, list):  # Ensure data is a list before accessing it
@@ -759,13 +759,13 @@ class COMMON:
                         file_name = files[0]['name'] if len(files) == 1 else [file['name'] for file in files[:5]]
 
                     if meta.debug:
-                        console.print(f"[blue]Extracted filename(s): {file_name}[/blue]")  # Print the extracted filename(s)
+                        logger.debug(f"[blue]Extracted filename(s): {file_name}[/blue]")  # Print the extracted filename(s)
 
             if (tmdb or imdb or tvdb) and not id:
                 # Only prompt the user for ID selection if not searching by ID
                 try:
                     if not await self.prompt_user_for_id_selection(meta, tmdb, imdb, tvdb, mal, file_name, tracker_name=tracker):
-                        console.print("[yellow]User chose to skip based on IDs.[/yellow]")
+                        logger.info("[yellow]User chose to skip based on IDs.[/yellow]")
                         return None, None, None, None, None, None, None, [], None
                 except (KeyboardInterrupt, EOFError):
                     sys.exit(1)
@@ -774,15 +774,15 @@ class COMMON:
                 bbcode = BBCODE()
                 description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
                 if not skip_tracker_descriptions:
-                    console.print(f"[green]Successfully grabbed description from {tracker}")
-                    console.print(f"Extracted description: {description}", markup=False)
+                    logger.info(f"[green]Successfully grabbed description from {tracker}")
+                    logger.info(f"Extracted description: {description}", extra={"markup": False})
 
                     from src.trackersetup import api_trackers
 
                     if meta.unattended or any(meta.get(t.lower()) for t in api_trackers):
                         return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
                     else:
-                        console.print("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                        logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                         edit_choice = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is:")
 
                         if (edit_choice or "").lower() == 'e':
@@ -791,9 +791,9 @@ class COMMON:
                                 description = edited_description.strip()
                         elif (edit_choice or "").lower() == 'd':
                             description = None
-                            console.print("[yellow]Description discarded.[/yellow]")
+                            logger.info("[yellow]Description discarded.[/yellow]")
                         else:
-                            console.print("[green]Keeping the original description.[/green]")
+                            logger.info("[green]Keeping the original description.[/green]")
                     if not meta.keep_images:
                         imagelist = []
                 else:
@@ -805,7 +805,7 @@ class COMMON:
 
         except Exception as e:
             console.print_exception()
-            console.print(f"[yellow]Invalid Response from {tracker} API. Error: {str(e)}[/yellow]")
+            logger.info(f"[yellow]Invalid Response from {tracker} API. Error: {str(e)}[/yellow]")
             return None, None, None, None, None, None, None, [], None
 
     async def parseCookieFile(self, cookiefile: str) -> dict[str, str]:
@@ -861,10 +861,10 @@ class COMMON:
                         else:
                             raise KeyError("No data in response")
                     except (KeyError, IndexError, TypeError):
-                        console.print("[red]Unable to get data from ptgen using IMDb")
+                        logger.info("[red]Unable to get data from ptgen using IMDb")
                         params['url'] = console.input("[red]Please enter [yellow]Douban[/yellow] link: ")
                 else:
-                    console.print("[red]No IMDb id was found.")
+                    logger.info("[red]No IMDb id was found.")
                     params['url'] = console.input("[red]Please enter [yellow]Douban[/yellow] link: ")
 
                 # Fetch with douban URL
@@ -876,7 +876,7 @@ class COMMON:
                             break
 
                 if ptgen_json is None:
-                    console.print("[bold red]Failed to get valid ptgen response after retries")
+                    logger.info("[bold red]Failed to get valid ptgen response after retries")
                     return ""
 
                 meta.ptgen = ptgen_json
@@ -890,7 +890,7 @@ class COMMON:
 
         except Exception:
             console.print_exception()
-            console.print("[bold red]There was an error getting the ptgen \\nUploading without ptgen")
+            logger.info("[bold red]There was an error getting the ptgen \\nUploading without ptgen")
             return ""
         return ptgen_text
 
@@ -1161,7 +1161,7 @@ class COMMON:
             # 1. Generate/Load initial MediaInfo (Playlist) if not exists
             if not os.path.isfile(mi_path):
                 if meta.debug:
-                    console.print("[blue]Generating MediaInfo for BDMV...[/blue]")
+                    logger.debug("[blue]Generating MediaInfo for BDMV...[/blue]")
 
                 path = meta.discs[0]["playlists"][0]["path"]
                 await exportInfo(path, False, meta.uuid, meta.base_dir, is_dvd=False, debug=meta.debug)
@@ -1187,7 +1187,7 @@ class COMMON:
             # 2. Check char_limit and fallback to largest M2TS if necessary
             if char_limit and len(mediainfo) > char_limit:
                 if meta.debug:
-                    console.print(f"[yellow]MediaInfo length ({len(mediainfo)}) exceeds limit ({char_limit}). Falling back to largest M2TS...[/yellow]")
+                    logger.debug(f"[yellow]MediaInfo length ({len(mediainfo)}) exceeds limit ({char_limit}). Falling back to largest M2TS...[/yellow]")
 
                 items = meta.discs[0]["playlists"][0].get("items", [])
 
@@ -1197,7 +1197,7 @@ class COMMON:
 
                     if largest_m2ts:
                         if meta.debug:
-                            console.print(f"[blue]Selected largest M2TS from meta: {os.path.basename(largest_m2ts)}[/blue]")
+                            logger.debug(f"[blue]Selected largest M2TS from meta: {os.path.basename(largest_m2ts)}[/blue]")
 
                         await exportInfo(largest_m2ts, False, meta.uuid, meta.base_dir, is_dvd=False, debug=meta.debug)
 
@@ -1255,7 +1255,7 @@ class COMMON:
                 languages_lower = [lang.lower() for lang in languages_to_check]
                 meets_requirement = not (languages_lower and book_language_lower not in languages_lower)
                 if not meets_requirement:
-                    console.print(
+                    logger.info(
                         f"[red]Language requirement not met for [bold]{tracker}[/bold].[/red]\n"
                         f"[yellow]Required one of:[/yellow] {', '.join(languages_to_check)}\n"
                         f"[cyan]Found book language:[/cyan] {book_language}"
@@ -1298,13 +1298,13 @@ class COMMON:
                     original_ok = bool(original_language_expanded.intersection(audio_languages_normalized))
 
                     if meta.debug and not original_ok:
-                        console.print(
+                        logger.info(
                             f"[blue]Debug: Original language expanded candidates: "
                             f"{', '.join(sorted(original_language_expanded)) or 'None'}[/blue]"
                         )
 
             if original_required and not original_ok:
-                console.print(
+                logger.info(
                     f"[red]Original language requirement not met for [bold]{tracker}[/bold].[/red]\n"
                     f"[yellow]Required original audio language:[/yellow] {language_display}\n"
                     f"[cyan]Found Audio Languages:[/cyan] {', '.join(audio_languages) or 'None'}"
@@ -1321,16 +1321,16 @@ class COMMON:
             )
 
             if meta.debug:
-                console.print(f"[blue]Debug: Audio Languages Found: {audio_languages}[/blue]")
-                console.print(f"[blue]Debug: Subtitle Languages Found: {subtitle_languages}[/blue]")
-                console.print(f"[blue]Debug: Original Audio Language: {language_display}[/blue]")
-                console.print(f"[blue]Debug: Audio OK: {audio_ok}, Subtitle OK: {subtitle_ok}, Original OK: {original_ok}[/blue]")
+                logger.debug(f"[blue]Debug: Audio Languages Found: {audio_languages}[/blue]")
+                logger.debug(f"[blue]Debug: Subtitle Languages Found: {subtitle_languages}[/blue]")
+                logger.debug(f"[blue]Debug: Original Audio Language: {language_display}[/blue]")
+                logger.debug(f"[blue]Debug: Audio OK: {audio_ok}, Subtitle OK: {subtitle_ok}, Original OK: {original_ok}[/blue]")
 
             if not audio_ok and original_ok:
                 if subtitle_ok:
                     return subtitle_ok
                 else:
-                    console.print(
+                    logger.info(
                         f"[red]Language requirement not met for [bold]{tracker}[/bold].[/red]\n"
                         f"[yellow]Required subtitles in one of the following with an original audio track:[/yellow] "
                         f"{', '.join(languages_to_check)}\n"
@@ -1342,7 +1342,7 @@ class COMMON:
 
             if require_both:
                 if not (audio_ok and subtitle_ok):
-                    console.print(
+                    logger.info(
                         f"[red]Language requirement not met for [bold]{tracker}[/bold].[/red]\n"
                         f"[yellow]Required both audio and subtitles in one of the following:[/yellow] "
                         f"{', '.join(languages_to_check)}\n"
@@ -1351,7 +1351,7 @@ class COMMON:
                     )
             else:
                 if not (audio_ok or subtitle_ok):
-                    console.print(
+                    logger.info(
                         f"[red]Language requirement not met for [bold]{tracker}[/bold].[/red]\n"
                         f"[yellow]Required at least one of the following:[/yellow] "
                         f"{', '.join(languages_to_check)}\n"
@@ -1366,7 +1366,7 @@ class COMMON:
 
         except Exception as e:
             console.print_exception()
-            console.print(f"[red]Error checking language requirements: {e}[/red]")
+            logger.error(f"[red]Error checking language requirements: {e}[/red]")
             return False
 
     async def save_html_file(self, meta: Meta, tracker: str, text: str = "", file_name: str = "") -> str:
@@ -1411,7 +1411,7 @@ class COMMON:
         """
         if meta.adult_media:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print(f"[bold red]Pornography is not allowed at {tracker}.[/bold red]")
+                logger.info(f"[bold red]Pornography is not allowed at {tracker}.[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -1494,12 +1494,12 @@ class COMMON:
     async def check_nzb_file(self, tracker: str, meta: Meta) -> bool:
         nzb_path = meta.nzb_path
         if not nzb_path or not os.path.exists(nzb_path):
-            console.print(f"{tracker}: [red]Error: The NZB file is missing. Aborting upload...[/red]")
+            logger.error(f"{tracker}: [red]Error: The NZB file is missing. Aborting upload...[/red]")
             return False
 
         usenet_cfg = self.config.get("USENET", {})
         if usenet_cfg.get("archive_password") and not await verify_nzb_has_password(nzb_path):
-            console.print(f"{tracker}: [red]Error: The NZB file does not contain the password in its metadata header. Aborting upload...[/red]")
+            logger.error(f"{tracker}: [red]Error: The NZB file does not contain the password in its metadata header. Aborting upload...[/red]")
             return False
         return True
 

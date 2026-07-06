@@ -8,7 +8,7 @@ import aiofiles
 
 from bin.get_bdinfo import BDInfoBinaryManager
 from bin.MI.get_linux_mi import download_dvd_mediainfo
-from src.console import console
+from src.console import logger
 from src.discparse import DiscParse
 from src.meta import Meta
 
@@ -40,13 +40,13 @@ class DiscInfoManager:
 
         if is_disc == "BDMV":
             if meta.site_check:
-                console.print("BDMV disc checking is not supported in site_check mode, yet.", markup=False)
+                logger.info("BDMV disc checking is not supported in site_check mode, yet.", extra={"markup": False})
                 raise RuntimeError("BDMV disc checking is not supported in site_check mode.")
             # Ensure bdinfo binary is present for BDMV processing
             try:
                 await BDInfoBinaryManager.ensure_bdinfo_binary(meta.base_dir, meta.debug, "v1.0.8")
             except Exception as e:
-                console.print(f"[red]Failed to ensure bdinfo binary: {e}[/red]", markup=False)
+                logger.error(f"[red]Failed to ensure bdinfo binary: {e}[/red]", extra={"markup": False})
                 raise
 
             if meta.edit is False:

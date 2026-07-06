@@ -9,7 +9,7 @@ from typing import Any, cast
 import awsmfunc as awsmfunc  # pyright: ignore[reportMissingImports] # pyrefly: ignore [missing-import]
 import vapoursynth as vs  # pyright: ignore[reportMissingImports] # pyrefly: ignore [missing-import]
 
-from src.console import console
+from src.console import logger
 
 vs = cast(Any, vs)  # pyright: ignore[reportUnnecessaryCast]
 awsmfunc = cast(Any, awsmfunc)  # pyright: ignore[reportUnnecessaryCast]
@@ -52,7 +52,7 @@ def optimize_images(image: str, config: dict[str, Any]) -> None:
             else:
                 oxipng.optimize(image, level=3)
         except Exception as e:
-            console.print(f"Image optimization failed: {e}", markup=False)
+            logger.info(f"Image optimization failed: {e}", extra={"markup": False})
     return
 
 
@@ -67,7 +67,7 @@ def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str =
         with open(screens_file) as txt:
             frames: list[int] = [int(line.strip()) for line in txt.readlines()]
         if len(frames) == num and all(f >= 0 for f in frames):
-            console.print(f"Using existing frame numbers from {screens_file}", markup=False)
+            logger.info(f"Using existing frame numbers from {screens_file}", extra={"markup": False})
         else:
             frames = []
     else:
@@ -75,27 +75,27 @@ def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str =
 
     # Indexing the source using ffms2 or lsmash for m2ts files
     if source.endswith(".m2ts"):
-        console.print(f"Indexing {source} with LSMASHSource... This may take a while.", markup=False)
+        logger.info(f"Indexing {source} with LSMASHSource... This may take a while.", extra={"markup": False})
         src: Any = core.lsmas.LWLibavSource(source)
     else:
         cachefile = f"{os.path.abspath(dir)}{os.sep}ffms2.ffms2"
         if not os.path.exists(cachefile):
-            console.print(f"Indexing {source} with ffms2... This may take a while.", markup=False)
+            logger.info(f"Indexing {source} with ffms2... This may take a while.", extra={"markup": False})
         try:
             src = core.ffms2.Source(source, cachefile=cachefile)
         except Exception as e:
-            console.print(f"Error during indexing: {str(e)}", markup=False)
+            logger.info(f"Error during indexing: {str(e)}", extra={"markup": False})
             raise
         if os.path.exists(cachefile):
-            console.print(f"Indexing completed and cached at: {cachefile}", markup=False)
+            logger.info(f"Indexing completed and cached at: {cachefile}", extra={"markup": False})
         else:
-            console.print("Indexing did not complete as expected.", markup=False)
+            logger.info("Indexing did not complete as expected.", extra={"markup": False})
 
     # Check if encode is provided
     enc: Any | None = None
     if encode:
         if not os.path.exists(encode):
-            console.print(f"Encode file {encode} not found. Skipping encode processing.", markup=False)
+            logger.info(f"Encode file {encode} not found. Skipping encode processing.", extra={"markup": False})
             encode = None
         else:
             enc = core.ffms2.Source(encode)
@@ -114,7 +114,7 @@ def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str =
         # Write the frame numbers to a file for reuse
         with open(screens_file, "w") as txt:
             txt.writelines(frame_lines)
-        console.print(f"Generated and saved new frame numbers to {screens_file}", markup=False)
+        logger.info(f"Generated and saved new frame numbers to {screens_file}", extra={"markup": False})
 
     # If an encode exists and is provided, crop and resize
     if encode and enc is not None and (src.width != enc.width or src.height != enc.height):

@@ -10,7 +10,7 @@ import aiofiles
 import httpx
 
 try:
-    from src.console import console
+    from src.console import console, logger
 except ImportError:
     # Fallback for Docker builds where rich is not yet installed
     class SimpleConsole:
@@ -25,8 +25,7 @@ class MkbrrBinaryManager:
     async def ensure_mkbrr_binary(base_dir: str | Path, debug: bool, version: str) -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
-        if debug:
-            console.print(f"[blue]Detected system: {system}, architecture: {machine}[/blue]")
+        logger.debug(f"[blue]Detected system: {system}, architecture: {machine}[/blue]")
 
         platform_map: dict[str, dict[str, dict[str, str]]] = {
             "windows": {
@@ -61,19 +60,16 @@ class MkbrrBinaryManager:
         platform_info = platform_map[system][machine]
         file_pattern = platform_info["file"]
         folder_path = platform_info["folder"]
-        if debug:
-            console.print(f"[blue]Using file pattern: {file_pattern}[/blue]")
-            console.print(f"[blue]Target folder: {folder_path}[/blue]")
+        logger.debug(f"[blue]Using file pattern: {file_pattern}[/blue]")
+        logger.debug(f"[blue]Target folder: {folder_path}[/blue]")
 
         bin_dir = Path(base_dir) / "bin" / "mkbrr" / folder_path
         bin_dir.mkdir(parents=True, exist_ok=True)
-        if debug:
-            console.print(f"[blue]Binary directory: {bin_dir}[/blue]")
+        logger.debug(f"[blue]Binary directory: {bin_dir}[/blue]")
 
         binary_name = "mkbrr.exe" if system == "windows" else "mkbrr"
         binary_path = bin_dir / binary_name
-        if debug:
-            console.print(f"[blue]Binary path: {binary_path}[/blue]")
+        logger.debug(f"[blue]Binary path: {binary_path}[/blue]")
 
         wrong_version = False
         version_path = bin_dir / version
@@ -81,8 +77,7 @@ class MkbrrBinaryManager:
         binary_executable = system == "windows" or os.access(binary_path, os.X_OK)
         binary_valid = binary_exists and binary_executable
         if version_path.exists() and version_path.is_file() and binary_valid:
-            if debug:
-                console.print("[blue]mkbrr version is up to date[/blue]")
+            logger.debug("[blue]mkbrr version is up to date[/blue]")
             return str(binary_path)
         else:
             wrong_version = True
@@ -92,19 +87,16 @@ class MkbrrBinaryManager:
                 # Set secure permissions before removal
                 os.chmod(binary_path, 0o600)
             os.remove(binary_path)
-            if debug:
-                console.print(f"[blue]Removed existing binary at: {binary_path}[/blue]")
+            logger.debug(f"[blue]Removed existing binary at: {binary_path}[/blue]")
 
         if wrong_version and version_path.exists():
             if system != "windows":
                 os.chmod(version_path, 0o644)
             os.remove(version_path)
-            if debug:
-                console.print(f"[blue]Removed existing version file at: {version_path}[/blue]")
+            logger.debug(f"[blue]Removed existing version file at: {version_path}[/blue]")
 
         download_url = f"https://github.com/autobrr/mkbrr/releases/download/{version}/mkbrr_{version[1:]}_{file_pattern}"
-        if debug:
-            console.print(f"[blue]Download URL: {download_url}[/blue]")
+        logger.debug(f"[blue]Download URL: {download_url}[/blue]")
 
         try:
             async with (
@@ -116,8 +108,7 @@ class MkbrrBinaryManager:
                 async with aiofiles.open(temp_archive, "wb") as f:
                     async for chunk in response.aiter_bytes(chunk_size=8192):
                         await f.write(chunk)
-            if debug:
-                console.print(f"[green]Downloaded {file_pattern}[/green]")
+            logger.debug(f"[green]Downloaded {file_pattern}[/green]")
 
             if file_pattern.endswith(".zip"):
                 with zipfile.ZipFile(temp_archive, "r") as zip_ref:
@@ -129,34 +120,29 @@ class MkbrrBinaryManager:
                             info = zip_file.getinfo(member)
                             perm = info.external_attr >> 16
                             if stat.S_ISLNK(perm):
-                                if debug:
-                                    console.print(f"[yellow]Warning: Skipping symlink: {member}[/yellow]")
+                                logger.debug(f"[yellow]Warning: Skipping symlink: {member}[/yellow]")
                                 continue
 
                             # Check for absolute paths
                             if os.path.isabs(member):
-                                if debug:
-                                    console.print(f"[yellow]Warning: Skipping absolute path: {member}[/yellow]")
+                                logger.debug(f"[yellow]Warning: Skipping absolute path: {member}[/yellow]")
                                 continue
 
                             # Check for directory traversal patterns
                             if ".." in member or member.startswith("/"):
-                                if debug:
-                                    console.print(f"[yellow]Warning: Skipping dangerous path: {member}[/yellow]")
+                                logger.debug(f"[yellow]Warning: Skipping dangerous path: {member}[/yellow]")
                                 continue
 
                             # Check if the final path would be safe
                             full_path = os.path.realpath(os.path.join(path, member))
                             base_path = os.path.realpath(path)
                             if not full_path.startswith(base_path + os.sep) and full_path != base_path:
-                                if debug:
-                                    console.print(f"[yellow]Warning: Skipping path outside target directory: {member}[/yellow]")
+                                logger.debug(f"[yellow]Warning: Skipping path outside target directory: {member}[/yellow]")
                                 continue
 
                             # Extract the safe member
                             zip_file.extract(member, path)
-                            if debug:
-                                console.print(f"[cyan]Extracted: {member}[/cyan]")
+                            logger.debug(f"[cyan]Extracted: {member}[/cyan]")
 
                     safe_extract_zip(zip_ref, str(bin_dir))
 
@@ -168,40 +154,34 @@ class MkbrrBinaryManager:
                         for member in tar_file.getmembers():
                             # Check for symlinks and hardlinks in TAR files
                             if member.islnk() or member.issym():
-                                if debug:
-                                    console.print(f"[yellow]Warning: Skipping link entry: {member.name}[/yellow]")
+                                logger.debug(f"[yellow]Warning: Skipping link entry: {member.name}[/yellow]")
                                 continue
 
                             # Check for absolute paths
                             if os.path.isabs(member.name):
-                                if debug:
-                                    console.print(f"[yellow]Warning: Skipping absolute path: {member.name}[/yellow]")
+                                logger.debug(f"[yellow]Warning: Skipping absolute path: {member.name}[/yellow]")
                                 continue
 
                             # Check for directory traversal patterns
                             if ".." in member.name or member.name.startswith("/"):
-                                if debug:
-                                    console.print(f"[yellow]Warning: Skipping dangerous path: {member.name}[/yellow]")
+                                logger.debug(f"[yellow]Warning: Skipping dangerous path: {member.name}[/yellow]")
                                 continue
 
                             # Check if the final path would be safe
                             full_path = os.path.realpath(os.path.join(path, member.name))
                             base_path = os.path.realpath(path)
                             if not full_path.startswith(base_path + os.sep) and full_path != base_path:
-                                if debug:
-                                    console.print(f"[yellow]Warning: Skipping path outside target directory: {member.name}[/yellow]")
+                                logger.debug(f"[yellow]Warning: Skipping path outside target directory: {member.name}[/yellow]")
                                 continue
 
                             # Check for reasonable file sizes (prevent tar bombs)
                             if member.size > 100 * 1024 * 1024:  # 100MB limit
-                                if debug:
-                                    console.print(f"[yellow]Warning: Skipping oversized file: {member.name} ({member.size} bytes)[/yellow]")
+                                logger.debug(f"[yellow]Warning: Skipping oversized file: {member.name} ({member.size} bytes)[/yellow]")
                                 continue
 
                             # Extract the safe member
                             tar_file.extract(member, path)
-                            if debug:
-                                console.print(f"[cyan]Extracted: {member.name}[/cyan]")
+                            logger.debug(f"[cyan]Extracted: {member.name}[/cyan]")
 
                     safe_extract_tar(tar_ref, str(bin_dir))
 
@@ -227,7 +207,7 @@ class MkbrrBinaryManager:
         """Download mkbrr binary for Docker/Linux - synchronous version."""
         system = platform.system().lower()
         machine = platform.machine().lower()
-        console.print(f"Detected system: {system}, architecture: {machine}", markup=False)
+        logger.info(f"Detected system: {system}, architecture: {machine}", extra={"markup": False})
 
         if system != "linux":
             raise Exception(f"This script is for Docker/Linux only, detected: {system}")
@@ -248,8 +228,8 @@ class MkbrrBinaryManager:
         file_pattern = platform_info["file"]
         folder_path = platform_info["folder"]
 
-        console.print(f"Using file pattern: {file_pattern}", markup=False)
-        console.print(f"Target folder: {folder_path}", markup=False)
+        logger.info(f"Using file pattern: {file_pattern}", extra={"markup": False})
+        logger.info(f"Target folder: {folder_path}", extra={"markup": False})
 
         bin_dir = Path(base_dir) / "bin" / "mkbrr" / folder_path
         bin_dir.mkdir(parents=True, exist_ok=True)
@@ -260,14 +240,14 @@ class MkbrrBinaryManager:
         binary_executable = os.access(binary_path, os.X_OK)
         binary_valid = binary_exists and binary_executable
         if version_path.exists() and version_path.is_file() and binary_valid:
-            console.print(f"mkbrr {version} already exists, skipping download", markup=False)
+            logger.info(f"mkbrr {version} already exists, skipping download", extra={"markup": False})
             return str(binary_path)
 
         if binary_path.exists():
             binary_path.unlink()
 
         download_url = f"https://github.com/autobrr/mkbrr/releases/download/{version}/mkbrr_{version[1:]}_{file_pattern}"
-        console.print(f"Downloading from: {download_url}", markup=False)
+        logger.info(f"Downloading from: {download_url}", extra={"markup": False})
 
         try:
             with (
@@ -280,7 +260,7 @@ class MkbrrBinaryManager:
                     for chunk in response.iter_bytes(chunk_size=8192):
                         f.write(chunk)
 
-            console.print(f"Downloaded {file_pattern}", markup=False)
+            logger.info(f"Downloaded {file_pattern}", extra={"markup": False})
 
             with tarfile.open(temp_archive, "r:gz") as tar_ref:
 
@@ -290,18 +270,18 @@ class MkbrrBinaryManager:
 
                     for member in tar.getmembers():
                         if member.issym():
-                            console.print(f"Warning: Skipping symbolic link: {member.name}", markup=False)
+                            logger.warning(f"Warning: Skipping symbolic link: {member.name}", extra={"markup": False})
                             continue
                         if member.islnk():
-                            console.print(f"Warning: Skipping hard link: {member.name}", markup=False)
+                            logger.warning(f"Warning: Skipping hard link: {member.name}", extra={"markup": False})
                             continue
 
                         if os.path.isabs(member.name):
-                            console.print(f"Warning: Skipping absolute path: {member.name}", markup=False)
+                            logger.warning(f"Warning: Skipping absolute path: {member.name}", extra={"markup": False})
                             continue
 
                         if ".." in member.name.split(os.sep):
-                            console.print(f"Warning: Skipping path with '..': {member.name}", markup=False)
+                            logger.warning(f"Warning: Skipping path with '..': {member.name}", extra={"markup": False})
                             continue
 
                         try:
@@ -310,22 +290,22 @@ class MkbrrBinaryManager:
                             try:
                                 os.path.commonpath([base_path, final_path])
                                 if not str(final_path).startswith(str(base_path) + os.sep) and final_path != base_path:
-                                    console.print(f"Warning: Path outside base directory: {member.name}", markup=False)
+                                    logger.warning(f"Warning: Path outside base directory: {member.name}", extra={"markup": False})
                                     continue
                             except ValueError:
-                                console.print(f"Warning: Invalid path resolution: {member.name}", markup=False)
+                                logger.warning(f"Warning: Invalid path resolution: {member.name}", extra={"markup": False})
                                 continue
 
                         except (OSError, ValueError) as e:
-                            console.print(f"Warning: Path resolution failed for {member.name}: {e}", markup=False)
+                            logger.warning(f"Warning: Path resolution failed for {member.name}: {e}", extra={"markup": False})
                             continue
 
                         if not (member.isfile() or member.isdir()):
-                            console.print(f"Warning: Skipping non-regular file: {member.name}", markup=False)
+                            logger.warning(f"Warning: Skipping non-regular file: {member.name}", extra={"markup": False})
                             continue
 
                         if member.isfile() and member.size > 100 * 1024 * 1024:  # 100MB limit
-                            console.print(f"Warning: Skipping oversized file: {member.name} ({member.size} bytes)", markup=False)
+                            logger.warning(f"Warning: Skipping oversized file: {member.name} ({member.size} bytes)", extra={"markup": False})
                             continue
 
                         if member.isfile():
@@ -342,7 +322,7 @@ class MkbrrBinaryManager:
                             final_path.mkdir(parents=True, exist_ok=True)
                             final_path.chmod(0o700)
 
-                        console.print(f"Extracted: {member.name}", markup=False)
+                        logger.info(f"Extracted: {member.name}", extra={"markup": False})
 
                 secure_extract(tar_ref, str(bin_dir))
 
@@ -350,7 +330,7 @@ class MkbrrBinaryManager:
 
             if binary_path.exists():
                 os.chmod(binary_path, 0o700)
-                console.print(f"mkbrr binary ready at: {binary_path}", markup=False)
+                logger.info(f"mkbrr binary ready at: {binary_path}", extra={"markup": False})
 
                 with open(version_path, "w", encoding="utf-8") as version_file:
                     version_file.write(f"mkbrr version {version} installed successfully.")

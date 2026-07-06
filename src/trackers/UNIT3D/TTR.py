@@ -3,7 +3,7 @@ from typing import Any, cast
 
 import cli_ui
 
-from src.console import console
+from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -38,10 +38,10 @@ class TTR(UNIT3D):
         name = meta.name_notag
 
         def ask_spanish_type(kind: str) -> str:
-            console.print(f"{self.tracker}: [green]Found Spanish {kind} track.[/green] [yellow]Is it Castellano or Latino?[/yellow]")
-            console.print("1 = Castellano")
-            console.print("2 = Latino")
-            console.print("3 = Castellano Latino")
+            logger.info(f"{self.tracker}: [green]Found Spanish {kind} track.[/green] [yellow]Is it Castellano or Latino?[/yellow]")
+            logger.info("1 = Castellano")
+            logger.info("2 = Latino")
+            logger.info("3 = Castellano Latino")
             return str(cli_ui.ask_string("Enter choice (1-3): "))
 
         def get_spanish_type(lang_code: str) -> str | None:
@@ -129,7 +129,7 @@ class TTR(UNIT3D):
 
         if "Spanish" not in (meta.audio_languages or []):
             if "Spanish" not in (meta.subtitle_languages or []):
-                console.print(
+                logger.info(
                     "[bold red]TTR requires at least one Spanish audio or subtitle track."
                 )
                 return False
@@ -138,7 +138,7 @@ class TTR(UNIT3D):
                     if not meta.unattended_confirm:
                         return False
                 else:
-                    console.print(f"{self.tracker}: [yellow]No Spanish audio track found, but Spanish subtitles are present.[/yellow]")
+                    logger.info(f"{self.tracker}: [yellow]No Spanish audio track found, but Spanish subtitles are present.[/yellow]")
                     if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                         return False
 

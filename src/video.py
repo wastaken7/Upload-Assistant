@@ -9,7 +9,7 @@ import aiofiles
 import cli_ui
 
 from src.cleanup import cleanup_manager
-from src.console import console
+from src.console import logger
 from src.exportmi import mi_resolution
 from src.meta import Meta
 
@@ -145,12 +145,10 @@ class VideoManager:
     async def get_video(self, videoloc: str, mode: str, sorted_filelist: bool = False, debug: bool = False) -> tuple[str, list[str]]:
         filelist: list[str] = []
         videoloc = os.path.abspath(videoloc)
-        if debug:
-            console.print(f"[blue]Video location: [yellow]{videoloc}[/yellow][/blue]")
+        logger.debug(f"[blue]Video location: [yellow]{videoloc}[/yellow][/blue]")
         video = ""
         if os.path.isdir(videoloc):
-            if debug:
-                console.print("[blue]Scanning directory for video files...[/blue]")
+            logger.debug("[blue]Scanning directory for video files...[/blue]")
             try:
                 entries = [e for e in os.listdir(videoloc) if os.path.isfile(os.path.join(videoloc, e))]
             except Exception:
@@ -170,43 +168,43 @@ class VideoManager:
                 filelist.append(os.path.abspath(os.path.join(videoloc, file)))
 
             filelist = sorted(filelist)
-            if debug and filelist:
-                console.print(f"[blue]Found {len(filelist)} video files in directory.[/blue]")
+            if filelist:
+                logger.debug(f"[blue]Found {len(filelist)} video files in directory.[/blue]")
             if len(filelist) > 1:
                 for f in list(filelist):
                     if 'sample' in os.path.basename(f).lower() and '!sample' not in os.path.basename(f).lower():
-                        console.print("[green]Filelist:[/green]")
+                        logger.info("[green]Filelist:[/green]")
                         for tf in filelist:
-                            console.print(f"[cyan]{tf}")
-                        console.print(f"[bold red]Possible sample file detected in filelist!: [yellow]{f}")
+                            logger.info(f"[cyan]{tf}")
+                        logger.info(f"[bold red]Possible sample file detected in filelist!: [yellow]{f}")
                         try:
                             if cli_ui.ask_yes_no("Do you want to remove it?", default=True):
                                 filelist.remove(f)
                         except EOFError:
-                            console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                            logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                             await cleanup_manager.cleanup()
                             cleanup_manager.reset_terminal()
                             sys.exit(1)
             for file in filelist:
                 if any(tag in file for tag in ['{tmdb-', '{imdb-', '{tvdb-']):
-                    console.print(f"[bold red]This looks like some *arr renamed file which is not allowed: [yellow]{file}")
+                    logger.info(f"[bold red]This looks like some *arr renamed file which is not allowed: [yellow]{file}")
                     try:
                         if cli_ui.ask_yes_no("Do you want to upload with this file?", default=False):
                             pass
                         else:
-                            console.print("[red]Exiting on user request[/red]")
+                            logger.info("[red]Exiting on user request[/red]")
                             await cleanup_manager.cleanup()
                             cleanup_manager.reset_terminal()
                             sys.exit(1)
                     except EOFError:
-                        console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                        logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                         await cleanup_manager.cleanup()
                         cleanup_manager.reset_terminal()
                         sys.exit(1)
             try:
                 video = sorted(filelist, key=os.path.getsize, reverse=True)[0] if sorted_filelist else sorted(filelist)[0]
             except IndexError:
-                console.print("[bold red]No Video files found")
+                logger.info("[bold red]No Video files found")
                 if mode == 'cli':
                     exit()
                 return "", []
@@ -214,17 +212,17 @@ class VideoManager:
             video = videoloc
             filelist.append(videoloc)
             if any(tag in videoloc for tag in ['{tmdb-', '{imdb-', '{tvdb-']):
-                console.print(f"[bold red]This looks like some *arr renamed file which is not allowed: [yellow]{videoloc}")
+                logger.info(f"[bold red]This looks like some *arr renamed file which is not allowed: [yellow]{videoloc}")
                 try:
                     if cli_ui.ask_yes_no("Do you want to upload with this file?", default=False):
                         pass
                     else:
-                        console.print("[red]Exiting on user request[/red]")
+                        logger.info("[red]Exiting on user request[/red]")
                         await cleanup_manager.cleanup()
                         cleanup_manager.reset_terminal()
                         sys.exit(1)
                 except EOFError:
-                    console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                    logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()
                     cleanup_manager.reset_terminal()
                     sys.exit(1)
@@ -376,11 +374,11 @@ class VideoManager:
                     return formatted_duration
                 except ValueError:
                     if meta.debug:
-                        console.print(f"[red]Invalid duration value: {general_track['Duration']}[/red]")
+                        logger.debug(f"[red]Invalid duration value: {general_track['Duration']}[/red]")
                     return None
             else:
                 if meta.debug:
-                    console.print("[red]No valid duration found in MediaInfo General track[/red]")
+                    logger.debug("[red]No valid duration found in MediaInfo General track[/red]")
                 return None
         else:
             length = meta.bdinfo.get("length", "")
@@ -390,11 +388,11 @@ class VideoManager:
                     return int(hours) * 60 + int(minutes)
                 except ValueError:
                     if meta.debug:
-                        console.print(f"[red]Invalid duration value: {length}[/red]")
+                        logger.debug(f"[red]Invalid duration value: {length}[/red]")
                     return None
             else:
                 if meta.debug:
-                    console.print("[red]No valid duration found in BDInfo[/red]")
+                    logger.debug("[red]No valid duration found in BDInfo[/red]")
                 return None
 
     async def get_container(self, meta: Meta) -> str:
@@ -408,13 +406,13 @@ class VideoManager:
             file_list = meta.filelist
 
             if not file_list:
-                console.print("[red]No files found to determine container[/red]")
+                logger.info("[red]No files found to determine container[/red]")
                 return ''
 
             try:
                 largest_file_path = max(file_list, key=os.path.getsize)
             except (OSError, ValueError) as e:
-                console.print(f"[red]Error getting container for file: {e}[/red]")
+                logger.error(f"[red]Error getting container for file: {e}[/red]")
                 return ''
 
             extension = os.path.splitext(str(largest_file_path))[1]

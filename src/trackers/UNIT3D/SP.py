@@ -5,7 +5,7 @@ from typing import Any, cast
 
 import cli_ui
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
@@ -107,7 +107,7 @@ class SP(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         resolution = meta.resolution
         if resolution not in ['8640p', '4320p', '2160p', '1440p', '1080p', '1080i']:
-            console.print(f'[bold red]Only 1080 or higher resolutions allowed at {self.tracker}.[/bold red]')
+            logger.info(f'[bold red]Only 1080 or higher resolutions allowed at {self.tracker}.[/bold red]')
             if not meta.unattended or (bool(meta.unattended) and meta.unattended_confirm):
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
@@ -128,7 +128,7 @@ class SP(UNIT3D):
             genre.lower() in disallowed_genres for genre in combined_genres
         ):
             if not meta.unattended or (bool(meta.unattended) and meta.unattended_confirm):
-                console.print(f'[bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]')
+                logger.info(f'[bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]')
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:

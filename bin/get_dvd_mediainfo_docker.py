@@ -17,7 +17,7 @@ from tempfile import TemporaryDirectory
 import requests
 
 try:
-    from src.console import console
+    from src.console import console, logger
 except ImportError:
     # Fallback for Docker builds where rich is not yet installed
     class SimpleConsole:
@@ -59,26 +59,26 @@ def get_url(system: str, arch: str, library_type: str = "cli") -> str:
 
 def download_file(url: str, output_path: Path) -> None:
     """Download a file from URL to specified path."""
-    console.print(f"Downloading: {url}", markup=False)
+    logger.info(f"Downloading: {url}", extra={"markup": False})
     response = requests.get(url, stream=True, timeout=60)
     response.raise_for_status()
 
     with open(output_path, "wb") as f:
         for chunk in response.iter_content(chunk_size=8192):
             f.write(chunk)
-    console.print(f"Downloaded: {output_path.name}", markup=False)
+    logger.info(f"Downloaded: {output_path.name}", extra={"markup": False})
 
 
 def extract_linux_binaries(cli_archive: Path, lib_archive: Path, output_dir: Path) -> None:
     """Extract MediaInfo CLI and library from downloaded archives."""
-    console.print("Extracting MediaInfo binaries...", markup=False)
+    logger.info("Extracting MediaInfo binaries...", extra={"markup": False})
 
     # Extract MediaInfo CLI from zip file
     with zipfile.ZipFile(cli_archive, "r") as zip_ref:
         file_list = zip_ref.namelist()
         mediainfo_file = output_dir / "mediainfo"
 
-        console.print(f"CLI archive contents: {file_list}", markup=False)
+        logger.info(f"CLI archive contents: {file_list}", extra={"markup": False})
 
         # Look for the mediainfo binary in the archive
         for member in file_list:
@@ -86,24 +86,24 @@ def extract_linux_binaries(cli_archive: Path, lib_archive: Path, output_dir: Pat
             info = zip_ref.getinfo(member)
             perm = info.external_attr >> 16
             if stat.S_ISLNK(perm):
-                console.print(f"Warning: Skipping symlink: {member}", markup=False)
+                logger.warning(f"Warning: Skipping symlink: {member}", extra={"markup": False})
                 continue
 
             # Check for absolute paths
             if os.path.isabs(member):
-                console.print(f"Warning: Skipping absolute path: {member}", markup=False)
+                logger.warning(f"Warning: Skipping absolute path: {member}", extra={"markup": False})
                 continue
 
             # Check for directory traversal patterns
             if ".." in member or member.startswith("/"):
-                console.print(f"Warning: Skipping dangerous path: {member}", markup=False)
+                logger.warning(f"Warning: Skipping dangerous path: {member}", extra={"markup": False})
                 continue
 
             if member.endswith("/mediainfo") or member == "mediainfo":
                 zip_ref.extract(member, output_dir.parent)
                 extracted_path = output_dir.parent / member
                 shutil.move(str(extracted_path), str(mediainfo_file))
-                console.print(f"Extracted CLI binary: {mediainfo_file}", markup=False)
+                logger.info(f"Extracted CLI binary: {mediainfo_file}", extra={"markup": False})
                 break
         else:
             raise Exception("MediaInfo CLI binary not found in archive")
@@ -113,7 +113,7 @@ def extract_linux_binaries(cli_archive: Path, lib_archive: Path, output_dir: Pat
         file_list = zip_ref.namelist()
         lib_file = output_dir / "libmediainfo.so.0"
 
-        console.print(f"Library archive contents: {file_list}", markup=False)
+        logger.info(f"Library archive contents: {file_list}", extra={"markup": False})
 
         # Look for the library file in the archive
         lib_candidates = ["lib/libmediainfo.so.0.0.0", "libmediainfo.so.0.0.0", "libmediainfo.so.0", "MediaInfo/libmediainfo.so.0.0.0", "MediaInfo/lib/libmediainfo.so.0.0.0"]
@@ -124,17 +124,17 @@ def extract_linux_binaries(cli_archive: Path, lib_archive: Path, output_dir: Pat
                 info = zip_ref.getinfo(candidate)
                 perm = info.external_attr >> 16
                 if stat.S_ISLNK(perm):
-                    console.print(f"Warning: Skipping symlink: {candidate}", markup=False)
+                    logger.warning(f"Warning: Skipping symlink: {candidate}", extra={"markup": False})
                     continue
 
                 # Check for absolute paths
                 if os.path.isabs(candidate):
-                    console.print(f"Warning: Skipping absolute path: {candidate}", markup=False)
+                    logger.warning(f"Warning: Skipping absolute path: {candidate}", extra={"markup": False})
                     continue
 
                 # Check for directory traversal patterns
                 if ".." in candidate or candidate.startswith("/"):
-                    console.print(f"Warning: Skipping dangerous path: {candidate}", markup=False)
+                    logger.warning(f"Warning: Skipping dangerous path: {candidate}", extra={"markup": False})
                     continue
 
                 zip_ref.extract(candidate, output_dir.parent)
@@ -143,7 +143,7 @@ def extract_linux_binaries(cli_archive: Path, lib_archive: Path, output_dir: Pat
                 shutil.move(str(extracted_path), str(lib_file))
                 # Set appropriate permissions for library file (readable by all)
                 os.chmod(lib_file, 0o644)
-                console.print(f"Extracted library: {lib_file}", markup=False)
+                logger.info(f"Extracted library: {lib_file}", extra={"markup": False})
                 break
         else:
             raise Exception("MediaInfo library not found in archive")
@@ -159,7 +159,7 @@ def download_dvd_mediainfo_docker():
     system = platform.system().lower()
     machine = platform.machine().lower()
 
-    console.print(f"System: {system}, Architecture: {machine}", markup=False)
+    logger.info(f"System: {system}, Architecture: {machine}", extra={"markup": False})
 
     if system != "linux":
         raise Exception(f"This script is only for Linux containers, got: {system}")
@@ -177,7 +177,7 @@ def download_dvd_mediainfo_docker():
     output_dir = base_dir / "bin" / "MI" / "linux"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    console.print(f"Installing DVD MediaInfo to: {output_dir}", markup=False)
+    logger.info(f"Installing DVD MediaInfo to: {output_dir}", extra={"markup": False})
 
     cli_file = output_dir / "mediainfo"
     lib_file = output_dir / "libmediainfo.so.0"
@@ -185,10 +185,10 @@ def download_dvd_mediainfo_docker():
 
     # Check if already installed
     if cli_file.exists() and lib_file.exists() and version_file.exists():
-        console.print(f"DVD MediaInfo {MEDIAINFO_VERSION} already installed", markup=False)
+        logger.info(f"DVD MediaInfo {MEDIAINFO_VERSION} already installed", extra={"markup": False})
         return str(cli_file)
 
-    console.print(f"Downloading DVD-specific MediaInfo CLI and Library: {MEDIAINFO_VERSION}", markup=False)
+    logger.info(f"Downloading DVD-specific MediaInfo CLI and Library: {MEDIAINFO_VERSION}", extra={"markup": False})
 
     # Get download URLs
     cli_url = get_url(system, arch, "cli")
@@ -197,8 +197,8 @@ def download_dvd_mediainfo_docker():
     cli_filename = get_filename(system, arch, "cli")
     lib_filename = get_filename(system, arch, "lib")
 
-    console.print(f"CLI URL: {cli_url}", markup=False)
-    console.print(f"Library URL: {lib_url}", markup=False)
+    logger.info(f"CLI URL: {cli_url}", extra={"markup": False})
+    logger.info(f"Library URL: {lib_url}", extra={"markup": False})
 
     # Download and extract in temporary directory
     with TemporaryDirectory() as tmp_dir:
@@ -224,7 +224,7 @@ def download_dvd_mediainfo_docker():
             file_stat = cli_file.stat()
             is_executable = bool(file_stat.st_mode & 0o100)  # Check if owner execute bit is set
             if is_executable:
-                console.print(f"✓ Set secure executable permissions on: {cli_file} (mode: {oct(file_stat.st_mode)})", markup=False)
+                logger.info(f"✓ Set secure executable permissions on: {cli_file} (mode: {oct(file_stat.st_mode)})", extra={"markup": False})
             else:
                 raise Exception(f"Failed to set executable permissions on: {cli_file}")
         else:
@@ -241,11 +241,11 @@ def download_dvd_mediainfo_docker():
     if not (cli_stat.st_mode & 0o111):
         raise Exception(f"CLI binary is not executable: {cli_file}")
     else:
-        console.print(f"✓ CLI binary is executable: {oct(cli_stat.st_mode)}", markup=False)
+        logger.info(f"✓ CLI binary is executable: {oct(cli_stat.st_mode)}", extra={"markup": False})
 
-    console.print(f"Successfully installed DVD MediaInfo {MEDIAINFO_VERSION}", markup=False)
-    console.print(f"CLI: {cli_file}", markup=False)
-    console.print(f"Library: {lib_file}", markup=False)
+    logger.info(f"Successfully installed DVD MediaInfo {MEDIAINFO_VERSION}", extra={"markup": False})
+    logger.info(f"CLI: {cli_file}", extra={"markup": False})
+    logger.info(f"Library: {lib_file}", extra={"markup": False})
 
     return str(cli_file)
 
@@ -253,7 +253,7 @@ def download_dvd_mediainfo_docker():
 if __name__ == "__main__":
     try:
         download_dvd_mediainfo_docker()
-        console.print("DVD MediaInfo installation completed successfully!", markup=False)
+        logger.info("DVD MediaInfo installation completed successfully!", extra={"markup": False})
     except Exception as e:
-        console.print(f"ERROR: Failed to install DVD MediaInfo: {e}", markup=False)
+        logger.info(f"ERROR: Failed to install DVD MediaInfo: {e}", extra={"markup": False})
         exit(1)

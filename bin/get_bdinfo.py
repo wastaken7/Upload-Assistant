@@ -12,7 +12,7 @@ import aiofiles
 import httpx
 
 try:
-    from src.console import console
+    from src.console import console, logger
 except ImportError:
     class SimpleConsole:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
@@ -31,8 +31,7 @@ class BDInfoBinaryManager:
     async def ensure_bdinfo_binary(base_dir: str | Path, debug: bool, version: str = "v1.0.8") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
-        if debug:
-            console.print(f"[blue]Detected system: {system}, architecture: {machine}[/blue]")
+        logger.debug(f"[blue]Detected system: {system}, architecture: {machine}[/blue]")
 
         platform_map: dict[str, dict[str, dict[str, str]]] = {
             "windows": {
@@ -61,19 +60,16 @@ class BDInfoBinaryManager:
         platform_info = platform_map[system][machine]
         file_pattern = platform_info["file"]
         folder_path = platform_info["folder"]
-        if debug:
-            console.print(f"[blue]Using file pattern: {file_pattern}[/blue]")
-            console.print(f"[blue]Target folder: {folder_path}[/blue]")
+        logger.debug(f"[blue]Using file pattern: {file_pattern}[/blue]")
+        logger.debug(f"[blue]Target folder: {folder_path}[/blue]")
 
         bin_dir = Path(base_dir) / "bin" / "bdinfo" / folder_path
         bin_dir.mkdir(parents=True, exist_ok=True)
-        if debug:
-            console.print(f"[blue]Binary directory: {bin_dir}[/blue]")
+        logger.debug(f"[blue]Binary directory: {bin_dir}[/blue]")
 
         binary_name = "bdinfo.exe" if system == "windows" else "bdinfo"
         binary_path = bin_dir / binary_name
-        if debug:
-            console.print(f"[blue]Binary path: {binary_path}[/blue]")
+        logger.debug(f"[blue]Binary path: {binary_path}[/blue]")
 
         version_path = bin_dir / version
         binary_exists = binary_path.exists() and binary_path.is_file()
@@ -90,13 +86,11 @@ class BDInfoBinaryManager:
                     if system != "windows":
                         os.chmod(candidate, 0o644)
                     candidate.unlink()
-                    if debug:
-                        console.print(f"[blue]Removed old version file at: {candidate}[/blue]")
+                    logger.debug(f"[blue]Removed old version file at: {candidate}[/blue]")
 
         if version_path.exists() and version_path.is_file() and binary_valid:
             cleanup_old_version_files()
-            if debug:
-                console.print("[blue]bdinfo version is up to date[/blue]")
+            logger.debug("[blue]bdinfo version is up to date[/blue]")
             return str(binary_path)
 
         # Remove any old binary/version markers
@@ -104,22 +98,19 @@ class BDInfoBinaryManager:
             if system != "windows":
                 os.chmod(binary_path, 0o600)
             os.remove(binary_path)
-            if debug:
-                console.print(f"[blue]Removed existing binary at: {binary_path}[/blue]")
+            logger.debug(f"[blue]Removed existing binary at: {binary_path}[/blue]")
 
         if version_path.exists():
             if system != "windows":
                 os.chmod(version_path, 0o644)
             os.remove(version_path)
-            if debug:
-                console.print(f"[blue]Removed existing version file at: {version_path}[/blue]")
+            logger.debug(f"[blue]Removed existing version file at: {version_path}[/blue]")
 
         cleanup_old_version_files()
 
         # Construct download URL using release asset filename
         download_url = f"https://github.com/Audionut/BDInfoCLI-ng/releases/download/{version}/{file_pattern}"
-        if debug:
-            console.print(f"[blue]Download URL: {download_url}[/blue]")
+        logger.debug(f"[blue]Download URL: {download_url}[/blue]")
 
         try:
             async with (
@@ -131,8 +122,7 @@ class BDInfoBinaryManager:
                 async with aiofiles.open(temp_archive, "wb") as f:
                     async for chunk in response.aiter_bytes(chunk_size=8192):
                         await f.write(chunk)
-            if debug:
-                console.print(f"[green]Downloaded {file_pattern}[/green]")
+            logger.debug(f"[green]Downloaded {file_pattern}[/green]")
 
             # Extract archive safely and ensure temporary archive is always removed.
             try:
@@ -143,22 +133,19 @@ class BDInfoBinaryManager:
                                 info = zip_file.getinfo(member)
                                 perm = info.external_attr >> 16
                                 if stat.S_ISLNK(perm):
-                                    if debug:
-                                        console.print(f"[yellow]Warning: Skipping symlink: {member}[/yellow]")
+                                    logger.debug(f"[yellow]Warning: Skipping symlink: {member}[/yellow]")
                                     continue
 
                                 # Check for absolute paths and directory traversal
                                 if os.path.isabs(member) or ".." in member or member.startswith("/"):
-                                    if debug:
-                                        console.print(f"[yellow]Warning: Skipping dangerous path: {member}[/yellow]")
+                                    logger.debug(f"[yellow]Warning: Skipping dangerous path: {member}[/yellow]")
                                     continue
 
                                 # Verify final path is inside target directory
                                 full_path = os.path.realpath(os.path.join(path, member))
                                 base_path = os.path.realpath(path)
                                 if not full_path.startswith(base_path + os.sep) and full_path != base_path:
-                                    if debug:
-                                        console.print(f"[yellow]Warning: Skipping path outside target directory: {member}[/yellow]")
+                                    logger.debug(f"[yellow]Warning: Skipping path outside target directory: {member}[/yellow]")
                                     continue
 
                                 # Check for reasonable file sizes (prevent zip bombs)
@@ -168,14 +155,12 @@ class BDInfoBinaryManager:
                                     file_size = 0
 
                                 if file_size > 100 * 1024 * 1024:
-                                    if debug:
-                                        console.print(f"[yellow]Warning: Skipping oversized file: {member} ({file_size} bytes)[/yellow]")
+                                    logger.debug(f"[yellow]Warning: Skipping oversized file: {member} ({file_size} bytes)[/yellow]")
                                     continue
 
                                 # Extract the safe member
                                 zip_file.extract(member, path)
-                                if debug:
-                                    console.print(f"[cyan]Extracted: {member}[/cyan]")
+                                logger.debug(f"[cyan]Extracted: {member}[/cyan]")
 
                         safe_extract_zip(zip_ref, str(bin_dir))
 
@@ -184,26 +169,21 @@ class BDInfoBinaryManager:
                         def safe_extract_tar(tar_file: tarfile.TarFile, path: str = ".") -> None:
                             for member in tar_file.getmembers():
                                 if member.islnk() or member.issym():
-                                    if debug:
-                                        console.print(f"[yellow]Warning: Skipping link entry: {member.name}[/yellow]")
+                                    logger.debug(f"[yellow]Warning: Skipping link entry: {member.name}[/yellow]")
                                     continue
                                 if os.path.isabs(member.name) or ".." in member.name or member.name.startswith("/"):
-                                    if debug:
-                                        console.print(f"[yellow]Warning: Skipping dangerous path: {member.name}[/yellow]")
+                                    logger.debug(f"[yellow]Warning: Skipping dangerous path: {member.name}[/yellow]")
                                     continue
                                 full_path = os.path.realpath(os.path.join(path, member.name))
                                 base_path = os.path.realpath(path)
                                 if not full_path.startswith(base_path + os.sep) and full_path != base_path:
-                                    if debug:
-                                        console.print(f"[yellow]Warning: Skipping path outside target directory: {member.name}[/yellow]")
+                                    logger.debug(f"[yellow]Warning: Skipping path outside target directory: {member.name}[/yellow]")
                                     continue
                                 if member.size > 100 * 1024 * 1024:
-                                    if debug:
-                                        console.print(f"[yellow]Warning: Skipping oversized file: {member.name} ({member.size} bytes)[/yellow]")
+                                    logger.debug(f"[yellow]Warning: Skipping oversized file: {member.name} ({member.size} bytes)[/yellow]")
                                     continue
                                 tar_file.extract(member, path)
-                                if debug:
-                                    console.print(f"[cyan]Extracted: {member.name}[/cyan]")
+                                logger.debug(f"[cyan]Extracted: {member.name}[/cyan]")
 
                         safe_extract_tar(tar_ref, str(bin_dir))
 
@@ -231,11 +211,9 @@ class BDInfoBinaryManager:
                 try:
                     if temp_archive.exists():
                         temp_archive.unlink()
-                        if debug:
-                            console.print(f"[blue]Removed temporary archive: {temp_archive}[/blue]")
+                        logger.debug(f"[blue]Removed temporary archive: {temp_archive}[/blue]")
                 except Exception as unlink_exc:
-                    if debug:
-                        console.print(f"[yellow]Warning: Failed to remove temporary archive {temp_archive}: {unlink_exc}[/yellow]")
+                    logger.debug(f"[yellow]Warning: Failed to remove temporary archive {temp_archive}: {unlink_exc}[/yellow]")
         except httpx.RequestError as e:
             raise Exception(f"Failed to download bdinfo binary: {e}") from e
         except (zipfile.BadZipFile, tarfile.TarError) as e:

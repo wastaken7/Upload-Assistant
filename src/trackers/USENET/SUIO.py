@@ -12,7 +12,8 @@ import aiofiles
 import httpx
 from PIL import Image
 
-from src.console import console
+from cogs.redaction import Redaction
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
@@ -45,7 +46,7 @@ class SUIO:
                 else:
                     self.upload_url = None
                     self.torrent_url = None
-                    console.print(f"{self.tracker} [red]base_url from config.py does not match the expected domain. Skipping...[/red]")
+                    logger.info(f"{self.tracker} [red]base_url from config.py does not match the expected domain. Skipping...[/red]")
             except Exception:
                 self.upload_url = None
                 self.torrent_url = None
@@ -58,23 +59,23 @@ class SUIO:
         release_name = await self.get_name(meta)
         cache_file = os.path.join(meta.base_dir, "tmp", meta.uuid, f"{self.tracker}_upload_ok")
         if release_name and os.path.exists(cache_file):
-            console.print(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
+            logger.info(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
             return [release_name]
 
-        console.print(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
+        logger.info(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
         return []
 
     async def get_additional_checks(self, _meta: Meta) -> bool:
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
         username = tracker_cfg.get("username", "").strip()
         if not (username and self.upload_url and self.torrent_url):
-            console.print(f"{self.tracker}: [red]Skipping due to missing Username or base_url.[/red]")
+            logger.info(f"{self.tracker}: [red]Skipping due to missing Username or base_url.[/red]")
             return False
         return True
 
 
     def get_category_id(self, meta: Meta) -> str:
-        category = str(meta.category or "").upper()
+        category = meta.category.upper()
         resolution = meta.resolution.lower()
         uhd_resolutions = {"2160p", "4320p", "8640p"}
         hd_resolutions = {"1080p", "1080i", "720p", "1440p"}
@@ -151,9 +152,9 @@ class SUIO:
         elif "multi" in lang:
             return "9"
         elif lang:
-            console.print(f"{self.tracker}: Could not find language {lang} ID, setting to Other ([red]10[/red])")
+            logger.info(f"{self.tracker}: Could not find language {lang} ID, setting to Other ([red]10[/red])")
             return "10"
-        console.print(f"{self.tracker}: No audio languages found, setting to Auto ([red]0[/red])")
+        logger.info(f"{self.tracker}: No audio languages found, setting to Auto ([red]0[/red])")
         return "0"
 
     def _is_same_language(self, lang_str: str, orig_code: str | None) -> bool:
@@ -211,7 +212,7 @@ class SUIO:
                 return self._map_single_language_to_id(audio_languages[0])
         elif num_langs >= 3:
             return "9"  # Multi
-        console.print(f"{self.tracker}: No audio languages found, setting to Auto ([red]0[/red])")
+        logger.info(f"{self.tracker}: No audio languages found, setting to Auto ([red]0[/red])")
         return "0"  # Auto
 
     async def _prepare_files(self, meta: Meta) -> dict[str, Any] | None:
@@ -310,7 +311,7 @@ class SUIO:
         status_dict = status_map[self.tracker]
 
         if not self.upload_url:
-            console.print(f"[red]{self.tracker}: base_url missing. Cannot upload.[/red]")
+            logger.info(f"[red]{self.tracker}: base_url missing. Cannot upload.[/red]")
             status_dict["status_message"] = "data error: base_url missing"
             return False
 
@@ -325,12 +326,12 @@ class SUIO:
 
         data = await self._prepare_data(meta)
         if meta.debug:
-            console.print(f"[cyan]{self.tracker} Upload (DEBUG MODE):[/cyan]")
-            console.print(f"User: {username}")
-            console.print("Fields:")
-            console.print(data)
-            console.print("Files:")
-            console.print({k: v[0] for k, v in files.items()})
+            logger.debug(f"[cyan]{self.tracker} Upload (DEBUG MODE):[/cyan]")
+            logger.debug(f"User: {username}")
+            logger.debug("Fields:")
+            logger.debug(Redaction.redact_private_info(data))
+            logger.debug("Files:")
+            logger.debug({k: v[0] for k, v in files.items()})
             status_dict["status_message"] = "Debug mode enabled, skipping upload."
             return True
         params = {

@@ -7,7 +7,8 @@ from typing import Any, cast
 import aiofiles
 import httpx
 
-from src.console import console
+from cogs.redaction import Redaction
+from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -160,7 +161,7 @@ class RTF:
                         except Exception:
                             error_msg = f'HTTP {response.status_code}: {response.text[:200]}'
 
-                        console.print(f"[bold red]Unexpected response: {error_msg}")
+                        logger.info(f"[bold red]Unexpected response: {error_msg}")
                         meta.tracker_status[self.tracker]["status_message"] = f"Unexpected response: {error_msg}"
                         return False
 
@@ -175,11 +176,11 @@ class RTF:
                 return False
 
         else:
-            console.print("[cyan]RTF Request Data:")
+            logger.info("[cyan]RTF Request Data:")
             debug_data = json_data.copy()
             if 'file' in debug_data and debug_data['file']:
                 debug_data['file'] = f"{str(debug_data['file'])[:10]}..."
-            console.print(debug_data)
+            logger.info(Redaction.redact_private_info(debug_data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
@@ -190,7 +191,7 @@ class RTF:
             return False
 
         year_value = meta.year
-        year = int(year_value) if (isinstance(year_value, int) or (isinstance(year_value, str) and year_value.isdigit())) else None
+        year = (year_value) if (isinstance(year_value, int) or (isinstance(year_value, str) and year_value.isdigit())) else None
         # Collect all possible years from different sources
         years: list[int] = []
 
@@ -244,7 +245,7 @@ class RTF:
                 ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365*10 + 3)  # add leeway
                 if release_date > ten_years_ago:
                     if not meta.unattended:
-                        console.print("[red]Content must be older than 10 Years to upload at RTF")
+                        logger.info("[red]Content must be older than 10 Years to upload at RTF")
                     return False
             except (ValueError, AttributeError):
                 # If date parsing fails, fall back to year comparison
@@ -253,7 +254,7 @@ class RTF:
                     year = int(release_year)
                     if datetime.datetime.now(datetime.UTC).date().year - year <= 9:
                         if not meta.unattended:
-                            console.print("[red]Content must be older than 10 Years to upload at RTF")
+                            logger.info("[red]Content must be older than 10 Years to upload at RTF")
                         return False
 
         elif meta.category == "TV" and most_recent_aired_date:
@@ -261,13 +262,13 @@ class RTF:
             ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365*10 + 3)  # add leeway
             if most_recent_aired_date > ten_years_ago:
                 if not meta.unattended:
-                    console.print("[red]Content must be older than 10 Years to upload at RTF")
+                    logger.info("[red]Content must be older than 10 Years to upload at RTF")
                 return False
 
         else:
             if year is not None and datetime.datetime.now(datetime.UTC).date().year - year <= 9:
                 if not meta.unattended:
-                    console.print("[red]Content must be older than 10 Years to upload at RTF")
+                    logger.info("[red]Content must be older than 10 Years to upload at RTF")
                 return False
         return True
 
@@ -325,7 +326,7 @@ class RTF:
                     }
                     dupes.append(result)
             else:
-                console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+                logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
 
         return dupes
@@ -352,17 +353,17 @@ class RTF:
                 response = await client.get('https://retroflix.club/api/test', headers=headers)
 
                 if response.status_code != 200:
-                    console.print('[bold red]Your API key is incorrect SO generating a new one')
+                    logger.info('[bold red]Your API key is incorrect SO generating a new one')
                     await self.generate_new_api(meta)
                     return None
                 else:
                     return True
         except httpx.RequestError as e:
-            console.print(f'[bold red]Error testing API: {str(e)}')
+            logger.info(f'[bold red]Error testing API: {str(e)}')
             await self.generate_new_api(meta)
             return None
         except Exception as e:
-            console.print(f'[bold red]Unexpected error testing API: {str(e)}')
+            logger.error(f'[bold red]Unexpected error testing API: {str(e)}')
             await self.generate_new_api(meta)
             return None
 
@@ -415,29 +416,29 @@ class RTF:
                             flags=re.DOTALL,
                         )
                         if replacements == 0:
-                            console.print("[bold red]Failed to update RTF api_key in config file.")
+                            logger.info("[bold red]Failed to update RTF api_key in config file.")
                             return None
 
                         # Write the updated config back to the file
                         async with aiofiles.open(config_path, 'w', encoding='utf-8') as file:
                             await file.write(new_config_data)
 
-                        console.print(f'[bold green]API Key successfully saved to {config_path}')
+                        logger.info(f'[bold green]API Key successfully saved to {config_path}')
                         return True
                     except Exception as e:
-                        console.print(f'[bold red]Failed to update config file: {str(e)}')
+                        logger.info(f'[bold red]Failed to update config file: {str(e)}')
                         return None
                 else:
-                    console.print('[bold red]API response does not contain a token.')
+                    logger.info('[bold red]API response does not contain a token.')
                     return None
             else:
-                console.print(f'[bold red]Error getting new API key: {response.status_code}, please check username and password in the config.')
+                logger.info(f'[bold red]Error getting new API key: {response.status_code}, please check username and password in the config.')
                 return None
 
         except httpx.RequestError as e:
-            console.print(f'[bold red]An error occurred while requesting the API: {str(e)}')
+            logger.info(f'[bold red]An error occurred while requesting the API: {str(e)}')
             return None
 
         except Exception as e:
-            console.print(f'[bold red]An unexpected error occurred: {str(e)}')
+            logger.info(f'[bold red]An unexpected error occurred: {str(e)}')
             return None

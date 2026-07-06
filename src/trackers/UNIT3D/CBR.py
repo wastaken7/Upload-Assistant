@@ -2,7 +2,7 @@
 import re
 from typing import Any
 
-from src.console import console
+from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -251,7 +251,7 @@ class CBR(UNIT3D):
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK" and meta.audiobook and not meta.narrator:
-            console.print(f"{self.tracker}: [bold red]Narrator is required for audiobooks. Skipping upload...[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Narrator is required for audiobooks. Skipping upload...[/bold red]")
             return False
 
         if meta.category in ["MOVIE", "TV"]:
@@ -260,7 +260,7 @@ class CBR(UNIT3D):
 
             # Encodes must include the "Encode settings" field in the MediaInfo.
             if upload_type == "encode" and not meta.has_encode_settings:
-                console.print(f"{self.tracker}: [bold red]'Encode settings' field in the MediaInfo is required for encodes. Skipping upload...[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]'Encode settings' field in the MediaInfo is required for encodes. Skipping upload...[/bold red]")
                 return False
 
             # Blu-ray remuxes that include encode settings must also include BDInfo.
@@ -270,7 +270,7 @@ class CBR(UNIT3D):
                 and meta.has_encode_settings
                 and not self.common.has_bdinfo(f"{meta.description}\n{meta.description_link_content}\n{meta.description_file_content}")
             ):
-                console.print(
+                logger.info(
                     f"{self.tracker}: [bold red]"
                     "BDInfo is required for Blu-ray remuxes that include 'Encode settings' field in the MediaInfo. "
                     "You can add BDInfo to the description using -df (path/to/file.txt) "

@@ -6,7 +6,7 @@ from typing import Any, cast
 import aiofiles
 
 from src.bbcode import BBCODE
-from src.console import console
+from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
@@ -109,7 +109,7 @@ class OE(UNIT3D):
                     desc = desc + str(tonemapped_header)
                     desc = desc + "\n\n"
             except Exception as e:
-                console.print(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
+                logger.warning(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
             desc = desc.replace('[img]', '[img=300]')
             await descfile.write(desc)
             images_value = meta.get(f"{self.tracker}_images_key", meta.image_list)

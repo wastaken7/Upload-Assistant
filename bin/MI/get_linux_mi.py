@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 
 import requests
 
-from src.console import console
+from src.console import logger
 
 MEDIAINFO_VERSION = "23.04"
 MEDIAINFO_CLI_BASE_URL = "https://mediaarea.net/download/binary/mediainfo"
@@ -84,8 +84,7 @@ def download_dvd_mediainfo(base_dir: str, debug: bool = False) -> str | None:
     system = platform.system().lower()
     machine = platform.machine().lower()
 
-    if debug:
-        console.print(f"[blue]System: {system}, arch: {machine}[/blue]")
+    logger.debug(f"[blue]System: {system}, arch: {machine}[/blue]")
 
     if system not in ["linux"]:
         return
@@ -100,18 +99,16 @@ def download_dvd_mediainfo(base_dir: str, debug: bool = False) -> str | None:
     output_dir = Path(base_dir) / "bin" / "MI" / platform_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if debug:
-        console.print(f"[blue]Output: {output_dir}[/blue]")
+    logger.debug(f"[blue]Output: {output_dir}[/blue]")
 
     cli_file = output_dir / "mediainfo"
     lib_file = output_dir / "libmediainfo.so.0"
     version_file = output_dir / f"version_{MEDIAINFO_VERSION}"
 
     if cli_file.exists() and lib_file.exists() and version_file.exists():
-        if debug:
-            console.print(f"[blue]MediaInfo CLI and Library {MEDIAINFO_VERSION} exist[/blue]")
+        logger.debug(f"[blue]MediaInfo CLI and Library {MEDIAINFO_VERSION} exist[/blue]")
         return str(cli_file)
-    console.print(f"[yellow]Downloading specific MediaInfo CLI and Library for DVD processing: {MEDIAINFO_VERSION}...[/yellow]")
+    logger.info(f"[yellow]Downloading specific MediaInfo CLI and Library for DVD processing: {MEDIAINFO_VERSION}...[/yellow]")
     # Download MediaInfo CLI
     cli_url = get_url(system, machine, "cli")
     cli_filename = get_filename(system, machine, "cli")
@@ -120,11 +117,10 @@ def download_dvd_mediainfo(base_dir: str, debug: bool = False) -> str | None:
     lib_url = get_url(system, machine, "lib")
     lib_filename = get_filename(system, machine, "lib")
 
-    if debug:
-        console.print(f"[blue]MediaInfo CLI URL: {cli_url}[/blue]")
-        console.print(f"[blue]MediaInfo CLI filename: {cli_filename}[/blue]")
-        console.print(f"[blue]MediaInfo Library URL: {lib_url}[/blue]")
-        console.print(f"[blue]MediaInfo Library filename: {lib_filename}[/blue]")
+    logger.debug(f"[blue]MediaInfo CLI URL: {cli_url}[/blue]")
+    logger.debug(f"[blue]MediaInfo CLI filename: {cli_filename}[/blue]")
+    logger.debug(f"[blue]MediaInfo Library URL: {lib_url}[/blue]")
+    logger.debug(f"[blue]MediaInfo Library filename: {lib_filename}[/blue]")
 
     with TemporaryDirectory() as tmp_dir:
         tmp_dir_path = Path(tmp_dir)
@@ -133,17 +129,14 @@ def download_dvd_mediainfo(base_dir: str, debug: bool = False) -> str | None:
 
         # Download both archives
         download_file(cli_url, cli_archive)
-        if debug:
-            console.print(f"[green]Downloaded {cli_filename}[/green]")
+        logger.debug(f"[green]Downloaded {cli_filename}[/green]")
 
         download_file(lib_url, lib_archive)
-        if debug:
-            console.print(f"[green]Downloaded {lib_filename}[/green]")
+        logger.debug(f"[green]Downloaded {lib_filename}[/green]")
 
         extract_linux(cli_archive, lib_archive, output_dir)
 
-        if debug:
-            console.print("[green]Extracted library[/green]")
+        logger.debug("[green]Extracted library[/green]")
 
         with open(version_file, 'w') as f:
             f.write(f"MediaInfo {MEDIAINFO_VERSION}")

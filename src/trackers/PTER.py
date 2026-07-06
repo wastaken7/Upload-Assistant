@@ -12,7 +12,8 @@ import httpx
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 
-from src.console import console
+from cogs.redaction import Redaction
+from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa E403
 from src.meta import Meta
@@ -49,7 +50,7 @@ class PTER:
     async def validate_credentials(self, meta: Meta) -> bool:
         vcookie = await self.validate_cookies(meta)
         if vcookie is not True:
-            console.print('[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.')
+            logger.error('[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.')
             return False
         return True
 
@@ -64,7 +65,7 @@ class PTER:
 
                 return resp.text.find('''<a href="#" data-url="logout.php" id="logout-confirm">''') != -1
         else:
-            console.print("[bold red]Missing Cookie File. (data/cookies/PTER.txt)")
+            logger.info("[bold red]Missing Cookie File. (data/cookies/PTER.txt)")
             return False
 
     async def search_existing(self, meta: Meta) -> list[str] | bool:
@@ -72,7 +73,7 @@ class PTER:
         common = COMMON(config=self.config)
         cookiefile = f"{meta.base_dir}/data/cookies/PTER.txt"
         if not os.path.exists(cookiefile):
-            console.print("[bold red]Missing Cookie File. (data/cookies/PTER.txt)")
+            logger.info("[bold red]Missing Cookie File. (data/cookies/PTER.txt)")
             return False
         cookies = await common.parseCookieFile(cookiefile)
         imdb_id = meta.imdb_id or 0
@@ -94,14 +95,14 @@ class PTER:
                         if release:
                             dupes.append(release)
             else:
-                console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+                logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
 
         return dupes
 
     async def get_type_category_id(self, meta: Meta) -> str:
         cat_id = "EXIT"
-        category = str(meta.category)
+        category = meta.category
 
         if category == 'MOVIE':
             cat_id = '401'
@@ -202,7 +203,7 @@ class PTER:
         parts.append(desc)
 
         if self.rehost_images is True:
-            console.print("[green]Rehosting Images...")
+            logger.info("[green]Rehosting Images...")
             images = await self.pterimg_upload(meta)
             if len(images) > 0:
                 parts.append("[center]")
@@ -245,7 +246,7 @@ class PTER:
                     auth_token = self._extract_auth_token(response.text, r'auth_token.*?"(\w+)"')
                     return auth_token
         else:
-            console.print("[yellow]Pterimg Cookies not found. Creating new session.")
+            logger.info("[yellow]Pterimg Cookies not found. Creating new session.")
 
         data = {
             'login-subject': self.username,
@@ -383,10 +384,7 @@ class PTER:
         async with aiofiles.open(torrent_path, 'rb') as torrentFile:
             torrent_bytes = await torrentFile.read()
         filelist = meta.filelist
-        if len(filelist) == 1:
-            torrentFileName = unidecode(os.path.basename(str(meta.video)).replace(" ", "."))
-        else:
-            torrentFileName = unidecode(os.path.basename(str(meta.path)).replace(" ", "."))
+        torrentFileName = unidecode(os.path.basename(meta.video).replace(" ", ".")) if len(filelist) == 1 else unidecode(os.path.basename(str(meta.path)).replace(" ", "."))
         files = {
             'file': (f"{torrentFileName}.torrent", torrent_bytes, "application/x-bittorent"),
         }
@@ -421,8 +419,8 @@ class PTER:
 
         # Submit
         if meta.debug:
-            console.print(url)
-            console.print(data)
+            logger.debug(url)
+            logger.debug(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
@@ -434,7 +432,7 @@ class PTER:
                     up = await client.post(url=url, data=data, files=files)
 
                     if str(up.url).startswith("https://pterclub.com/details.php?id="):
-                        console.print(f"[green]Uploaded to: [yellow]{str(up.url).replace('&uploaded=1', '')}[/yellow][/green]")
+                        logger.info(f"[green]Uploaded to: [yellow]{str(up.url).replace('&uploaded=1', '')}[/yellow][/green]")
                         id_match = re.search(r"(id=)(\d+)", urlparse(str(up.url)).query)
                         if id_match is None:
                             raise UploadException("Upload succeeded but torrent id was not present in the redirect URL.", 'red')  # noqa: F405
@@ -444,8 +442,8 @@ class PTER:
                         meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
                         return True
                     else:
-                        console.print(data)
-                        console.print("\n\n")
+                        logger.info(data)
+                        logger.info("\n\n")
                         raise UploadException(f"Upload to Pter Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa #F405
         return False
 
@@ -457,5 +455,5 @@ class PTER:
             async with aiofiles.open(torrent_path, "wb") as tor:
                 await tor.write(r.content)
         else:
-            console.print("[red]There was an issue downloading the new .torrent from pter")
-            console.print(r.text)
+            logger.info("[red]There was an issue downloading the new .torrent from pter")
+            logger.info(r.text)

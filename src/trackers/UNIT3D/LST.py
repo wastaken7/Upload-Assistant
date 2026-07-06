@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
@@ -33,7 +33,7 @@ class LST(UNIT3D):
 
         should_continue = True
         if not meta.valid_mi_settings:
-            console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
+            logger.info(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
             return False
 
         if meta.is_disc not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(

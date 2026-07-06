@@ -8,7 +8,8 @@ import aiofiles
 import cli_ui
 import httpx
 
-from src.console import console
+from cogs.redaction import Redaction
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
@@ -70,7 +71,7 @@ class NBL:
         data: dict[str, Any] = {
             "action": "upload",
             "api_key": self.api_key,
-            "tvmazeid": int(meta.tvmaze_id),
+            "tvmazeid": "" if not meta.tvmaze_id else int(meta.tvmaze_id),
             "mediainfo": mi_dump,
             "category": await self.get_cat_id(meta),
             "ignoredupes": "1",
@@ -100,8 +101,8 @@ class NBL:
                         meta.tracker_status[self.tracker]["status_message"] = response_data
                     return False
             else:
-                console.print("[cyan]NBL Request Data:")
-                console.print(data)
+                logger.info("[cyan]NBL Request Data:")
+                logger.info(Redaction.redact_private_info(data))
                 meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
                 await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
                 return True  # Debug mode - simulated success
@@ -113,7 +114,7 @@ class NBL:
         if meta.category != "TV":
             if meta.tvmaze_id != 0:
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    console.print("[red]Only TV or TV Movies are allowed at NBL, this has a tvmaze ID[/red]")
+                    logger.info("[red]Only TV or TV Movies are allowed at NBL, this has a tvmaze ID[/red]")
                     if cli_ui.ask_yes_no("Do you want to upload it?", default=False):
                         pass
                     else:
@@ -122,7 +123,7 @@ class NBL:
                     return False
             else:
                 if not meta.unattended:
-                    console.print("[red]Only TV Is allowed at NBL")
+                    logger.info("[red]Only TV Is allowed at NBL")
                 return False
 
         if meta.is_disc != "BDMV" and not await self.common.check_language_requirements(
@@ -131,12 +132,12 @@ class NBL:
             return False
 
         if meta.valid_mi is False:
-            console.print(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
+            logger.info(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
             return False
 
         if meta.is_disc:
             if not meta.unattended:
-                console.print('[bold red]NBL does not allow raw discs')
+                logger.info('[bold red]NBL does not allow raw discs')
             return False
 
         return True
@@ -160,7 +161,7 @@ class NBL:
             params["season"] = season_int
 
         if int(meta.tvmaze_id or 0) != 0:
-            params["tvmaze"] = int(meta.tvmaze_id)
+            params["tvmaze"] = meta.tvmaze_id
         elif meta.imdb_id or 0 != 0:
             params["imdb"] = meta.imdb_id
         else:
@@ -188,15 +189,15 @@ class NBL:
                         message = str(error.get('message', '')) if isinstance(error, dict) else ''
                         if "out of range" in message.lower() and "valid pages" in message.lower():
                             break
-                    console.print(f"[bold red]NBL HTTP request failed. Status: {response.status_code}")
-                    console.print(f"[bold red]NBL Search Response Content (page {page}): {response.text}")
+                    logger.info(f"[bold red]NBL HTTP request failed. Status: {response.status_code}")
+                    logger.info(f"[bold red]NBL Search Response Content (page {page}): {response.text}")
                     meta.skipping = "NBL"
                     break
 
                 try:
                     data = cast(dict[str, Any], response.json())
                 except json.JSONDecodeError:
-                    console.print("[bold yellow]NBL response content is not valid JSON. Skipping this API call.")
+                    logger.info("[bold yellow]NBL response content is not valid JSON. Skipping this API call.")
                     meta.skipping = "NBL"
                     break
 

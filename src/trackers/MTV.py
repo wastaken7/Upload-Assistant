@@ -13,7 +13,8 @@ import httpx
 import pyotp
 from defusedxml import ElementTree as ET
 
-from src.console import console
+from cogs.redaction import Redaction
+from src.console import console, logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
@@ -90,7 +91,7 @@ class MTV:
         if base_piece_mb > 8 and not meta.nohash:
             tracker_config = self.config['TRACKERS'].get(self.tracker, {})
             if str(tracker_config.get('skip_if_rehash', 'false')).lower() == "false":
-                console.print("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
+                logger.info("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
                 piece_size = 8
                 tracker_url = str(tracker_config.get('announce_url', "https://fake.tracker")).strip()
                 torrent_create = f"[{self.tracker}]"
@@ -105,7 +106,7 @@ class MTV:
                 await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
 
             else:
-                console.print("[red]Piece size is OVER 8M and skip_if_rehash enabled. Skipping upload.")
+                logger.info("[red]Piece size is OVER 8M and skip_if_rehash enabled. Skipping upload.")
                 return
         else:
             await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
@@ -198,8 +199,8 @@ class MTV:
                             if "authkey.php" in str(response.url):
                                 meta.tracker_status[self.tracker]["status_message"] = "data error - No DL link in response, It may have uploaded, check manually."
                             else:
-                                console.print(f"response URL: {response.url}")
-                                console.print(f"response status: {response.status_code}")
+                                logger.info(f"response URL: {response.url}")
+                                logger.info(f"response status: {response.status_code}")
                             return False
                     except Exception:
                         meta.tracker_status[self.tracker]["status_message"] = "data error -It may have uploaded, check manually."
@@ -209,12 +210,12 @@ class MTV:
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: {e}"
                 return False
         else:
-            console.print("[cyan]MTV Request Data:")
+            logger.info("[cyan]MTV Request Data:")
             debug_data = data.copy()
             if 'auth' in debug_data:
                 auth_value = str(debug_data.get('auth', ''))
                 debug_data['auth'] = f"{auth_value[:3]}..." if len(auth_value) > 3 else '***'
-            console.print(debug_data)
+            logger.info(Redaction.redact_private_info(debug_data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
@@ -253,7 +254,7 @@ class MTV:
         if meta.imdb_id != 0:
             description += str(meta.imdb_info.get("imdb_url", ""))
         if meta.tmdb:
-            description += f"\nhttps://www.themoviedb.org/{str(meta.category.lower())}/{str(meta.tmdb)}"
+            description += f"\nhttps://www.themoviedb.org/{(meta.category.lower())}/{str(meta.tmdb)}"
         if meta.tvdb_id != 0:
             description += f"\nhttps://www.thetvdb.com/?id={str(meta.tvdb_id)}"
         if meta.tvmaze_id != 0:
@@ -308,7 +309,7 @@ class MTV:
             mtv_name = os.path.splitext(mtv_name)[0]
 
         tag_value = meta.tag
-        tag_lower = tag_value.lower()
+        tag_lower = "" if not tag_value else tag_value.lower()
         invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
         if tag_value == "" or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
             for invalid_tag in invalid_tags:
@@ -374,7 +375,7 @@ class MTV:
                 "MIXED": "11",
                 "Unknown": "12",
                 "ENCODE": "7",
-            }.get(meta.type, "0")
+            }.get(meta.type or "", "0")
         return type_id
 
     async def get_origin_id(self, meta: Meta) -> str:
@@ -411,7 +412,7 @@ class MTV:
         tags.extend(
             each
             for each in ["remux", "WEB.DL", "WEBRip", "HDTV", "BluRay", "DVD", "HDDVD"]
-            if (each.lower().replace(".", "") in str(meta.type or "").lower()) or (each.lower().replace("-", "") in meta.source or "")
+            if (each.lower().replace(".", "") in (meta.type or "").lower()) or (each.lower().replace("-", "") in (meta.source or ""))
         )
         # series tags
         if meta.category == "TV":
@@ -449,7 +450,7 @@ class MTV:
         tags.append(video_codec.replace('AVC', 'h264').replace('HEVC', 'h265').replace('-', ''))
 
         # Group Tags
-        if meta.tag != "":
+        if meta.tag:
             tags.append(f"{meta.tag[1:].replace(' ', '.')}.release")
         else:
             tags.append('NOGRP.release')
@@ -477,7 +478,7 @@ class MTV:
             await self.login(cookiefile)
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
-            console.print('[red]Failed to validate cookies. Please confirm that the site is up and your username and password is valid.')
+            logger.error('[red]Failed to validate cookies. Please confirm that the site is up and your username and password is valid.')
             if "mtv_timeout" in meta and meta.mtv_timeout:
                 meta.skipping = "MTV"
                 return False
@@ -506,30 +507,30 @@ class MTV:
                     try:
                         resp = await client.get(url=url)
                         if meta.debug:
-                            console.print('[cyan]Validating MTV Cookies:')
+                            logger.debug('[cyan]Validating MTV Cookies:')
 
                         if "Logout" in resp.text:
                             return True
                         else:
-                            console.print("[yellow]Valid session not found in cookies")
+                            logger.info("[yellow]Valid session not found in cookies")
                             return False
 
                     except httpx.TimeoutException:
-                        console.print(f"[red]Connection to {url} timed out. The site may be down or unreachable.")
+                        logger.info(f"[red]Connection to {url} timed out. The site may be down or unreachable.")
                         meta.mtv_timeout = True
                         return False
                     except httpx.ConnectError:
-                        console.print(f"[red]Failed to connect to {url}. The site may be down or your connection is blocked.")
+                        logger.error(f"[red]Failed to connect to {url}. The site may be down or your connection is blocked.")
                         meta.mtv_timeout = True
                         return False
                     except Exception as e:
-                        console.print(f"[red]Error connecting to MTV: {str(e)}")
+                        logger.error(f"[red]Error connecting to MTV: {str(e)}")
                         return False
             except Exception as e:
-                console.print(f"[red]Error loading cookies: {str(e)}")
+                logger.error(f"[red]Error loading cookies: {str(e)}")
                 return False
         else:
-            console.print("[yellow]Cookie file not found")
+            logger.info("[yellow]Cookie file not found")
             return False
 
     async def get_auth(self, cookiefile: str) -> str:
@@ -547,16 +548,16 @@ class MTV:
                             auth = resp.text.rsplit('authkey=', 1)[1][:32]
                             return auth
                         else:
-                            console.print("[yellow]Auth key not found in response")
+                            logger.info("[yellow]Auth key not found in response")
                             return ""
                     except httpx.RequestError as e:
-                        console.print(f"[red]Error getting auth key: {str(e)}")
+                        logger.error(f"[red]Error getting auth key: {str(e)}")
                         return ""
             else:
-                console.print("[yellow]Cookie file not found for auth key retrieval")
+                logger.info("[yellow]Cookie file not found for auth key retrieval")
                 return ""
         except Exception as e:
-            console.print(f"[red]Unexpected error retrieving auth key: {str(e)}")
+            logger.error(f"[red]Unexpected error retrieving auth key: {str(e)}")
             return ""
 
     async def login(self, cookiefile: str) -> bool:
@@ -576,7 +577,7 @@ class MTV:
                     res = await client.get(url="https://www.morethantv.me/login")
 
                     if 'name="token" value="' not in res.text:
-                        console.print("[red]Unable to find token in login page")
+                        logger.info("[red]Unable to find token in login page")
                         return False
 
                     token = res.text.rsplit('name="token" value="', 1)[1][:48]
@@ -606,37 +607,37 @@ class MTV:
 
                     await asyncio.sleep(1)
                     if 'authkey=' in resp.text:
-                        console.print('[green]Successfully logged in to MTV')
+                        logger.info('[green]Successfully logged in to MTV')
                         cookies_dict = dict(client.cookies)
                         cookies_data = await self.async_json_dumps(cookies_dict)
                         async with aiofiles.open(cookiefile, 'w', encoding='utf-8') as cf:
                             await cf.write(cookies_data)
-                        console.print(f"[green]Cookies saved to {cookiefile}")
+                        logger.info(f"[green]Cookies saved to {cookiefile}")
                         return True
                     else:
-                        console.print('[bold red]Something went wrong while trying to log into MTV')
-                        console.print(f"[red]Final URL: {resp.url}")
+                        logger.info('[bold red]Something went wrong while trying to log into MTV')
+                        logger.info(f"[red]Final URL: {resp.url}")
                         return False
 
                 except httpx.TimeoutException:
-                    console.print("[red]Connection to MTV timed out. The site may be down or unreachable.")
+                    logger.info("[red]Connection to MTV timed out. The site may be down or unreachable.")
                     return False
                 except httpx.ConnectError:
-                    console.print("[red]Failed to connect to MTV. The site may be down or your connection is blocked.")
+                    logger.error("[red]Failed to connect to MTV. The site may be down or your connection is blocked.")
                     return False
                 except Exception as e:
-                    console.print(f"[red]Error during MTV login: {str(e)}")
-                    console.print(f"[dim red]{traceback.format_exc()}[/dim red]")
+                    logger.error(f"[red]Error during MTV login: {str(e)}")
+                    logger.info(f"[dim red]{traceback.format_exc()}[/dim red]")
                     return False
         except Exception as e:
-            console.print(f"[red]Unexpected error during login: {str(e)}")
-            console.print(f"[dim red]{traceback.format_exc()}[/dim red]")
+            logger.error(f"[red]Unexpected error during login: {str(e)}")
+            logger.info(f"[dim red]{traceback.format_exc()}[/dim red]")
         return False
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.type not in ["WEBDL"] and meta.tag and any(x in meta.tag for x in ["EVO"]):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print(f"[bold red]Group {meta.tag} is only allowed for raw type content at {self.tracker}[/bold red]")
+                logger.info(f"[bold red]Group {meta.tag} is only allowed for raw type content at {self.tracker}[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -651,13 +652,13 @@ class MTV:
         if meta.resolution not in ["2160p"] and meta.video_codec in ["HEVC"]:
             if meta.anime and meta.tag and not any(x in meta.tag for x in allowed_anime):
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    console.print(f"[bold red]Only 4K HEVC anime releases from {meta.tag} are allowed at {self.tracker}[/bold red]")
+                    logger.info(f"[bold red]Only 4K HEVC anime releases from {meta.tag} are allowed at {self.tracker}[/bold red]")
                     if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                         pass
                     else:
                         return False
             else:
-                console.print(f'[bold red]Only 4K HEVC releases are allowed at {self.tracker}[/bold red]')
+                logger.info(f'[bold red]Only 4K HEVC releases are allowed at {self.tracker}[/bold red]')
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                     if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                         pass
@@ -668,18 +669,18 @@ class MTV:
 
         disallowed_keywords = {'xxx', 'erotic', 'porn'}
         disallowed_genres = {'adult', 'erotica'}
-        keywords_list = [str(item) for item in meta.keywords]
+        keywords_list = list(meta.keywords)
         genres_value = meta.combined_genres
         genres_list: list[str] = []
         if isinstance(genres_value, list):
-            genres_list.extend([str(item) for item in genres_value])
+            genres_list.extend(list(genres_value))
         else:
-            genres_list.append(str(genres_value))
+            genres_list.append(genres_value)
         keywords_lower = {k.lower() for k in keywords_list if k}
         genres_lower = {g.lower() for g in genres_list if g}
         if any(keyword in keywords_lower for keyword in disallowed_keywords) or any(genre in genres_lower for genre in disallowed_genres):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print(f'[bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]')
+                logger.info(f'[bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]')
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -729,14 +730,14 @@ class MTV:
                         result = {"name": title, "files": title, "file_count": int(files_text), "size": int(size_text), "link": guid, "download": link}
                         dupes.append(result)
                 except ET.ParseError:
-                    console.print("[red]Failed to parse XML response from MTV API")
+                    logger.error("[red]Failed to parse XML response from MTV API")
             else:
                 # Handle potential error messages
                 if response.status_code != 200:
-                    console.print(f"[red]HTTP request failed. Status: {response.status_code}")
+                    logger.info(f"[red]HTTP request failed. Status: {response.status_code}")
                 elif "status_message" in response.json():
-                    console.print(f"[yellow]{response.json().get('status_message')}")
+                    logger.info(f"[yellow]{response.json().get('status_message')}")
                 else:
-                    console.print("[red]Site Seems to be down or not responding to API")
+                    logger.info("[red]Site Seems to be down or not responding to API")
 
         return dupes

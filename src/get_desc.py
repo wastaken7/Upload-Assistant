@@ -14,7 +14,7 @@ from jinja2 import Template
 from pymediainfo import MediaInfo
 
 from src.bbcode import BBCODE
-from src.console import console
+from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.takescreens import TakeScreensManager
@@ -101,11 +101,11 @@ async def gen_desc(
                     meta.description_template_content = cleaned_content
                 content_written = True
         except FileNotFoundError:
-            console.print(f"[ERROR] Template '{meta.description_template}' not found.")
+            logger.info(f"[ERROR] Template '{meta.description_template}' not found.")
     if meta.nfo:
         if meta.debug:
-            console.print(f"specified_dir_path: {specified_dir_path}")
-            console.print(f"sourcedir_path: {source_dir_path}")
+            logger.debug(f"specified_dir_path: {specified_dir_path}")
+            logger.debug(f"sourcedir_path: {source_dir_path}")
         if "auto_nfo" in meta and meta.auto_nfo is True:
             nfo_files = glob.glob(specified_dir_path)
             scene_nfo = True
@@ -115,7 +115,7 @@ async def gen_desc(
         else:
             nfo_files = glob.glob(source_dir_path)
         if not nfo_files:
-            console.print("NFO was set but no nfo file was found")
+            logger.info("NFO was set but no nfo file was found")
             if not content_written:
                 description_lines.append("")
             await write_description_file(description_path, description_lines)
@@ -127,10 +127,10 @@ async def gen_desc(
                 async with aiofiles.open(nfo, encoding="utf-8") as nfo_file:
                     nfo_content = await nfo_file.read()
                 if meta.debug:
-                    console.print("NFO content read with utf-8 encoding.")
+                    logger.debug("NFO content read with utf-8 encoding.")
             except UnicodeDecodeError:
                 if meta.debug:
-                    console.print("utf-8 decoding failed, trying latin1.")
+                    logger.debug("utf-8 decoding failed, trying latin1.")
                 async with aiofiles.open(nfo, encoding="latin1") as nfo_file:
                     nfo_content = await nfo_file.read()
 
@@ -171,7 +171,7 @@ async def gen_desc(
             elif cleaned_content and "Not Found" in cleaned_content:
                 raise ValueError("Description link returned 'Not Found'")
         except Exception as e:
-            console.print(f"[ERROR] Failed to fetch description from link: {e}")
+            logger.info(f"[ERROR] Failed to fetch description from link: {e}")
             raise e
 
     if description_file and os.path.isfile(description_file):
@@ -277,7 +277,7 @@ class DescriptionBuilder:
             if custom_description_header:
                 return custom_description_header
         except Exception as e:
-            console.print(f"[yellow]Warning: Error setting custom description header: {str(e)}[/yellow]")
+            logger.warning(f"[yellow]Warning: Error setting custom description header: {str(e)}[/yellow]")
 
         return ""
 
@@ -287,7 +287,7 @@ class DescriptionBuilder:
             if tonemapped_description_header and meta.tonemapped:
                 return tonemapped_description_header
         except Exception as e:
-            console.print(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
+            logger.warning(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
         return ""
 
     async def get_logo_section(self, meta: Meta) -> tuple[str, str]:
@@ -312,7 +312,7 @@ class DescriptionBuilder:
             if logo:
                 return logo, logo_size
         except Exception as e:
-            console.print(f"[yellow]Warning: Error getting logo section: {str(e)}[/yellow]")
+            logger.warning(f"[yellow]Warning: Error getting logo section: {str(e)}[/yellow]")
 
         return logo, logo_size
 
@@ -355,7 +355,7 @@ class DescriptionBuilder:
                 title += f"{episode_title}"
 
         except Exception as e:
-            console.print(f"[yellow]Warning: Error getting TV info: {str(e)}[/yellow]")
+            logger.warning(f"[yellow]Warning: Error getting TV info: {str(e)}[/yellow]")
 
         return title, overview
 
@@ -438,7 +438,7 @@ class DescriptionBuilder:
                             bdinfo_sections.append(file_info)
                 return "\n\n".join(bdinfo_sections)
         except Exception as e:
-            console.print(f"[yellow]Warning: Error getting bdinfo section: {str(e)}[/yellow]")
+            logger.warning(f"[yellow]Warning: Error getting bdinfo section: {str(e)}[/yellow]")
 
         return ""
 
@@ -449,7 +449,7 @@ class DescriptionBuilder:
             if screenheader:
                 return screenheader
         except Exception as e:
-            console.print(f"[yellow]Warning: Error getting screenshot header: {str(e)}[/yellow]")
+            logger.warning(f"[yellow]Warning: Error getting screenshot header: {str(e)}[/yellow]")
 
         return ""
 
@@ -461,7 +461,7 @@ class DescriptionBuilder:
                 if disc_menu_header:
                     return disc_menu_header
         except Exception as e:
-            console.print(f"[yellow]Warning: Error getting menus screenshot header: {str(e)}[/yellow]")
+            logger.warning(f"[yellow]Warning: Error getting menus screenshot header: {str(e)}[/yellow]")
 
         return ""
 
@@ -477,7 +477,7 @@ class DescriptionBuilder:
                 elif description_link_content:
                     return description_link_content
         except Exception as e:
-            console.print(f"[yellow]Warning: Error getting user description: {str(e)}[/yellow]")
+            logger.warning(f"[yellow]Warning: Error getting user description: {str(e)}[/yellow]")
 
         return ""
 
@@ -486,7 +486,7 @@ class DescriptionBuilder:
         try:
             custom_signature = self._get_str_config("custom_signature", "")
         except Exception as e:
-            console.print(f"[yellow]Warning: Error setting custom signature: {str(e)}[/yellow]")
+            logger.warning(f"[yellow]Warning: Error setting custom signature: {str(e)}[/yellow]")
 
         return custom_signature
 
@@ -527,7 +527,7 @@ class DescriptionBuilder:
                 cover_images = "".join(cover_list)
 
         except Exception as e:
-            console.print(f"[yellow]Warning: Error getting bluray section: {str(e)}[/yellow]")
+            logger.warning(f"[yellow]Warning: Error getting bluray section: {str(e)}[/yellow]")
 
         return release_url, cover_images
 
@@ -558,7 +558,7 @@ class DescriptionBuilder:
             desc_parts.append("[/center]\n")
             return "".join(desc_parts)
         except Exception as e:
-            console.print(f"[yellow]Warning: Error getting audio spectrogram section: {str(e)}[/yellow]")
+            logger.warning(f"[yellow]Warning: Error getting audio spectrogram section: {str(e)}[/yellow]")
         return ""
 
     def _build_book_desc_section(self, meta: Meta, header_size: int = 0, table: bool = True, underline: bool = False, bullet: str = "") -> str:
@@ -879,7 +879,7 @@ class DescriptionBuilder:
                 if meta.subtitle_languages and meta.write_hc_languages:
                     desc_parts.append(f"[code]Hardcoded Subtitle Language/s: {', '.join(meta.subtitle_languages)}[/code]")
             except Exception as e:
-                console.print(f"[yellow]Warning: Error processing language: {str(e)}[/yellow]")
+                logger.warning(f"[yellow]Warning: Error processing language: {str(e)}[/yellow]")
 
         # Logo
         if logo:
@@ -1061,7 +1061,7 @@ class DescriptionBuilder:
 
         if meta.debug:
             desc_file = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
-            console.print(f"DEBUG: Saving final description to [yellow]{desc_file}[/yellow]")
+            logger.debug(f"DEBUG: Saving final description to [yellow]{desc_file}[/yellow]")
             async with aiofiles.open(desc_file, "w", encoding="utf-8") as description_file:
                 await description_file.write(description_str)
 
@@ -1131,13 +1131,11 @@ class DescriptionBuilder:
                                 if host_approved:
                                     images_to_keep.append(img)
                                 elif meta.debug:
-                                    console.print(
-                                        f"[yellow]Filtering out image from non-approved host: {hostname}[/yellow]"
-                                    )
+                                    logger.info(f"[yellow]Filtering out image from non-approved host: {hostname}[/yellow]")
                             except Exception:
                                 # If URL parsing fails, skip this image
                                 if meta.debug:
-                                    console.print(f"[yellow]Could not parse URL: {raw_url}[/yellow]")
+                                    logger.debug(f"[yellow]Could not parse URL: {raw_url}[/yellow]")
                                 continue
 
                         if images_to_keep:
@@ -1152,9 +1150,7 @@ class DescriptionBuilder:
                     for key_name in keys_to_remove:
                         del pack_images_data["keys"][key_name]
                         if meta.debug:
-                            console.print(
-                                f"[yellow]Removed key '{key_name}' - no approved image hosts[/yellow]"
-                            )
+                            logger.debug(f"[yellow]Removed key '{key_name}' - no approved image hosts[/yellow]")
 
                     # Recalculate total count
                     pack_images_data["total_count"] = sum(
@@ -1164,17 +1160,13 @@ class DescriptionBuilder:
                     if pack_images_data.get("total_count", 0) < 3:
                         pack_images_data = {}  # Invalidate if less than 3 images total
                         if meta.debug:
-                            console.print(
-                                "[yellow]Invalidating pack images - less than 3 approved images total[/yellow]"
-                            )
+                            logger.debug("[yellow]Invalidating pack images - less than 3 approved images total[/yellow]")
                     else:
                         if meta.debug:
-                            console.print(f"[green]Loaded previously uploaded images from {pack_images_file}")
-                            console.print(
-                                f"[blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]"
-                            )
+                            logger.debug(f"[green]Loaded previously uploaded images from {pack_images_file}")
+                            logger.debug(f"[blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]")
             except Exception as e:
-                console.print(f"[yellow]Warning: Could not load pack image data: {str(e)}[/yellow]")
+                logger.warning(f"[yellow]Warning: Could not load pack image data: {str(e)}[/yellow]")
         return pack_images_data
 
     async def _handle_discs_and_screenshots(self, meta: Meta, approved_image_hosts: list[str], images: list[dict[str, str]], multi_screens: int) -> str:
@@ -1254,9 +1246,7 @@ class DescriptionBuilder:
                             saved_images = pack_images_data["keys"][new_images_key]["images"]
                             if saved_images:
                                 if meta.debug:
-                                    console.print(
-                                        f"[yellow]Using saved images from pack_image_links.json for {new_images_key}"
-                                    )
+                                    logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
@@ -1275,7 +1265,7 @@ class DescriptionBuilder:
                                 f"[spoiler={edition}][code]{summary}[/code][/spoiler]\n\n"
                             )
                             if meta.debug:
-                                console.print("[yellow]Using original uploaded images for first disc")
+                                logger.debug("[yellow]Using original uploaded images for first disc")
                             desc_parts.append("[center]")
                             for img in meta[new_images_key]:
                                 web_url = img["web_url"]
@@ -1309,7 +1299,7 @@ class DescriptionBuilder:
                                         True,
                                     )
                                 except Exception as e:
-                                    console.print(f"Error during BDMV screenshot capture: {e}", markup=False)
+                                    logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
                                 new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"PLAYLIST_{i}-*.png"))]
                             if new_screens and not meta.skip_imghost_upload:
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
@@ -1354,8 +1344,8 @@ class DescriptionBuilder:
             total_discs_to_process = min(len(discs), process_limit)
             processed_count = 0
             if multi_screens != 0:
-                console.print("[cyan]Processing screenshots for packed content (multiScreens)[/cyan]")
-                console.print(f"[cyan]{total_discs_to_process} files (processLimit)[/cyan]")
+                logger.info("[cyan]Processing screenshots for packed content (multiScreens)[/cyan]")
+                logger.info(f"[cyan]{total_discs_to_process} files (processLimit)[/cyan]")
 
             for i, each in enumerate(discs):
                 # Set a unique key per disc for managing images
@@ -1375,7 +1365,7 @@ class DescriptionBuilder:
                         )
                     # For the first disc, use images from `meta.image_list` and add screenheader if applicable
                     if meta.debug:
-                        console.print("[yellow]Using original uploaded images for first disc")
+                        logger.debug("[yellow]Using original uploaded images for first disc")
                     if screenheader is not None:
                         desc_parts.append("[/center]\n\n")
                         desc_parts.append(screenheader + "\n")
@@ -1392,10 +1382,9 @@ class DescriptionBuilder:
                     if multi_screens != 0:
                         processed_count += 1
                         disc_name = each.get("name", f"Disc {i}")
-                        console.print(
+                        logger.info(
                             f"\rProcessing disc {processed_count}/{total_discs_to_process}: {disc_name[:40]}{'...' if len(disc_name) > 40 else ''}",
-                            markup=False,
-                            end="",
+                            extra={"markup": False},
                         )
                         # Check if screenshots exist for the current disc key
                         # Check for saved images first
@@ -1407,9 +1396,7 @@ class DescriptionBuilder:
                             saved_images = pack_images_data["keys"][new_images_key]["images"]
                             if saved_images:
                                 if meta.debug:
-                                    console.print(
-                                        f"[yellow]Using saved images from pack_image_links.json for {new_images_key}"
-                                    )
+                                    logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
@@ -1422,7 +1409,7 @@ class DescriptionBuilder:
                                     )
                         if new_images_key in meta and meta[new_images_key]:
                             if meta.debug:
-                                console.print(f"[yellow]Found needed image URLs for {new_images_key}")
+                                logger.debug(f"[yellow]Found needed image URLs for {new_images_key}")
                             desc_parts.append("[center]")
                             if each["type"] == "BDMV":
                                 desc_parts.append(
@@ -1471,9 +1458,7 @@ class DescriptionBuilder:
                                 new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"{meta.discs[i]['name']}-*.png"))]
                             if not new_screens:
                                 if meta.debug:
-                                    console.print(
-                                        f"[yellow]No new screens for {new_images_key}; creating new screenshots"
-                                    )
+                                    logger.debug(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
                                 # Run prep.screenshots if no screenshots are present
                                 if each["type"] == "BDMV":
                                     use_vs = meta.vapoursynth
@@ -1491,13 +1476,13 @@ class DescriptionBuilder:
                                             True,
                                         )
                                     except Exception as e:
-                                        console.print(f"Error during BDMV screenshot capture: {e}", markup=False)
+                                        logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
                                     new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"FILE_{i}-*.png"))]
                                 if each["type"] == "DVD":
                                     try:
                                         await self.takescreens_manager.dvd_screenshots(meta, i, multi_screens, True)
                                     except Exception as e:
-                                        console.print(f"Error during DVD screenshot capture: {e}", markup=False)
+                                        logger.info(f"Error during DVD screenshot capture: {e}", extra={"markup": False})
                                     new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"{meta.discs[i]['name']}-*.png"))]
 
                             if new_screens and not meta.skip_imghost_upload:
@@ -1536,7 +1521,7 @@ class DescriptionBuilder:
                             meta_filename = f"{meta.base_dir}/tmp/{meta.uuid}/meta.json"
                             async with aiofiles.open(meta_filename, "w") as f:
                                 await f.write(json.dumps(meta.to_dict(), indent=4))
-                        console.print()
+                        logger.info("")
 
         # Handle single file case
         filelist = meta.filelist
@@ -1592,8 +1577,8 @@ class DescriptionBuilder:
         total_files_to_process = min(len(filelist), process_limit)
         processed_count = 0
         if multi_screens != 0 and total_files_to_process > 1:
-            console.print("[cyan]Processing screenshots for packed content (multiScreens)[/cyan]")
-            console.print(f"[cyan]{total_files_to_process} files (processLimit)[/cyan]")
+            logger.info("[cyan]Processing screenshots for packed content (multiScreens)[/cyan]")
+            logger.info(f"[cyan]{total_files_to_process} files (processLimit)[/cyan]")
 
         # First Pass: Create and Upload Images for Each File
         for i, file in enumerate(filelist):
@@ -1604,11 +1589,7 @@ class DescriptionBuilder:
                 if total_files_to_process > 1:
                     processed_count += 1
                     filename = os.path.basename(file)
-                    console.print(
-                        f"\rProcessing file {processed_count}/{total_files_to_process}: {filename[:40]}{'...' if len(filename) > 40 else ''}",
-                        markup=False,
-                        end="",
-                    )
+                    logger.info(f"\rProcessing file {processed_count}/{total_files_to_process}: {filename[:40]}{'...' if len(filename) > 40 else ''}", extra={"markup": False})
                 if i > 0:
                     new_images_key = f"new_images_file_{i}"
                     # Check for saved images first
@@ -1620,9 +1601,7 @@ class DescriptionBuilder:
                         saved_images = pack_images_data["keys"][new_images_key]["images"]
                         if saved_images:
                             if meta.debug:
-                                console.print(
-                                    f"[yellow]Using saved images from pack_image_links.json for {new_images_key}"
-                                )
+                                logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                             meta[new_images_key] = []
                             for img in saved_images:
@@ -1640,9 +1619,7 @@ class DescriptionBuilder:
 
                         # If no screenshots exist, create them
                         if not new_screens and meta.debug:
-                            console.print(
-                                f"[yellow]No existing screenshots for {new_images_key}; generating new ones."
-                            )
+                            logger.info(f"[yellow]No existing screenshots for {new_images_key}; generating new ones.")
                         try:
                             await self.takescreens_manager.screenshots(
                                 file,
@@ -1655,7 +1632,7 @@ class DescriptionBuilder:
                             )
                             await asyncio.sleep(0.1)
                         except Exception as e:
-                            console.print(f"Error during generic screenshot capture: {e}", markup=False)
+                            logger.info(f"Error during generic screenshot capture: {e}", extra={"markup": False})
 
                         new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"FILE_{i}-*.png"))]
 
@@ -1767,9 +1744,9 @@ class DescriptionBuilder:
                 char_count += len("[/spoiler][/center]\n")
 
         if char_count >= 1 and meta.debug:
-            console.print(f"[yellow]Total characters written to description: {char_count}")
+            logger.info(f"[yellow]Total characters written to description: {char_count}")
         if total_files_to_process > 1:
-            console.print()
+            logger.info("")
 
         description = "".join(p for p in desc_parts if p)
 
@@ -1812,7 +1789,7 @@ class DescriptionBuilder:
                     menu_parts.append("[/center]\n\n")
                     menu_image_section = "".join(menu_parts)
         except Exception as e:
-            console.print(f"[yellow]Warning: Error processing disc menu section: {str(e)}[/yellow]")
+            logger.warning(f"[yellow]Warning: Error processing disc menu section: {str(e)}[/yellow]")
 
         return menu_image_section
 

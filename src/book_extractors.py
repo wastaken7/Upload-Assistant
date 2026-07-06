@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from typing import Any
 
-from src.console import console
+from src.console import logger
 
 
 def extract_epub_metadata(epub_path: str, debug: bool = False) -> dict[str, Any]:
@@ -32,8 +32,7 @@ def extract_epub_metadata(epub_path: str, debug: bool = False) -> dict[str, Any]
                         if rootfile_path:
                             break
             except Exception as e:
-                if debug:
-                    console.print(f"[yellow]Debug: META-INF/container.xml not found or unreadable: {e}[/yellow]")
+                logger.debug(f"[yellow]Debug: META-INF/container.xml not found or unreadable: {e}[/yellow]")
 
             # Fallback: search for any .opf file in the archive
             if not rootfile_path:
@@ -43,8 +42,7 @@ def extract_epub_metadata(epub_path: str, debug: bool = False) -> dict[str, Any]
                         break
 
             if not rootfile_path:
-                if debug:
-                    console.print("[yellow]Debug: No OPF metadata file found in EPUB ZIP[/yellow]")
+                logger.debug("[yellow]Debug: No OPF metadata file found in EPUB ZIP[/yellow]")
                 return metadata
 
             # 2. Read and parse the .opf file
@@ -102,8 +100,7 @@ def extract_epub_metadata(epub_path: str, debug: bool = False) -> dict[str, Any]
                 metadata["publisher"] = publisher
 
     except Exception as e:
-        if debug:
-            console.print(f"[yellow]Warning: Error parsing EPUB metadata: {e}[/yellow]")
+        logger.debug(f"[yellow]Warning: Error parsing EPUB metadata: {e}[/yellow]")
 
     return metadata
 
@@ -125,14 +122,12 @@ def extract_cbr_cbz_metadata(filepath: str, debug: bool = False) -> dict[str, An
                 if xml_name:
                     xml_data = z.read(xml_name)
         except Exception as e:
-            if debug:
-                console.print(f"[yellow]Debug: Error reading CBZ zip archive: {e}[/yellow]")
+            logger.debug(f"[yellow]Debug: Error reading CBZ zip archive: {e}[/yellow]")
     elif ext == ".cbr":
         try:
             from rarfile import RarFile
         except ImportError:
-            if debug:
-                console.print("[yellow]Debug: rarfile library not available for CBR metadata extraction.[/yellow]")
+            logger.debug("[yellow]Debug: rarfile library not available for CBR metadata extraction.[/yellow]")
             RarFile = None
 
         if RarFile:
@@ -142,8 +137,7 @@ def extract_cbr_cbz_metadata(filepath: str, debug: bool = False) -> dict[str, An
                     if xml_name:
                         xml_data = r.read(xml_name)
             except Exception as e:
-                if debug:
-                    console.print(f"[yellow]Debug: Error reading CBR rar archive: {e}[/yellow]")
+                logger.debug(f"[yellow]Debug: Error reading CBR rar archive: {e}[/yellow]")
 
     if not xml_data:
         return metadata
@@ -210,8 +204,7 @@ def extract_cbr_cbz_metadata(filepath: str, debug: bool = False) -> dict[str, An
             metadata["keywords"] = metadata["genres"] = genres_list
 
     except Exception as e:
-        if debug:
-            console.print(f"[yellow]Warning: Error parsing ComicInfo.xml metadata: {e}[/yellow]")
+        logger.debug(f"[yellow]Warning: Error parsing ComicInfo.xml metadata: {e}[/yellow]")
 
     return metadata
 
@@ -225,8 +218,7 @@ def extract_mobi_metadata(mobi_path: str, debug: bool = False) -> dict[str, Any]
     try:
         import mobi
     except ImportError:
-        if debug:
-            console.print("[yellow]Debug: mobi library is not installed. Skipping MOBI metadata extraction.[/yellow]")
+        logger.debug("[yellow]Debug: mobi library is not installed. Skipping MOBI metadata extraction.[/yellow]")
         return metadata
 
     tempdir = None
@@ -254,8 +246,7 @@ def extract_mobi_metadata(mobi_path: str, debug: bool = False) -> dict[str, Any]
                     decoded = opf_data.decode("utf-8", errors="replace")
                     root = ET.fromstring(decoded.encode("utf-8"))
                 except Exception as e:
-                    if debug:
-                        console.print(f"[yellow]Debug: Error parsing MOBI XML data: {e}[/yellow]")
+                    logger.debug(f"[yellow]Debug: Error parsing MOBI XML data: {e}[/yellow]")
                     root = None
 
             if root is not None:
@@ -312,8 +303,7 @@ def extract_mobi_metadata(mobi_path: str, debug: bool = False) -> dict[str, Any]
                     metadata["publisher"] = publisher
 
     except Exception as e:
-        if debug:
-            console.print(f"[yellow]Warning: Error parsing MOBI metadata: {e}[/yellow]")
+        logger.debug(f"[yellow]Warning: Error parsing MOBI metadata: {e}[/yellow]")
     finally:
         if tempdir and os.path.exists(tempdir):
             with contextlib.suppress(Exception):
@@ -346,8 +336,7 @@ def extract_isbn_from_pdf(pdf_path: str, debug: bool = False) -> str | None:
     try:
         import fitz
     except ImportError:
-        if debug:
-            console.print("[yellow]Debug: PyMuPDF (fitz) is not installed. Skipping PDF ISBN extraction.[/yellow]")
+        logger.debug("[yellow]Debug: PyMuPDF (fitz) is not installed. Skipping PDF ISBN extraction.[/yellow]")
         return None
 
     if not os.path.isfile(pdf_path):
@@ -391,10 +380,9 @@ def extract_isbn_from_pdf(pdf_path: str, debug: bool = False) -> str | None:
                 for cand in candidates:
                     validated = validate_isbn_checksum(cand)
                     if validated:
-                        console.print(f"[cyan]Found valid ISBN {validated} on PDF page {page_num}[/cyan]")
+                        logger.info(f"[cyan]Found valid ISBN {validated} on PDF page {page_num}[/cyan]")
                         return validated
     except Exception as e:
-        if debug:
-            console.print(f"[yellow]Warning: Error extracting ISBN from PDF: {e}[/yellow]")
+        logger.debug(f"[yellow]Warning: Error extracting ISBN from PDF: {e}[/yellow]")
 
     return None

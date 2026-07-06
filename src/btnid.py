@@ -5,7 +5,7 @@ from typing import Any, cast
 import httpx
 
 from src.bbcode import BBCODE
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
 
@@ -19,7 +19,7 @@ class BtnIdManager:
         imdb_id = 0
         tvdb_id = 0
         if meta.debug:
-            console.print("Fetching BTN data...", markup=False)
+            logger.debug("Fetching BTN data...", extra={"markup": False})
         post_query_url = "https://api.broadcasthe.net/"
         post_data = {
             "jsonrpc": "2.0",
@@ -40,15 +40,15 @@ class BtnIdManager:
                 try:
                     data = cast(dict[str, Any], response.json())
                 except ValueError as e:
-                    console.print(f"[ERROR] Failed to parse BTN response as JSON: {e}", markup=False)
-                    console.print(f"Response content: {response.text[:200]}...", markup=False)
+                    logger.info(f"[ERROR] Failed to parse BTN response as JSON: {e}", extra={"markup": False})
+                    logger.info(f"Response content: {response.text[:200]}...", extra={"markup": False})
                     return 0, 0
         except Exception as e:
-            console.print(f"[ERROR] Failed to fetch BTN data: {e}", markup=False)
+            logger.info(f"[ERROR] Failed to fetch BTN data: {e}", extra={"markup": False})
             return 0, 0
 
         if not data:
-            console.print("[ERROR] BTN API response is empty or invalid.", markup=False)
+            logger.info("[ERROR] BTN API response is empty or invalid.", extra={"markup": False})
             return 0, 0
 
         error = data.get('error')
@@ -57,16 +57,16 @@ class BtnIdManager:
             code = error_map.get('code', 'unknown')
             message = str(error_map.get('message', 'Unknown BTN API error'))
             if 'unauthorized ip' in message.lower():
-                console.print(f"[red]BTN API error: Unauthorized IP address (code {code}).[/red]")
-                console.print("[yellow]Your current public IP isn't whitelisted for your BTN API key.[/yellow]")
+                logger.info(f"[red]BTN API error: Unauthorized IP address (code {code}).[/red]")
+                logger.info("[yellow]Your current public IP isn't whitelisted for your BTN API key.[/yellow]")
             else:
-                console.print(f"[red]BTN API error (code {code}): {message}[/red]")
+                logger.info(f"[red]BTN API error (code {code}): {message}[/red]")
             if meta.debug:
-                console.print(data)
+                logger.debug(data)
             return 0, 0
 
         if meta.debug:
-            console.print(f"[green]BTN data fetched successfully for BTN ID {data.get('id')}[/green]")
+            logger.debug(f"[green]BTN data fetched successfully for BTN ID {data.get('id')}[/green]")
 
         result = data.get('result')
         if isinstance(result, dict) and "torrents" in result:
@@ -79,7 +79,7 @@ class BtnIdManager:
                 if imdb_id or tvdb_id:
                     return int(imdb_id or 0), int(tvdb_id or 0)
         if meta.debug:
-            console.print("[red]No IMDb or TVDb ID found.")
+            logger.debug("[red]No IMDb or TVDb ID found.")
         return 0, 0
 
     @staticmethod
@@ -96,7 +96,7 @@ class BtnIdManager:
         imdb = 0
         tmdb = 0
         if meta.debug:
-            console.print("Fetching BHD data...", markup=False)
+            logger.debug("Fetching BHD data...", extra={"markup": False})
         post_query_url = f"https://beyond-hd.me/api/torrents/{bhd_api}"
 
         post_data = {"action": "details", "torrent_id": torrent_id} if torrent_id is not None else {"action": "search", "rsskey": bhd_rss_key}
@@ -119,16 +119,16 @@ class BtnIdManager:
                 try:
                     data = response.json()
                 except ValueError as e:
-                    console.print(f"[ERROR] Failed to parse BHD response as JSON: {e}", markup=False)
-                    console.print(f"Response content: {response.text[:200]}...", markup=False)
+                    logger.info(f"[ERROR] Failed to parse BHD response as JSON: {e}", extra={"markup": False})
+                    logger.info(f"Response content: {response.text[:200]}...", extra={"markup": False})
                     return 0, 0
         except (httpx.RequestError, httpx.HTTPStatusError) as e:
-            console.print(f"[ERROR] Failed to fetch BHD data: {e}", markup=False)
+            logger.info(f"[ERROR] Failed to fetch BHD data: {e}", extra={"markup": False})
             return 0, 0
 
         if data.get("status_code") == 0 or data.get("success") is False:
             error_message = data.get("status_message", "Unknown BHD API error")
-            console.print(f"[ERROR] BHD API error: {error_message}", markup=False)
+            logger.info(f"[ERROR] BHD API error: {error_message}", extra={"markup": False})
             return 0, 0
 
         # Handle different response formats from BHD API
@@ -143,7 +143,7 @@ class BtnIdManager:
             first_result = data["result"]
 
         if not first_result:
-            console.print("No valid results found in BHD API response.", markup=False)
+            logger.info("No valid results found in BHD API response.", extra={"markup": False})
             return 0, 0
 
         name = str(first_result.get("name", "")).lower()
@@ -166,13 +166,13 @@ class BtnIdManager:
 
                     if desc_data.get("status_code") == 1 and desc_data.get("success") is True:
                         description = str(desc_data.get("result", ""))
-                        console.print("Successfully retrieved full description", markup=False)
+                        logger.info("Successfully retrieved full description", extra={"markup": False})
                     else:
                         description = ""
                         error_message = desc_data.get("status_message", "Unknown BHD API error")
-                        console.print(f"[ERROR] Failed to fetch description: {error_message}", markup=False)
+                        logger.info(f"[ERROR] Failed to fetch description: {error_message}", extra={"markup": False})
             except (httpx.RequestError, httpx.HTTPStatusError) as e:
-                console.print(f"[ERROR] Failed to fetch description: {e}", markup=False)
+                logger.info(f"[ERROR] Failed to fetch description: {e}", extra={"markup": False})
                 description = ""
         else:
             # Use the description from the initial response
@@ -205,9 +205,9 @@ class BtnIdManager:
             meta.image_list = imagelist
 
         if (imdb and imdb != 0) or (tmdb and tmdb != 0):
-            console.print(f"[green]Found BHD IDs: IMDb={imdb}, TMDb={tmdb}")
+            logger.info(f"[green]Found BHD IDs: IMDb={imdb}, TMDb={tmdb}")
         elif meta.debug:
-            console.print(f"[yellow]BHD search returned no valid IDs (IMDb={imdb}, TMDb={tmdb})[/yellow]")
+            logger.info(f"[yellow]BHD search returned no valid IDs (IMDb={imdb}, TMDb={tmdb})[/yellow]")
 
         return imdb, tmdb
 

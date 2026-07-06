@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
@@ -36,7 +36,7 @@ class HHD(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
         if meta.type == "DVDRIP":
-            console.print("[bold red]DVDRIP uploads are not allowed on HHD.[/bold red]")
+            logger.info("[bold red]DVDRIP uploads are not allowed on HHD.[/bold red]")
             return False
 
         return should_continue

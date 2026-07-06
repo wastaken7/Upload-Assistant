@@ -12,7 +12,7 @@ import anitopy
 import guessit
 import httpx
 
-from src.console import console
+from src.console import console, logger
 from src.exceptions import *  # noqa: F403
 from src.meta import Meta
 from src.tags import get_tag
@@ -99,7 +99,7 @@ class SeasonEpisodeManager:
                                 season_int = int(guess_data.get("season") or 1)
                                 season = "S" + str(season_int).zfill(2)
                         except Exception:
-                            console.print(
+                            logger.info(
                                 "[bold yellow]There was an error guessing the season number. Guessing S01. Use [bold green]--season #[/bold green] to correct if needed"
                             )
                             season_int = 1
@@ -200,7 +200,7 @@ class SeasonEpisodeManager:
                                             continue
 
                             if episode_int == 1:  # Still using fallback
-                                console.print(
+                                logger.info(
                                     "[bold yellow]There was an error guessing the episode number. Guessing E01. Use [bold green]--episode #[/bold green] to correct if needed"
                                 )
 
@@ -279,12 +279,12 @@ class SeasonEpisodeManager:
                             except Exception:
                                 season_int = 1  # Default to 1 if error occurs
                                 season = "S01"
-                            console.print(f"[bold yellow]{meta.title} does not exist on thexem, guessing {season}")
-                            console.print(f"[bold yellow]If [green]{season}[/green] is incorrect, use --season to correct")
+                            logger.info(f"[bold yellow]{meta.title} does not exist on thexem, guessing {season}")
+                            logger.info(f"[bold yellow]If [green]{season}[/green] is incorrect, use --season to correct")
                             await asyncio.sleep(3)
                 else:
-                    console.print("[bold red]Error determining if TV show is anime or not[/bold red]")
-                    console.print("[bold yellow]Set manual season and episode[/bold yellow]")
+                    logger.info("[bold red]Error determining if TV show is anime or not[/bold red]")
+                    logger.info("[bold yellow]Set manual season and episode[/bold yellow]")
                     season_int = 1
                     season = "S01"
                     episode_int = 1
@@ -331,17 +331,17 @@ class SeasonEpisodeManager:
             try:
                 missing_list = [f"S{s:02d}E{e:02d}" for s, e in completeness["missing_episodes"]]
             except ValueError:
-                console.print("[red]Error determining missing episodes, you should double check the pack manually.")
+                logger.error("[red]Error determining missing episodes, you should double check the pack manually.")
                 missing_list = ["Unknown"]
             if "Unknown" not in missing_list:
-                console.print("[red]Warning: Season pack appears incomplete!")
-                console.print(f"[yellow]Missing episodes: {', '.join(missing_list)}")
+                logger.warning("[red]Warning: Season pack appears incomplete!")
+                logger.info(f"[yellow]Missing episodes: {', '.join(missing_list)}")
             else:
-                console.print("[red]Warning: Season pack appears incomplete (missing episodes could not be determined).")
+                logger.warning("[red]Warning: Season pack appears incomplete (missing episodes could not be determined).")
 
             # In unattended mode with no confirmation prompts, ensure we always log that we're proceeding.
             if unattended and not unattended_confirm:
-                console.print("[yellow]Unattended mode: continuing despite incomplete season pack (no confirmation).")
+                logger.info("[yellow]Unattended mode: continuing despite incomplete season pack (no confirmation).")
 
             if "Unknown" not in missing_list:
                 # Show first 15 files from filelist
@@ -349,16 +349,16 @@ class SeasonEpisodeManager:
                 files_shown = 0
                 batch_size = 15
 
-                console.print(f"[cyan]Filelist ({len(filelist)} files):")
+                logger.info(f"[cyan]Filelist ({len(filelist)} files):")
                 for i, file in enumerate(filelist[:batch_size]):
-                    console.print(f"[cyan]  {i + 1:2d}. {os.path.basename(file)}")
+                    logger.info(f"[cyan]  {i + 1:2d}. {os.path.basename(file)}")
 
                 files_shown = min(batch_size, len(filelist))
 
                 # Loop to handle showing more files in batches
                 while files_shown < len(filelist) and (not unattended or unattended_confirm):
                     remaining_files = len(filelist) - files_shown
-                    console.print(f"[yellow]... and {remaining_files} more files")
+                    logger.info(f"[yellow]... and {remaining_files} more files")
 
                     if remaining_files > batch_size:
                         response = await asyncio.to_thread(
@@ -371,37 +371,37 @@ class SeasonEpisodeManager:
                         # Show next batch of files
                         next_batch = filelist[files_shown : files_shown + batch_size]
                         for i, file in enumerate(next_batch):
-                            console.print(f"[cyan]  {files_shown + i + 1:2d}. {os.path.basename(file)}")
+                            logger.info(f"[cyan]  {files_shown + i + 1:2d}. {os.path.basename(file)}")
                         files_shown += len(next_batch)
                     elif response.lower() == "a":
                         # Show all remaining files
                         remaining_batch = filelist[files_shown:]
                         for i, file in enumerate(remaining_batch):
-                            console.print(f"[cyan]  {files_shown + i + 1:2d}. {os.path.basename(file)}")
+                            logger.info(f"[cyan]  {files_shown + i + 1:2d}. {os.path.basename(file)}")
                         files_shown = len(filelist)
                     elif response.lower() == "c":
                         just_go = True
                         break  # Continue with incomplete pack
                     else:  # 'q' or any other input
-                        console.print("[red]Aborting torrent creation due to incomplete season pack")
+                        logger.info("[red]Aborting torrent creation due to incomplete season pack")
                         sys.exit(1)
 
                 # Final confirmation if not in unattended mode
                 if (not unattended or unattended_confirm) and not just_go:
                     response = await asyncio.to_thread(input, "Continue with incomplete season pack? (y/N): ")
                     if response.lower() != "y":
-                        console.print("[red]Aborting torrent creation due to incomplete season pack")
+                        logger.info("[red]Aborting torrent creation due to incomplete season pack")
                         sys.exit(1)
         else:
             if meta.debug:
-                console.print("[green]Season pack completeness verified")
+                logger.debug("[green]Season pack completeness verified")
 
         if not completeness["consistent_tags"]:
-            console.print("[yellow]Warning: Multiple group tags detected in season pack!")
+            logger.warning("[yellow]Warning: Multiple group tags detected in season pack!")
             for tag, files in completeness["tags_found"].items():
-                console.print(f"[cyan]Tag: {tag} found in files:")
+                logger.info(f"[cyan]Tag: {tag} found in files:")
                 for file in files:
-                    console.print(f"[cyan]  - {file}")
+                    logger.info(f"[cyan]  - {file}")
 
     async def check_season_pack_detail(self, meta: Meta) -> dict[str, Any]:
         if not meta.tv_pack:
@@ -481,7 +481,7 @@ class SeasonEpisodeManager:
                     season_numbers.add(season_num)
 
         if not found_episodes:
-            console.print("[red]No episodes found in the season pack files.")
+            logger.info("[red]No episodes found in the season pack files.")
             # return true to not annoy the user with bad regex
             return {"complete": True, "missing_episodes": [], "found_episodes": [], "consistent_tags": True, "tags_found": tags_found}
 
@@ -517,15 +517,15 @@ class SeasonEpisodeManager:
         }
 
         if meta.debug:
-            console.print("[cyan]Season pack completeness check:")
-            console.print(f"[cyan]Found episodes: {found_episodes}")
+            logger.debug("[cyan]Season pack completeness check:")
+            logger.debug(f"[cyan]Found episodes: {found_episodes}")
             if missing_episodes:
-                console.print(f"[red]Missing episodes: {missing_episodes}")
+                logger.debug(f"[red]Missing episodes: {missing_episodes}")
             else:
-                console.print("[green]Season pack episode list appears complete")
+                logger.debug("[green]Season pack episode list appears complete")
             if tags_found:
-                console.print(f"[cyan]Group tags found: {list(tags_found.keys())}")
+                logger.debug(f"[cyan]Group tags found: {list(tags_found.keys())}")
                 if not consistent_tags:
-                    console.print("[yellow]Warning: Multiple group tags detected in season pack")
+                    logger.debug("[yellow]Warning: Multiple group tags detected in season pack")
 
         return result

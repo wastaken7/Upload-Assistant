@@ -3,7 +3,7 @@ from typing import Any
 
 import cli_ui
 
-from src.console import console
+from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
@@ -58,12 +58,12 @@ class A4K(UNIT3D):
         should_continue = True
         if meta.resolution not in ["2160p", "4320p"]:
             if not meta.unattended:
-                console.print(f"[red]{self.tracker} only accepts 4K uploads.")
+                logger.info(f"[red]{self.tracker} only accepts 4K uploads.")
             return False
 
         if meta.type not in ["DISC", "REMUX", "WEBDL", "ENCODE"]:
             if not meta.unattended:
-                console.print(f"[red]{self.tracker} only accepts DISC, REMUX, WEBDL, and ENCODE uploads.")
+                logger.info(f"[red]{self.tracker} only accepts DISC, REMUX, WEBDL, and ENCODE uploads.")
             return False
 
         if meta.is_disc not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(
@@ -90,32 +90,32 @@ class A4K(UNIT3D):
                                 bit_rate_kbps = bit_rate_num / 1000
                                 if meta.category == "MOVIE" and bit_rate_kbps < 15000:
                                     if not meta.unattended:
-                                        console.print(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K movie uploads.")
+                                        logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K movie uploads.")
                                     return False
                                 elif meta.category == "TV" and bit_rate_kbps < 10000:
                                     if not meta.unattended:
-                                        console.print(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K TV uploads.")
+                                        logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K TV uploads.")
                                     return False
                             else:
                                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                                    console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                                    console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
+                                    logger.info(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
+                                    logger.info("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
                                     if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                                         pass
                                     else:
                                         return False
                         else:
                             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                                console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                                console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
+                                logger.info(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
+                                logger.info("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
                                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                                     pass
                                 else:
                                     return False
                     else:
                         if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                            console.print(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                            console.print("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
+                            logger.info(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
+                            logger.info("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
                             if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                                 pass
                             else:
@@ -158,5 +158,5 @@ class A4K(UNIT3D):
             foreign_lang = audio_languages[0].upper()
             if meta.is_disc != "BDMV":
                 a4k_name = a4k_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
-        console.print(f"[yellow]Generated name for {self.tracker}: [bold]{a4k_name}[/bold][/yellow]")
+        logger.info(f"[yellow]Generated name for {self.tracker}: [bold]{a4k_name}[/bold][/yellow]")
         return {'name': a4k_name}

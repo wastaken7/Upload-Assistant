@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 
-from src.console import console
+from src.console import logger
 
 openlibrary_color_str = "[#e1d8c1]OpenLibrary[/#e1d8c1]"
 
@@ -28,8 +28,7 @@ class OpenLibraryManager:
                     if cached_data and "name" in cached_data:
                         return cached_data["name"]
                 except Exception as ex:
-                    if debug:
-                        console.print(f"[yellow]Warning: Could not read author cache for '{author_id}': {ex}[/yellow]")
+                    logger.debug(f"[yellow]Warning: Could not read author cache for '{author_id}': {ex}[/yellow]")
 
         url = f"https://openlibrary.org/authors/{author_id}.json"
         try:
@@ -42,8 +41,7 @@ class OpenLibraryManager:
                         await asyncio.to_thread(Path(author_cache_file).write_text, json.dumps(data, indent=4), encoding="utf-8")
                 return name
         except Exception as e:
-            if debug:
-                console.print(f"[yellow]Warning: Error fetching author name for {author_id}: {e}[/yellow]")
+            logger.debug(f"[yellow]Warning: Error fetching author name for {author_id}: {e}[/yellow]")
         return ""
 
     async def search_by_work_id(self, work_id: str, base_dir: str = "", debug: bool = False) -> dict[str, Any] | None:
@@ -64,20 +62,17 @@ class OpenLibraryManager:
                         cached_data = json.loads(cache_content)
                         if cached_data:
                             if cached_data.get("not_found"):
-                                console.print(f"{openlibrary_color_str}: Work match not found (cached): {work_id}")
+                                logger.info(f"{openlibrary_color_str}: Work match not found (cached): {work_id}")
                                 return None
-                            console.print(f"{openlibrary_color_str}: Work match found (cached): {work_id}")
+                            logger.info(f"{openlibrary_color_str}: Work match found (cached): {work_id}")
                             return cached_data
                     except Exception as ex:
-                        if debug:
-                            console.print(f"[yellow]Warning: Could not read cache file for Work ID '{work_id}': {ex}[/yellow]")
+                        logger.debug(f"[yellow]Warning: Could not read cache file for Work ID '{work_id}': {ex}[/yellow]")
             except Exception as ex:
-                if debug:
-                    console.print(f"[yellow]Warning: Could not create cache directory: {ex}[/yellow]")
+                logger.debug(f"[yellow]Warning: Could not create cache directory: {ex}[/yellow]")
 
         url = f"https://openlibrary.org/works/{work_id}.json"
-        if debug:
-            console.print(f"[cyan]{openlibrary_color_str}: Searching API for Work ID: {work_id}[/cyan]")
+        logger.debug(f"[cyan]{openlibrary_color_str}: Searching API for Work ID: {work_id}[/cyan]")
 
         try:
             async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -125,22 +120,21 @@ class OpenLibraryManager:
                             try:
                                 await asyncio.to_thread(Path(cache_file).write_text, json.dumps(metadata, indent=4), encoding="utf-8")
                             except Exception as ex:
-                                if debug:
-                                    console.print(f"[yellow]Warning: Could not write cache for Work ID '{work_id}': {ex}[/yellow]")
+                                logger.debug(f"[yellow]Warning: Could not write cache for Work ID '{work_id}': {ex}[/yellow]")
 
                         return metadata
                     else:
-                        console.print(f"{openlibrary_color_str}: No metadata found for Work ID: {work_id}")
+                        logger.info(f"{openlibrary_color_str}: No metadata found for Work ID: {work_id}")
                         if cache_file:
                             with contextlib.suppress(Exception):
                                 await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
                 else:
-                    console.print(f"{openlibrary_color_str}: API returned error status code {resp.status_code} for Work ID: {work_id}")
+                    logger.info(f"{openlibrary_color_str}: API returned error status code {resp.status_code} for Work ID: {work_id}")
                     if resp.status_code == 404 and cache_file:
                         with contextlib.suppress(Exception):
                             await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
         except Exception as e:
-            console.print(f"{openlibrary_color_str}: Network or query error for Work ID {work_id}: {e}")
+            logger.info(f"{openlibrary_color_str}: Network or query error for Work ID {work_id}: {e}")
 
         return None
 
@@ -163,21 +157,18 @@ class OpenLibraryManager:
                         cached_data = json.loads(cache_content)
                         if cached_data:
                             if cached_data.get("not_found"):
-                                console.print(f"{openlibrary_color_str}: ISBN match not found (cached): {clean_isbn}")
+                                logger.info(f"{openlibrary_color_str}: ISBN match not found (cached): {clean_isbn}")
                                 return None
-                            console.print(f"{openlibrary_color_str}: ISBN match found (cached): {clean_isbn}")
+                            logger.info(f"{openlibrary_color_str}: ISBN match found (cached): {clean_isbn}")
                             return cached_data
                     except Exception as ex:
-                        if debug:
-                            console.print(f"[yellow]Warning: Could not read cache file for ISBN '{clean_isbn}': {ex}[/yellow]")
+                        logger.debug(f"[yellow]Warning: Could not read cache file for ISBN '{clean_isbn}': {ex}[/yellow]")
             except Exception as ex:
-                if debug:
-                    console.print(f"[yellow]Warning: Could not create cache directory: {ex}[/yellow]")
+                logger.debug(f"[yellow]Warning: Could not create cache directory: {ex}[/yellow]")
 
         bibkey = f"ISBN:{clean_isbn}"
         url = f"https://openlibrary.org/api/books?bibkeys={bibkey}&jscmd=details&format=json"
-        if debug:
-            console.print(f"[cyan]{openlibrary_color_str}: Searching API for ISBN: {clean_isbn}[/cyan]")
+        logger.debug(f"[cyan]{openlibrary_color_str}: Searching API for ISBN: {clean_isbn}[/cyan]")
 
         try:
             async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -265,17 +256,17 @@ class OpenLibraryManager:
                                         await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
                                 return None
                     else:
-                        console.print(f"{openlibrary_color_str}: No items found for ISBN: {clean_isbn}")
+                        logger.info(f"{openlibrary_color_str}: No items found for ISBN: {clean_isbn}")
                         if cache_file:
                             with contextlib.suppress(Exception):
                                 await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
                 else:
-                    console.print(f"{openlibrary_color_str}: API returned error status code {resp.status_code} for ISBN: {clean_isbn}")
+                    logger.info(f"{openlibrary_color_str}: API returned error status code {resp.status_code} for ISBN: {clean_isbn}")
                     if resp.status_code == 404 and cache_file:
                         with contextlib.suppress(Exception):
                             await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
         except Exception as e:
-            console.print(f"{openlibrary_color_str}: Network or query error for ISBN {clean_isbn}: {e}")
+            logger.info(f"{openlibrary_color_str}: Network or query error for ISBN {clean_isbn}: {e}")
 
         return None
 

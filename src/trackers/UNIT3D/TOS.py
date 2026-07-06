@@ -2,7 +2,7 @@
 import asyncio
 from typing import Any
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.torrentcreate import TorrentCreator
 from src.trackers.COMMON import COMMON
@@ -114,7 +114,7 @@ class TOS(UNIT3D):
             require_both=False,
             original_language=True,
         ):
-            console.print(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
+            logger.info(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
 
         # Check if it's a Scene release without NFO - TOS requires NFO for Scene releases
@@ -122,7 +122,7 @@ class TOS(UNIT3D):
         has_nfo = meta.nfo or meta.auto_nfo
 
         if is_scene and not has_nfo:
-            console.print(
+            logger.info(
                 f"[red]{self.tracker}: Scene release detected but no NFO file found. TOS requires NFO files for Scene releases.[/red]"
             )
             return False

@@ -12,7 +12,8 @@ import httpx
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 
-from src.console import console
+from cogs.redaction import Redaction
+from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
@@ -95,7 +96,7 @@ class FL:
         fl_name = fl_name.replace(meta.aka, "")
         imdb_info = meta.imdb_info
         if isinstance(imdb_info, dict):
-            imdb_info_dict = cast(dict[str, Any], imdb_info)
+            imdb_info_dict = imdb_info
             title = meta.title
             imdb_aka = str(imdb_info_dict.get('aka', ''))
             if imdb_aka:
@@ -134,7 +135,7 @@ class FL:
                 self.cookie_validator._save_cookies_secure(session_cookies, cookiefile_json)  # pyright: ignore[reportPrivateUsage]
                 return {cookie.name: cookie.value for cookie in session_cookies}
             except Exception as e:
-                console.print(f"[red]Failed to migrate legacy cookies: {e}[/red]")
+                logger.error(f"[red]Failed to migrate legacy cookies: {e}[/red]")
 
         return {}
 
@@ -153,8 +154,8 @@ class FL:
             if fl_confirm is not True:
                 fl_name_manually = cli_ui.ask_string("Please enter a proper name", default="")
                 if fl_name_manually == "":
-                    console.print('No proper name given')
-                    console.print("Aborting...")
+                    logger.info('No proper name given')
+                    logger.info("Aborting...")
                     return False
                 else:
                     fl_name = fl_name_manually
@@ -188,7 +189,7 @@ class FL:
         if imdb_id_value.isdigit() and int(imdb_id_value) != 0:
             data["imdbid"] = meta.imdb
             imdb_info = meta.imdb_info
-            imdb_info_dict = cast(dict[str, Any], imdb_info) if isinstance(imdb_info, dict) else {}
+            imdb_info_dict = imdb_info if isinstance(imdb_info, dict) else {}
             data['description'] = imdb_info_dict.get('genres', '')
         if self.uploader_name not in ("", None) and not self._is_true(self.config['TRACKERS'][self.tracker].get('anon', "False")):
             data['epenis'] = self.uploader_name
@@ -204,8 +205,8 @@ class FL:
         url = "https://filelist.io/takeupload.php"
         # Submit
         if meta.debug:
-            console.print(url)
-            console.print(data)
+            logger.debug(url)
+            logger.debug(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
@@ -224,9 +225,9 @@ class FL:
                 await self.download_new_torrent(cookies, torrent_id, torrent_path)
                 return True
             else:
-                console.print(data)
-                console.print("\n\n")
-                console.print(up.text)
+                logger.info(data)
+                logger.info("\n\n")
+                logger.info(up.text)
                 raise UploadException(f"Upload to FL Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa F405
 
     async def search_existing(self, meta: Meta) -> list[str]:
@@ -254,7 +255,7 @@ class FL:
                     if isinstance(href_attr, str) and href_attr.startswith("details.php?id=") and "&" not in href_attr and isinstance(title_attr, str):
                         dupes.append(title_attr)
             else:
-                console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+                logger.info(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
             await asyncio.sleep(0.5)
 
         return dupes
@@ -274,7 +275,7 @@ class FL:
             await self.login(cookiefile)
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
-            console.print('[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.')
+            logger.error('[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.')
             recreate = cli_ui.ask_yes_no("Log in again and create new session?")
             if recreate is True:
                 if os.path.exists(cookiefile):
@@ -295,7 +296,7 @@ class FL:
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0) as client:
                 resp = await client.get(url=url)
             if meta.debug:
-                console.print(resp.url)
+                logger.debug(resp.url)
             return resp.text.find("Logout") != -1
         return False
 
@@ -321,11 +322,11 @@ class FL:
             index = 'https://filelist.io/index.php'
             response = await client.get(index)
             if response.text.find("Logout") != -1:
-                console.print('[green]Successfully logged into FL')
+                logger.info('[green]Successfully logged into FL')
                 self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # pyright: ignore[reportPrivateUsage]
             else:
-                console.print("[bold red]Something went wrong while trying to log into FL")
-                console.print(response.url)
+                logger.info("[bold red]Something went wrong while trying to log into FL")
+                logger.info(response.url)
         return
 
     async def download_new_torrent(self, cookies: dict[str, str], id: str, torrent_path: str) -> None:
@@ -336,8 +337,8 @@ class FL:
             async with aiofiles.open(torrent_path, "wb") as tor:
                 await tor.write(r.content)
         else:
-            console.print("[red]There was an issue downloading the new .torrent from FL")
-            console.print(r.text)
+            logger.info("[red]There was an issue downloading the new .torrent from FL")
+            logger.info(r.text)
         return
 
     async def edit_desc(self, meta: Meta) -> None:

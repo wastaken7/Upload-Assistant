@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import cli_ui
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
@@ -48,7 +48,7 @@ class OTW(UNIT3D):
 
         if not any(genre in combined_genres for genre in ['Animation', 'Family']):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print('[bold red]Genre does not match Animation or Family for OTW.')
+                logger.info('[bold red]Genre does not match Animation or Family for OTW.')
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -62,7 +62,7 @@ class OTW(UNIT3D):
         adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy', 'hentai', 'adult animation', 'softcore']
         if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print('[bold red]Adult animation not allowed at OTW.')
+                logger.info('[bold red]Adult animation not allowed at OTW.')
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -73,7 +73,7 @@ class OTW(UNIT3D):
         game_show_keywords = ['reality', 'game show', 'game-show', 'reality tv', 'reality television']
         if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in game_show_keywords):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print('[bold red]Reality / Game Show content not allowed at OTW.')
+                logger.info('[bold red]Reality / Game Show content not allowed at OTW.')
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -83,7 +83,7 @@ class OTW(UNIT3D):
 
         if meta.type not in ["WEBDL"] and not meta.is_disc and meta.tag in ["CMRG", "EVO", "TERMiNAL", "ViSION"]:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print(f"[bold red]Group {meta.tag} is only allowed for raw type content at OTW[/bold red]")
+                logger.info(f"[bold red]Group {meta.tag} is only allowed for raw type content at OTW[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:

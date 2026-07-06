@@ -15,8 +15,9 @@ from bs4 import BeautifulSoup
 from bs4.element import AttributeValueList
 from unidecode import unidecode
 
+from cogs.redaction import Redaction
 from src.bbcode import BBCODE
-from src.console import console
+from src.console import console, logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
@@ -49,8 +50,8 @@ class THR:
             if thr_confirm is not True:
                 thr_name_manually = cli_ui.ask_string("Please enter a proper name", default="") or ""
                 if thr_name_manually == "":
-                    console.print('No proper name given')
-                    console.print("Aborting...")
+                    logger.info('No proper name given')
+                    logger.info("Aborting...")
                     return
                 else:
                     thr_name = thr_name_manually
@@ -58,7 +59,7 @@ class THR:
 
         mi_file: bytes = b""
 
-        if str(meta.is_disc) == "BDMV":
+        if (meta.is_disc) == "BDMV":
             mi_file = b""
             # bd_file = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", 'r', encoding='utf-8'
         else:
@@ -82,7 +83,7 @@ class THR:
         files: dict[str, tuple[str, Any]] = {
             'tfile': (f'{torrent_name}.torrent', tfile)
         }
-        imdb_info = cast(dict[str, Any], meta.imdb_info)
+        imdb_info = meta.imdb_info
         payload: dict[str, Any] = {
             "name": thr_name,
             "descr": desc,
@@ -94,7 +95,7 @@ class THR:
             "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})"
         }
         # If pronfo fails, put mediainfo into THR parser
-        if str(meta.is_disc) != "BDMV":
+        if (meta.is_disc) != "BDMV":
             files['nfo'] = ("MEDIAINFO.txt", mi_file)
         if subs:
             payload['subs[]'] = tuple(subs)
@@ -108,15 +109,15 @@ class THR:
                 cookies = await self.login(meta)
 
                 if cookies:
-                    console.print("[green]Using authenticated session for upload")
+                    logger.info("[green]Using authenticated session for upload")
 
                     async with httpx.AsyncClient(cookies=cookies, follow_redirects=True) as session:
                         response = await session.post(url=url, files=files, data=payload, headers=headers)
 
                         if meta.debug:
-                            console.print(f"[dim]Response status: {response.status_code}")
-                            console.print(f"[dim]Response URL: {response.url}")
-                            console.print(response.text[:500] + "...")
+                            logger.debug(f"[dim]Response status: {response.status_code}")
+                            logger.debug(f"[dim]Response URL: {response.url}")
+                            logger.debug(response.text[:500] + "...")
 
                         if "uploaded=1" in str(response.url):
                             tracker_status = meta.tracker_status
@@ -124,33 +125,33 @@ class THR:
                             tracker_status[self.tracker]['status_message'] = response.url
                             return True
                         else:
-                            console.print(f"[yellow]Upload response didn't contain 'uploaded=1'. URL: {response.url}")
+                            logger.info(f"[yellow]Upload response didn't contain 'uploaded=1'. URL: {response.url}")
                             soup = BeautifulSoup(response.text, 'html.parser')
                             error_text = soup.find('h2', string=re.compile(r'Error'))  # type: ignore
 
                             if error_text:
                                 error_message = cast(Any, error_text).find_next('p')
                                 if error_message:
-                                    console.print(
+                                    logger.info(
                                         f"[red]Upload error: {error_message.text}"
                                     )
 
                             return False
                 else:
-                    console.print("[red]Failed to log in to THR for upload")
+                    logger.error("[red]Failed to log in to THR for upload")
                     return False
 
             except Exception as e:
-                console.print(f"[red]Error during upload: {str(e)}")
+                logger.error(f"[red]Error during upload: {str(e)}")
                 console.print_exception()
                 if meta.debug and response is not None:
                     with contextlib.suppress(Exception):
-                        console.print(f"[red]Response: {response.text[:500]}...")
-                console.print("[yellow]It may have uploaded, please check THR manually")
+                        logger.info(f"[red]Response: {response.text[:500]}...")
+                logger.info("[yellow]It may have uploaded, please check THR manually")
                 return False
         else:
-            console.print("[cyan]THR Request Data:")
-            console.print(payload)
+            logger.info("[cyan]THR Request Data:")
+            logger.info(Redaction.redact_private_info(payload))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
@@ -160,8 +161,8 @@ class THR:
     async def get_cat_id(self, meta: Meta) -> str:
         genres = str(meta.genres).lower()
         keywords = str(meta.keywords).lower()
-        category = str(meta.category)
-        is_disc = str(meta.is_disc)
+        category = meta.category
+        is_disc = meta.is_disc
         sd = int(meta.sd or 0)
         cat = '17'
 
@@ -183,7 +184,7 @@ class THR:
     def get_subtitles(self, meta: Meta) -> list[int]:
         subs: list[int] = []
         sub_langs: list[str] = []
-        if str(meta.is_disc) != "BDMV":
+        if (meta.is_disc) != "BDMV":
             with open(f"{meta.base_dir}/tmp/{meta.uuid}/MediaInfo.json", encoding="utf-8") as f:
                 mi = cast(dict[str, Any], json.load(f))
             tracks = cast(list[dict[str, Any]], cast(dict[str, Any], mi.get('media', {})).get('track', []))
@@ -222,7 +223,7 @@ class THR:
         desc_parts: list[str] = []
         tag_value = meta.tag
         tag = "" if not tag_value else f" / {tag_value[1:]}"
-        res = str(meta.source) if str(meta.is_disc) == "DVD" else meta.resolution
+        res = str(meta.source) if (meta.is_disc) == "DVD" else meta.resolution
         desc_parts.append("[quote=Info]")
         year_str = str(meta.year) if meta.year is not None else ""
         name_aka = f"{meta.title} {meta.aka} {year_str}"
@@ -231,12 +232,12 @@ class THR:
         desc_parts.append(f"Name: {' '.join(name_aka.split())}\n\n")
         desc_parts.append(f"Overview: {meta.overview}\n\n")
         desc_parts.append(f"{res} / {meta.type}{tag}\n\n")
-        category = str(meta.category)
+        category = meta.category
         desc_parts.append(f"Category: {category}\n")
         if meta.tmdb:
             desc_parts.append(f"TMDB: https://www.themoviedb.org/{category.lower()}/{meta.tmdb}\n")
         if meta.imdb_id or 0 != 0:
-            imdb_info = cast(dict[str, Any], meta.imdb_info)
+            imdb_info = meta.imdb_info
             desc_parts.append(f"IMDb: {str(imdb_info.get('imdb_url', ''))}\n")
         if meta.tvdb_id or 0 != 0:
             desc_parts.append(f"TVDB: https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series\n")
@@ -284,7 +285,7 @@ class THR:
         image_list: list[str] = []
         image_api_key = str(self.config['TRACKERS']['THR'].get('img_api', '')).strip()
         if ordered_images and not image_api_key:
-            console.print("[yellow]THR image API key is not configured, skipping screenshot rehost")
+            logger.info("[yellow]THR image API key is not configured, skipping screenshot rehost")
 
         for image in ordered_images:
             if not image_api_key:
@@ -313,23 +314,23 @@ class THR:
                         raise KeyError('image.url')
                     image_list.append(img_url)
             except httpx.RequestError as exc:
-                console.print(f"[yellow]Failed to upload image {os.path.basename(image)}: {exc}")
+                logger.info(f"[yellow]Failed to upload image {os.path.basename(image)}: {exc}")
             except httpx.HTTPStatusError:
-                console.print(f"[yellow]Failed to upload image {os.path.basename(image)}")
+                logger.info(f"[yellow]Failed to upload image {os.path.basename(image)}")
                 if response is not None:
-                    console.print(f"[yellow]THR image host returned HTTP {response.status_code}")
-                    console.print(response.text)
+                    logger.info(f"[yellow]THR image host returned HTTP {response.status_code}")
+                    logger.info(response.text)
             except json.decoder.JSONDecodeError:
-                console.print(f"[yellow]Failed to parse THR image host response for {os.path.basename(image)}")
+                logger.info(f"[yellow]Failed to parse THR image host response for {os.path.basename(image)}")
                 if response is not None:
-                    console.print(response.text)
+                    logger.info(response.text)
             except KeyError:
-                console.print(f"[yellow]THR image host response was missing an image URL for {os.path.basename(image)}")
-                console.print(response_data)
+                logger.info(f"[yellow]THR image host response was missing an image URL for {os.path.basename(image)}")
+                logger.info(response_data)
             await asyncio.sleep(1)
 
         desc_parts.append("[align=center]")
-        if str(meta.is_disc) == "BDMV":
+        if (meta.is_disc) == "BDMV":
             async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt") as bd_file:
                 desc_parts.append(f"[nfo]{await bd_file.read()}[/nfo]")
         elif self.config['TRACKERS']['THR'].get('pronfo_api_key'):
@@ -350,10 +351,10 @@ class THR:
                     desc_parts.append(f"\n[img]{mi_img}[/img]\n")
                     pronfo = True
             except Exception:
-                console.print('[bold red]Error parsing pronfo response, using THR parser instead')
+                logger.info('[bold red]Error parsing pronfo response, using THR parser instead')
                 if meta.debug:
-                    console.print(f"[red]{response}")
-                    console.print(response.text)
+                    logger.debug(f"[red]{response}")
+                    logger.debug(response.text)
 
         screens = meta.screens or 0
         desc_parts.extend([f"\n[img]{each}[/img]\n" for each in image_list[:screens]])
@@ -377,7 +378,7 @@ class THR:
         dupes: list[str] = []
 
         if not imdb_id:
-            console.print("[red]No IMDb ID available for search", style="bold red")
+            logger.info("[red]No IMDb ID available for search")
             return dupes
 
         cookies = await self.login(meta)
@@ -386,7 +387,7 @@ class THR:
         if cookies:
             client_args['cookies'] = cookies
         else:
-            console.print("[red]Failed to log in to THR for search")
+            logger.error("[red]Failed to log in to THR for search")
             return dupes
 
         async with httpx.AsyncClient(**client_args) as client:
@@ -403,7 +404,7 @@ class THR:
 
                 page_count += 1
                 if meta.debug:
-                    console.print(f"[dim]Searching page {page_count}...")
+                    logger.debug(f"[dim]Searching page {page_count}...")
                 response = await client.get(page_url)
 
                 page_dupes, has_next_page, next_page_number = await self._process_search_response(
@@ -415,7 +416,7 @@ class THR:
                         all_titles_seen.add(dupe)
 
                 if meta.debug and has_next_page:
-                    console.print(f"[dim]Next page available: page {next_page_number}")
+                    logger.info(f"[dim]Next page available: page {next_page_number}")
 
                 if has_next_page:
                     current_page = next_page_number
@@ -440,19 +441,19 @@ class THR:
         if response.status_code == 200 or response.status_code == 302:
             html_length = len(response.text)
             if meta.debug:
-                console.print(f"[dim]Response HTML length: {html_length} bytes")
+                logger.debug(f"[dim]Response HTML length: {html_length} bytes")
 
             if html_length < 1000:
-                console.print(f"[yellow]Response seems too small ({html_length} bytes), might be an error page")
+                logger.info(f"[yellow]Response seems too small ({html_length} bytes), might be an error page")
                 if meta.debug:
-                    console.print(f"[yellow]Response content: {response.text[:500]}")
+                    logger.debug(f"[yellow]Response content: {response.text[:500]}")
                 return page_dupes, False, current_page
 
             soup = BeautifulSoup(response.text, 'html.parser')
 
             result_table = soup.find('table', {'class': 'torrentlist'}) or soup.find('table', {'align': 'center'})
             if not result_table:
-                console.print("[yellow]No results table found in HTML - either no results or page structure changed")
+                logger.info("[yellow]No results table found in HTML - either no results or page structure changed")
 
             link_count = 0
             onmousemove_count = 0
@@ -475,18 +476,18 @@ class THR:
                             page_dupes.append(dupe)
                         except Exception as parsing_error:
                             if meta.debug:
-                                console.print(f"[yellow]Error parsing link: {parsing_error}")
+                                logger.debug(f"[yellow]Error parsing link: {parsing_error}")
 
             page_number_display = current_page + 1
             if meta.debug:
-                console.print(f"[dim]Page {page_number_display}: Found {link_count} detail links, {onmousemove_count} parsed successfully")
+                logger.debug(f"[dim]Page {page_number_display}: Found {link_count} detail links, {onmousemove_count} parsed successfully")
 
             pagination_text = None
             for p_tag in soup.find_all('p', align="center"):
                 if p_tag.text and ('Prev' in p_tag.text or 'Next' in p_tag.text):
                     pagination_text = p_tag
                     if meta.debug:
-                        console.print(f"[dim]Found pagination: {pagination_text.text.strip()}")
+                        logger.debug(f"[dim]Found pagination: {pagination_text.text.strip()}")
                     break
 
             if pagination_text:
@@ -500,27 +501,27 @@ class THR:
                             href = ' '.join(href_raw) if isinstance(href_raw, AttributeValueList) else href_raw
 
                         if meta.debug:
-                            console.print(f"[dim]Next page URL: {href}")
+                            logger.debug(f"[dim]Next page URL: {href}")
 
                         page_match = re.search(r'page=(\d+)', href)
                         if page_match:
                             next_page_number = int(page_match.group(1))
                             if meta.debug:
-                                console.print(f"[dim]Found next page link: page={next_page_number} (will be displayed as page {next_page_number + 1})")
+                                logger.debug(f"[dim]Found next page link: page={next_page_number} (will be displayed as page {next_page_number + 1})")
                             break
         else:
-            console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+            logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
             if meta.debug:
-                console.print(f"[red]Response: {response.text[:500]}...")
+                logger.debug(f"[red]Response: {response.text[:500]}...")
 
         return page_dupes, has_next_page, next_page_number
 
     async def login(self, meta) -> dict[str, Any] | None:
-        console.print("[yellow]Logging in to THR...")
+        logger.info("[yellow]Logging in to THR...")
         url = 'https://www.torrenthr.org/takelogin.php'
 
         if not self.username or not self.password:
-            console.print('[red]Missing THR credentials in config.py')
+            logger.info('[red]Missing THR credentials in config.py')
             return None
 
         payload: dict[str, Any] = {
@@ -549,15 +550,15 @@ class THR:
                 resp = await session.post(url, headers=headers, data=payload)
 
                 if "index.php" in str(resp.url) or "logout.php" in resp.text:
-                    console.print('[green]Successfully logged in to THR')
+                    logger.info('[green]Successfully logged in to THR')
                     return dict(session.cookies)
                 else:
-                    console.print('[red]Failed to log in to THR')
-                    console.print(f'[red]Login response URL: {resp.url}')
-                    console.print(f'[red]Login status code: {resp.status_code}')
+                    logger.error('[red]Failed to log in to THR')
+                    logger.info(f'[red]Login response URL: {resp.url}')
+                    logger.info(f'[red]Login status code: {resp.status_code}')
                     return None
 
             except Exception as e:
-                console.print(f"[red]Error during THR login: {str(e)}")
+                logger.error(f"[red]Error during THR login: {str(e)}")
                 console.print_exception()
                 return None

@@ -12,7 +12,7 @@ from pathlib import Path
 import requests
 
 try:
-    from src.console import console
+    from src.console import console, logger
 except ImportError:
     class SimpleConsole:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
@@ -26,13 +26,13 @@ BASE_RELEASE_URL = "https://github.com/Audionut/BDInfoCLI-ng/releases/download"
 
 
 def download_file(url: str, output_path: Path) -> None:
-    console.print(f"Downloading: {url}", markup=False)
+    logger.info(f"Downloading: {url}", extra={"markup": False})
     resp = requests.get(url, stream=True, timeout=60)
     resp.raise_for_status()
     with open(output_path, "wb") as f:
         for chunk in resp.iter_content(chunk_size=8192):
             f.write(chunk)
-    console.print(f"Downloaded: {output_path.name}", markup=False)
+    logger.info(f"Downloaded: {output_path.name}", extra={"markup": False})
 
 
 def secure_extract_tar(tar_path: Path, extract_to: Path) -> None:
@@ -40,31 +40,31 @@ def secure_extract_tar(tar_path: Path, extract_to: Path) -> None:
         base_path = extract_to.resolve()
         for member in tar_ref.getmembers():
             if member.issym() or member.islnk():
-                console.print(f"Warning: Skipping link: {member.name}", markup=False)
+                logger.warning(f"Warning: Skipping link: {member.name}", extra={"markup": False})
                 continue
             if os.path.isabs(member.name) or ".." in member.name.split(os.sep):
-                console.print(f"Warning: Skipping dangerous path: {member.name}", markup=False)
+                logger.warning(f"Warning: Skipping dangerous path: {member.name}", extra={"markup": False})
                 continue
             try:
                 final_path = (base_path / member.name).resolve()
                 try:
                     os.path.commonpath([str(base_path), str(final_path)])
                     if not str(final_path).startswith(str(base_path) + os.sep) and final_path != base_path:
-                        console.print(f"Warning: Path outside base directory: {member.name}", markup=False)
+                        logger.warning(f"Warning: Path outside base directory: {member.name}", extra={"markup": False})
                         continue
                 except ValueError:
-                    console.print(f"Warning: Invalid path resolution: {member.name}", markup=False)
+                    logger.warning(f"Warning: Invalid path resolution: {member.name}", extra={"markup": False})
                     continue
             except (OSError, ValueError) as e:
-                console.print(f"Warning: Path resolution failed for {member.name}: {e}", markup=False)
+                logger.warning(f"Warning: Path resolution failed for {member.name}: {e}", extra={"markup": False})
                 continue
 
             if not (member.isfile() or member.isdir()):
-                console.print(f"Warning: Skipping non-regular file: {member.name}", markup=False)
+                logger.warning(f"Warning: Skipping non-regular file: {member.name}", extra={"markup": False})
                 continue
 
             if member.isfile() and member.size > 100 * 1024 * 1024:
-                console.print(f"Warning: Skipping oversized file: {member.name} ({member.size} bytes)", markup=False)
+                logger.warning(f"Warning: Skipping oversized file: {member.name} ({member.size} bytes)", extra={"markup": False})
                 continue
 
             if member.isdir():
@@ -84,7 +84,7 @@ def secure_extract_tar(tar_path: Path, extract_to: Path) -> None:
 def download_bdinfo_for_docker(base_dir: Path = Path("/Upload-Assistant"), version: str = BDINFO_VERSION) -> str:
     system = platform.system().lower()
     machine = platform.machine().lower()
-    console.print(f"System: {system}, Architecture: {machine}", markup=False)
+    logger.info(f"System: {system}, Architecture: {machine}", extra={"markup": False})
 
     if system != "linux":
         raise Exception(f"This script is only for Linux containers, got: {system}")
@@ -107,16 +107,16 @@ def download_bdinfo_for_docker(base_dir: Path = Path("/Upload-Assistant"), versi
     version_path = bin_dir / version
 
     if version_path.exists() and binary_path.exists() and os.access(binary_path, os.X_OK):
-        console.print(f"bdinfo {version} already installed", markup=False)
+        logger.info(f"bdinfo {version} already installed", extra={"markup": False})
         return str(binary_path)
 
     download_url = f"{BASE_RELEASE_URL}/{version}/{file_pattern}"
-    console.print(f"Downloading bdinfo from: {download_url}", markup=False)
+    logger.info(f"Downloading bdinfo from: {download_url}", extra={"markup": False})
 
     temp_archive = bin_dir / f"temp_{file_pattern}"
     download_file(download_url, temp_archive)
 
-    console.print(f"Extracting {temp_archive} to {bin_dir}", markup=False)
+    logger.info(f"Extracting {temp_archive} to {bin_dir}", extra={"markup": False})
     secure_extract_tar(temp_archive, bin_dir)
     temp_archive.unlink()
 
@@ -138,14 +138,14 @@ def download_bdinfo_for_docker(base_dir: Path = Path("/Upload-Assistant"), versi
     with open(version_path, "w", encoding="utf-8") as vf:
         vf.write(f"BDInfoCLI-ng version {version} installed successfully.")
 
-    console.print(f"Installed bdinfo: {binary_path}", markup=False)
+    logger.info(f"Installed bdinfo: {binary_path}", extra={"markup": False})
     return str(binary_path)
 
 
 if __name__ == "__main__":
     try:
         download_bdinfo_for_docker()
-        console.print("bdinfo installation completed successfully!", markup=False)
+        logger.info("bdinfo installation completed successfully!", extra={"markup": False})
     except Exception as exc:
-        console.print(f"ERROR: Failed to install bdinfo: {exc}", markup=False)
+        logger.info(f"ERROR: Failed to install bdinfo: {exc}", extra={"markup": False})
         raise SystemExit(1) from exc

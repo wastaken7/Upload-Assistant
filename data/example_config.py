@@ -37,6 +37,33 @@ config = {
         # Play the bell sound effect when asking for confirmation
         "sfx_on_prompt": True,
 
+        # Console logging configuration
+        # Show time in console logs
+        "console_show_time": False,
+        # Show log level in console logs
+        "console_show_level": False,
+        # Show file path of log source in console logs
+        "console_show_path": False,
+        # Enable rich markup parsing in console logs
+        "console_markup": True,
+
+        # File logging configuration
+        # Set true to save a plain text log file of the upload flow in each release's tmp folder
+        "write_log": False,
+
+        # Debug configuration
+        # Set true to enable debug mode globally (same as running with --debug)
+        "debug": False,
+        # Console logging configuration when running in debug mode
+        # Show time in console logs under debug mode
+        "console_debug_show_time": True,
+        # Show log level in console logs under debug mode
+        "console_debug_show_level": True,
+        # Show file path of log source in console logs under debug mode
+        "console_debug_show_path": True,
+        # Enable rich markup parsing in console logs under debug mode
+        "console_debug_markup": True,
+
         # How many trackers need to pass successful checking to continue with the upload process
         # Default = 1. If 1 (or more) tracker/s pass banned_group, content and dupe checking, uploading will continue
         # If less than the number of trackers pass the checking, exit immediately.

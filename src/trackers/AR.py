@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from pymediainfo import MediaInfo
 from rich.prompt import Prompt
 
-from src.console import console
+from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
@@ -180,8 +180,8 @@ class AR:
                     full_mediainfo = await mi_file.read()
                 description += f"[hide=FULL MEDIAINFO][code]{full_mediainfo}[/code][/hide]\n"
             else:
-                console.print("[bold red]Couldn't find the MediaInfo template")
-                console.print("[green]Using normal MediaInfo for the description.")
+                logger.info("[bold red]Couldn't find the MediaInfo template")
+                logger.info("[green]Using normal MediaInfo for the description.")
 
                 async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as mi_file:
                     cleaned_mediainfo = await mi_file.read()
@@ -226,7 +226,7 @@ class AR:
                         if not has_eng_audio:
                             audio_lang = mi['media']['track'][2].get('Language_String', "").upper()
             except Exception as e:
-                console.print(f"[red]Error: {e}")
+                logger.error(f"[red]Error: {e}")
         else:
             for audio in meta.bdinfo["audio"]:
                 if audio['language'] == 'English':
@@ -246,14 +246,14 @@ class AR:
         dupes: list[dict[str, str]] = []
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if not cookie_jar:
-            console.print(f"{self.tracker}: Cannot search without valid cookies.")
+            logger.info(f"{self.tracker}: Cannot search without valid cookies.")
             return dupes
 
         # Combine title and year
         title = meta.title.strip()
         year = str(meta.year).strip() if meta.year is not None else ""
         if not title:
-            console.print("[red]Title is missing.")
+            logger.info("[red]Title is missing.")
             return dupes
 
         search_query = f"{title} {year}".strip()
@@ -261,7 +261,7 @@ class AR:
         search_url = f'{self.base_url}/ajax.php?action=browse&searchstr={search_query_encoded}'
 
         if meta.debug:
-            console.print(f"[blue]{search_url}")
+            logger.debug(f"[blue]{search_url}")
 
         headers = {"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"}
 
@@ -275,7 +275,7 @@ class AR:
 
             json_response = response.json()
             if json_response.get('status') != 'success':
-                console.print("[red]Invalid response status.")
+                logger.info("[red]Invalid response status.")
                 return dupes
 
             results = json_response.get('response', {}).get('results', [])
@@ -303,8 +303,8 @@ class AR:
         if auth_key:
             return auth_key
 
-        console.print(f"{self.tracker}: [yellow]Auth key not found. This may happen if you're using manually exported cookies.[/yellow]")
-        console.print(f"{self.tracker}: [yellow]Attempting to extract auth key from torrents page...[/yellow]")
+        logger.info(f"{self.tracker}: [yellow]Auth key not found. This may happen if you're using manually exported cookies.[/yellow]")
+        logger.info(f"{self.tracker}: [yellow]Attempting to extract auth key from torrents page...[/yellow]")
 
         # Fallback: extract from torrents page if not saved
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -330,12 +330,12 @@ class AR:
                         try:
                             async with aiofiles.open(auth_file, 'w', encoding='utf-8') as f:
                                 await f.write(auth_key)
-                            console.print(f"{self.tracker}: [green]Auth key saved for future use[/green]")
+                            logger.info(f"{self.tracker}: [green]Auth key saved for future use[/green]")
                         except Exception:
                             pass
                         return auth_key
         except Exception as e:
-            console.print(f"[red]Error extracting auth key: {e}")
+            logger.error(f"[red]Error extracting auth key: {e}")
 
         return None
 
@@ -362,7 +362,7 @@ class AR:
         while cover is None and not meta.unattended:
             cover = Prompt.ask("No Cover was found. Please input a link to a cover:", default="")
             if not re.match(r'https?://.*\.(jpg|png|gif)$', cover):
-                console.print("[red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
+                logger.info("[red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
                 cover = None
 
         # Tag Compilation

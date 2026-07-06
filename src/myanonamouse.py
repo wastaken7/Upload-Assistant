@@ -10,14 +10,13 @@ from typing import Any
 import httpx
 
 from src.book_prep import _resolve_book_language, is_valid_book_language
-from src.console import console
+from src.console import logger
 
 mam_color = "[#eac117]MyAnonamouse[/#eac117]"
 
 class MyAnonamouseManager:
     def _parse_torrent_info(self, item: dict[str, Any], debug: bool = False) -> dict[str, Any]:
-        if debug:
-            console.print(f"{mam_color} raw item: {item}")
+        logger.debug(f"{mam_color} raw item: {item}")
 
         metadata: dict[str, Any] = {}
 
@@ -40,8 +39,7 @@ class MyAnonamouseManager:
                 if authors:
                     metadata["author"] = ", ".join(authors)
             except Exception as e:
-                if debug:
-                    console.print(f"{mam_color}: [yellow]Warning: Could not parse MAM authors: {e}[/yellow]")
+                logger.debug(f"{mam_color}: [yellow]Warning: Could not parse MAM authors: {e}[/yellow]")
 
         # Narrator
         narrator_info = item.get("narrator_info")
@@ -57,8 +55,7 @@ class MyAnonamouseManager:
                 if narrators:
                     metadata["narrator"] = ", ".join(narrators)
             except Exception as e:
-                if debug:
-                    console.print(f"[yellow]Warning: Could not parse MAM narrators: {e}[/yellow]")
+                logger.debug(f"[yellow]Warning: Could not parse MAM narrators: {e}[/yellow]")
 
         # Description -> overview
         description = item.get("description")
@@ -91,8 +88,7 @@ class MyAnonamouseManager:
                     if iso3:
                         metadata["book_language_iso"] = iso3
             except Exception as ex:
-                if debug:
-                    console.print(f"[yellow]Warning: Could not resolve language '{lang}': {ex}[/yellow]")
+                logger.debug(f"[yellow]Warning: Could not resolve language '{lang}': {ex}[/yellow]")
 
         """ Not useful for now, too polluted
         # Tags -> keywords
@@ -152,20 +148,17 @@ class MyAnonamouseManager:
                         cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
                         cached_data = json.loads(cache_content)
                         if cached_data:
-                            console.print(f"{mam_color}: ID match found (cached): {clean_id}")
+                            logger.info(f"{mam_color}: ID match found (cached): {clean_id}")
 
                             if "data" in cached_data and cached_data["data"]:
                                 return self._parse_torrent_info(cached_data["data"][0], debug)
                     except Exception as ex:
-                        if debug:
-                            console.print(f"{mam_color}: [yellow]Warning: Could not read cache file for ID '{clean_id}': {ex}[/yellow]")
+                        logger.debug(f"{mam_color}: [yellow]Warning: Could not read cache file for ID '{clean_id}': {ex}[/yellow]")
             except Exception as ex:
-                if debug:
-                    console.print(f"{mam_color}: [yellow]Warning: Could not create cache directory: {ex}[/yellow]")
+                logger.debug(f"{mam_color}: [yellow]Warning: Could not create cache directory: {ex}[/yellow]")
 
         if not api_key:
-            if debug:
-                console.print(f"{mam_color}: [yellow]API key/session cookie not configured, skipping search[/yellow]")
+            logger.debug(f"{mam_color}: [yellow]API key/session cookie not configured, skipping search[/yellow]")
             return None
 
         url = "https://www.myanonamouse.net/tor/js/loadSearchJSONbasic.php"
@@ -184,8 +177,7 @@ class MyAnonamouseManager:
             "mam_id": api_key
         }
 
-        if debug:
-            console.print(f"{mam_color}: Searching API for ID: {clean_id}")
+        logger.debug(f"{mam_color}: Searching API for ID: {clean_id}")
 
         try:
             async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -195,30 +187,28 @@ class MyAnonamouseManager:
                     if "data" in data and isinstance(data["data"], list) and data["data"]:
                         metadata = self._parse_torrent_info(data["data"][0], debug)
                         if metadata:
-                            console.print(f"{mam_color}: match found: {metadata.get('title')}")
+                            logger.info(f"{mam_color}: match found: {metadata.get('title')}")
 
                             # Save raw response to cache
                             if cache_file:
                                 try:
                                     cache_content = json.dumps(data, indent=4)
                                     await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
-                                    if debug:
-                                        console.print(f"{mam_color}: Saved cache for ID: {clean_id}")
+                                    logger.debug(f"{mam_color}: Saved cache for ID: {clean_id}")
                                 except Exception as ex:
-                                        if debug:
-                                            console.print(f"{mam_color}: [yellow]Warning: Could not write cache for ID '{clean_id}': {ex}[/yellow]")
+                                        logger.debug(f"{mam_color}: [yellow]Warning: Could not write cache for ID '{clean_id}': {ex}[/yellow]")
 
                             return metadata
                     else:
-                        console.print(f"{mam_color}: [yellow]No items found for ID: {clean_id}[/yellow]")
+                        logger.info(f"{mam_color}: [yellow]No items found for ID: {clean_id}[/yellow]")
                 elif resp.status_code in (401, 403):
-                    console.print(
+                    logger.info(
                         f"{mam_color}: [bold red]API: Unauthorized/Forbidden (Status {resp.status_code}). Check your mam_api_key/mam_id and IP locked session cookie setting on the website.[/bold red]"
                     )
                 else:
-                    console.print(f"{mam_color}: [red]API returned error status code {resp.status_code} for ID: {clean_id}[/red]")
+                    logger.info(f"{mam_color}: [red]API returned error status code {resp.status_code} for ID: {clean_id}[/red]")
         except Exception as e:
-            console.print(f"{mam_color}: [red]API: Network or query error for ID {clean_id}: {e}[/red]")
+            logger.info(f"{mam_color}: [red]API: Network or query error for ID {clean_id}: {e}[/red]")
 
         return None
 

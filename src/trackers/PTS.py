@@ -5,7 +5,7 @@ from typing import Any, cast
 import httpx
 from bs4 import BeautifulSoup
 
-from src.console import console
+from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -81,7 +81,7 @@ class PTS:
         if not mandarin:
             user_input = input("Warning: Mandarin subtitle or audio not found. Do you want to continue with the upload anyway? (y/n): ")
             if user_input.lower() not in ['y', 'yes']:
-                console.print("Upload cancelled by user.", markup=False)
+                logger.info("Upload cancelled by user.", extra={"markup": False})
                 return False
         return True
 

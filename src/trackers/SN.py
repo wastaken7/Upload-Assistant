@@ -5,7 +5,7 @@ import aiofiles
 import httpx
 
 from cogs.redaction import Redaction
-from src.console import console
+from src.console import console, logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
@@ -51,7 +51,7 @@ class SN:
             demographic = meta.demographic if meta.demographic is not None else "Mina"
             sub_cat_id = demographics_map.get(demographic, sub_cat_id)
 
-        category = str(meta.category)
+        category = meta.category
         if category == 'MOVIE':
             cat_id = '1'
             # sub cat is source so using source to get
@@ -110,7 +110,7 @@ class SN:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = await client.post(self.upload_url, data=data, files=files)
             except httpx.RequestError as e:
-                console.print(f"[red]Request failed with error: {e}")
+                logger.info(f"[red]Request failed with error: {e}")
                 return False
 
             try:
@@ -131,20 +131,20 @@ class SN:
                         )
                         return True
                     else:
-                        console.print("[red]No Link in Response")
+                        logger.info("[red]No Link in Response")
                         return False
                 else:
-                    console.print("[red]Did not upload successfully")
-                    console.print(response.json())
+                    logger.info("[red]Did not upload successfully")
+                    logger.info(response.json())
                     return False
             except Exception:
-                console.print("[red]Error! It may have uploaded, go check")
-                console.print(data)
+                logger.error("[red]Error! It may have uploaded, go check")
+                logger.info(Redaction.redact_private_info(data))
                 console.print_exception()
                 return False
         else:
-            console.print("[cyan]SN Request Data:")
-            console.print(Redaction.redact_private_info(data))
+            logger.info("[cyan]SN Request Data:")
+            logger.info(Redaction.redact_private_info(data))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
@@ -188,7 +188,7 @@ class SN:
 
         # Determine search parameters based on metadata
         imdb_id = meta.imdb_id or 0
-        category = str(meta.category)
+        category = meta.category
         title = meta.title
         if imdb_id == 0:
             if category == 'TV':
@@ -212,7 +212,7 @@ class SN:
                     if result:
                         dupes.append(str(result))
             else:
-                console.print(f"[bold red]HTTP request failed. Status: {response.status_code}")
+                logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
 
         return dupes

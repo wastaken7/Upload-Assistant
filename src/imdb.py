@@ -13,7 +13,7 @@ import guessit
 import httpx
 
 from src.cleanup import cleanup_manager
-from src.console import console
+from src.console import logger
 
 anitopy_parse_fn: Any = cast(Any, anitopy).parse
 guessit_module: Any = cast(Any, guessit)
@@ -50,7 +50,7 @@ class ImdbManager:
             if not str(imdbID).startswith("tt"):
                 imdbID = f"tt{imdbID:07d}"
         except Exception as e:
-            console.print(f"[red]Error:[/red] {e}")
+            logger.error(f"[red]Error:[/red] {e}")
             return imdb_info
 
         query = {
@@ -279,10 +279,10 @@ class ImdbManager:
                 response.raise_for_status()
                 data = cast(dict[str, Any], response.json())
             except httpx.HTTPStatusError as e:
-                console.print(f"[red]IMDb API error: {e.response.status_code}[/red]")
+                logger.info(f"[red]IMDb API error: {e.response.status_code}[/red]")
                 return imdb_info
             except httpx.RequestError as e:
-                console.print(f"[red]IMDb API Network error: {e}[/red]")
+                logger.info(f"[red]IMDb API Network error: {e}[/red]")
                 return imdb_info
 
         title_data = self.safe_get(data, ["data", "title"], {})
@@ -471,8 +471,7 @@ class ImdbManager:
         else:
             imdb_info['tv_year'] = None
 
-        if debug:
-            console.print(f"[yellow]IMDb Response: {json.dumps(imdb_info, indent=2)[:1000]}...[/yellow]")
+        logger.debug(f"[yellow]IMDb Response: {json.dumps(imdb_info, indent=2)[:1000]}...[/yellow]")
 
         return imdb_info
 
@@ -494,8 +493,7 @@ class ImdbManager:
         imdbID = imdb_id = 0
         if attempted is None:
             attempted = 0
-        if debug:
-            console.print(f"[yellow]Searching IMDb for {filename} and year {search_year}...[/yellow]")
+        logger.debug(f"[yellow]Searching IMDb for {filename} and year {search_year}...[/yellow]")
         if attempted:
             await asyncio.sleep(1)  # Whoa baby, slow down
 
@@ -580,15 +578,14 @@ class ImdbManager:
                     response.raise_for_status()
                     data = response.json()
             except Exception as e:
-                console.print(f"[red]IMDb GraphQL API error: {e}[/red]")
+                logger.info(f"[red]IMDb GraphQL API error: {e}[/red]")
                 return []
 
             results = cast(list[dict[str, Any]], self.safe_get(data, ["data", "advancedTitleSearch", "edges"], []))
             search_results = results
 
-            if debug:
-                console.print(f"[yellow]Found {len(results)} results...[/yellow]")
-                console.print(f"quickie: {quickie}, category: {category}, search_year: {search_year}")
+            logger.debug(f"[yellow]Found {len(results)} results...[/yellow]")
+            logger.debug(f"quickie: {quickie}, category: {category}, search_year: {search_year}")
             return search_results
 
         if not search_results:
@@ -597,8 +594,7 @@ class ImdbManager:
                 search_results = result
 
         if not search_results and secondary_title:
-            if debug:
-                console.print(f"[yellow]Trying IMDb with secondary title: {secondary_title}[/yellow]")
+            logger.debug(f"[yellow]Trying IMDb with secondary title: {secondary_title}[/yellow]")
             result = await run_imdb_search(secondary_title, search_year, category, debug, attempted, duration, wide_search=True)
             if result and len(result) > 0:
                 search_results = result
@@ -614,25 +610,23 @@ class ImdbManager:
                     words.pop(0)
                     words_lower.pop(0)
                     title = ' '.join(words)
-                    if debug:
-                        console.print(f"[bold yellow]Trying IMDb with the prefix removed: {title}[/bold yellow]")
+                    logger.debug(f"[bold yellow]Trying IMDb with the prefix removed: {title}[/bold yellow]")
                     result = await run_imdb_search(title, search_year, category, debug, attempted + 1, wide_search=False)
                     if result and len(result) > 0:
                         search_results = result
             except Exception as e:
-                console.print(f"[bold red]Reduced name search error:[/bold red] {e}")
+                logger.info(f"[bold red]Reduced name search error:[/bold red] {e}")
                 search_results = []
 
         # relax the constraints
         if not search_results:
-            if debug:
-                console.print("[yellow]No results found, trying with a wider search...[/yellow]")
+            logger.debug("[yellow]No results found, trying with a wider search...[/yellow]")
             try:
                 result = await run_imdb_search(filename, search_year, category, debug, attempted + 1, wide_search=True)
                 if result and len(result) > 0:
                     search_results = result
             except Exception as e:
-                console.print(f"[red]Error during wide search: {e}[/red]")
+                logger.error(f"[red]Error during wide search: {e}[/red]")
 
         # Try parsed title (anitopy + guessit)
         if not search_results:
@@ -640,13 +634,12 @@ class ImdbManager:
                 parsed = guessit_fn(untouched_filename or "", {"excludes": ["country", "language"]})
                 parsed_title_data = cast(dict[str, Any], anitopy_parse_fn(parsed.get('title', '')) or {})
                 parsed_title = str(parsed_title_data.get('anime_title', ''))
-                if debug:
-                    console.print(f"[bold yellow]Trying IMDB with parsed title: {parsed_title}[/bold yellow]")
+                logger.debug(f"[bold yellow]Trying IMDB with parsed title: {parsed_title}[/bold yellow]")
                 result = await run_imdb_search(parsed_title, search_year, category, debug, attempted + 1, wide_search=True)
                 if result and len(result) > 0:
                     search_results = result
             except Exception:
-                console.print("[bold red]Guessit failed parsing title, trying another method[/bold red]")
+                logger.info("[bold red]Guessit failed parsing title, trying another method[/bold red]")
 
         # Try with less words in the title
         if not search_results:
@@ -664,13 +657,12 @@ class ImdbManager:
 
                 if len(words) > 1:
                     reduced_title = ' '.join(words[:-1])
-                    if debug:
-                        console.print(f"[bold yellow]Trying IMDB with reduced name: {reduced_title}[/bold yellow]")
+                    logger.debug(f"[bold yellow]Trying IMDB with reduced name: {reduced_title}[/bold yellow]")
                     result = await run_imdb_search(reduced_title, search_year, category, debug, attempted + 1, wide_search=True)
                     if result and len(result) > 0:
                         search_results = result
             except Exception as e:
-                console.print(f"[bold red]Reduced name search error:[/bold red] {e}")
+                logger.info(f"[bold red]Reduced name search error:[/bold red] {e}")
 
         # Try with even fewer words
         if not search_results:
@@ -688,19 +680,17 @@ class ImdbManager:
 
                 if len(words) > 2:
                     further_reduced_title = ' '.join(words[:-2])
-                    if debug:
-                        console.print(f"[bold yellow]Trying IMDB with further reduced name: {further_reduced_title}[/bold yellow]")
+                    logger.debug(f"[bold yellow]Trying IMDB with further reduced name: {further_reduced_title}[/bold yellow]")
                     result = await run_imdb_search(further_reduced_title, search_year, category, debug, attempted + 1, wide_search=True)
                     if result and len(result) > 0:
                         search_results = result
             except Exception as e:
-                console.print(f"[bold red]Further reduced name search error:[/bold red] {e}")
+                logger.info(f"[bold red]Further reduced name search error:[/bold red] {e}")
 
         if quickie:
             if search_results:
                 first_result = search_results[0]
-                if debug:
-                    console.print(f"[cyan]Quickie search result: {first_result}[/cyan]")
+                logger.debug(f"[cyan]Quickie search result: {first_result}[/cyan]")
                 node = self.safe_get(first_result, ["node"], {})
                 title = self.safe_get(node, ["title"], {})
                 type_info = self.safe_get(title, ["titleType"], {})
@@ -722,17 +712,16 @@ class ImdbManager:
                             imdbID = int(imdb_id.replace('tt', '').strip())
                             return imdbID
                         else:
-                            if debug:
-                                console.print(f"[yellow]Year mismatch: found {year_int}, expected {search_year_int}[/yellow]")
+                            logger.debug(f"[yellow]Year mismatch: found {year_int}, expected {search_year_int}[/yellow]")
                             return 0
                     else:
                         imdbID = int(imdb_id.replace('tt', '').strip())
                         return imdbID
                 else:
-                    if not imdb_id and debug:
-                        console.print("[yellow]No IMDb ID found in quickie result[/yellow]")
-                    if not type_matches and debug:
-                        console.print(f"[yellow]Type mismatch: found {type_info.get('text', '')}, expected {category}[/yellow]")
+                    if not imdb_id:
+                        logger.debug("[yellow]No IMDb ID found in quickie result[/yellow]")
+                    if not type_matches:
+                        logger.debug(f"[yellow]Type mismatch: found {type_info.get('text', '')}, expected {category}[/yellow]")
                     imdbID = 0
 
             return imdbID if imdbID else 0
@@ -777,10 +766,7 @@ class ImdbManager:
                     ]
                     results_with_similarity = filtered_results_with_similarity
 
-                    if debug:
-                        console.print(
-                            f"[yellow]Filtered out low similarity results (< 0.70) since best match has {best_similarity:.2f} similarity[/yellow]"
-                        )
+                    logger.debug(f"[yellow]Filtered out low similarity results (< 0.70) since best match has {best_similarity:.2f} similarity[/yellow]")
 
                 sorted_results: list[dict[str, Any]] = [r[0] for r in results_with_similarity]
 
@@ -792,10 +778,9 @@ class ImdbManager:
                     second_best = results_with_similarity[1][1] if len(results_with_similarity) > 1 else 0.0
 
                     if best_similarity - second_best >= 0.10:
-                        if debug:
-                            console.print(
-                                f"[green]Auto-selecting best match: {self.safe_get(sorted_results[0], ['node', 'title', 'titleText', 'text'], '')} (similarity: {best_similarity:.2f})[/green]"
-                            )
+                        logger.debug(
+                            f"[green]Auto-selecting best match: {self.safe_get(sorted_results[0], ['node', 'title', 'titleText', 'text'], '')} (similarity: {best_similarity:.2f})[/green]"
+                        )
                         imdb_id = self.safe_get(sorted_results[0], ["node", "title", "id"], "")
                         if imdb_id:
                             imdbID = int(imdb_id.replace('tt', '').strip())
@@ -805,12 +790,11 @@ class ImdbManager:
                     imdb_id = self.safe_get(sorted_results[0], ["node", "title", "id"], "")
                     if imdb_id:
                         imdbID = int(imdb_id.replace('tt', '').strip())
-                        if debug:
-                            console.print(f"[green]Unattended mode: auto-selected IMDb ID {imdbID}[/green]")
+                        logger.debug(f"[green]Unattended mode: auto-selected IMDb ID {imdbID}[/green]")
                         return imdbID
 
                 # Show sorted results to user
-                console.print("[bold yellow]Multiple IMDb results found. Please select the correct entry:[/bold yellow]")
+                logger.info("[bold yellow]Multiple IMDb results found. Please select the correct entry:[/bold yellow]")
 
                 for idx, candidate in enumerate(sorted_results):
                     node = self.safe_get(candidate, ["node"], {})
@@ -822,12 +806,12 @@ class ImdbManager:
                     plot = self.safe_get(title, ["plot", "plotText", "plainText"], "")
                     similarity_score = results_with_similarity[idx][1]
 
-                    console.print(
-                        f"[cyan]{idx+1}.[/cyan] [bold]{title_text}[/bold] ({year}) [yellow]ID:[/yellow] {imdb_id} [yellow]Type:[/yellow] {title_type} [dim](similarity: {similarity_score:.2f})[/dim]"
+                    logger.info(
+                        f"[cyan]{idx + 1}.[/cyan] [bold]{title_text}[/bold] ({year}) [yellow]ID:[/yellow] {imdb_id} [yellow]Type:[/yellow] {title_type} [dim](similarity: {similarity_score:.2f})[/dim]"
                     )
                     if plot:
-                        console.print(f"[green]Plot:[/green] {plot[:200]}{'...' if len(plot) > 200 else ''}")
-                    console.print()
+                        logger.info(f"[green]Plot:[/green] {plot[:200]}{'...' if len(plot) > 200 else ''}")
+                    logger.info("")
 
                 if sorted_results:
                     selection = None
@@ -837,7 +821,7 @@ class ImdbManager:
                                 "Enter the number of the correct entry, 0 for none, or manual IMDb ID (tt1234567): "
                             ) or ""
                         except (EOFError, KeyboardInterrupt):
-                            console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                            logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                             await cleanup_manager.cleanup()
                             cleanup_manager.reset_terminal()
                             sys.exit(1)
@@ -847,13 +831,13 @@ class ImdbManager:
                                 try:
                                     manual_imdb_id = selection.lower().replace('tt', '').strip()
                                     if manual_imdb_id.isdigit():
-                                        console.print(f"[green]Using manual IMDb ID: {selection}[/green]")
+                                        logger.info(f"[green]Using manual IMDb ID: {selection}[/green]")
                                         return int(manual_imdb_id)
                                     else:
-                                        console.print("[bold red]Invalid IMDb ID format. Please try again.[/bold red]")
+                                        logger.info("[bold red]Invalid IMDb ID format. Please try again.[/bold red]")
                                         continue
                                 except Exception as e:
-                                    console.print(f"[bold red]Error parsing IMDb ID: {e}. Please try again.[/bold red]")
+                                    logger.info(f"[bold red]Error parsing IMDb ID: {e}. Please try again.[/bold red]")
                                     continue
 
                             # Handle numeric selection
@@ -865,12 +849,12 @@ class ImdbManager:
                                     imdbID = int(imdb_id.replace('tt', '').strip())
                                     return imdbID
                             elif selection_int == 0:
-                                console.print("[bold red]Skipping IMDb[/bold red]")
+                                logger.info("[bold red]Skipping IMDb[/bold red]")
                                 return 0
                             else:
-                                console.print("[bold red]Selection out of range. Please try again.[/bold red]")
+                                logger.info("[bold red]Selection out of range. Please try again.[/bold red]")
                         except ValueError:
-                            console.print("[bold red]Invalid input. Please enter a number or IMDb ID (tt1234567).[/bold red]")
+                            logger.info("[bold red]Invalid input. Please enter a number or IMDb ID (tt1234567).[/bold red]")
 
             else:
                 if not unattended:
@@ -879,7 +863,7 @@ class ImdbManager:
                             "No results found. Please enter a manual IMDb ID (tt1234567) or 0 to skip: "
                         ) or ""
                     except (EOFError, KeyboardInterrupt):
-                        console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                        logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                         await cleanup_manager.cleanup()
                         cleanup_manager.reset_terminal()
                         sys.exit(1)
@@ -887,14 +871,14 @@ class ImdbManager:
                         try:
                             manual_imdb_id = selection.lower().replace('tt', '').strip()
                             if manual_imdb_id.isdigit():
-                                console.print(f"[green]Using manual IMDb ID: {selection}[/green]")
+                                logger.info(f"[green]Using manual IMDb ID: {selection}[/green]")
                                 return int(manual_imdb_id)
                             else:
-                                console.print("[bold red]Invalid IMDb ID format. Please try again.[/bold red]")
+                                logger.info("[bold red]Invalid IMDb ID format. Please try again.[/bold red]")
                         except Exception as e:
-                            console.print(f"[bold red]Error parsing IMDb ID: {e}. Please try again.[/bold red]")
+                            logger.info(f"[bold red]Error parsing IMDb ID: {e}. Please try again.[/bold red]")
                 else:
-                    console.print("[bold red]No IMDb results found in unattended mode. Skipping IMDb.[/bold red]")
+                    logger.info("[bold red]No IMDb results found in unattended mode. Skipping IMDb.[/bold red]")
 
         return imdbID if imdbID else 0
 
@@ -956,8 +940,7 @@ class ImdbManager:
                 response.raise_for_status()
                 data = response.json()
             except Exception as e:
-                if debug:
-                    console.print(f"[red]IMDb API error: {e}[/red]")
+                logger.debug(f"[red]IMDb API error: {e}[/red]")
                 return None
 
         title_data = self.safe_get(data, ["data", "title"], {})

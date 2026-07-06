@@ -5,7 +5,7 @@ from collections.abc import MutableMapping, Sequence
 from pathlib import Path
 from typing import Any, cast
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.uploadscreens import UploadScreensManager
 
@@ -30,7 +30,7 @@ class DiscMenus:
         if os.path.isdir(self.path_to_menu_screenshots):
             await self.get_local_images(meta)
         else:
-            console.print(f"[red]Invalid disc menus path: {self.path_to_menu_screenshots}[/red]")
+            logger.info(f"[red]Invalid disc menus path: {self.path_to_menu_screenshots}[/red]")
 
     async def get_local_images(self, meta: Meta) -> None:
         """
@@ -43,7 +43,7 @@ class DiscMenus:
         ]
 
         if not image_paths:
-            console.print("[yellow]No local menu images found to upload.[/yellow]")
+            logger.info("[yellow]No local menu images found to upload.[/yellow]")
             return
 
         uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
@@ -65,7 +65,7 @@ class DiscMenus:
         Saves the uploaded disc menu images to a JSON file.
         """
         if not image_list:
-            console.print("[yellow]No menu images found.[/yellow]")
+            logger.info("[yellow]No menu images found.[/yellow]")
             return
 
         menu_images = {
@@ -80,7 +80,7 @@ class DiscMenus:
         menu_json = json.dumps(menu_images, indent=4)
         await asyncio.to_thread(Path(json_path).write_text, menu_json)
 
-        console.print(f"[green]Saved {len(image_list)} menu images to {json_path}[/green]")
+        logger.info(f"[green]Saved {len(image_list)} menu images to {json_path}[/green]")
 
 
 async def process_disc_menus(meta: Meta, config: MutableMapping[str, Any]) -> None:

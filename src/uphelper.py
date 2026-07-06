@@ -14,7 +14,7 @@ from rich.markup import escape
 from cogs.redaction import Redaction
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
-from src.console import console
+from src.console import console, logger
 from src.meta import Meta
 from src.trackersetup import tracker_class_map
 
@@ -167,7 +167,7 @@ class UploadHelper:
         meta.were_trumping = False
         if not dupes_list:
             if meta.debug:
-                console.print(f"[green]No dupes found at[/green] [yellow]{tracker_name}[/yellow]")
+                logger.debug(f"[green]No dupes found at[/green] [yellow]{tracker_name}[/yellow]")
             return False,  meta
         else:
             tracker_class_factory = cast(Callable[..., Any], self.tracker_class_map[tracker_name])
@@ -199,7 +199,7 @@ class UploadHelper:
                 ]
                 if trumpable_dupes:
                     trumpable_text = _format_dupes_list(trumpable_dupes)
-                    console.print("[bold red]Trumpable found![/bold red]")
+                    logger.info("[bold red]Trumpable found![/bold red]")
                 elif meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", []):
                     matched_episodes = cast(list[DupeEntry], meta.get(f'{tracker_name}_matched_episode_ids', []))
                     user_tag = meta.tag.lstrip("-").lower() if meta.tag else ""  # Remove leading dash for comparison
@@ -221,18 +221,18 @@ class UploadHelper:
                         selected_match = matched_episodes[0]
 
                     trumpable_text = _format_dupe(selected_match)
-                    console.print("[bold red]Trumpable found based on episode matching![/bold red]")
+                    logger.info("[bold red]Trumpable found based on episode matching![/bold red]")
 
                     if user_tag and not tag_matched:
-                        console.print(f"[yellow]Note: No release found with matching tag '{meta.tag}'. Selected release may be from a different group.[/yellow]")
+                        logger.info(f"[yellow]Note: No release found with matching tag '{meta.tag}'. Selected release may be from a different group.[/yellow]")
 
             if (not meta.unattended or (meta.unattended and meta.unattended_confirm)) and not meta.ask_dupe:
                 dupe_text = _format_dupes_list(dupes_list)
 
                 if trumpable_text and (meta.trumpable_id or (meta.season_pack_contains_episode and meta.get(f"{tracker_name}_matched_episode_ids", []))):
-                    console.print(f"[bold cyan]{trumpable_text}[/bold cyan]")
-                    console.print("[yellow]Please check the trumpable entries above to see if you want to upload[/yellow]")
-                    console.print("[yellow]You will have the option to report the trumpable torrent if you upload.[/yellow]")
+                    logger.info(f"[bold cyan]{trumpable_text}[/bold cyan]")
+                    logger.info("[yellow]Please check the trumpable entries above to see if you want to upload[/yellow]")
+                    logger.info("[yellow]You will have the option to report the trumpable torrent if you upload.[/yellow]")
                     if meta.dupe is False:
                         try:
                             upload = cli_ui.ask_yes_no("Are you trumping this release?", default=False)
@@ -246,7 +246,7 @@ class UploadHelper:
                                 else:
                                     meta.trump_reason = "trumpable_release"
                                 if meta.debug:
-                                    console.print(f"[bold green]Trump reason: {meta.trump_reason} on {tracker_name}[/bold green]")
+                                    logger.debug(f"[bold green]Trump reason: {meta.trump_reason} on {tracker_name}[/bold green]")
                             else:
                                 # For season packs: individual episodes are only in dupes for trumping purposes.
                                 # If user declines to trump, filter them out so they aren't shown as "potential dupes"
@@ -260,17 +260,17 @@ class UploadHelper:
                                     # Clear tracker-specific matched_episode_ids since we're not trumping
                                     meta[f'{tracker_name}_matched_episode_ids'] = []
                         except EOFError:
-                            console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                            logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                             await cleanup_manager.cleanup()
                             cleanup_manager.reset_terminal()
                             sys.exit(1)
 
                 if not meta.were_trumping:
                     if meta.filename_match and meta.file_count_match:
-                        console.print(f"[bold red]Exact match found! - {meta.filename_match}[/bold red]")
+                        logger.info(f"[bold red]Exact match found! - {meta.filename_match}[/bold red]")
                         try:
                             if tracker_name in ["AITHER", "LST"]:
-                                console.print(f"[yellow]{tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped.[/yellow]")
+                                logger.info(f"[yellow]{tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped.[/yellow]")
                                 upload = cli_ui.ask_yes_no("Are you trumping this exact match?", default=False)
                                 if upload:
                                     meta.we_asked = True
@@ -282,7 +282,7 @@ class UploadHelper:
                                 upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
                                 meta.we_asked = True
                         except EOFError:
-                            console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                            logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                             await cleanup_manager.cleanup()
                             cleanup_manager.reset_terminal()
                             sys.exit(1)
@@ -300,14 +300,14 @@ class UploadHelper:
                                     season_pack_text = f"{season_pack_name} - {season_pack_link}"
                             else:
                                 season_pack_text = season_pack_name
-                            console.print(f"[yellow]Note: A season pack exists on {tracker_name}[/yellow]")
-                            console.print("[yellow]Ensure your upload is not part of that season pack, or is otherwise allowed.[/yellow]")
-                            console.print()
-                            console.print(f"[bold cyan]{season_pack_text}[/bold cyan]")
+                            logger.info(f"[yellow]Note: A season pack exists on {tracker_name}[/yellow]")
+                            logger.info("[yellow]Ensure your upload is not part of that season pack, or is otherwise allowed.[/yellow]")
+                            logger.info("")
+                            logger.info(f"[bold cyan]{season_pack_text}[/bold cyan]")
                         else:
-                            console.print(f"[bold blue]{tracker_name}[/bold blue]: Check if these are actually dupes:")
-                            console.print()
-                            console.print(f"[bold cyan]{dupe_text}[/bold cyan]")
+                            logger.info(f"[bold blue]{tracker_name}[/bold blue]: Check if these are actually dupes:")
+                            logger.info("")
+                            logger.info(f"[bold cyan]{dupe_text}[/bold cyan]", extra={"highlighter": None})
                         if meta.dupe is False:
                             try:
                                 if meta.is_disc == "BDMV":
@@ -315,7 +315,7 @@ class UploadHelper:
                                 upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
                                 meta.we_asked = True
                             except EOFError:
-                                console.print("\n[red]Exiting on user request (Ctrl+C)[/red]")
+                                logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                                 await cleanup_manager.cleanup()
                                 cleanup_manager.reset_terminal()
                                 sys.exit(1)
@@ -333,7 +333,7 @@ class UploadHelper:
 
             if tracker_name in ["BHD"]:
                 if meta.debug:
-                    console.print("[yellow]BHD cross seeding check[/yellow]")
+                    logger.debug("[yellow]BHD cross seeding check[/yellow]")
                 tracker_download_link = meta.get(f'{tracker_name}_matched_download')
                 # Ensure display_name is a string before using 'in' operator
                 if display_name:
@@ -350,34 +350,34 @@ class UploadHelper:
                         if similarity > 0.9 and meta.size_match and tracker_download_link:
                             meta[f'{tracker_name}_cross_seed'] = tracker_download_link
                             if meta.debug:
-                                console.print(f'[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]')
+                                logger.debug(f"[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]")
                             break
 
             elif meta.filename_match and meta.file_count_match:
                 if meta.debug:
-                    console.print(f"[yellow]{tracker_name} filename and file count cross seeding check[/yellow]")
+                    logger.debug(f"[yellow]{tracker_name} filename and file count cross seeding check[/yellow]")
                 tracker_download_link = meta.get(f'{tracker_name}_matched_download')
                 for d in dupes_list:
                     if isinstance(d, dict) and tracker_download_link:
                         meta[f'{tracker_name}_cross_seed'] = tracker_download_link
                         if meta.debug:
-                            console.print(f'[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]')
+                            logger.debug(f"[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]")
                         break
 
             elif meta.size_match:
                 if meta.debug:
-                    console.print(f"[yellow]{tracker_name} size cross seeding check[/yellow]")
+                    logger.debug(f"[yellow]{tracker_name} size cross seeding check[/yellow]")
                 tracker_download_link = meta.get(f'{tracker_name}_matched_download')
                 for d in dupes_list:
                     if isinstance(d, dict):
                         entry_name = str(d.get('name', '')).lower()
                         similarity = SequenceMatcher(None, entry_name, display_name.lower().strip()).ratio()
                         if meta.debug:
-                            console.print(f"[debug] Comparing sizes with similarity {similarity:.4f}")
+                            logger.debug(f"[debug] Comparing sizes with similarity {similarity:.4f}")
                         if similarity > 0.9 and tracker_download_link:
                             meta[f'{tracker_name}_cross_seed'] = tracker_download_link
                             if meta.debug:
-                                console.print(f'[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]')
+                                logger.debug(f"[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]")
                             break
 
             if upload is False:
@@ -423,13 +423,13 @@ class UploadHelper:
                     results.append(results_message)
 
             if warnings:
-                console.print()
-                console.print("\n\n".join(warnings))
+                logger.info("")
+                logger.info("\n\n".join(warnings))
 
             if results:
-                console.print()
-                console.print("\n".join(results))
-                console.print()
+                logger.info("")
+                logger.info("\n".join(results))
+                logger.info("")
 
     async def get_confirmation(self, meta: Meta) -> bool:
         confirm: bool = False
@@ -585,17 +585,17 @@ class UploadHelper:
             else:
                 formatted_lines.append(item)
 
-        console.print("\n".join(formatted_lines), highlight=False)
+        logger.info("\n".join(formatted_lines), extra={"highlighter": None})
 
         if meta.unattended and not meta.unattended_confirm:
             if meta.debug is True:
-                console.print("[bold yellow]Unattended mode is enabled, skipping confirmation.[/bold yellow]")
+                logger.info("[bold yellow]Unattended mode is enabled, skipping confirmation.[/bold yellow]")
             return True
         else:
             await self.get_missing(meta)
             ring_the_bell = "\a" if bool(self.default_config.get("sfx_on_prompt", True)) else ""
             if ring_the_bell:
-                console.print(ring_the_bell)
+                logger.info(ring_the_bell)
 
             if meta.is_disc:
                 meta.keep_folder = False
@@ -603,7 +603,7 @@ class UploadHelper:
             if meta.keep_folder and meta.isdir:
                 kf_confirm = console.input("[bold yellow]You specified --keep-folder. Uploading in folders might not be allowed.[/bold yellow] [green]Proceed? y/N: [/green]").strip().lower()
                 if kf_confirm != 'y':
-                    console.print("[bold red]Aborting...[/bold red]")
+                    logger.info("[bold red]Aborting...[/bold red]")
                     exit()
             different_names = {}
             for tracker_name in meta.trackers:
@@ -636,17 +636,18 @@ class UploadHelper:
                     pass
 
             if different_names:
-                console.print(f"[bold]Base Name:[/bold] {meta.name}\n", highlight=False)
+                logger.info(f"[bold]Base Name:[/bold] {meta.name}\n", extra={"highlighter": None})
                 max_t_len = max(len(t) for t in different_names)
                 for t_name, d_name in different_names.items():
                     prefix = f"{t_name}:".ljust(max_t_len + 1)
-                    console.print(f"{prefix} {d_name}", highlight=False)
-                console.print()
+                    logger.info(f"{prefix} {d_name}", extra={"highlighter": None})
+                logger.info("")
             else:
-                console.print(f"[bold]Base Name:[/bold] {meta.name}\n", highlight=False)
+                logger.info(f"[bold]Base Name:[/bold] {meta.name}\n", extra={"highlighter": None})
 
-            confirm = console.input("[bold green]Is this correct?[/bold green] [yellow]y/N[/yellow]: ").strip().lower() == "y"
-            console.print()
+            confirm = cli_ui.ask_yes_no("Is this correct?")
+            logger.info("")
+
             if confirm:
                 if (
                     meta.original_imdb == meta.imdb_id
@@ -656,7 +657,7 @@ class UploadHelper:
                     and meta.original_tvdb == meta.tvdb_id
                     and meta.original_category == meta.category
                 ):
-                    console.print("[bold yellow]Database ID's are correct![/bold yellow]")
+                    logger.info("[bold yellow]Database ID's are correct![/bold yellow]")
                     return True
                 else:
                     nfo_dir = os.path.join(f"{meta.base_dir}/data")
@@ -751,7 +752,7 @@ class UploadHelper:
         missing = [f"--{each} | {info_notes.get(each, '')}" for each in potential_missing if str(meta.get(each, "")).strip() in ["", "None", "0"]]
 
         if missing:
-            console.print("[bold yellow]Potentially missing information:[/bold yellow]")
+            logger.info("[bold yellow]Potentially missing information:[/bold yellow]")
             for each in missing:
                 cli_ui.info(each)
                 print()

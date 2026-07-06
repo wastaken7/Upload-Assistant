@@ -56,6 +56,15 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "default_torrent_client": (str,),
     "skip_auto_torrent": (bool,),
     "sfx_on_prompt": (bool,),
+    "console_show_time": (bool,),
+    "console_show_level": (bool,),
+    "console_show_path": (bool,),
+    "console_markup": (bool,),
+    "debug": (bool,),
+    "console_debug_show_time": (bool,),
+    "console_debug_show_level": (bool,),
+    "console_debug_show_path": (bool,),
+    "console_debug_markup": (bool,),
     "embed_dupe_links": (bool,),
     "show_dupe_size_diff": (bool,),
     "dupe_size_difference_tolerance": (float, int),
@@ -497,10 +506,8 @@ def _validate_trackers_section(
             section="TRACKERS"
         ))
 
-    # Ensure active trackers have their configs and required keys
-    for active_t in active_set:
-        if active_t == "DS" and active_t not in [t.upper() for t in trackers]:
-            errors.append("Missing config section for active tracker: 'DS' under 'TRACKERS'")
+    if "DS" in active_set and "DS" not in [t.upper() for t in trackers]:
+        errors.append("Missing config section for active tracker: 'DS' under 'TRACKERS'")
 
     # Validate individual tracker configs
     for tracker_name, tracker_config in trackers.items():

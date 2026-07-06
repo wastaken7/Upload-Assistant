@@ -1335,7 +1335,7 @@ def _format_dict(dict_node: ast.Dict, indent_level: int) -> list[str]:
     lines = []
     indent = "    " * indent_level
 
-    for _i, (key_node, value_node) in enumerate(zip(dict_node.keys, dict_node.values)):
+    for _i, (key_node, value_node) in enumerate(zip(dict_node.keys, dict_node.values, strict=False)):
         key_str = repr(key_node.value) if isinstance(key_node, ast.Constant) and isinstance(key_node.value, str) else ast.unparse(key_node) if key_node is not None else "None"
 
         if isinstance(value_node, ast.Dict):
@@ -1369,7 +1369,7 @@ def _replace_config_value_in_source(source: str, key_path: list[str], new_value:
 
     for i, key in enumerate(key_path):
         found = False
-        for k_node, v_node in zip(current_dict.keys, current_dict.values):
+        for k_node, v_node in zip(current_dict.keys, current_dict.values, strict=False):
             if isinstance(k_node, ast.Constant) and isinstance(k_node.value, str) and k_node.value == key:
                 if isinstance(v_node, ast.Dict):
                     if i < len(key_path) - 1:  # Not the final key
@@ -1445,7 +1445,7 @@ def _remove_config_key_in_source(source: str, key_path: list[str]) -> str:
 
     for i, key in enumerate(key_path):
         found = False
-        for j, (k_node, v_node) in enumerate(zip(current_dict.keys, current_dict.values)):
+        for j, (k_node, v_node) in enumerate(zip(current_dict.keys, current_dict.values, strict=False)):
             if isinstance(k_node, ast.Constant) and isinstance(k_node.value, str) and k_node.value == key:
                 if isinstance(v_node, ast.Dict):
                     if i < len(key_path) - 1:  # Not the final key
@@ -1619,7 +1619,7 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
     def walk_dict(node: ast.Dict, path: list[str]) -> None:
         key_entries: list[tuple[str, int, ast.AST]] = []
         child_ranges: list[tuple[int, int]] = []
-        for key_node, value_node in zip(node.keys, node.values):
+        for key_node, value_node in zip(node.keys, node.values, strict=False):
             if not isinstance(key_node, ast.Constant) or not isinstance(key_node.value, str):
                 continue
             key = key_node.value

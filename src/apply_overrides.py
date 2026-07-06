@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from src.args import Args
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
 UserArgsEntry = dict[str, Any]
@@ -20,7 +20,7 @@ class ApplyOverrides:
         try:
             user_args_path = Path(meta.base_dir) / "data" / "templates" / "user-args.json"
             user_args_text = await asyncio.to_thread(user_args_path.read_text, encoding="utf-8")
-            console.print("[green]Found user-args.json")
+            logger.info("[green]Found user-args.json")
             user_args = cast(dict[str, Any], json.loads(user_args_text))
 
             current_tmdb_id = meta.tmdb_id
@@ -49,13 +49,13 @@ class ApplyOverrides:
                     entry_category, entry_normalized_id = await self.parse_tmdb_id(entry_tmdb_id)
                     if entry_category and entry_category != meta.category:
                         if meta.debug:
-                            console.print(f"Skipping user entry because override category {entry_category} does not match UA category {meta.category}:")
+                            logger.debug(f"Skipping user entry because override category {entry_category} does not match UA category {meta.category}:")
                         continue
 
                     # Check if IDs match
                     if entry_normalized_id == current_tmdb_id:
-                        console.print(f"[green]Found matching override for TMDb ID: {entry_normalized_id}")
-                        console.print(f"[yellow]Applying arguments: {' '.join(args)}")
+                        logger.info(f"[green]Found matching override for TMDb ID: {entry_normalized_id}")
+                        logger.info(f"[yellow]Applying arguments: {' '.join(args)}")
 
                         meta = await self.apply_args_to_meta(meta, args)
                         break
@@ -65,8 +65,8 @@ class ApplyOverrides:
                     # Check for TVDB ID match
                     if 'tvdb_id' in entry and str(entry['tvdb_id']) == str(current_tvdb_id) and current_tvdb_id != 0:
                         args = cast(list[str], entry.get('args', []))
-                        console.print(f"[green]Found matching override for TVDb ID: {current_tvdb_id}")
-                        console.print(f"[yellow]Applying arguments: {' '.join(args)}")
+                        logger.info(f"[green]Found matching override for TVDb ID: {current_tvdb_id}")
+                        logger.info(f"[yellow]Applying arguments: {' '.join(args)}")
                         meta = await self.apply_args_to_meta(meta, args)
                         break
 
@@ -78,13 +78,13 @@ class ApplyOverrides:
 
                         if str(entry_imdb) == str(current_imdb_id) and current_imdb_id != 0:
                             args = cast(list[str], entry.get('args', []))
-                            console.print(f"[green]Found matching override for IMDb ID: {current_imdb_id}")
-                            console.print(f"[yellow]Applying arguments: {' '.join(args)}")
+                            logger.info(f"[green]Found matching override for IMDb ID: {current_imdb_id}")
+                            logger.info(f"[yellow]Applying arguments: {' '.join(args)}")
                             meta = await self.apply_args_to_meta(meta, args)
                             break
 
         except (FileNotFoundError, json.JSONDecodeError) as e:
-            console.print(f"[red]Error loading user-args.json: {e}")
+            logger.error(f"[red]Error loading user-args.json: {e}")
 
         return meta
 
@@ -139,7 +139,7 @@ class ApplyOverrides:
                 i += 1
 
             if meta.debug:
-                console.print(f"[Debug] Tracking changes for keys: {', '.join(arg_keys_to_track)}")
+                logger.debug(f"[Debug] Tracking changes for keys: {', '.join(arg_keys_to_track)}")
 
             # Create a new Args instance and process the arguments
             arg_processor = Args(self.config)
@@ -175,7 +175,7 @@ class ApplyOverrides:
                             meta[related_key] = value
                             modified_keys.append(related_key)
                             if meta.debug:
-                                console.print(f"[Debug] Override: {related_key} changed from {meta.get(related_key)} to {value}")
+                                logger.debug(f"[Debug] Override: {related_key} changed from {meta.get(related_key)} to {value}")
                 # Handle regular fields
                 elif key in updated_meta and key in meta:
                     # Skip path to preserve original
@@ -189,13 +189,13 @@ class ApplyOverrides:
                         meta[key] = new_value
                         modified_keys.append(key)
                         if meta.debug:
-                            console.print(f"[Debug] Override: {key} changed from {old_value} to {new_value}")
+                            logger.debug(f"[Debug] Override: {key} changed from {old_value} to {new_value}")
             if meta.debug and modified_keys:
-                console.print(f"[Debug] Applied overrides for: {', '.join(modified_keys)}")
+                logger.info(f"[Debug] Applied overrides for: {', '.join(modified_keys)}")
 
         except Exception as e:
-            console.print(f"[red]Error processing arguments: {e}")
+            logger.error(f"[red]Error processing arguments: {e}")
             if meta.debug:
-                console.print(traceback.format_exc())
+                logger.debug(traceback.format_exc())
 
         return meta

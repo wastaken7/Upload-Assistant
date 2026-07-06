@@ -5,7 +5,7 @@ from collections.abc import Callable, MutableMapping, Sequence
 from typing import Any, TypedDict, cast
 
 from cogs.redaction import Redaction
-from src.console import console
+from src.console import console, logger
 from src.meta import Meta
 from src.trackers.UNIT3D.HUNO import HUNO
 
@@ -823,7 +823,7 @@ class DupeChecker:
                 if dupe_size is not None and dupe_size != 0:
                     size_difference = (target_size - dupe_size) / dupe_size
                     if meta.debug:
-                        console.print(f"Your size: {target_size}, Dupe size: {dupe_size}, Size difference: {size_difference:.4f}")
+                        logger.debug(f"Your size: {target_size}, Dupe size: {dupe_size}, Size difference: {size_difference:.4f}")
                     if size_difference >= 0.20:
                         await log_exclusion(f"Your file is significantly larger ({size_difference * 100:.2f}%)", each)
                         return True

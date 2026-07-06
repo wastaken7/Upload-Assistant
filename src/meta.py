@@ -575,7 +575,7 @@ class Meta:
         try:
             return getattr(self, key)
         except AttributeError:
-            raise KeyError(key)
+            raise KeyError(key) from None
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Bracket write access for backwards compatibility during migration."""

@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import langcodes
 
-from src.console import console
+from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -166,7 +166,7 @@ class LDU(UNIT3D):
                         non_eng_audio = True
                     break
                 except (LookupError, AttributeError, ValueError) as e:
-                    console.print(f"[bold red]Error extracting audio language: {e}[/bold red]")
+                    logger.info(f"[bold red]Error extracting audio language: {e}[/bold red]")
 
         if meta.no_subs:
             iso_subtitle = "NoSubs"
@@ -183,7 +183,7 @@ class LDU(UNIT3D):
                         iso_subtitle = f"Subs {lang.upper()}"
                         break
                     except (LookupError, AttributeError, ValueError) as e:
-                        console.print(f"[bold red]Error extracting subtitle language: {e}[/bold red]")
+                        logger.info(f"[bold red]Error extracting subtitle language: {e}[/bold red]")
 
         if cat_id == '18' and iso_subtitle:
             ldu_name = f"{ldu_name} [{iso_subtitle}]"

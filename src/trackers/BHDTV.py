@@ -8,7 +8,7 @@ import httpx
 from pymediainfo import MediaInfo
 
 from cogs.redaction import Redaction
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
@@ -102,8 +102,8 @@ class BHDTV:
                     parsed = response.json()
                     meta.tracker_status[self.tracker]["status_message"] = parsed
                 except Exception:
-                    console.print("[cyan]It may have uploaded, go check")
-                    console.print(Redaction.redact_private_info(data))
+                    logger.info("[cyan]It may have uploaded, go check")
+                    logger.info(Redaction.redact_private_info(data))
                     traceback.print_exc()
 
             parsed_data: dict[str, Any] | None = cast(dict[str, Any] | None, parsed) if isinstance(parsed, dict) else None
@@ -121,8 +121,8 @@ class BHDTV:
                     return True
             return False
 
-        console.print("[cyan]BHDTV Request Data:")
-        console.print(Redaction.redact_private_info(data))
+        logger.info("[cyan]BHDTV Request Data:")
+        logger.info(Redaction.redact_private_info(data))
         meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
         await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
         return True
@@ -213,6 +213,6 @@ class BHDTV:
         return None
 
     async def search_existing(self, _meta: dict[str, Any]) -> list[str]:
-        console.print("[red]Dupes must be checked Manually")
+        logger.info("[red]Dupes must be checked Manually")
         return ['Dupes must be checked Manually']
         # hopefully someone else has the time to implement this.

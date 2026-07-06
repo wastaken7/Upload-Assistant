@@ -12,7 +12,7 @@ from src.check_requirements import check_dependencies
 
 check_dependencies()
 
-from src.console import console
+from src.console import console  # noqa: E402
 
 
 class LinkedSetting(TypedDict):

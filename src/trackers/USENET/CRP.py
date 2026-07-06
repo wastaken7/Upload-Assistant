@@ -8,7 +8,8 @@ import aiofiles
 import httpx
 import langcodes
 
-from src.console import console
+from cogs.redaction import Redaction
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
@@ -31,10 +32,10 @@ class CRP:
         release_name = await self.get_name(meta)
         cache_file = os.path.join(meta.base_dir, "tmp", meta.uuid, f"{self.tracker}_upload_ok")
         if release_name and os.path.exists(cache_file):
-            console.print(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
+            logger.info(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
             return [release_name]
 
-        console.print(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
+        logger.info(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
         return []
 
     async def get_additional_checks(self, _meta: Meta) -> bool:
@@ -45,7 +46,7 @@ class CRP:
         if meta.anime:
             return "5070"
 
-        category = str(meta.category or "").upper()
+        category = meta.category.upper()
         resolution = meta.resolution.lower()
 
         uhd_resolutions = {"2160p", "4320p", "8640p"}
@@ -141,10 +142,10 @@ class CRP:
                 async with aiofiles.open(info_file_path, encoding="utf-8") as f:
                     return await f.read()
             except Exception as e:
-                console.print(f"[bold red]Erro ao ler o arquivo de info em {info_file_path}: {e}[/bold red]")
+                logger.info(f"[bold red]Erro ao ler o arquivo de info em {info_file_path}: {e}[/bold red]")
                 return ""
         else:
-            console.print(f"[bold red]Arquivo de info não encontrado: {info_file_path}[/bold red]")
+            logger.info(f"[bold red]Arquivo de info não encontrado: {info_file_path}[/bold red]")
             return ""
 
     def get_cover(self, meta: Meta) -> str:
@@ -230,7 +231,7 @@ class CRP:
         tmdb_id = meta.tmdb_id
         if tmdb_id and str(tmdb_id).isdigit() and tmdb_id > 0:
             data["tmdb_id"] = str(tmdb_id)
-            tmdb_type = str(meta.category or "").lower()
+            tmdb_type = meta.category.lower()
             if tmdb_type in ("movie", "tv"):
                 data["tmdb_type"] = tmdb_type
 
@@ -265,20 +266,20 @@ class CRP:
 
         files = await self._prepare_files(meta)
         if not files:
-            console.print(f"[red]Error: NZB file not found for {self.tracker}.[/red]")
+            logger.error(f"[red]Error: NZB file not found for {self.tracker}.[/red]")
             status_dict["status_message"] = "data error: NZB file not found"
             return False
 
         data = await self._prepare_data(meta, tracker_cfg)
 
         if meta.debug:
-            console.print("[cyan]CRP Upload (DEBUG MODE):[/cyan]")
-            console.print(f"URL: {self.upload_url}")
-            console.print(f"Category ID: {self.get_category_id(meta)}")
-            console.print("Fields:")
-            console.print(data)
-            console.print("Files:")
-            console.print({k: v[0] for k, v in files.items()})
+            logger.debug("[cyan]CRP Upload (DEBUG MODE):[/cyan]")
+            logger.debug(f"URL: {self.upload_url}")
+            logger.debug(f"Category ID: {self.get_category_id(meta)}")
+            logger.debug("Fields:")
+            logger.debug(Redaction.redact_private_info(data))
+            logger.debug("Files:")
+            logger.debug({k: v[0] for k, v in files.items()})
 
             status_dict["status_message"] = "Debug mode enabled, skipping upload."
             return True

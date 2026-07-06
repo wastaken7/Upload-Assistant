@@ -5,7 +5,7 @@ from typing import Any
 import aiofiles
 import cli_ui
 
-from src.console import console
+from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.UNIT3D import UNIT3D
@@ -36,7 +36,7 @@ class ULCX(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         if "concert" in meta.keywords:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print(f'[bold red]Concerts not allowed at {self.tracker}.[/bold red]')
+                logger.info(f'[bold red]Concerts not allowed at {self.tracker}.[/bold red]')
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -45,7 +45,7 @@ class ULCX(UNIT3D):
                 return False
         if meta.video_codec == "HEVC" and meta.resolution != "2160p" and "animation" not in meta.keywords and meta.anime is not True:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print(f'[bold red]This content might not fit HEVC rules for {self.tracker}.[/bold red]')
+                logger.info(f'[bold red]This content might not fit HEVC rules for {self.tracker}.[/bold red]')
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -54,12 +54,12 @@ class ULCX(UNIT3D):
                 return False
         if meta.type in ["ENCODE", "HDTV"] and meta.resolution not in ["8640p", "4320p", "2160p", "1440p", "1080p", "1080i", "720p"]:
             if not meta.unattended:
-                console.print(f'[bold red]Encodes must be at least 720p resolution for {self.tracker}.[/bold red]')
+                logger.info(f'[bold red]Encodes must be at least 720p resolution for {self.tracker}.[/bold red]')
             return False
 
         if meta.type in ["DVDRIP"]:
             if not meta.unattended:
-                console.print(f'[bold red]DVDRIPs are not allowed for {self.tracker}.[/bold red]')
+                logger.info(f'[bold red]DVDRIPs are not allowed for {self.tracker}.[/bold red]')
             return False
 
         if meta.is_disc != "BDMV" and not await self.common.check_language_requirements(
@@ -68,27 +68,27 @@ class ULCX(UNIT3D):
             return False
 
         if not meta.valid_mi_settings:
-            console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
+            logger.info(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
             return False
 
         if meta.personalrelease:
             if meta.has_multiple_default_audio_tracks:
-                console.print(
+                logger.info(
                     f"[bold red]Multiple default audio tracks detected, skipping {self.tracker} upload.[/bold red]")
                 return False
 
             if meta.has_multiple_default_subtitle_tracks:
-                console.print(
+                logger.info(
                     f"[bold red]Multiple default subtitle tracks detected, skipping {self.tracker} upload.[/bold red]")
                 return False
 
         if meta.non_disc_has_pcm_audio_tracks:
-            console.print(
+            logger.info(
                 f"[bold red]Non-disc source with PCM audio tracks detected, skipping {self.tracker} upload.[/bold red]")
             return False
 
         if meta.discs_missing_certificate:
-            console.print(
+            logger.info(
                 f"[bold red]Disc source(s) missing BD certificate, skipping {self.tracker} upload.[/bold red]")
             return False
 

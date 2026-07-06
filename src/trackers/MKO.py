@@ -2,10 +2,10 @@ import gettext
 import os
 import re
 import secrets
+import shutil
 import urllib.parse
 from html.entities import codepoint2name
 from typing import Any
-import shutil
 
 import aiofiles
 import httpx
@@ -14,7 +14,7 @@ import pycountry
 from bs4 import BeautifulSoup
 
 from cogs.redaction import Redaction
-from src.console import console
+from src.console import logger
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.languages import languages_manager
 from src.meta import Meta
@@ -383,7 +383,7 @@ class MKO:
             resp = await self.session.get(f"{self.base_url}/index.php?")
             resp.raise_for_status()
         except httpx.HTTPError as e:
-            console.print(f"[cyan]{self.tracker}:[/cyan] Error validating session: {e}")
+            logger.error(f"[cyan]{self.tracker}:[/cyan] Error validating session: {e}")
             return False
 
         live = self.live_session_id()
@@ -398,7 +398,7 @@ class MKO:
             return False
 
         if "id='login_form'" in resp.text or 'id="login_form"' in resp.text:
-            console.print(f"[cyan]{self.tracker}:[/cyan] The session is unauthenticated. Check member_id and pass_hash on the configuration.")
+            logger.warning(f"[cyan]{self.tracker}:[/cyan] The session is unauthenticated. Check member_id and pass_hash on the configuration.")
             return False
 
         return True
@@ -418,7 +418,7 @@ class MKO:
             resp = await self.session.get(url)
             resp.raise_for_status()
         except httpx.HTTPError as e:
-            console.print(f"[cyan]{self.tracker}:[/cyan] Failed loading topic new page: {e}")
+            logger.error(f"[cyan]{self.tracker}:[/cyan] Failed loading topic new page: {e}")
             return "", "", ""
 
         soup = BeautifulSoup(resp.text, "html.parser")
@@ -432,11 +432,11 @@ class MKO:
         attach_post_key = _val("attach_post_key")
 
         if "id='sign_in'" in resp.text or 'id="sign_in"' in resp.text:
-            console.print(f"[cyan]{self.tracker}:[/cyan] Unauthenticated session detected on this page. Copy new headers from the browser.")
+            logger.warning(f"[cyan]{self.tracker}:[/cyan] Unauthenticated session detected on this page. Copy new headers from the browser.")
             return "", "", ""
 
         if not auth_key or not attach_post_key:
-            console.print(f"[cyan]{self.tracker}:[/cyan] It wasn't possible to extract auth_key or attach_post_key. Check if the session is valid.")
+            logger.warning(f"[cyan]{self.tracker}:[/cyan] It wasn't possible to extract auth_key or attach_post_key. Check if the session is valid.")
 
         return session_id, auth_key, attach_post_key
 
@@ -506,17 +506,17 @@ class MKO:
             )
             resp.raise_for_status()
         except FileNotFoundError:
-            console.print(f"[cyan]{self.tracker}:[/cyan] [bold red]Torrent file not found[/bold red]: {torrent_path}")
+            logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Torrent file not found[/bold red]: {torrent_path}")
             return False
         except httpx.HTTPError as e:
-            console.print(f"[cyan]{self.tracker}:[/cyan] [bold red]Failed uploading attachment:[/bold red] {e}")
+            logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Failed uploading attachment:[/bold red] {e}")
             return False
 
         if '"is_error":0' in resp.text or '"msg":"upload_ok"' in resp.text:
-            console.print(f"[cyan]{self.tracker}:[/cyan] [green]Attachment sent successfully.[/green]")
+            logger.info(f"[cyan]{self.tracker}:[/cyan] [green]Attachment sent successfully.[/green]")
             return True
 
-        console.print(f"[cyan]{self.tracker}:[/cyan] [bold red]Unwanted response while uploading attachment:[/bold red]\n{resp.text[:500]}")
+        logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Unwanted response while uploading attachment:[/bold red]\n{resp.text[:500]}")
         return False
 
     async def search(self, index_url: str, phrase: str) -> dict[str, str] | None:
@@ -554,10 +554,10 @@ class MKO:
             resp.raise_for_status()
             data = resp.json()
         except httpx.HTTPError as e:
-            console.print(f"[cyan]{self.tracker}:[/cyan] Error on the search:[/bold red] {e}")
+            logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Error on the search:[/bold red] {e}")
             return None
         except Exception as e:
-            console.print(f"[cyan]{self.tracker}:[/cyan] [bold red]Unwanted response while searching:[/bold red] {e}")
+            logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Unwanted response while searching:[/bold red] {e}")
             return None
 
         rows = data.get("rows") or []
@@ -664,7 +664,7 @@ class MKO:
             )
             resp.raise_for_status()
         except httpx.HTTPError as e:
-            console.print(f"[cyan]{self.tracker}:[/cyan] Failed creating topic: {e}")
+            logger.error(f"[cyan]{self.tracker}:[/cyan] Failed creating topic: {e}")
             return ""
 
         topic_url = str(resp.url)
@@ -675,7 +675,7 @@ class MKO:
         if match:
             return f"{self.base_url}/index.php?showtopic={match.group(1)}"
 
-        console.print(f"[yellow]{self.tracker}:[/yellow] Topic possibly created, but it wasn't possible to get the url.")
+        logger.warning(f"[yellow]{self.tracker}:[/yellow] Topic possibly created, but it wasn't possible to get the url.")
         return topic_url
 
     async def validate_credentials(self, _meta: Meta) -> bool:
@@ -710,7 +710,7 @@ class MKO:
             pass_hash = tracker_config.get("pass_hash", "").strip()
 
             if not member_id or not pass_hash:
-                console.print(
+                logger.error(
                     f"[cyan]{self.tracker}:[/cyan] [bold red]Incomplete credentials on configuration "
                     f"Fill 'cookie_header' (recommended) or 'member_id' and 'pass_hash' "
                     f"in config['TRACKERS']['{self.tracker}'].[/bold red]"
@@ -727,7 +727,7 @@ class MKO:
                 self.session.cookies.set("pass_hash", pass_hash, domain=domain)
 
         if not await self.refresh_session():
-            console.print(f"[cyan]{self.tracker}:[/cyan] [bold red]Session couldn't be validated.[/bold red] Cookies may be expired.")
+            logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Session couldn't be validated.[/bold red] Cookies may be expired.")
             return False
 
         return True
@@ -767,7 +767,7 @@ class MKO:
         results: dict[str, str] = {}
         for candidate in candidates:
             term = candidate.strip()
-            console.print(f"[cyan]{self.tracker}:[/cyan] [yellow]Searching for:[/yellow] {term}")
+            logger.info(f"[cyan]{self.tracker}:[/cyan] [yellow]Searching for:[/yellow] {term}")
             found = await self.search(self.index_url, term)
             if found:
                 results = found
@@ -782,12 +782,12 @@ class MKO:
             if upload_year:
                 year_int = int(upload_year)
                 if not any(f"({y})" in title for y in (year_int - 1, year_int, year_int + 1)):
-                    console.print(f"[cyan]{self.tracker}:[/cyan] [yellow]Skipping: different year in existing release:[/yellow] {title}")
+                    logger.info(f"[cyan]{self.tracker}:[/cyan] [yellow]Skipping: different year in existing release:[/yellow] {title}")
                     continue
 
             # Uploading SD while a Hidef exists → block immediately.
             if not uploading_hidef and existing_hidef:
-                console.print(f"[cyan]{self.tracker}:[/cyan] [bold red]Aborting: A Hidef release exists:[/bold red] {title}")
+                logger.warning(f"[cyan]{self.tracker}:[/cyan] [bold red]Aborting: A Hidef release exists:[/bold red] {title}")
                 meta.skipping = self.tracker
                 duplicates.append({"name": title, "size": "", "link": url})
                 continue
@@ -805,7 +805,7 @@ class MKO:
                 upload_height = 0
 
             if resolution >= upload_height:
-                console.print(f"[cyan]{self.tracker}:[/cyan] [bold red]Aborting: A better or equivalent Hidef release exists:[/bold red] {title}")
+                logger.warning(f"[cyan]{self.tracker}:[/cyan] [bold red]Aborting: A better or equivalent Hidef release exists:[/bold red] {title}")
                 meta.skipping = self.tracker
                 duplicates.append({"name": title, "size": str(resolution), "link": url})
                 continue
@@ -898,7 +898,7 @@ class MKO:
             if code in forum_id_by_country:
                 return forum_id_by_country[code]
 
-        console.print(
+        logger.info(
             f"[cyan]{self.tracker}:[/cyan] [bold yellow]Unmapped origin country [/bold yellow]({origin_countries}). [bold yellow]Select the subforum manually:[/bold yellow]"
         )
         forum_options = {
@@ -914,13 +914,13 @@ class MKO:
             "10": (30, "Oriente Médio"),
         }
         for k, (fid, name) in forum_options.items():
-            console.print(f"  {k}) {name} (ID: {fid})")
+            logger.info(f"  {k}) {name} (ID: {fid})")
 
         choice = input("Escolha: ").strip()
         if choice in forum_options:
             return forum_options[choice][0]
 
-        console.print(f"[cyan]{self.tracker}:[/cyan] [yellow]Invalid option, using North-American (26) as default.[/yellow]")
+        logger.warning(f"[cyan]{self.tracker}:[/cyan] [yellow]Invalid option, using North-American (26) as default.[/yellow]")
         return 26
 
     # -- title resolution
@@ -1079,9 +1079,9 @@ class MKO:
 
         # Fallback to asking
         options = {"1": "Anexas", "2": "Embutidas", "3": "Fixas", "4": "Sem Legenda"}
-        console.print(f"[cyan]{self.tracker}:[/cyan] [yellow]Any subtitles?[/yellow]")
+        logger.info(f"[cyan]{self.tracker}:[/cyan] [yellow]Any subtitles?[/yellow]")
         for k, v in options.items():
-            console.print(f"  {k}) {v}")
+            logger.info(f"  {k}) {v}")
         return options.get(input("Choose: ").strip(), "")
 
     async def generate_description(self, meta: Meta) -> str:
@@ -1181,16 +1181,16 @@ class MKO:
             bool: True if the release meets all requirements.
         """
         if meta.resolution == "2160p":
-            console.print(f"[cyan]{self.tracker}:[/cyan] [bold red]4K Resolution (2160p) isn't allowed on this forum.[/bold red]")
+            logger.warning(f"[cyan]{self.tracker}:[/cyan] [bold red]4K Resolution (2160p) isn't allowed on this forum.[/bold red]")
             return False
 
         video = meta.video_codec.upper()
         if not any(c in video for c in ("H264", "H.264", "AVC")):
-            console.print(f"[cyan]{self.tracker}:[/cyan] [bold red]Only H.264 codec is allowed on this forum.[/bold red]")
+            logger.warning(f"[cyan]{self.tracker}:[/cyan] [bold red]Only H.264 codec is allowed on this forum.[/bold red]")
             return False
 
         if not meta.is_disc and meta.container.upper() not in ("MKV", "AVI"):
-            console.print(f"[cyan]{self.tracker}:[/cyan] [bold red]Only MKV/AVI containers are allowed on this forum.[/bold red]")
+            logger.warning(f"[cyan]{self.tracker}:[/cyan] [bold red]Only MKV/AVI containers are allowed on this forum.[/bold red]")
             return False
 
         return True
@@ -1206,7 +1206,7 @@ class MKO:
             bool: True if the upload succeeded.
         """
         forum_id = self.get_forum_id(meta)
-        console.print(f"[cyan]{self.tracker}:[/cyan] [green]Selected subforum:[/green] {forum_id} ")
+        logger.info(f"[cyan]{self.tracker}:[/cyan] [green]Selected subforum:[/green] {forum_id} ")
         await self.common.create_torrent_for_upload(
             meta=meta,
             tracker=self.tracker,
@@ -1236,14 +1236,14 @@ class MKO:
                 post_body=post_body,
             )
 
-            console.print(f"[cyan]{self.tracker} Request Data:[/cyan]")
-            console.print(Redaction.redact_private_info(fields))
+            logger.info(f"[cyan]{self.tracker} Request Data:[/cyan]")
+            logger.info(Redaction.redact_private_info(fields))
 
             txt_path = f"{meta.base_dir}/tmp/{meta.uuid}/MKO_bbcode.txt"
             async with aiofiles.open(txt_path, "w", encoding="utf-8") as f:
                 await f.write(f"TITULO: {topic_title}\n\n")
                 await f.write(post_body)
-            console.print(f"[cyan]{self.tracker}:[/cyan] [yellow]BBCode saved.[/yellow] {txt_path}")
+            logger.info(f"[cyan]{self.tracker}:[/cyan] [yellow]BBCode saved.[/yellow] {txt_path}")
             meta["tracker_status"][self.tracker]["status_message"] = "Debug mode enabled, not uploading (simulated successfully)"
             return True
 

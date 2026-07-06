@@ -8,18 +8,16 @@ import re
 import shlex
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, TypeAlias, cast
+from typing import Any, cast
 
 import cli_ui
 import click
-from rich.markdown import Markdown
-from rich.style import Style
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
-QueueItem: TypeAlias = dict[str, Any]
-QueueList: TypeAlias = list[str] | list[QueueItem]
+type QueueItem = dict[str, Any]
+type QueueList = list[str] | list[QueueItem]
 
 
 async def _read_json_file(path: str) -> Any:
@@ -48,13 +46,13 @@ class QueueManager:
         search_results_file = os.path.join(base_dir, "tmp", f"{site_upload}_search_results.json")
 
         if not os.path.exists(search_results_file):
-            console.print(f"[red]Search results file not found: {search_results_file}[/red]")
+            logger.info(f"[red]Search results file not found: {search_results_file}[/red]")
             return [], None
 
         try:
             search_results = cast(list[QueueItem], await _read_json_file(search_results_file))
         except (json.JSONDecodeError, OSError) as e:
-            console.print(f"[red]Error loading search results file: {e}[/red]")
+            logger.error(f"[red]Error loading search results file: {e}[/red]")
             return [], None
 
         # Get processed files log
@@ -65,7 +63,7 @@ class QueueManager:
             try:
                 processed_paths = set(cast(list[str], await _read_json_file(processed_files_log)))
             except (json.JSONDecodeError, OSError) as e:
-                console.print(f"[yellow]Warning: Could not load processed files log: {e}[/yellow]")
+                logger.warning(f"[yellow]Warning: Could not load processed files log: {e}[/yellow]")
 
         # Extract paths and IMDb IDs, filtering out processed paths
         queue: list[QueueItem] = []
@@ -85,16 +83,16 @@ class QueueManager:
                 }
                 queue.append(queue_item)
 
-        console.print(f"[cyan]Found {len(queue)} unprocessed items for {site_upload} upload[/cyan]")
+        logger.info(f"[cyan]Found {len(queue)} unprocessed items for {site_upload} upload[/cyan]")
 
         if queue:
             # Display the queue
             paths_only = [item['path'] for item in queue]
             md_text = "\n - ".join(paths_only)
-            console.print("\n[bold green]Queuing these files for site upload:[/bold green]", end='')
-            console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
-            console.print(f"[yellow]Tracker: {site_upload}[/yellow]")
-            console.print("\n\n")
+            logger.info("\n[bold green]Queuing these files for site upload:[/bold green]")
+            logger.info(f"- {md_text.rstrip()}\n\n")
+            logger.info(f"[yellow]Tracker: {site_upload}[/yellow]")
+            logger.info("\n\n")
 
         return queue, processed_files_log
 
@@ -128,7 +126,7 @@ class QueueManager:
             os.makedirs(os.path.dirname(processed_files_log), exist_ok=True)
             await _write_json_file(processed_files_log, list(processed_paths), indent=4)
         except OSError as e:
-            console.print(f"[red]Error saving processed path: {e}[/red]")
+            logger.error(f"[red]Error saving processed path: {e}[/red]")
 
     @staticmethod
     async def get_log_file(base_dir: str, queue_name: str) -> str:
@@ -170,7 +168,7 @@ class QueueManager:
             # Ensure proper path format
             normalized_path = os.path.normpath(path_str)
         except Exception as e:
-            console.print(f"[yellow]Warning: Path normalization failed for {path_str}: {e}[/yellow]")
+            logger.warning(f"[yellow]Warning: Path normalization failed for {path_str}: {e}[/yellow]")
             normalized_path = os.path.normpath(path_str)
 
         if os.path.isdir(normalized_path):
@@ -181,14 +179,14 @@ class QueueManager:
                     )
 
             except (OSError, PermissionError) as e:
-                console.print(f"[red]Error scanning directory {normalized_path}: {e}[/red]")
+                logger.error(f"[red]Error scanning directory {normalized_path}: {e}[/red]")
                 return []
 
         elif os.path.isfile(normalized_path):
             if allowed_extensions_tuple is None or normalized_path.lower().endswith(allowed_extensions_tuple):
                 queue.append(normalized_path)
         else:
-            console.print(f"[red]Invalid path: {normalized_path}[/red]")
+            logger.info(f"[red]Invalid path: {normalized_path}[/red]")
 
         return queue
 
@@ -212,7 +210,7 @@ class QueueManager:
                 entry_paths.append(entry_path)
 
         except (OSError, UnicodeDecodeError, UnicodeError) as e:
-            console.print(f"[yellow]Warning: Skipping entry due to encoding issue: {e}[/yellow]")
+            logger.warning(f"[yellow]Warning: Skipping entry due to encoding issue: {e}[/yellow]")
             # Try to get the path in a different way
             try:
                 alt_path = os.path.join(normalized_path, entry.name)
@@ -261,7 +259,7 @@ class QueueManager:
             return False
 
         except (OSError, PermissionError, UnicodeError) as e:
-            console.print(f"[yellow]Warning: Could not scan directory {dir_path}: {e}[/yellow]")
+            logger.warning(f"[yellow]Warning: Could not scan directory {dir_path}: {e}[/yellow]")
             return False
 
     @staticmethod
@@ -282,7 +280,7 @@ class QueueManager:
         if os.path.exists(p1):
             queue.append(p1)
         else:
-            console.print(f"[red]Path: [bold red]{p1}[/bold red] does not exist")
+            logger.info(f"[red]Path: [bold red]{p1}[/bold red] does not exist")
 
         return queue
 
@@ -368,9 +366,9 @@ class QueueManager:
                 paths_or_lines.append(str(item))
 
         md_text = "\n - ".join(paths_or_lines)
-        console.print("\n[bold green]Queuing these files:[/bold green]", end='')
-        console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
-        console.print("\n\n")
+        logger.info("\n[bold green]Queuing these files:[/bold green]")
+        logger.info(f"- {md_text.rstrip()}\n\n")
+        logger.info("\n\n")
 
         if save_to_log and base_dir and queue_name:
             tmp_dir = os.path.join(base_dir, "tmp")
@@ -386,9 +384,9 @@ class QueueManager:
 
             try:
                 await _write_json_file(log_file, paths_or_lines, indent=4)
-                console.print(f"[bold green]Queue successfully saved to log file: {log_file}")
+                logger.info(f"[bold green]Queue successfully saved to log file: {log_file}")
             except Exception as e:
-                console.print(f"[bold red]Failed to save queue to log file: {e}")
+                logger.info(f"[bold red]Failed to save queue to log file: {e}")
 
     @staticmethod
     async def handle_queue(
@@ -401,7 +399,7 @@ class QueueManager:
         queue: list[Any] = []
 
         if meta.site_upload:
-            console.print(f"[bold yellow]Processing site upload queue for tracker: {meta.site_upload}[/bold yellow]")
+            logger.info(f"[bold yellow]Processing site upload queue for tracker: {meta.site_upload}[/bold yellow]")
             site_queue, processed_log = await QueueManager.process_site_upload_queue(meta, base_dir)
 
             if site_queue:
@@ -411,13 +409,13 @@ class QueueManager:
                 # Return the structured queue and log file
                 return site_queue, processed_log
             else:
-                console.print(f"[yellow]No unprocessed items found for {meta.site_upload} upload[/yellow]")
+                logger.info(f"[yellow]No unprocessed items found for {meta.site_upload} upload[/yellow]")
                 return [], None
 
         log_file = os.path.join(base_dir, "tmp", f"{(meta.queue if meta.queue is not None else 'default')}_queue.log")
 
         if path.endswith(".txt") and not meta.unit3d:
-            console.print(f"[bold yellow]Detected a text file for queue input: {path}[/bold yellow]")
+            logger.info(f"[bold yellow]Detected a text file for queue input: {path}[/bold yellow]")
             if os.path.exists(path):
                 queue_name = os.path.splitext(os.path.basename(path))[0]
                 meta.queue = queue_name
@@ -451,60 +449,60 @@ class QueueManager:
                         if line_stripped not in processed_files and item_path not in processed_files:
                             queue.append(queue_item)
                     except ValueError as e:
-                        console.print(f"[red]Error parsing line (shlex) in queue file: {line_stripped}. Error: {e}[/red]")
+                        logger.error(f"[red]Error parsing line (shlex) in queue file: {line_stripped}. Error: {e}[/red]")
                     except Exception as e:
-                        console.print(f"[red]Unexpected error processing line in queue file: {line_stripped}. Error: {e}[/red]")
+                        logger.error(f"[red]Unexpected error processing line in queue file: {line_stripped}. Error: {e}[/red]")
 
                 if not queue:
-                    console.print(f"[bold yellow]All items in the {queue_name} queue have already been processed.[/bold yellow]")
+                    logger.info(f"[bold yellow]All items in the {queue_name} queue have already been processed.[/bold yellow]")
                     exit(0)
 
                 queue_log = os.path.join(base_dir, "tmp", f"{queue_name}_queue.log")
                 try:
                     await _write_json_file(queue_log, [item["line"] for item in queue], indent=4)
                 except OSError as e:
-                    console.print(f"[bold red]Failed to save the queue log file: {e}[/bold red]")
+                    logger.info(f"[bold red]Failed to save the queue log file: {e}[/bold red]")
 
                 if meta.debug:
                     await QueueManager.display_queue(queue, base_dir, queue_name, save_to_log=False)
 
                 return queue, log_file
             else:
-                console.print(f"[bold red]Text file not found: {path}. Exiting.[/bold red]")
+                logger.info(f"[bold red]Text file not found: {path}. Exiting.[/bold red]")
                 exit(1)
 
         elif path.endswith(".txt") and meta.unit3d:
-            console.print(f"[bold yellow]Detected a text file for queue input: {path}[/bold yellow]")
+            logger.info(f"[bold yellow]Detected a text file for queue input: {path}[/bold yellow]")
             if os.path.exists(path):
                 safe_file_locations = await QueueManager.extract_safe_file_locations(path)
                 if safe_file_locations:
-                    console.print(f"[cyan]Extracted {len(safe_file_locations)} safe file locations from the text file.[/cyan]")
+                    logger.info(f"[cyan]Extracted {len(safe_file_locations)} safe file locations from the text file.[/cyan]")
                     queue = safe_file_locations
                     meta.queue = "unit3d"
 
                     # Save the queue to the log file
                     try:
                         await _write_json_file(log_file, queue, indent=4)
-                        console.print(f"[bold green]Queue log file saved successfully: {log_file}[/bold green]")
+                        logger.info(f"[bold green]Queue log file saved successfully: {log_file}[/bold green]")
                     except OSError as e:
-                        console.print(f"[bold red]Failed to save the queue log file: {e}[/bold red]")
+                        logger.info(f"[bold red]Failed to save the queue log file: {e}[/bold red]")
                         exit(1)
                 else:
-                    console.print("[bold red]No safe file locations found in the text file. Exiting.[/bold red]")
+                    logger.info("[bold red]No safe file locations found in the text file. Exiting.[/bold red]")
                     exit(1)
             else:
-                console.print(f"[bold red]Text file not found: {path}. Exiting.[/bold red]")
+                logger.info(f"[bold red]Text file not found: {path}. Exiting.[/bold red]")
                 exit(1)
 
         elif path.endswith(".log") and meta.debug:
-            console.print(f"[bold yellow]Processing debugging queue:[/bold yellow] [bold green{path}[/bold green]")
+            logger.info(f"[bold yellow]Processing debugging queue:[/bold yellow] [bold green{path}[/bold green]")
             if os.path.exists(path):
                 log_file = path
                 queue = cast(list[str], await _read_json_file(path))
                 meta.queue = "debugging"
 
             else:
-                console.print(f"[bold red]Log file not found: {path}. Exiting.[/bold red]")
+                logger.info(f"[bold red]Log file not found: {path}. Exiting.[/bold red]")
                 exit(1)
 
         elif meta.queue:
@@ -524,76 +522,76 @@ class QueueManager:
                 processed_files = await QueueManager.load_processed_files(log_file_proccess)
                 queued = [file for file in existing_queue if file not in processed_files]
 
-                console.print(f"[bold yellow]Found an existing queue log file:[/bold yellow] [green]{log_file}[/green]")
-                console.print(f"[cyan]The queue log contains {len(existing_queue)} total items and {len(queued)} unprocessed items.[/cyan]")
+                logger.info(f"[bold yellow]Found an existing queue log file:[/bold yellow] [green]{log_file}[/green]")
+                logger.info(f"[cyan]The queue log contains {len(existing_queue)} total items and {len(queued)} unprocessed items.[/cyan]")
 
                 if new_files or removed_files:
-                    console.print("[bold yellow]Queue changes detected:[/bold yellow]")
+                    logger.info("[bold yellow]Queue changes detected:[/bold yellow]")
                     if new_files and meta.debug:
-                        console.print(f"[green]New files found ({len(new_files)}):[/green]")
+                        logger.info(f"[green]New files found ({len(new_files)}):[/green]")
                         for file in sorted(new_files):
-                            console.print(f"  + {file}")
+                            logger.info(f"  + {file}")
                     if removed_files and meta.debug:
-                        console.print(f"[red]Removed files ({len(removed_files)}):[/red]")
+                        logger.info(f"[red]Removed files ({len(removed_files)}):[/red]")
                         for file in sorted(removed_files):
-                            console.print(f"  - {file}")
+                            logger.info(f"  - {file}")
 
                     if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                        console.print("[yellow]Do you want to update the queue log, edit, discard, or keep the existing queue?[/yellow]")
+                        logger.info("[yellow]Do you want to update the queue log, edit, discard, or keep the existing queue?[/yellow]")
                         edit_choice_raw = cli_ui.ask_string("Enter 'u' to update, 'a' to add specific new files, 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
                         edit_choice = (edit_choice_raw or "").strip().lower()
 
                         if edit_choice == 'u':
                             queue = current_files
-                            console.print(f"[bold green]Queue updated with current files ({len(queue)} items).")
+                            logger.info(f"[bold green]Queue updated with current files ({len(queue)} items).")
                             await _write_json_file(log_file, queue, indent=4)
-                            console.print(f"[bold green]Queue log file updated: {log_file}[/bold green]")
+                            logger.info(f"[bold green]Queue log file updated: {log_file}[/bold green]")
                         elif edit_choice == 'a':
-                            console.print("[yellow]Select which new files to add (comma-separated numbers):[/yellow]")
+                            logger.info("[yellow]Select which new files to add (comma-separated numbers):[/yellow]")
                             for idx, file in enumerate(sorted(new_files), 1):
-                                console.print(f"  {idx}. {file}")
+                                logger.info(f"  {idx}. {file}")
                             selected_raw = cli_ui.ask_string("Enter numbers (e.g., 1,3,5): ")
                             selected = (selected_raw or "").strip()
                             try:
                                 indices = [int(x) for x in selected.split(',') if x.strip().isdigit()]
                                 selected_files = [file for i, file in enumerate(sorted(new_files), 1) if i in indices]
                                 queue = list(existing_queue) + selected_files
-                                console.print(f"[bold green]Queue updated with selected new files ({len(queue)} items).")
+                                logger.info(f"[bold green]Queue updated with selected new files ({len(queue)} items).")
                                 await _write_json_file(log_file, queue, indent=4)
-                                console.print(f"[bold green]Queue log file updated: {log_file}[/bold green]")
+                                logger.info(f"[bold green]Queue log file updated: {log_file}[/bold green]")
                             except Exception as e:
-                                console.print(f"[bold red]Failed to update queue with selected files: {e}. Using the existing queue.")
+                                logger.info(f"[bold red]Failed to update queue with selected files: {e}. Using the existing queue.")
                                 queue = existing_queue
                         elif edit_choice == 'e':
                             edited_content = click.edit(json.dumps(current_files, indent=4))
                             if edited_content:
                                 try:
                                     queue = json.loads(edited_content.strip())
-                                    console.print("[bold green]Successfully updated the queue from the editor.")
+                                    logger.info("[bold green]Successfully updated the queue from the editor.")
                                     await _write_json_file(log_file, queue, indent=4)
                                 except json.JSONDecodeError as e:
-                                    console.print(f"[bold red]Failed to parse the edited content: {e}. Using the current files.")
+                                    logger.info(f"[bold red]Failed to parse the edited content: {e}. Using the current files.")
                                     queue = current_files
                             else:
-                                console.print("[bold red]No changes were made. Using the current files.")
+                                logger.info("[bold red]No changes were made. Using the current files.")
                                 queue = current_files
                         elif edit_choice == 'd':
-                            console.print("[bold yellow]Discarding the existing queue log. Creating a new queue.")
+                            logger.info("[bold yellow]Discarding the existing queue log. Creating a new queue.")
                             queue = current_files
                             await _write_json_file(log_file, queue, indent=4)
-                            console.print(f"[bold green]New queue log file created: {log_file}[/bold green]")
+                            logger.info(f"[bold green]New queue log file created: {log_file}[/bold green]")
                         else:
-                            console.print("[bold green]Keeping the existing queue as is.")
+                            logger.info("[bold green]Keeping the existing queue as is.")
                             queue = existing_queue
                     else:
                         # In unattended mode, just use the existing queue
                         queue = existing_queue
-                        console.print("[bold yellow]New or removed files detected, but unattended mode is active. Using existing queue.")
+                        logger.info("[bold yellow]New or removed files detected, but unattended mode is active. Using existing queue.")
                 else:
                     # No changes detected
-                    console.print("[green]No changes detected in the queue.[/green]")
+                    logger.info("[green]No changes detected in the queue.[/green]")
                     if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                        console.print("[yellow]Do you want to edit, discard, or keep the existing queue?[/yellow]")
+                        logger.info("[yellow]Do you want to edit, discard, or keep the existing queue?[/yellow]")
                         edit_choice_raw = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
                         edit_choice = (edit_choice_raw or "").strip().lower()
 
@@ -602,24 +600,24 @@ class QueueManager:
                             if edited_content:
                                 try:
                                     queue = json.loads(edited_content.strip())
-                                    console.print("[bold green]Successfully updated the queue from the editor.")
+                                    logger.info("[bold green]Successfully updated the queue from the editor.")
                                     await _write_json_file(log_file, queue, indent=4)
                                 except json.JSONDecodeError as e:
-                                    console.print(f"[bold red]Failed to parse the edited content: {e}. Using the original queue.")
+                                    logger.info(f"[bold red]Failed to parse the edited content: {e}. Using the original queue.")
                                     queue = existing_queue
                             else:
-                                console.print("[bold red]No changes were made. Using the original queue.")
+                                logger.info("[bold red]No changes were made. Using the original queue.")
                                 queue = existing_queue
                         elif edit_choice == 'd':
-                            console.print("[bold yellow]Discarding the existing queue log. Creating a new queue.")
+                            logger.info("[bold yellow]Discarding the existing queue log. Creating a new queue.")
                             queue = current_files
                             await _write_json_file(log_file, queue, indent=4)
-                            console.print(f"[bold green]New queue log file created: {log_file}[/bold green]")
+                            logger.info(f"[bold green]New queue log file created: {log_file}[/bold green]")
                         else:
-                            console.print("[bold green]Keeping the existing queue as is.")
+                            logger.info("[bold green]Keeping the existing queue as is.")
                             queue = existing_queue
                     else:
-                        console.print("[bold green]Keeping the existing queue as is.")
+                        logger.info("[bold green]Keeping the existing queue as is.")
                         queue = existing_queue
             else:
                 if os.path.exists(path):
@@ -627,9 +625,9 @@ class QueueManager:
                 else:
                     queue = await QueueManager.resolve_queue_with_glob_or_split(path, paths, allowed_extensions=allowed_extensions)
 
-                console.print(f"[cyan]A new queue log file will be created:[/cyan] [green]{log_file}[/green]")
-                console.print(f"[cyan]The new queue will contain {len(queue)} items.[/cyan]")
-                console.print("[cyan]Do you want to edit the initial queue before saving?[/cyan]")
+                logger.info(f"[cyan]A new queue log file will be created:[/cyan] [green]{log_file}[/green]")
+                logger.info(f"[cyan]The new queue will contain {len(queue)} items.[/cyan]")
+                logger.info("[cyan]Do you want to edit the initial queue before saving?[/cyan]")
                 edit_choice_raw = cli_ui.ask_string("Enter 'e' to edit, or press Enter to save as is: ")
                 edit_choice = (edit_choice_raw or "").strip().lower()
 
@@ -638,15 +636,15 @@ class QueueManager:
                     if edited_content:
                         try:
                             queue = json.loads(edited_content.strip())
-                            console.print("[bold green]Successfully updated the queue from the editor.")
+                            logger.info("[bold green]Successfully updated the queue from the editor.")
                         except json.JSONDecodeError as e:
-                            console.print(f"[bold red]Failed to parse the edited content: {e}. Using the original queue.")
+                            logger.info(f"[bold red]Failed to parse the edited content: {e}. Using the original queue.")
                     else:
-                        console.print("[bold red]No changes were made. Using the original queue.")
+                        logger.info("[bold red]No changes were made. Using the original queue.")
 
                 # Save the queue to the log file
                 await _write_json_file(log_file, queue, indent=4)
-                console.print(f"[bold green]Queue log file created: {log_file}[/bold green]")
+                logger.info(f"[bold green]Queue log file created: {log_file}[/bold green]")
 
         elif os.path.exists(path):
             queue = [path]
@@ -659,33 +657,33 @@ class QueueManager:
                 queue = globs
                 if queue:
                     md_text = "\n - ".join(queue)
-                    console.print("\n[bold green]Queuing these files:[/bold green]", end='')
-                    console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
-                    console.print("\n\n")
+                    logger.info("\n[bold green]Queuing these files:[/bold green]")
+                    logger.info(f"- {md_text.rstrip()}\n\n")
+                    logger.info("\n\n")
                 else:
-                    console.print(f"[red]Path: [bold red]{path}[/bold red] does not exist")
+                    logger.info(f"[red]Path: [bold red]{path}[/bold red] does not exist")
 
             elif os.path.exists(os.path.dirname(path)) and len(paths) != 1:
                 queue = list(paths)
                 md_text = "\n - ".join(queue)
-                console.print("\n[bold green]Queuing these files:[/bold green]", end='')
-                console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
-                console.print("\n\n")
+                logger.info("\n[bold green]Queuing these files:[/bold green]")
+                logger.info(f"- {md_text.rstrip()}\n\n")
+                logger.info("\n\n")
             elif not os.path.exists(os.path.dirname(path)):
                 queue = await QueueManager._resolve_split_path(path)
                 if queue:
                     md_text = "\n - ".join(queue)
-                    console.print("\n[bold green]Queuing these files:[/bold green]", end='')
-                    console.print(Markdown(f"- {md_text.rstrip()}\n\n", style=Style(color='cyan')))
-                    console.print("\n\n")
+                    logger.info("\n[bold green]Queuing these files:[/bold green]")
+                    logger.info(f"- {md_text.rstrip()}\n\n")
+                    logger.info("\n\n")
 
             else:
                 # Add Search Here
-                console.print("[red]There was an issue with your input. If you think this was not an issue, please make a report that includes the full command used.")
+                logger.info("[red]There was an issue with your input. If you think this was not an issue, please make a report that includes the full command used.")
                 exit()
 
         if not queue:
-            console.print(f"[red]No valid files or directories found for path: {path}")
+            logger.info(f"[red]No valid files or directories found for path: {path}")
             exit(1)
 
         if meta.queue:
@@ -694,7 +692,7 @@ class QueueManager:
             processed_files = await QueueManager.load_processed_files(log_file)
             queue = [file for file in queue if file not in processed_files]
             if not queue:
-                console.print(f"[bold yellow]All files in the {meta.queue} queue have already been processed.")
+                logger.info(f"[bold yellow]All files in the {meta.queue} queue have already been processed.")
                 exit(0)
             if meta.debug:
                 await QueueManager.display_queue(queue, base_dir, queue_name, save_to_log=False)

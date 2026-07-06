@@ -11,7 +11,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from cogs.redaction import Redaction
-from src.console import console
+from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
@@ -268,10 +268,10 @@ class GPW:
         media_type = str(meta.type).lower()
         tag = "" if not meta.tag else meta.tag.strip().lower()
         if media_type == "remux" and tag in ("-hdt", "-frds"):
-            console.print(f"{self.tracker}: Remuxes from {meta.tag} are not allowed on {self.tracker}")
+            logger.info(f"{self.tracker}: Remuxes from {meta.tag} are not allowed on {self.tracker}")
             return False
         if media_type == "webdl" and tag == "-evo":
-            console.print(f"{self.tracker}: WEB-DLs from {meta.tag} are not allowed on {self.tracker}")
+            logger.info(f"{self.tracker}: WEB-DLs from {meta.tag} are not allowed on {self.tracker}")
             return False
 
         return True
@@ -285,7 +285,7 @@ class GPW:
 
         imdb = dict(meta.imdb_info).get("imdbID", "")
         if not imdb:
-            console.print(f"{self.tracker}: IMDb ID not found in metadata. Skipping search.")
+            logger.info(f"{self.tracker}: IMDb ID not found in metadata. Skipping search.")
             return []
 
         cookies = await self.load_cookies(meta)
@@ -378,7 +378,7 @@ class GPW:
             response = await client.get(url)
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
-            console.print(f'Error on request: {e.response.status_code} - {e.response.reason_phrase}', markup=False)
+            logger.info(f'Error on request: {e.response.status_code} - {e.response.reason_phrase}', extra={"markup": False})
             return
 
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -421,8 +421,8 @@ class GPW:
             if final_slots:
                 final_slots = final_slots.replace('Slot', '').replace('Empty slots:', '').strip()
                 if resolution == meta.resolution:
-                    console.print(f'\n[green]Available Slots for[/green] {resolution}:')
-                    console.print(f'{final_slots}\n')
+                    logger.info(f'\n[green]Available Slots for[/green] {resolution}:')
+                    logger.info(f'{final_slots}\n')
 
     async def get_media_info(self, meta: Meta) -> str:
         info_file_path = ''
@@ -433,10 +433,10 @@ class GPW:
                 async with aiofiles.open(info_file_path, encoding='utf-8') as f:
                     return await f.read()
             except Exception as e:
-                console.print(f'[bold red]Error reading info file at {info_file_path}: {e}[/bold red]')
+                logger.info(f'[bold red]Error reading info file at {info_file_path}: {e}[/bold red]')
                 return ''
         else:
-            console.print(f'[bold red]Info file not found: {info_file_path}[/bold red]')
+            logger.info(f'[bold red]Info file not found: {info_file_path}[/bold red]')
             return ''
 
     def get_edition(self, meta: Meta) -> str:
@@ -590,16 +590,16 @@ class GPW:
                 response.raise_for_status()
 
         except httpx.RequestError as e:
-            console.print(f'[bold red]Network error fetching groupid: {e}[/bold red]')
+            logger.info(f'[bold red]Network error fetching groupid: {e}[/bold red]')
             return False
         except httpx.HTTPStatusError as e:
-            console.print(f'[bold red]HTTP error when fetching groupid: Status {e.response.status_code}[/bold red]')
+            logger.info(f'[bold red]HTTP error when fetching groupid: Status {e.response.status_code}[/bold red]')
             return False
 
         try:
             data: dict[str, Any] = response.json()
         except Exception as e:
-            console.print(f'[bold red]Error decoding JSON from groupid response: {e}[/bold red]')
+            logger.info(f'[bold red]Error decoding JSON from groupid response: {e}[/bold red]')
             return False
 
         if data.get('status') == 200 and 'response' in data and 'ID' in data['response']:
@@ -626,19 +626,19 @@ class GPW:
                     async with aiofiles.open(poster_path, mode="wb") as f:
                         await f.write(response.content)
             except Exception as e:
-                console.print(f"{self.tracker}: [red]Error downloading poster: {e}[/red]")
+                logger.error(f"{self.tracker}: [red]Error downloading poster: {e}[/red]")
                 return ""
 
         if os.path.exists(poster_path):
             try:
-                console.print(f"{self.tracker}: Uploading poster to image host...")
+                logger.info(f"{self.tracker}: Uploading poster to image host...")
                 new_images, _ = await self.rehost_images_manager.uploadscreens_manager.upload_screens(
                     meta, 1, 1, 0, 1, [poster_path], {}, allowed_hosts=self.approved_image_hosts
                 )
                 if new_images:
                     return str(new_images[0].get("raw_url", ""))
             except Exception as e:
-                console.print(f"[red]Error uploading poster: {e}[/red]")
+                logger.error(f"[red]Error uploading poster: {e}[/red]")
 
         return ""
 
@@ -654,7 +654,7 @@ class GPW:
                 if any(host in poster_url for host in self.approved_image_hosts):
                     break
                 else:
-                    console.print("[red]Invalid host. Please use a URL from the allowed hosts.[/red]")
+                    logger.info("[red]Invalid host. Please use a URL from the allowed hosts.[/red]")
 
         imdb_identifier = str(meta.imdb_info.get("imdbID") or meta.imdb or "").strip()
         tmdb_identifier = str(meta.tmdb_id or "").strip()
@@ -774,21 +774,21 @@ class GPW:
             english_name = first_director_name
             chinese_name = ''
         else:
-            console.print(f'{self.tracker}: This movie is not registered in the {self.tracker} database, please enter the details of 1 director')
+            logger.info(f'{self.tracker}: This movie is not registered in the {self.tracker} database, please enter the details of 1 director')
 
             imdb_id = ''
             while not re.match(r'^nm\d+$', imdb_id):
                 imdb_id_raw = await asyncio.to_thread(cli_ui.ask_string, 'Enter Director IMDb ID (e.g., nm0000138): ')
                 imdb_id = (imdb_id_raw or "").strip()
                 if not re.match(r'^nm\d+$', imdb_id):
-                    console.print('[red]Invalid IMDb person ID. Format must be like nm0000138.[/red]')
+                    logger.info('[red]Invalid IMDb person ID. Format must be like nm0000138.[/red]')
 
             english_name = ''
             while not english_name:
                 english_name_raw = await asyncio.to_thread(cli_ui.ask_string, 'Enter Director English name: ')
                 english_name = (english_name_raw or "").strip()
                 if not english_name:
-                    console.print('[red]Director English name cannot be empty.[/red]')
+                    logger.info('[red]Director English name cannot be empty.[/red]')
 
             chinese_name_raw = await asyncio.to_thread(cli_ui.ask_string, 'Enter Director Chinese name (optional, press Enter to skip): ')
             chinese_name = (chinese_name_raw or "").strip()
@@ -1015,7 +1015,7 @@ class GPW:
         data: dict[str, Any] = {}
 
         if not GPW.group_id:
-            console.print(f'{self.tracker}: This movie is not registered in the database, please enter additional information.')
+            logger.info(f'{self.tracker}: This movie is not registered in the database, please enter additional information.')
             data.update(await self.get_additional_data(meta))
 
         data.update({
@@ -1105,7 +1105,7 @@ class GPW:
                     try:
                         response_data = response.json()
                     except Exception as e:
-                        console.print(f"{self.tracker}: Failed to decode JSON response: {e}")
+                        logger.info(f"{self.tracker}: Failed to decode JSON response: {e}")
                         return False
 
                     if not isinstance(response_data, dict):
@@ -1144,8 +1144,8 @@ class GPW:
                 return False
 
         else:
-            console.print("[cyan]GPW Request Data:")
-            console.print(Redaction.redact_private_info(data))
+            logger.info("[cyan]GPW Request Data:")
+            logger.info(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True

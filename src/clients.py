@@ -12,7 +12,7 @@ import httpx
 import qbittorrentapi
 from torf import Torrent
 
-from src.console import console
+from src.console import console, logger
 from src.meta import Meta
 from src.torrent_clients import DelugeClientMixin, QbittorrentClientMixin, RtorrentClientMixin, TransmissionClientMixin
 
@@ -130,13 +130,13 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         else:
             torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{tracker}].torrent"
         if meta.no_seed is True:
-            console.print("[bold red]--no-seed was passed, so the torrent will not be added to the client")
-            console.print("[bold yellow]Add torrent manually to the client")
+            logger.info("[bold red]--no-seed was passed, so the torrent will not be added to the client")
+            logger.info("[bold yellow]Add torrent manually to the client")
             return
         if os.path.exists(torrent_path):
             torrent = Torrent.read(torrent_path)
         else:
-            console.print(f"[bold red]Torrent file {torrent_path} does not exist, cannot add to client")
+            logger.info(f"[bold red]Torrent file {torrent_path} does not exist, cannot add to client")
             return
 
         inject_clients: list[str] = []
@@ -144,10 +144,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         if isinstance(client_value, str) and client_value != 'none':
             inject_clients = [client_value]
             if meta.debug:
-                console.print(f"[cyan]DEBUG: Using client from meta: {inject_clients}[/cyan]")
+                logger.debug(f"[cyan]DEBUG: Using client from meta: {inject_clients}[/cyan]")
         elif client_value == 'none':
             if meta.debug:
-                console.print("[cyan]DEBUG: meta client is 'none', skipping adding to client[/cyan]")
+                logger.debug("[cyan]DEBUG: meta client is 'none', skipping adding to client[/cyan]")
             return
         else:
             try:
@@ -155,45 +155,45 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 if isinstance(inject_clients_config, str) and inject_clients_config.strip():
                     inject_clients = [inject_clients_config]
                     if meta.debug:
-                        console.print(f"[cyan]DEBUG: Converted injecting_client_list string to list: {inject_clients}[/cyan]")
+                        logger.debug(f"[cyan]DEBUG: Converted injecting_client_list string to list: {inject_clients}[/cyan]")
                 elif isinstance(inject_clients_config, list):
                     # Filter out empty strings and whitespace-only strings
                     inject_clients_list = cast(list[Any], inject_clients_config)
                     inject_clients = [str(c).strip() for c in inject_clients_list if str(c).strip()]
                     if meta.debug:
-                        console.print(f"[cyan]DEBUG: Using injecting_client_list from config: {inject_clients}[/cyan]")
+                        logger.debug(f"[cyan]DEBUG: Using injecting_client_list from config: {inject_clients}[/cyan]")
                 else:
                     inject_clients = []
             except Exception as e:
                 if meta.debug:
-                    console.print(f"[cyan]DEBUG: Error reading injecting_client_list from config: {e}[/cyan]")
+                    logger.debug(f"[cyan]DEBUG: Error reading injecting_client_list from config: {e}[/cyan]")
 
             if not inject_clients:
                 default_client = self.config['DEFAULT'].get('default_torrent_client')
                 if isinstance(default_client, str) and default_client != 'none':
                     if meta.debug:
-                        console.print(f"[cyan]DEBUG: Falling back to default_torrent_client: {default_client}[/cyan]")
+                        logger.debug(f"[cyan]DEBUG: Falling back to default_torrent_client: {default_client}[/cyan]")
                     inject_clients = [default_client]
 
         if not inject_clients:
             if meta.debug:
-                console.print("[cyan]DEBUG: No clients configured for injecting[/cyan]")
+                logger.debug("[cyan]DEBUG: No clients configured for injecting[/cyan]")
             return
 
         if meta.debug:
-            console.print(f"[cyan]DEBUG: Clients to inject into: {inject_clients}[/cyan]")
+            logger.debug(f"[cyan]DEBUG: Clients to inject into: {inject_clients}[/cyan]")
 
         for client_name in inject_clients:
             client_to_skip = self.config["TRACKERS"][tracker].get("client_to_skip", [])
             if client_name in client_to_skip:
                 if meta.debug:
-                    console.print(f"[cyan]DEBUG: Skipping client '{client_name}' for tracker '{tracker}' as it's in client_to_skip list[/cyan]")
+                    logger.debug(f"[cyan]DEBUG: Skipping client '{client_name}' for tracker '{tracker}' as it's in client_to_skip list[/cyan]")
                 continue
             if client_name == "none" or not client_name:
                 continue
 
             if client_name not in self.config['TORRENT_CLIENTS']:
-                console.print(f"[bold red]Torrent client '{client_name}' not found in config.")
+                logger.info(f"[bold red]Torrent client '{client_name}' not found in config.")
                 continue
 
             client = self.config['TORRENT_CLIENTS'][client_name]
@@ -204,7 +204,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             local_path, remote_path = await self.remote_path_map(meta, client_name)
 
             if meta.debug:
-                console.print(f"[bold green]Adding to {client_name} ({torrent_client})")
+                logger.debug(f"[bold green]Adding to {client_name} ({torrent_client})")
 
             try:
                 if torrent_client.lower() == "rtorrent":
@@ -218,7 +218,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 elif torrent_client.lower() == "watch":
                     shutil.copy(torrent_path, client['watch_folder'])
             except Exception as e:
-                console.print(f"[bold red]Failed to add torrent to {client_name}: {e}")
+                logger.info(f"[bold red]Failed to add torrent to {client_name}: {e}")
         return
 
     async def inject_delay(self, meta: Meta, tracker: str, client_name: str) -> None:
@@ -244,20 +244,20 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 inject_delay = int(inject_delay)
             except (ValueError, TypeError):
                 if has_tracker_delay:
-                    console.print(f"{tracker}: [bold red]CONFIG ERROR: 'inject_delay' must be an integer")
+                    logger.info(f"{tracker}: [bold red]CONFIG ERROR: 'inject_delay' must be an integer")
                 else:
-                    console.print("[bold red]CONFIG ERROR: 'inject_delay' must be an integer")
+                    logger.info("[bold red]CONFIG ERROR: 'inject_delay' must be an integer")
                 inject_delay = 0
 
             if inject_delay < 0:
-                console.print("[bold red]CONFIG ERROR: 'inject_delay' must be >= 0")
+                logger.info("[bold red]CONFIG ERROR: 'inject_delay' must be >= 0")
                 inject_delay = 0
             if inject_delay > 0:
                 if meta.debug or inject_delay > 5:
                     if has_tracker_delay:
-                        console.print(f"{tracker}: [cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
+                        logger.info(f"{tracker}: [cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
                     else:
-                        console.print(f"[cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
+                        logger.info(f"[cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
                 await asyncio.sleep(inject_delay)
 
     async def find_existing_torrent(self, meta: Meta) -> str | None:
@@ -281,7 +281,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         if isinstance(meta_client, str) and meta_client != 'none':
             clients_to_search = [meta_client]
             if meta.debug:
-                console.print(f"[cyan]DEBUG: Using client from meta: {clients_to_search}[/cyan]")
+                logger.debug(f"[cyan]DEBUG: Using client from meta: {clients_to_search}[/cyan]")
         else:
             searching_list = self.config['DEFAULT'].get('searching_client_list', [])
             searching_list_values = cast(list[Any], searching_list) if isinstance(searching_list, list) else []
@@ -289,7 +289,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             if searching_list_values:
                 clients_to_search = [str(c) for c in searching_list_values if str(c) and str(c) != 'none']
                 if meta.debug:
-                    console.print(f"[cyan]DEBUG: Using searching_client_list from config: {clients_to_search}[/cyan]")
+                    logger.debug(f"[cyan]DEBUG: Using searching_client_list from config: {clients_to_search}[/cyan]")
             else:
                 clients_to_search = []
 
@@ -297,14 +297,14 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 if default_torrent_client and default_torrent_client != 'none':
                     clients_to_search = [default_torrent_client]
                     if meta.debug:
-                        console.print(f"[cyan]DEBUG: Falling back to default_torrent_client: {default_torrent_client}[/cyan]")
+                        logger.debug(f"[cyan]DEBUG: Falling back to default_torrent_client: {default_torrent_client}[/cyan]")
                 else:
-                    console.print("[yellow]No clients configured for searching...[/yellow]")
+                    logger.info("[yellow]No clients configured for searching...[/yellow]")
                     return None
 
         for client_name in clients_to_search:
             if client_name not in self.config['TORRENT_CLIENTS']:
-                console.print(f"[yellow]Client '{client_name}' not found in TORRENT_CLIENTS config, skipping...")
+                logger.info(f"[yellow]Client '{client_name}' not found in TORRENT_CLIENTS config, skipping...")
                 continue
 
             result = await self._search_single_client_for_torrent(
@@ -318,21 +318,21 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     # If prefer_small_pieces is False, we don't care about piece size optimization
                     # so stop searching after finding the first valid torrent
                     if not prefer_small_pieces:
-                        console.print(f"[green]Found valid torrent in client '{client_name}', stopping search[/green]")
+                        logger.info(f"[green]Found valid torrent in client '{client_name}', stopping search[/green]")
                         torrent_path = best_match.get('torrent_path')
                         return torrent_path if isinstance(torrent_path, str) else None
                 else:
                     # Got a path - this means we found a torrent with ideal piece size
                     if meta.debug:
-                        console.print(f"[green]Found valid torrent with preferred piece size in client '{client_name}', stopping search[/green]")
+                        logger.debug(f"[green]Found valid torrent with preferred piece size in client '{client_name}', stopping search[/green]")
                     return result
 
         if prefer_small_pieces and best_match:
-            console.print(f"[yellow]Using best match torrent with hash: [bold yellow]{best_match['torrenthash']}[/bold yellow]")
+            logger.info(f"[yellow]Using best match torrent with hash: [bold yellow]{best_match['torrenthash']}[/bold yellow]")
             torrent_path = best_match.get('torrent_path')
             return torrent_path if isinstance(torrent_path, str) else None
 
-        console.print("[bold yellow]No Valid .torrent found")
+        logger.info("[bold yellow]No Valid .torrent found")
         return None
 
     async def _search_single_client_for_torrent(
@@ -371,10 +371,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                                     if response.status_code == 200:
                                         torrent_file_content = response.content
                                     else:
-                                        console.print(f"[red]Failed to export torrent via proxy: {response.status_code}")
+                                        logger.error(f"[red]Failed to export torrent via proxy: {response.status_code}")
                                         continue
                                 except Exception as e:
-                                    console.print(f"[red]Error exporting torrent via proxy: {e}")
+                                    logger.error(f"[red]Error exporting torrent via proxy: {e}")
                                     continue
                         else:
                             potential_qbt_client = await self.init_qbittorrent_client(client)
@@ -395,7 +395,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                             except (TimeoutError, qbittorrentapi.APIError):
                                 continue
                         if not torrent_file_content:
-                            console.print(f"[bold red]qBittorrent returned an empty response for hash {hash_value_str}")
+                            logger.info(f"[bold red]qBittorrent returned an empty response for hash {hash_value_str}")
                             continue  # Skip to the next hash
 
                         # Save the .torrent file
@@ -404,10 +404,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
                         await asyncio.to_thread(Path(torrent_path).write_bytes, torrent_file_content)
 
-                        console.print(f"[green]Successfully saved .torrent file: {torrent_path}")
+                        logger.info(f"[green]Successfully saved .torrent file: {torrent_path}")
 
                     except qbittorrentapi.APIError as e:
-                        console.print(f"[bold red]Failed to fetch .torrent from qBittorrent for hash {hash_value_str}: {e}")
+                        logger.info(f"[bold red]Failed to fetch .torrent from qBittorrent for hash {hash_value_str}: {e}")
                         continue
 
                 # Validate the .torrent file
@@ -439,7 +439,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     await qbt_session.aclose()
 
             except KeyboardInterrupt:
-                console.print("[bold red]Search cancelled by user")
+                logger.info("[bold red]Search cancelled by user")
                 found_hash = None
                 if qbt_session:
                     await qbt_session.aclose()
@@ -448,7 +448,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     await qbt_session.aclose()
                 raise
             except Exception as e:
-                console.print(f"[bold red]Error searching qBittorrent: {e}")
+                logger.info(f"[bold red]Error searching qBittorrent: {e}")
                 found_hash = None
                 if qbt_session:
                     await qbt_session.aclose()
@@ -461,7 +461,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     found_torrent_path = os.path.join(extracted_torrent_dir, f"{found_hash}.torrent")
 
                     if not os.path.exists(found_torrent_path):
-                        console.print(f"[yellow]Exporting .torrent file from qBittorrent for hash: {found_hash}[/yellow]")
+                        logger.info(f"[yellow]Exporting .torrent file from qBittorrent for hash: {found_hash}[/yellow]")
 
                         torrent_file_content: bytes | None = None
 
@@ -476,17 +476,17 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                                         if response.status_code == 200:
                                             torrent_file_content = response.content
                                         else:
-                                            console.print(f"[red]Failed to export torrent via proxy: {response.status_code}")
+                                            logger.error(f"[red]Failed to export torrent via proxy: {response.status_code}")
                                             found_hash = None
                                     except Exception as e:
-                                        console.print(f"[red]Error exporting torrent via proxy: {e}")
+                                        logger.error(f"[red]Error exporting torrent via proxy: {e}")
                                         found_hash = None
                             else:
                                 # Reuse or create qbt_client if needed
                                 if qbt_client is None:
                                     qbt_client = await self.init_qbittorrent_client(client)
                                     if qbt_client is None:
-                                        console.print("[bold red]Failed to connect to qBittorrent for export.")
+                                        logger.info("[bold red]Failed to connect to qBittorrent for export.")
                                         found_hash = None
 
                                 if found_hash and qbt_client is not None:  # Only proceed if we still have a hash
@@ -499,7 +499,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                                             f"Export torrent {found_hash}"
                                         )
                                     except (TimeoutError, qbittorrentapi.APIError) as e:
-                                        console.print(f"[red]Error exporting torrent: {e}")
+                                        logger.error(f"[red]Error exporting torrent: {e}")
 
                             if found_hash:  # Only proceed if export succeeded
                                 if not torrent_file_content:
@@ -507,14 +507,14 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                                 else:
                                     os.makedirs(extracted_torrent_dir, exist_ok=True)
                                     await asyncio.to_thread(Path(found_torrent_path).write_bytes, torrent_file_content)
-                                    console.print(f"[green]Successfully saved .torrent file: {found_torrent_path}")
+                                    logger.info(f"[green]Successfully saved .torrent file: {found_torrent_path}")
                         except Exception as e:
-                            console.print(f"[bold red]Unexpected error fetching .torrent from qBittorrent: {e}")
-                            console.print("[cyan]DEBUG: Skipping found_hash due to unexpected error[/cyan]")
+                            logger.error(f"[bold red]Unexpected error fetching .torrent from qBittorrent: {e}")
+                            logger.info("[cyan]DEBUG: Skipping found_hash due to unexpected error[/cyan]")
                             found_hash = None
                     else:
                         if meta.debug:
-                            console.print(f"[cyan]DEBUG: .torrent file already exists at {found_torrent_path}[/cyan]")
+                            logger.debug(f"[cyan]DEBUG: .torrent file already exists at {found_torrent_path}[/cyan]")
 
                 # Only validate if we still have a hash (export succeeded or file already existed)
                 resolved_path = ""
@@ -524,7 +524,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     )
                 else:
                     valid = False
-                    console.print("[cyan]DEBUG: Skipping validation because found_hash is None[/cyan]")
+                    logger.info("[cyan]DEBUG: Skipping validation because found_hash is None[/cyan]")
 
                 if valid:
                     torrent = Torrent.read(resolved_path)
@@ -533,21 +533,21 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
                     if not prefer_small_pieces:
                         if meta.debug:
-                            console.print(f"[green]Found a valid torrent from client search with piece size {piece_in_mib} MiB: [bold yellow]{found_hash}")
+                            logger.debug(f"[green]Found a valid torrent from client search with piece size {piece_in_mib} MiB: [bold yellow]{found_hash}")
                         return resolved_path
 
                     # Track best match for small pieces
                     if piece_size <= 8388608 and mtv_torrent:
-                        console.print(f"[green]Found a valid torrent with preferred piece size from client search: [bold yellow]{found_hash}")
+                        logger.info(f"[green]Found a valid torrent with preferred piece size from client search: [bold yellow]{found_hash}")
                         return resolved_path
 
                     if piece_size < 16777216 and piece_limit:  # 16 MiB
-                        console.print(f"[green]Found a valid torrent with piece size under 16 MiB from client search: [bold yellow]{found_hash}")
+                        logger.info(f"[green]Found a valid torrent with piece size under 16 MiB from client search: [bold yellow]{found_hash}")
                         return resolved_path
 
                     if best_match is None or piece_size < best_match['piece_size']:
                         best_match = {'torrenthash': found_hash, 'torrent_path': resolved_path, 'piece_size': piece_size}
-                        console.print(f"[yellow]Storing valid torrent from client search as best match: [bold yellow]{found_hash}")
+                        logger.info(f"[yellow]Storing valid torrent from client search as best match: [bold yellow]{found_hash}")
 
         return best_match
 
@@ -574,14 +574,14 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             try:
                 torrent = Torrent.read(torrent_path)
             except Exception as e:
-                console.print(f'[bold red]Error reading torrent file: {e}')
+                logger.info(f'[bold red]Error reading torrent file: {e}')
                 return valid, torrent_path
 
             # Reuse if disc and basename matches or --keep-folder was specified
             if (meta.is_disc and meta.is_disc != "") or (meta.keep_folder and meta.isdir):
                 torrent_name = torrent.metainfo['info']['name']
                 if meta_uuid != torrent_name and meta.debug:
-                    console.print("Modified file structure, skipping hash")
+                    logger.info("Modified file structure, skipping hash")
                     valid = False
                 torrent_filepath = os.path.commonpath(torrent.files)
                 if os.path.basename(meta_path) in torrent_filepath:
@@ -630,7 +630,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                             console.log(f"Multiple file match status: valid={valid}")
 
         else:
-            console.print(f'[bold yellow]{torrent_path} was not found')
+            logger.info(f'[bold yellow]{torrent_path} was not found')
 
         # Additional checks if the torrent is valid so far
         if valid:
@@ -648,21 +648,21 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     max_piece_size = meta.max_piece_size
                     if reuse_torrent.pieces >= 5000 and reuse_torrent.piece_size < 4294304 and (max_piece_size is None or max_piece_size >= 4):
                         if meta.debug:
-                            console.print("[bold red]Torrent needs to have less than 5000 pieces with a 4 MiB piece size")
+                            logger.debug("[bold red]Torrent needs to have less than 5000 pieces with a 4 MiB piece size")
                         valid = False
                     elif (
                         reuse_torrent.pieces >= 8000 and reuse_torrent.piece_size < 8488608 and (max_piece_size is None or max_piece_size >= 8) and not meta.prefer_small_pieces
                     ):
                         if meta.debug:
-                            console.print("[bold red]Torrent needs to have less than 8000 pieces with a 8 MiB piece size")
+                            logger.debug("[bold red]Torrent needs to have less than 8000 pieces with a 8 MiB piece size")
                         valid = False
                     elif 'max_piece_size' not in meta and reuse_torrent.pieces >= 12000:
                         if meta.debug:
-                            console.print("[bold red]Torrent needs to have less than 12000 pieces to be valid")
+                            logger.debug("[bold red]Torrent needs to have less than 12000 pieces to be valid")
                         valid = False
                     elif reuse_torrent.piece_size < 32768:
                         if meta.debug:
-                            console.print("[bold red]Piece size too small to reuse")
+                            logger.debug("[bold red]Piece size too small to reuse")
                         valid = False
                     elif 'max_piece_size' not in meta and torrent_file_size_kib > 250:
                         if meta.debug:
@@ -676,7 +676,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                         if meta.debug:
                             console.log(f"[bold green]REUSING .torrent with infohash: [bold yellow]{torrenthash}")
                 except Exception as e:
-                    console.print(f'[bold red]Error checking reuse torrent: {e}')
+                    logger.info(f'[bold red]Error checking reuse torrent: {e}')
                     valid = False
 
             if meta.debug:

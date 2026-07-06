@@ -16,7 +16,7 @@ import aiofiles.ospath
 import cli_ui
 from rich.progress import BarColumn, Progress, TaskID, TaskProgressColumn, TextColumn
 
-from src.console import console
+from src.console import console, logger
 from src.meta import Meta
 
 
@@ -98,8 +98,7 @@ async def check_binary(binary_name: str, config_path: str | None = None, meta: M
 
                 return await PestoBinaryManager.ensure_pesto_binary(base_dir, debug)
         except Exception as e:
-            if debug:
-                console.print(f"[yellow]Automatic download of '{binary_name}' failed: {e}[/yellow]")
+            logger.debug(f"[yellow]Automatic download of '{binary_name}' failed: {e}[/yellow]")
 
     raise FileNotFoundError(f"Binary '{path}' not found in PATH or config. Please install it.")
 
@@ -122,18 +121,17 @@ async def run_command_with_logging(cmd: list[str], description: str, debug: bool
             redacted_cmd.append(arg)
     redacted_str = " ".join(redacted_cmd)
 
-    if debug:
-        console.print(f"[cyan]Running command: {redacted_str}[/cyan]")
+    logger.debug(f"[cyan]Running command: {redacted_str}[/cyan]")
     try:
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         stdout, stderr = await process.communicate()
 
         if process.returncode != 0:
-            console.print(f"[red]Error running {description} (exit code {process.returncode}):[/red]")
+            logger.error(f"[red]Error running {description} (exit code {process.returncode}):[/red]")
             if stdout:
-                console.print(f"[red]STDOUT:[/red]\n{stdout.decode(errors='replace')}")
+                logger.info(f"[red]STDOUT:[/red]\n{stdout.decode(errors='replace')}")
             if stderr:
-                console.print(f"[red]STDERR:[/red]\n{stderr.decode(errors='replace')}")
+                logger.info(f"[red]STDERR:[/red]\n{stderr.decode(errors='replace')}")
             raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
 
     except Exception as e:
@@ -175,8 +173,7 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
             redacted_cmd.append(arg)
     redacted_str = " ".join(redacted_cmd)
 
-    if debug:
-        console.print(f"[cyan]Running command: {redacted_str}[/cyan]")
+    logger.debug(f"[cyan]Running command: {redacted_str}[/cyan]")
 
     try:
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
@@ -220,11 +217,11 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
             monitor_task.cancel()
 
             if process.returncode != 0:
-                console.print(f"[red]Error running 7z Archiver (exit code {process.returncode}):[/red]")
+                logger.error(f"[red]Error running 7z Archiver (exit code {process.returncode}):[/red]")
                 if stdout:
-                    console.print(f"[red]STDOUT:[/red]\n{stdout.decode(errors='replace')}")
+                    logger.info(f"[red]STDOUT:[/red]\n{stdout.decode(errors='replace')}")
                 if stderr:
-                    console.print(f"[red]STDERR:[/red]\n{stderr.decode(errors='replace')}")
+                    logger.info(f"[red]STDERR:[/red]\n{stderr.decode(errors='replace')}")
                 raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
 
             # Finish progress display cleanly
@@ -250,9 +247,8 @@ async def run_par2_with_progress(cmd: list[str], cwd: str | None = None, debug: 
             redacted_cmd.append(arg)
     redacted_str = " ".join(redacted_cmd)
 
-    if debug:
-        cwd_str = f" in {cwd}" if cwd else ""
-        console.print(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
+    cwd_str = f" in {cwd}" if cwd else ""
+    logger.debug(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
 
     try:
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, cwd=cwd)
@@ -287,10 +283,10 @@ async def run_par2_with_progress(cmd: list[str], cwd: str | None = None, debug: 
         await process.wait()
 
         if process.returncode != 0:
-            console.print(f"[red]Error running PAR2 Creator (exit code {process.returncode}):[/red]")
+            logger.error(f"[red]Error running PAR2 Creator (exit code {process.returncode}):[/red]")
             stdout_str = "".join(stdout_accum)
             if stdout_str:
-                console.print(f"[red]OUTPUT:[/red]\n{stdout_str}")
+                logger.info(f"[red]OUTPUT:[/red]\n{stdout_str}")
             raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
 
         # Finish progress display cleanly
@@ -317,9 +313,8 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None, debug: 
             redacted_cmd.append(arg)
     redacted_str = " ".join(redacted_cmd)
 
-    if debug:
-        cwd_str = f" in {cwd}" if cwd else ""
-        console.print(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
+    cwd_str = f" in {cwd}" if cwd else ""
+    logger.debug(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
 
     try:
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, cwd=cwd)
@@ -355,10 +350,10 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None, debug: 
         await process.wait()
 
         if process.returncode != 0:
-            console.print(f"[red]Error running Nyuu Uploader (exit code {process.returncode}):[/red]")
+            logger.error(f"[red]Error running Nyuu Uploader (exit code {process.returncode}):[/red]")
             stdout_str = "".join(stdout_accum)
             if stdout_str:
-                console.print(f"[red]OUTPUT:[/red]\n{stdout_str}")
+                logger.info(f"[red]OUTPUT:[/red]\n{stdout_str}")
             raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
 
         # Finish progress display cleanly
@@ -385,9 +380,8 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, debug:
             redacted_cmd.append(arg)
     redacted_str = " ".join(redacted_cmd)
 
-    if debug:
-        cwd_str = f" in {cwd}" if cwd else ""
-        console.print(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
+    cwd_str = f" in {cwd}" if cwd else ""
+    logger.debug(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
 
     try:
         process = await asyncio.create_subprocess_exec(
@@ -444,11 +438,11 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, debug:
                         progress.update(tasks["upload"], completed=pct)
                     elif etype == "status":
                         text = event.get("text", "").strip()
-                        if text and debug:
-                            console.print(f"[cyan]{text}[/cyan]")
+                        if text:
+                            logger.debug(f"[cyan]{text}[/cyan]")
                     elif etype == "failed":
                         desc = event.get("description", "unknown failure")
-                        console.print(f"[red]Pesto segment failed: {desc}[/red]")
+                        logger.info(f"[red]Pesto segment failed: {desc}[/red]")
                     elif etype == "par2_encode_started":
                         total = event.get("input_slices", 0)
                         if "par2_encode" not in tasks:
@@ -496,16 +490,15 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, debug:
                         if "check" in tasks and check_total:
                             progress.update(tasks["check"], completed=check_total)
                         if failed:
-                            console.print(f"[yellow]Article check: {failed} article(s) missing on server — pesto is reposting them automatically...[/yellow]")
+                            logger.info(f"[yellow]Article check: {failed} article(s) missing on server — pesto is reposting them automatically...[/yellow]")
                         else:
-                            console.print("[green]Article check: all articles verified on server.[/green]")
+                            logger.info("[green]Article check: all articles verified on server.[/green]")
                     elif etype == "check_retrying":
                         attempt = event.get("attempt", 0)
                         max_attempts = event.get("max_attempts", 0)
                         delay = event.get("delay_secs", 0)
                         check_wait_total = delay
-                        if debug:
-                            console.print(f"[cyan]Article check: retry {attempt}/{max_attempts} in {delay}s...[/cyan]")
+                        logger.debug(f"[cyan]Article check: retry {attempt}/{max_attempts} in {delay}s...[/cyan]")
                 except json.JSONDecodeError:
                     pass
 
@@ -517,11 +510,11 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None, debug:
 
         if process.returncode != 0:
             if check_missing_count:
-                console.print(f"[red]Pesto could not confirm {check_missing_count} article(s) on the server after reposting — the NZB is incomplete and will be discarded.[/red]")
-            console.print(f"[red]Error running Pesto Uploader (exit code {process.returncode}):[/red]")
+                logger.info(f"[red]Pesto could not confirm {check_missing_count} article(s) on the server after reposting — the NZB is incomplete and will be discarded.[/red]")
+            logger.error(f"[red]Error running Pesto Uploader (exit code {process.returncode}):[/red]")
             stderr_str = "".join(stderr_accum)
             if stderr_str:
-                console.print(f"[red]STDERR:[/red]\n{stderr_str}")
+                logger.info(f"[red]STDERR:[/red]\n{stderr_str}")
             raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
 
     except Exception as e:
@@ -572,7 +565,7 @@ async def inject_nzb_password(nzb_path: str, password: str) -> None:
         async with aiofiles.open(nzb_path, "w", encoding="utf-8") as f:
             await f.write(new_content)
     except Exception as e:
-        console.print(f"[red]Error injecting password into NZB file: {e}[/red]")
+        logger.error(f"[red]Error injecting password into NZB file: {e}[/red]")
 
 
 async def verify_nzb_has_password(nzb_path: str) -> bool:
@@ -601,7 +594,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     """
     usenet_cfg = config.get("USENET", {})
     if not usenet_cfg:
-        console.print("[red]Error: USENET section is missing from configuration.[/red]")
+        logger.error("[red]Error: USENET section is missing from configuration.[/red]")
         return None
 
     # Handle Usenet archive encryption/password
@@ -610,16 +603,16 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         if str(archive_password).lower() == "random":
             archive_password = secrets.token_urlsafe(16)
             if meta.debug:
-                console.print(f"[cyan]Generated random Usenet archive password: {archive_password}[/cyan]")
+                logger.debug(f"[cyan]Generated random Usenet archive password: {archive_password}[/cyan]")
         else:
-            console.print("[cyan]Using configured static password for Usenet archive encryption.[/cyan]")
+            logger.info("[cyan]Using configured static password for Usenet archive encryption.[/cyan]")
         meta.archive_password = archive_password
 
     # Determine paths and names
     base_dir = meta.base_dir
     input_path = meta.path
     if not input_path:
-        console.print("[red]Error: Input path is missing.[/red]")
+        logger.error("[red]Error: Input path is missing.[/red]")
         return None
     import hashlib
 
@@ -638,7 +631,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     if archive_password:
         archive_name = secrets.token_hex(16)
         if meta.debug:
-            console.print(f"[cyan]Obfuscating archive filenames to: {archive_name}[/cyan]")
+            logger.debug(f"[cyan]Obfuscating archive filenames to: {archive_name}[/cyan]")
 
     # NZB filename: prefer meta name (already properly constructed by UA).
     # For directories, fall back to the directory basename only when meta name is absent.
@@ -658,7 +651,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     try:
         os.makedirs(nzb_output_dir, exist_ok=True)
     except Exception as e:
-        console.print(f"[yellow]Warning: Could not create nzb_output_dir '{nzb_output_dir}' ({e}). Falling back to default tmp dir.[/yellow]")
+        logger.warning(f"[yellow]Warning: Could not create nzb_output_dir '{nzb_output_dir}' ({e}). Falling back to default tmp dir.[/yellow]")
         nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(input_path))
         with contextlib.suppress(Exception):
             os.makedirs(nzb_output_dir, exist_ok=True)
@@ -670,7 +663,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             os.makedirs(usenet_tmp_dir, exist_ok=True)
             tmp_base = usenet_tmp_dir
         except Exception as e:
-            console.print(f"[yellow]Warning: Could not create usenet_tmp_dir '{usenet_tmp_dir}' ({e}). Falling back to default tmp dir.[/yellow]")
+            logger.warning(f"[yellow]Warning: Could not create usenet_tmp_dir '{usenet_tmp_dir}' ({e}). Falling back to default tmp dir.[/yellow]")
             tmp_base = os.path.join(base_dir, "tmp", os.path.basename(input_path))
     else:
         tmp_base = os.path.join(base_dir, "tmp", os.path.basename(input_path))
@@ -701,9 +694,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         path_7z = await check_binary("7z", usenet_cfg.get("7z_path"), meta=meta)
     except FileNotFoundError as e:
         if is_debug:
-            console.print(f"[yellow]Warning: {e} Using simulation mode for 7z.[/yellow]")
+            logger.warning(f"[yellow]Warning: {e} Using simulation mode for 7z.[/yellow]")
         else:
-            console.print(f"[bold red]Configuration Error: {e}[/bold red]")
+            logger.info(f"[bold red]Configuration Error: {e}[/bold red]")
             return None
 
     if use_pesto:
@@ -711,27 +704,27 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             path_pesto = await check_binary("pesto", usenet_cfg.get("pesto_path"), meta=meta)
         except FileNotFoundError as e:
             if is_debug:
-                console.print(f"[yellow]Warning: {e} Using simulation mode for pesto.[/yellow]")
+                logger.warning(f"[yellow]Warning: {e} Using simulation mode for pesto.[/yellow]")
             else:
-                console.print(f"[bold red]Configuration Error: {e}[/bold red]")
+                logger.info(f"[bold red]Configuration Error: {e}[/bold red]")
                 return None
     else:
         try:
             path_par2 = await check_binary("par2", usenet_cfg.get("par2_path"), meta=meta)
         except FileNotFoundError as e:
             if is_debug:
-                console.print(f"[yellow]Warning: {e} Using simulation mode for par2.[/yellow]")
+                logger.warning(f"[yellow]Warning: {e} Using simulation mode for par2.[/yellow]")
             else:
-                console.print(f"[bold red]Configuration Error: {e}[/bold red]")
+                logger.info(f"[bold red]Configuration Error: {e}[/bold red]")
                 return None
 
         try:
             path_nyuu = await check_binary("nyuu", usenet_cfg.get("nyuu_path"), meta=meta, path_7z=path_7z)
         except FileNotFoundError as e:
             if is_debug:
-                console.print(f"[yellow]Warning: {e} Using simulation mode for nyuu.[/yellow]")
+                logger.warning(f"[yellow]Warning: {e} Using simulation mode for nyuu.[/yellow]")
             else:
-                console.print(f"[bold red]Configuration Error: {e}[/bold red]")
+                logger.info(f"[bold red]Configuration Error: {e}[/bold red]")
                 return None
 
     # 2. Archive and Split with 7z (mx=0 to store without compression)
@@ -741,7 +734,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
 
     if skip_archive:
         # Skip 7z entirely — copy files/dir contents straight to usenet_dir
-        console.print("[cyan]Skipping archive step; copying files directly for upload...[/cyan]")
+        logger.info("[cyan]Skipping archive step; copying files directly for upload...[/cyan]")
         if await aiofiles.ospath.isdir(input_path):
             for entry in await aiofiles.os.listdir(input_path):
                 src = os.path.join(input_path, entry)
@@ -763,7 +756,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         if volume_size and volume_size.lower() == "auto":
             volume_size = get_dynamic_volume_size(total_size)
             if is_debug:
-                console.print(f"[cyan]Dynamic volume size chosen based on upload size ({total_size / (1024 * 1024 * 1024):.2f} GB): {volume_size.upper()}[/cyan]")
+                logger.info(f"[cyan]Dynamic volume size chosen based on upload size ({total_size / (1024 * 1024 * 1024):.2f} GB): {volume_size.upper()}[/cyan]")
 
         archive_out = os.path.join(usenet_dir, f"{archive_name}.7z")
 
@@ -776,17 +769,17 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             cmd_7z.extend([archive_out, input_path])
 
             if is_debug and not path_7z:
-                console.print(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_7z)}[/yellow]")
+                logger.info(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_7z)}[/yellow]")
                 mock_7z = f"{archive_out}.001" if volume_size else archive_out
                 async with aiofiles.open(mock_7z, "wb") as f:
                     await f.write(b"mock 7z volume content")
             else:
                 await run_7z_with_progress(cmd_7z, usenet_dir, archive_name, volume_size, total_size, debug=is_debug)
         else:
-            console.print("[cyan]Copying single file for upload...[/cyan]")
+            logger.info("[cyan]Copying single file for upload...[/cyan]")
             dest_file = os.path.join(usenet_dir, os.path.basename(input_path))
             if is_debug and not await aiofiles.ospath.exists(input_path):
-                console.print(f"[yellow][DEBUG SIMULATION] Input path '{input_path}' doesn't exist, writing dummy file to '{dest_file}'[/yellow]")
+                logger.info(f"[yellow][DEBUG SIMULATION] Input path '{input_path}' doesn't exist, writing dummy file to '{dest_file}'[/yellow]")
                 async with aiofiles.open(dest_file, "wb") as f:
                     await f.write(b"mock single file content")
             else:
@@ -803,12 +796,12 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 target_files.append(file_path)
 
         if target_files:
-            console.print("[cyan]Generating PAR2 parity files...[/cyan]")
+            logger.info("[cyan]Generating PAR2 parity files...[/cyan]")
             par2_file = f"{archive_name}.par2"
             relative_target_files = [os.path.basename(f) for f in target_files]
             cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", "-n1", par2_file] + relative_target_files
             if is_debug and not path_par2:
-                console.print(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_par2)}[/yellow]")
+                logger.info(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_par2)}[/yellow]")
                 mock_par2 = os.path.normpath(os.path.join(usenet_dir, par2_file))
                 async with aiofiles.open(mock_par2, "wb") as f:
                     await f.write(b"mock par2 content")
@@ -822,7 +815,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         poster = generate_random_poster()
         display_name = poster.split("<")[0].strip()
         if is_debug:
-            console.print(f"[cyan]Generated anonymous poster: {display_name}[/cyan]")
+            logger.info(f"[cyan]Generated anonymous poster: {display_name}[/cyan]")
 
     # 5. Subject line
     obscure_subject = usenet_cfg.get("obscure_subject", True)
@@ -833,7 +826,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     elif obscure_subject:
         subject = secrets.token_hex(16)
         if is_debug:
-            console.print(f"[cyan]Obfuscating post subject: {subject}[/cyan]")
+            logger.info(f"[cyan]Obfuscating post subject: {subject}[/cyan]")
     else:
         subject = name
 
@@ -846,7 +839,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         if await aiofiles.ospath.isfile(file_path):
             all_upload_files.append(f)
 
-    console.print(f"[yellow]Posting {len(all_upload_files)} files to Usenet via NNTP ({uploader})...[/yellow]")
+    logger.info(f"[yellow]Posting {len(all_upload_files)} files to Usenet via NNTP ({uploader})...[/yellow]")
 
     # Build mock NZB content used in debug/simulation mode
     mock_nzb_password_tag = f'  <meta type="password">{archive_password}</meta>\n' if archive_password else ""
@@ -913,7 +906,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         cmd_pesto.extend(all_upload_files)
 
         if is_debug:
-            console.print(f"[yellow][DEBUG SIMULATION] Would run Pesto upload: {' '.join(cmd_pesto)}[/yellow]")
+            logger.info(f"[yellow][DEBUG SIMULATION] Would run Pesto upload: {' '.join(cmd_pesto)}[/yellow]")
             async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
                 await f.write(mock_nzb_content)
         else:
@@ -951,7 +944,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         cmd_nyuu.extend(all_upload_files)
 
         if is_debug:
-            console.print(f"[yellow][DEBUG SIMULATION] Would run Nyuu upload: {' '.join(cmd_nyuu)}[/yellow]")
+            logger.info(f"[yellow][DEBUG SIMULATION] Would run Nyuu upload: {' '.join(cmd_nyuu)}[/yellow]")
             async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
                 await f.write(mock_nzb_content)
         else:
@@ -960,30 +953,30 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         # nyuu doesn't inject the password into the NZB — do it manually
         if archive_password and await aiofiles.ospath.exists(nzb_file):
             if is_debug:
-                console.print(f"[cyan][DEBUG SIMULATION] Injecting password '{archive_password}' into NZB file...[/cyan]")
+                logger.info(f"[cyan][DEBUG SIMULATION] Injecting password '{archive_password}' into NZB file...[/cyan]")
             else:
-                console.print("[cyan]Injecting password into NZB metadata...[/cyan]")
+                logger.info("[cyan]Injecting password into NZB metadata...[/cyan]")
             await inject_nzb_password(nzb_file, archive_password)
 
     # 7. Cleanup compressed volumes after successful upload
     try:
         if await aiofiles.ospath.exists(usenet_dir):
             if is_debug:
-                console.print(f"[cyan][DEBUG SIMULATION] Would delete temporary Usenet folder: {usenet_dir}[/cyan]")
+                logger.info(f"[cyan][DEBUG SIMULATION] Would delete temporary Usenet folder: {usenet_dir}[/cyan]")
             else:
                 await asyncio.to_thread(shutil.rmtree, usenet_dir)
-                console.print("[green]Cleaned up temporary compressed Usenet files.[/green]")
+                logger.info("[green]Cleaned up temporary compressed Usenet files.[/green]")
     except Exception as e:
-        console.print(f"[yellow]Warning: Could not clean up temporary Usenet folder '{usenet_dir}' ({e})[/yellow]")
+        logger.warning(f"[yellow]Warning: Could not clean up temporary Usenet folder '{usenet_dir}' ({e})[/yellow]")
 
     # 8. Relocate NZB output
     if await aiofiles.ospath.exists(nzb_file):
         try:
             await asyncio.to_thread(shutil.move, nzb_file, final_nzb_path)
             if is_debug:
-                console.print(f"[bold green]NZB file saved to: {final_nzb_path}[/bold green]")
+                logger.info(f"[bold green]NZB file saved to: {final_nzb_path}[/bold green]")
         except Exception as e:
-            console.print(f"[red]Error moving NZB file to final destination: {e}[/red]")
+            logger.error(f"[red]Error moving NZB file to final destination: {e}[/red]")
             final_nzb_path = nzb_file
 
     # Clean up empty parent uuid folder

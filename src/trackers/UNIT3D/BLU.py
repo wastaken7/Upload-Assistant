@@ -3,7 +3,7 @@ from typing import Any
 
 import cli_ui
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
@@ -47,12 +47,12 @@ class BLU(UNIT3D):
                 allowed.append('mp4')
 
             if container not in allowed:
-                console.print(f"[bold red]For this release, {self.tracker} requires one of the following containers: {', '.join([a.upper() for a in allowed])}[/bold red]")
+                logger.info(f"[bold red]For this release, {self.tracker} requires one of the following containers: {', '.join([a.upper() for a in allowed])}[/bold red]")
                 return False
 
         if meta.type in ["ENCODE", "REMUX"] and "HDR" in meta.hdr and "DV" in meta.hdr and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
-            console.print('[bold red]Releases using a Dolby Vision layer from a different source have specific description requirements.[/bold red]')
-            console.print('[bold red]See rule 12.5. You must have a correct pre-formatted description if this release has a derived layer[/bold red]')
+            logger.info('[bold red]Releases using a Dolby Vision layer from a different source have specific description requirements.[/bold red]')
+            logger.info('[bold red]See rule 12.5. You must have a correct pre-formatted description if this release has a derived layer[/bold red]')
             if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                 return False
             if cli_ui.ask_yes_no("Is this a derived layer release?", default=False):
@@ -60,7 +60,7 @@ class BLU(UNIT3D):
 
         if meta.type not in ["WEBDL"] and not meta.is_disc and meta.tag in ["AOC", "CMRG", "EVO", "TERMiNAL", "ViSION"]:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                console.print(f"[bold red]Group {meta.tag} is only allowed for raw type content[/bold red]")
+                logger.info(f"[bold red]Group {meta.tag} is only allowed for raw type content[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -69,7 +69,7 @@ class BLU(UNIT3D):
                 return False
 
         if not meta.valid_mi_settings:
-            console.print(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
+            logger.info(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
             return False
 
         return should_continue

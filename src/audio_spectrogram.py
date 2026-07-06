@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from rich.prompt import Prompt
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 
 DURATION_LIMIT = 600
@@ -36,7 +36,7 @@ def generate_spectrogram(stream_index, stream_label, stream_lang, file_path, out
     """
     Extracts specific stream and generates the spectrogram plot.
     """
-    console.print(f"--- Processing Stream {stream_index} ({stream_label}) [{stream_lang}] ---")
+    logger.info(f"--- Processing Stream {stream_index} ({stream_label}) [{stream_lang}] ---")
 
     # FFmpeg command to extract specific audio stream to pipe
     command = [
@@ -67,7 +67,7 @@ def generate_spectrogram(stream_index, stream_label, stream_lang, file_path, out
     plt.tight_layout()
     plt.savefig(output_name, dpi=DPI_VALUE, bbox_inches='tight')
     plt.close() # Free memory
-    console.print(f"Saved: {output_name}")
+    logger.info(f"Saved: {output_name}")
     return output_name
 
 
@@ -82,15 +82,15 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
                 if "spectrograms_images" in spectrograms_image_file and not meta.spectrograms_images:
                     meta.spectrograms_images = spectrograms_image_file["spectrograms_images"]
                     if meta.debug:
-                        console.print(f"[cyan]Loaded {len(spectrograms_image_file['spectrograms_images'])} previously saved spectrograms")
+                        logger.debug(f"[cyan]Loaded {len(spectrograms_image_file['spectrograms_images'])} previously saved spectrograms")
 
         except Exception as e:
-            console.print(f"[yellow]Could not load spectrograms image data: {str(e)}")
+            logger.info(f"[yellow]Could not load spectrograms image data: {str(e)}")
 
     if meta.spectrograms_images:
         return []
 
-    console.print("[yellow]Generating Audio Spectrograms...[/yellow]")
+    logger.info("[yellow]Generating Audio Spectrograms...[/yellow]")
 
     output_dir = os.path.join(meta.base_dir, "tmp", meta.uuid, "spectrograms")
     os.makedirs(output_dir, exist_ok=True)
@@ -103,7 +103,7 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
         disc_file = files_list[0].get("file", "") if files_list else ""
         disc_final_path = os.path.join(disc_path, "STREAM", disc_file) if disc_path and disc_file else ""
         if meta.debug:
-            console.print(f"disc_final_path: {disc_final_path}")
+            logger.debug(f"disc_final_path: {disc_final_path}")
 
     mkv_path = ""
     filelist = meta.filelist
@@ -115,7 +115,7 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
     generated_files = []
 
     if not audio_path or not os.path.exists(audio_path):
-        console.print("[red]Could not find a valid audio or video file to process spectrograms from.[/red]")
+        logger.info("[red]Could not find a valid audio or video file to process spectrograms from.[/red]")
         return generated_files
 
     streams = get_audio_streams(audio_path)
@@ -134,23 +134,23 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
         streams = valid_streams
 
     if not streams:
-        console.print("No audio streams found.")
+        logger.info("No audio streams found.")
     else:
-        console.print("\nAvailable Audio Streams:")
+        logger.info("\nAvailable Audio Streams:")
         for i, s in enumerate(streams):
             lang = s.get('tags', {}).get('language', 'und')
             title = s.get('tags', {}).get('title', 'No Title')
-            console.print(f"[{i}] Lang: {lang} | Title: {title}")
+            logger.info(f"[{i}] Lang: {lang} | Title: {title}")
 
         unattended = meta.unattended
         audio_spectrogram_tracks = meta.audio_spectrogram_tracks
 
         if audio_spectrogram_tracks is not None:
             choice = str(audio_spectrogram_tracks)
-            console.print(f"[yellow]Using audio spectrogram tracks from argument: {choice}[/yellow]")
+            logger.info(f"[yellow]Using audio spectrogram tracks from argument: {choice}[/yellow]")
         elif unattended:
             choice = "all" if config["DEFAULT"].get("process_all_audio_spectrogram", False) else "0"
-            console.print(f"[yellow]Unattended mode. Automatically selected option: {choice}[/yellow]")
+            logger.info(f"[yellow]Unattended mode. Automatically selected option: {choice}[/yellow]")
         else:
             choice = Prompt.ask(
                 "\nSelect the stream index to scan (comma-separated list e.g. [bold yellow]0,1,2[/bold yellow] or [bold yellow]all[/bold yellow])", default="all"
@@ -177,12 +177,12 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
                         filepath = generate_spectrogram(target["index"], label, lang, audio_path, output_dir)
                         generated_files.append(filepath)
                     else:
-                        console.print(f"Invalid index: {idx}")
+                        logger.info(f"Invalid index: {idx}")
                 else:
-                    console.print(f"Invalid input: {c}")
+                    logger.info(f"Invalid input: {c}")
 
         if generated_files and uploadscreens_manager:
-            console.print("[yellow]Uploading Audio Spectrograms...[/yellow]")
+            logger.info("[yellow]Uploading Audio Spectrograms...[/yellow]")
             try:
                 spec_images, _ = await uploadscreens_manager.upload_screens(meta, len(generated_files), 1, 0, len(generated_files), generated_files, {})
                 if spec_images:
@@ -192,10 +192,10 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
                         async with aiofiles.open(audio_spectrograms_images, "w", encoding="utf-8") as spec_file:
                             await spec_file.write(json.dumps(spectrograms_image_file_dict, indent=4))
                         if meta.debug:
-                            console.print(f"[cyan]Saved {len(spec_images)} spectrograms to audio_spectrograms_images.json")
+                            logger.debug(f"[cyan]Saved {len(spec_images)} spectrograms to audio_spectrograms_images.json")
                     except Exception as e:
-                        console.print(f"[yellow]Failed to save spectrograms image data: {str(e)}")
+                        logger.info(f"[yellow]Failed to save spectrograms image data: {str(e)}")
             except Exception as e:
-                console.print(f"[red]Error uploading audio spectrograms: {e}[/red]")
+                logger.error(f"[red]Error uploading audio spectrograms: {e}[/red]")
 
     return generated_files

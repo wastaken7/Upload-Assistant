@@ -6,7 +6,7 @@ from typing import Any
 import aiofiles
 import httpx
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
@@ -29,10 +29,10 @@ class DS:
         release_name = await self.get_name(meta)
         cache_file = os.path.join(meta.base_dir, "tmp", meta.uuid, f"{self.tracker}_upload_ok")
         if release_name and os.path.exists(cache_file):
-            console.print(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
+            logger.info(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
             return [release_name]
 
-        console.print(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
+        logger.info(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
         return []
 
     async def get_name(self, meta: Meta) -> str:

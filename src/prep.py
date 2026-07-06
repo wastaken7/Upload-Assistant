@@ -17,7 +17,7 @@ try:
     from src.audio import AudioManager
     from src.book_prep import gather_book_prep as _gather_book_prep_fn
     from src.book_prep import resolve_book_filelist as _resolve_book_filelist_fn
-    from src.console import console
+    from src.console import console, logger
     from src.get_disc import DiscInfoManager
     from src.get_name import NameManager
     from src.get_tracker_data import TrackerDataManager
@@ -35,7 +35,7 @@ try:
 
 except ModuleNotFoundError:
     if console is not None:
-        console.print("Missing Module Found. Please reinstall required dependencies from requirements.txt.", markup=False)
+        logger.info("Missing Module Found. Please reinstall required dependencies from requirements.txt.", extra={"markup": False})
     else:
         print("Missing Module Found. Please reinstall required dependencies from requirements.txt.")
     raise SystemExit(1) from None
@@ -134,7 +134,7 @@ class Prep:
         await prep_helpers.finalize_metadata(self, meta, videopath, bdinfo, mi, filename, untouched_filename, video)
 
         if meta.debug:
-            console.print(f"Metadata processed in {time.time() - meta_start_time:.2f} seconds")
+            logger.debug(f"Metadata processed in {time.time() - meta_start_time:.2f} seconds")
 
         return meta
 
@@ -171,25 +171,25 @@ class Prep:
         path = meta.path or ""
         uuid = meta.uuid
         if meta.debug:
-            console.print(f"[cyan]Checking category for path: {path} and uuid: {uuid}[/cyan]")
+            logger.debug(f"[cyan]Checking category for path: {path} and uuid: {uuid}[/cyan]")
 
         for pattern in path_patterns:
             if re.search(pattern, path):
                 if meta.debug:
-                    console.print(f"[cyan]Matched TV pattern in path: {pattern}[/cyan]")
+                    logger.debug(f"[cyan]Matched TV pattern in path: {pattern}[/cyan]")
                 return "TV"
 
         for pattern in filename_patterns:
             if re.search(pattern, uuid) or re.search(pattern, os.path.basename(path)):
                 if meta.debug:
-                    console.print(f"[cyan]Matched TV pattern in filename: {pattern}[/cyan]")
+                    logger.debug(f"[cyan]Matched TV pattern in filename: {pattern}[/cyan]")
                 return "TV"
 
         if "subsplease" in path.lower() or "subsplease" in uuid.lower():
             anime_pattern = r"(?:\s-\s)?(\d{1,3})\s*\((?:\d+p|480p|480i|576i|576p|720p|1080i|1080p|2160p)\)"
             if re.search(anime_pattern, path.lower()) or re.search(anime_pattern, uuid.lower()):
                 if meta.debug:
-                    console.print(f"[cyan]Matched Anime pattern for SubsPlease: {anime_pattern}[/cyan]")
+                    logger.debug(f"[cyan]Matched Anime pattern for SubsPlease: {anime_pattern}[/cyan]")
                 return "TV"
 
         return "MOVIE"
@@ -204,11 +204,11 @@ class Prep:
 
             if not nfo_file:
                 if meta.debug:
-                    console.print("[yellow]No NFO file found for scene release[/yellow]")
+                    logger.debug("[yellow]No NFO file found for scene release[/yellow]")
                 return
 
             if meta.debug:
-                console.print(f"[cyan]Parsing NFO file: {nfo_file}[/cyan]")
+                logger.debug(f"[cyan]Parsing NFO file: {nfo_file}[/cyan]")
 
             async with aiofiles.open(nfo_file, encoding="utf-8", errors="ignore") as f:
                 nfo_content = await f.read()
@@ -218,7 +218,7 @@ class Prep:
             if source_match:
                 nfo_source = source_match.group(1).strip()
                 if meta.debug:
-                    console.print(f"[cyan]Found source in NFO: {nfo_source}[/cyan]")
+                    logger.debug(f"[cyan]Found source in NFO: {nfo_source}[/cyan]")
 
                 # Check if source matches any service
                 services = cast(dict[str, str], await get_service(get_services_only=True))
@@ -229,9 +229,9 @@ class Prep:
                         meta.service = service_code
                         meta.service_longname = service_name
                         if meta.debug:
-                            console.print(f"[green]Matched service: {service_code} ({service_name})[/green]")
+                            logger.debug(f"[green]Matched service: {service_code} ({service_name})[/green]")
                         break
 
         except Exception as e:
             if meta.debug:
-                console.print(f"[red]Error parsing NFO file: {e}[/red]")
+                logger.debug(f"[red]Error parsing NFO file: {e}[/red]")

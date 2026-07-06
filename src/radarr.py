@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import httpx
 
-from src.console import console
+from src.console import logger
 
 MovieInfo = dict[str, Any]
 
@@ -15,7 +15,7 @@ class RadarrManager:
 
     async def get_radarr_data(self, tmdb_id: int | None = None, filename: str | None = None, debug: bool = False) -> MovieInfo | None:
         if not any(key.startswith('radarr_api_key') for key in self.default_config):
-            console.print("[red]No Radarr API keys are configured.[/red]")
+            logger.info("[red]No Radarr API keys are configured.[/red]")
             return None
 
         # Try each Radarr instance until we get valid data
@@ -44,8 +44,7 @@ class RadarrManager:
             api_key = api_key_value.strip()
             base_url = base_url_value.strip().rstrip('/')
 
-            if debug:
-                console.print(f"[blue]Trying Radarr instance {instance_index if instance_index > 0 else 'default'}[/blue]")
+            logger.debug(f"[blue]Trying Radarr instance {instance_index if instance_index > 0 else 'default'}[/blue]")
 
             # Build the appropriate URL
             if tmdb_id:
@@ -61,9 +60,8 @@ class RadarrManager:
                 "Content-Type": "application/json"
             }
 
-            if debug:
-                console.print(f"[green]TMDB ID {tmdb_id}[/green]")
-                console.print(f"[blue]Radarr URL:[/blue] {url}")
+            logger.debug(f"[green]TMDB ID {tmdb_id}[/green]")
+            logger.debug(f"[blue]Radarr URL:[/blue] {url}")
 
             try:
                 async with httpx.AsyncClient() as client:
@@ -72,31 +70,30 @@ class RadarrManager:
                     if response.status_code == 200:
                         data = response.json()
 
-                        if debug:
-                            console.print(f"[blue]Radarr Response Status:[/blue] {response.status_code}")
-                            console.print(f"[blue]Radarr Response Data:[/blue] {data}")
+                        logger.debug(f"[blue]Radarr Response Status:[/blue] {response.status_code}")
+                        logger.debug(f"[blue]Radarr Response Data:[/blue] {data}")
 
                         # Check if we got valid data by trying to extract movie info
                         movie_data = await self.extract_movie_data(data, filename)
 
                         if movie_data and (movie_data.get("imdb_id") or movie_data.get("tmdb_id")):
-                            console.print(f"[green]Found valid movie data from Radarr instance {instance_index if instance_index > 0 else 'default'}[/green]")
+                            logger.info(f"[green]Found valid movie data from Radarr instance {instance_index if instance_index > 0 else 'default'}[/green]")
                             return movie_data
                     else:
-                        console.print(f"[yellow]Failed to fetch from Radarr instance {instance_index if instance_index > 0 else 'default'}: {response.status_code} - {response.text}[/yellow]")
+                        logger.info(f"[yellow]Failed to fetch from Radarr instance {instance_index if instance_index > 0 else 'default'}: {response.status_code} - {response.text}[/yellow]")
 
             except httpx.TimeoutException:
-                console.print(f"[red]Timeout when fetching from Radarr instance {instance_index if instance_index > 0 else 'default'}[/red]")
+                logger.info(f"[red]Timeout when fetching from Radarr instance {instance_index if instance_index > 0 else 'default'}[/red]")
             except httpx.RequestError as e:
-                console.print(f"[red]Error fetching from Radarr instance {instance_index if instance_index > 0 else 'default'}: {e}[/red]")
+                logger.error(f"[red]Error fetching from Radarr instance {instance_index if instance_index > 0 else 'default'}: {e}[/red]")
             except Exception as e:
-                console.print(f"[red]Unexpected error with Radarr instance {instance_index if instance_index > 0 else 'default'}: {e}[/red]")
+                logger.error(f"[red]Unexpected error with Radarr instance {instance_index if instance_index > 0 else 'default'}: {e}[/red]")
 
             # Move to the next instance
             instance_index += 1
 
         # If we got here, no instances provided valid data
-        console.print("[yellow]No Radarr instance returned valid movie data.[/yellow]")
+        logger.info("[yellow]No Radarr instance returned valid movie data.[/yellow]")
         return None
 
     async def extract_movie_data(self, radarr_data: Any, filename: str | None = None) -> MovieInfo | None:

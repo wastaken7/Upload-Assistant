@@ -14,7 +14,7 @@ import aiofiles
 import httpx
 from torf import Torrent
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.uploadscreens import UploadScreensManager
 
@@ -55,7 +55,7 @@ class ManualPackageManager:
                     async with httpx.AsyncClient(timeout=30.0) as client:
                         response = await client.get(meta.poster)
                     if response.status_code == 200:
-                        console.print("[bold yellow]Rehosting Cover")
+                        logger.info("[bold yellow]Rehosting Cover")
                         await asyncio.to_thread(Path(poster_img).write_bytes, response.content)
                         if not meta.skip_imghost_upload:
                             poster, _ = await self.uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [poster_img], {})
@@ -66,7 +66,7 @@ class ManualPackageManager:
                         async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/meta.json", "w") as metafile:
                             await metafile.write(meta_text)
                     else:
-                        console.print("[bold yellow]Cover could not be retrieved")
+                        logger.info("[bold yellow]Cover could not be retrieved")
             elif os.path.exists(poster_img) and meta.rehosted_poster is not None:
                 await generic.write(f"TMDB Cover: {meta.rehosted_poster}\n")
             if len(meta.image_list) > 0:
@@ -104,7 +104,7 @@ class ManualPackageManager:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = (await client.post("https://uguu.se/upload.php", files=files)).json()
                 if meta.debug:
-                    console.print(f"[cyan]{response}")
+                    logger.debug(f"[cyan]{response}")
                 url = response['files'][0]['url']
             return url
         except Exception:

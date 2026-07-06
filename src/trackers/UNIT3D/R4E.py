@@ -3,7 +3,7 @@ from typing import Any, cast
 
 import httpx
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
@@ -140,6 +140,6 @@ class R4E(UNIT3D):
                         'download': ''
                     })
             else:
-                console.print(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+                logger.info(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
 
         return dupes

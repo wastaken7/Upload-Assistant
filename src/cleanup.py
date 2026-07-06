@@ -13,7 +13,7 @@ from typing import Any
 
 import psutil
 
-from src.console import console
+from src.console import logger
 
 if os.name == "posix":
     import termios
@@ -70,7 +70,7 @@ class CleanupManager:
                 except (PermissionError, OSError):
                     # Android doesn't allow process termination in many cases
                     if not IS_ANDROID:
-                        console.print(f"[yellow]Cannot terminate process {proc.pid}: Permission denied[/yellow]")
+                        logger.info(f"[yellow]Cannot terminate process {proc.pid}: Permission denied[/yellow]")
 
             # 🔹 Close process streams safely
             for stream in (proc.stdout, proc.stderr, proc.stdin):
@@ -109,7 +109,7 @@ class CleanupManager:
 
         for result in results:
             if isinstance(result, Exception) and not isinstance(result, asyncio.CancelledError):
-                console.print(f"[red]Error during cleanup: {result}[/red]")
+                logger.error(f"[red]Error during cleanup: {result}[/red]")
 
         # 🔹 Step 6: Kill all remaining threads and orphaned processes
         self.kill_all_threads()
@@ -124,7 +124,7 @@ class CleanupManager:
                     try:
                         resource_tracker.unregister(name, kind)
                     except Exception as exc:  # noqa: PERF203 - per-item logging is required here
-                        console.print(
+                        logger.info(
                             f"[red]Error unregistering multiprocessing resource {name} ({kind}): {exc}[/red]"
                         )
 
@@ -170,9 +170,9 @@ class CleanupManager:
                         pass
             except (PermissionError, psutil.AccessDenied, OSError) as e:
                 if not IS_ANDROID:
-                    console.print(f"[yellow]Limited process access: {e}[/yellow]")
+                    logger.info(f"[yellow]Limited process access: {e}[/yellow]")
             except Exception as e:
-                console.print(f"[red]Error during process cleanup: {e}[/red]")
+                logger.error(f"[red]Error during process cleanup: {e}[/red]")
 
         # 🔹 For macOS, specifically check and terminate any multiprocessing processes
         if IS_MACOS and hasattr(multiprocessing, 'active_children'):
@@ -190,7 +190,7 @@ class CleanupManager:
                         with contextlib.suppress(Exception):
                             delete_fn()
         except Exception as e:
-            console.print(f"[red]Error cleaning up threads: {e}[/red]")
+            logger.error(f"[red]Error cleaning up threads: {e}[/red]")
 
         # 🔹 Print remaining active threads
         # active_threads = [t for t in threading.enumerate()]

@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 import aiofiles
 from aiofiles import os as aio_os
 
-from src.console import console
+from src.console import logger
 from src.meta import Meta
 from src.takescreens import TakeScreensManager
 from src.type_utils import to_int
@@ -28,7 +28,7 @@ def _safe_remove(path: str) -> bool:
             os.remove(path)
             return True
     except Exception as e:
-        console.print(f"[yellow]Failed to delete file {path}: {str(e)}[/yellow]")
+        logger.info(f"[yellow]Failed to delete file {path}: {str(e)}[/yellow]")
     return False
 
 
@@ -113,13 +113,13 @@ async def _check_hosts(
     new_images_key = f'{tracker}_images_key'
     if meta.skip_imghost_upload:
         if meta.debug:
-            console.print(f"[yellow]Skipping image host upload for {tracker} as per meta.skip_imghost_upload setting.")
+            logger.debug(f"[yellow]Skipping image host upload for {tracker} as per meta.skip_imghost_upload setting.")
         return meta.get(new_images_key, []), False, False
     if new_images_key not in meta:
         meta[new_images_key] = []
 
     if meta.debug:
-        console.print(
+        logger.debug(
             f"[cyan]check_hosts debug: tracker={tracker} meta.imghost={meta.imghost} approved_image_hosts={approved_image_hosts} "
             f"image_list={len(meta.image_list or [])} {new_images_key}={len(meta.get(new_images_key, []) or [])}[/cyan]"  # noqa: E501
         )
@@ -127,7 +127,7 @@ async def _check_hosts(
     # Check if we have main image_list but no tracker-specific images yet
     if meta.image_list and not meta.get(new_images_key):
         if meta.debug:
-            console.print(f"[yellow]Checking if existing images in meta.image_list can be used for {tracker}...")
+            logger.debug(f"[yellow]Checking if existing images in meta.image_list can be used for {tracker}...")
         # Check if the URLs in image_list are from approved hosts
         approved_images: list[dict[str, str]] = []
         need_reupload = False
@@ -147,11 +147,11 @@ async def _check_hosts(
                 if mapped_host in approved_image_hosts:
                     approved_images.append(image)
                     if meta.debug:
-                        console.print(f"[green]URL '{raw_url}' is from approved host '{mapped_host}'.")
+                        logger.debug(f"[green]URL '{raw_url}' is from approved host '{mapped_host}'.")
                 else:
                     need_reupload = True
                     if meta.debug:
-                        console.print(f"[yellow]URL '{raw_url}' is not from an approved host for {tracker}.")
+                        logger.debug(f"[yellow]URL '{raw_url}' is not from an approved host for {tracker}.")
             else:
                 need_reupload = True
 
@@ -159,7 +159,7 @@ async def _check_hosts(
         if approved_images and len(approved_images) == len(meta.image_list) and not need_reupload:
             meta[new_images_key] = approved_images.copy()
             if meta.debug:
-                console.print(f"[green]All existing images are from approved hosts for {tracker}.")
+                logger.debug(f"[green]All existing images are from approved hosts for {tracker}.")
             return meta[new_images_key], False, False
 
     if tracker == "covers":
@@ -176,7 +176,7 @@ async def _check_hosts(
                 if isinstance(loaded, list):
                     reuploaded_images = cast(list[dict[str, str]], loaded)
         except Exception as e:
-            console.print(f"[red]Failed to load reuploaded images: {e}")
+            logger.error(f"[red]Failed to load reuploaded images: {e}")
 
     valid_reuploaded_images: list[dict[str, str]] = []
     for image in reuploaded_images:
@@ -188,9 +188,9 @@ async def _check_hosts(
         if tracker == "covers" and "release_url" in meta and ("release_url" not in image or image["release_url"] != meta.release_url):
             if meta.debug:
                 if "release_url" not in image:
-                    console.print(f"[yellow]Skipping image without release_url: {raw_url}")
+                    logger.debug(f"[yellow]Skipping image without release_url: {raw_url}")
                 else:
-                    console.print(f"[yellow]Skipping image with mismatched release_url: {image['release_url']} != {meta.release_url}")
+                    logger.debug(f"[yellow]Skipping image with mismatched release_url: {image['release_url']} != {meta.release_url}")
             continue
 
         parsed_url = urlparse(raw_url)
@@ -202,14 +202,14 @@ async def _check_hosts(
             if mapped_host in approved_image_hosts:
                 valid_reuploaded_images.append(image)
             elif meta.debug:
-                console.print(f"[red]URL '{raw_url}' from reuploaded_images.json is not recognized as an approved host.")
+                logger.info(f"[red]URL '{raw_url}' from reuploaded_images.json is not recognized as an approved host.")
 
     if valid_reuploaded_images:
         meta[new_images_key] = valid_reuploaded_images
         if tracker == "covers":
-            console.print("[green]Using valid images from covers.json.")
+            logger.info("[green]Using valid images from covers.json.")
         else:
-            console.print("[green]Using valid images from reuploaded_images.json.")
+            logger.info("[green]Using valid images from reuploaded_images.json.")
         return meta[new_images_key], False, False
 
     # Check if the tracker-specific key has valid images
@@ -229,11 +229,11 @@ async def _check_hosts(
             has_valid_images = True
 
     if has_valid_images:
-        console.print(f"[green]Using valid images from {new_images_key}.")
+        logger.info(f"[green]Using valid images from {new_images_key}.")
         return meta[new_images_key], False, False
 
     if meta.debug:
-        console.print(f"[yellow]No valid images found for {tracker}, will attempt to reupload...")
+        logger.debug(f"[yellow]No valid images found for {tracker}, will attempt to reupload...")
 
     images_reuploaded = False
     max_retries = len(approved_image_hosts)
@@ -254,17 +254,17 @@ async def _check_hosts(
             meta[new_images_key] = image_list
 
         if retry_mode:
-            console.print(f"[yellow]Switching to the next image host. Current index: {img_host_index}")
+            logger.info(f"[yellow]Switching to the next image host. Current index: {img_host_index}")
             img_host_index += 1
             continue  # Retry with next host
 
         break
 
     if not meta.get(new_images_key):
-        console.print("[red]All image hosts failed. Please check your configuration.")
+        logger.info("[red]All image hosts failed. Please check your configuration.")
 
     if meta.debug:
-        console.print(
+        logger.debug(
             f"[cyan]check_hosts debug: done tracker={tracker} image_list={len(meta.image_list or [])} {new_images_key}={len(meta.get(new_images_key, []) or [])}[/cyan]"  # noqa: E501
         )
 
@@ -315,7 +315,7 @@ async def _handle_image_upload(
 
     screenshots_dir = os.path.join(base_dir, 'tmp', folder_id)
     if meta.debug:
-        console.print(f"[yellow]Searching for screenshots in {screenshots_dir}...")
+        logger.debug(f"[yellow]Searching for screenshots in {screenshots_dir}...")
     all_screenshots: list[str] = []
 
     # First check if there are any saved screenshots matching those in the image_list
@@ -323,7 +323,7 @@ async def _handle_image_upload(
         # Get all PNG files in the screenshots directory
         all_png_files: list[str] = [file for file in await aio_os.listdir(screenshots_dir) if file.endswith('.png')]
         if all_png_files and meta.debug:
-            console.print(f"[cyan]Found {len(all_png_files)} PNG files in screenshots directory")
+            logger.info(f"[cyan]Found {len(all_png_files)} PNG files in screenshots directory")
 
         # Extract filenames from the image_list
         image_filenames: list[str] = []
@@ -338,7 +338,7 @@ async def _handle_image_upload(
                         break
 
         if image_filenames and meta.debug:
-            console.print(f"[cyan]Extracted {len(image_filenames)} filenames from image_list URLs: {image_filenames}")
+            logger.info(f"[cyan]Extracted {len(image_filenames)} filenames from image_list URLs: {image_filenames}")
 
         # Check if any of the extracted filenames match the actual files in the directory
         if all_png_files and image_filenames:
@@ -348,14 +348,14 @@ async def _handle_image_upload(
                     # Found a match for this filename
                     all_screenshots.append(png_file)
                     if meta.debug:
-                        console.print(f"[green]Found existing screenshot matching URL: {basename}")
+                        logger.debug(f"[green]Found existing screenshot matching URL: {basename}")
 
         # Also check for any screenshots that match the title pattern as a fallback
         if filename and len(all_screenshots) < multi_screens:
             sanitized_title = await sanitize_filename(filename)
             title_pattern_files = [f for f in all_png_files if os.path.basename(f).startswith(sanitized_title)]
             if meta.debug:
-                console.print(f"[yellow]Searching for screenshots with pattern: {sanitized_title}*.png")
+                logger.debug(f"[yellow]Searching for screenshots with pattern: {sanitized_title}*.png")
             if title_pattern_files:
                 # Only add title pattern files that aren't already in all_screenshots
                 for file in title_pattern_files:
@@ -363,7 +363,7 @@ async def _handle_image_upload(
                         all_screenshots.append(file)
 
                 if meta.debug:
-                    console.print(f"[green]Found {len(title_pattern_files)} screenshots matching title pattern")
+                    logger.debug(f"[green]Found {len(title_pattern_files)} screenshots matching title pattern")
 
     # If we haven't found enough screenshots yet, search for files in the normal way
     if len(all_screenshots) < multi_screens:
@@ -371,7 +371,7 @@ async def _handle_image_upload(
             sanitized_title = await sanitize_filename(filename)
             filename_pattern = f"{sanitized_title}*.png"
             if meta.debug:
-                console.print(f"[yellow]Searching for screenshots with pattern: {filename_pattern}")
+                logger.debug(f"[yellow]Searching for screenshots with pattern: {filename_pattern}")
 
             if meta.is_disc == "DVD":
                 existing_screens: list[str] = await asyncio.to_thread(glob.glob, f"{meta.base_dir}/tmp/{meta.uuid}/{meta.discs[0]['name']}-*.png")
@@ -392,7 +392,7 @@ async def _handle_image_upload(
             glob_results = await asyncio.to_thread(glob.glob, pattern)
             image_glob.extend(glob_results)
             if meta.debug:
-                console.print(f"[cyan]Found {len(image_glob)} files matching pattern: {pattern}")
+                logger.debug(f"[cyan]Found {len(image_glob)} files matching pattern: {pattern}")
 
         unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
         unwanted_files: set[str] = set()
@@ -408,20 +408,20 @@ async def _handle_image_upload(
         image_glob = [file for file in image_glob if file not in unwanted_files]
         image_glob = list(set(image_glob))
         if meta.debug:
-            console.print(f"[cyan]Filtered out {len(unwanted_files)} unwanted files, remaining: {len(image_glob)}")
+            logger.debug(f"[cyan]Filtered out {len(unwanted_files)} unwanted files, remaining: {len(image_glob)}")
 
         # Only keep files that match the indexed pattern: xxx-0.png, xxx-1.png, etc.
         indexed_pattern = re.compile(r".*-\d+\.png$")
         indexed_files: list[str] = [file for file in image_glob if indexed_pattern.match(os.path.basename(file))]
         if meta.debug:
-            console.print(f"[cyan]Found {len(indexed_files)} indexed files matching pattern")
+            logger.debug(f"[cyan]Found {len(indexed_files)} indexed files matching pattern")
 
         # Add any new indexed screenshots to our list
         for screen in indexed_files:
             if screen not in all_screenshots:
                 all_screenshots.append(screen)
                 if meta.debug:
-                    console.print(f"[green]Found indexed screenshot: {os.path.basename(screen)}")
+                    logger.debug(f"[green]Found indexed screenshot: {os.path.basename(screen)}")
 
     if tracker == "covers":
         all_screenshots = []
@@ -442,7 +442,7 @@ async def _handle_image_upload(
         needed_screenshots = multi_screens - len(all_screenshots)
 
         if meta.debug:
-            console.print(f"[yellow]Found {len(all_screenshots)} screenshots, need {needed_screenshots} more to reach {multi_screens} total.")
+            logger.debug(f"[yellow]Found {len(all_screenshots)} screenshots, need {needed_screenshots} more to reach {multi_screens} total.")
 
         try:
             if meta.is_disc == "BDMV":
@@ -462,7 +462,7 @@ async def _handle_image_upload(
                         "",
                     )
                 else:
-                    console.print("[red]No valid path available for screenshot generation.[/red]")
+                    logger.info("[red]No valid path available for screenshot generation.[/red]")
 
             if meta.is_disc == "DVD":
                 new_screens = await asyncio.to_thread(glob.glob, f"{meta.base_dir}/tmp/{meta.uuid}/{meta.discs[0]['name']}-*.png")
@@ -477,21 +477,21 @@ async def _handle_image_upload(
 
             # Add any new screenshots to our list (only those not already in all_screenshots)
             if new_screens and meta.debug:
-                console.print(f"[green]Found {len(new_screens)} new screenshots after generation")
+                logger.info(f"[green]Found {len(new_screens)} new screenshots after generation")
 
             for screen in new_screens:
                 if screen not in all_screenshots:
                     all_screenshots.append(screen)
                     if meta.debug:
-                        console.print(f"[green]Added new screenshot: {os.path.basename(screen)}")
+                        logger.debug(f"[green]Added new screenshot: {os.path.basename(screen)}")
 
         except Exception as e:
-            console.print(f"[red]Error during screenshot capture: {e}")
+            logger.error(f"[red]Error during screenshot capture: {e}")
             import traceback
-            console.print(f"[dim]{traceback.format_exc()}[/dim]")
+            logger.info(f"[dim]{traceback.format_exc()}[/dim]")
 
     if not all_screenshots:
-        console.print("[red]No screenshots were generated or found. Please check the screenshot generation process.")
+        logger.info("[red]No screenshots were generated or found. Please check the screenshot generation process.")
         return [], True, images_reuploaded
 
     all_screenshots.sort()
@@ -528,9 +528,9 @@ async def _handle_image_upload(
     all_screenshots = all_screenshots if tracker == "covers" else final_screenshots[:multi_screens]
 
     if meta.debug:
-        console.print(f"[green]Using {len(all_screenshots)} screenshots:")
+        logger.debug(f"[green]Using {len(all_screenshots)} screenshots:")
         for i, screenshot in enumerate(all_screenshots):
-            console.print(f"  {i+1}. {os.path.basename(screenshot)}")
+            logger.debug(f"  {i+1}. {os.path.basename(screenshot)}")
 
     if not meta.skip_imghost_upload:
         uploaded_images: list[dict[str, str]] = []
@@ -542,11 +542,11 @@ async def _handle_image_upload(
             current_img_host = _as_str(default_config.get(current_img_host_key))
 
             if not current_img_host:
-                console.print("[red]No more image hosts left to try.")
+                logger.info("[red]No more image hosts left to try.")
                 return [], True, images_reuploaded
 
             if current_img_host not in approved_image_hosts:
-                console.print(f"[red]Your preferred image host '{current_img_host}' is not supported at {tracker}, trying next host.")
+                logger.info(f"[red]Your preferred image host '{current_img_host}' is not supported at {tracker}, trying next host.")
                 retry_mode = True
                 images_reuploaded = True
                 img_host_index += 1
@@ -554,7 +554,7 @@ async def _handle_image_upload(
             else:
                 meta.imghost = current_img_host
                 if meta.debug:
-                    console.print(f"[green]Uploading to approved host '{current_img_host}'.")
+                    logger.debug(f"[green]Uploading to approved host '{current_img_host}'.")
                 break
 
         uploaded_images, _ = await uploadscreens_manager.upload_screens(
@@ -565,9 +565,9 @@ async def _handle_image_upload(
             meta[new_images_key] = uploaded_images
 
         if meta.debug:
-            console.print(f"[debug] Updated {new_images_key} with {len(uploaded_images)} images.")
+            logger.debug(f"[debug] Updated {new_images_key} with {len(uploaded_images)} images.")
             for image in uploaded_images:
-                console.print(f"[debug] Response in upload_image_task: {image['img_url']}, {image['raw_url']}, {image['web_url']}")
+                logger.debug(f"[debug] Response in upload_image_task: {image['img_url']}, {image['raw_url']}, {image['web_url']}")
 
         for image in cast(list[dict[str, str]], meta.get(new_images_key, [])):
             raw_url = image['raw_url']
@@ -577,7 +577,7 @@ async def _handle_image_upload(
             mapped_host = url_host_mapping.get(mapped_host, mapped_host)
 
             if mapped_host not in approved_image_hosts:
-                console.print(f"[red]Unsupported image host detected in URL '{raw_url}'. Please use one of the approved image hosts.")
+                logger.info(f"[red]Unsupported image host detected in URL '{raw_url}'. Please use one of the approved image hosts.")
                 if original_imghost:
                     meta.imghost = original_imghost
                 return meta[new_images_key], True, images_reuploaded  # Trigger retry_mode if switching hosts
@@ -600,7 +600,7 @@ async def _handle_image_upload(
                     if isinstance(loaded_value, list):
                         existing_data = cast(list[dict[str, str]], loaded_value)
                     else:
-                        console.print(f"[red]Existing data in {output_file} is not a list. Resetting to an empty list.")
+                        logger.info(f"[red]Existing data in {output_file} is not a list. Resetting to an empty list.")
             except Exception:
                 existing_data = []
 
@@ -611,13 +611,13 @@ async def _handle_image_upload(
                 for image in updated_data:
                     if "release_url" not in image:
                         image["release_url"] = meta.release_url
-                console.print(f"[green]Added release URL to {len(updated_data)} cover images: {meta.release_url}")
+                logger.info(f"[green]Added release URL to {len(updated_data)} cover images: {meta.release_url}")
 
             try:
                 async with aiofiles.open(output_file, 'w', encoding='utf-8') as f:
                     await f.write(json.dumps(updated_data, indent=4))
                 if meta.debug:
-                    console.print(f"[green]Successfully updated reuploaded images in {output_file}.")
+                    logger.debug(f"[green]Successfully updated reuploaded images in {output_file}.")
 
                 if tracker == "covers":
                     deleted_count = 0
@@ -625,15 +625,15 @@ async def _handle_image_upload(
                         if _safe_remove(screenshot):
                             deleted_count += 1
                             if meta.debug:
-                                console.print(f"[dim]Deleted cover image file: {screenshot}[/dim]")
+                                logger.debug(f"[dim]Deleted cover image file: {screenshot}[/dim]")
 
                     if deleted_count > 0 and meta.debug:
-                        console.print(f"[green]Cleaned up {deleted_count} cover image files after successful upload[/green]")
+                        logger.info(f"[green]Cleaned up {deleted_count} cover image files after successful upload[/green]")
 
             except Exception as e:
-                console.print(f"[red]Failed to save reuploaded images: {e}")
+                logger.error(f"[red]Failed to save reuploaded images: {e}")
         else:
-            console.print("[red]new_images_key is not a valid key in meta or is not a list.")
+            logger.info("[red]new_images_key is not a valid key in meta or is not a list.")
 
         if original_imghost:
             meta.imghost = original_imghost
