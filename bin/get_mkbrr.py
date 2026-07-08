@@ -69,6 +69,12 @@ class MkbrrBinaryManager:
 
         bundled_path = get_bundled_binary_path("mkbrr", folder_path, binary_name)
         if bundled_path:
+            if system != "windows":
+                try:
+                    p = Path(bundled_path)
+                    p.chmod(p.stat().st_mode | stat.S_IEXEC)
+                except Exception as e:
+                    logger.debug(f"[yellow]Failed to set execute permission on bundled binary: {e}[/yellow]")
             logger.debug(f"[blue]Using bundled mkbrr binary: {bundled_path}[/blue]")
             return bundled_path
 
