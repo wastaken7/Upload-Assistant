@@ -806,6 +806,12 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     total_size = await asyncio.to_thread(get_path_size, input_path)
 
     if skip_archive:
+        if archive_password:
+            logger.warning(
+                "[yellow]Warning: 'archive_password' is set but 'skip_archive' is enabled — no archive "
+                "will be created, so this upload will proceed as if no password were configured (the "
+                "password is only meaningful when compressing into a 7z/rar).[/yellow]"
+            )
         # Skip 7z entirely — copy files/dir contents straight to usenet_dir
         logger.info("[cyan]Skipping archive step; copying files directly for upload...[/cyan]")
         if await aiofiles.ospath.isdir(input_path):
@@ -872,7 +878,10 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             logger.info("[cyan]Generating PAR2 parity files...[/cyan]")
             par2_file = f"{archive_name}.par2"
             relative_target_files = [os.path.basename(f) for f in target_files]
-            cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", "-n1", par2_file] + relative_target_files
+            # No -n/-u/-l flag: par2cmdline falls back to its default scheme of
+            # exponentially-sized recovery volumes, matching standard Usenet posts
+            # and letting repair tools fetch only as much recovery data as needed.
+            cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", par2_file] + relative_target_files
             if is_debug and not path_par2:
                 logger.info(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_par2)}[/yellow]")
                 mock_par2 = os.path.normpath(os.path.join(usenet_dir, par2_file))
@@ -957,7 +966,11 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         if obscure_subject and not custom_subject:
             cmd_pesto.append("--obfuscate=full")
 
-        if archive_password:
+        # --nzb-password only writes the <meta type="password"> tag in the NZB;
+        # it doesn't itself encrypt anything (that would be pesto's own
+        # --password/--compress, which UA never passes here). Real protection
+        # still comes from the 7z step above, so gate this the same way.
+        if archive_password and not skip_archive:
             cmd_pesto.extend(["--nzb-password", archive_password])
 
         # --check: after posting, verify every article is retrievable via STAT.
@@ -1066,8 +1079,10 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                         await aiofiles.os.remove(nzb_file)
                 raise
 
-        # nyuu doesn't inject the password into the NZB — do it manually
-        if archive_password and await aiofiles.ospath.exists(nzb_file):
+        # nyuu doesn't inject the password into the NZB — do it manually.
+        # Skipped when skip_archive is on: no 7z archive was created to encrypt,
+        # so the password never protected anything and shouldn't be advertised.
+        if archive_password and not skip_archive and await aiofiles.ospath.exists(nzb_file):
             if is_debug:
                 logger.info(f"[cyan][DEBUG SIMULATION] Injecting password '{archive_password}' into NZB file...[/cyan]")
             else:
