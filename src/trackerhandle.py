@@ -412,7 +412,7 @@ async def process_trackers(
         for (tracker, _), result in zip(tasks, results, strict=False):
             if isinstance(result, Exception):
                 logger.info(f"[red]{tracker} encountered an error: {result}[/red]")
-                logger.debug(traceback.format_exception(type(result), result, result.__traceback__))
+                logger.debug("".join(traceback.format_exception(type(result), result, result.__traceback__)))
     else:
         # Process each tracker sequentially
         for tracker in enabled_trackers:

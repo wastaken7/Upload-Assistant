@@ -205,17 +205,15 @@ class SceneManager:
                                     except Exception as e:
                                         logger.info(f"[yellow]Failed to download NFO file: {e}")
 
-                            return release_name, True, imdb
+                            video = release_name
+                            scene = True
                         else:
                             logger.debug("[yellow]SRRDB: No match found with lower/tag search")
-                            return video, scene, imdb
 
                     except Exception as e:
                         logger.info(f"[yellow]SRRDB search failed: {e}")
-                        return video, scene, imdb
                 else:
                     logger.debug("[yellow]SRRDB: Missing name or tag for lower/tag search")
-                    return video, scene, imdb
 
         check_predb = bool(self.default_config.get('check_predb', False))
         if not scene and check_predb:

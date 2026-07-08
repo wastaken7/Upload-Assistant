@@ -25,7 +25,7 @@ class LPT(NEXUSPHP):
         tv_series = 402
         tv_shows = 403
 
-        category = (meta.category).upper()
+        category = meta.category.upper()
         genres = ", ".join(meta.genres).lower()
         keywords = ", ".join(meta.keywords).lower()
 
@@ -68,7 +68,7 @@ class LPT(NEXUSPHP):
         uhd_remux = 11
         web_dl = 4
 
-        is_disc = (meta.is_disc).lower()
+        is_disc = (meta.is_disc or "").lower()
         mtype = str(meta.type).lower()
         resolution = meta.resolution.lower()
 

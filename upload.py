@@ -342,7 +342,7 @@ async def merge_meta(meta: Meta, saved_meta: dict[str, Any]) -> dict[str, Any]:
         if clean_key in overwrite_list:
             if clean_key in meta and getattr(meta, clean_key, None) is not None:
                 sanitized_saved_meta[clean_key] = meta[clean_key]
-                logger.debug(f"Overriding {clean_key} with meta value:", meta[clean_key])
+                logger.debug(f"Overriding {clean_key} with meta value: {meta[clean_key]}")
             else:
                 sanitized_saved_meta[clean_key] = value
         else:
@@ -1220,10 +1220,10 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                                         f"switching meta.imghost from '{meta.imghost}' to '{preferred_host}'.[/cyan]"
                                     )
                                     meta.imghost = preferred_host
-
-                            logger.info(
-                                f"[cyan]Image host debug: cannot compute common host (all_known={all_known}, approved_sets={len(approved_sets)}, configured_hosts={len(configured_hosts)}).[/cyan]"
-                            )
+                            else:
+                                logger.debug(
+                                    f"[cyan]Image host debug: cannot compute common host (all_known={all_known}, approved_sets={len(approved_sets)}, configured_hosts={len(configured_hosts)}).[/cyan]"
+                                )
 
                         except Exception as e:
                             logger.debug(f"[yellow]Could not determine a common approved image host: {e}[/yellow]")

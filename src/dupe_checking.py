@@ -477,7 +477,7 @@ class DupeChecker:
 
                 if not target_is_audiobook:
                     # Compare ebook formats (e.g. EPUB vs PDF)
-                    target_type = str(meta.type or "").lower()
+                    target_type = (meta.type or "").lower()
 
                     # Check if formats match either by type_id/dupe_type or file extension
                     format_match = target_type == dupe_type
@@ -541,7 +541,7 @@ class DupeChecker:
                             logger.debug(f"[debug] Size comparison failed due to ValueError: entry_size={entry.get('size')}, source_size={meta.source_size}")
                     else:
                         logger.debug(f"[debug] Comparing file: {file} against dupe files list.")
-                        logger.debug(f"[debug] Dupe files list: {files[:10]}{'...' if len(files) > 10 else files}")
+                        logger.debug(f"[debug] Dupe files list: {files[:10]}{'...' if len(files) > 10 else ''}")
                         if any(file.lower() == f.lower() for f in files):
                             meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
                             logger.debug(f"[debug] Filename match found: {meta.filename_match}")

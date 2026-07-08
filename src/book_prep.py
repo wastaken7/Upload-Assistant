@@ -256,11 +256,10 @@ async def gather_book_prep(
                 meta.uuid,
                 base_dir,
                 is_dvd=(meta.is_disc == "DVD"),
-                debug=meta.debug,
             )
             meta.mediainfo = mi
         except Exception as e:
-            logger.debug(f"[yellow]Warning: MediaInfo export failed for book: {e}[/yellow]")
+            logger.info(f"[yellow]Warning: MediaInfo export failed for book: {e}[/yellow]")
             meta.mediainfo = {}
     else:
         pass  # meta.mediainfo already populated from a previous run
@@ -529,19 +528,13 @@ async def gather_book_prep(
     openlibrary_data = None
     openlibrary_id = meta.openlibrary
     if openlibrary_id:
-        try:
-            from src.openlibrary import openlibrary_manager
+        from src.openlibrary import openlibrary_manager
 
-            openlibrary_data = await openlibrary_manager.search_by_work_id(openlibrary_id, base_dir=base_dir)
-        except Exception as ex:
-            logger.debug(f"[yellow]Warning: OpenLibrary API lookup by Work ID failed: {ex}[/yellow]")
+        openlibrary_data = await openlibrary_manager.search_by_work_id(openlibrary_id, base_dir=base_dir)
     elif meta.isbn:
-        try:
-            from src.openlibrary import openlibrary_manager
+        from src.openlibrary import openlibrary_manager
 
-            openlibrary_data = await openlibrary_manager.search_by_isbn(meta.isbn, base_dir=base_dir)
-        except Exception as ex:
-            logger.debug(f"[yellow]Warning: OpenLibrary API lookup by ISBN failed: {ex}[/yellow]")
+        openlibrary_data = await openlibrary_manager.search_by_isbn(meta.isbn, base_dir=base_dir)
 
     if openlibrary_data:
         for key, val in openlibrary_data.items():
@@ -731,14 +724,14 @@ def sanitize_book_author(meta: Meta) -> None:
             meta.author = ""
             return
 
-    author = author
     has_underscores = "_" in author and " " not in author
     normalized_author = author.replace("_", " ") if has_underscores else author
 
     manual_translator = meta.book_translator
     if manual_translator:
         # Also replace underscores in manual translator names in case they entered underscores
-        names_to_remove = [n.replace("_", " ").strip() for n in (manual_translator).split(",") if n.strip()]
+        manual_translator_str = manual_translator
+        names_to_remove = [n.replace("_", " ").strip() for n in manual_translator_str.split(",") if n.strip()]
         for name in names_to_remove:
             pattern = r"\b" + re.escape(name) + r"\b"
             normalized_author = re.sub(pattern, "", normalized_author, flags=re.IGNORECASE)

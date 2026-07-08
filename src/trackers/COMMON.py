@@ -562,6 +562,25 @@ class COMMON:
         response = (await asyncio.to_thread(input, f"{message} (Y/n): ")).strip().lower()
         return response == '' or response == 'y'
 
+    async def _apply_region_distributor(self, meta: Meta, attributes: dict[str, Any]) -> None:
+        region_id = attributes.get('region_id', 0)
+        distributor_id = attributes.get('distributor_id', 0)
+
+        logger.debug(f"[blue]Region ID: {region_id}[/blue]")
+        logger.debug(f"[blue]Distributor ID: {distributor_id}[/blue]")
+
+        if not meta.region and region_id:
+            region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
+            if region_name:
+                meta.region = region_name
+                logger.debug(f"[green]Mapped region_id {region_id} to '{region_name}'[/green]")
+
+        if not meta.distributor and distributor_id:
+            distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
+            if distributor_name:
+                meta.distributor = distributor_name
+                logger.debug(f"[green]Mapped distributor_id {distributor_id} to '{distributor_name}'[/green]")
+
     async def unit3d_region_distributor(self, meta: Meta, tracker: str, torrent_url: str, id: str = "") -> None:
         """Get region and distributor information from API response"""
         raw_api_key = self.config['TRACKERS'][tracker].get('api_key')
@@ -582,51 +601,16 @@ class COMMON:
             if data == "404":
                 logger.info("[yellow]No data found (404). Returning None.[/yellow]")
                 return
+
             if data and isinstance(data, list):
                 attributes = data[0].get('attributes', {})
-
-                region_id = attributes.get('region_id', 0)
-                distributor_id = attributes.get('distributor_id', 0)
-
-                logger.debug(f"[blue]Region ID: {region_id}[/blue]")
-                logger.debug(f"[blue]Distributor ID: {distributor_id}[/blue]")
-
-                # use reverse to reverse map the id to the name
-                if not meta.region and region_id:
-                    region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
-                    if region_name:
-                        meta.region = region_name
-                        logger.debug(f"[green]Mapped region_id {region_id} to '{region_name}'[/green]")
-
-                # use reverse to reverse map the id to the name
-                if not meta.distributor and distributor_id:
-                    distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
-                    if distributor_name:
-                        meta.distributor = distributor_name
-                        logger.debug(f"[green]Mapped distributor_id {distributor_id} to '{distributor_name}'[/green]")
+                await self._apply_region_distributor(meta, attributes)
                 return
-
             else:
                 # Handle direct attributes from JSON response (when not in a list)
                 attributes = json_response.get("attributes", {})
                 if attributes:
-                    region_id = attributes.get("region_id")
-                    distributor_id = attributes.get("distributor_id")
-
-                    logger.debug(f"[blue]Region ID: {region_id}[/blue]")
-                    logger.debug(f"[blue]Distributor ID: {distributor_id}[/blue]")
-
-                    if not meta.region and region_id:
-                        region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
-                        if region_name:
-                            meta.region = region_name
-                            logger.debug(f"[green]Mapped region_id {region_id} to '{region_name}'[/green]")
-
-                    if not meta.distributor and distributor_id:
-                        distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
-                        if distributor_name:
-                            meta.distributor = distributor_name
-                            logger.debug(f"[green]Mapped distributor_id {distributor_id} to '{distributor_name}'[/green]")
+                    await self._apply_region_distributor(meta, attributes)
         except Exception as e:
             console.print_exception()
             logger.info(f"[yellow]Invalid Response from {tracker} API. Error: {str(e)}[/yellow]")

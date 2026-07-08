@@ -855,9 +855,9 @@ async def get_tv_data(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) 
             except Exception as e:
                 logger.error(f"[red]Error fetching TVDb episode data: {e}[/red]")
 
-        tvdb_episode_id = meta.tvdb_episode_id
-        if tvdb_episode_id is not None:
-            meta.tvdb_imdb_id = await tvdb_handler.get_imdb_id_from_tvdb_episode_id(tvdb_episode_id)
+    tvdb_episode_id = meta.tvdb_episode_id
+    if tvdb_episode_id is not None:
+        meta.tvdb_imdb_id = await tvdb_handler.get_imdb_id_from_tvdb_episode_id(tvdb_episode_id)
 
     return meta
 

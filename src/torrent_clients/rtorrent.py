@@ -272,7 +272,7 @@ class RtorrentClientMixin:
             fr_file = f"{os.path.dirname(path)}/fr.torrent"
             modified_fr = True
             logger.debug(f"[cyan]Modified fast resume file path because path mapping: {fr_file}")
-        if meta.category in ("BOOK", "GAME") and len(filelist) > 1 and isdir or isdir is False:
+        if (meta.category in ("BOOK", "GAME") and len(filelist) > 1 and isdir) or isdir is False:
             path = os.path.dirname(path)
         logger.debug(f"[cyan]Final path for rTorrent: {path}")
 
@@ -291,7 +291,10 @@ class RtorrentClientMixin:
         # Delete modified fr_file location
         if modified_fr:
             logger.debug(f"[cyan]Removing modified fast resume file: {fr_file}")
-            os.remove(f"{path_dir}/fr.torrent")
+            try:
+                os.remove(f"{path_dir}/fr.torrent")
+            except OSError as e:
+                logger.debug(f"[yellow]Warning: Could not remove modified fast resume file: {e}[/yellow]")
         logger.debug(f"[cyan]Path: {path}")
         return
 

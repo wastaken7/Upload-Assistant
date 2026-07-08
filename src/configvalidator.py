@@ -246,7 +246,7 @@ def validate_config(
             if tracker_class and getattr(tracker_class, "is_usenet", False):
                 is_usenet_tracker_active = True
                 break
-    except Exception:
+    except ImportError:
         if any(ut in trackers_upper for ut in ("CRP", "SUIO", "DS")):
             is_usenet_tracker_active = True
 

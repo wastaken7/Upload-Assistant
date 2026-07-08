@@ -553,11 +553,7 @@ async def get_conformance_error(meta: Meta) -> bool:
     if meta.is_disc != "BDMV" and meta.mediainfo.get("media", {}).get("track"):
         general_track = next((track for track in meta.mediainfo["media"]["track"] if track.get("@type") == "General"), None)
         if general_track and general_track.get("extra", {}).get("ConformanceErrors", {}):
-            try:
-                return True
-            except ValueError:
-                logger.debug(f"[red]Unexpected value: {general_track['extra']['ConformanceErrors']}[/red]")
-                return True
+            return True
         else:
             logger.debug("[green]No Conformance errors found in MediaInfo General track[/green]")
             return False

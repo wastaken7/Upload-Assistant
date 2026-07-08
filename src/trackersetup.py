@@ -1053,8 +1053,8 @@ class TRACKER_SETUP:
             logger.debug("[bold green]LST does not support searching existing trump reports[/bold green]")
             return True
 
-        if not meta.skip_upload_trackers or not isinstance(meta.skip_upload_trackers, list) or meta.skip_upload_trackers is None:
-            meta.setdefault('skip_upload_trackers', [])
+        if not isinstance(meta.skip_upload_trackers, list):
+            meta.skip_upload_trackers = []
 
         trumping_reports, status = await self.get_tracker_trumps(tracker, url, reported_torrent_id)
         upload = False

@@ -146,9 +146,8 @@ class TrackerDataManager:
                         logger.debug(f"[yellow]Tracker {tracker} not found in config, skipping[/yellow]")
                         continue
 
-                    # Accept tracker if it has either a valid api_key or announce_url
-                    has_api_key = api_key and api_key.strip() != ''
-                    has_announce_url = announce_url and announce_url.strip() != ''
+                    has_api_key = isinstance(api_key, str) and api_key.strip() != ""
+                    has_announce_url = isinstance(announce_url, str) and announce_url.strip() != ""
 
                     if not has_api_key and not has_announce_url:
                         logger.debug(f"[yellow]Tracker {tracker} has no api_key or announce_url set, skipping[/yellow]")
@@ -172,7 +171,7 @@ class TrackerDataManager:
                     meta_trackers = [t.strip().upper() for t in meta_trackers_raw.split(',')]
                 elif isinstance(meta_trackers_raw, list):
                     meta_trackers_list = meta_trackers_raw
-                    meta_trackers = [str(t).upper() for t in meta_trackers_list]
+                    meta_trackers = [t.upper() for t in meta_trackers_list]
                 else:
                     meta_trackers = []
 
