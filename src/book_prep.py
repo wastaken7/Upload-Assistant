@@ -724,13 +724,14 @@ def sanitize_book_author(meta: Meta) -> None:
             meta.author = ""
             return
 
+    author = str(author)
     has_underscores = "_" in author and " " not in author
     normalized_author = author.replace("_", " ") if has_underscores else author
 
     manual_translator = meta.book_translator
     if manual_translator:
         # Also replace underscores in manual translator names in case they entered underscores
-        manual_translator_str = manual_translator
+        manual_translator_str = str(manual_translator)
         names_to_remove = [n.replace("_", " ").strip() for n in manual_translator_str.split(",") if n.strip()]
         for name in names_to_remove:
             pattern = r"\b" + re.escape(name) + r"\b"

@@ -205,8 +205,8 @@ class SceneManager:
                                     except Exception as e:
                                         logger.info(f"[yellow]Failed to download NFO file: {e}")
 
-                            video = release_name
-                            scene = True
+                                video = release_name
+                                scene = True
                         else:
                             logger.debug("[yellow]SRRDB: No match found with lower/tag search")
 
