@@ -1,0 +1,73 @@
+name: Build and Release Standalone Binaries
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            suffix: linux
+            sep: ":"
+          - os: windows-latest
+            suffix: windows
+            sep: ";"
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14' # Pinned to the project's target python version
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Download all internal utility binaries (pesto, nyuu, 7z, par2, mkbrr, bdinfo)
+        run: python bin/download_all_build_binaries.py
+
+      - name: Download all release dependencies (FFmpeg, MediaInfo)
+        run: python bin/download_release_dependencies.py
+
+      - name: Build upload binary with PyInstaller
+        run: |
+          pyinstaller --onefile --name upload-${{ matrix.suffix }} \
+            --add-data "src${{ matrix.sep }}src" \
+            --add-data "cogs${{ matrix.sep }}cogs" \
+            --add-data "bin${{ matrix.sep }}bin" \
+            --add-data "data/example_config.py${{ matrix.sep }}data" \
+            --add-data "data/tags.json${{ matrix.sep }}data" \
+            --add-data "data/templates${{ matrix.sep }}data/templates" \
+            upload.py
+
+      - name: Build config-generator binary with PyInstaller
+        run: |
+          pyinstaller --onefile --name config-generator-${{ matrix.suffix }} \
+            --add-data "src${{ matrix.sep }}src" \
+            --add-data "bin${{ matrix.sep }}bin" \
+            --add-data "data/example_config.py${{ matrix.sep }}data" \
+            config-generator.py
+
+      - name: Upload binaries to Release
+        run: |
+          gh release upload "$RELEASE_TAG" dist/upload-${{ matrix.suffix }}* dist/config-generator-${{ matrix.suffix }}* --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        shell: bash

@@ -921,6 +921,10 @@ class ASC:
             filelist = cast(list[str], meta.filelist or [])
             video_file = filelist[0] if filelist else str(meta.path or "")
             template_path = os.path.abspath(f"{meta.base_dir}/data/templates/MEDIAINFO.txt")
+            if not os.path.exists(template_path):
+                from src.path_utils import get_resource_path
+
+                template_path = str(get_resource_path("data", "templates", "MEDIAINFO.txt"))
             if os.path.exists(template_path):
                 mi_output = MediaInfo.parse(
                     video_file,

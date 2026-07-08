@@ -63,11 +63,31 @@ class BDInfoBinaryManager:
         logger.debug(f"[blue]Using file pattern: {file_pattern}[/blue]")
         logger.debug(f"[blue]Target folder: {folder_path}[/blue]")
 
+        import sys
+
+        binary_name = "bdinfo.exe" if system == "windows" else "bdinfo"
+
+        try:
+            from src.path_utils import get_bundled_binary_path
+        except ImportError:
+            get_bundled_binary_path = None
+
+        if get_bundled_binary_path:
+            bundled_path = get_bundled_binary_path("bdinfo", folder_path, binary_name)
+            if bundled_path:
+                logger.debug(f"[blue]Using bundled BDInfo binary: {bundled_path}[/blue]")
+                return bundled_path
+        elif getattr(sys, "frozen", False):
+            bundle_bin_dir = Path(sys._MEIPASS) / "bin" / "bdinfo" / folder_path
+            bundle_binary_path = bundle_bin_dir / binary_name
+            if bundle_binary_path.exists():
+                logger.debug(f"[blue]Using bundled BDInfo binary: {bundle_binary_path}[/blue]")
+                return str(bundle_binary_path)
+
         bin_dir = Path(base_dir) / "bin" / "bdinfo" / folder_path
         bin_dir.mkdir(parents=True, exist_ok=True)
         logger.debug(f"[blue]Binary directory: {bin_dir}[/blue]")
 
-        binary_name = "bdinfo.exe" if system == "windows" else "bdinfo"
         binary_path = bin_dir / binary_name
         logger.debug(f"[blue]Binary path: {binary_path}[/blue]")
 

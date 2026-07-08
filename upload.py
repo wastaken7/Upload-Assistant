@@ -63,7 +63,37 @@ from src.uphelper import UploadHelper
 from src.uploadscreens import UploadScreensManager
 
 cli_ui.setup(color='always', title="Upload Assistant")
-base_dir = os.path.abspath(os.path.dirname(__file__))
+if getattr(sys, "frozen", False):
+    base_dir = os.path.abspath(os.path.dirname(sys.executable))
+    # Prepend sys._MEIPASS and sys._MEIPASS/bin to PATH so system can find bundled binaries
+    from src.path_utils import setup_frozen_environment
+
+    setup_frozen_environment()
+    # Tell pymediainfo to find DLL/so in sys._MEIPASS by monkey-patching MediaInfo.parse
+    try:
+        from pymediainfo import MediaInfo
+
+        _orig_parse = MediaInfo.parse
+        if sys.platform == "win32":
+            lib_path = os.path.join(sys._MEIPASS, "MediaInfo.dll")
+        else:
+            lib_path = os.path.join(sys._MEIPASS, "libmediainfo.so")
+
+        @classmethod
+        def _wrapped_parse(cls, filename, library_file=None, *args, **kwargs):  # noqa: ARG001
+            if library_file is None:
+                library_file = lib_path
+            return _orig_parse(filename, *args, library_file=library_file, **kwargs)
+
+        MediaInfo.parse = _wrapped_parse
+    except Exception:
+        # Fallback to env variable if pymediainfo import/patch fails
+        if sys.platform == "win32":
+            os.environ["MEDIAINFO_PATH"] = os.path.join(sys._MEIPASS, "MediaInfo.dll")
+        else:
+            os.environ["MEDIAINFO_PATH"] = os.path.join(sys._MEIPASS, "libmediainfo.so")
+else:
+    base_dir = os.path.abspath(os.path.dirname(__file__))
 
 # Global state for shutdown handling (reset via _reset_shutdown_state() for in-process runs)
 _shutdown_requested = False

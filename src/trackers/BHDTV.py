@@ -68,6 +68,10 @@ class BHDTV:
             filelist = cast(list[str], meta.filelist or [])
             video = filelist[0] if filelist else (meta.path or "")
             mi_template = os.path.abspath(f"{meta.base_dir}/data/templates/MEDIAINFO.txt")
+            if not os.path.exists(mi_template):
+                from src.path_utils import get_resource_path
+
+                mi_template = str(get_resource_path("data", "templates", "MEDIAINFO.txt"))
             if os.path.exists(mi_template):
                 media_info = MediaInfo.parse(video, output="STRING", full=False,
                                                 mediainfo_options={"inform": f"file://{mi_template}"})

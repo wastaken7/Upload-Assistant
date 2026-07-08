@@ -172,6 +172,10 @@ class AR:
             # using custom mediainfo template.
             # can not use full media info as sometimes its more than max chars per post.
             mi_template = os.path.abspath(f"{meta.base_dir}/data/templates/summary-mediainfo.csv")
+            if not os.path.exists(mi_template):
+                from src.path_utils import get_resource_path
+
+                mi_template = str(get_resource_path("data", "templates", "summary-mediainfo.csv"))
             if os.path.exists(mi_template):
                 media_info = await self.parse_mediainfo_async(video, mi_template)
                 description += (f"""[code]\n{media_info}\n[/code]\n""")

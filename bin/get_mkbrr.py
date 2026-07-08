@@ -63,11 +63,25 @@ class MkbrrBinaryManager:
         logger.debug(f"[blue]Using file pattern: {file_pattern}[/blue]")
         logger.debug(f"[blue]Target folder: {folder_path}[/blue]")
 
+        binary_name = "mkbrr.exe" if system == "windows" else "mkbrr"
+
+        from src.path_utils import get_bundled_binary_path
+
+        bundled_path = get_bundled_binary_path("mkbrr", folder_path, binary_name)
+        if bundled_path:
+            if system != "windows":
+                try:
+                    p = Path(bundled_path)
+                    p.chmod(p.stat().st_mode | stat.S_IEXEC)
+                except Exception as e:
+                    logger.debug(f"[yellow]Failed to set execute permission on bundled binary: {e}[/yellow]")
+            logger.debug(f"[blue]Using bundled mkbrr binary: {bundled_path}[/blue]")
+            return bundled_path
+
         bin_dir = Path(base_dir) / "bin" / "mkbrr" / folder_path
         bin_dir.mkdir(parents=True, exist_ok=True)
         logger.debug(f"[blue]Binary directory: {bin_dir}[/blue]")
 
-        binary_name = "mkbrr.exe" if system == "windows" else "mkbrr"
         binary_path = bin_dir / binary_name
         logger.debug(f"[blue]Binary path: {binary_path}[/blue]")
 
