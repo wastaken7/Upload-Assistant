@@ -920,7 +920,10 @@ class ASC:
         if not meta.is_disc:
             filelist = cast(list[str], meta.filelist or [])
             video_file = filelist[0] if filelist else str(meta.path or "")
+            import sys
             template_path = os.path.abspath(f"{meta.base_dir}/data/templates/MEDIAINFO.txt")
+            if getattr(sys, "frozen", False) and not os.path.exists(template_path):
+                template_path = os.path.join(sys._MEIPASS, "data", "templates", "MEDIAINFO.txt")
             if os.path.exists(template_path):
                 mi_output = MediaInfo.parse(
                     video_file,

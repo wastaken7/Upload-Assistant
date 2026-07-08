@@ -171,7 +171,10 @@ class AR:
             video = filelist[0] if filelist else str(meta.path or "")
             # using custom mediainfo template.
             # can not use full media info as sometimes its more than max chars per post.
+            import sys
             mi_template = os.path.abspath(f"{meta.base_dir}/data/templates/summary-mediainfo.csv")
+            if getattr(sys, "frozen", False) and not os.path.exists(mi_template):
+                mi_template = os.path.join(sys._MEIPASS, "data", "templates", "summary-mediainfo.csv")
             if os.path.exists(mi_template):
                 media_info = await self.parse_mediainfo_async(video, mi_template)
                 description += (f"""[code]\n{media_info}\n[/code]\n""")

@@ -4,9 +4,17 @@ import ast
 import json
 import os
 import re
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypedDict, cast
+
+if getattr(sys, "frozen", False):
+    base_dir = Path(sys.executable).parent
+    # Prepend sys._MEIPASS and sys._MEIPASS/bin to PATH so system can find bundled binaries
+    os.environ["PATH"] = sys._MEIPASS + os.path.pathsep + os.path.join(sys._MEIPASS, "bin") + os.path.pathsep + os.environ["PATH"]
+else:
+    base_dir = Path(__file__).resolve().parent
 
 from src.check_requirements import check_dependencies
 
@@ -27,7 +35,7 @@ UnexpectedKey = tuple[str, ConfigDict, str]
 
 def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
     """Read the example config file and return its structure and comments"""
-    example_path = Path("data/example_config.py")
+    example_path = Path(sys._MEIPASS) / "data" / "example_config.py" if getattr(sys, "frozen", False) else base_dir / "data" / "example_config.py"
     comments: ConfigComments = {}
 
     if not example_path.exists():
@@ -100,10 +108,7 @@ def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
 
 def load_existing_config() -> tuple[ConfigDict | None, Path | None]:
     """Load an existing config file if available"""
-    config_paths = [
-        Path("data/config.py"),
-        Path("data/config1.py")
-    ]
+    config_paths = [base_dir / "data" / "config.py", base_dir / "data" / "config1.py"]
 
     for path in config_paths:
         if path.exists():
@@ -887,7 +892,7 @@ def configure_discord(
 def generate_config_file(config_data: ConfigDict, existing_path: Path | None = None) -> bool:
     """Generate the config.py file from the config dictionary"""
     # Create output directory if it doesn't exist
-    os.makedirs("data", exist_ok=True)
+    os.makedirs(base_dir / "data", exist_ok=True)
 
     # Determine the output path
     if existing_path:
@@ -899,8 +904,8 @@ def generate_config_file(config_data: ConfigDict, existing_path: Path | None = N
                 dst.write(src.read())
             console.print(f"\n[✓] Created backup of existing config at {backup_path}", markup=False)
     else:
-        config_path = Path("data/config.py")
-        backup_path = Path("data/config.py.bak")
+        config_path = base_dir / "data" / "config.py"
+        backup_path = base_dir / "data" / "config.py.bak"
         if config_path.exists():
             overwrite = input(f"{config_path} already exists. Overwrite? (y/n): ").lower()
             if overwrite == "y":

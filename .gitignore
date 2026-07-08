@@ -18,6 +18,14 @@ bin/7z/*
 bin/nyuu/*
 bin/par2/*
 bin/pesto/*
+bin/ffmpeg
+bin/ffmpeg.exe
+bin/ffprobe
+bin/ffprobe.exe
+bin/MediaInfo.dll
+bin/MediaInfo.exe
+bin/mediainfo
+bin/libmediainfo.so
 *.mkv
 .vscode/
 __pycache__/

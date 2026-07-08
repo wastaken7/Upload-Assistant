@@ -10,6 +10,10 @@ def check_dependencies() -> None:
     If the Python version is unsupported or packages are missing, it outputs a clear warning and exits.
     If versions mismatch, it prints a warning but allows execution to continue.
     """
+    # Bypass check if running from frozen binary (PyInstaller)
+    if getattr(sys, "frozen", False):
+        return
+
     # Verify Python version
     required_version = (3, 14)
     if sys.version_info < required_version:

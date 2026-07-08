@@ -67,7 +67,10 @@ class BHDTV:
         if meta.is_disc != "BDMV":
             filelist = cast(list[str], meta.filelist or [])
             video = filelist[0] if filelist else (meta.path or "")
+            import sys
             mi_template = os.path.abspath(f"{meta.base_dir}/data/templates/MEDIAINFO.txt")
+            if getattr(sys, "frozen", False) and not os.path.exists(mi_template):
+                mi_template = os.path.join(sys._MEIPASS, "data", "templates", "MEDIAINFO.txt")
             if os.path.exists(mi_template):
                 media_info = MediaInfo.parse(video, output="STRING", full=False,
                                                 mediainfo_options={"inform": f"file://{mi_template}"})

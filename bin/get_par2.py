@@ -57,10 +57,19 @@ class Par2BinaryManager:
         file_pattern = platform_info["file"]
         folder_path = platform_info["folder"]
 
+        import sys
+        binary_name = "par2.exe" if system == "windows" else "par2"
+
+        if getattr(sys, 'frozen', False):
+            bundle_bin_dir = Path(sys._MEIPASS) / "bin" / "par2" / folder_path
+            bundle_binary_path = bundle_bin_dir / binary_name
+            if bundle_binary_path.exists():
+                logger.debug(f"[blue]Using bundled par2 binary: {bundle_binary_path}[/blue]")
+                return str(bundle_binary_path)
+
         bin_dir = Path(base_dir) / "bin" / "par2" / folder_path
         bin_dir.mkdir(parents=True, exist_ok=True)
 
-        binary_name = "par2.exe" if system == "windows" else "par2"
         binary_path = bin_dir / binary_name
         version_path = bin_dir / version
 
