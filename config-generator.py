@@ -9,10 +9,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
+from src.path_utils import get_resource_path, setup_frozen_environment
+
 if getattr(sys, "frozen", False):
     base_dir = Path(sys.executable).parent
     # Prepend sys._MEIPASS and sys._MEIPASS/bin to PATH so system can find bundled binaries
-    os.environ["PATH"] = sys._MEIPASS + os.path.pathsep + os.path.join(sys._MEIPASS, "bin") + os.path.pathsep + os.environ["PATH"]
+    setup_frozen_environment()
 else:
     base_dir = Path(__file__).resolve().parent
 
@@ -35,7 +37,7 @@ UnexpectedKey = tuple[str, ConfigDict, str]
 
 def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
     """Read the example config file and return its structure and comments"""
-    example_path = Path(sys._MEIPASS) / "data" / "example_config.py" if getattr(sys, "frozen", False) else base_dir / "data" / "example_config.py"
+    example_path = get_resource_path("data", "example_config.py")
     comments: ConfigComments = {}
 
     if not example_path.exists():

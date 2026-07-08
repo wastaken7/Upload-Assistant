@@ -90,10 +90,11 @@ async def gen_desc(
 
     if meta.description_template:
         try:
-            import sys
             template_path = f"{meta.base_dir}/data/templates/{meta.description_template}.txt"
-            if getattr(sys, "frozen", False) and not os.path.exists(template_path):
-                template_path = os.path.join(sys._MEIPASS, "data", "templates", f"{meta.description_template}.txt")
+            if not os.path.exists(template_path):
+                from src.path_utils import get_resource_path
+
+                template_path = str(get_resource_path("data", "templates", f"{meta.description_template}.txt"))
             async with aiofiles.open(template_path, encoding="utf-8") as f:
                 template = Template(await f.read())
             template_desc = template.render(meta)

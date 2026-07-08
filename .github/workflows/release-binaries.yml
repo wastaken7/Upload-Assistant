@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -63,10 +65,8 @@ jobs:
             config-generator.py
 
       - name: Upload binaries to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/upload-${{ matrix.suffix }}*
-            dist/config-generator-${{ matrix.suffix }}*
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" dist/upload-${{ matrix.suffix }}* dist/config-generator-${{ matrix.suffix }}* --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash

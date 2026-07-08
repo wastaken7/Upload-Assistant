@@ -21,21 +21,50 @@ def download_file(url: str, dest: Path) -> None:
     print(f"Downloading {url} to {dest}...")
     headers = {"User-Agent": "Mozilla/5.0"}
     req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req) as response, open(dest, "wb") as out_file:
+    with urllib.request.urlopen(req, timeout=60) as response, open(dest, "wb") as out_file:
         shutil.copyfileobj(response, out_file)
     print("Download completed.")
 
 
 def extract_zip(zip_path: Path, extract_to: Path) -> None:
     print(f"Extracting {zip_path}...")
+    import stat
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(extract_to)
+        for member in zip_ref.namelist():
+            info = zip_ref.getinfo(member)
+            perm = info.external_attr >> 16
+            if stat.S_ISLNK(perm):
+                continue
+            if os.path.isabs(member) or ".." in member or member.startswith("/"):
+                continue
+            full_path = os.path.realpath(os.path.join(extract_to, member))
+            base_path = os.path.realpath(extract_to)
+            if not full_path.startswith(base_path + os.sep) and full_path != base_path:
+                continue
+            try:
+                file_size = info.file_size
+            except Exception:
+                file_size = 0
+            if file_size > 500 * 1024 * 1024:
+                continue
+            zip_ref.extract(member, extract_to)
 
 
 def extract_tar_xz(tar_path: Path, extract_to: Path) -> None:
     print(f"Extracting {tar_path}...")
     with tarfile.open(tar_path, "r:xz") as tar_ref:
-        tar_ref.extractall(extract_to)
+        for member in tar_ref.getmembers():
+            if member.islnk() or member.issym():
+                continue
+            if os.path.isabs(member.name) or ".." in member.name or member.name.startswith("/"):
+                continue
+            full_path = os.path.realpath(os.path.join(extract_to, member.name))
+            base_path = os.path.realpath(extract_to)
+            if not full_path.startswith(base_path + os.sep) and full_path != base_path:
+                continue
+            if member.size > 500 * 1024 * 1024:
+                continue
+            tar_ref.extract(member, extract_to)
 
 
 def extract_7z(archive_path: Path, extract_to: Path) -> None:
@@ -44,6 +73,8 @@ def extract_7z(archive_path: Path, extract_to: Path) -> None:
     is_windows = sys.platform == "win32"
     if is_windows:
         seven_zip_path = base_dir / "bin" / "7z" / "windows" / "x86_64" / "7zr.exe"
+        if not seven_zip_path.exists():
+            seven_zip_path = Path(shutil.which("7z") or "7z")
     else:
         # On Linux, GHA runner can have 7z installed, or we use our downloaded 7zz
         seven_zip_path = base_dir / "bin" / "7z" / "linux" / "amd64" / "7zz"

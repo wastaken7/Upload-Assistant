@@ -64,7 +64,17 @@ class NyuuBinaryManager:
 
         binary_name = "nyuu.exe" if system == "windows" else "nyuu"
 
-        if getattr(sys, "frozen", False):
+        try:
+            from src.path_utils import get_bundled_binary_path
+        except ImportError:
+            get_bundled_binary_path = None
+
+        if get_bundled_binary_path:
+            bundled_path = get_bundled_binary_path("nyuu", folder_path, binary_name)
+            if bundled_path:
+                logger.debug(f"[blue]Using bundled Nyuu binary: {bundled_path}[/blue]")
+                return bundled_path
+        elif getattr(sys, "frozen", False):
             bundle_bin_dir = Path(sys._MEIPASS) / "bin" / "nyuu" / folder_path
             bundle_binary_path = bundle_bin_dir / binary_name
             if bundle_binary_path.exists():

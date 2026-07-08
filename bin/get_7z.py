@@ -62,7 +62,17 @@ class SevenZipBinaryManager:
 
         binary_name = "7zr.exe" if system == "windows" else "7zz"
 
-        if getattr(sys, "frozen", False):
+        try:
+            from src.path_utils import get_bundled_binary_path
+        except ImportError:
+            get_bundled_binary_path = None
+
+        if get_bundled_binary_path:
+            bundled_path = get_bundled_binary_path("7z", folder_path, binary_name)
+            if bundled_path:
+                logger.debug(f"[blue]Using bundled 7-Zip binary: {bundled_path}[/blue]")
+                return bundled_path
+        elif getattr(sys, "frozen", False):
             bundle_bin_dir = Path(sys._MEIPASS) / "bin" / "7z" / folder_path
             bundle_binary_path = bundle_bin_dir / binary_name
             if bundle_binary_path.exists():
