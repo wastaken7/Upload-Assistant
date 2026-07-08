@@ -18,7 +18,21 @@ except ImportError:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
             print(message)
 
+    class SimpleLogger:
+        def info(self, message: str, extra: dict = None) -> None:  # noqa: ARG002
+            print(message)
+
+        def warning(self, message: str, extra: dict = None) -> None:  # noqa: ARG002
+            print(message)
+
+        def error(self, message: str, extra: dict = None) -> None:  # noqa: ARG002
+            print(message)
+
+        def debug(self, message: str, extra: dict = None) -> None:  # noqa: ARG002
+            print(message)
+
     console = SimpleConsole()
+    logger = SimpleLogger()
 
 
 class BDInfoBinaryManager:
