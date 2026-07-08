@@ -13,7 +13,6 @@ from typing import Any
 import aiofiles
 import aiofiles.os
 import aiofiles.ospath
-import cli_ui
 from rich.progress import BarColumn, Progress, TaskID, TaskProgressColumn, TextColumn
 
 from src.console import console, logger
@@ -67,6 +66,32 @@ def get_dynamic_volume_size(total_bytes: int) -> str:
         return "500m"
     else:
         return "1g"
+
+
+def compute_nyuu_connections(total_connections: int, nyuu_check_enabled: bool, check_connections_cfg: str | int | None) -> tuple[int, int | None]:
+    """Split the configured connection budget between nyuu posting and checking.
+
+    Unlike pesto (which checks in a separate phase after posting finishes), nyuu
+    checks concurrently with posting over its own connections, and throttles
+    posting speed to match if the check connections can't keep up. So by default
+    (check_connections_cfg empty), `total_connections` is split between posting
+    and checking, keeping the combined socket count within what was configured
+    instead of adding check connections on top of it. An explicit
+    check_connections_cfg overrides this and posts at the full connection count,
+    with that many additional connections dedicated to checking.
+
+    Returns (post_connections, check_connections), where check_connections is
+    None when checking is disabled.
+    """
+    if not nyuu_check_enabled:
+        return total_connections, None
+
+    if check_connections_cfg not in (None, ""):
+        return total_connections, int(check_connections_cfg)
+
+    post_connections = max(1, total_connections // 2)
+    check_connections = max(1, total_connections - post_connections)
+    return post_connections, check_connections
 
 
 async def check_binary(binary_name: str, config_path: str | None = None, meta: Meta | None = None, path_7z: str | None = None) -> str:
@@ -231,7 +256,13 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
 
 
 async def run_par2_with_progress(cmd: list[str], cwd: str | None = None) -> None:
-    """Execute par2 c with real-time percentage progress parsing."""
+    """Execute par2 c with real-time percentage progress via a persistent rich progress bar.
+
+    par2 redraws its percentage in place using carriage returns with no trailing newline,
+    so readline() (which only splits on '\\n') can't pick up individual updates — it would
+    buffer everything into one blob until an unrelated real newline happens to show up.
+    Reads raw chunks instead and splits on either '\\r' or '\\n' to get each update.
+    """
     redacted_cmd = []
     skip_next = False
     for i, arg in enumerate(cmd):
@@ -253,31 +284,56 @@ async def run_par2_with_progress(cmd: list[str], cwd: str | None = None) -> None
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, cwd=cwd)
 
         stdout_accum = []
-        last_percent = 0
 
         if process.stdout is None:
             raise RuntimeError("Process stdout is None")
 
-        while True:
-            line_bytes = await process.stdout.readline()
-            if not line_bytes:
-                break
-            line = line_bytes.decode(errors="replace")
-            stdout_accum.append(line)
-            line = line.strip()
+        tasks: dict[str, TaskID] = {}
+        buffer = b""
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
+            transient=False,
+        ) as progress:
+            while True:
+                chunk = await process.stdout.read(4096)
+                if not chunk:
+                    break
+                stdout_accum.append(chunk.decode(errors="replace"))
+                buffer += chunk
 
-            match = re.search(r"(\d+(?:\.\d+)?)%", line)
-            if match:
-                percent = float(match.group(1))
-                last_percent = int(percent)
-                action = "Generating PAR2"
-                if "Computing" in line:
-                    action = "Computing PAR2"
-                elif "Writing" in line:
-                    action = "Writing PAR2"
-                elif "Loading" in line:
-                    action = "Loading PAR2"
-                cli_ui.info_progress(f"{action}... {percent:.1f}%", int(percent), 100)
+                while True:
+                    idx_r = buffer.find(b"\r")
+                    idx_n = buffer.find(b"\n")
+                    candidates = [i for i in (idx_r, idx_n) if i != -1]
+                    if not candidates:
+                        break
+                    idx = min(candidates)
+                    line = buffer[:idx].decode(errors="replace").strip()
+                    buffer = buffer[idx + 1 :]
+                    if not line:
+                        continue
+
+                    match = re.search(r"(\d+(?:\.\d+)?)%", line)
+                    if match:
+                        percent = float(match.group(1))
+                        action = "Generating PAR2"
+                        if "Constructing" in line:
+                            action = "Computing PAR2 recovery matrix"
+                        elif "Processing" in line or "Computing" in line:
+                            action = "Computing PAR2"
+                        elif "Writing" in line:
+                            action = "Writing PAR2"
+                        elif "Loading" in line:
+                            action = "Loading PAR2"
+                        if "par2" not in tasks:
+                            tasks["par2"] = progress.add_task(action, total=100)
+                        progress.update(tasks["par2"], description=action, completed=percent)
+
+            if "par2" in tasks:
+                progress.update(tasks["par2"], completed=100)
 
         await process.wait()
 
@@ -288,16 +344,18 @@ async def run_par2_with_progress(cmd: list[str], cwd: str | None = None) -> None
                 logger.info(f"[red]OUTPUT:[/red]\n{stdout_str}")
             raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
 
-        # Finish progress display cleanly
-        if last_percent < 100:
-            cli_ui.info_progress("Generating PAR2... 100.0%", 100, 100)
-
     except Exception as e:
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
 async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None) -> None:
-    """Execute nyuu upload with real-time speed, ETA, and percentage progress parsing."""
+    """Execute nyuu upload, parsing its periodic `--progress log` output for posting/check status.
+
+    Nyuu's default terminal progress indicator redraws a single line via carriage-return
+    style ANSI codes with no trailing newline, which readline()-based parsing can't pick up
+    incrementally. `--progress log:Ns` instead emits a normal newline-terminated log line on
+    a fixed interval, which is what's parsed here.
+    """
     redacted_cmd = []
     skip_next = False
     for i, arg in enumerate(cmd):
@@ -315,36 +373,55 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None) -> None
     cwd_str = f" in {cwd}" if cwd else ""
     logger.debug(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
 
+    total_re = re.compile(r"Uploading (\d+) article\(s\)")
+    progress_re = re.compile(r"Article posting progress: \d+ read, (\d+) posted(?:, (\d+) checked)?")
+
     try:
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, cwd=cwd)
 
         stdout_accum = []
-        last_percent = 0
+        total_articles = 0
 
         if process.stdout is None:
             raise RuntimeError("Process stdout is None")
 
-        while True:
-            line_bytes = await process.stdout.readline()
-            if not line_bytes:
-                break
-            line = line_bytes.decode(errors="replace")
-            stdout_accum.append(line)
-            line = line.strip()
+        tasks: dict[str, TaskID] = {}
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
+            transient=False,
+        ) as progress:
+            while True:
+                line_bytes = await process.stdout.readline()
+                if not line_bytes:
+                    break
+                line = line_bytes.decode(errors="replace")
+                stdout_accum.append(line)
+                line = line.strip()
 
-            if "Upload:" in line:
-                match = re.search(r"\((\d+(?:\.\d+)?)\%\)", line)
-                if match:
-                    percent = float(match.group(1))
-                    last_percent = int(percent)
-                    # Extract speed and ETA if possible
-                    speed_match = re.search(r"\|\s*([\d\.]+\s*\w+/s)", line)
-                    eta_match = re.search(r"ETA:\s*([\d:]+)", line)
+                total_match = total_re.search(line)
+                if total_match:
+                    total_articles = int(total_match.group(1))
 
-                    speed_str = f" ({speed_match.group(1)})" if speed_match else ""
-                    eta_str = f" | ETA: {eta_match.group(1)}" if eta_match else ""
+                progress_match = progress_re.search(line)
+                if progress_match and total_articles:
+                    posted = int(progress_match.group(1))
+                    checked = progress_match.group(2)
+                    if checked is not None:
+                        checked = int(checked)
+                        pct = ((checked + posted) / 2) / total_articles * 100
+                        description = "Verifying articles on server" if posted >= total_articles else "Posting & verifying to Usenet"
+                    else:
+                        pct = posted / total_articles * 100
+                        description = "Posting to Usenet"
+                    if "upload" not in tasks:
+                        tasks["upload"] = progress.add_task(description, total=100)
+                    progress.update(tasks["upload"], description=description, completed=pct)
 
-                    cli_ui.info_progress(f"Posting to Usenet...{speed_str}{eta_str}", int(percent), 100)
+            if "upload" in tasks:
+                progress.update(tasks["upload"], completed=100)
 
         await process.wait()
 
@@ -354,10 +431,6 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None) -> None
             if stdout_str:
                 logger.info(f"[red]OUTPUT:[/red]\n{stdout_str}")
             raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
-
-        # Finish progress display cleanly
-        if last_percent < 100:
-            cli_ui.info_progress("Posting to Usenet... 100.0%", 100, 100)
 
     except Exception as e:
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
@@ -925,21 +998,50 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 raise
     else:
         # 6b. Upload via nyuu
+        total_connections = int(usenet_cfg.get("connections", 20))
+        nyuu_check_enabled = usenet_cfg.get("nyuu_check", True)
+        post_connections, check_connections = compute_nyuu_connections(total_connections, nyuu_check_enabled, usenet_cfg.get("nyuu_check_connections"))
+
         cmd_nyuu = [
             path_nyuu or "nyuu",
             "-h", usenet_cfg.get("host"),
             "-P", str(usenet_cfg.get("port", 563)),
             "-u", usenet_cfg.get("username"),
             "-p", usenet_cfg.get("password"),
-            "-n", str(usenet_cfg.get("connections", 20)),
+            "-n", str(post_connections),
             "-g", usenet_cfg.get("newsgroups"),
             "-f", poster,
             "-s", subject,
             "-o", nzb_file,
+            "--progress", "log:2s",
         ]
 
         if usenet_cfg.get("ssl", True):
             cmd_nyuu.append("-S")
+
+        # --filename: obfuscate the yEnc "name=" field embedded in each posted
+        # article's body — this is what most indexers/downloaders show as the
+        # "real" filename, independent of the (already obfuscated) Subject
+        # header. ${rand(16)} is resolved once per file and stays identical
+        # across every segment of that file (verified empirically), so
+        # multi-part reconstruction still works; it varies between different
+        # files in the same upload. No on-disk renaming needed.
+        if obscure_subject and not custom_subject:
+            cmd_nyuu.extend(["--filename", "${rand(16)}"])
+
+        # --check-connections: verify every article is retrievable on the server
+        # while posting is still in progress. Missing articles are reposted
+        # automatically and reverified (nyuu --check-post-tries, default 1); nyuu
+        # exits non-zero if any are still missing after that, so we know the NZB
+        # is trustworthy whenever this command succeeds.
+        if nyuu_check_enabled:
+            cmd_nyuu.extend(["--check-connections", str(check_connections)])
+            check_delay = usenet_cfg.get("nyuu_check_delay")
+            if check_delay is not None and str(check_delay).strip() != "":
+                cmd_nyuu.extend(["--check-delay", str(check_delay)])
+            check_retries = usenet_cfg.get("nyuu_check_retries")
+            if check_retries is not None and str(check_retries).strip() != "":
+                cmd_nyuu.extend(["--check-tries", str(check_retries)])
 
         cmd_nyuu.extend(all_upload_files)
 
@@ -948,7 +1050,21 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             async with aiofiles.open(nzb_file, "w", encoding="utf-8") as f:
                 await f.write(mock_nzb_content)
         else:
-            await run_nyuu_with_progress(cmd_nyuu, cwd=usenet_dir)
+            try:
+                await run_nyuu_with_progress(cmd_nyuu, cwd=usenet_dir)
+            except Exception:
+                # nyuu writes the NZB progressively as files are posted, before
+                # the post-check verification (if enabled) confirms every article
+                # is actually retrievable on the server. A failed check (missing
+                # articles that couldn't be reposted) can still leave a
+                # well-formed (but incomplete) .nzb file behind. is_valid_nzb()
+                # only checks XML structure, so if we don't remove it here, the
+                # next attempt would find it at the top of this function and
+                # reuse it as-is instead of re-uploading the missing articles.
+                with contextlib.suppress(Exception):
+                    if await aiofiles.ospath.exists(nzb_file):
+                        await aiofiles.os.remove(nzb_file)
+                raise
 
         # nyuu doesn't inject the password into the NZB — do it manually
         if archive_password and await aiofiles.ospath.exists(nzb_file):

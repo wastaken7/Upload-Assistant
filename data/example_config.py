@@ -2792,6 +2792,29 @@ config = {
         "pesto_check_retries": 3,
         # Parallel connections used for the verification pass (empty = same as "connections")
         "pesto_check_connections": "",
+        # nyuu only: verify every article is retrievable on the server while
+        # posting is still in progress. Missing articles are reposted and
+        # reverified automatically; the upload is only considered successful
+        # (and the NZB kept) once every article is confirmed. Strongly
+        # recommended — without this, a "successfully posted" article can
+        # still be missing/unpropagated on the server, producing a broken NZB.
+        "nyuu_check": True,
+        # Seconds to wait after EACH article is posted before verifying that
+        # specific article (nyuu --check-delay). Unlike pesto's check_delay
+        # (a single wait after the whole upload finishes), this applies
+        # per-article, so keep it low — nyuu's own default is 5. A larger value
+        # here backs up the check queue on big uploads and can stall posting.
+        "nyuu_check_delay": 5,
+        # Number of check attempts per article before marking it missing (nyuu --check-tries)
+        "nyuu_check_retries": 3,
+        # Connections used for the verification pass (nyuu --check-connections).
+        # Empty (default) splits "connections" in half between posting and
+        # checking, since nyuu checks concurrently with posting and throttles
+        # posting speed to match if checking can't keep up — this keeps the
+        # combined connection count within what you configured. Set explicitly
+        # to instead post at the full "connections" count with this many
+        # additional connections dedicated to checking.
+        "nyuu_check_connections": "",
         # Paths to binaries (defaults to looking in PATH, downloaded automatically if not found)
         # Available at: https://github.com/animetosho/nyuu
         "nyuu_path": "nyuu",
