@@ -127,6 +127,56 @@ IMAGE_HOST_API_KEYS: dict[str, str] = {
 # Valid torrent client types (must match example_config.py)
 VALID_TORRENT_CLIENTS = ["qbit", "rtorrent", "deluge", "transmission", "watch"]
 
+# Required keys in USENET section when Usenet uploading is active
+USENET_REQUIRED_KEYS = ["host", "port", "username", "password", "newsgroups"]
+
+# Expected types for known USENET keys (must match data/example_config.py's USENET section)
+USENET_KEY_TYPES: dict[str, tuple[type, ...]] = {
+    "enabled": (bool,),
+    "host": (str,),
+    "port": (str, int),
+    "username": (str,),
+    "password": (str,),
+    "ssl": (bool,),
+    "connections": (str, int),
+    "newsgroups": (str,),
+    "poster": (str,),
+    "random_poster": (bool,),
+    "skip_archive": (bool,),
+    "rar_volume_size": (str,),
+    "archive_password": (str,),
+    "par2_percentage": (str, int),
+    "obscure_subject": (bool,),
+    "usenet_uploader": (str,),
+    "pesto_check": (bool,),
+    "pesto_check_delay": (str, int),
+    "pesto_check_retries": (str, int),
+    "pesto_check_connections": (str, int),
+    "nyuu_check": (bool,),
+    "nyuu_check_delay": (str, int),
+    "nyuu_check_retries": (str, int),
+    "nyuu_check_connections": (str, int),
+    "nyuu_path": (str,),
+    "par2_path": (str,),
+    "pesto_path": (str,),
+    "7z_path": (str,),
+    "nzb_output_dir": (str,),
+    "usenet_tmp_dir": (str,),
+}
+
+# USENET keys expected to hold a plain integer or a numeric string
+USENET_NUMERIC_STRING_KEYS = [
+    "port",
+    "connections",
+    "par2_percentage",
+    "pesto_check_delay",
+    "pesto_check_retries",
+    "pesto_check_connections",
+    "nyuu_check_delay",
+    "nyuu_check_retries",
+    "nyuu_check_connections",
+]
+
 
 class ConfigValidationError(Exception):
     """Raised when config validation fails with critical errors."""
@@ -642,40 +692,13 @@ def _validate_usenet_section(usenet: dict[str, Any], is_usenet_active: bool = Fa
 
     # Check required fields for Usenet upload
     if is_usenet_active:
-        required_keys = ["host", "port", "username", "password", "newsgroups"]
-        for key in required_keys:
+        for key in USENET_REQUIRED_KEYS:
             val = usenet.get(key)
             if not val or (isinstance(val, str) and not val.strip()):
                 errors.append(f"[USENET] is active but '{key}' is empty or not configured")
 
     # Validate types of known keys
-    usenet_key_types = {
-        "enabled": (bool,),
-        "host": (str,),
-        "port": (str, int),
-        "username": (str,),
-        "password": (str,),
-        "ssl": (bool,),
-        "connections": (str, int),
-        "newsgroups": (str,),
-        "poster": (str,),
-        "random_poster": (bool,),
-        "rar_volume_size": (str,),
-        "par2_percentage": (str, int),
-        "obscure_subject": (bool,),
-        "nyuu_path": (str,),
-        "par2_path": (str,),
-        "7z_path": (str,),
-        "nzb_output_dir": (str,),
-        "usenet_tmp_dir": (str,),
-        "usenet_uploader": (str,),
-        "pesto_check": (bool,),
-        "pesto_check_delay": (str, int),
-        "pesto_check_retries": (str, int),
-        "pesto_check_connections": (str, int),
-    }
-
-    for key, expected_types in usenet_key_types.items():
+    for key, expected_types in USENET_KEY_TYPES.items():
         if key in usenet and usenet[key] is not None:
             value = usenet[key]
             if not isinstance(value, expected_types):
@@ -684,7 +707,7 @@ def _validate_usenet_section(usenet: dict[str, Any], is_usenet_active: bool = Fa
                 )
 
     # Validate numeric string values
-    for key in ["port", "connections", "par2_percentage", "pesto_check_delay", "pesto_check_retries", "pesto_check_connections"]:
+    for key in USENET_NUMERIC_STRING_KEYS:
         if key in usenet:
             value = usenet[key]
             if isinstance(value, str) and value.strip():
