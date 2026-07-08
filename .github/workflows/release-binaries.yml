@@ -66,7 +66,8 @@ jobs:
 
       - name: Upload binaries to Release
         run: |
-          gh release upload "${{ github.event.release.tag_name }}" dist/upload-${{ matrix.suffix }}* dist/config-generator-${{ matrix.suffix }}* --clobber
+          gh release upload "$RELEASE_TAG" dist/upload-${{ matrix.suffix }}* dist/config-generator-${{ matrix.suffix }}* --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         shell: bash

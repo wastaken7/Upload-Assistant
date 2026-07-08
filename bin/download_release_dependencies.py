@@ -26,6 +26,19 @@ def download_file(url: str, dest: Path) -> None:
     print("Download completed.")
 
 
+def _is_safe_extract(name: str, extract_to: Path, size: int, archive_path: Path, max_size: int = 500 * 1024 * 1024) -> bool:
+    if os.path.isabs(name) or ".." in name or name.startswith("/"):
+        return False
+    full_path = os.path.realpath(os.path.join(extract_to, name))
+    base_path = os.path.realpath(extract_to)
+    if not full_path.startswith(base_path + os.sep) and full_path != base_path:
+        return False
+    if size > max_size:
+        print(f"Warning: Skipping oversized member '{name}' in archive '{archive_path}' ({size} bytes, limit is {max_size} bytes)")
+        return False
+    return True
+
+
 def extract_zip(zip_path: Path, extract_to: Path) -> None:
     print(f"Extracting {zip_path}...")
     import stat
@@ -35,17 +48,11 @@ def extract_zip(zip_path: Path, extract_to: Path) -> None:
             perm = info.external_attr >> 16
             if stat.S_ISLNK(perm):
                 continue
-            if os.path.isabs(member) or ".." in member or member.startswith("/"):
-                continue
-            full_path = os.path.realpath(os.path.join(extract_to, member))
-            base_path = os.path.realpath(extract_to)
-            if not full_path.startswith(base_path + os.sep) and full_path != base_path:
-                continue
             try:
                 file_size = info.file_size
             except Exception:
                 file_size = 0
-            if file_size > 500 * 1024 * 1024:
+            if not _is_safe_extract(member, extract_to, file_size, zip_path):
                 continue
             zip_ref.extract(member, extract_to)
 
@@ -56,13 +63,7 @@ def extract_tar_xz(tar_path: Path, extract_to: Path) -> None:
         for member in tar_ref.getmembers():
             if member.islnk() or member.issym():
                 continue
-            if os.path.isabs(member.name) or ".." in member.name or member.name.startswith("/"):
-                continue
-            full_path = os.path.realpath(os.path.join(extract_to, member.name))
-            base_path = os.path.realpath(extract_to)
-            if not full_path.startswith(base_path + os.sep) and full_path != base_path:
-                continue
-            if member.size > 500 * 1024 * 1024:
+            if not _is_safe_extract(member.name, extract_to, member.size, tar_path):
                 continue
             tar_ref.extract(member, extract_to)
 

@@ -83,7 +83,7 @@ if getattr(sys, "frozen", False):
         def _wrapped_parse(cls, filename, library_file=None, *args, **kwargs):  # noqa: ARG001
             if library_file is None:
                 library_file = lib_path
-            return _orig_parse(filename, library_file, *args, **kwargs)
+            return _orig_parse(filename, library_file=library_file, *args, **kwargs)
 
         MediaInfo.parse = _wrapped_parse
     except Exception:
