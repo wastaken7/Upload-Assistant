@@ -25,7 +25,7 @@ class PTCAFE(NEXUSPHP):
         tv_series = 402
         tv_shows = 403
 
-        category = str(meta.category).upper()
+        category = (meta.category).upper()
         genres = ", ".join(meta.genres).lower()
         keywords = ", ".join(meta.keywords).lower()
 
@@ -101,7 +101,7 @@ class PTCAFE(NEXUSPHP):
         uhd_remux = 3
         web_dl = 8
 
-        is_disc = str(meta.is_disc).lower()
+        is_disc = (meta.is_disc).lower()
         is_diy = meta.diy_disc
         mtype = str(meta.type).lower()
         resolution = meta.resolution.lower()
@@ -262,7 +262,7 @@ class PTCAFE(NEXUSPHP):
             "-wiki": 29,
         }
 
-        group = meta.tag.lower()
+        group = meta.tag.lower() if meta.tag else ""
         return group_tag.get(group, 30)
 
     def get_checkboxes(self, meta: Meta) -> list[str]:
@@ -274,9 +274,9 @@ class PTCAFE(NEXUSPHP):
         hdr = 12
         reposting_prohibited = 5
 
-        audio_tracks = meta.audio_languages
+        audio_tracks = meta.audio_languages or []
         mhdr = meta.hdr
-        subtitle_tracks = meta.subtitle_languages
+        subtitle_tracks = meta.subtitle_languages or []
 
         checkboxes = []
 

@@ -80,7 +80,7 @@ def extract_linux(cli_archive: Path, lib_archive: Path, output_dir: Path) -> Non
         lib_dir.rmdir()
 
 
-def download_dvd_mediainfo(base_dir: str, debug: bool = False) -> str | None:
+def download_dvd_mediainfo(base_dir: str) -> str | None:
     system = platform.system().lower()
     machine = platform.machine().lower()
 

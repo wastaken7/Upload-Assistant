@@ -563,7 +563,7 @@ class QueueManager:
                                 logger.info(f"[bold red]Failed to update queue with selected files: {e}. Using the existing queue.")
                                 queue = existing_queue
                         elif edit_choice == 'e':
-                            edited_content = click.edit(json.dumps(current_files, indent=4))
+                            edited_content = cast(str | None, click.edit(cast(Any, json.dumps(current_files, indent=4))))
                             if edited_content:
                                 try:
                                     queue = json.loads(edited_content.strip())
@@ -596,7 +596,7 @@ class QueueManager:
                         edit_choice = (edit_choice_raw or "").strip().lower()
 
                         if edit_choice == 'e':
-                            edited_content = click.edit(json.dumps(existing_queue, indent=4))
+                            edited_content = cast(str | None, click.edit(cast(Any, json.dumps(existing_queue, indent=4))))
                             if edited_content:
                                 try:
                                     queue = json.loads(edited_content.strip())
@@ -632,7 +632,7 @@ class QueueManager:
                 edit_choice = (edit_choice_raw or "").strip().lower()
 
                 if edit_choice == 'e':
-                    edited_content = click.edit(json.dumps(queue, indent=4))
+                    edited_content = cast(str | None, click.edit(cast(Any, json.dumps(queue, indent=4))))
                     if edited_content:
                         try:
                             queue = json.loads(edited_content.strip())

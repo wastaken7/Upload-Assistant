@@ -2012,9 +2012,9 @@ async def set_tmdb_metadata(meta: Meta, filename: str | None = None) -> None:
                     search_year=meta.search_year,
                     category=meta.category,
                     imdb_id=meta.imdb_id,
-                    manual_language=meta.manual_language,
+                    manual_language=meta.manual_language if isinstance(meta.manual_language, str) else None,
                     anime=meta.anime,
-                    mal_manual=meta.mal_manual,
+                    mal_manual=int(meta.mal_manual) if isinstance(meta.mal_manual, int) or (isinstance(meta.mal_manual, str) and meta.mal_manual.isdigit()) else None,
                     aka=meta.aka,
                     original_language=meta.original_language,
                     poster=meta.poster,
@@ -2032,8 +2032,7 @@ async def set_tmdb_metadata(meta: Meta, filename: str | None = None) -> None:
                     break
                 else:
                     error_msg = f"Failed to retrieve essential metadata from TMDB ID: {meta.tmdb_id}"
-                    if meta.debug:
-                        logger.debug(f"[bold red]{error_msg}[/bold red]")
+                    logger.debug(f"[bold red]{error_msg}[/bold red]")
                     if attempt < max_attempts:
                         logger.info(f"[yellow]Retrying TMDB metadata fetch in {delay_seconds} seconds... (Attempt {attempt + 1}/{max_attempts})[/yellow]")
                         await asyncio.sleep(delay_seconds)
@@ -2041,8 +2040,7 @@ async def set_tmdb_metadata(meta: Meta, filename: str | None = None) -> None:
                         raise ValueError(error_msg)
             except Exception as e:
                 error_msg = f"TMDB metadata retrieval failed for ID {meta.tmdb_id}: {str(e)}"
-                if meta.debug:
-                    logger.debug(f"[bold red]{error_msg}[/bold red]")
+                logger.debug(f"[bold red]{error_msg}[/bold red]")
                 if attempt < max_attempts:
                     logger.info(f"[yellow]Retrying TMDB metadata fetch in {delay_seconds} seconds... (Attempt {attempt + 1}/{max_attempts})[/yellow]")
                     await asyncio.sleep(delay_seconds)
@@ -2079,8 +2077,7 @@ async def get_tmdb_localized_data(meta: Meta, data_type: str, language: str, app
     if append_to_response:
         params.update({'append_to_response': append_to_response})
 
-    if meta.debug:
-        logger.debug(
+    logger.debug(
             "[green]Requesting localized data from TMDB.\n"
             f"Type: '{data_type}'.\n"
             f"Language: '{language}'\n"

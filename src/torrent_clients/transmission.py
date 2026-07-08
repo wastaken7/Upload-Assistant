@@ -45,5 +45,4 @@ class TransmissionClientMixin:
             labels=label
         )
 
-        if meta.debug:
-            logger.debug(f"[cyan]Path: {path}")
+        logger.debug(f"[cyan]Path: {path}")

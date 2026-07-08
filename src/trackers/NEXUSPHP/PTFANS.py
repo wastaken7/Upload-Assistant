@@ -25,7 +25,7 @@ class PTFANS(NEXUSPHP):
         tv_series = 404
         tv_shows = 405
 
-        category = str(meta.category).upper()
+        category = (meta.category).upper()
         genres = ", ".join(meta.genres).lower()
         keywords = ", ".join(meta.keywords).lower()
 
@@ -66,7 +66,7 @@ class PTFANS(NEXUSPHP):
         remux = 3
         web_dl = 5
 
-        is_disc = str(meta.is_disc).lower()
+        is_disc = (meta.is_disc).lower()
         mtype = str(meta.type).lower()
 
         if is_disc == "bdmv":
@@ -145,5 +145,5 @@ class PTFANS(NEXUSPHP):
             "-wiki": 4,
         }
 
-        group = meta.tag.lower()
+        group = meta.tag.lower() if meta.tag else ""
         return group_tag.get(group, 5)

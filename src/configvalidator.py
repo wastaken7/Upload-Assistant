@@ -242,16 +242,12 @@ def validate_config(
         from src.trackersetup import tracker_class_map
 
         for t in trackers_upper:
-            if t in tracker_class_map:
-                try:
-                    tracker_instance = tracker_class_map[t](config_dict)
-                    if getattr(tracker_instance, "is_usenet", False):
-                        is_usenet_tracker_active = True
-                        break
-                except Exception:
-                    pass
+            tracker_class = tracker_class_map.get(t)
+            if tracker_class and getattr(tracker_class, "is_usenet", False):
+                is_usenet_tracker_active = True
+                break
     except Exception:
-        if "CRP" in trackers_upper or "SUIO" in trackers_upper or "DS" in trackers_upper:
+        if any(ut in trackers_upper for ut in ("CRP", "SUIO", "DS")):
             is_usenet_tracker_active = True
 
     if "USENET" in config_dict:

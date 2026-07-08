@@ -183,10 +183,9 @@ async def gather_book_prep(
 
     # Extract EPUB metadata directly if the file is an EPUB
     if videopath.lower().endswith(".epub") and os.path.isfile(videopath):  # noqa: ASYNC240
-        epub_meta = _extract_epub_metadata(videopath, debug=meta.debug)
+        epub_meta = _extract_epub_metadata(videopath)
         if epub_meta:
-            if meta.debug:
-                logger.debug(f"[cyan]EPUB metadata extracted: {epub_meta}[/cyan]")
+            logger.debug(f"[cyan]EPUB metadata extracted: {epub_meta}[/cyan]")
             for key, val in epub_meta.items():
                 if key == "book_language_raw":
                     full, iso3 = _resolve_book_language(val)
@@ -204,10 +203,9 @@ async def gather_book_prep(
 
     # Extract CBR/CBZ metadata directly if the file is a CBR/CBZ
     if videopath.lower().endswith((".cbr", ".cbz")) and os.path.isfile(videopath):  # noqa: ASYNC240
-        cbr_cbz_meta = _extract_cbr_cbz_metadata(videopath, debug=meta.debug)
+        cbr_cbz_meta = _extract_cbr_cbz_metadata(videopath)
         if cbr_cbz_meta:
-            if meta.debug:
-                logger.debug(f"[cyan]CBR/CBZ metadata extracted: {cbr_cbz_meta}[/cyan]")
+            logger.debug(f"[cyan]CBR/CBZ metadata extracted: {cbr_cbz_meta}[/cyan]")
             for key, val in cbr_cbz_meta.items():
                 if key == "book_language_raw":
                     full, iso3 = _resolve_book_language(val)
@@ -225,10 +223,9 @@ async def gather_book_prep(
 
     # Extract MOBI metadata directly if the file is a MOBI
     if videopath.lower().endswith(".mobi") and os.path.isfile(videopath):  # noqa: ASYNC240
-        mobi_meta = _extract_mobi_metadata(videopath, debug=meta.debug)
+        mobi_meta = _extract_mobi_metadata(videopath)
         if mobi_meta:
-            if meta.debug:
-                logger.debug(f"[cyan]MOBI metadata extracted: {mobi_meta}[/cyan]")
+            logger.debug(f"[cyan]MOBI metadata extracted: {mobi_meta}[/cyan]")
             for key, val in mobi_meta.items():
                 if key == "book_language_raw":
                     full, iso3 = _resolve_book_language(val)
@@ -246,11 +243,10 @@ async def gather_book_prep(
 
     # Extract ISBN from PDF directly if the file is a PDF
     if videopath.lower().endswith(".pdf") and os.path.isfile(videopath):  # noqa: ASYNC240
-        pdf_isbn = _extract_isbn_from_pdf(videopath, debug=meta.debug)
+        pdf_isbn = _extract_isbn_from_pdf(videopath)
         if pdf_isbn and not meta.isbn:
             meta.isbn = pdf_isbn
-            if meta.debug:
-                logger.debug(f"[cyan]PDF ISBN extracted: {pdf_isbn}[/cyan]")
+            logger.debug(f"[cyan]PDF ISBN extracted: {pdf_isbn}[/cyan]")
 
     if not meta.edit:
         try:
@@ -264,8 +260,7 @@ async def gather_book_prep(
             )
             meta.mediainfo = mi
         except Exception as e:
-            if meta.debug:
-                logger.debug(f"[yellow]Warning: MediaInfo export failed for book: {e}[/yellow]")
+            logger.debug(f"[yellow]Warning: MediaInfo export failed for book: {e}[/yellow]")
             meta.mediainfo = {}
     else:
         pass  # meta.mediainfo already populated from a previous run
@@ -405,8 +400,7 @@ async def gather_book_prep(
                                     meta.book_language_iso = iso3
                                     break
         except Exception as ex:
-            if meta.debug:
-                logger.debug(f"[yellow]Warning: Error extracting embedded book metadata: {ex}[/yellow]")
+            logger.debug(f"[yellow]Warning: Error extracting embedded book metadata: {ex}[/yellow]")
 
     # MyAnonamouse API search using torrent client comments (online lookup takes precedence)
     if not meta.torrent_comments and not meta.skip_auto_torrent and not meta.edit and config:
@@ -416,8 +410,7 @@ async def gather_book_prep(
             client = Clients(config=config)
             await client.get_pathed_torrents((meta.path if meta.path is not None else videopath), meta)
         except Exception as e:
-            if meta.debug:
-                logger.debug(f"[yellow]Warning: Could not search client for book torrent comments: {e}[/yellow]")
+            logger.debug(f"[yellow]Warning: Could not search client for book torrent comments: {e}[/yellow]")
 
     mam_id = None
     if meta.torrent_comments:
@@ -449,8 +442,7 @@ async def gather_book_prep(
                 match = re.search(r"\bMID=(\d+)", comment)
                 if match:
                     mam_id = match.group(1)
-                    if meta.debug:
-                        logger.debug(f"[cyan]Found MyAnonamouse ID {mam_id} in torrent comment[/cyan]")
+                    logger.debug(f"[cyan]Found MyAnonamouse ID {mam_id} in torrent comment[/cyan]")
                     break
 
     mam_data = None
@@ -463,7 +455,7 @@ async def gather_book_prep(
 
             from src.myanonamouse import myanonamouse_manager
 
-            mam_data = await myanonamouse_manager.search_by_id(mam_id, base_dir=base_dir, api_key=api_key, debug=meta.debug)
+            mam_data = await myanonamouse_manager.search_by_id(mam_id, base_dir=base_dir, api_key=api_key)
             if mam_data:
                 for key, val in mam_data.items():
                     if val:
@@ -489,8 +481,7 @@ async def gather_book_prep(
                             if key == "year" and "search_year" not in mam_data:
                                 meta.search_year = int(val)
         except Exception as ex:
-            if meta.debug:
-                logger.debug(f"[yellow]Warning: MyAnonamouse API lookup failed: {ex}[/yellow]")
+            logger.debug(f"[yellow]Warning: MyAnonamouse API lookup failed: {ex}[/yellow]")
 
     # Google Books API search using ISBN (online lookup takes precedence)
     google_books_data = None
@@ -502,7 +493,7 @@ async def gather_book_prep(
                 api_key = config["DEFAULT"].get("google_books_api_key", "").strip()
             from src.google_books import google_books_manager
 
-            google_books_data = await google_books_manager.search_by_isbn(isbn, base_dir=base_dir, api_key=api_key, debug=meta.debug)
+            google_books_data = await google_books_manager.search_by_isbn(isbn, base_dir=base_dir, api_key=api_key)
             if google_books_data:
                 for key, val in google_books_data.items():
                     if val:
@@ -532,8 +523,7 @@ async def gather_book_prep(
                             if key == "year" and "search_year" not in google_books_data:
                                 meta.search_year = int(val)
         except Exception as ex:
-            if meta.debug:
-                logger.debug(f"[yellow]Warning: Google Books API lookup failed: {ex}[/yellow]")
+            logger.debug(f"[yellow]Warning: Google Books API lookup failed: {ex}[/yellow]")
 
     # OpenLibrary API search (online lookup takes precedence)
     openlibrary_data = None
@@ -542,18 +532,16 @@ async def gather_book_prep(
         try:
             from src.openlibrary import openlibrary_manager
 
-            openlibrary_data = await openlibrary_manager.search_by_work_id(openlibrary_id, base_dir=base_dir, debug=meta.debug)
+            openlibrary_data = await openlibrary_manager.search_by_work_id(openlibrary_id, base_dir=base_dir)
         except Exception as ex:
-            if meta.debug:
-                logger.debug(f"[yellow]Warning: OpenLibrary API lookup by Work ID failed: {ex}[/yellow]")
+            logger.debug(f"[yellow]Warning: OpenLibrary API lookup by Work ID failed: {ex}[/yellow]")
     elif meta.isbn:
         try:
             from src.openlibrary import openlibrary_manager
 
-            openlibrary_data = await openlibrary_manager.search_by_isbn(meta.isbn, base_dir=base_dir, debug=meta.debug)
+            openlibrary_data = await openlibrary_manager.search_by_isbn(meta.isbn, base_dir=base_dir)
         except Exception as ex:
-            if meta.debug:
-                logger.debug(f"[yellow]Warning: OpenLibrary API lookup by ISBN failed: {ex}[/yellow]")
+            logger.debug(f"[yellow]Warning: OpenLibrary API lookup by ISBN failed: {ex}[/yellow]")
 
     if openlibrary_data:
         for key, val in openlibrary_data.items():
@@ -743,14 +731,14 @@ def sanitize_book_author(meta: Meta) -> None:
             meta.author = ""
             return
 
-    author = str(author)
+    author = author
     has_underscores = "_" in author and " " not in author
     normalized_author = author.replace("_", " ") if has_underscores else author
 
     manual_translator = meta.book_translator
     if manual_translator:
         # Also replace underscores in manual translator names in case they entered underscores
-        names_to_remove = [n.replace("_", " ").strip() for n in str(manual_translator).split(",") if n.strip()]
+        names_to_remove = [n.replace("_", " ").strip() for n in (manual_translator).split(",") if n.strip()]
         for name in names_to_remove:
             pattern = r"\b" + re.escape(name) + r"\b"
             normalized_author = re.sub(pattern, "", normalized_author, flags=re.IGNORECASE)

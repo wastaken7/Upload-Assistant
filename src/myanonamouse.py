@@ -15,7 +15,7 @@ from src.console import logger
 mam_color = "[#eac117]MyAnonamouse[/#eac117]"
 
 class MyAnonamouseManager:
-    def _parse_torrent_info(self, item: dict[str, Any], debug: bool = False) -> dict[str, Any]:
+    def _parse_torrent_info(self, item: dict[str, Any]) -> dict[str, Any]:
         logger.debug(f"{mam_color} raw item: {item}")
 
         metadata: dict[str, Any] = {}
@@ -127,7 +127,7 @@ class MyAnonamouseManager:
 
         return metadata
 
-    async def search_by_id(self, torrent_id: str, base_dir: str = "", api_key: str = "", debug: bool = False) -> dict[str, Any] | None:
+    async def search_by_id(self, torrent_id: str, base_dir: str = "", api_key: str = "") -> dict[str, Any] | None:
         """
         Search MyAnonamouse API by torrent ID.
         Returns a dict of metadata or None if not found/error.
@@ -151,7 +151,7 @@ class MyAnonamouseManager:
                             logger.info(f"{mam_color}: ID match found (cached): {clean_id}")
 
                             if "data" in cached_data and cached_data["data"]:
-                                return self._parse_torrent_info(cached_data["data"][0], debug)
+                                return self._parse_torrent_info(cached_data["data"][0])
                     except Exception as ex:
                         logger.debug(f"{mam_color}: [yellow]Warning: Could not read cache file for ID '{clean_id}': {ex}[/yellow]")
             except Exception as ex:
@@ -185,7 +185,7 @@ class MyAnonamouseManager:
                 if resp.status_code == 200:
                     data = resp.json()
                     if "data" in data and isinstance(data["data"], list) and data["data"]:
-                        metadata = self._parse_torrent_info(data["data"][0], debug)
+                        metadata = self._parse_torrent_info(data["data"][0])
                         if metadata:
                             logger.info(f"{mam_color}: match found: {metadata.get('title')}")
 

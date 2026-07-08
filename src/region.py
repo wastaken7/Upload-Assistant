@@ -14,7 +14,7 @@ def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, A
 
 
 async def get_region(bdinfo: dict[str, Any], region: str | None = None) -> str:
-    label = bdinfo.get('label', bdinfo.get('title', bdinfo.get('path', ''))).replace('.', ' ')
+    label = (bdinfo.get('label') or bdinfo.get('title') or bdinfo.get('path') or '').replace('.', ' ')
     if region is not None:
         region = region.upper()
     else:

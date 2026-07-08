@@ -23,7 +23,7 @@ class Par2BinaryManager:
     """Download par2cmdline-turbo binaries for the host architecture."""
 
     @staticmethod
-    async def ensure_par2_binary(base_dir: str | Path, debug: bool, version: str = "v1.4.0") -> str:
+    async def ensure_par2_binary(base_dir: str | Path, version: str = "v1.4.0") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         logger.debug(f"[blue]PAR2: Detected system: {system}, architecture: {machine}[/blue]")

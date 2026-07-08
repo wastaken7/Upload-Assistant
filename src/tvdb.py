@@ -41,7 +41,6 @@ def _english_alias_names(aliases: list[dict[str, Any]]) -> list[str]:
 
 def _pick_eng_alias(
     aliases: list[dict[str, Any]],
-    debug: bool = False,
 ) -> str | None:
     if not aliases:
         return None
@@ -75,7 +74,6 @@ def _series_translation_metadata(
     series_id: int,
     aliases: list[dict[str, Any]],
     _series_info: dict[str, Any] | None = None,
-    debug: bool = False,
 ) -> dict[str, str | None]:
     translation_name: str | None = None
     translation_aliases: list[str] = []
@@ -93,7 +91,7 @@ def _series_translation_metadata(
 
     extended_eng_aliases = _english_alias_names(aliases)
     english_aliases = translation_aliases + extended_eng_aliases
-    fallback_title = translation_aliases[-1] if translation_aliases else _pick_eng_alias(aliases, debug=debug)
+    fallback_title = translation_aliases[-1] if translation_aliases else _pick_eng_alias(aliases)
     title = translation_name or fallback_title
     year = None
     for alias in english_aliases:
@@ -175,7 +173,6 @@ class tvdb_data:
         self,
         filename: str,
         year: str | None = None,
-        debug: bool = False,
     ) -> tuple[list[dict[str, Any]] | None, int | None]:
         logger.debug(f"filename for TVDB search: {filename} year: {year}")
         client = _get_tvdb_or_warn(self.config)
@@ -230,7 +227,6 @@ class tvdb_data:
         self,
         series_id: int | str,
         base_dir: str | bool | None = None,
-        debug: bool = False,
         season: int | str | None = None,
         episode: int | str | None = None,
         absolute_number: int | str | None = None,
@@ -238,8 +234,7 @@ class tvdb_data:
         original_language: str | None = None,
     ) -> tuple[dict[str, Any] | None, str | None]:
         # Backward compat: older call sites used (series_id, debug)
-        if isinstance(base_dir, bool) is False:
-            debug = base_dir
+        if isinstance(base_dir, bool):
             base_dir = None
 
         def _episode_is_present(episodes: list[dict[str, Any]]) -> bool:
@@ -335,7 +330,6 @@ class tvdb_data:
                                             series_id_int,
                                             aliases_list,
                                             _series_info=series_info,
-                                            debug=debug,
                                         )
                                         episodes_data.update(series_metadata)
                                     except Exception as series_error:
@@ -434,7 +428,6 @@ class tvdb_data:
                         series_id_int,
                         aliases_list,
                         _series_info=series_info,
-                        debug=debug,
                     ))
             except Exception as alias_error:
                 logger.debug(f"[yellow]Could not retrieve series aliases: {alias_error}[/yellow]")
@@ -474,7 +467,6 @@ class tvdb_data:
         self,
         imdb: int | str | None,
         tmdb: int | str | None,
-        debug: bool = False,
         tv_movie: bool = False,
     ) -> tuple[int | None, str | None]:
         client = _get_tvdb_or_warn(self.config)
@@ -494,7 +486,6 @@ class tvdb_data:
                     series_id_int,
                     aliases,
                     _series_info=series_info,
-                    debug=debug,
                 )
                 return series_metadata.get('series_title') or fallback_name
             except Exception as series_error:
@@ -606,7 +597,6 @@ class tvdb_data:
     async def get_imdb_id_from_tvdb_episode_id(
         self,
         episode_id: int | str,
-        debug: bool = False,
     ) -> str | None:
         try:
             client = _get_tvdb_or_warn(self.config)
@@ -644,7 +634,6 @@ class tvdb_data:
         data: Any,
         season: int | str | None,
         episode: int | str | None,
-        debug: bool = False,
         aired_date: str | None = None,
     ) -> tuple[
         Any | None,

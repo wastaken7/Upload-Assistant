@@ -237,17 +237,15 @@ class LanguagesManager:
                             language_found: str | None = None
 
                             # Skip commentary tracks
-                            if "title" in audio_track and "commentary" in audio_track['title'].lower():
-                                if meta.debug:
-                                    logger.debug(f"Skipping commentary track: {audio_track['title']}")
+                            if "title" in audio_track and "commentary" in audio_track["title"].lower():
+                                logger.debug(f"Skipping commentary track: {audio_track['title']}")
                                 continue
 
                             if 'language' in audio_track:
                                 language_found = audio_track['language']
 
-                            if not language_found and 'title' in audio_track:
-                                if meta.debug:
-                                    logger.debug(f"Attempting to extract language from title: {audio_track['title']}")
+                            if not language_found and "title" in audio_track:
+                                logger.debug(f"Attempting to extract language from title: {audio_track['title']}")
                                 title_language = self.extract_language_from_title(audio_track['title'])
                                 if title_language:
                                     language_found = title_language
@@ -374,15 +372,18 @@ class LanguagesManager:
             if 'bluray_audio_skip' not in meta:
                 meta.bluray_audio_skip = False
             existing_audio_languages: list[str] = meta.audio_languages or []
-            existing_subtitle_languages: list[str] = meta.subtitle_languages or []
+            existing_subtitle_languages: list[str] = (
+                [meta.subtitle_languages]
+                if isinstance(meta.subtitle_languages, str)
+                else (meta.subtitle_languages or [])
+            )
             try:
                 bluray = await self.parse_blu_ray(meta)
                 audio_tracks = bluray.get("audio", [])
                 commentary_tracks = [track for track in audio_tracks if track.get("is_commentary")]
                 if commentary_tracks:
                     for track in commentary_tracks:
-                        if meta.debug:
-                            logger.debug(f"Skipping commentary track: {track}")
+                        logger.debug(f"Skipping commentary track: {track}")
                         audio_tracks.remove(track)
                 audio_languages_ordered: list[str] = self._dedupe_preserve_order(existing_audio_languages)
                 audio_language_set: set[str] = set(audio_languages_ordered)
@@ -428,8 +429,7 @@ class LanguagesManager:
                 sub_commentary_tracks = [track for track in subtitle_tracks if track.get("is_commentary")]
                 if sub_commentary_tracks:
                     for track in sub_commentary_tracks:
-                        if meta.debug:
-                            logger.debug(f"Skipping commentary subtitle track: {track}")
+                        logger.debug(f"Skipping commentary subtitle track: {track}")
                         subtitle_tracks.remove(track)
                 subtitle_languages_ordered: list[str] = self._dedupe_preserve_order(existing_subtitle_languages)
                 subtitle_language_set: set[str] = set(subtitle_languages_ordered)

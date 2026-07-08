@@ -61,15 +61,13 @@ class TL:
         try:
             if force:
                 response = await self.session.get('https://www.torrentleech.org/torrents/browse/index', timeout=10)
-                if response.status_code == 301 and 'torrents/browse' in str(response.url):
-                    if meta.debug:
-                        logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
+                if response.status_code == 301 and "torrents/browse" in str(response.url):
+                    logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
                     return True
             elif not force:
                 response = await self.session.get(self.http_upload_url, timeout=10)
-                if response.status_code == 200 and 'torrents/upload' in str(response.url):
-                    if meta.debug:
-                        logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
+                if response.status_code == 200 and "torrents/upload" in str(response.url):
+                    logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
                     return True
             else:
                 logger.info(f"[bold red]Login to '{self.tracker}' with cookies failed. Please check your cookies.[/bold red]")
@@ -238,8 +236,7 @@ class TL:
         login = await self.login(meta, force=True)
         if not login:
             meta.skipping = "TL"
-            if meta.debug:
-                logger.debug(f"[bold red]Skipping upload to '{self.tracker}' as login failed.[/bold red]")
+            logger.debug(f"[bold red]Skipping upload to '{self.tracker}' as login failed.[/bold red]")
             return []
         cat_id = self.get_category(meta)
 

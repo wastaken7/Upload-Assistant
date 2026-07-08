@@ -119,9 +119,8 @@ class TorrentCreator:
         else:
             max_size = 134217728  # 128 MiB default maximum
 
-        if meta.debug:
-            logger.debug(f"Content size: {total_size / (1024 * 1024):.2f} MiB")
-            logger.debug(f"Max size: {max_size}")
+        logger.debug(f"Content size: {total_size / (1024 * 1024):.2f} MiB")
+        logger.debug(f"Max size: {max_size}")
 
         total_size_mib = total_size / (1024 * 1024)
 
@@ -160,9 +159,8 @@ class TorrentCreator:
 
         # Calculate number of pieces for debugging
         num_pieces = math.ceil(total_size / piece_size)
-        if meta.debug:
-            logger.debug(f"Selected piece size: {piece_size / 1024:.2f} KiB")
-            logger.debug(f"Number of pieces: {num_pieces}")
+        logger.debug(f"Selected piece size: {piece_size / 1024:.2f} KiB")
+        logger.debug(f"Number of pieces: {num_pieces}")
 
         return piece_size
 
@@ -200,8 +198,7 @@ class TorrentCreator:
         wait_started: float | None = None
         if cls._create_torrent_semaphore.locked():
             wait_started = time.time()
-            if meta.debug:
-                logger.debug("[yellow]Waiting for create_torrent slot...[/yellow]")
+            logger.debug("[yellow]Waiting for create_torrent slot...[/yellow]")
 
         async with cls._create_torrent_semaphore:
             cls._create_torrent_inflight += 1
@@ -323,8 +320,7 @@ class TorrentCreator:
                             cmd.extend(["--exclude", exclude_str])
 
                         cmd.extend(["-o", output_path])
-                        if meta.debug:
-                            logger.debug(f"[cyan]mkbrr cmd: {cmd}")
+                        logger.debug(f"[cyan]mkbrr cmd: {cmd}")
 
                         # Run mkbrr subprocess in thread to avoid blocking
                         def run_mkbrr() -> int:
@@ -450,15 +446,13 @@ class TorrentCreator:
 
                 torrent_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/{output_filename}.torrent"
                 torrent_file_size = os.path.getsize(torrent_file_path) / 1024
-                if meta.debug:
-                    logger.debug("")
-                    logger.debug(f"[bold green]torrent created in {formatted_time}")
-                    logger.debug(f"[green]Torrent file size: {torrent_file_size:.2f} KB")
+                logger.debug("")
+                logger.debug(f"[bold green]torrent created in {formatted_time}")
+                logger.debug(f"[green]Torrent file size: {torrent_file_size:.2f} KB")
                 return torrent
             finally:
                 cls._create_torrent_inflight -= 1
-                if meta.debug:
-                    logger.debug(f"[cyan]create_torrent end | in-flight={cls._create_torrent_inflight}[/cyan]")
+                logger.debug(f"[cyan]create_torrent end | in-flight={cls._create_torrent_inflight}[/cyan]")
 
     @staticmethod
     def torf_cb(torrent: Torrent, _filepath: str, pieces_done: int, pieces_total: int) -> None:

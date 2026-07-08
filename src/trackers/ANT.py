@@ -153,8 +153,7 @@ class ANT:
                 }
                 antType = type_map.get(choice, 0)
             else:
-                if meta.debug:
-                    logger.debug(f"[bold red]{self.tracker} type could not be determined automatically in unattended mode.")
+                logger.debug(f"[bold red]{self.tracker} type could not be determined automatically in unattended mode.")
                 antType = 0  # Default to Feature Film in unattended mode
 
         return antType
@@ -389,8 +388,7 @@ class ANT:
 
                     for each in data.get('item', []):
                         if target_resolution and each.get('resolution', '').lower() != target_resolution.lower():
-                            if meta.debug:
-                                logger.debug(f"[yellow]Skipping {each.get('fileName')} - resolution mismatch: {each.get('resolution')} vs {target_resolution}")
+                            logger.debug(f"[yellow]Skipping {each.get('fileName')} - resolution mismatch: {each.get('resolution')} vs {target_resolution}")
                             continue
 
                         largest_file = None
@@ -414,8 +412,7 @@ class ANT:
                         }
                         dupes.append(result)
 
-                        if meta.debug:
-                            logger.debug(f"[green]Found potential dupe: {result['name']} ({result['size']} bytes)")
+                        logger.debug(f"[green]Found potential dupe: {result['name']} ({result['size']} bytes)")
 
                 except json.JSONDecodeError:
                     logger.info("[bold yellow]ANT response content is not valid JSON. Skipping this API call.")
@@ -433,16 +430,14 @@ class ANT:
 
         filelist: list[str] = meta.filelist
         if not filelist:
-            if meta.debug:
-                logger.debug(f"[yellow]{self.tracker}: No files in filelist, skipping file-based search.")
+            logger.debug(f"[yellow]{self.tracker}: No files in filelist, skipping file-based search.")
             return imdb_tmdb_list
 
         filename: str = os.path.basename(filelist[0])
 
         api_key = self.tracker_config.get('api_key')
         if not api_key or not isinstance(api_key, str) or not api_key.strip():
-            if meta.debug:
-                logger.debug(f"[yellow]{self.tracker}: API key not configured, skipping file-based search.")
+            logger.debug(f"[yellow]{self.tracker}: API key not configured, skipping file-based search.")
             return imdb_tmdb_list
 
         headers = {
@@ -489,8 +484,7 @@ class ANT:
                                     break
 
                             if not matched_item:
-                                if meta.debug:
-                                    logger.debug("[yellow]Could not match filename, returning empty list")
+                                logger.debug("[yellow]Could not match filename, returning empty list")
                                 imdb_tmdb_list = []
 
                         if matched_item:

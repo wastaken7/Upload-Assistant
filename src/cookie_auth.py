@@ -13,6 +13,7 @@ import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 from bs4.element import AttributeValueList
+from rich.align import Align
 from rich.panel import Panel
 from rich.table import Table
 
@@ -208,8 +209,7 @@ class CookieValidator:
             return False
         except Exception as e:
             logger.info(f"{tracker}: Login error: {e}")
-            if meta.debug:
-                logger.debug(traceback.format_exc())
+            logger.debug(traceback.format_exc())
             return False
 
     async def cookie_validation(
@@ -628,10 +628,10 @@ class CookieAuthUploader:
                     else:
                         table_data.add_row(key, str(v))
 
-                logger.info(table_data,  justify="center", extra={"markup": False})
+                logger.info(Align.center(table_data), extra={"markup": False})
             else:
                 data_panel = Panel(str(data), title=f"{tracker}: Form Data - DO NOT SHARE THIS", border_style="blue")
-                logger.info(data_panel, justify="center")
+                logger.info(Align.center(data_panel))
         except Exception as e:
             logger.info(f"Error displaying form data: {e}")
             raise

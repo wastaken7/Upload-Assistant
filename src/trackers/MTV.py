@@ -506,8 +506,7 @@ class MTV:
                 async with httpx.AsyncClient(cookies=cookies_dict, timeout=10) as client:
                     try:
                         resp = await client.get(url=url)
-                        if meta.debug:
-                            logger.debug('[cyan]Validating MTV Cookies:')
+                        logger.debug('[cyan]Validating MTV Cookies:')
 
                         if "Logout" in resp.text:
                             return True
@@ -717,7 +716,7 @@ class MTV:
                 # Parse XML response
                 try:
                     loop = asyncio.get_running_loop()
-                    response_xml = await loop.run_in_executor(None, ET.fromstring, response.text)
+                    response_xml = await loop.run_in_executor(None, lambda: ET.fromstring(response.text))
                     channel = cast(Any | None, response_xml.find("channel"))
                     if channel is None:
                         return dupes

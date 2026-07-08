@@ -295,8 +295,7 @@ class FL:
         if cookies:
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0) as client:
                 resp = await client.get(url=url)
-            if meta.debug:
-                logger.debug(resp.url)
+            logger.debug(resp.url)
             return resp.text.find("Logout") != -1
         return False
 

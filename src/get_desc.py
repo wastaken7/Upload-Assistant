@@ -103,9 +103,8 @@ async def gen_desc(
         except FileNotFoundError:
             logger.info(f"[ERROR] Template '{meta.description_template}' not found.")
     if meta.nfo:
-        if meta.debug:
-            logger.debug(f"specified_dir_path: {specified_dir_path}")
-            logger.debug(f"sourcedir_path: {source_dir_path}")
+        logger.debug(f"specified_dir_path: {specified_dir_path}")
+        logger.debug(f"sourcedir_path: {source_dir_path}")
         if "auto_nfo" in meta and meta.auto_nfo is True:
             nfo_files = glob.glob(specified_dir_path)
             scene_nfo = True
@@ -126,11 +125,9 @@ async def gen_desc(
             try:
                 async with aiofiles.open(nfo, encoding="utf-8") as nfo_file:
                     nfo_content = await nfo_file.read()
-                if meta.debug:
-                    logger.debug("NFO content read with utf-8 encoding.")
+                logger.debug("NFO content read with utf-8 encoding.")
             except UnicodeDecodeError:
-                if meta.debug:
-                    logger.debug("utf-8 decoding failed, trying latin1.")
+                logger.debug("utf-8 decoding failed, trying latin1.")
                 async with aiofiles.open(nfo, encoding="latin1") as nfo_file:
                     nfo_content = await nfo_file.read()
 
@@ -1134,8 +1131,7 @@ class DescriptionBuilder:
                                     logger.info(f"[yellow]Filtering out image from non-approved host: {hostname}[/yellow]")
                             except Exception:
                                 # If URL parsing fails, skip this image
-                                if meta.debug:
-                                    logger.debug(f"[yellow]Could not parse URL: {raw_url}[/yellow]")
+                                logger.debug(f"[yellow]Could not parse URL: {raw_url}[/yellow]")
                                 continue
 
                         if images_to_keep:
@@ -1149,8 +1145,7 @@ class DescriptionBuilder:
                     # Remove keys with no approved images
                     for key_name in keys_to_remove:
                         del pack_images_data["keys"][key_name]
-                        if meta.debug:
-                            logger.debug(f"[yellow]Removed key '{key_name}' - no approved image hosts[/yellow]")
+                        logger.debug(f"[yellow]Removed key '{key_name}' - no approved image hosts[/yellow]")
 
                     # Recalculate total count
                     pack_images_data["total_count"] = sum(
@@ -1159,12 +1154,10 @@ class DescriptionBuilder:
 
                     if pack_images_data.get("total_count", 0) < 3:
                         pack_images_data = {}  # Invalidate if less than 3 images total
-                        if meta.debug:
-                            logger.debug("[yellow]Invalidating pack images - less than 3 approved images total[/yellow]")
+                        logger.debug("[yellow]Invalidating pack images - less than 3 approved images total[/yellow]")
                     else:
-                        if meta.debug:
-                            logger.debug(f"[green]Loaded previously uploaded images from {pack_images_file}")
-                            logger.debug(f"[blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]")
+                        logger.debug(f"[green]Loaded previously uploaded images from {pack_images_file}")
+                        logger.debug(f"[blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]")
             except Exception as e:
                 logger.warning(f"[yellow]Warning: Could not load pack image data: {str(e)}[/yellow]")
         return pack_images_data
@@ -1245,8 +1238,7 @@ class DescriptionBuilder:
                         ):
                             saved_images = pack_images_data["keys"][new_images_key]["images"]
                             if saved_images:
-                                if meta.debug:
-                                    logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                                logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
@@ -1264,8 +1256,7 @@ class DescriptionBuilder:
                             desc_parts.append(
                                 f"[spoiler={edition}][code]{summary}[/code][/spoiler]\n\n"
                             )
-                            if meta.debug:
-                                logger.debug("[yellow]Using original uploaded images for first disc")
+                            logger.debug("[yellow]Using original uploaded images for first disc")
                             desc_parts.append("[center]")
                             for img in meta[new_images_key]:
                                 web_url = img["web_url"]
@@ -1364,8 +1355,7 @@ class DescriptionBuilder:
                             f"[spoiler={os.path.basename(each['ifo'])}][code]{each['ifo_mi']}[/code][/spoiler]\n\n"
                         )
                     # For the first disc, use images from `meta.image_list` and add screenheader if applicable
-                    if meta.debug:
-                        logger.debug("[yellow]Using original uploaded images for first disc")
+                    logger.debug("[yellow]Using original uploaded images for first disc")
                     if screenheader is not None:
                         desc_parts.append("[/center]\n\n")
                         desc_parts.append(screenheader + "\n")
@@ -1395,8 +1385,7 @@ class DescriptionBuilder:
                         ):
                             saved_images = pack_images_data["keys"][new_images_key]["images"]
                             if saved_images:
-                                if meta.debug:
-                                    logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                                logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
@@ -1408,8 +1397,7 @@ class DescriptionBuilder:
                                         }
                                     )
                         if new_images_key in meta and meta[new_images_key]:
-                            if meta.debug:
-                                logger.debug(f"[yellow]Found needed image URLs for {new_images_key}")
+                            logger.debug(f"[yellow]Found needed image URLs for {new_images_key}")
                             desc_parts.append("[center]")
                             if each["type"] == "BDMV":
                                 desc_parts.append(
@@ -1457,8 +1445,7 @@ class DescriptionBuilder:
                             elif each["type"] == "DVD":
                                 new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"{meta.discs[i]['name']}-*.png"))]
                             if not new_screens:
-                                if meta.debug:
-                                    logger.debug(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
+                                logger.debug(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
                                 # Run prep.screenshots if no screenshots are present
                                 if each["type"] == "BDMV":
                                     use_vs = meta.vapoursynth
@@ -1600,8 +1587,7 @@ class DescriptionBuilder:
                     ):
                         saved_images = pack_images_data["keys"][new_images_key]["images"]
                         if saved_images:
-                            if meta.debug:
-                                logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                            logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                             meta[new_images_key] = []
                             for img in saved_images:

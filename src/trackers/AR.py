@@ -260,8 +260,7 @@ class AR:
         search_query_encoded = urllib.parse.quote(search_query)
         search_url = f'{self.base_url}/ajax.php?action=browse&searchstr={search_query_encoded}'
 
-        if meta.debug:
-            logger.debug(f"[blue]{search_url}")
+        logger.debug(f"[blue]{search_url}")
 
         headers = {"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"}
 

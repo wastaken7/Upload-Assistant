@@ -29,8 +29,7 @@ async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta,
             mi_text = await asyncio.to_thread(Path(f"{base_dir}/tmp/{folder_id}/MediaInfo.json").read_text, encoding="utf-8")
             mi = json.loads(mi_text)
         except Exception:
-            if meta.debug:
-                logger.debug("No mediainfo.json")
+            logger.debug("No mediainfo.json")
     try:
         if meta.manual_source:
             source = str(meta.manual_source)

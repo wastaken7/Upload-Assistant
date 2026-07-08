@@ -15,7 +15,7 @@ openlibrary_color_str = "[#e1d8c1]OpenLibrary[/#e1d8c1]"
 
 
 class OpenLibraryManager:
-    async def get_author_name(self, author_key: str, client: httpx.AsyncClient, cache_dir: str | None, debug: bool = False) -> str:
+    async def get_author_name(self, author_key: str, client: httpx.AsyncClient, cache_dir: str | None) -> str:
         """Fetch author name from key like /authors/OL26320A."""
         author_id = author_key.split("/")[-1]
         author_cache_file = None
@@ -44,7 +44,7 @@ class OpenLibraryManager:
             logger.debug(f"[yellow]Warning: Error fetching author name for {author_id}: {e}[/yellow]")
         return ""
 
-    async def search_by_work_id(self, work_id: str, base_dir: str = "", debug: bool = False) -> dict[str, Any] | None:
+    async def search_by_work_id(self, work_id: str, base_dir: str = "") -> dict[str, Any] | None:
         """Search OpenLibrary by Work ID (e.g. OL45883W)."""
         work_id = work_id.strip()
         if not work_id:
@@ -103,7 +103,7 @@ class OpenLibraryManager:
                         for author_entry in authors_list:
                             author_obj = author_entry.get("author")
                             if author_obj and "key" in author_obj:
-                                author_name = await self.get_author_name(author_obj["key"], client, cache_dir, debug)
+                                author_name = await self.get_author_name(author_obj["key"], client, cache_dir)
                                 if author_name:
                                     author_names.append(author_name)
                         if author_names:
@@ -138,7 +138,7 @@ class OpenLibraryManager:
 
         return None
 
-    async def search_by_isbn(self, isbn: str, base_dir: str = "", debug: bool = False) -> dict[str, Any] | None:
+    async def search_by_isbn(self, isbn: str, base_dir: str = "") -> dict[str, Any] | None:
         """Search OpenLibrary by ISBN."""
         clean_isbn = re.sub(r"[-\s]", "", isbn)
         if not clean_isbn:
@@ -187,8 +187,7 @@ class OpenLibraryManager:
 
                         if work_key:
                             work_id = work_key.split("/")[-1]
-                            # Let search_by_work_id do the work and fetch complete info
-                            metadata = await self.search_by_work_id(work_id, base_dir, debug)
+                            metadata = await self.search_by_work_id(work_id, base_dir)
                             if metadata:
                                 # Add any details fields that might not be in the work info
                                 publishers = details.get("publishers")

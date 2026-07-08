@@ -47,7 +47,7 @@ class DiscMenus:
             return
 
         uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
-            cast(dict[str, Any], meta),
+            meta,
             screens=len(image_paths),
             img_host_num=1,
             i=0,

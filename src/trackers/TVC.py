@@ -763,7 +763,7 @@ class TVC:
 
         elif meta.category == "TV":
             # TVC-specific extras
-            if meta.networks and len(meta.networks) != 0 and "name" in meta.networks[0]:
+            if isinstance(meta.networks, list) and len(meta.networks) != 0 and "name" in meta.networks[0]:
                 meta.networks = meta.networks[0]["name"]
 
             if meta.tmdb is None:
@@ -850,7 +850,7 @@ class TVC:
             return False
         return True
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
+    async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:  # noqa: ARG002
         # Search on TVCUK has been DISABLED due to issues, but we can still skip uploads based on criteria
         dupes: list[dict[str, Any]] = []
 

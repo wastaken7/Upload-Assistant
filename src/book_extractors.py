@@ -13,7 +13,7 @@ from typing import Any
 from src.console import logger
 
 
-def extract_epub_metadata(epub_path: str, debug: bool = False) -> dict[str, Any]:
+def extract_epub_metadata(epub_path: str) -> dict[str, Any]:
     """Extract metadata from an EPUB zip container's OPF file."""
     metadata: dict[str, Any] = {}
     if not os.path.isfile(epub_path) or not zipfile.is_zipfile(epub_path):
@@ -105,7 +105,7 @@ def extract_epub_metadata(epub_path: str, debug: bool = False) -> dict[str, Any]
     return metadata
 
 
-def extract_cbr_cbz_metadata(filepath: str, debug: bool = False) -> dict[str, Any]:
+def extract_cbr_cbz_metadata(filepath: str) -> dict[str, Any]:
     """Extract metadata from a CBR (RAR) or CBZ (ZIP) container's ComicInfo.xml file."""
     metadata: dict[str, Any] = {}
     if not os.path.isfile(filepath):
@@ -209,7 +209,7 @@ def extract_cbr_cbz_metadata(filepath: str, debug: bool = False) -> dict[str, An
     return metadata
 
 
-def extract_mobi_metadata(mobi_path: str, debug: bool = False) -> dict[str, Any]:
+def extract_mobi_metadata(mobi_path: str) -> dict[str, Any]:
     """Extract metadata from a MOBI file using the mobi library and parsing the extracted OPF."""
     metadata: dict[str, Any] = {}
     if not os.path.isfile(mobi_path):
@@ -331,7 +331,7 @@ def validate_isbn_checksum(candidate: str) -> str | None:
     return None
 
 
-def extract_isbn_from_pdf(pdf_path: str, debug: bool = False) -> str | None:
+def extract_isbn_from_pdf(pdf_path: str) -> str | None:
     """Search for and extract a valid ISBN from a PDF file using PyMuPDF (fitz)."""
     try:
         import fitz

@@ -51,8 +51,7 @@ async def search_bluray(meta: Meta) -> str | None:
 
     try:
         if os.path.exists(debug_filename):
-            if meta.debug:
-                logger.debug(f"[green]Found existing file for {imdb_id}[/green]")
+            logger.debug(f"[green]Found existing file for {imdb_id}[/green]")
             response_text = await asyncio.to_thread(Path(debug_filename).read_text, encoding="utf-8")
 
             if response_text and "No index" not in response_text:
@@ -63,8 +62,7 @@ async def search_bluray(meta: Meta) -> str | None:
         logger.info(f"[yellow]Error reading cached file: {str(e)}[/yellow]")
 
     # If we're here, we need to make a request
-    if meta.debug:
-        logger.debug(f"[dim]Search URL: {url}[/dim]")
+    logger.debug(f"[dim]Search URL: {url}[/dim]")
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -88,12 +86,10 @@ async def search_bluray(meta: Meta) -> str | None:
     while retry_count <= max_retries:
         try:
             delay = random.uniform(1, 3)  # nosec B311 - Rate limiting delay, not cryptographic
-            if meta.debug:
-                logger.debug(f"[dim]Waiting {delay:.2f} seconds before request (attempt {retry_count + 1}/{max_retries + 1})...[/dim]")
+            logger.debug(f"[dim]Waiting {delay:.2f} seconds before request (attempt {retry_count + 1}/{max_retries + 1})...[/dim]")
             await asyncio.sleep(delay)
 
-            if meta.debug:
-                logger.debug(f"[yellow]Sending request to blu-ray.com (attempt {retry_count + 1}/{max_retries + 1})...[/yellow]")
+            logger.debug(f"[yellow]Sending request to blu-ray.com (attempt {retry_count + 1}/{max_retries + 1})...[/yellow]")
             async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
                 response = await client.get(url, headers=headers)
 
@@ -103,8 +99,7 @@ async def search_bluray(meta: Meta) -> str | None:
                     try:
                         debug_path = Path(base_dir) / "tmp" / uuid / f"debug_bluray_search_{imdb_id}.html"
                         await asyncio.to_thread(debug_path.write_text, response_text, encoding="utf-8")
-                        if meta.debug:
-                            logger.debug(f"[dim]Saved search response to debug_bluray_search_{imdb_id}.html[/dim]")
+                        logger.debug(f"[dim]Saved search response to debug_bluray_search_{imdb_id}.html[/dim]")
                     except Exception as e:
                         logger.info(f"[dim]Could not save debug file: {str(e)}[/dim]")
 
@@ -128,8 +123,7 @@ async def search_bluray(meta: Meta) -> str | None:
 
                     if retry_count < max_retries:
                         backoff_time *= 2
-                        if meta.debug:
-                            logger.debug(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
+                        logger.debug(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
                         await asyncio.sleep(backoff_time)
                         retry_count += 1
                     else:
@@ -140,8 +134,7 @@ async def search_bluray(meta: Meta) -> str | None:
             logger.info(f"[red]HTTP request error when accessing {url} (attempt {retry_count + 1}/{max_retries + 1}): {str(e)}[/red]")
             if retry_count < max_retries:
                 backoff_time *= 2
-                if meta.debug:
-                    logger.debug(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
+                logger.debug(f"[yellow]Retrying in {backoff_time:.1f} seconds...[/yellow]")
                 await asyncio.sleep(backoff_time)
                 retry_count += 1
             else:
@@ -163,16 +156,16 @@ def extract_bluray_links(html_content: str | None) -> list[MovieLink] | None:
     results: list[MovieLink] = []
 
     try:
-        soup: Any = BeautifulSoup(html_content, 'lxml')
-        movie_divs: list[Any] = list(soup.select('div.figure'))
+        soup: Any = BeautifulSoup(html_content, "lxml")
+        movie_divs: list[Any] = list(soup.select("div.figure"))
         if not movie_divs:
             return None
 
         for _i, movie_div in enumerate(movie_divs, 1):
-            link: Any = movie_div.find('a', class_='alphaborder')
+            link: Any = movie_div.find("a", class_="alphaborder")
 
-            if link and 'href' in link.attrs:
-                movie_url = link['href']
+            if link and "href" in link.attrs:
+                movie_url = link["href"]
                 releases_url = f"{movie_url}#Releases"
                 title_div: Any = movie_div.select_one('div.figurecaptionbottom div[style*="font-weight: bold"]')
                 year_div: Any = movie_div.select_one('div.figurecaptionbottom div[style*="margin-top"]')
@@ -183,11 +176,7 @@ def extract_bluray_links(html_content: str | None) -> list[MovieLink] | None:
                 logger.info(f"[green]Found movie: {title} ({year})[/green]")
                 logger.info(f"[dim]URL: {releases_url}[/dim]")
 
-                results.append({
-                    'title': title,
-                    'year': year,
-                    'releases_url': releases_url
-                })
+                results.append({"title": title, "year": year, "releases_url": releases_url})
             else:
                 logger.info("[red]Movie div doesn't have a valid link[/red]")
 
@@ -207,7 +196,7 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
     matching_releases: list[Release] = []
     is_3d = meta.three_d.lower() == "yes"
     resolution = meta.resolution.lower()
-    is_4k = '2160p' in resolution or '4k' in resolution
+    is_4k = "2160p" in resolution or "4k" in resolution
     is_dvd = str(meta.is_disc).upper() == "DVD"
     release_type = "4K" if is_4k else "3D" if is_3d else "DVD" if is_dvd else "BD"
     release_type_debug = "DVD" if is_dvd else "Blu-ray"
@@ -226,21 +215,19 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
         uuid = meta.uuid
         debug_path = Path(base_dir) / "tmp" / uuid / f"debug_bluray_{release_type}.html"
         await asyncio.to_thread(debug_path.write_text, html_content, encoding="utf-8")
-        if meta.debug:
-            logger.debug(f"[dim]Saved releases response to debug_bluray_{release_type}.html[/dim]")
+        logger.debug(f"[dim]Saved releases response to debug_bluray_{release_type}.html[/dim]")
     except Exception as e:
         logger.info(f"[dim]Could not save debug file: {str(e)}[/dim]")
 
     try:
-        soup: Any = BeautifulSoup(html_content, 'lxml')
+        soup: Any = BeautifulSoup(html_content, "lxml")
         selected_sections: list[Any] = []
         if is_dvd:
-            selected_sections = list(soup.find_all('h3', string=re.compile(r'DVD Editions')))
+            selected_sections = list(soup.find_all("h3", string=re.compile(r"DVD Editions")))
         else:
-            selected_sections = list(soup.find_all('h3', string=re.compile(r'Blu-ray Editions|4K Blu-ray Editions|3D Blu-ray Editions')))
+            selected_sections = list(soup.find_all("h3", string=re.compile(r"Blu-ray Editions|4K Blu-ray Editions|3D Blu-ray Editions")))
 
-        if meta.debug:
-            logger.debug(f"[blue]Found {len(selected_sections)} {release_type_debug} section(s)[/blue]")
+        logger.debug(f"[blue]Found {len(selected_sections)} {release_type_debug} section(s)[/blue]")
         filtered_sections: list[Any] = []
         for section in selected_sections:
             section_title = section.text
@@ -248,20 +235,16 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
             # Check if this section matches what we're looking for
             if is_3d and '3D Blu-ray Editions' in section_title:
                 filtered_sections.append(section)
-                if meta.debug:
-                    logger.debug(f"[green]Including 3D section: {section_title}[/green]")
+                logger.debug(f"[green]Including 3D section: {section_title}[/green]")
             elif is_4k and '4K Blu-ray Editions' in section_title:
                 filtered_sections.append(section)
-                if meta.debug:
-                    logger.debug(f"[green]Including 4K section: {section_title}[/green]")
+                logger.debug(f"[green]Including 4K section: {section_title}[/green]")
             elif is_dvd and 'DVD Editions' in section_title:
                 filtered_sections.append(section)
-                if meta.debug:
-                    logger.debug(f"[green]Including DVD section: {section_title}[/green]")
+                logger.debug(f"[green]Including DVD section: {section_title}[/green]")
             elif not is_3d and not is_4k and 'Blu-ray Editions' in section_title and '3D Blu-ray Editions' not in section_title and '4K Blu-ray Editions' not in section_title:
                 filtered_sections.append(section)
-                if meta.debug:
-                    logger.debug(f"[green]Including standard Blu-ray section: {section_title}[/green]")
+                logger.debug(f"[green]Including standard Blu-ray section: {section_title}[/green]")
 
         # If no sections match our filter criteria, use all sections
         if not filtered_sections:
@@ -295,8 +278,7 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
                     release_id_match = re.search(r'blu-ray\.com/(movies|dvd)/.*?/(\d+)/', release_url)
                     if release_id_match:
                         release_id = release_id_match.group(2)
-                        if meta.debug:
-                            logger.debug(f"[green]Found release ID: {release_id}[/green]")
+                        logger.debug(f"[green]Found release ID: {release_id}[/green]")
 
                         matching_releases.append({
                             'title': title,
@@ -322,14 +304,13 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
         return []
 
 
-async def extract_product_id(url: str, meta: Meta) -> str | None:
+async def extract_product_id(url: str) -> str | None:
     pattern = r'blu-ray\.com/.*?/(\d+)/'
     match = re.search(pattern, url)
 
     if match:
         product_id = match.group(1)
-        if meta.debug:
-            logger.debug(f"[green]Successfully extracted product ID: {product_id}[/green]")
+        logger.debug(f"[green]Successfully extracted product ID: {product_id}[/green]")
         return product_id
 
     logger.info(f"[red]Could not extract product ID from URL: {url}[/red]")
@@ -350,17 +331,15 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
     movie_links = extract_bluray_links(html_content) or []
 
     if not movie_links:
-        if meta.debug:
-            logger.debug(f"[red]No movies found for IMDB ID: tt{meta.imdb_id:07d}[/red]")
+        logger.debug(f"[red]No movies found for IMDB ID: tt{meta.imdb_id:07d}[/red]")
         return []
 
     matching_releases: list[Release] = []
 
     for idx, movie in enumerate(movie_links, 1):
-        if meta.debug:
-            logger.debug(f"[blue]Processing movie {idx}/{len(movie_links)}: {movie['title']} ({movie['year']})[/blue]")
+        logger.debug(f"[blue]Processing movie {idx}/{len(movie_links)}: {movie['title']} ({movie['year']})[/blue]")
         releases_url = movie['releases_url']
-        product_id = await extract_product_id(releases_url, meta)
+        product_id = await extract_product_id(releases_url)
         if not product_id:
             logger.info(f"[red]Could not extract product ID from {releases_url}[/red]")
             continue
@@ -376,8 +355,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
 
         try:
             if os.path.exists(release_debug_filename):
-                if meta.debug:
-                    logger.debug(f"[green]Found existing release data for product ID {product_id}[/green]")
+                logger.debug(f"[green]Found existing release data for product ID {product_id}[/green]")
                 response_text = await asyncio.to_thread(Path(release_debug_filename).read_text, encoding="utf-8")
 
                 if response_text and "No index" not in response_text:
@@ -396,8 +374,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
 
         # If we're here, we need to make a request
         delay = random.uniform(2, 4)  # nosec B311 - Rate limiting delay, not cryptographic
-        if meta.debug:
-            logger.debug(f"[dim]Waiting {delay:.2f} seconds before request...[/dim]")
+        logger.debug(f"[dim]Waiting {delay:.2f} seconds before request...[/dim]")
         await asyncio.sleep(delay)
 
         headers = {
@@ -548,8 +525,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
         }
         debug_text = json.dumps(debug_payload, indent=2)
         await asyncio.to_thread(Path(debug_filename).write_text, debug_text, encoding="utf-8")
-        if meta.debug:
-            logger.debug(f"[dim]Saved results to {debug_filename}[/dim]")
+        logger.debug(f"[dim]Saved results to {debug_filename}[/dim]")
     except Exception as e:
         logger.info(f"[dim]Could not save debug results: {str(e)}[/dim]")
 
@@ -578,24 +554,21 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
         if video_section:
             codec_match = re.search(r'Codec: ([^<\n]+)', video_section)
             if codec_match:
-                specs['video']['codec'] = codec_match.group(1).strip()
-                if meta.debug:
-                    logger.debug(f"[blue]Video Codec: {specs['video']['codec']}[/blue]")
+                specs["video"]["codec"] = codec_match.group(1).strip()
+                logger.debug(f"[blue]Video Codec: {specs['video']['codec']}[/blue]")
 
             resolution_match = re.search(r'Resolution: ([^<\n]+)', video_section)
             if resolution_match:
-                specs['video']['resolution'] = resolution_match.group(1).strip()
-                if meta.debug:
-                    logger.debug(f"[blue]Resolution: {specs['video']['resolution']}[/blue]")
+                specs["video"]["resolution"] = resolution_match.group(1).strip()
+                logger.debug(f"[blue]Resolution: {specs['video']['resolution']}[/blue]")
 
         # Parse audio section
         audio_section = extract_section(specs_td, 'Audio')
         if audio_section:
             audio_div = specs_td.find('div', id='longaudio')
             if not audio_div:
-                audio_div = specs_td.find('div', id='shortaudio')
-                if meta.debug:
-                    logger.debug("[dim]Using shortaudio because longaudio wasn't found[/dim]")
+                audio_div = specs_td.find("div", id="shortaudio")
+                logger.debug("[dim]Using shortaudio because longaudio wasn't found[/dim]")
             if audio_div:
                 audio_html = str(audio_div)
                 audio_html = re.sub(r'<br\s*/?>', '\n', audio_html)
@@ -645,40 +618,35 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
 
                     i += 1
 
-                specs['audio'] = audio_lines
-                if meta.debug:
-                    logger.debug(f"[blue]Audio Tracks: {len(audio_lines)} found[/blue]")
-                    for track in audio_lines:
-                        logger.debug(f"[dim]  - {track}[/dim]")
+                specs["audio"] = audio_lines
+                logger.debug(f"[blue]Audio Tracks: {len(audio_lines)} found[/blue]")
+                for track in audio_lines:
+                    logger.debug(f"[dim]  - {track}[/dim]")
 
         # Parse subtitle section
         subtitle_section = extract_section(specs_td, 'Subtitles')
         if subtitle_section:
             subs_div = specs_td.find('div', id='longsubs')
             if not subs_div:
-                subs_div = specs_td.find('div', id='shortsubs')
-                if meta.debug:
-                    logger.debug("[dim]Using shortsubs because longsubs wasn't found[/dim]")
+                subs_div = specs_td.find("div", id="shortsubs")
+                logger.debug("[dim]Using shortsubs because longsubs wasn't found[/dim]")
             if subs_div:
                 subtitle_text = subs_div.get_text().strip()
                 subtitle_text = re.sub(r'\s*\(less\)\s*', '', subtitle_text)
                 subtitles = [s.strip() for s in re.split(r',|\n', subtitle_text) if s.strip()]
-                specs['subtitles'] = subtitles
-                if meta.debug:
-                    logger.debug(f"[blue]Subtitles: {', '.join(subtitles)}[/blue]")
+                specs["subtitles"] = subtitles
+                logger.debug(f"[blue]Subtitles: {', '.join(subtitles)}[/blue]")
 
         # Parse disc section
         disc_section = extract_section(specs_td, 'Discs')
         if disc_section:
             disc_type_match = re.search(r'(Blu-ray Disc|DVD|Ultra HD Blu-ray|4K Ultra HD)', disc_section)
             if disc_type_match:
-                specs['discs']['type'] = disc_type_match.group(1).strip()
-                if meta.debug:
-                    logger.debug(f"[blue]Disc Type: {specs['discs']['type']}[/blue]")
+                specs["discs"]["type"] = disc_type_match.group(1).strip()
+                logger.debug(f"[blue]Disc Type: {specs['discs']['type']}[/blue]")
 
-            disc_count_match = re.search(r'Single disc \(1 ([^)]+)\)|(One|Two|Three|Four|Five|\d+)[ -]disc set(?:\s*\(([^)]+)\))?', disc_section)
-            if meta.debug:
-                logger.debug(f"[dim]Disc Count Match: {disc_count_match}[/dim]")
+            disc_count_match = re.search(r"Single disc \(1 ([^)]+)\)|(One|Two|Three|Four|Five|\d+)[ -]disc set(?:\s*\(([^)]+)\))?", disc_section)
+            logger.debug(f"[dim]Disc Count Match: {disc_count_match}[/dim]")
             if disc_count_match:
                 if disc_count_match.group(1):
                     specs['discs']['count'] = 1
@@ -692,9 +660,8 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
                         specs['discs']['count'] = number_map.get(disc_count, 1)
 
                     if disc_count_match.group(3):
-                        bd_format_match = re.search(r'(\d+\s*BD-\d+|\d+\s*BD)', disc_count_match.group(3))
-                        if meta.debug:
-                            logger.debug(f"[dim]BD Format Match: {bd_format_match}[/dim]")
+                        bd_format_match = re.search(r"(\d+\s*BD-\d+|\d+\s*BD)", disc_count_match.group(3))
+                        logger.debug(f"[dim]BD Format Match: {bd_format_match}[/dim]")
                         if bd_format_match:
                             specs['discs']['format'] = bd_format_match.group(1).strip()
                         else:
@@ -712,24 +679,21 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
             region_match = re.search(r'(?:2K Blu-ray|4K Blu-ray|DVD): Region ([A-C])(?: \(([^)]+)\))?', playback_section)
             if region_match:
                 specs['playback']['region'] = region_match.group(1).strip()
-                specs['playback']['region_notes'] = region_match.group(2).strip() if region_match.group(2) else ""
-                if meta.debug:
-                    logger.debug(f"[blue]Region: {specs['playback']['region']}[/blue]")
+                specs["playback"]["region_notes"] = region_match.group(2).strip() if region_match.group(2) else ""
+                logger.debug(f"[blue]Region: {specs['playback']['region']}[/blue]")
                 if specs["playback"]["region_notes"] and meta.debug:
                     logger.info(f"[dim]Region Notes: {specs['playback']['region_notes']}[/dim]")
 
         if meta.use_bluray_images:
             cover_images = extract_cover_images(response_text)
             if cover_images:
-                release['cover_images'] = cover_images
-                if meta.debug:
-                    logger.debug(f"[green]Found {len(cover_images)} cover images:[/green]")
-                    for img_type, url in cover_images.items():
-                        logger.debug(f"[dim]  - {img_type}: {url}[/dim]")
+                release["cover_images"] = cover_images
+                logger.debug(f"[green]Found {len(cover_images)} cover images:[/green]")
+                for img_type, url in cover_images.items():
+                    logger.debug(f"[dim]  - {img_type}: {url}[/dim]")
 
-        release['specs'] = specs
-        if meta.debug:
-            logger.debug(f"[green]Successfully parsed details for {release['title']}[/green]")
+        release["specs"] = specs
+        logger.debug(f"[green]Successfully parsed details for {release['title']}[/green]")
         return release
 
     except Exception as e:
@@ -758,23 +722,20 @@ async def download_cover_images(meta: Meta) -> bool:
                 if len(covers_list) > 0:
                     for cover in covers_list:
                         if cover.get("release_url") == meta.release_url:
-                            if meta.debug:
-                                logger.debug(f"[green]Found existing cover images for this release URL: {meta.release_url}[/green]")
+                            logger.debug(f"[green]Found existing cover images for this release URL: {meta.release_url}[/green]")
                             matching_release = True
                             return True
 
             if not matching_release:
-                if meta.debug:
-                    logger.debug(f"[yellow]Existing covers.json found but none match current release URL: {meta.release_url}[/yellow]")
-                    logger.debug("[yellow]Deleting outdated covers.json file[/yellow]")
+                logger.debug(f"[yellow]Existing covers.json found but none match current release URL: {meta.release_url}[/yellow]")
+                logger.debug("[yellow]Deleting outdated covers.json file[/yellow]")
                 os.remove(reuploaded_images_path)
 
         except Exception as e:
             logger.error(f"[red]Error reading covers.json: {str(e)}[/red]")
             try:
                 os.remove(reuploaded_images_path)
-                if meta.debug:
-                    logger.debug("[yellow]Deleted potentially corrupted covers.json file[/yellow]")
+                logger.debug("[yellow]Deleted potentially corrupted covers.json file[/yellow]")
             except Exception as delete_error:
                 logger.error(f"[red]Failed to delete corrupted covers.json: {str(delete_error)}[/red]")
 
@@ -900,16 +861,15 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
     release_url = release['url']
     release_id = release.get('release_id', '0000000')
     debug_filename = f"{meta.base_dir}/tmp/{meta.uuid}/debug_release_{release_id}.html"
-    if meta.debug:
-        logger.debug(f"[yellow]Fetching details for: {release['title']} - {release_url}[/yellow]")
+    logger.debug(f"[yellow]Fetching details for: {release['title']} - {release_url}[/yellow]")
 
     response_text: str | None = None
 
     try:
         import os
+
         if os.path.exists(debug_filename):
-            if meta.debug:
-                logger.debug(f"[green]Found existing debug file for release ID {release_id}[/green]")
+            logger.debug(f"[green]Found existing debug file for release ID {release_id}[/green]")
             response_text = await asyncio.to_thread(Path(debug_filename).read_text, encoding="utf-8")
 
             if response_text and "No index" not in response_text:
@@ -921,8 +881,7 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
 
     # If we're here, we need to make a request
     delay = random.uniform(2, 4)  # nosec B311 - Rate limiting delay, not cryptographic
-    if meta.debug:
-        logger.debug(f"[dim]Waiting {delay:.2f} seconds before request...[/dim]")
+    logger.debug(f"[dim]Waiting {delay:.2f} seconds before request...[/dim]")
     await asyncio.sleep(delay)
 
     headers = {
@@ -934,7 +893,7 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
         "Referer": "https://www.blu-ray.com/movies/",
         "Sec-Fetch-Dest": "document",
         "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "same-origin"
+        "Sec-Fetch-Site": "same-origin",
     }
 
     max_retries = 2
@@ -943,8 +902,7 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
 
     while retry_count <= max_retries:
         try:
-            if meta.debug:
-                logger.debug(f"[yellow]Sending request to {release_url} (attempt {retry_count + 1}/{max_retries + 1})...[/yellow]")
+            logger.debug(f"[yellow]Sending request to {release_url} (attempt {retry_count + 1}/{max_retries + 1})...[/yellow]")
 
             async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
                 response = await client.get(release_url, headers=headers)
@@ -953,11 +911,10 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
                     response_text = response.text
 
                     try:
-                        release_id = release.get('release_id', '0000000')
+                        release_id = release.get("release_id", "0000000")
                         debug_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"debug_release_{release_id}.html"
                         await asyncio.to_thread(debug_path.write_text, response_text, encoding="utf-8")
-                        if meta.debug:
-                            logger.debug(f"[dim]Saved release page to debug_release_{release_id}.html[/dim]")
+                        logger.debug(f"[dim]Saved release page to debug_release_{release_id}.html[/dim]")
                     except Exception as e:
                         logger.info(f"[dim]Could not save debug file: {str(e)}[/dim]")
 
@@ -1004,7 +961,7 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
 
 
 def extract_section(specs_td: Any, section_title: str) -> str | None:
-    section_span: Any = specs_td.find('span', class_='subheading', string=section_title)
+    section_span: Any = specs_td.find("span", class_="subheading", string=section_title)
     if not section_span:
         return None
 
@@ -1013,7 +970,7 @@ def extract_section(specs_td: Any, section_title: str) -> str | None:
 
     while current_element:
         element = current_element
-        if getattr(element, "name", None) == 'span' and 'subheading' in cast(list[str], element.get('class', [])):
+        if getattr(element, "name", None) == "span" and "subheading" in cast(list[str], element.get("class", [])):
             break
 
         if isinstance(element, str):
@@ -1023,21 +980,19 @@ def extract_section(specs_td: Any, section_title: str) -> str | None:
 
         current_element = getattr(element, "next_sibling", None)
 
-    return ''.join(section_content)
+    return "".join(section_content)
 
 
 async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[Release]:
     if not releases:
         return []
 
-    if meta.debug:
-        logger.debug("")
-        logger.debug("Processing Local Details")
-        logger.debug("----------------------------")
+    logger.debug("")
+    logger.debug("Processing Local Details")
+    logger.debug("----------------------------")
 
     disc_count = len(meta.discs)
-    if meta.debug:
-        logger.debug(f"[dim]Local disc count from meta: {disc_count}")
+    logger.debug(f"[dim]Local disc count from meta: {disc_count}")
 
     meta_video_specs: dict[str, Any] = {}
     meta_audio_specs: list[dict[str, Any]] = []
@@ -1046,27 +1001,24 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
     if disc_count > 0 and "discs" in meta and meta.discs and "bdinfo" in meta.discs[0]:
         bdinfo = meta.discs[0]["bdinfo"]
 
-        if 'video' in bdinfo and bdinfo['video']:
-            meta_video_specs = bdinfo['video'][0]
-            codec = meta_video_specs.get('codec', '')
-            resolution = meta_video_specs.get('res', '')
-            if meta.debug:
-                logger.debug(f"[dim]Local video: {codec} {resolution}")
+        if "video" in bdinfo and bdinfo["video"]:
+            meta_video_specs = bdinfo["video"][0]
+            codec = meta_video_specs.get("codec", "")
+            resolution = meta_video_specs.get("res", "")
+            logger.debug(f"[dim]Local video: {codec} {resolution}")
 
-        if 'audio' in bdinfo and bdinfo['audio']:
-            meta_audio_specs = bdinfo['audio']
+        if "audio" in bdinfo and bdinfo["audio"]:
+            meta_audio_specs = bdinfo["audio"]
             for track in meta_audio_specs:
-                if meta.debug:
-                    logger.debug(f"[dim]Local audio: {track.get('language', '')} {track.get('codec', '')} {track.get('channels', '')} {track.get('bitrate', '')}")
+                logger.debug(f"[dim]Local audio: {track.get('language', '')} {track.get('codec', '')} {track.get('channels', '')} {track.get('bitrate', '')}")
 
         bd_summary_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt"
         filtered_languages: list[str] = []
         meta_subtitles = []  # Initialize here so it's clear we're creating it
 
         if os.path.exists(bd_summary_path):
-            if meta.debug:
-                logger.debug(f"[blue]Opening BD_SUMMARY file: {bd_summary_path}[/blue]")
-                logger.debug("[dim]Stripping extremely small subtitle tracks from bdinfo[/dim]")
+            logger.debug(f"[blue]Opening BD_SUMMARY file: {bd_summary_path}[/blue]")
+            logger.debug("[dim]Stripping extremely small subtitle tracks from bdinfo[/dim]")
             try:
                 summary_text = await asyncio.to_thread(Path(bd_summary_path).read_text, encoding="utf-8")
                 lines = summary_text.splitlines()
@@ -1091,15 +1043,12 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                             if bitrate >= 1.0:
                                 filtered_languages.append(language.lower())
                                 meta_subtitles.append(language)  # Add to meta_subtitles directly
-                                if meta.debug:
-                                    logger.debug(f"[green]✓ Keeping subtitle: {language} ({bitrate} kbps)[/green]")
+                                logger.debug(f"[green]✓ Keeping subtitle: {language} ({bitrate} kbps)[/green]")
                             else:
-                                if meta.debug:
-                                    logger.debug(f"[red]✗ Discarding subtitle due to size: {language} ({bitrate} kbps)[/red]")
+                                logger.debug(f"[red]✗ Discarding subtitle due to size: {language} ({bitrate} kbps)[/red]")
 
                 if meta_subtitles:
-                    if meta.debug:
-                        logger.debug(f"[blue]Added subtitle languages: {', '.join(meta_subtitles)}[/blue]")
+                    logger.debug(f"[blue]Added subtitle languages: {', '.join(meta_subtitles)}[/blue]")
                 else:
                     logger.info("[yellow]No valid subtitles found to add.[/yellow]")
 
@@ -1114,24 +1063,21 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
         detailed_release = await fetch_release_details(release, meta)
         detailed_releases.append(detailed_release)
 
-    if meta.debug:
-        logger.debug("")
-        cli_ui.info_section("Processing Complete")
+    logger.debug("")
+    cli_ui.info_section("Processing Complete")
     cli_ui.info(f"Successfully processed {len(detailed_releases)} releases")
 
     logs: list[tuple[Release, list[str]]] = []  # Initialize a list to store logs for each release
 
     def log_and_print(message: str, log_list: list[str]) -> None:
-        if meta.debug:
-            logger.debug(message)
+        logger.debug(message)
         log_list.append(message)
 
     if detailed_releases:
         scored_releases: list[tuple[float, Release]] = []
         for idx, release in enumerate(detailed_releases, 1):
             release_logs: list[str] = []
-            if meta.debug:
-                logger.debug(f"\n[bold blue]=== Release {idx}/{len(detailed_releases)}: {release['title']} ({release['country']}) ===[/bold blue]")
+            logger.debug(f"\n[bold blue]=== Release {idx}/{len(detailed_releases)}: {release['title']} ({release['country']}) ===[/bold blue]")
             log_and_print(f"[blue]Release URL: {release['url']}[/blue]", release_logs)
             score = 100.0
 

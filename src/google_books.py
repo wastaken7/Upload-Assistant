@@ -15,7 +15,7 @@ google_color_str = "[#4285f4]G[/#4285f4][#ea4335]o[/#ea4335][#fbbc05]o[/#fbbc05]
 
 
 class GoogleBooksManager:
-    def _parse_volume_info(self, data: dict[str, Any], isbn: str, debug: bool = False) -> dict[str, Any] | None:
+    def _parse_volume_info(self, data: dict[str, Any], isbn: str) -> dict[str, Any] | None:
         """
         Helper to parse raw Google Books API response data uniformly.
         """
@@ -98,7 +98,7 @@ class GoogleBooksManager:
         metadata["isbn"] = isbn
         return metadata
 
-    async def search_by_isbn(self, isbn: str, base_dir: str = "", api_key: str = "", debug: bool = False) -> dict[str, Any] | None:
+    async def search_by_isbn(self, isbn: str, base_dir: str = "", api_key: str = "") -> dict[str, Any] | None:
         """
         Search Google Books API by ISBN.
         Returns a dict of metadata or None if not found/error.
@@ -124,7 +124,7 @@ class GoogleBooksManager:
                                 if cached_data.get("totalItems", 0) == 0:
                                     logger.info(f"{google_color_str}: ISBN match not found (cached): {clean_isbn}")
                                     return None
-                                parsed_meta = self._parse_volume_info(cached_data, isbn, debug)
+                                parsed_meta = self._parse_volume_info(cached_data, isbn)
                                 if parsed_meta:
                                     logger.info(f"{google_color_str}: ISBN match found (cached): {clean_isbn}")
                                 else:
@@ -153,7 +153,7 @@ class GoogleBooksManager:
                     data = resp.json()
                     total_items = data.get("totalItems", 0)
                     if total_items > 0 and "items" in data:
-                        metadata = self._parse_volume_info(data, isbn, debug)
+                        metadata = self._parse_volume_info(data, isbn)
                         # Save full response to cache since response was successful
                         if cache_file:
                             try:

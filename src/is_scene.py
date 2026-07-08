@@ -74,15 +74,13 @@ class SceneManager:
                     try:
                         search_text = await asyncio.to_thread(Path(search_cache_file).read_text, encoding='utf-8')
                         response_json = json.loads(search_text)
-                        if meta.debug:
-                            logger.debug(f"[cyan]SRRDB: Using cached search for {base}")
+                        logger.debug(f"[cyan]SRRDB: Using cached search for {base}")
                     except Exception:
                         response_json = None
 
                 if response_json is None:
                     url = f"https://api.srrdb.com/v1/search/r:{quoted_base}"
-                    if meta.debug:
-                        logger.debug(f"Using SRRDB url: {url}")
+                    logger.debug(f"Using SRRDB url: {url}")
                     try:
                         response = await client.get(url, timeout=30.0)
                         if response.status_code == 200:
@@ -154,8 +152,7 @@ class SceneManager:
                                     await asyncio.to_thread(Path(nfo_file_path).write_bytes, nfo_response.content)
                                     meta.nfo = True
                                     meta.auto_nfo = True
-                                    if meta.debug:
-                                        logger.debug(f"[green]NFO downloaded to {nfo_file_path}")
+                                    logger.debug(f"[green]NFO downloaded to {nfo_file_path}")
                                 else:
                                     logger.info("[yellow]NFO file not available for download.")
                         except Exception as e:
@@ -173,8 +170,7 @@ class SceneManager:
                 if name and tag:
                     url = f"https://api.srrdb.com/v1/search/start:{name}/group:{tag}"
 
-                    if meta.debug:
-                        logger.debug(f"Using SRRDB url: {url}")
+                    logger.debug(f"Using SRRDB url: {url}")
 
                     try:
                         response = await client.get(url, timeout=10.0)
@@ -211,22 +207,19 @@ class SceneManager:
 
                             return release_name, True, imdb
                         else:
-                            if meta.debug:
-                                logger.debug("[yellow]SRRDB: No match found with lower/tag search")
+                            logger.debug("[yellow]SRRDB: No match found with lower/tag search")
                             return video, scene, imdb
 
                     except Exception as e:
                         logger.info(f"[yellow]SRRDB search failed: {e}")
                         return video, scene, imdb
                 else:
-                    if meta.debug:
-                        logger.debug("[yellow]SRRDB: Missing name or tag for lower/tag search")
+                    logger.debug("[yellow]SRRDB: Missing name or tag for lower/tag search")
                     return video, scene, imdb
 
         check_predb = bool(self.default_config.get('check_predb', False))
         if not scene and check_predb:
-            if meta.debug:
-                logger.debug("[yellow]SRRDB: No scene match found, checking predb")
+            logger.debug("[yellow]SRRDB: No scene match found, checking predb")
             scene = await self.predb_check(meta, video)
 
         if meta.debug:
@@ -237,8 +230,7 @@ class SceneManager:
 
     async def predb_check(self, meta: Meta, video: str) -> bool:
         url = f"https://predb.pw/search.php?search={urllib.parse.quote(os.path.basename(video))}"
-        if meta.debug:
-            logger.debug(f"Using predb url: {url}")
+        logger.debug(f"Using predb url: {url}")
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(url, timeout=10.0)
@@ -256,8 +248,7 @@ class SceneManager:
                             if not release_attr:
                                 continue
                             release_name = release_attr.lower()
-                            if meta.debug:
-                                logger.debug(f"[yellow]Predb: Checking {release_name} against {video_base}")
+                            logger.debug(f"[yellow]Predb: Checking {release_name} against {video_base}")
                             if release_name == video_base:
                                 found = True
                                 meta.scene_name = release_attr

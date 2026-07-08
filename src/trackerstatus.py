@@ -67,7 +67,6 @@ class TrackerStatusManager:
                         meta["imdb_info"] = await imdb_manager.get_imdb_info_api(
                             meta["imdb_id"],
                             manual_language=meta.get("manual_language"),
-                            debug=bool(meta.get("debug", False)),
                         )
                         break
                     else:

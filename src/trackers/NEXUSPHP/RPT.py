@@ -25,7 +25,7 @@ class RPT(NEXUSPHP):
         tv_series = 402
         tv_shows = 403
 
-        category = str(meta.category).upper()
+        category = (meta.category).upper()
         genres = ", ".join(meta.genres).lower()
         keywords = ", ".join(meta.keywords).lower()
 
@@ -67,7 +67,7 @@ class RPT(NEXUSPHP):
         uhd = 2
         web_dl = 4
 
-        is_disc = str(meta.is_disc).lower()
+        is_disc = (meta.is_disc).lower()
         mtype = str(meta.type).lower()
         resolution = meta.resolution.lower()
 
@@ -156,9 +156,9 @@ class RPT(NEXUSPHP):
         hdr = 7
         reposting_prohibited = 1
 
-        audio_tracks = meta.audio_languages
+        audio_tracks = meta.audio_languages or []
         mhdr = meta.hdr
-        subtitle_tracks = meta.subtitle_languages
+        subtitle_tracks = meta.subtitle_languages or []
 
         checkboxes = []
 

@@ -15,11 +15,10 @@ class BtnIdManager:
         return str(uuid.uuid4())
 
     @staticmethod
-    async def get_btn_torrents(btn_api: str, btn_id: str, meta: Meta) -> tuple[int, int]:
+    async def get_btn_torrents(btn_api: str, btn_id: str) -> tuple[int, int]:
         imdb_id = 0
         tvdb_id = 0
-        if meta.debug:
-            logger.debug("Fetching BTN data...", extra={"markup": False})
+        logger.debug("Fetching BTN data...", extra={"markup": False})
         post_query_url = "https://api.broadcasthe.net/"
         post_data = {
             "jsonrpc": "2.0",
@@ -61,12 +60,10 @@ class BtnIdManager:
                 logger.info("[yellow]Your current public IP isn't whitelisted for your BTN API key.[/yellow]")
             else:
                 logger.info(f"[red]BTN API error (code {code}): {message}[/red]")
-            if meta.debug:
-                logger.debug(data)
+            logger.debug(data)
             return 0, 0
 
-        if meta.debug:
-            logger.debug(f"[green]BTN data fetched successfully for BTN ID {data.get('id')}[/green]")
+        logger.debug(f"[green]BTN data fetched successfully for BTN ID {data.get('id')}[/green]")
 
         result = data.get('result')
         if isinstance(result, dict) and "torrents" in result:
@@ -78,8 +75,7 @@ class BtnIdManager:
 
                 if imdb_id or tvdb_id:
                     return int(imdb_id or 0), int(tvdb_id or 0)
-        if meta.debug:
-            logger.debug("[red]No IMDb or TVDb ID found.")
+        logger.debug("[red]No IMDb or TVDb ID found.")
         return 0, 0
 
     @staticmethod
@@ -95,8 +91,7 @@ class BtnIdManager:
     ) -> tuple[int, int]:
         imdb = 0
         tmdb = 0
-        if meta.debug:
-            logger.debug("Fetching BHD data...", extra={"markup": False})
+        logger.debug("Fetching BHD data...", extra={"markup": False})
         post_query_url = f"https://beyond-hd.me/api/torrents/{bhd_api}"
 
         post_data = {"action": "details", "torrent_id": torrent_id} if torrent_id is not None else {"action": "search", "rsskey": bhd_rss_key}
@@ -184,7 +179,9 @@ class BtnIdManager:
         tmdb = 0
         raw_tmdb_id = first_result.get("tmdb_id", "")
         if raw_tmdb_id and raw_tmdb_id != "0":
-            meta.category, parsed_tmdb_id = await BtnIdManager.parse_tmdb_id(raw_tmdb_id, meta.category)
+            parsed_cat, parsed_tmdb_id = await BtnIdManager.parse_tmdb_id(raw_tmdb_id, meta.category)
+            if parsed_cat is not None:
+                meta.category = parsed_cat
             tmdb = parsed_tmdb_id
 
         if skip_tracker_descriptions and not meta.keep_images:
@@ -196,7 +193,7 @@ class BtnIdManager:
             meta.framestor = True
         elif "flux" in name:
             meta.flux = True
-        description, imagelist = bbcode.clean_bhd_description(description, cast(dict[str, Any], meta))
+        description, imagelist = bbcode.clean_bhd_description(description, meta)
         if not skip_tracker_descriptions:
             meta.description = description
             meta.image_list = imagelist
@@ -231,8 +228,8 @@ async def generate_guid() -> str:
     return await BtnIdManager.generate_guid()
 
 
-async def get_btn_torrents(btn_api: str, btn_id: str, meta: Meta) -> tuple[int, int]:
-    return await BtnIdManager.get_btn_torrents(btn_api, btn_id, meta)
+async def get_btn_torrents(btn_api: str, btn_id: str) -> tuple[int, int]:
+    return await BtnIdManager.get_btn_torrents(btn_api, btn_id)
 
 
 async def get_bhd_torrents(

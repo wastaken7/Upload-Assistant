@@ -17,6 +17,8 @@ from src.console import logger
 
 if os.name == "posix":
     import termios
+else:
+    termios = None
 
 # Detect Android environment
 IS_ANDROID = ('android' in platform.platform().lower() or
@@ -214,7 +216,7 @@ class CleanupManager:
                     subprocess.run(["stty", "sane"], check=False)
                     if erase_key is not None:
                         subprocess.run(["stty", "erase", erase_key], check=False)  # explicitly restore backspace character to original value
-                    if hasattr(termios, 'tcflush'):
+                    if termios is not None and hasattr(termios, 'tcflush'):
                         tciflush = getattr(termios, 'TCIOFLUSH', None)
                         if tciflush is not None:
                             termios.tcflush(sys.stdin.fileno(), tciflush)

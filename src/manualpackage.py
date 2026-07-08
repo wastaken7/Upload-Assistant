@@ -103,8 +103,7 @@ class ManualPackageManager:
                 files = {"files[]": (f"{meta.title}.tar", tar_bytes)}
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = (await client.post("https://uguu.se/upload.php", files=files)).json()
-                if meta.debug:
-                    logger.debug(f"[cyan]{response}")
+                logger.debug(f"[cyan]{response}")
                 url = response['files'][0]['url']
             return url
         except Exception:

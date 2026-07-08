@@ -18,7 +18,6 @@ class TvmazeManager:
         tvdbID: int | str | None,
         manual_date: str | None = None,
         tvmaze_manual: int | str | None = None,
-        debug: bool = False,
         return_full_tuple: bool = False,
     ) -> int | tuple[int, int, int]:
         """Searches TVMaze for a show using TVDB ID, IMDb ID, or a title query.
@@ -240,8 +239,7 @@ class TvmazeManager:
                     manual_date = meta.manual_date
                     if isinstance(manual_date, str):
                         airdate = manual_date
-                    if meta.debug:
-                        logger.debug(f"[cyan]Using manual_date: {airdate}[/cyan]")
+                    logger.debug(f"[cyan]Using manual_date: {airdate}[/cyan]")
 
                 # Second priority: find airdate from tvdb_episode_data using tvdb_episode_id
                 elif meta and meta.tvdb_episode_id and meta.tvdb_episode_data:
@@ -262,8 +260,7 @@ class TvmazeManager:
                             ep_airdate = ep.get('aired')
                             if isinstance(ep_airdate, str):
                                 airdate = ep_airdate
-                                if meta.debug:
-                                    logger.debug(f"[cyan]Found airdate from TVDB episode data: {airdate}[/cyan]")
+                                logger.debug(f"[cyan]Found airdate from TVDB episode data: {airdate}[/cyan]")
                                 break
 
                     if not airdate and meta.debug:
@@ -271,12 +268,10 @@ class TvmazeManager:
 
                 # Try date-based lookup if we have an airdate
                 if isinstance(airdate, str) and airdate:
-                    if meta.debug:
-                        logger.debug(f"[cyan]Attempting TVMaze lookup by date: {airdate}[/cyan]")
+                    logger.debug(f"[cyan]Attempting TVMaze lookup by date: {airdate}[/cyan]")
                     return await self.get_tvmaze_episode_data_by_date(tvmaze_id, airdate)
                 else:
-                    if meta.debug:
-                        logger.debug("[yellow]No airdate available for fallback lookup[/yellow]")
+                    logger.debug("[yellow]No airdate available for fallback lookup[/yellow]")
                     return None
             else:
                 return None

@@ -33,6 +33,7 @@ def check_dependencies() -> None:
 
         has_packaging = True
     except ImportError:
+        Requirement = None
         has_packaging = False
         # If packaging is missing, we list it as missing since it's in requirements.txt
         missing_packages.append("  - packaging: not installed (required by Upload Assistant)")
@@ -66,13 +67,14 @@ def check_dependencies() -> None:
 
                 # If packaging is available, use it for parsing
                 try:
-                    req = Requirement(line)
-                    try:
-                        installed_version = importlib.metadata.version(req.name)
-                        if not req.specifier.contains(installed_version, prereleases=True):
-                            mismatched_versions.append(f"  - {req.name}: installed {installed_version}, required {req.specifier}")
-                    except importlib.metadata.PackageNotFoundError:
-                        missing_packages.append(f"  - {req.name}: not installed (required: {line})")
+                    if has_packaging and Requirement is not None:
+                        req = Requirement(line)
+                        try:
+                            installed_version = importlib.metadata.version(req.name)
+                            if not req.specifier.contains(installed_version, prereleases=True):
+                                mismatched_versions.append(f"  - {req.name}: installed {installed_version}, required {req.specifier}")
+                        except importlib.metadata.PackageNotFoundError:
+                            missing_packages.append(f"  - {req.name}: not installed (required: {line})")
                 except Exception:
                     # Ignore lines with parsing errors (e.g. custom URLs, local paths)
                     continue

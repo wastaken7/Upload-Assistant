@@ -253,16 +253,15 @@ class TTG:
                 return False
         return True
 
-    async def validate_cookies(self, meta: Meta, cookiefile: str) -> bool:
+    async def validate_cookies(self, meta: Meta, cookiefile: str) -> bool:  # noqa: ARG002
         url = "https://totheglory.im"
         if os.path.exists(cookiefile):
             raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
             cookies = {name: str(data.get('value', '')) for name, data in raw_cookies.items()}
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
                 resp = await client.get(url=url)
-                if meta.debug:
-                    logger.debug('[cyan]Cookies:')
-                    logger.debug(resp.url)
+                logger.debug("[cyan]Cookies:")
+                logger.debug(resp.url)
                 return resp.text.find('''<a href="/logout.php">Logout</a>''') != -1
         else:
             return False

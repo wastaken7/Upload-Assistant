@@ -48,8 +48,7 @@ class ApplyOverrides:
                     # Parse the entry's TMDB ID from the user-args.json file
                     entry_category, entry_normalized_id = await self.parse_tmdb_id(entry_tmdb_id)
                     if entry_category and entry_category != meta.category:
-                        if meta.debug:
-                            logger.debug(f"Skipping user entry because override category {entry_category} does not match UA category {meta.category}:")
+                        logger.debug(f"Skipping user entry because override category {entry_category} does not match UA category {meta.category}:")
                         continue
 
                     # Check if IDs match
@@ -138,8 +137,7 @@ class ApplyOverrides:
                         i += 1
                 i += 1
 
-            if meta.debug:
-                logger.debug(f"[Debug] Tracking changes for keys: {', '.join(arg_keys_to_track)}")
+            logger.debug(f"[Debug] Tracking changes for keys: {', '.join(arg_keys_to_track)}")
 
             # Create a new Args instance and process the arguments
             arg_processor = Args(self.config)
@@ -174,8 +172,7 @@ class ApplyOverrides:
                         for related_key in id_mappings[key]:
                             meta[related_key] = value
                             modified_keys.append(related_key)
-                            if meta.debug:
-                                logger.debug(f"[Debug] Override: {related_key} changed from {meta.get(related_key)} to {value}")
+                            logger.debug(f"[Debug] Override: {related_key} changed from {meta.get(related_key)} to {value}")
                 # Handle regular fields
                 elif key in updated_meta and key in meta:
                     # Skip path to preserve original
@@ -188,14 +185,12 @@ class ApplyOverrides:
                     if new_value != old_value:
                         meta[key] = new_value
                         modified_keys.append(key)
-                        if meta.debug:
-                            logger.debug(f"[Debug] Override: {key} changed from {old_value} to {new_value}")
+                        logger.debug(f"[Debug] Override: {key} changed from {old_value} to {new_value}")
             if meta.debug and modified_keys:
                 logger.info(f"[Debug] Applied overrides for: {', '.join(modified_keys)}")
 
         except Exception as e:
             logger.error(f"[red]Error processing arguments: {e}")
-            if meta.debug:
-                logger.debug(traceback.format_exc())
+            logger.debug(traceback.format_exc())
 
         return meta

@@ -1,3 +1,4 @@
+import asyncio
 import gettext
 import os
 import re
@@ -1082,7 +1083,8 @@ class MKO:
         logger.info(f"[cyan]{self.tracker}:[/cyan] [yellow]Any subtitles?[/yellow]")
         for k, v in options.items():
             logger.info(f"  {k}) {v}")
-        return options.get(input("Choose: ").strip(), "")
+        selection = (await asyncio.to_thread(input, "Choose: ")).strip()
+        return options.get(selection, "")
 
     async def generate_description(self, meta: Meta) -> str:
         """

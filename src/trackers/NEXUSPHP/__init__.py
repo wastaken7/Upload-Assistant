@@ -370,7 +370,7 @@ class NEXUSPHP:
     async def get_data(self, meta: Meta):
         await self.load_localized_data(meta)
         builder = DescriptionBuilder(self.tracker, self.config)
-        data = {
+        data: dict[str, Any] = {
             "codec_sel[4]": self.get_codec(meta),
             "color": 0,
             "descr": await self.get_description(meta),

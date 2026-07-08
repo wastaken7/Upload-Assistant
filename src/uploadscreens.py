@@ -150,46 +150,44 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     raw_url = response_data['data']['image']['url']
                     web_url = response_data['data']['url_viewer']
 
-                    if meta.debug:
-                        logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+                    logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
-                    return {'status': 'success', 'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
+                    return {"status": "success", "img_url": img_url, "raw_url": raw_url, "web_url": web_url}
 
             except httpx.TimeoutException:
                 logger.info("[red]Request timed out. The server took too long to respond.")
-                return {'status': 'failed', 'reason': 'Request timed out'}
+                return {"status": "failed", "reason": "Request timed out"}
 
             except ValueError as e:  # JSON decoding error
                 logger.info(f"[red]Invalid JSON response: {e}")
-                return {'status': 'failed', 'reason': 'Invalid JSON response'}
+                return {"status": "failed", "reason": "Invalid JSON response"}
 
             except httpx.RequestError as e:
                 logger.info(f"[red]Request failed with error: {e}")
-                return {'status': 'failed', 'reason': str(e)}
+                return {"status": "failed", "reason": str(e)}
 
         elif img_host == "dalexni":
             url = "https://dalexni.com/1/upload"
             try:
                 async with aiofiles.open(image, "rb") as img_file:
-                    encoded_image = base64.b64encode(await img_file.read()).decode('utf8')
+                    encoded_image = base64.b64encode(await img_file.read()).decode("utf8")
 
                 data = {
-                    'key': config['DEFAULT']['dalexni_api'],
-                    'image': encoded_image,
+                    "key": config["DEFAULT"]["dalexni_api"],
+                    "image": encoded_image,
                 }
                 async with httpx.AsyncClient() as client:
                     response = await client.post(url, data=data, timeout=timeout)
                     response_data = response.json()
-                    if response.status_code != 200 or not response_data.get('success'):
+                    if response.status_code != 200 or not response_data.get("success"):
                         logger.info("[yellow]DALEXNI failed, trying next image host")
-                        return {'status': 'failed', 'reason': 'DALEXNI upload failed'}
+                        return {"status": "failed", "reason": "DALEXNI upload failed"}
 
-                    img_url = response_data['data'].get('medium', {}).get('url') or response_data['data']['thumb']['url']
-                    raw_url = response_data['data']['image']['url']
-                    web_url = response_data['data']['url_viewer']
+                    img_url = response_data["data"].get("medium", {}).get("url") or response_data["data"]["thumb"]["url"]
+                    raw_url = response_data["data"]["image"]["url"]
+                    web_url = response_data["data"]["url_viewer"]
 
-                    if meta.debug:
-                        logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+                    logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
                     return {'status': 'success', 'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
 
@@ -228,30 +226,27 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     raw_url = response_data['image']['url']
                     web_url = response_data['image']['url_viewer']
 
-                    if meta.debug:
-                        logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+                    logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
             except httpx.TimeoutException:
                 logger.info("[red]Request timed out. The server took too long to respond.")
-                return {'status': 'failed', 'reason': 'Request timed out'}
+                return {"status": "failed", "reason": "Request timed out"}
             except httpx.RequestError as e:
                 logger.info(f"[red]Request failed with error: {e}")
-                return {'status': 'failed', 'reason': str(e)}
+                return {"status": "failed", "reason": str(e)}
             except ValueError as e:
                 logger.info(f"[red]Invalid JSON response from ptscreens: {e}")
-                return {'status': 'failed', 'reason': 'Invalid JSON response'}
+                return {"status": "failed", "reason": "Invalid JSON response"}
 
         elif img_host == "utppm":
             url = "https://utp.pm/api/1/upload"
             try:
                 async with aiofiles.open(image, "rb") as img_file:
-                    encoded_image = base64.b64encode(await img_file.read()).decode('utf8')
+                    encoded_image = base64.b64encode(await img_file.read()).decode("utf8")
 
-                data = {
-                    'source': encoded_image
-                }
+                data = {"source": encoded_image}
                 headers = {
-                    'X-API-Key': config['DEFAULT']['utppm_api'],
+                    "X-API-Key": config["DEFAULT"]["utppm_api"],
                 }
 
                 async with httpx.AsyncClient() as client:
@@ -260,14 +255,13 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
 
                     if response.status_code != 200:
                         logger.info("[yellow]utppm failed, trying next image host")
-                        return {'status': 'failed', 'reason': 'utppm upload failed'}
+                        return {"status": "failed", "reason": "utppm upload failed"}
 
-                    img_url = response_data['image']['medium']['url']
-                    raw_url = response_data['image']['url']
-                    web_url = response_data['image']['url_viewer']
+                    img_url = response_data["image"]["medium"]["url"]
+                    raw_url = response_data["image"]["url"]
+                    web_url = response_data["image"]["url_viewer"]
 
-                    if meta.debug:
-                        logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+                    logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
             except httpx.TimeoutException:
                 logger.info("[red]Request timed out. The server took too long to respond.")
@@ -304,50 +298,43 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     raw_url = response_data['data']['image']['url']
                     web_url = response_data['data']['url_viewer']
 
-                    if meta.debug:
-                        logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+                    logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
             except httpx.TimeoutException:
                 logger.info("[red]Request timed out. The server took too long to respond.")
-                return {'status': 'failed', 'reason': 'Request timed out'}
+                return {"status": "failed", "reason": "Request timed out"}
             except httpx.RequestError as e:
                 logger.info(f"[red]Request failed with error: {e}")
-                return {'status': 'failed', 'reason': str(e)}
+                return {"status": "failed", "reason": str(e)}
             except ValueError as e:
                 logger.info(f"[red]Invalid JSON response from OnlyImage: {e}")
-                return {'status': 'failed', 'reason': 'Invalid JSON response'}
+                return {"status": "failed", "reason": "Invalid JSON response"}
 
         elif img_host == "pixhost":
             url = "https://api.pixhost.to/images"
             try:
-                data = {
-                    'content_type': '0',
-                    'max_th_size': 350
-                }
+                data = {"content_type": "0", "max_th_size": 350}
 
-                async with httpx.AsyncClient() as client, aiofiles.open(image, 'rb') as file:
-                    files = {
-                        'img': ('file-upload[0]', await file.read())
-                    }
+                async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as file:
+                    files = {"img": ("file-upload[0]", await file.read())}
 
                     response = await client.post(url, data=data, files=files, timeout=timeout)
 
                     if response.status_code != 200:
                         logger.info(f"[yellow]pixhost failed with status code {response.status_code}, trying next image host")
-                        return {'status': 'failed', 'reason': f'pixhost upload failed with status code {response.status_code}'}
+                        return {"status": "failed", "reason": f"pixhost upload failed with status code {response.status_code}"}
 
                     try:
                         response_data = response.json()
-                        if 'th_url' not in response_data:
+                        if "th_url" not in response_data:
                             logger.info("[yellow]pixhost failed: Invalid response format")
-                            return {'status': 'failed', 'reason': 'Invalid response from pixhost'}
+                            return {"status": "failed", "reason": "Invalid response from pixhost"}
 
-                        raw_url = response_data['th_url'].replace('https://t', 'https://img').replace('/thumbs/', '/images/')
-                        img_url = response_data['th_url']
-                        web_url = response_data['show_url']
+                        raw_url = response_data["th_url"].replace("https://t", "https://img").replace("/thumbs/", "/images/")
+                        img_url = response_data["th_url"]
+                        web_url = response_data["show_url"]
 
-                        if meta.debug:
-                            logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+                        logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
                     except ValueError as e:
                         logger.info(f"[red]Invalid JSON response from pixhost: {e}")
@@ -523,68 +510,66 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                         elif 'thumb' in file_data.get('variants', {}):
                             img_url = file_data['variants']['thumb']
 
-                        if meta.debug:
-                            logger.debug(f"[green]Seedpool CDN upload successful: {file_data['cdn_id']}")
-                            logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
+                        logger.debug(f"[green]Seedpool CDN upload successful: {file_data['cdn_id']}")
+                        logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
-                        return {'status': 'success', 'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url}
+                        return {"status": "success", "img_url": img_url, "raw_url": raw_url, "web_url": web_url}
                     else:
                         logger.info("[yellow]Seedpool CDN returned empty files array")
-                        return {'status': 'failed', 'reason': 'No files in Seedpool CDN response'}
+                        return {"status": "failed", "reason": "No files in Seedpool CDN response"}
 
             except httpx.TimeoutException:
                 logger.info("[red]Request to Seedpool CDN timed out.")
-                return {'status': 'failed', 'reason': 'Request timed out'}
+                return {"status": "failed", "reason": "Request timed out"}
             except httpx.RequestError as e:
                 logger.info(f"[red]Seedpool CDN request failed: {e}")
-                return {'status': 'failed', 'reason': str(e)}
+                return {"status": "failed", "reason": str(e)}
             except ValueError as e:
                 logger.info(f"[red]Invalid JSON response from Seedpool CDN: {e}")
-                return {'status': 'failed', 'reason': 'Invalid JSON response'}
+                return {"status": "failed", "reason": "Invalid JSON response"}
             except Exception as e:
                 logger.error(f"[red]Unexpected error with Seedpool CDN: {e}")
-                return {'status': 'failed', 'reason': f'Unexpected error: {str(e)}'}
+                return {"status": "failed", "reason": f"Unexpected error: {str(e)}"}
 
         elif img_host == "sharex":
             # Generic "ShareX-style" image host (IMageHosting and similar).
-            url = config['DEFAULT'].get('sharex_url', 'https://img.digitalcore.club/api/upload')
-            api_key = config['DEFAULT'].get('sharex_api_key')
+            url = config["DEFAULT"].get("sharex_url", "https://img.digitalcore.club/api/upload")
+            api_key = config["DEFAULT"].get("sharex_api_key")
 
             if not api_key:
                 logger.info("[red]ShareX image host token not found in config (sharex_api_key).[/red]")
-                return {'status': 'failed', 'reason': 'Missing ShareX image host token'}
+                return {"status": "failed", "reason": "Missing ShareX image host token"}
 
             try:
-                headers = {'Authorization': f'{api_key}'}
-                data = {'title': 'Upload-Assistant screenshot'}
+                headers = {"Authorization": f"{api_key}"}
+                data = {"title": "Upload-Assistant screenshot"}
 
-                async with httpx.AsyncClient() as client, aiofiles.open(image, 'rb') as img_file:
-                    files = {'file': (os.path.basename(image), await img_file.read())}
+                async with httpx.AsyncClient() as client, aiofiles.open(image, "rb") as img_file:
+                    files = {"file": (os.path.basename(image), await img_file.read())}
                     response = await client.post(url, headers=headers, data=data, files=files, timeout=timeout)
 
-                    content_type = response.headers.get('Content-Type', '')
-                    if 'application/json' in content_type:
+                    content_type = response.headers.get("Content-Type", "")
+                    if "application/json" in content_type:
                         response_data = response.json()
                     else:
                         logger.info(f"[red]ShareX image host did not return JSON. Status: {response.status_code}, Response: {response.text[:200]}[/red]")
-                        return {'status': 'failed', 'reason': f'Non-JSON response from sharex image host: {response.status_code}'}
+                        return {"status": "failed", "reason": f"Non-JSON response from sharex image host: {response.status_code}"}
 
                     if response.status_code not in (200, 201):
-                        message = response_data.get('message') or response_data.get('error') or response.text[:200]
+                        message = response_data.get("message") or response_data.get("error") or response.text[:200]
                         logger.info(f"[yellow]ShareX image host upload failed ({response.status_code}): {message}[/yellow]")
-                        return {'status': 'failed', 'reason': f'sharex upload failed: {message}'}
+                        return {"status": "failed", "reason": f"sharex upload failed: {message}"}
 
-                    link = response_data.get('data', {}).get('link') or response_data.get('link')
+                    link = response_data.get("data", {}).get("link") or response_data.get("link")
                     if not link:
                         logger.info(f"[yellow]ShareX image host response missing link: {response_data}[/yellow]")
-                        return {'status': 'failed', 'reason': 'No link in sharex response'}
+                        return {"status": "failed", "reason": "No link in sharex response"}
 
                     img_url = link
                     raw_url = link
                     web_url = link
 
-                    if meta.debug:
-                        logger.debug(f"[green]ShareX image host upload successful: {link}[/green]")
+                    logger.debug(f"[green]ShareX image host upload successful: {link}[/green]")
 
                     return {'status': 'success', 'img_url': img_url, 'raw_url': raw_url, 'web_url': web_url, 'local_file_path': image}
 
@@ -635,8 +620,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     raw_url = img_url
                     web_url = img_url
 
-                    if meta.debug:
-                        logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}[/green]")
+                    logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}[/green]")
 
                     return {"status": "success", "img_url": img_url, "raw_url": raw_url, "web_url": web_url, "local_file_path": image}
 
@@ -654,24 +638,12 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 return {"status": "failed", "reason": f"Unexpected error: {str(e)}"}
 
         if img_url and raw_url and web_url:
-            return {
-                'status': 'success',
-                'img_url': img_url,
-                'raw_url': raw_url,
-                'web_url': web_url,
-                'local_file_path': image
-            }
+            return {"status": "success", "img_url": img_url, "raw_url": raw_url, "web_url": web_url, "local_file_path": image}
         else:
-            return {
-                'status': 'failed',
-                'reason': f"Failed to upload image to {img_host}. No URLs received."
-            }
+            return {"status": "failed", "reason": f"Failed to upload image to {img_host}. No URLs received."}
 
     except Exception as e:
-        return {
-            'status': 'failed',
-            'reason': str(e)
-        }
+        return {"status": "failed", "reason": str(e)}
 
 
 async def _upload_screens(
@@ -685,10 +657,10 @@ async def _upload_screens(
     return_dict: dict[str, Any],
     retry_mode: bool = False,
     max_retries: int = 3,
-    allowed_hosts: list[str] | None = None
+    allowed_hosts: list[str] | None = None,
 ) -> tuple[list[ImageDict], int]:
-    default_config = config.get('DEFAULT', {})
-    if 'image_list' not in meta:
+    default_config = config.get("DEFAULT", {})
+    if "image_list" not in meta:
         meta.image_list = []
     upload_start_time: float | None = None
     if meta.debug:
@@ -696,7 +668,7 @@ async def _upload_screens(
 
     os.chdir(f"{meta.base_dir}/tmp/{meta.uuid}")
 
-    initial_img_host = default_config[f'img_host_{img_host_num}']
+    initial_img_host = default_config[f"img_host_{img_host_num}"]
     img_host = meta.imghost
 
     image_list = meta.image_list
@@ -712,7 +684,7 @@ async def _upload_screens(
         # Find the first approved host from config
         approved_host = None
         for i in range(1, 10):  # Check img_host_1 through img_host_9
-            host_key = f'img_host_{i}'
+            host_key = f"img_host_{i}"
             if host_key in default_config:
                 host = default_config[host_key]
                 if host in allowed_hosts:
@@ -727,11 +699,10 @@ async def _upload_screens(
             logger.info(f"[red]No approved image hosts found in config. Available: {allowed_hosts}[/red]")
             return image_list, len(image_list)
 
-    if meta.debug:
-        logger.debug(f"[blue]Using image host: {img_host} (configured: {initial_img_host})[/blue]")
+    logger.debug(f"[blue]Using image host: {img_host} (configured: {initial_img_host})[/blue]")
     using_custom_img_list = bool(custom_img_list)
 
-    if 'image_sizes' not in meta:
+    if "image_sizes" not in meta:
         meta.image_sizes = {}
 
     # Handle image selection
@@ -763,20 +734,18 @@ async def _upload_screens(
         # Sort images by numeric suffix
         def extract_numeric_suffix(filename: str) -> float:
             match = re.search(r"-(\d+)\.png$", filename)
-            return int(match.group(1)) if match else float('inf')
+            return int(match.group(1)) if match else float("inf")
 
         image_glob.sort(key=extract_numeric_suffix)
 
-        if meta.debug:
-            logger.debug(f"image globs (sorted): {image_glob}")
+        logger.debug(f"image globs (sorted): {image_glob}")
 
         existing_images = [img for img in image_list if img.get('img_url') and img.get('web_url')]
         existing_count = len(existing_images)
 
     # Determine images needed
     images_needed = total_screens - existing_count if not retry_mode else total_screens
-    if meta.debug:
-        logger.debug(f"[blue]Existing images: {existing_count}, Images needed: {images_needed}, Total screens: {total_screens}[/blue]")
+    logger.debug(f"[blue]Existing images: {existing_count}, Images needed: {images_needed}, Total screens: {total_screens}[/blue]")
 
     if existing_count >= total_screens and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
         logger.debug(f"[yellow]Skipping upload: {existing_count} existing, {total_screens} required.")
@@ -875,15 +844,13 @@ async def _upload_screens(
         except Exception as e:
             logger.error(f"[red]Error during uploads: {str(e)}[/red]")
 
-        successfully_uploaded = [(index, result) for index, result in results if result['status'] == 'success']
-        if meta.debug:
-            logger.debug(f"[blue]Successfully uploaded {len(successfully_uploaded)} out of {len(upload_tasks)} attempted uploads.[/blue]")
+        successfully_uploaded = [(index, result) for index, result in results if result["status"] == "success"]
+        logger.debug(f"[blue]Successfully uploaded {len(successfully_uploaded)} out of {len(upload_tasks)} attempted uploads.[/blue]")
 
         # Ensure we only switch hosts if necessary
-        if meta.debug:
-            logger.debug(f"[blue]Double checking current image host: {img_host}, Initial image host: {initial_img_host}[/blue]")
-            logger.debug(f"[blue]retry_mode: {retry_mode}, using_custom_img_list: {using_custom_img_list}[/blue]")
-            logger.debug(f"[blue]successfully_uploaded={len(successfully_uploaded)}, meta.image_list={len(image_list)}, cutoff={meta.cutoff}[/blue]")
+        logger.debug(f"[blue]Double checking current image host: {img_host}, Initial image host: {initial_img_host}[/blue]")
+        logger.debug(f"[blue]retry_mode: {retry_mode}, using_custom_img_list: {using_custom_img_list}[/blue]")
+        logger.debug(f"[blue]successfully_uploaded={len(successfully_uploaded)}, meta.image_list={len(image_list)}, cutoff={meta.cutoff}[/blue]")
         if len(successfully_uploaded) < len(upload_tasks) and not retry_mode and img_host == initial_img_host:
             img_host_num += 1
             next_host_key = f'img_host_{img_host_num}'
@@ -907,9 +874,8 @@ async def _upload_screens(
                 'web_url': upload['web_url']
             }
             new_images.append(new_image)
-            if not using_custom_img_list and raw_url not in {img['raw_url'] for img in image_list}:
-                if meta.debug:
-                    logger.debug(f"[blue]Adding {raw_url} to image_list")
+            if not using_custom_img_list and raw_url not in {img["raw_url"] for img in image_list}:
+                logger.debug(f"[blue]Adding {raw_url} to image_list")
                 image_list.append(new_image)
                 local_file_path = upload.get('local_file_path')
                 if local_file_path:

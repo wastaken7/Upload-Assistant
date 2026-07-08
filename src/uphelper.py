@@ -166,8 +166,7 @@ class UploadHelper:
         upload: bool = False
         meta.were_trumping = False
         if not dupes_list:
-            if meta.debug:
-                logger.debug(f"[green]No dupes found at[/green] [yellow]{tracker_name}[/yellow]")
+            logger.debug(f"[green]No dupes found at[/green] [yellow]{tracker_name}[/yellow]")
             return False,  meta
         else:
             tracker_class_factory = cast(Callable[..., Any], self.tracker_class_map[tracker_name])
@@ -245,8 +244,7 @@ class UploadHelper:
                                     meta.trump_reason = "exact_match"
                                 else:
                                     meta.trump_reason = "trumpable_release"
-                                if meta.debug:
-                                    logger.debug(f"[bold green]Trump reason: {meta.trump_reason} on {tracker_name}[/bold green]")
+                                logger.debug(f"[bold green]Trump reason: {meta.trump_reason} on {tracker_name}[/bold green]")
                             else:
                                 # For season packs: individual episodes are only in dupes for trumping purposes.
                                 # If user declines to trump, filter them out so they aren't shown as "potential dupes"
@@ -332,8 +330,7 @@ class UploadHelper:
             display_name = display_name
 
             if tracker_name in ["BHD"]:
-                if meta.debug:
-                    logger.debug("[yellow]BHD cross seeding check[/yellow]")
+                logger.debug("[yellow]BHD cross seeding check[/yellow]")
                 tracker_download_link = meta.get(f'{tracker_name}_matched_download')
                 # Ensure display_name is a string before using 'in' operator
                 if display_name:
@@ -349,35 +346,29 @@ class UploadHelper:
                         similarity = SequenceMatcher(None, entry_name, display_name.lower().strip()).ratio()
                         if similarity > 0.9 and meta.size_match and tracker_download_link:
                             meta[f'{tracker_name}_cross_seed'] = tracker_download_link
-                            if meta.debug:
-                                logger.debug(f"[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]")
+                            logger.debug(f"[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]")
                             break
 
             elif meta.filename_match and meta.file_count_match:
-                if meta.debug:
-                    logger.debug(f"[yellow]{tracker_name} filename and file count cross seeding check[/yellow]")
+                logger.debug(f"[yellow]{tracker_name} filename and file count cross seeding check[/yellow]")
                 tracker_download_link = meta.get(f'{tracker_name}_matched_download')
                 for d in dupes_list:
                     if isinstance(d, dict) and tracker_download_link:
-                        meta[f'{tracker_name}_cross_seed'] = tracker_download_link
-                        if meta.debug:
-                            logger.debug(f"[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]")
+                        meta[f"{tracker_name}_cross_seed"] = tracker_download_link
+                        logger.debug(f"[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]")
                         break
 
             elif meta.size_match:
-                if meta.debug:
-                    logger.debug(f"[yellow]{tracker_name} size cross seeding check[/yellow]")
+                logger.debug(f"[yellow]{tracker_name} size cross seeding check[/yellow]")
                 tracker_download_link = meta.get(f'{tracker_name}_matched_download')
                 for d in dupes_list:
                     if isinstance(d, dict):
                         entry_name = str(d.get('name', '')).lower()
                         similarity = SequenceMatcher(None, entry_name, display_name.lower().strip()).ratio()
-                        if meta.debug:
-                            logger.debug(f"[debug] Comparing sizes with similarity {similarity:.4f}")
+                        logger.debug(f"[debug] Comparing sizes with similarity {similarity:.4f}")
                         if similarity > 0.9 and tracker_download_link:
                             meta[f'{tracker_name}_cross_seed'] = tracker_download_link
-                            if meta.debug:
-                                logger.debug(f"[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]")
+                            logger.debug(f"[bold red]Cross-seed link saved for {tracker_name}: {Redaction.redact_private_info(tracker_download_link)}.[/bold red]")
                             break
 
             if upload is False:

@@ -49,5 +49,6 @@ exclude = ["data"]
 disable-search-path-heuristics = true
 search-path = ["."]
 project-excludes = [
-    "**/__pyrefly_virtual__/**"
+    "**/__pyrefly_virtual__/**",
+    "**/tmp/**"
 ]

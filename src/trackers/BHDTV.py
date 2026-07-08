@@ -43,10 +43,10 @@ class BHDTV:
         if meta.category == "MOVIE":
             sub_cat_id = await self.get_type_movie_id(meta)
         elif meta.category == "TV" and not meta.tv_pack:
-            sub_cat_id = await self.get_type_tv_id(meta.type)
+            sub_cat_id = await self.get_type_tv_id(meta.type or "")
         else:
             # must be TV pack
-            sub_cat_id = await self.get_type_tv_pack_id(meta.type)
+            sub_cat_id = await self.get_type_tv_pack_id(meta.type or "")
 
         resolution_id = await self.get_res_id(meta.resolution)
         # region_id = await common.unit3d_region_ids(meta.region)
@@ -66,7 +66,7 @@ class BHDTV:
         media_info = ""
         if meta.is_disc != "BDMV":
             filelist = cast(list[str], meta.filelist or [])
-            video = filelist[0] if filelist else str(meta.path or "")
+            video = filelist[0] if filelist else (meta.path or "")
             mi_template = os.path.abspath(f"{meta.base_dir}/data/templates/MEDIAINFO.txt")
             if os.path.exists(mi_template):
                 media_info = MediaInfo.parse(video, output="STRING", full=False,

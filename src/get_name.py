@@ -10,7 +10,7 @@ import cli_ui
 import guessit
 
 from src.cleanup import cleanup_manager
-from src.console import console, logger
+from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
@@ -105,11 +105,11 @@ class NameManager:
         if meta.no_aka is True:
             alt_title = ''
         if meta.debug:
-            console.log("[cyan]get_name cat/type")
-            console.log(f"CATEGORY: {meta.category}")
-            console.log(f"TYPE: {meta.type}")
-            console.log("[cyan]get_name meta:")
-            # console.log(meta)
+            logger.debug("[cyan]get_name cat/type")
+            logger.debug(f"CATEGORY: {meta.category}")
+            logger.debug(f"TYPE: {meta.type}")
+            logger.debug("[cyan]get_name meta:")
+            # logger.debug(meta)
 
         # YAY NAMING FUN
         name = ""
@@ -299,7 +299,7 @@ class NameManager:
         repack = meta.repack or "".strip().upper()
 
         #  language / MULTI tag
-        languages: dict[str, Any] = meta.languages or {}
+        languages: dict[str, Any] | list[Any] = meta.languages or {}
         lang_names: list[str] = [k for k in languages if k]
         lang_count = len(lang_names)
 
@@ -411,8 +411,7 @@ class NameManager:
                 return title, None, year
 
         folder_name = os.path.basename(meta.uuid) if meta.uuid else ""
-        if meta.debug:
-            logger.debug(f"[cyan]Extracting title and year from folder name: {folder_name}[/cyan]")
+        logger.debug(f"[cyan]Extracting title and year from folder name: {folder_name}[/cyan]")
         # lets do some subsplease handling
         if 'subsplease' in folder_name.lower():
             guess_data = guessit_fn(folder_name, {"excludes": ["country", "language"]})
@@ -440,8 +439,7 @@ class NameManager:
             first_year = years[0]
             second_year = years[1]
 
-            if meta.debug:
-                logger.debug(f"[cyan]Found double year pattern: {full_match}, using {second_year} as year[/cyan]")
+            logger.debug(f"[cyan]Found double year pattern: {full_match}, using {second_year} as year[/cyan]")
 
             modified_folder_name = folder_name.replace(full_match, first_year)
             year_match = None

@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
 import platform
 from typing import Any, cast
 
@@ -79,7 +80,7 @@ class PTS:
         )
 
         if not mandarin:
-            user_input = input("Warning: Mandarin subtitle or audio not found. Do you want to continue with the upload anyway? (y/n): ")
+            user_input = await asyncio.to_thread(input, "Warning: Mandarin subtitle or audio not found. Do you want to continue with the upload anyway? (y/n): ")
             if user_input.lower() not in ['y', 'yes']:
                 logger.info("Upload cancelled by user.", extra={"markup": False})
                 return False

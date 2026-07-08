@@ -142,7 +142,7 @@ class VideoManager:
             video_codec = f"MPEG-{mi_dict['media']['track'][1].get('Format_Version')}"
         return video_encode, video_codec, has_encode_settings, bit_depth
 
-    async def get_video(self, videoloc: str, mode: str, sorted_filelist: bool = False, debug: bool = False) -> tuple[str, list[str]]:
+    async def get_video(self, videoloc: str, mode: str, sorted_filelist: bool = False) -> tuple[str, list[str]]:
         filelist: list[str] = []
         videoloc = os.path.abspath(videoloc)
         logger.debug(f"[blue]Video location: [yellow]{videoloc}[/yellow][/blue]")
@@ -326,7 +326,7 @@ class VideoManager:
 
     async def get_type(self, video: str, _scene: bool, is_disc: str, meta: Meta) -> str:
         if meta.manual_type:
-            type = cast(str, meta.manual_type)
+            type = meta.manual_type
         else:
             filename = os.path.basename(video).lower()
             if "remux" in filename:
@@ -373,12 +373,10 @@ class VideoManager:
                     formatted_duration = int(media_duration_seconds // 60)
                     return formatted_duration
                 except ValueError:
-                    if meta.debug:
-                        logger.debug(f"[red]Invalid duration value: {general_track['Duration']}[/red]")
+                    logger.debug(f"[red]Invalid duration value: {general_track['Duration']}[/red]")
                     return None
             else:
-                if meta.debug:
-                    logger.debug("[red]No valid duration found in MediaInfo General track[/red]")
+                logger.debug("[red]No valid duration found in MediaInfo General track[/red]")
                 return None
         else:
             length = meta.bdinfo.get("length", "")
@@ -387,12 +385,10 @@ class VideoManager:
                     hours, minutes, seconds = length.split(":")
                     return int(hours) * 60 + int(minutes)
                 except ValueError:
-                    if meta.debug:
-                        logger.debug(f"[red]Invalid duration value: {length}[/red]")
+                    logger.debug(f"[red]Invalid duration value: {length}[/red]")
                     return None
             else:
-                if meta.debug:
-                    logger.debug("[red]No valid duration found in BDInfo[/red]")
+                logger.debug("[red]No valid duration found in BDInfo[/red]")
                 return None
 
     async def get_container(self, meta: Meta) -> str:

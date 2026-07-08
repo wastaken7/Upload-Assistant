@@ -50,7 +50,7 @@ class TrackerDataManager:
             logger.warning(f"[yellow]Warning: Could not load tracker timestamps: {e}[/yellow]")
             return {}
 
-    async def save_tracker_timestamp(self, tracker_name: str, base_dir: str | None = None, debug: bool = False) -> None:
+    async def save_tracker_timestamp(self, tracker_name: str, base_dir: str | None = None) -> None:
         """Save timestamp for when tracker was processed"""
         timestamp_file = os.path.join(f"{base_dir}", "data", "banned", "tracker_timestamps.json")
         try:
@@ -143,8 +143,7 @@ class TrackerDataManager:
                     announce_url = tracker_config.get('announce_url', '')
 
                     if not tracker_config:
-                        if meta.debug:
-                            logger.debug(f"[yellow]Tracker {tracker} not found in config, skipping[/yellow]")
+                        logger.debug(f"[yellow]Tracker {tracker} not found in config, skipping[/yellow]")
                         continue
 
                     # Accept tracker if it has either a valid api_key or announce_url
@@ -152,16 +151,14 @@ class TrackerDataManager:
                     has_announce_url = announce_url and announce_url.strip() != ''
 
                     if not has_api_key and not has_announce_url:
-                        if meta.debug:
-                            logger.debug(f"[yellow]Tracker {tracker} has no api_key or announce_url set, skipping[/yellow]")
+                        logger.debug(f"[yellow]Tracker {tracker} has no api_key or announce_url set, skipping[/yellow]")
                         continue
 
                     valid_trackers.append(tracker)
 
                 specific_tracker = valid_trackers
 
-            if meta.debug:
-                logger.debug(f"[blue]Specific trackers to check: {specific_tracker}[/blue]")
+            logger.debug(f"[blue]Specific trackers to check: {specific_tracker}[/blue]")
 
             if specific_tracker:
                 if meta.is_disc and "ANT" in specific_tracker:
@@ -211,8 +208,7 @@ class TrackerDataManager:
                         )
                         if match:
                             found_match = True
-                            if meta.debug:
-                                logger.debug(f"[green]Match found on tracker: {tracker_name}[/green]")
+                            logger.debug(f"[green]Match found on tracker: {tracker_name}[/green]")
                             meta.matched_tracker = tracker_name
                         await self.save_tracker_timestamp(tracker_name, base_dir=base_dir)
                         return updated_meta
@@ -237,8 +233,7 @@ class TrackerDataManager:
                     available_trackers, waiting_trackers = await self.get_available_trackers(specific_tracker, base_dir, debug=meta.debug)
 
                     if available_trackers:
-                        if meta.debug:
-                            logger.debug(f"[green]Available trackers: {', '.join(available_trackers)}[/green]")
+                        logger.debug(f"[green]Available trackers: {', '.join(available_trackers)}[/green]")
                         tracker_to_process = available_trackers[0]
                     else:
                         if waiting_trackers:
@@ -259,8 +254,7 @@ class TrackerDataManager:
                             logger.info("")
 
                         else:
-                            if meta.debug:
-                                logger.debug("[red]No specific trackers available[/red]")
+                            logger.debug("[red]No specific trackers available[/red]")
                             break
 
                     # Process the selected tracker
@@ -269,7 +263,7 @@ class TrackerDataManager:
                         btn_id = str(btn_id_value) if btn_id_value is not None else ""
                         btn_api = self.default_config.get('btn_api')
                         if isinstance(btn_api, str) and len(btn_api) > 25:
-                            imdb, tvdb = await BtnIdManager.get_btn_torrents(btn_api, btn_id, meta)
+                            imdb, tvdb = await BtnIdManager.get_btn_torrents(btn_api, btn_id)
                             if imdb != 0 or tvdb != 0:
                                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                                     logger.info(f"[green]Found BTN IDs: IMDb={imdb}, TVDb={tvdb}[/green]")
@@ -325,19 +319,15 @@ class TrackerDataManager:
                         remaining_available, remaining_waiting = await self.get_available_trackers(specific_tracker, base_dir, debug=meta.debug)
 
                         if remaining_available or remaining_waiting:
-                            if meta.debug:
-                                logger.debug(f"[yellow]No match found with {tracker_to_process}. Checking remaining trackers...[/yellow]")
+                            logger.debug(f"[yellow]No match found with {tracker_to_process}. Checking remaining trackers...[/yellow]")
                         else:
-                            if meta.debug:
-                                logger.debug(f"[yellow]No match found with {tracker_to_process}. No more trackers available to check.[/yellow]")
+                            logger.debug(f"[yellow]No match found with {tracker_to_process}. No more trackers available to check.[/yellow]")
                             break
 
                 if found_match:
-                    if meta.debug:
-                        logger.debug(f"[green]Successfully found match using tracker: {(meta.matched_tracker if meta.matched_tracker is not None else 'Unknown')}[/green]")
+                    logger.debug(f"[green]Successfully found match using tracker: {(meta.matched_tracker if meta.matched_tracker is not None else 'Unknown')}[/green]")
                 else:
-                    if meta.debug:
-                        logger.debug("[yellow]No matches found on any available specific trackers.[/yellow]")
+                    logger.debug("[yellow]No matches found on any available specific trackers.[/yellow]")
 
             else:
                 # Process all trackers with API = true if no specific tracker is set in meta
@@ -346,8 +336,7 @@ class TrackerDataManager:
                 tracker_order = ["PTP", "HDB", "BHD"] + other_api
 
                 if cat == "TV" or meta.category == "TV":
-                    if meta.debug:
-                        logger.debug("[yellow]Detected TV content, skipping PTP tracker check")
+                    logger.debug("[yellow]Detected TV content, skipping PTP tracker check")
                     tracker_order = [tracker for tracker in tracker_order if tracker != "PTP"]
 
                 async def process_tracker(tracker_name: str, meta: Meta, skip_tracker_descriptions: bool) -> Meta:
@@ -369,8 +358,7 @@ class TrackerDataManager:
                         )
                         if match:
                             found_match = True
-                            if meta.debug:
-                                logger.debug(f"[green]Match found on tracker: {tracker_name}[/green]")
+                            logger.debug(f"[green]Match found on tracker: {tracker_name}[/green]")
                             meta.matched_tracker = tracker_name
                         return updated_meta
                     except httpx.ConnectError:
@@ -390,8 +378,7 @@ class TrackerDataManager:
 
                 if not found_match:
                     meta.no_tracker_match = True
-                    if meta.debug:
-                        logger.debug("[yellow]No matches found on any trackers.[/yellow]")
+                    logger.debug("[yellow]No matches found on any trackers.[/yellow]")
 
         else:
             logger.warning("[yellow]Warning: No valid search term available, skipping tracker updates.[/yellow]")
@@ -416,8 +403,7 @@ class TrackerDataManager:
             for tracker_name in tracker_order:
                 # Skip if we already have region and distributor
                 if meta.region and meta.distributor:
-                    if meta.debug:
-                        logger.debug(f"[green]Both region ({meta.region}) and distributor ({meta.distributor}) found - no need to check more trackers[/green]")
+                    logger.debug(f"[green]Both region ({meta.region}) and distributor ({meta.distributor}) found - no need to check more trackers[/green]")
                     break
 
                 tracker_id: str = ""
@@ -480,8 +466,7 @@ class TrackerDataManager:
                     if not meta.distributor:
                         missing_info.append("distributor")
 
-                    if meta.debug:
-                        logger.debug(f"[cyan]Using {tracker_name} ID {tracker_id} to get {'/'.join(missing_info)} info[/cyan]")
+                    logger.debug(f"[cyan]Using {tracker_name} ID {tracker_id} to get {'/'.join(missing_info)} info[/cyan]")
 
                     tracker_instance = tracker_class_map[tracker_name](config=self.config)
 
