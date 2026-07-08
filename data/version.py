@@ -1,5 +1,22 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
+__version__ = "v2.3"
+
+"""
+Changelog for version v2.3 (2026-07-08):
+
+## What's Changed
+* **Features & Improvements**:
+  * Added support for MakingOff (MKO) tracker.
+  * Replaced standard print statements with structured logging (added option to save log files).
+  * Improved title, tags, and overview extraction for BJS tracker.
+  * Added automated release binaries workflow.
+  * Cleaned up codebase to resolve Ruff linter issues and prepare for Python 3.14.
+* **Fixes**:
+  * Fixed client handling to respect the `--skip_auto_torrent` argument.
+  * Fixed Usenet handling to avoid passwords that begin with `-`.
+"""
+
 __version__ = "v2.2"
 
 """
