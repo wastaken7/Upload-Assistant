@@ -25,7 +25,7 @@ class LAJIDUI(NEXUSPHP):
         tv_series = 402
         tv_shows = 403
 
-        category = str(meta.category).upper()
+        category = (meta.category).upper()
         genres = ", ".join(meta.genres).lower()
         keywords = ", ".join(meta.keywords).lower()
 
@@ -119,7 +119,7 @@ class LAJIDUI(NEXUSPHP):
         remux = 3
         web_dl = 10
 
-        is_disc = str(meta.is_disc).lower()
+        is_disc = (meta.is_disc).lower()
         mtype = str(meta.type).lower()
 
         if is_disc == "bdmv":
@@ -240,7 +240,7 @@ class LAJIDUI(NEXUSPHP):
             "-原创": 3,
         }
 
-        group = meta.tag.lower()
+        group = meta.tag.lower() if meta.tag else ""
         return group_tag.get(group, 5)
 
     def get_checkboxes(self, meta: Meta) -> list[str]:
@@ -256,8 +256,8 @@ class LAJIDUI(NEXUSPHP):
         reposting_prohibited = 1
         single_episode = 12
 
-        audio_tracks = meta.audio_languages
-        subtitle_tracks = meta.subtitle_languages
+        audio_tracks = meta.audio_languages or []
+        subtitle_tracks = meta.subtitle_languages or []
         mhdr = meta.hdr
 
         checkboxes = []
@@ -277,7 +277,7 @@ class LAJIDUI(NEXUSPHP):
         if "Chinese" in subtitle_tracks and "English" in subtitle_tracks:
             checkboxes.append(str(chinese_and_english_subtitle))
 
-        if len(meta.audio_languages) > 1:
+        if len(audio_tracks) > 1:
             checkboxes.append(str(multi_track))
 
         if "Cantonese" in audio_tracks:

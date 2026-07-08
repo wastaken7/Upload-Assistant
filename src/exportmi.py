@@ -38,7 +38,7 @@ def validate_file_path(file_path: str) -> str:
     return str(path)
 
 
-def setup_mediainfo_library(base_dir: str, debug: bool = False) -> dict[str, Any] | None:
+def setup_mediainfo_library(base_dir: str) -> dict[str, Any] | None:
     system = platform.system().lower()
 
     if system == "windows":
@@ -162,7 +162,6 @@ async def exportInfo(
     folder_id: str,
     base_dir: str,
     is_dvd: bool = False,
-    debug: bool = False,
 ) -> dict[str, Any]:
     def filter_mediainfo(data: dict[str, Any]) -> dict[str, Any]:
         media = data.get("media")
@@ -374,7 +373,7 @@ async def exportInfo(
         current_platform = platform.system().lower()
 
         if current_platform in ["linux", "windows"]:
-            mediainfo_config = setup_mediainfo_library(base_dir, debug=debug)
+            mediainfo_config = setup_mediainfo_library(base_dir)
             if mediainfo_config:
                 if mediainfo_config["cli"]:
                     mediainfo_cmd = mediainfo_config["cli"]
@@ -436,7 +435,7 @@ async def exportInfo(
         media_info = MediaInfo.parse(video, output="STRING", full=False)
 
     # Filter out unwanted lines from media info regardless of type
-    media_info_str = str(media_info)
+    media_info_str = media_info
     filtered_media_info = "\n".join(line for line in media_info_str.splitlines() if not line.strip().startswith("ReportBy") and not line.strip().startswith("Report created by "))
 
     async with aiofiles.open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt", "w", newline="", encoding="utf-8") as export:
@@ -447,12 +446,12 @@ async def exportInfo(
 
     if mediainfo_cmd and is_dvd:
         result: subprocess.CompletedProcess[str] | None = None
+        result2: subprocess.CompletedProcess[str] | None = None
         try:
             # Validate and sanitize the video path
             safe_video_path = validate_file_path(video)
             safe_mediainfo_cmd = validate_file_path(mediainfo_cmd)
             cmd = [safe_mediainfo_cmd, "--Output=JSON", safe_video_path]
-            result2: subprocess.CompletedProcess[str] | None = None
             result2 = cast(subprocess.CompletedProcess[str], await asyncio.to_thread(subprocess.run, cmd, capture_output=True, text=True, timeout=30))
 
             if result2.returncode == 0 and result2.stdout:
@@ -504,7 +503,7 @@ async def exportInfo(
     return mi
 
 
-def validate_mediainfo(meta: Meta, debug: bool, settings: bool = False) -> bool:
+def validate_mediainfo(meta: Meta, settings: bool = False) -> bool:
     if not any(str(f).lower().endswith(".mkv") for f in meta.filelist):
         logger.debug(f"[yellow]Skipping {meta.path} (not an .mkv file)[/yellow]")
         return True
@@ -554,15 +553,9 @@ async def get_conformance_error(meta: Meta) -> bool:
     if meta.is_disc != "BDMV" and meta.mediainfo.get("media", {}).get("track"):
         general_track = next((track for track in meta.mediainfo["media"]["track"] if track.get("@type") == "General"), None)
         if general_track and general_track.get("extra", {}).get("ConformanceErrors", {}):
-            try:
-                return True
-            except ValueError:
-                if meta.debug:
-                    logger.debug(f"[red]Unexpected value: {general_track['extra']['ConformanceErrors']}[/red]")
-                return True
+            return True
         else:
-            if meta.debug:
-                logger.debug("[green]No Conformance errors found in MediaInfo General track[/green]")
+            logger.debug("[green]No Conformance errors found in MediaInfo General track[/green]")
             return False
     else:
         return False

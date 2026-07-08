@@ -3233,7 +3233,7 @@ def execute_command():
                         try:
                             orig_ask_string = _cli_ui.ask_string
 
-                            def wrapped_ask_string(*question: Any, default: str | None = None) -> str | None:
+                            def wrapped_ask_string(*question: Any, **_kwargs: Any) -> str | None:
                                 prompt = " ".join(str(q) for q in question)
                                 with contextlib.suppress(Exception):
                                     wrapped_print(prompt)
@@ -3299,10 +3299,11 @@ def execute_command():
                                         nonlocal_upload = None
 
                                 # Ensure Windows event loop policy when needed
-                                if sys.platform == "win32" and hasattr(asyncio, "WindowsProactorEventLoopPolicy"):
-                                    with contextlib.suppress(Exception):
-                                        policy_class = asyncio.WindowsProactorEventLoopPolicy
-                                        asyncio.set_event_loop_policy(policy_class())
+                                if sys.platform == "win32" and sys.version_info < (3, 14):
+                                    policy_class = getattr(asyncio, "WindowsProactorEventLoopPolicy", None)
+                                    if policy_class is not None:
+                                        with contextlib.suppress(Exception):
+                                            asyncio.set_event_loop_policy(policy_class())
                                 if nonlocal_upload is None:
                                     raise RuntimeError("upload.main not available for in-process execution")
                                 asyncio.run(nonlocal_upload())

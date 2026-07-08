@@ -61,25 +61,21 @@ class TL:
         try:
             if force:
                 response = await self.session.get('https://www.torrentleech.org/torrents/browse/index', timeout=10)
-                if response.status_code == 301 and 'torrents/browse' in str(response.url):
-                    if meta.debug:
-                        logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
-                    return True
-            elif not force:
-                response = await self.session.get(self.http_upload_url, timeout=10)
-                if response.status_code == 200 and 'torrents/upload' in str(response.url):
-                    if meta.debug:
-                        logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
+                if response.status_code == 301 and "torrents/browse" in str(response.url):
+                    logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
                     return True
             else:
-                logger.info(f"[bold red]Login to '{self.tracker}' with cookies failed. Please check your cookies.[/bold red]")
-                return False
+                response = await self.session.get(self.http_upload_url, timeout=10)
+                if response.status_code == 200 and "torrents/upload" in str(response.url):
+                    logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
+                    return True
+
+            logger.info(f"[bold red]Login to '{self.tracker}' with cookies failed. Please check your cookies.[/bold red]")
+            return False
 
         except httpx.RequestError as e:
             logger.info(f"[bold red]Error while validating credentials for '{self.tracker}': {e}[/bold red]")
             return False
-
-        return False
 
     async def generate_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
@@ -148,7 +144,7 @@ class TL:
         if meta.anime:
             return anime
 
-        category = str(meta.category)
+        category = meta.category
 
         if category == "MOVIE":
             if str(meta.original_language) != "en":
@@ -157,14 +153,14 @@ class TL:
                 return movie_documentary
             elif meta.resolution == "2160p":
                 return movie_4k
-            elif str(meta.is_disc) in ("BDMV", "HDDVD") or (str(meta.type) == "REMUX" and str(meta.source) in ("BluRay", "HDDVD")):
+            elif meta.is_disc in ("BDMV", "HDDVD") or (str(meta.type) == "REMUX" and str(meta.source) in ("BluRay", "HDDVD")):
                 return movie_bluray
             elif str(meta.type) == "ENCODE" and str(meta.source) in (
                 "BluRay",
                 "HDDVD",
             ):
                 return movie_bluray_rip
-            elif str(meta.is_disc) == "DVD" or (str(meta.type) == "REMUX" and "DVD" in str(meta.source)):
+            elif meta.is_disc == "DVD" or (str(meta.type) == "REMUX" and "DVD" in str(meta.source)):
                 return movie_dvd
             elif (str(meta.type) == "ENCODE" and "DVD" in str(meta.source)) or str(meta.type) == "DVDRIP":
                 return movie_dvd_rip
@@ -238,8 +234,7 @@ class TL:
         login = await self.login(meta, force=True)
         if not login:
             meta.skipping = "TL"
-            if meta.debug:
-                logger.debug(f"[bold red]Skipping upload to '{self.tracker}' as login failed.[/bold red]")
+            logger.debug(f"[bold red]Skipping upload to '{self.tracker}' as login failed.[/bold red]")
             return []
         cat_id = self.get_category(meta)
 
@@ -252,8 +247,8 @@ class TL:
 
         forbidden_keywords: list[str] = []
 
-        is_disc = str(meta.is_disc or "").strip().lower()
-        _type = str(meta.type or "").strip().lower()
+        is_disc = (meta.is_disc or "").strip().lower()
+        _type = (meta.type or "").strip().lower()
 
         if is_disc == 'bdmv':
             forbidden_keywords.extend(['remux', 'x264', 'x265'])
@@ -346,7 +341,7 @@ class TL:
 
         else:
             if meta.category == "MOVIE":
-                imdb_info = cast(dict[str, Any], meta.imdb_info)
+                imdb_info = meta.imdb_info
                 data.update({'imdb': imdb_info.get('imdbID', '')})
 
             if meta.category == "TV":
@@ -396,7 +391,7 @@ class TL:
             "name": await self.get_name(meta),
             "category": self.get_category(meta),
             "nonscene": "on" if not meta.scene else "off",
-            "imdbURL": str(cast(dict[str, Any], meta.imdb_info).get("imdb_url", "")),
+            "imdbURL": meta.imdb_info.get("imdb_url", ""),
             "tvMazeURL": tvMazeURL,
             "igdbURL": "",
             "torrentNFO": "0",

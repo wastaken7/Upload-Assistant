@@ -316,12 +316,10 @@ async def gather_game_prep(
                 match = re.search(r"store\.steampowered\.com/app/(\d+)", content)
                 if match:
                     detected_steam_id = match.group(1)
-                    if meta.debug:
-                        logger.debug(f"[green]Auto-detected Steam ID {detected_steam_id} from NFO file.[/green]")
+                    logger.debug(f"[green]Auto-detected Steam ID {detected_steam_id} from NFO file.[/green]")
                     break
             except Exception as e:
-                if meta.debug:
-                    logger.debug(f"[yellow]Debug: Error reading NFO {nfo_path}: {e}[/yellow]")
+                logger.debug(f"[yellow]Debug: Error reading NFO {nfo_path}: {e}[/yellow]")
 
         if detected_steam_id:
             steam_manual = detected_steam_id
@@ -527,8 +525,7 @@ async def gather_game_prep(
             logger.info(f"[green]Game platform auto-detected from folder/file name: {detected_platform}[/green]")
         elif len(platforms) == 1:
             meta.platform = platforms[0]
-            if meta.debug:
-                logger.debug(f"[green]Game platform set to: {platforms[0]}[/green]")
+            logger.debug(f"[green]Game platform set to: {platforms[0]}[/green]")
 
     # Companies
     developers = []
@@ -657,8 +654,7 @@ async def gather_game_prep(
             try:
                 async with aiofiles.open(image_data_file, "w", encoding="utf-8") as img_file:
                     await img_file.write(json.dumps(image_data, indent=4))
-                if meta.debug:
-                    logger.debug(f"[green]IGDB: Saved {len(image_list)} screenshots to image_data.json[/green]")
+                logger.debug(f"[green]IGDB: Saved {len(image_list)} screenshots to image_data.json[/green]")
             except Exception as e:
                 logger.info(f"[yellow]IGDB: Failed to save screenshots to image_data.json: {e}[/yellow]")
 
@@ -673,5 +669,4 @@ async def gather_game_prep(
     else:
         meta.console_game = False
 
-    if meta.debug:
-        logger.debug(f"[green]IGDB metadata successfully retrieved for game: {meta.title}[/green]")
+    logger.debug(f"[green]IGDB metadata successfully retrieved for game: {meta.title}[/green]")

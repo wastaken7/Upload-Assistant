@@ -18,7 +18,6 @@ class SonarrManager:
         tvdb_id: int | None = None,
         filename: str | None = None,
         title: str | None = None,
-        debug: bool = False,
     ) -> ShowInfo | None:
         if not any(key.startswith('sonarr_api_key') for key in self.default_config):
             logger.info("[red]No Sonarr API keys are configured.[/red]")

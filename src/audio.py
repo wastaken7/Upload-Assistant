@@ -242,12 +242,10 @@ async def _get_audio_v2(
                     if os.path.exists(mi_path):
                         mi_text = await asyncio.to_thread(Path(mi_path).read_text, encoding='utf-8')
                         mi = json.loads(mi_text)
-                        if meta.debug:
-                            logger.debug(f"[yellow]Loaded MediaInfo from file:[/yellow] {mi_path}")
+                        logger.debug(f"[yellow]Loaded MediaInfo from file:[/yellow] {mi_path}")
             except Exception:
-                if meta.debug:
-                    logger.debug("[red]Failed to load MediaInfo.json from tmp directory[/red]")
-                    logger.debug(traceback.format_exc())
+                logger.debug("[red]Failed to load MediaInfo.json from tmp directory[/red]")
+                logger.debug(traceback.format_exc())
                 bd_mi = None
         else:
             format_settings = ""
@@ -309,8 +307,7 @@ async def _get_audio_v2(
             channel_layout = ''
 
         # Enhanced channel count determination based on MediaArea AudioChannelLayout
-        if meta.debug:
-            logger.debug(f"DEBUG: Channels: {channels}, Channel Layout: {channel_layout}, Additional: {additional}, Format: {format}")
+        logger.debug(f"DEBUG: Channels: {channels}, Channel Layout: {channel_layout}, Additional: {additional}, Format: {format}")
         chan = determine_channel_count(channels, channel_layout, additional, format)
 
         try:
@@ -326,8 +323,7 @@ async def _get_audio_v2(
             if not meta.is_disc:
                 eng, orig, non_en_non_commentary = False, False, False
                 orig_lang = meta.original_language.lower() if meta.original_language else ""
-                if meta.debug:
-                    logger.debug(f"DEBUG: Original Language: {orig_lang}")
+                logger.debug(f"DEBUG: Original Language: {orig_lang}")
                 try:
                     tracks = cast(list[TrackDict], cast(Mapping[str, Any], mi_map.get('media', {})).get('track', []))
                     # no proper auro3d marker in mediainfo, which leaves us vulnerable to misdetection
@@ -345,9 +341,8 @@ async def _get_audio_v2(
                         has_commentary = True
                     if has_compat:
                         has_compatibility = True
-                    if meta.debug:
-                        logger.debug(f"DEBUG: Found {len(has_coms)} commentary tracks, has_commentary = {has_commentary}")
-                        logger.debug(f"DEBUG: Found {len(has_compat)} compatibility tracks, has_compatibility = {has_compatibility}")
+                    logger.debug(f"DEBUG: Found {len(has_coms)} commentary tracks, has_commentary = {has_commentary}")
+                    logger.debug(f"DEBUG: Found {len(has_compat)} compatibility tracks, has_compatibility = {has_compatibility}")
                     audio_tracks = [
                         t
                         for t in tracks
@@ -356,30 +351,25 @@ async def _get_audio_v2(
                         and "compatibility" not in str(t.get('Title') or '').lower()
                     ]
                     audio_language = None
-                    if meta.debug:
-                        logger.debug(f"DEBUG: Audio Tracks (not commentary)= {len(audio_tracks)}")
+                    logger.debug(f"DEBUG: Audio Tracks (not commentary)= {len(audio_tracks)}")
 
                     # First pass: collect all audio languages and set flags
                     non_eng_non_orig_languages: list[str] = []
                     for t in audio_tracks:
-                        audio_language = str(t.get('Language') or '')
-                        if meta.debug:
-                            logger.debug(f"DEBUG: Audio Language = {audio_language}")
+                        audio_language = str(t.get("Language") or "")
+                        logger.debug(f"DEBUG: Audio Language = {audio_language}")
                         audio_language = audio_language.lower().strip()
                         if audio_language.startswith("en"):
-                            if meta.debug:
-                                logger.debug(f"DEBUG: Found English audio track: {audio_language}")
+                            logger.debug(f"DEBUG: Found English audio track: {audio_language}")
                             eng = True
 
                         if audio_language and "en" not in audio_language and audio_language.startswith(orig_lang):
-                            if meta.debug:
-                                logger.debug(f"DEBUG: Found original language audio track: {audio_language}")
+                            logger.debug(f"DEBUG: Found original language audio track: {audio_language}")
                             orig = True
 
                         variants = ['zh', 'cn', 'cmn', 'no', 'nb']
                         if any(audio_language.startswith(var) for var in variants) and any(orig_lang.startswith(var) for var in variants):
-                            if meta.debug:
-                                logger.debug(f"DEBUG: Found original language audio track with variant: {audio_language}")
+                            logger.debug(f"DEBUG: Found original language audio track with variant: {audio_language}")
                             orig = True
 
                         if audio_language and not audio_language.startswith(orig_lang) and not audio_language.startswith("en") and not audio_language.startswith("zx"):
@@ -568,8 +558,7 @@ def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_origi
                 language_display = lang.display_name()
         except (LookupError, AttributeError, ValueError) as e:
             # Silently fall back to the original language code
-            if meta.debug:
-                logger.debug(f"[yellow]Debug: Unable to convert language code '{audio_language}' to full name: {e}[/yellow]")
+            logger.debug(f"[yellow]Debug: Unable to convert language code '{audio_language}' to full name: {e}[/yellow]")
 
         # Separate trackers that don't allow bloat at all vs those that just warn
         # Only remove trackers if this is an English original with English and non-English tracks
@@ -590,9 +579,8 @@ def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_origi
             meta.trackers = [t for t in meta.trackers if t not in not_allowed_trackers]
             meta.bloated = True
             printed_not_allowed = True
-            if meta.debug:
-                logger.debug(f"[yellow]Removed trackers: {not_allowed_list}[/yellow]")
-                logger.debug(f"[yellow]Remaining trackers: {', '.join(meta.trackers) if meta.trackers else 'None'}[/yellow]")
+            logger.debug(f"[yellow]Removed trackers: {not_allowed_list}[/yellow]")
+            logger.debug(f"[yellow]Remaining trackers: {', '.join(meta.trackers) if meta.trackers else 'None'}[/yellow]")
 
         # Handle trackers that warn about bloat (only print once)
         if warning_trackers and not printed_warning:
@@ -660,10 +648,9 @@ def dts_core_additional_check(meta: Meta) -> None:
                     hd_idx, lossy_idx = j + 1, i + 1
                     hd_track = track_two
 
-                if meta.debug:
-                    logger.debug(
-                        f"[yellow]DEBUG: Detected potential DTS core duplicate between tracks {i+1} and {j+1}, matched on properties: (Duration={hd_track.get('Duration')}, FrameRate={hd_track.get('FrameRate')}, FrameCount={hd_track.get('FrameCount')}, Language={hd_track.get('Language')})[/yellow]"
-                    )
+                logger.debug(
+                    f"[yellow]DEBUG: Detected potential DTS core duplicate between tracks {i + 1} and {j + 1}, matched on properties: (Duration={hd_track.get('Duration')}, FrameRate={hd_track.get('FrameRate')}, FrameCount={hd_track.get('FrameCount')}, Language={hd_track.get('Language')})[/yellow]"
+                )
                 if not warned_once:
                     warned_once = True
                     logger.info(

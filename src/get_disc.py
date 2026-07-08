@@ -44,7 +44,7 @@ class DiscInfoManager:
                 raise RuntimeError("BDMV disc checking is not supported in site_check mode.")
             # Ensure bdinfo binary is present for BDMV processing
             try:
-                await BDInfoBinaryManager.ensure_bdinfo_binary(meta.base_dir, meta.debug, "v1.0.8")
+                await BDInfoBinaryManager.ensure_bdinfo_binary(meta.base_dir, "v1.0.8")
             except Exception as e:
                 logger.error(f"[red]Failed to ensure bdinfo binary: {e}[/red]", extra={"markup": False})
                 raise
@@ -54,8 +54,8 @@ class DiscInfoManager:
             else:
                 discs, bdinfo = await self._parser.get_bdinfo(meta, meta.discs, meta.uuid, meta.base_dir, meta.discs)
         elif is_disc == "DVD":
-            download_dvd_mediainfo(meta.base_dir, debug=meta.debug)
-            discs = cast(list[Disc], await cast(Any, self._parser).get_dvdinfo(discs, base_dir=meta.base_dir, debug=meta.debug))
+            download_dvd_mediainfo(meta.base_dir)
+            discs = cast(list[Disc], await cast(Any, self._parser).get_dvdinfo(discs, base_dir=meta.base_dir))
         elif is_disc == "HDDVD":
             discs = await self._parser.get_hddvd_info(discs, meta)
             async with aiofiles.open(

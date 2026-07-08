@@ -152,7 +152,7 @@ class SeasonEpisodeManager:
                     if meta.tmdb_id == 0:
                         year = str(parsed.get("anime_year", seasonYear))
                         guess_title = _guessit_data(str(parsed.get("anime_title", "")), {"excludes": ["country", "language"]}).get("title", "")
-                        tmdb_id_value, category_value = await self.tmdb_manager.get_tmdb_id(str(guess_title), year, meta, meta.category)
+                        tmdb_id_value, category_value = await self.tmdb_manager.get_tmdb_id(str(guess_title), year, meta.category, meta.filename)
                         meta.tmdb_id = tmdb_id_value
                         meta.category = category_value
                     # meta = await tmdb_other_meta(meta)
@@ -231,8 +231,7 @@ class SeasonEpisodeManager:
                                     response = (await client.post(url, params=params)).json()
                                 if response["result"] == "failure":
                                     raise XEMNotFound  # noqa: F405
-                                if meta.debug:
-                                    console.log(f"[cyan]TheXEM Absolute -> Standard[/cyan]\n{response}")
+                                logger.debug(f"[cyan]TheXEM Absolute -> Standard[/cyan]\n{response}")
                                 season_int = int(response["data"]["scene"]["season"])  # Convert to integer
                                 season = f"S{str(season_int).zfill(2)}"
                                 if len(filelist) == 1:
@@ -244,8 +243,7 @@ class SeasonEpisodeManager:
                                 names_url = f"https://thexem.info/map/names?origin=tvdb&id={str(meta.tvdb_id)}"
                                 async with httpx.AsyncClient(timeout=30.0) as client:
                                     names_response = (await client.get(names_url)).json()
-                                if meta.debug:
-                                    console.log(f"[cyan]Matching Season Number from TheXEM\n{names_response}")
+                                logger.debug(f"[cyan]Matching Season Number from TheXEM\n{names_response}")
                                 difference: float = 0.0
                                 if names_response["result"] == "success":
                                     for season_num, values in names_response["data"].items():
@@ -318,7 +316,7 @@ class SeasonEpisodeManager:
             meta.part = ""
             if meta.tv_pack == 1:
                 part = _guessit_data(os.path.dirname(video)).get("part")
-                meta.part = f"Part {part}" if part else ""
+                meta.part = f"Part {part}" if part else ""  # pyrefly: ignore [bad-assignment]
 
         return meta
 
@@ -393,8 +391,7 @@ class SeasonEpisodeManager:
                         logger.info("[red]Aborting torrent creation due to incomplete season pack")
                         sys.exit(1)
         else:
-            if meta.debug:
-                logger.debug("[green]Season pack completeness verified")
+            logger.debug("[green]Season pack completeness verified")
 
         if not completeness["consistent_tags"]:
             logger.warning("[yellow]Warning: Multiple group tags detected in season pack!")
@@ -516,16 +513,15 @@ class SeasonEpisodeManager:
             "tags_found": tags_found,
         }
 
-        if meta.debug:
-            logger.debug("[cyan]Season pack completeness check:")
-            logger.debug(f"[cyan]Found episodes: {found_episodes}")
-            if missing_episodes:
-                logger.debug(f"[red]Missing episodes: {missing_episodes}")
-            else:
-                logger.debug("[green]Season pack episode list appears complete")
-            if tags_found:
-                logger.debug(f"[cyan]Group tags found: {list(tags_found.keys())}")
-                if not consistent_tags:
-                    logger.debug("[yellow]Warning: Multiple group tags detected in season pack")
+        logger.debug("[cyan]Season pack completeness check:")
+        logger.debug(f"[cyan]Found episodes: {found_episodes}")
+        if missing_episodes:
+            logger.debug(f"[red]Missing episodes: {missing_episodes}")
+        else:
+            logger.debug("[green]Season pack episode list appears complete")
+        if tags_found:
+            logger.debug(f"[cyan]Group tags found: {list(tags_found.keys())}")
+            if not consistent_tags:
+                logger.debug("[yellow]Warning: Multiple group tags detected in season pack")
 
         return result

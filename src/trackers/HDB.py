@@ -683,10 +683,9 @@ class HDB:
                     if image_idx < len(group_images[group_idx])
                 )
 
-            if meta.debug:
-                logger.debug("[cyan]Images will be uploaded in this order:")
-                for i, path in enumerate(all_image_files):
-                    logger.debug(f"[cyan]{i}: {os.path.basename(path)}")
+            logger.debug("[cyan]Images will be uploaded in this order:")
+            for i, path in enumerate(all_image_files):
+                logger.debug(f"[cyan]{i}: {os.path.basename(path)}")
         else:
             thumb_size = 'w300'
             screenshot_dir = f"{meta.base_dir}/tmp/{meta.uuid}"
@@ -725,8 +724,7 @@ class HDB:
             upload_count = 3 if meta.category == "TV" and meta.tv_pack == 0 else 6
             upload_count = min(len(all_image_files), upload_count)
 
-        if meta.debug:
-            logger.debug(f"[cyan]Uploading {upload_count} images to HDB Image Host")
+        logger.debug(f"[cyan]Uploading {upload_count} images to HDB Image Host")
 
         upload_files: dict[str, tuple[str, bytes, str]] = {}
         for i in range(upload_count):
@@ -735,9 +733,8 @@ class HDB:
                 filename = os.path.basename(file_path)
                 async with aiofiles.open(file_path, 'rb') as file_handle:
                     file_bytes = await file_handle.read()
-                upload_files[f'images_files[{i}]'] = (filename, file_bytes, 'image/png')
-                if meta.debug:
-                    logger.debug(f"[cyan]Added file {filename} as images_files[{i}]")
+                upload_files[f"images_files[{i}]"] = (filename, file_bytes, "image/png")
+                logger.debug(f"[cyan]Added file {filename} as images_files[{i}]")
             except (OSError, ValueError) as e:
                 logger.error(f"[red]Failed to open {file_path}: {e}")
                 continue
@@ -747,8 +744,7 @@ class HDB:
                 logger.info("[red]No files to upload")
                 return None
 
-            if meta.debug:
-                logger.debug(f"[green]Uploading {len(upload_files)} images to HDB...")
+            logger.debug(f"[green]Uploading {len(upload_files)} images to HDB...")
 
             uploadSuccess = True
             if meta.comparison:
@@ -777,17 +773,16 @@ class HDB:
                 if current_chunk:
                     chunks.append(current_chunk)
 
-                if meta.debug:
-                    logger.debug(f"[cyan]Split into {len(chunks)} chunks based on 100 MiB limit")
+                logger.debug(f"[cyan]Split into {len(chunks)} chunks based on 100 MiB limit")
 
                 # Upload each chunk
                 for chunk_idx, chunk in enumerate(chunks):
                     fileList: dict[str, tuple[str, bytes, str]] = {}
                     for j, (_key, value) in enumerate(chunk):
-                        fileList[f'images_files[{j}]'] = value
+                        fileList[f"images_files[{j}]"] = value
 
                     if meta.debug:
-                        chunk_size_mb = sum(os.path.getsize(all_image_files[int(key.split('[')[1].split(']')[0])]) for key, _ in chunk) / (1024 * 1024)
+                        chunk_size_mb = sum(os.path.getsize(all_image_files[int(key.split("[")[1].split("]")[0])]) for key, _ in chunk) / (1024 * 1024)
                         logger.debug(f"[cyan]Uploading chunk {chunk_idx + 1}/{len(chunks)} ({len(fileList)} images, {chunk_size_mb:.2f} MiB)")
 
                     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -810,12 +805,12 @@ class HDB:
 
             if uploadSuccess is True:
                 if meta.comparison:
-                    matches = re.findall(r'\[url=.*?\]\[img\].*?\[/img\]\[/url\]', bbcode)
+                    matches = re.findall(r"\[url=.*?\]\[img\].*?\[/img\]\[/url\]", bbcode)
                     formatted_bbcode = ""
                     num_groups = len(sorted_group_indices) if sorted_group_indices else 3
 
                     for i in range(0, len(matches), num_groups):
-                        line = " ".join(matches[i:i+num_groups])
+                        line = " ".join(matches[i : i + num_groups])
                         if i + num_groups < len(matches):
                             formatted_bbcode += line + "\n"
                         else:
@@ -823,8 +818,7 @@ class HDB:
 
                     bbcode = formatted_bbcode
 
-                    if meta.debug:
-                        logger.debug(f"[cyan]Response formatted with {num_groups} images per line")
+                    logger.debug(f"[cyan]Response formatted with {num_groups} images per line")
 
                 return bbcode
             else:

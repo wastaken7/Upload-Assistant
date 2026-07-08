@@ -51,7 +51,7 @@ class TrackerMetaManager:
     async def check_images_concurrently(self, imagelist: Sequence[ImageDict], meta: Meta) -> list[ImageDict]:
         return await check_images_concurrently(imagelist, meta)
 
-    async def check_image_link(self, url: str, timeout: httpx.Timeout | None = None) -> bool:
+    async def check_image_link(self, url: str, timeout: httpx.Timeout | None = None) -> bool:  # noqa: ASYNC109
         return await check_image_link(url, timeout)
 
     async def update_meta_with_unit3d_data(self, meta: Meta, tracker_data: Sequence[Any], tracker_name: str, skip_tracker_descriptions: bool = False) -> bool:
@@ -104,8 +104,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
             seen_urls.add(img_url)
             unique_images.append(img)
         elif img_url:
-            if meta.debug:
-                logger.debug(f"[yellow]Removing duplicate image URL: {img_url}[/yellow]")
+            logger.debug(f"[yellow]Removing duplicate image URL: {img_url}[/yellow]")
 
     if len(unique_images) < len(imagelist) and meta.debug:
         logger.info(f"[yellow]Removed {len(imagelist) - len(unique_images)} duplicate images from the list.[/yellow]")
@@ -189,8 +188,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
 
                                     meta.image_sizes[img_url] = len(image_content)
 
-                                    if meta.debug:
-                                        logger.debug(
+                                    logger.debug(
                                             f"Valid image {img_url} with resolution {image.width}x{image.height} "
                                             f"and size {len(image_content) / 1024:.2f} KiB"
                                         )
@@ -239,7 +237,7 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
     return valid_images
 
 
-async def check_image_link(url: str, timeout: httpx.Timeout | None = None) -> bool:
+async def check_image_link(url: str, timeout: httpx.Timeout | None = None) -> bool:  # noqa: ASYNC109
     # Handle when pixhost url points to web_url and convert to raw_url
     if url.startswith("https://pixhost.to/show/"):
         url = url.replace("https://pixhost.to/show/", "https://img1.pixhost.to/images/", 1)
@@ -284,20 +282,16 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
     tmdb, imdb, tvdb, mal, desc, category, _infohash, imagelist, filename, *_rest = tracker_data
     if tmdb:
         meta.tmdb_id = tmdb
-        if meta.debug:
-            logger.debug(f"set TMDB ID: {meta.tmdb_id}")
+        logger.debug(f"set TMDB ID: {meta.tmdb_id}")
     if imdb:
         meta.imdb_id = int(imdb)
-        if meta.debug:
-            logger.debug(f"set IMDB ID: {meta.imdb_id}")
+        logger.debug(f"set IMDB ID: {meta.imdb_id}")
     if tvdb:
         meta.tvdb_id = tvdb
-        if meta.debug:
-            logger.debug(f"set TVDB ID: {meta.tvdb_id}")
+        logger.debug(f"set TVDB ID: {meta.tvdb_id}")
     if mal:
         meta.mal_id = mal
-        if meta.debug:
-            logger.debug(f"set MAL ID: {meta.mal_id}")
+        logger.debug(f"set MAL ID: {meta.mal_id}")
     if desc and not skip_tracker_descriptions:
         meta.description = desc
         meta.saved_description = True
@@ -310,8 +304,7 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
             meta.category = "MOVIE"
         elif "TV" in cat_upper:
             meta.category = "TV"
-        if meta.debug:
-            logger.debug(f"set Category: {meta.category}")
+        logger.debug(f"set Category: {meta.category}")
 
     imagelist_typed = cast(list[ImageDict] | None, imagelist)
     if imagelist_typed:  # Ensure imagelist is not empty before setting
@@ -324,8 +317,7 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
     if filename:
         meta[f'{tracker_name.lower()}_filename'] = filename
 
-    if meta.debug:
-        logger.debug(f"[green]{tracker_name} data successfully updated in meta[/green]")
+    logger.debug(f"[green]{tracker_name} data successfully updated in meta[/green]")
     return True
 
 
@@ -388,8 +380,7 @@ async def update_metadata_from_tracker(
                         if valid_images:
                             meta.image_list = valid_images
             else:
-                if meta.debug:
-                    logger.debug("[yellow]Skipping PTP as no match found[/yellow]")
+                logger.debug("[yellow]Skipping PTP as no match found[/yellow]")
                 found_match = False
 
         else:
@@ -398,8 +389,7 @@ async def update_metadata_from_tracker(
             imdb_id, meta.ext_torrenthash = cast(tuple[int, str | None], ptp_imdb_result)
             if imdb_id:
                 meta.imdb_id = imdb_id
-                if meta.debug:
-                    logger.debug(f"[green]IMDb ID found: tt{str(meta.imdb_id).zfill(7)}[/green]")
+                logger.debug(f"[green]IMDb ID found: tt{str(meta.imdb_id).zfill(7)}[/green]")
                 found_match = True
                 meta.skipit = True
                 if not skip_tracker_descriptions or meta.keep_images:
@@ -572,18 +562,15 @@ async def update_metadata_from_tracker(
                         else:
                             meta.image_list = []
                 else:
-                    if meta.debug:
-                        logger.debug(f"[yellow]{tracker_name} returned invalid IDs (both 0), not using as match[/yellow]")
+                    logger.debug(f"[yellow]{tracker_name} returned invalid IDs (both 0), not using as match[/yellow]")
                     found_match = False
         else:
-            if meta.debug:
-                logger.debug(f"[yellow]{tracker_name} returned invalid IDs (both 0)[/yellow]")
+            logger.debug(f"[yellow]{tracker_name} returned invalid IDs (both 0)[/yellow]")
             found_match = False
 
     elif tracker_name in api_trackers:
         if meta.get(tracker_key) is not None:
-            if meta.debug:
-                logger.debug(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
+            logger.debug(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
             tracker_data = cast(
                 Sequence[Any],
                 await COMMON(config).unit3d_torrent_info(
@@ -596,8 +583,7 @@ async def update_metadata_from_tracker(
                 ),
             )
         else:
-            if meta.debug:
-                logger.debug(f"[yellow]No ID found in meta for {tracker_name}, searching by file name[/yellow]")
+            logger.debug(f"[yellow]No ID found in meta for {tracker_name}, searching by file name[/yellow]")
             tracker_data = cast(
                 Sequence[Any],
                 await COMMON(config).unit3d_torrent_info(
@@ -611,13 +597,11 @@ async def update_metadata_from_tracker(
             )
 
         if any(item not in [None, 0] for item in tracker_data[:3]):  # Check for valid tmdb, imdb, or tvdb
-            if meta.debug:
-                logger.debug(f"[green]Valid data found on {tracker_name}[/green]")
+            logger.debug(f"[green]Valid data found on {tracker_name}[/green]")
             selected = await update_meta_with_unit3d_data(meta, tracker_data, tracker_name, skip_tracker_descriptions)
             found_match = selected
         else:
-            if meta.debug:
-                logger.debug(f"[yellow]No valid data found on {tracker_name}[/yellow]")
+            logger.debug(f"[yellow]No valid data found on {tracker_name}[/yellow]")
             found_match = False
 
     elif tracker_name == "HDB":
@@ -662,8 +646,7 @@ async def update_metadata_from_tracker(
                 logger.info(f"[yellow]{tracker_name} data not found for ID: {meta[tracker_key]}[/yellow]")
                 found_match = False
         else:
-            if meta.debug:
-                logger.debug("[yellow]No ID found in meta for HDB, searching by file name[/yellow]")
+            logger.debug("[yellow]No ID found in meta for HDB, searching by file name[/yellow]")
 
             # Use search_filename function if ID is not found in meta
             hdb_search = await tracker_instance.search_filename(search_term, search_file_folder, meta)

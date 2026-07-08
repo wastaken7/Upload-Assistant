@@ -18,12 +18,12 @@ Config = dict[str, Any]
 
 class CRP:
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")
+    is_usenet = True
 
     def __init__(self, config: Config) -> None:
         self.config = config
         self.common = COMMON(config)
         self.tracker = "CRP"
-        self.is_usenet = True
         self.upload_url = "https://curupira.cc/v1/releases"
         self.torrent_url = "https://curupira.cc/releases/"
         self.banned_groups = []

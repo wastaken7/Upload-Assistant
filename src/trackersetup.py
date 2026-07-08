@@ -131,13 +131,14 @@ class TRACKER_SETUP:
             tracker_config = self.config["TRACKERS"].get(tracker_name, {})
             example_tracker_config = example_config["TRACKERS"].get(tracker_name, {})
 
-            if "api_key" in example_tracker_config and not tracker_config.get("api_key"):
-                logger.info(f"{tracker_name}: [bold red]Tracker is missing an API key and will be ignored.[/bold red]")
-                continue
+            if isinstance(example_tracker_config, dict) and isinstance(tracker_config, dict):
+                if "api_key" in example_tracker_config and not tracker_config.get("api_key"):
+                    logger.info(f"{tracker_name}: [bold red]Tracker is missing an API key and will be ignored.[/bold red]")
+                    continue
 
-            if "announce_url" in example_tracker_config and not tracker_config.get("announce_url"):
-                logger.info(f"{tracker_name}: [bold red]Tracker is missing an announce URL and will be ignored.[/bold red]")
-                continue
+                if "announce_url" in example_tracker_config and not tracker_config.get("announce_url"):
+                    logger.info(f"{tracker_name}: [bold red]Tracker is missing an announce URL and will be ignored.[/bold red]")
+                    continue
 
             supported_cats = getattr(tracker_class, "supported_categories", None)
             if supported_cats is None:
@@ -192,7 +193,7 @@ class TRACKER_SETUP:
             return None
         if tracker.upper() == "LUME":
             # LUME doesn't expose a banned_url; sync TRaSH groups and use the file if present
-            await self.sync_trash_groups(meta, file_path)
+            await self.sync_trash_groups(file_path)
             if os.path.exists(file_path):
                 return file_path
         banned_url = getattr(tracker_instance, 'banned_url', None)
@@ -264,17 +265,16 @@ class TRACKER_SETUP:
                     logger.info(f"[red]An unexpected error occurred: {e}[/red]")
                     return None
 
-        if meta.debug:
-            logger.debug(f"Total banned groups retrieved: {len(all_data)}")
+        logger.debug(f"Total banned groups retrieved: {len(all_data)}")
 
         if not all_data:
             return "empty"
 
-        await self.write_banned_groups_to_file(file_path, all_data, debug=meta.debug)
+        await self.write_banned_groups_to_file(file_path, all_data)
 
         return file_path
 
-    async def write_banned_groups_to_file(self, file_path: str, json_data: list[Any], debug: bool = False) -> None:
+    async def write_banned_groups_to_file(self, file_path: str, json_data: list[Any]) -> None:
         try:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
@@ -285,28 +285,22 @@ class TRACKER_SETUP:
                     names.append(str(item["name"]))
                 elif isinstance(item, str):
                     names.append(item)
-            names_csv = ', '.join(names)
-            file_content = {
-                "last_updated": datetime.now(UTC).strftime("%Y-%m-%d"),
-                "banned_groups": names_csv,
-                "raw_data": json_data
-            }
+            names_csv = ", ".join(names)
+            file_content = {"last_updated": datetime.now(UTC).strftime("%Y-%m-%d"), "banned_groups": names_csv, "raw_data": json_data}
 
             await asyncio.to_thread(self._write_file, file_path, file_content)
             logger.debug(f"File '{file_path}' updated successfully with {len(names)} groups.")
         except Exception as e:
             logger.info(f"An error occurred: {e}")
 
-    async def sync_trash_groups(self, meta: Meta, file_path: str) -> None:
+    async def sync_trash_groups(self, file_path: str) -> None:
         """Fetch TRaSH guide JSON and extract release group names to ban file.
 
         This downloads the TRaSH LQ release-group specifications, extracts
         group names from `ReleaseGroupSpecification` fields, and writes them
         via `write_banned_groups_to_file` into the tracker's banned file.
         """
-        url = (
-            "https://raw.githubusercontent.com/TRaSH-Guides/Guides/refs/heads/master/docs/json/radarr/cf/lq.json"
-        )
+        url = "https://raw.githubusercontent.com/TRaSH-Guides/Guides/refs/heads/master/docs/json/radarr/cf/lq.json"
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url)
@@ -319,15 +313,15 @@ class TRACKER_SETUP:
             logger.error(f"[red]Failed to fetch TRaSH groups: {e}[/red]")
             return
 
-        specs = cast(list[JsonDict], data.get('specifications', []))
+        specs = cast(list[JsonDict], data.get("specifications", []))
         groups: list[str] = []
 
         for spec in specs:
             try:
-                if spec.get('implementation') != 'ReleaseGroupSpecification':
+                if spec.get("implementation") != "ReleaseGroupSpecification":
                     continue
-                fields = cast(JsonDict, spec.get('fields') or {})
-                val = str(fields.get('value', '') or '')
+                fields = cast(JsonDict, spec.get("fields") or {})
+                val = str(fields.get("value", "") or "")
                 # Prefer a captured group if present: e.g. ^(GROUP)$ or \b(GROUP)\b
                 m = re.search(r"\(([^)]+)\)", val)
                 if m:
@@ -341,8 +335,8 @@ class TRACKER_SETUP:
                     continue
 
                 # Handle alternation inside the captured name
-                if '|' in name:
-                    parts = [p.strip() for p in name.split('|') if p.strip()]
+                if "|" in name:
+                    parts = [p.strip() for p in name.split("|") if p.strip()]
                     for p in parts:
                         if p not in groups:
                             groups.append(p)
@@ -350,21 +344,19 @@ class TRACKER_SETUP:
                     if name not in groups:
                         groups.append(name)
             except (KeyError, TypeError, ValueError, AttributeError, re.error) as e:
-                if meta.debug:
-                    logger.debug(f"[yellow]Skipped invalid TRaSH specification: {e}[/yellow]")
+                logger.debug(f"[yellow]Skipped invalid TRaSH specification: {e}[/yellow]")
                 continue
 
         json_data = [{"name": g} for g in groups]
 
         if not json_data:
-            if meta.debug:
-                logger.debug("[yellow]No groups extracted from TRaSH data.[/yellow]")
+            logger.debug("[yellow]No groups extracted from TRaSH data.[/yellow]")
             return
 
-        await self.write_banned_groups_to_file(file_path, json_data, debug=meta.debug)
+        await self.write_banned_groups_to_file(file_path, json_data)
 
     def _write_file(self, file_path: str, data: JsonDict) -> None:
-        """ Blocking file write operation, runs in a background thread """
+        """Blocking file write operation, runs in a background thread"""
         with open(file_path, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
 
@@ -372,7 +364,7 @@ class TRACKER_SETUP:
         try:
             content = await asyncio.to_thread(self._read_file, file_path)
             data = cast(JsonDict, json.loads(content))
-            last_updated = datetime.strptime(str(data['last_updated']), "%Y-%m-%d").replace(tzinfo=UTC)
+            last_updated = datetime.strptime(str(data["last_updated"]), "%Y-%m-%d").replace(tzinfo=UTC)
             return datetime.now(UTC) >= last_updated + timedelta(days=1)
         except FileNotFoundError:
             return True
@@ -381,7 +373,7 @@ class TRACKER_SETUP:
             return True
 
     def _read_file(self, file_path: str) -> str:
-        """ Helper function to read the file in a blocking thread """
+        """Helper function to read the file in a blocking thread"""
         with open(file_path, encoding="utf-8") as file:
             return file.read()
 
@@ -391,8 +383,8 @@ class TRACKER_SETUP:
             return False
 
         group_tags = meta.tag[1:].lower()
-        if 'taoe' in group_tags:
-            group_tags = 'taoe'
+        if "taoe" in group_tags:
+            group_tags = "taoe"
 
         if tracker.upper() in ("AITHER", "LST", "LUME", "SPD", "ZNTH"):
             file_path = await self.get_banned_groups(meta, tracker)
@@ -451,37 +443,32 @@ class TRACKER_SETUP:
 
         return False
 
-    async def write_internal_claims_to_file(self, file_path: str, data: list[JsonDict], debug: bool = False) -> None:
+    async def write_internal_claims_to_file(self, file_path: str, data: list[JsonDict]) -> None:
         try:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
             extracted_data: list[JsonDict] = []
             for item in data:
-                if 'attributes' not in item:
+                if "attributes" not in item:
                     logger.info(f"Skipping invalid item: {item}")
                     continue
 
-                attributes = cast(JsonDict, item['attributes'])
+                attributes = cast(JsonDict, item["attributes"])
                 extracted_data.append({
-                    "title": attributes.get('title', 'Unknown'),
-                    "season": attributes.get('season', 'Unknown'),
-                    "tmdb_id": attributes.get('tmdb_id', 'Unknown'),
-                    "resolutions": attributes.get('resolutions', []),
-                    "types": attributes.get('types', [])
+                    "title": attributes.get("title", "Unknown"),
+                    "season": attributes.get("season", "Unknown"),
+                    "tmdb_id": attributes.get("tmdb_id", "Unknown"),
+                    "resolutions": attributes.get("resolutions", []),
+                    "types": attributes.get("types", []),
                 })
 
             if not extracted_data:
                 logger.debug("No valid claims found to write.")
                 return
 
-            titles_csv = ', '.join([str(entry.get('title', '')) for entry in extracted_data])
+            titles_csv = ", ".join([str(entry.get("title", "")) for entry in extracted_data])
 
-            file_content = {
-                "last_updated": datetime.now(UTC).strftime("%Y-%m-%d"),
-                "titles_csv": titles_csv,
-                "extracted_data": extracted_data,
-                "raw_data": data
-            }
+            file_content = {"last_updated": datetime.now(UTC).strftime("%Y-%m-%d"), "titles_csv": titles_csv, "extracted_data": extracted_data, "raw_data": data}
 
             await asyncio.to_thread(self._write_file, file_path, file_content)
             logger.debug(f"File '{file_path}' updated successfully with {len(extracted_data)} claims.")
@@ -493,7 +480,7 @@ class TRACKER_SETUP:
         tracker_instance = self._create_tracker_instance(tracker)
         if tracker_instance is None:
             return None
-        claims_url = getattr(tracker_instance, 'claims_url', None)
+        claims_url = getattr(tracker_instance, "claims_url", None)
         if not isinstance(claims_url, str):
             return None
 
@@ -501,11 +488,7 @@ class TRACKER_SETUP:
         if not await self.should_update(file_path):
             return await self.check_tracker_claims(meta, tracker)
 
-        headers = {
-            'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
+        headers = {"Authorization": f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}", "Content-Type": "application/json", "Accept": "application/json"}
 
         all_data: list[JsonDict] = []
         next_cursor: str | None = None
@@ -514,7 +497,7 @@ class TRACKER_SETUP:
             while True:
                 try:
                     # Add query parameters for pagination
-                    params: JsonDict = {'cursor': next_cursor, 'per_page': 100} if next_cursor else {'per_page': 100}
+                    params: JsonDict = {"cursor": next_cursor, "per_page": 100} if next_cursor else {"per_page": 100}
                     response = await client.get(url=claims_url, headers=headers, params=params)
 
                     if response.status_code == 200:
@@ -523,21 +506,21 @@ class TRACKER_SETUP:
                             logger.info(f"[red]Unexpected response format: {type(response_json)}[/red]")
                             return False
                         response_dict = cast(JsonDict, response_json)
-                        page_data_any = response_dict.get('data', [])
+                        page_data_any = response_dict.get("data", [])
                         if not isinstance(page_data_any, list):
                             logger.info(f"[red]Unexpected 'data' format: {type(page_data_any)}[/red]")
                             return False
                         page_data = cast(list[JsonDict], page_data_any)
 
                         all_data.extend(page_data)
-                        meta_info_any = response_dict.get('meta', {})
+                        meta_info_any = response_dict.get("meta", {})
                         if not isinstance(meta_info_any, dict):
                             logger.info(f"[red]Unexpected 'meta' format: {type(meta_info_any)}[/red]")
                             return False
                         meta_info = cast(JsonDict, meta_info_any)
 
                         # Check if there is a next page
-                        next_cursor = cast(str | None, meta_info.get('next_cursor'))
+                        next_cursor = cast(str | None, meta_info.get("next_cursor"))
                         if not next_cursor:
                             break  # Exit loop if there are no more pages
                     else:
@@ -551,13 +534,12 @@ class TRACKER_SETUP:
                     logger.info(f"[red]An unexpected error occurred: {e}[/red]")
                     return False
 
-        if meta.debug:
-            logger.debug(f"Total claims retrieved: {len(all_data)}")
+        logger.debug(f"Total claims retrieved: {len(all_data)}")
 
         if not all_data:
             return False
 
-        await self.write_internal_claims_to_file(file_path, all_data, debug=meta.debug)
+        await self.write_internal_claims_to_file(file_path, all_data)
 
         return await self.check_tracker_claims(meta, tracker)
 
@@ -631,8 +613,7 @@ class TRACKER_SETUP:
         return match_found
 
     async def get_tracker_requests(self, meta: Meta, tracker: str, url: str) -> list[JsonDict]:
-        if meta.debug:
-            logger.debug(f"[bold green]Searching for existing requests on {tracker}[/bold green]")
+        logger.debug(f"[bold green]Searching for existing requests on {tracker}[/bold green]")
         requests: list[dict[str, Any]] = []
         headers = {
             'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
@@ -694,12 +675,11 @@ class TRACKER_SETUP:
         if 'BHD' not in self.config['TRACKERS'] or not self.config['TRACKERS']['BHD'].get('api_key'):
             logger.info("[red]BHD API key not configured. Skipping BHD request check.[/red]")
             return []
-        if meta.debug:
-            logger.debug(f"[bold green]Searching for existing requests on {tracker}[/bold green]")
+        logger.debug(f"[bold green]Searching for existing requests on {tracker}[/bold green]")
         requests: list[dict[str, Any]] = []
         params = {
             "action": "search",
-            "tmdb_id": f"{str(meta.category or '').lower()}/{meta.tmdb_id}",
+            "tmdb_id": f"{(meta.category or '').lower()}/{meta.tmdb_id}",
         }
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -978,7 +958,7 @@ class TRACKER_SETUP:
                             type_name = True
                     elif api_resolution == meta.resolution:
                         resolution = True
-                    meta_type = str(meta.type or "")
+                    meta_type = meta.type or ""
                     if 'Blu-ray' in api_type_str and meta_type == "ENCODE" or 'WEB' in api_type_str and 'WEB' in meta_type:
                         type_name = True
                     if meta.category == "MOVIE" and type_name and resolution and unclaimed and not internal and dv and hdr:
@@ -1070,14 +1050,13 @@ class TRACKER_SETUP:
             # Store per-tracker to avoid overwriting across multiple trackers
             meta[f'{tracker}_reported_torrent_id'] = reported_torrent_id
         if tracker == "LST":
-            if meta.debug:
-                logger.debug("[bold green]LST does not support searching existing trump reports[/bold green]")
+            logger.debug("[bold green]LST does not support searching existing trump reports[/bold green]")
             return True
 
-        if not meta.skip_upload_trackers or not isinstance(meta.skip_upload_trackers, list) or meta.skip_upload_trackers is None:
-            meta.setdefault('skip_upload_trackers', [])
+        if not isinstance(meta.skip_upload_trackers, list):
+            meta.skip_upload_trackers = []
 
-        trumping_reports, status = await self.get_tracker_trumps(meta, tracker, url, reported_torrent_id)
+        trumping_reports, status = await self.get_tracker_trumps(tracker, url, reported_torrent_id)
         upload = False
         if status != 200:
             logger.info(f"[bold red]Failed to retrieve trumping reports from {tracker}. HTTP Status: {status}[/bold red]")
@@ -1110,8 +1089,7 @@ class TRACKER_SETUP:
                 return False
             logger.info(f"[bold green]Proceeding with upload despite existing trumping reports on {tracker}[/bold green]")
         else:
-            if meta.debug:
-                logger.debug(f"[bold green]Will make a trumpable report for this upload at {tracker}[/bold green]")
+            logger.debug(f"[bold green]Will make a trumpable report for this upload at {tracker}[/bold green]")
 
         if not meta.tv_pack:
             logger.info(f"[yellow]{tracker} requires comparisons to be provided for trump reports.\nAre the comparison images in the description or are you adding links?")
@@ -1158,13 +1136,11 @@ class TRACKER_SETUP:
                 logger.info("[yellow]Skipping trump report creation as no comparison method provided.[/yellow]")
                 return False
         else:
-            if meta.debug:
-                logger.debug(f"[bold green]TV pack upload detected, skipping comparison images for trump report on {tracker}[/bold green]")
+            logger.debug(f"[bold green]TV pack upload detected, skipping comparison images for trump report on {tracker}[/bold green]")
             return True
 
-    async def get_tracker_trumps(self, meta: Meta, tracker: str, url: str, reported_torrent_id: str) -> tuple[list[JsonDict], int | None]:
-        if meta.debug:
-            logger.debug(f"[bold green]Searching for trumps on {tracker}[/bold green]")
+    async def get_tracker_trumps(self, tracker: str, url: str, reported_torrent_id: str) -> tuple[list[JsonDict], int | None]:
+        logger.debug(f"[bold green]Searching for trumps on {tracker}[/bold green]")
         requests: list[JsonDict] = []
         status_code: int | None = None
         headers = {
@@ -1266,15 +1242,13 @@ class TRACKER_SETUP:
             logger.error(f"[bold red]Unexpected error: {e}")
             status_code = None
 
-        if meta.debug:
-            logger.debug(f"Total trumping reports retrieved: {len(requests)}")
+        logger.debug(f"Total trumping reports retrieved: {len(requests)}")
 
         return requests, status_code
 
     async def make_trumpable_report(self, meta: Meta, tracker: str) -> bool:
         """Create a trump report by POSTing to the /create endpoint"""
-        if meta.debug:
-            logger.debug(f"[bold green]Creating trump report on {tracker}[/bold green]")
+        logger.debug(f"[bold green]Creating trump report on {tracker}[/bold green]")
 
         tracker_instance = self._create_tracker_instance(tracker)
         if not tracker_instance:

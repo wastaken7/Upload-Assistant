@@ -84,7 +84,7 @@ logger.addHandler(rich_handler)
 
 
 # Context variable to hold the path to the current release's log file (e.g. /tmp/<uuid>/upload.log)
-current_release_log_path = contextvars.ContextVar("current_release_log_path", default=None)
+current_release_log_path: contextvars.ContextVar[str | None] = contextvars.ContextVar("current_release_log_path", default=None)
 
 
 class LogFileFormatter(logging.Formatter):

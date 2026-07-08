@@ -23,7 +23,7 @@ class SevenZipBinaryManager:
     """Download 7-Zip binaries for the host architecture."""
 
     @staticmethod
-    async def ensure_7z_binary(base_dir: str | Path, debug: bool, version: str = "26.01") -> str:
+    async def ensure_7z_binary(base_dir: str | Path, version: str = "26.01") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         logger.debug(f"[blue]7-Zip: Detected system: {system}, architecture: {machine}[/blue]")

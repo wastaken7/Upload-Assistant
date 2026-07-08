@@ -5,7 +5,7 @@ from collections.abc import Callable, MutableMapping, Sequence
 from typing import Any, TypedDict, cast
 
 from cogs.redaction import Redaction
-from src.console import console, logger
+from src.console import logger
 from src.meta import Meta
 from src.trackers.UNIT3D.HUNO import HUNO
 
@@ -47,7 +47,7 @@ class DupeChecker:
         Everything is a dupe, until it matches a criteria to be excluded.
         """
         if meta.debug:
-            console.log(f"[cyan]Pre-filtered dupes from {tracker_name}")
+            logger.debug(f"[cyan]Pre-filtered dupes from {tracker_name}")
             # Limit dupe output for readability
             if dupes:
                 dupes_to_print: list[dict[str, Any]] = []
@@ -62,9 +62,9 @@ class DupeChecker:
                         dupes_to_print.append(limited_dupe)
                     else:
                         dupes_to_print.append(Redaction.redact_private_info(dupe))
-                console.log(dupes_to_print)
+                logger.debug(dupes_to_print)
             else:
-                console.log(dupes)
+                logger.debug(dupes)
 
         meta.trumpable_id = None
         processed_dupes: list[DupeEntry] = []
@@ -170,7 +170,7 @@ class DupeChecker:
                     filename = os.path.basename(file_path)
                     filenames.append(filename)
             if meta.debug:
-                console.log(f"dupe checking filenames: {filenames[:10]}{'...' if len(filenames) > 10 else ''}")
+                logger.debug(f"dupe checking filenames: {filenames[:10]}{'...' if len(filenames) > 10 else ''}")
 
         attribute_checks: list[AttributeCheck] = [
             {
@@ -189,7 +189,7 @@ class DupeChecker:
 
         async def log_exclusion(reason: str, item: str) -> None:
             if meta.debug:
-                console.log(f"[yellow]Excluding result due to {reason}: {item}")
+                logger.debug(f"[yellow]Excluding result due to {reason}: {item}")
 
         async def process_exclusion(entry: DupeEntry) -> bool:
             """
@@ -219,8 +219,7 @@ class DupeChecker:
                                 await log_exclusion(f"size difference ({diff_pct:.2f}%) exceeding tolerance ({tolerance_val}%)", each)
                                 return True
                 except Exception as e:
-                    if meta.debug:
-                        console.log(f"[debug] Error in dupe size tolerance check: {e}")
+                    logger.debug(f"[debug] Error in dupe size tolerance check: {e}")
 
             files_value = cast(list[Any], entry.get('files') or [])
             files = [str(file) for file in files_value]
@@ -249,32 +248,31 @@ class DupeChecker:
                         file_hdr.add('DV')
                     elif flag_upper in ['HDR', 'HDR10', 'HDR10+']:
                         file_hdr.add('HDR')
-                if meta.debug:
-                    console.log(f"[debug] Using flags for HDR detection: {flags} -> {file_hdr}")
+                logger.debug(f"[debug] Using flags for HDR detection: {flags} -> {file_hdr}")
             else:
                 # Fall back to parsing filename for HDR terms
                 file_hdr = await DupeChecker.refine_hdr_terms(normalized)
 
             if meta.debug:
-                console.log(f"[debug] Evaluating dupe: {each}")
-                console.log(f"[debug] Normalized dupe: {normalized}")
-                console.log(f"[debug] Target resolution: {target_resolution}")
-                console.log(f"[debug] Target source: {target_source}")
-                console.log(f"[debug] File HDR terms: {file_hdr}")
-                console.log(f"[debug] Flags: {flags}")
-                console.log(f"[debug] Target HDR terms: {target_hdr}")
-                console.log(f"[debug] Target Season: {target_season}")
-                console.log(f"[debug] Target Episode: {target_episode}")
-                console.log(f"[debug] TAG: {tag}")
-                console.log("[debug] Evaluating repack condition:")
-                console.log(f"  has_repack_in_uuid: {has_repack_in_uuid}")
-                console.log(f"  'repack' in each.lower(): {'repack' in each.lower()}")
-                console.log(f"[debug] meta.uuid: {meta.uuid}")
-                console.log(f"[debug] normalized encoder: {normalized_encoder}")
-                console.log(f"[debug] type_id: {type_id}, res_id: {res_id}")
-                console.log(f"[debug] link: {entry.get('link', None)}")
-                console.log(f"[debug] files: {files[:10]}{'...' if len(files) > 10 else ''}")
-                console.log(f"[debug] file_count: {file_count}")
+                logger.debug(f"[debug] Evaluating dupe: {each}")
+                logger.debug(f"[debug] Normalized dupe: {normalized}")
+                logger.debug(f"[debug] Target resolution: {target_resolution}")
+                logger.debug(f"[debug] Target source: {target_source}")
+                logger.debug(f"[debug] File HDR terms: {file_hdr}")
+                logger.debug(f"[debug] Flags: {flags}")
+                logger.debug(f"[debug] Target HDR terms: {target_hdr}")
+                logger.debug(f"[debug] Target Season: {target_season}")
+                logger.debug(f"[debug] Target Episode: {target_episode}")
+                logger.debug(f"[debug] TAG: {tag}")
+                logger.debug("[debug] Evaluating repack condition:")
+                logger.debug(f"  has_repack_in_uuid: {has_repack_in_uuid}")
+                logger.debug(f"  'repack' in each.lower(): {'repack' in each.lower()}")
+                logger.debug(f"[debug] meta.uuid: {meta.uuid}")
+                logger.debug(f"[debug] normalized encoder: {normalized_encoder}")
+                logger.debug(f"[debug] type_id: {type_id}, res_id: {res_id}")
+                logger.debug(f"[debug] link: {entry.get('link', None)}")
+                logger.debug(f"[debug] files: {files[:10]}{'...' if len(files) > 10 else ''}")
+                logger.debug(f"[debug] file_count: {file_count}")
 
             def remember_match(reason: str) -> None:
                 """Persist details about the dupe that triggered a match for later use."""
@@ -382,8 +380,7 @@ class DupeChecker:
                 clean_target = clean_game_title(target_title)
                 clean_each = clean_game_title(each)
 
-                if meta.debug:
-                    console.log(f"[debug] Game title comparison: Target='{clean_target}' vs Dupe='{clean_each}'")
+                logger.debug(f"[debug] Game title comparison: Target='{clean_target}' vs Dupe='{clean_each}'")
 
                 is_match = False
                 if (
@@ -401,8 +398,7 @@ class DupeChecker:
 
                 # Title match! It is a duplicate.
                 remember_match("title")
-                if meta.debug:
-                    console.log(f"[cyan]Game duplicate matched: {each}")
+                logger.debug(f"[cyan]Game duplicate matched: {each}")
                 return False
 
             if meta.category == "BOOK":
@@ -466,7 +462,7 @@ class DupeChecker:
                 # Check format/type compatibility
                 target_is_audiobook = meta.audiobook
 
-                dupe_type = entry.get("type") or "".lower()
+                dupe_type = (entry.get("type") or "").lower()
                 audiobook_types = {"audiobook", "mp3", "flac", "m4b", "m4a", "wav", "ogg", "aac", "ac3", "wma", "opus"}
                 dupe_is_audiobook = (
                     (dupe_type in audiobook_types)
@@ -481,7 +477,7 @@ class DupeChecker:
 
                 if not target_is_audiobook:
                     # Compare ebook formats (e.g. EPUB vs PDF)
-                    target_type = str(meta.type or "").lower()
+                    target_type = (meta.type or "").lower()
 
                     # Check if formats match either by type_id/dupe_type or file extension
                     format_match = target_type == dupe_type
@@ -495,8 +491,7 @@ class DupeChecker:
 
                     if not format_match:
                         if tracker_name == "CBR":
-                            if meta.debug:
-                                console.log("[debug] CBR allows only one ebook format per book, so different formats are considered duplicates.")
+                            logger.debug("[debug] CBR allows only one ebook format per book, so different formats are considered duplicates.")
                         else:
                             await log_exclusion(f"book format type mismatch (expected {target_type})", each)
                             return True
@@ -506,21 +501,18 @@ class DupeChecker:
                     for file in filenames:
                         if any(file.lower() == f.lower() for f in files):
                             meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
-                            if meta.debug:
-                                console.log(f"[debug] Book filename match found: {meta.filename_match}")
+                            logger.debug(f"[debug] Book filename match found: {meta.filename_match}")
                             remember_match("filename")
                             remember_match("id")
                             if file_count and file_count == len(filelist):
                                 meta.file_count_match = file_count
-                                if meta.debug:
-                                    console.log(f"[debug] Book file count match found: {meta.file_count_match}")
+                                logger.debug(f"[debug] Book file count match found: {meta.file_count_match}")
                                 remember_match("file_count")
                                 break
 
                 # Title and format match! It is a duplicate.
                 remember_match("title")
-                if meta.debug:
-                    console.log(f"[cyan]Book duplicate matched: {each}")
+                logger.debug(f"[cyan]Book duplicate matched: {each}")
                 return False
 
             # Aither-specific trumping logic - no internal checking, if it's marked trumpable, it's trumpable
@@ -546,21 +538,18 @@ class DupeChecker:
                             remember_match('size')
                             return False
                         if meta.debug and entry_size is None and meta.source_size is not None:
-                            console.log(f"[debug] Size comparison failed due to ValueError: entry_size={entry.get('size')}, source_size={meta.source_size}")
+                            logger.debug(f"[debug] Size comparison failed due to ValueError: entry_size={entry.get('size')}, source_size={meta.source_size}")
                     else:
-                        if meta.debug:
-                            console.log(f"[debug] Comparing file: {file} against dupe files list.")
-                            console.log(f"[debug] Dupe files list: {files[:10]}{'...' if len(files) > 10 else files}")
+                        logger.debug(f"[debug] Comparing file: {file} against dupe files list.")
+                        logger.debug(f"[debug] Dupe files list: {files[:10]}{'...' if len(files) > 10 else ''}")
                         if any(file.lower() == f.lower() for f in files):
                             meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
-                            if meta.debug:
-                                console.log(f"[debug] Filename match found: {meta.filename_match}")
+                            logger.debug(f"[debug] Filename match found: {meta.filename_match}")
                             remember_match('filename')
                             remember_match('id')
                             if file_count and file_count == len(filelist):
                                 meta.file_count_match = file_count
-                                if meta.debug:
-                                    console.log(f"[debug] File count match found: {meta.file_count_match}")
+                                logger.debug(f"[debug] File count match found: {meta.file_count_match}")
                                 remember_match('file_count')
                                 return False
                 if tracker_name in ["BHD"]:
@@ -568,27 +557,25 @@ class DupeChecker:
                     entry_size = coerce_int(entry.get('size'))
                     source_size = coerce_int(meta.source_size)
                     if entry_size is not None and source_size is not None:
-                        if meta.debug:
-                            console.log(f"[debug] Comparing sizes: Entry size {entry_size} vs Source size {source_size}")
+                        logger.debug(f"[debug] Comparing sizes: Entry size {entry_size} vs Source size {source_size}")
                         if entry_size == source_size:
                             meta.size_match = f"{entry.get('name')} = {entry.get('link', None)}"
                             remember_match('size')
                             return False
                     elif meta.debug and entry_size is None and meta.source_size is not None:
-                        console.log(f"[debug] Size comparison failed due to ValueError: entry_size={entry.get('size')}, source_size={meta.source_size}")
+                        logger.debug(f"[debug] Size comparison failed due to ValueError: entry_size={entry.get('size')}, source_size={meta.source_size}")
 
             else:
                 entry_size = coerce_int(entry.get('size'))
                 source_size = coerce_int(meta.source_size)
                 if entry_size is not None and source_size is not None:
-                    if meta.debug:
-                        console.log(f"[debug] Comparing sizes: Entry size {entry_size} vs Source size {source_size}")
+                    logger.debug(f"[debug] Comparing sizes: Entry size {entry_size} vs Source size {source_size}")
                     if entry_size == source_size:
                         meta.size_match = f"{entry.get('name')} = {entry.get('link', None)}"
                         remember_match('size')
                         return False
                 elif meta.debug and entry_size is None and meta.source_size is not None:
-                    console.log(f"[debug] Size comparison failed due to ValueError: entry_size={entry.get('size')}, source_size={meta.source_size}")
+                    logger.debug(f"[debug] Size comparison failed due to ValueError: entry_size={entry.get('size')}, source_size={meta.source_size}")
 
             if meta.is_disc and file_count and file_count < 2:
                 await log_exclusion("file count less than 2 for disc upload", each)
@@ -706,8 +693,7 @@ class DupeChecker:
                     uuid_has_remux = check["uuid_flag"]
                     dupe_has_remux = check["condition"](normalized)
 
-                    if meta.debug:
-                        console.log(f"[debug] Remux check: uuid_has_remux={uuid_has_remux}, dupe_has_remux={dupe_has_remux}")
+                    logger.debug(f"[debug] Remux check: uuid_has_remux={uuid_has_remux}, dupe_has_remux={dupe_has_remux}")
 
                     if uuid_has_remux and not dupe_has_remux:
                         await log_exclusion("missing 'remux'", each)
@@ -718,9 +704,8 @@ class DupeChecker:
 
             if meta.category == "TV":
                 season_episode_match, is_season = await DupeChecker.is_season_episode_match(normalized, target_season, target_episode)
-                if meta.debug:
-                    console.log(f"[debug] Season/Episode match result: {season_episode_match}")
-                    console.log(f"[debug] is_season: {is_season}")
+                logger.debug(f"[debug] Season/Episode match result: {season_episode_match}")
+                logger.debug(f"[debug] is_season: {is_season}")
                 # Aither episode trumping logic
                 if is_season and tracker_name in ["AITHER", "LST"]:
                     # Null-safe normalization for comparisons
@@ -730,13 +715,11 @@ class DupeChecker:
                     target_resolution_safe = target_resolution or ""
 
                     if type_id_lower and res_id_safe:
-                        if meta.debug:
-                            console.log(
-                                f"[debug] Checking trumping: target_source='{target_source_lower}', type_id='{type_id_lower}', target_res='{target_resolution_safe}', res_id='{res_id_safe}'"
-                            )
+                        logger.debug(
+                            f"[debug] Checking trumping: target_source='{target_source_lower}', type_id='{type_id_lower}', target_res='{target_resolution_safe}', res_id='{res_id_safe}'"
+                        )
                         if target_source_lower in type_id_lower and target_resolution_safe == res_id_safe:
-                            if meta.debug:
-                                console.log(f"[debug] Episode with matching source and resolution found for trumping: {each}")
+                            logger.debug(f"[debug] Episode with matching source and resolution found for trumping: {each}")
 
                             is_internal = False
                             if entry.get('internal', 0) == 1:
@@ -749,7 +732,7 @@ class DupeChecker:
                                         if tag_without_prefix in internal_groups and tag_without_prefix.lower() in normalized:
                                             is_internal = True
                                 if not is_internal and meta.debug:
-                                    console.log("[debug] Skipping internal episode for trumping since you're not the internal uploader.")
+                                    logger.debug("[debug] Skipping internal episode for trumping since you're not the internal uploader.")
 
                             if not entry.get('internal', False) or is_internal:
                                 # Store the matched episode ID/s for later use
@@ -779,14 +762,13 @@ class DupeChecker:
                                         'tracker': tracker_name,
                                         'internal': entry.get('internal', 0),
                                     })
-                                    if meta.debug:
-                                        console.log(f"[debug] Added episode ID {entry_id} to matched list")
+                                    logger.debug(f"[debug] Added episode ID {entry_id} to matched list")
                                     # Ensure this matched dupe is recorded for later use
                                     remember_match('season_pack_contains_episode')
                                     # Don't exclude this entry - it's a valid trump target
                                     return False
                                 if already_exists and meta.debug:
-                                    console.log(f"[debug] Skipping duplicate entry for episode ID {entry_id}")
+                                    logger.debug(f"[debug] Skipping duplicate entry for episode ID {entry_id}")
 
                 # Normal season/episode matching
                 if not season_episode_match:
@@ -800,9 +782,8 @@ class DupeChecker:
                     meta.season_pack_name = each
                     meta.season_pack_link = entry.get("link")
                     meta.season_pack_id = entry.get("id")
-                    if meta.debug:
-                        console.log(f"[yellow]Season pack detected for episode upload: {each}")
-                        console.log(f"[yellow]Your episode {target_season}{target_episode} is contained in existing season pack")
+                    logger.debug(f"[yellow]Season pack detected for episode upload: {each}")
+                    logger.debug(f"[yellow]Your episode {target_season}{target_episode} is contained in existing season pack")
                     remember_match('season_pack_contains_episode')
                     return False
 
@@ -822,8 +803,7 @@ class DupeChecker:
 
                 if dupe_size is not None and dupe_size != 0:
                     size_difference = (target_size - dupe_size) / dupe_size
-                    if meta.debug:
-                        logger.debug(f"Your size: {target_size}, Dupe size: {dupe_size}, Size difference: {size_difference:.4f}")
+                    logger.debug(f"Your size: {target_size}, Dupe size: {dupe_size}, Size difference: {size_difference:.4f}")
                     if size_difference >= 0.20:
                         await log_exclusion(f"Your file is significantly larger ({size_difference * 100:.2f}%)", each)
                         return True
@@ -835,14 +815,14 @@ class DupeChecker:
                     return True
 
             if meta.debug:
-                console.log(f"[cyan]Release PASSED all checks: {each}")
+                logger.debug(f"[cyan]Release PASSED all checks: {each}")
             return False
 
         new_dupes = [each for each in processed_dupes if not await process_exclusion(each)]
 
         if new_dupes and not meta.unattended and meta.debug:
             if len(processed_dupes) > 1:
-                console.log(f"[yellow]Filtered dupes on {tracker_name}: ")
+                logger.debug(f"[yellow]Filtered dupes on {tracker_name}: ")
             # Limit filtered dupe output for readability
             filtered_dupes_to_print: list[dict[str, Any]] = []
 
@@ -860,7 +840,7 @@ class DupeChecker:
                 filtered_dupes_to_print.append(limited_dupe)
 
             if len(processed_dupes) > 1:
-                console.log(filtered_dupes_to_print)
+                logger.debug(filtered_dupes_to_print)
 
         return new_dupes
 

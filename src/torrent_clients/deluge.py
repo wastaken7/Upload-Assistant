@@ -7,11 +7,10 @@ from deluge_client import DelugeRPCClient
 from torf import Torrent
 
 from src.console import logger
-from src.meta import Meta
 
 
 class DelugeClientMixin:
-    def deluge(self, path: str, torrent_path: str, torrent: Torrent, local_path: str, remote_path: str, client: dict[str, Any], meta: Meta) -> None:
+    def deluge(self, path: str, torrent_path: str, torrent: Torrent, local_path: str, remote_path: str, client: dict[str, Any]) -> None:
         deluge_client: Any = DelugeRPCClient(client['deluge_url'], int(client['deluge_port']), client['deluge_user'], client['deluge_pass'])
         # deluge_client = LocalDelugeRPCClient()
         deluge_client.connect()
@@ -25,7 +24,6 @@ class DelugeClientMixin:
             path = os.path.dirname(path)
 
             deluge_client.call('core.add_torrent_file', torrent_path, base64.b64encode(torrent.dump()), {'download_location': path, 'seed_mode': True})
-            if meta.debug:
-                logger.debug(f"[cyan]Path: {path}")
+            logger.debug(f"[cyan]Path: {path}")
         else:
             logger.info("[bold red]Unable to connect to deluge")

@@ -1,3 +1,4 @@
+import asyncio
 import gettext
 import os
 import re
@@ -814,7 +815,7 @@ class MKO:
 
     # -- forum routing
 
-    def get_forum_id(self, meta: Meta) -> int:
+    async def get_forum_id(self, meta: Meta) -> int:
         """
         Determine the target forum ID based on content type and country of origin.
 
@@ -916,7 +917,7 @@ class MKO:
         for k, (fid, name) in forum_options.items():
             logger.info(f"  {k}) {name} (ID: {fid})")
 
-        choice = input("Escolha: ").strip()
+        choice = (await asyncio.to_thread(input, "Escolha: ")).strip()
         if choice in forum_options:
             return forum_options[choice][0]
 
@@ -1082,7 +1083,8 @@ class MKO:
         logger.info(f"[cyan]{self.tracker}:[/cyan] [yellow]Any subtitles?[/yellow]")
         for k, v in options.items():
             logger.info(f"  {k}) {v}")
-        return options.get(input("Choose: ").strip(), "")
+        selection = (await asyncio.to_thread(input, "Choose: ")).strip()
+        return options.get(selection, "")
 
     async def generate_description(self, meta: Meta) -> str:
         """
@@ -1205,7 +1207,7 @@ class MKO:
         Returns:
             bool: True if the upload succeeded.
         """
-        forum_id = self.get_forum_id(meta)
+        forum_id = await self.get_forum_id(meta)
         logger.info(f"[cyan]{self.tracker}:[/cyan] [green]Selected subforum:[/green] {forum_id} ")
         await self.common.create_torrent_for_upload(
             meta=meta,

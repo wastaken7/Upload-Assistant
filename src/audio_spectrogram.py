@@ -81,8 +81,7 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
 
                 if "spectrograms_images" in spectrograms_image_file and not meta.spectrograms_images:
                     meta.spectrograms_images = spectrograms_image_file["spectrograms_images"]
-                    if meta.debug:
-                        logger.debug(f"[cyan]Loaded {len(spectrograms_image_file['spectrograms_images'])} previously saved spectrograms")
+                    logger.debug(f"[cyan]Loaded {len(spectrograms_image_file['spectrograms_images'])} previously saved spectrograms")
 
         except Exception as e:
             logger.info(f"[yellow]Could not load spectrograms image data: {str(e)}")
@@ -102,8 +101,7 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
         files_list = bdinfo.get("files", [])
         disc_file = files_list[0].get("file", "") if files_list else ""
         disc_final_path = os.path.join(disc_path, "STREAM", disc_file) if disc_path and disc_file else ""
-        if meta.debug:
-            logger.debug(f"disc_final_path: {disc_final_path}")
+        logger.debug(f"disc_final_path: {disc_final_path}")
 
     mkv_path = ""
     filelist = meta.filelist
@@ -191,8 +189,7 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
                         spectrograms_image_file_dict = {"spectrograms_images": spec_images}
                         async with aiofiles.open(audio_spectrograms_images, "w", encoding="utf-8") as spec_file:
                             await spec_file.write(json.dumps(spectrograms_image_file_dict, indent=4))
-                        if meta.debug:
-                            logger.debug(f"[cyan]Saved {len(spec_images)} spectrograms to audio_spectrograms_images.json")
+                        logger.debug(f"[cyan]Saved {len(spec_images)} spectrograms to audio_spectrograms_images.json")
                     except Exception as e:
                         logger.info(f"[yellow]Failed to save spectrograms image data: {str(e)}")
             except Exception as e:

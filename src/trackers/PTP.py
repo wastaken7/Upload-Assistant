@@ -251,7 +251,7 @@ class PTP:
                 edit_choice = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
 
                 if (edit_choice or "").lower() == 'e':
-                    edited_description = click.edit(desc)
+                    edited_description = cast(str | None, click.edit(cast(Any, desc)))
                     if edited_description:
                         desc = edited_description.strip()
                         meta.description = desc
@@ -880,8 +880,7 @@ class PTP:
                                     logger.info(f"[yellow]Filtering out image from non-approved host: {hostname}[/yellow]")
                             except Exception:
                                 # If URL parsing fails, skip this image
-                                if meta.debug:
-                                    logger.debug(f"[yellow]Could not parse URL: {raw_url}[/yellow]")
+                                logger.debug(f"[yellow]Could not parse URL: {raw_url}[/yellow]")
                                 continue
 
                         if images_to_keep:
@@ -894,9 +893,8 @@ class PTP:
 
                     # Remove keys with no approved images
                     for key_name in keys_to_remove:
-                        del pack_images_data['keys'][key_name]
-                        if meta.debug:
-                            logger.debug(f"[yellow]Removed key '{key_name}' - no approved image hosts[/yellow]")
+                        del pack_images_data["keys"][key_name]
+                        logger.debug(f"[yellow]Removed key '{key_name}' - no approved image hosts[/yellow]")
 
                     # Recalculate total count
                     keys = cast(dict[str, Any], pack_images_data.get('keys', {}))
@@ -904,12 +902,10 @@ class PTP:
 
                     if pack_images_data.get('total_count', 0) < 3:
                         pack_images_data = {}  # Invalidate if less than 3 images total
-                        if meta.debug:
-                            logger.debug("[yellow]Invalidating pack images - less than 3 approved images total[/yellow]")
+                        logger.debug("[yellow]Invalidating pack images - less than 3 approved images total[/yellow]")
                     else:
-                        if meta.debug:
-                            logger.debug(f"[green]Loaded previously uploaded images from {pack_images_file}")
-                            logger.debug(f"[blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]")
+                        logger.debug(f"[green]Loaded previously uploaded images from {pack_images_file}")
+                        logger.debug(f"[blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]")
             except Exception as e:
                 logger.warning(f"[yellow]Warning: Could not load pack image data: {str(e)}[/yellow]")
 
@@ -973,8 +969,7 @@ class PTP:
                     if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
                         saved_images = cast(list[dict[str, Any]], pack_images_data['keys'][new_images_key]['images'])
                         if saved_images:
-                            if meta.debug:
-                                logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                            logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                             meta[new_images_key] = []
                             for img in saved_images:
@@ -988,8 +983,7 @@ class PTP:
                         desc.write(f"\n[b]{edition}[/b]\n\n")
                         # Use the summary corresponding to the current bdinfo
                         desc.write(f"[mediainfo]{summary}[/mediainfo]\n\n")
-                        if meta.debug:
-                            logger.debug("[yellow]Using original uploaded images for first disc")
+                        logger.debug("[yellow]Using original uploaded images for first disc")
                         for img in meta[new_images_key]:
                             raw_url = str(img.get('raw_url', ''))
                             desc.write(f"[img]{raw_url}[/img]\n")
@@ -1064,8 +1058,7 @@ class PTP:
                         if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
                             saved_images = cast(list[dict[str, Any]], pack_images_data['keys'][new_images_key]['images'])
                             if saved_images:
-                                if meta.debug:
-                                    logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                                logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
@@ -1135,8 +1128,7 @@ class PTP:
                         if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
                             saved_images = pack_images_data['keys'][new_images_key]['images']
                             if saved_images:
-                                if meta.debug:
-                                    logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                                logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
@@ -1265,8 +1257,7 @@ class PTP:
                     if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
                         saved_images = pack_images_data['keys'][new_images_key]['images']
                         if saved_images:
-                            if meta.debug:
-                                logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                            logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                             meta[new_images_key] = []
                             for img in saved_images:
@@ -1374,9 +1365,8 @@ class PTP:
             async with aiofiles.open(output_file, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(existing_data, indent=2))
 
-            if meta.debug:
-                logger.debug(f"[green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
-                logger.debug(f"[blue]  - JSON: {output_file}[/blue]")
+            logger.debug(f"[green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
+            logger.debug(f"[blue]  - JSON: {output_file}[/blue]")
 
             return output_file
         except Exception as e:
@@ -1392,7 +1382,7 @@ class PTP:
         cookies: dict[str, str] = {}
         if os.path.exists(cookiefile):
             raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # pyright: ignore[reportPrivateUsage]
-            cookies = {name: str(data.get('value', '')) for name, data in raw_cookies.items()}
+            cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
                 uploadresponse = await client.get("https://passthepopcorn.me/upload.php")
                 loggedIn = await self.validate_login(uploadresponse)
@@ -1425,9 +1415,9 @@ class PTP:
             await asyncio.sleep(2)
             try:
                 resp = loginresponse.json()
-                if resp['Result'] == "TfaRequired":
-                    data['TfaType'] = "normal"
-                    data['TfaCode'] = cli_ui.ask_string("2FA Required: Please enter PTP 2FA code")
+                if resp["Result"] == "TfaRequired":
+                    data["TfaType"] = "normal"
+                    data["TfaCode"] = cli_ui.ask_string("2FA Required: Please enter PTP 2FA code")
                     loginresponse = await client.post("https://passthepopcorn.me/ajax.php?action=login", data=data, headers=headers)
                     await asyncio.sleep(2)
                     resp = loginresponse.json()
@@ -1492,16 +1482,14 @@ class PTP:
         else:
             mediainfo = meta.mediainfo
             audio_tracks = [track for track in mediainfo.get("media", {}).get("track", []) if track.get("@type") == "Audio"]
-            if meta.debug:
-                logger.debug(f"[Debug] Found {len(audio_tracks)} audio tracks")
+            logger.debug(f"[Debug] Found {len(audio_tracks)} audio tracks")
 
             if not audio_tracks:
                 no_audio_found = True
                 logger.info("[yellow]No audio tracks found in mediainfo")
             else:
                 first_language = str(audio_tracks[0].get("Language", "")).lower()
-                if meta.debug:
-                    logger.debug(f"[Debug] First audio track language: {first_language}")
+                logger.debug(f"[Debug] First audio track language: {first_language}")
 
                 if not first_language:
                     no_audio_found = True
@@ -1535,9 +1523,8 @@ class PTP:
             if cli_ui.ask_yes_no("Mark trumpable?", default=True):
                 ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
 
-        if meta.debug:
-            logger.debug(f"ptp_trumpable: {ptp_trumpable}")
-            logger.debug(f"ptp_subtitles: {ptp_subtitles}")
+        logger.debug(f"ptp_trumpable: {ptp_trumpable}")
+        logger.debug(f"ptp_subtitles: {ptp_subtitles}")
         data: dict[str, Any] = {
             "submit": "true",
             "remaster_year": "",
@@ -1673,8 +1660,8 @@ class PTP:
             # Redact the AntiCsrfToken
             if 'AntiCsrfToken' in debug_data:
                 debug_data['AntiCsrfToken'] = '[REDACTED]'
-            console.log(url)
-            console.log(Redaction.redact_private_info(debug_data))
+            logger.debug(url)
+            logger.debug(Redaction.redact_private_info(debug_data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success

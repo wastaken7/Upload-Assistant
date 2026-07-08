@@ -25,7 +25,7 @@ class LPT(NEXUSPHP):
         tv_series = 402
         tv_shows = 403
 
-        category = str(meta.category).upper()
+        category = meta.category.upper()
         genres = ", ".join(meta.genres).lower()
         keywords = ", ".join(meta.keywords).lower()
 
@@ -68,7 +68,7 @@ class LPT(NEXUSPHP):
         uhd_remux = 11
         web_dl = 4
 
-        is_disc = str(meta.is_disc).lower()
+        is_disc = (meta.is_disc or "").lower()
         mtype = str(meta.type).lower()
         resolution = meta.resolution.lower()
 
@@ -189,7 +189,7 @@ class LPT(NEXUSPHP):
             "-wiki": 4,
         }
 
-        group = meta.tag.lower()
+        group = meta.tag.lower() if meta.tag else ""
         return group_tag.get(group, 5)
 
     def get_checkboxes(self, meta: Meta) -> list[str]:
@@ -200,8 +200,8 @@ class LPT(NEXUSPHP):
         hdr = 7
         reposting_prohibited = 1
 
-        audio_tracks = meta.audio_languages
-        subtitle_tracks = meta.subtitle_languages
+        audio_tracks = meta.audio_languages or []
+        subtitle_tracks = meta.subtitle_languages or []
         mhdr = meta.hdr
 
         checkboxes = []

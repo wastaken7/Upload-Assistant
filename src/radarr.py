@@ -13,7 +13,7 @@ class RadarrManager:
         self.config = config
         self.default_config = cast(dict[str, Any], config.get('DEFAULT', {}))
 
-    async def get_radarr_data(self, tmdb_id: int | None = None, filename: str | None = None, debug: bool = False) -> MovieInfo | None:
+    async def get_radarr_data(self, tmdb_id: int | None = None, filename: str | None = None) -> MovieInfo | None:
         if not any(key.startswith('radarr_api_key') for key in self.default_config):
             logger.info("[red]No Radarr API keys are configured.[/red]")
             return None

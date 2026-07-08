@@ -15,12 +15,12 @@ Config = dict[str, Any]
 
 class DS:
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")
+    is_usenet = True
 
     def __init__(self, config: Config) -> None:
         self.config = config
         self.common = COMMON(config)
         self.tracker = "DS"
-        self.is_usenet = True
         self.upload_url = str(self.config.get("TRACKERS", {}).get(self.tracker, {}).get("upload_url", "").replace("/upload_form", "/upload.php")).strip()
         self.torrent_url = "https://drunkenslug.com/search/"
         self.banned_groups = []

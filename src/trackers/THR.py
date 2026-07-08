@@ -114,27 +114,24 @@ class THR:
                     async with httpx.AsyncClient(cookies=cookies, follow_redirects=True) as session:
                         response = await session.post(url=url, files=files, data=payload, headers=headers)
 
-                        if meta.debug:
-                            logger.debug(f"[dim]Response status: {response.status_code}")
-                            logger.debug(f"[dim]Response URL: {response.url}")
-                            logger.debug(response.text[:500] + "...")
+                        logger.debug(f"[dim]Response status: {response.status_code}")
+                        logger.debug(f"[dim]Response URL: {response.url}")
+                        logger.debug(response.text[:500] + "...")
 
                         if "uploaded=1" in str(response.url):
                             tracker_status = meta.tracker_status
                             tracker_status.setdefault(self.tracker, {})
-                            tracker_status[self.tracker]['status_message'] = response.url
+                            tracker_status[self.tracker]["status_message"] = response.url
                             return True
                         else:
                             logger.info(f"[yellow]Upload response didn't contain 'uploaded=1'. URL: {response.url}")
-                            soup = BeautifulSoup(response.text, 'html.parser')
-                            error_text = soup.find('h2', string=re.compile(r'Error'))  # type: ignore
+                            soup = BeautifulSoup(response.text, "html.parser")
+                            error_text = soup.find("h2", string=re.compile(r"Error"))  # type: ignore
 
                             if error_text:
-                                error_message = cast(Any, error_text).find_next('p')
+                                error_message = cast(Any, error_text).find_next("p")
                                 if error_message:
-                                    logger.info(
-                                        f"[red]Upload error: {error_message.text}"
-                                    )
+                                    logger.info(f"[red]Upload error: {error_message.text}")
 
                             return False
                 else:
@@ -154,7 +151,7 @@ class THR:
             logger.info(Redaction.redact_private_info(payload))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
-            tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
+            tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return False
 
@@ -164,21 +161,21 @@ class THR:
         category = meta.category
         is_disc = meta.is_disc
         sd = int(meta.sd or 0)
-        cat = '17'
+        cat = "17"
 
-        if 'documentary' in genres or 'documentary' in keywords:
-            cat = '12'
+        if "documentary" in genres or "documentary" in keywords:
+            cat = "12"
         elif category == "MOVIE":
-            if is_disc == "BMDV":
-                cat = '40'
+            if is_disc == "BDMV":
+                cat = "40"
             elif is_disc in {"DVD", "HDDVD"}:
-                cat = '14'
+                cat = "14"
             else:
-                cat = '4' if sd == 1 else '17'
+                cat = "4" if sd == 1 else "17"
         elif category == "TV":
-            cat = '7' if sd == 1 else '34'
+            cat = "7" if sd == 1 else "34"
         elif meta.anime:
-            cat = '31'
+            cat = "31"
         return cat
 
     def get_subtitles(self, meta: Meta) -> list[int]:
@@ -187,24 +184,21 @@ class THR:
         if (meta.is_disc) != "BDMV":
             with open(f"{meta.base_dir}/tmp/{meta.uuid}/MediaInfo.json", encoding="utf-8") as f:
                 mi = cast(dict[str, Any], json.load(f))
-            tracks = cast(list[dict[str, Any]], cast(dict[str, Any], mi.get('media', {})).get('track', []))
+            tracks = cast(list[dict[str, Any]], cast(dict[str, Any], mi.get("media", {})).get("track", []))
             for track in tracks:
-                if track['@type'] == "Text":
-                    language = track.get('Language')
-                    language = language.split('-')[0] if language else language
-                    if language in ['hr', 'en', 'bs', 'sr', 'sl'] and language not in sub_langs:
+                if track["@type"] == "Text":
+                    language = track.get("Language")
+                    language = language.split("-")[0] if language else language
+                    if language in ["hr", "en", "bs", "sr", "sl"] and language not in sub_langs:
                         sub_langs.append(str(language))
         else:
             bdinfo = meta.bdinfo
-            for sub in cast(list[Any], bdinfo.get('subtitles', [])):
+            for sub in cast(list[Any], bdinfo.get("subtitles", [])):
                 if sub not in sub_langs:
                     sub_langs.append(str(sub))
         if sub_langs != []:
             subs = []
-            sub_lang_map = {
-                'hr': 1, 'en': 2, 'bs': 3, 'sr': 4, 'sl': 5,
-                'Croatian': 1, 'English': 2, 'Bosnian': 3, 'Serbian': 4, 'Slovenian': 5
-            }
+            sub_lang_map = {"hr": 1, "en": 2, "bs": 3, "sr": 4, "sl": 5, "Croatian": 1, "English": 2, "Bosnian": 3, "Serbian": 4, "Slovenian": 5}
             for sub in sub_langs:
                 language = sub_lang_map.get(sub)
                 if language is not None:
@@ -255,10 +249,12 @@ class THR:
             base = bbcode.convert_spoiler_to_hide(base)
             base = bbcode.convert_code_to_pre(base)
             # fix alignment for NFO content inherited from centering the spoiler
-            base = re.sub(r'(?P<open>\[hide=(Scene|FraMeSToR) NFO:\]\[pre\])(?P<content>.*?)(?P<close>\[/pre\]\[/hide\])',
-                          r'\g<open>[align=left]\g<content>[/align]\g<close>',
-                          base,
-                          flags=re.DOTALL)
+            base = re.sub(
+                r"(?P<open>\[hide=(Scene|FraMeSToR) NFO:\]\[pre\])(?P<content>.*?)(?P<close>\[/pre\]\[/hide\])",
+                r"\g<open>[align=left]\g<content>[/align]\g<close>",
+                base,
+                flags=re.DOTALL,
+            )
             desc_parts.append("\n\n" + base)
 
         # REHOST IMAGES
@@ -283,7 +279,7 @@ class THR:
             ordered_images.append(image)
 
         image_list: list[str] = []
-        image_api_key = str(self.config['TRACKERS']['THR'].get('img_api', '')).strip()
+        image_api_key = str(self.config["TRACKERS"]["THR"].get("img_api", "")).strip()
         if ordered_images and not image_api_key:
             logger.info("[yellow]THR image API key is not configured, skipping screenshot rehost")
 
@@ -293,9 +289,9 @@ class THR:
 
             url = "https://img2.torrenthr.org/api/1/upload"
             data: dict[str, Any] = {
-                'key': image_api_key,
+                "key": image_api_key,
             }
-            async with aiofiles.open(image, 'rb') as image_file:
+            async with aiofiles.open(image, "rb") as image_file:
                 file_bytes = await image_file.read()
             response: httpx.Response | None = None
             response_data: dict[str, Any] = {}
@@ -304,14 +300,14 @@ class THR:
                     response = await image_client.post(
                         url,
                         data=data,
-                        files={'source': (os.path.basename(image), file_bytes)},
+                        files={"source": (os.path.basename(image), file_bytes)},
                     )
                     response.raise_for_status()
                     response_data = response.json()
-                    img_data = cast(dict[str, Any], response_data.get('image', {}))
-                    img_url = str(img_data.get('url', '')).strip()
+                    img_data = cast(dict[str, Any], response_data.get("image", {}))
+                    img_url = str(img_data.get("url", "")).strip()
                     if not img_url:
-                        raise KeyError('image.url')
+                        raise KeyError("image.url")
                     image_list.append(img_url)
             except httpx.RequestError as exc:
                 logger.info(f"[yellow]Failed to upload image {os.path.basename(image)}: {exc}")
@@ -333,36 +329,35 @@ class THR:
         if (meta.is_disc) == "BDMV":
             async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt") as bd_file:
                 desc_parts.append(f"[nfo]{await bd_file.read()}[/nfo]")
-        elif self.config['TRACKERS']['THR'].get('pronfo_api_key'):
+        elif self.config["TRACKERS"]["THR"].get("pronfo_api_key"):
             # ProNFO
             pronfo_url = f"https://www.pronfo.com/api/v1/access/upload/{self.config['TRACKERS']['THR'].get('pronfo_api_key', '')}"
             async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt") as mi_file:
                 data = {
-                    'content': await mi_file.read(),
-                    'theme': self.config['TRACKERS']['THR'].get('pronfo_theme', 'gray'),
-                    'rapi': self.config['TRACKERS']['THR'].get('pronfo_rapi_id')
+                    "content": await mi_file.read(),
+                    "theme": self.config["TRACKERS"]["THR"].get("pronfo_theme", "gray"),
+                    "rapi": self.config["TRACKERS"]["THR"].get("pronfo_rapi_id"),
                 }
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(pronfo_url, data=data)
             try:
                 response_data = response.json()
-                if response_data.get('error', True) is False:
-                    mi_img = response_data.get('url')
+                if response_data.get("error", True) is False:
+                    mi_img = response_data.get("url")
                     desc_parts.append(f"\n[img]{mi_img}[/img]\n")
                     pronfo = True
             except Exception:
-                logger.info('[bold red]Error parsing pronfo response, using THR parser instead')
-                if meta.debug:
-                    logger.debug(f"[red]{response}")
-                    logger.debug(response.text)
+                logger.info("[bold red]Error parsing pronfo response, using THR parser instead")
+                logger.debug(f"{response}")
+                logger.debug(response.text)
 
         screens = meta.screens or 0
         desc_parts.extend([f"\n[img]{each}[/img]\n" for each in image_list[:screens]])
-            # if pronfo:
+        # if pronfo:
         #     with open(os.path.abspath(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt"), 'r') as mi_file:
-            #         full_mi = mi_file.read()
-            #         desc.write(f"[/align]\n[hide=FULL MEDIAINFO]{full_mi}[/hide][align=center]")
-            #         mi_file.close()
+        #         full_mi = mi_file.read()
+        #         desc.write(f"[/align]\n[hide=FULL MEDIAINFO]{full_mi}[/hide][align=center]")
+        #         mi_file.close()
         desc_parts.append(f"\n\n[size=2][url=https://www.torrenthr.org/forums.php?action=viewtopic&topicid=8977]{meta.ua_signature}[/url][/size][/align]")
         async with aiofiles.open(
             f"{meta.base_dir}/tmp/{meta.uuid}/[THR]DESCRIPTION.txt",
@@ -383,9 +378,9 @@ class THR:
 
         cookies = await self.login(meta)
 
-        client_args: dict[str, Any] = {'timeout': 10.0, 'follow_redirects': True}
+        client_args: dict[str, Any] = {"timeout": 10.0, "follow_redirects": True}
         if cookies:
-            client_args['cookies'] = cookies
+            client_args["cookies"] = cookies
         else:
             logger.error("[red]Failed to log in to THR for search")
             return dupes
@@ -403,20 +398,18 @@ class THR:
                     page_url += f"&page={current_page}"
 
                 page_count += 1
-                if meta.debug:
-                    logger.debug(f"[dim]Searching page {page_count}...")
+                logger.debug(f"[dim]Searching page {page_count}...")
                 response = await client.get(page_url)
 
-                page_dupes, has_next_page, next_page_number = await self._process_search_response(
-                    response, meta, current_page)
+                page_dupes, has_next_page, next_page_number = await self._process_search_response(response, current_page)
 
                 for dupe in page_dupes:
                     if dupe not in dupes:
                         dupes.append(dupe)
                         all_titles_seen.add(dupe)
 
-                if meta.debug and has_next_page:
-                    logger.info(f"[dim]Next page available: page {next_page_number}")
+                if has_next_page:
+                    logger.debug(f"[dim]Next page available: page {next_page_number}")
 
                 if has_next_page:
                     current_page = next_page_number
@@ -425,13 +418,11 @@ class THR:
                 else:
                     more_pages = False
 
-
         return dupes
 
     async def _process_search_response(
         self,
         response: httpx.Response,
-        meta: Meta,
         current_page: int,
     ) -> tuple[list[str], bool, int]:
         page_dupes: list[str] = []
@@ -440,79 +431,71 @@ class THR:
 
         if response.status_code == 200 or response.status_code == 302:
             html_length = len(response.text)
-            if meta.debug:
-                logger.debug(f"[dim]Response HTML length: {html_length} bytes")
+            logger.debug(f"[dim]Response HTML length: {html_length} bytes")
 
             if html_length < 1000:
                 logger.info(f"[yellow]Response seems too small ({html_length} bytes), might be an error page")
-                if meta.debug:
-                    logger.debug(f"[yellow]Response content: {response.text[:500]}")
+                logger.debug(f"[yellow]Response content: {response.text[:500]}")
                 return page_dupes, False, current_page
 
-            soup = BeautifulSoup(response.text, 'html.parser')
+            soup = BeautifulSoup(response.text, "html.parser")
 
-            result_table = soup.find('table', {'class': 'torrentlist'}) or soup.find('table', {'align': 'center'})
+            result_table = soup.find("table", {"class": "torrentlist"}) or soup.find("table", {"align": "center"})
             if not result_table:
                 logger.info("[yellow]No results table found in HTML - either no results or page structure changed")
 
             link_count = 0
             onmousemove_count = 0
 
-            for link in soup.find_all('a', href=True):
-                href_raw = link.get('href')
+            for link in soup.find_all("a", href=True):
+                href_raw = link.get("href")
                 if not href_raw:
                     continue
-                href = ' '.join(href_raw) if isinstance(href_raw, AttributeValueList) else href_raw
+                href = " ".join(href_raw) if isinstance(href_raw, AttributeValueList) else href_raw
 
-                if href.startswith('details.php'):
+                if href.startswith("details.php"):
                     link_count += 1
-                    onmousemove_raw = link.get('onmousemove')
+                    onmousemove_raw = link.get("onmousemove")
                     if onmousemove_raw:
                         onmousemove_count += 1
                         try:
-                            onmousemove = ' '.join(onmousemove_raw) if isinstance(onmousemove_raw, AttributeValueList) else onmousemove_raw
+                            onmousemove = " ".join(onmousemove_raw) if isinstance(onmousemove_raw, AttributeValueList) else onmousemove_raw
                             dupe = onmousemove.split("','/images")[0]
                             dupe = dupe.replace("return overlibImage('", "")
                             page_dupes.append(dupe)
                         except Exception as parsing_error:
-                            if meta.debug:
-                                logger.debug(f"[yellow]Error parsing link: {parsing_error}")
+                            logger.debug(f"[yellow]Error parsing link: {parsing_error}")
 
             page_number_display = current_page + 1
-            if meta.debug:
-                logger.debug(f"[dim]Page {page_number_display}: Found {link_count} detail links, {onmousemove_count} parsed successfully")
+            logger.debug(f"[dim]Page {page_number_display}: Found {link_count} detail links, {onmousemove_count} parsed successfully")
 
             pagination_text = None
-            for p_tag in soup.find_all('p', align="center"):
-                if p_tag.text and ('Prev' in p_tag.text or 'Next' in p_tag.text):
+            for p_tag in soup.find_all("p", align="center"):
+                if p_tag.text and ("Prev" in p_tag.text or "Next" in p_tag.text):
                     pagination_text = p_tag
-                    if meta.debug:
-                        logger.debug(f"[dim]Found pagination: {pagination_text.text.strip()}")
+                    logger.debug(f"[dim]Found pagination: {pagination_text.text.strip()}")
                     break
 
             if pagination_text:
-                next_links = pagination_text.find_all('a')
+                next_links = pagination_text.find_all("a")
                 for link in next_links:
-                    if 'Next' in link.text:
+                    if "Next" in link.text:
                         has_next_page = True
-                        href_raw = link.get('href')
-                        href = ''
+                        href_raw = link.get("href")
+                        href = ""
                         if href_raw:
-                            href = ' '.join(href_raw) if isinstance(href_raw, AttributeValueList) else href_raw
+                            href = " ".join(href_raw) if isinstance(href_raw, AttributeValueList) else href_raw
 
-                        if meta.debug:
-                            logger.debug(f"[dim]Next page URL: {href}")
+                        logger.debug(f"[dim]Next page URL: {href}")
 
                         page_match = re.search(r'page=(\d+)', href)
                         if page_match:
                             next_page_number = int(page_match.group(1))
-                            if meta.debug:
-                                logger.debug(f"[dim]Found next page link: page={next_page_number} (will be displayed as page {next_page_number + 1})")
+                            logger.debug(f"[dim]Found next page link: page={next_page_number} (will be displayed as page {next_page_number + 1})")
                             break
         else:
             logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
-            if meta.debug:
-                logger.debug(f"[red]Response: {response.text[:500]}...")
+            logger.debug(f"[red]Response: {response.text[:500]}...")
 
         return page_dupes, has_next_page, next_page_number
 

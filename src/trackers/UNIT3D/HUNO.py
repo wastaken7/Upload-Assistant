@@ -86,16 +86,14 @@ class HUNO(UNIT3D):
                     if encoding_settings:
                         crf_match = re.search(r"crf[ =:]+([\d.]+)", encoding_settings, re.IGNORECASE)
                         if crf_match:
-                            if meta.debug:
-                                logger.debug(f"Found CRF value: {crf_match.group(1)}")
+                            logger.debug(f"Found CRF value: {crf_match.group(1)}")
                             crf_value = float(crf_match.group(1))
                             if crf_value > 22:
                                 if not meta.unattended:
                                     logger.info(f"CRF value too high: {crf_value} for HUNO")
                                 return False
                         else:
-                            if meta.debug:
-                                logger.debug("No CRF value found in encoding settings.")
+                            logger.debug("No CRF value found in encoding settings.")
                             bit_rate = track.get("BitRate")
                             if bit_rate and "Animation" not in meta.genre:
                                 try:

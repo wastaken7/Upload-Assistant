@@ -26,7 +26,6 @@ class NyuuBinaryManager:
     @staticmethod
     async def ensure_nyuu_binary(
         base_dir: str | Path,
-        debug: bool,
         path_7z: str | None = None,
         version: str = "v0.4.2"
     ) -> str:
@@ -96,14 +95,14 @@ class NyuuBinaryManager:
                 temp_file = bin_dir / f"temp_{file_pattern}"
                 async with aiofiles.open(temp_file, "wb") as f:
                     async for chunk in response.aiter_bytes(chunk_size=8192):
-                        await f.write(chunk)
+                         await f.write(chunk)
 
             logger.debug(f"[green]Downloaded Nyuu package: {file_pattern}[/green]")
 
             if file_pattern.endswith(".7z"):
                 if not path_7z:
                     from bin.get_7z import SevenZipBinaryManager
-                    path_7z = await SevenZipBinaryManager.ensure_7z_binary(base_dir, debug)
+                    path_7z = await SevenZipBinaryManager.ensure_7z_binary(base_dir)
 
                 # Extract using the 7z binary
                 cmd = [path_7z, "x", "-y", f"-o{bin_dir}", str(temp_file)]

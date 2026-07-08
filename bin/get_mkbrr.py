@@ -22,7 +22,7 @@ except ImportError:
 
 class MkbrrBinaryManager:
     @staticmethod
-    async def ensure_mkbrr_binary(base_dir: str | Path, debug: bool, version: str) -> str:
+    async def ensure_mkbrr_binary(base_dir: str | Path, version: str) -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         logger.debug(f"[blue]Detected system: {system}, architecture: {machine}[/blue]")

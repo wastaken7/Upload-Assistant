@@ -28,7 +28,7 @@ class BDInfoBinaryManager:
     """
 
     @staticmethod
-    async def ensure_bdinfo_binary(base_dir: str | Path, debug: bool, version: str = "v1.0.8") -> str:
+    async def ensure_bdinfo_binary(base_dir: str | Path, version: str = "v1.0.8") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         logger.debug(f"[blue]Detected system: {system}, architecture: {machine}[/blue]")

@@ -38,7 +38,6 @@ class ImdbManager:
         self,
         imdbID: int | str | None,
         manual_language: str | dict[str, Any] | None = None,
-        debug: bool = False,
     ) -> dict[str, Any]:
         imdb_info: dict[str, Any] = {}
 
@@ -481,7 +480,6 @@ class ImdbManager:
         search_year: str | int | None,
         quickie: bool = False,
         category: str | None = None,
-        debug: bool = False,
         secondary_title: str | None = None,
         _path: str | None = None,
         untouched_filename: str | None = None,
@@ -501,7 +499,6 @@ class ImdbManager:
             filename: str,
             search_year: str | int | None,
             category: str | None = None,
-            debug: bool = False,
             attempted: int | None = 0,
             duration: str | int | None = None,
             wide_search: bool = False,
@@ -589,13 +586,13 @@ class ImdbManager:
             return search_results
 
         if not search_results:
-            result = await run_imdb_search(filename, search_year, category, debug, attempted, duration, wide_search=False)
+            result = await run_imdb_search(filename, search_year, category, attempted, duration, wide_search=False)
             if result and len(result) > 0:
                 search_results = result
 
         if not search_results and secondary_title:
             logger.debug(f"[yellow]Trying IMDb with secondary title: {secondary_title}[/yellow]")
-            result = await run_imdb_search(secondary_title, search_year, category, debug, attempted, duration, wide_search=True)
+            result = await run_imdb_search(secondary_title, search_year, category, attempted, duration, wide_search=True)
             if result and len(result) > 0:
                 search_results = result
 
@@ -611,7 +608,7 @@ class ImdbManager:
                     words_lower.pop(0)
                     title = ' '.join(words)
                     logger.debug(f"[bold yellow]Trying IMDb with the prefix removed: {title}[/bold yellow]")
-                    result = await run_imdb_search(title, search_year, category, debug, attempted + 1, wide_search=False)
+                    result = await run_imdb_search(title, search_year, category, attempted + 1, wide_search=False)
                     if result and len(result) > 0:
                         search_results = result
             except Exception as e:
@@ -622,7 +619,7 @@ class ImdbManager:
         if not search_results:
             logger.debug("[yellow]No results found, trying with a wider search...[/yellow]")
             try:
-                result = await run_imdb_search(filename, search_year, category, debug, attempted + 1, wide_search=True)
+                result = await run_imdb_search(filename, search_year, category, attempted + 1, wide_search=True)
                 if result and len(result) > 0:
                     search_results = result
             except Exception as e:
@@ -635,7 +632,7 @@ class ImdbManager:
                 parsed_title_data = cast(dict[str, Any], anitopy_parse_fn(parsed.get('title', '')) or {})
                 parsed_title = str(parsed_title_data.get('anime_title', ''))
                 logger.debug(f"[bold yellow]Trying IMDB with parsed title: {parsed_title}[/bold yellow]")
-                result = await run_imdb_search(parsed_title, search_year, category, debug, attempted + 1, wide_search=True)
+                result = await run_imdb_search(parsed_title, search_year, category, attempted + 1, wide_search=True)
                 if result and len(result) > 0:
                     search_results = result
             except Exception:
@@ -658,7 +655,7 @@ class ImdbManager:
                 if len(words) > 1:
                     reduced_title = ' '.join(words[:-1])
                     logger.debug(f"[bold yellow]Trying IMDB with reduced name: {reduced_title}[/bold yellow]")
-                    result = await run_imdb_search(reduced_title, search_year, category, debug, attempted + 1, wide_search=True)
+                    result = await run_imdb_search(reduced_title, search_year, category, attempted + 1, wide_search=True)
                     if result and len(result) > 0:
                         search_results = result
             except Exception as e:
@@ -681,7 +678,7 @@ class ImdbManager:
                 if len(words) > 2:
                     further_reduced_title = ' '.join(words[:-2])
                     logger.debug(f"[bold yellow]Trying IMDB with further reduced name: {further_reduced_title}[/bold yellow]")
-                    result = await run_imdb_search(further_reduced_title, search_year, category, debug, attempted + 1, wide_search=True)
+                    result = await run_imdb_search(further_reduced_title, search_year, category, attempted + 1, wide_search=True)
                     if result and len(result) > 0:
                         search_results = result
             except Exception as e:
@@ -882,7 +879,7 @@ class ImdbManager:
 
         return imdbID if imdbID else 0
 
-    async def get_imdb_from_episode(self, imdb_id: int | str, debug: bool = False) -> dict[str, Any] | None:
+    async def get_imdb_from_episode(self, imdb_id: int | str) -> dict[str, Any] | None:
         if not imdb_id or imdb_id == 0:
             return None
 

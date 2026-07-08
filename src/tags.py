@@ -34,8 +34,7 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
         if anime_match:
             matched_anime = True
             release_group = anime_match.group(1)
-            if meta.debug:
-                logger.debug(f"Anime regex match: {release_group}")
+            logger.debug(f"Anime regex match: {release_group}")
     if (not meta.anime or not matched_anime) and meta.is_disc != "BDMV":
         # Non-anime pattern: group at the end after last hyphen, avoiding resolutions and numbers
         if os.path.isdir(video):
@@ -85,16 +84,14 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
                 release_group = release_group.replace("Z0N3", "D-Z0N3")
             if not meta.scene and release_group and len(release_group) > 12:
                 release_group = None
-            if meta.debug:
-                logger.debug(f"Non-anime regex match: {release_group}")
+            logger.debug(f"Non-anime regex match: {release_group}")
 
     # If regex patterns didn't work, fall back to guessit
     if not release_group and meta.is_disc:
         try:
             parsed = guessit_fn(video)
             release_group = cast(str | None, parsed.get('release_group'))
-            if meta.debug:
-                logger.debug(f"Guessit match: {release_group}")
+            logger.debug(f"Guessit match: {release_group}")
 
         except Exception as e:
             logger.info(f"Error while parsing group tag: {e}")

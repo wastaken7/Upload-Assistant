@@ -169,7 +169,7 @@ class COMMON:
         path = f"{meta.base_dir}/tmp/{meta.uuid}/{torrent_filename}.torrent"
         if await self.path_exists(path):
             loop = asyncio.get_running_loop()
-            new_torrent = await loop.run_in_executor(None, Torrent.read, path)
+            new_torrent = await loop.run_in_executor(None, lambda: Torrent.read(path))
             for each in list(new_torrent.metainfo):
                 if each not in (
                     "announce",
@@ -288,7 +288,7 @@ class COMMON:
         path = f"{meta.base_dir}/tmp/{meta.uuid}/[{tracker}].torrent"
         if await self.path_exists(path):
             loop = asyncio.get_running_loop()
-            new_torrent = await loop.run_in_executor(None, Torrent.read, path)
+            new_torrent = await loop.run_in_executor(None, lambda: Torrent.read(path))
             if isinstance(new_tracker, list):
                 if not new_tracker:
                     logger.error(f"[red]Error: Empty tracker list provided for {tracker}. Cannot create torrent.[/red]")
@@ -420,9 +420,8 @@ class COMMON:
             async with aiofiles.open(output_file, 'w', encoding='utf-8') as f:
                 await f.write(json.dumps(existing_data, indent=2))
 
-            if meta.debug:
-                logger.debug(f"[green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
-                logger.debug(f"[blue]  - JSON: {output_file}[/blue]")
+            logger.debug(f"[green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
+            logger.debug(f"[blue]  - JSON: {output_file}[/blue]")
 
             return output_file
         except Exception as e:
@@ -551,7 +550,7 @@ class COMMON:
             logger.info(f"Filename: {filename}")  # Ensure filename is printed if available
 
         if not meta.unattended:
-            selection = input(f"Do you want to use these IDs from {tracker_name}? (Y/n): ").strip().lower()
+            selection = (await asyncio.to_thread(input, f"Do you want to use these IDs from {tracker_name}? (Y/n): ")).strip().lower()
             try:
                 return selection == '' or selection == 'y' or selection == 'yes'
             except (KeyboardInterrupt, EOFError):
@@ -560,8 +559,27 @@ class COMMON:
             return True
 
     async def prompt_user_for_confirmation(self, message: str) -> bool:
-        response = input(f"{message} (Y/n): ").strip().lower()
+        response = (await asyncio.to_thread(input, f"{message} (Y/n): ")).strip().lower()
         return response == '' or response == 'y'
+
+    async def _apply_region_distributor(self, meta: Meta, attributes: dict[str, Any]) -> None:
+        region_id = attributes.get('region_id', 0)
+        distributor_id = attributes.get('distributor_id', 0)
+
+        logger.debug(f"[blue]Region ID: {region_id}[/blue]")
+        logger.debug(f"[blue]Distributor ID: {distributor_id}[/blue]")
+
+        if not meta.region and region_id:
+            region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
+            if region_name:
+                meta.region = region_name
+                logger.debug(f"[green]Mapped region_id {region_id} to '{region_name}'[/green]")
+
+        if not meta.distributor and distributor_id:
+            distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
+            if distributor_name:
+                meta.distributor = distributor_name
+                logger.debug(f"[green]Mapped distributor_id {distributor_id} to '{distributor_name}'[/green]")
 
     async def unit3d_region_distributor(self, meta: Meta, tracker: str, torrent_url: str, id: str = "") -> None:
         """Get region and distributor information from API response"""
@@ -583,57 +601,16 @@ class COMMON:
             if data == "404":
                 logger.info("[yellow]No data found (404). Returning None.[/yellow]")
                 return
+
             if data and isinstance(data, list):
                 attributes = data[0].get('attributes', {})
-
-                region_id = attributes.get('region_id', 0)
-                distributor_id = attributes.get('distributor_id', 0)
-
-                if meta.debug:
-                    logger.debug(f"[blue]Region ID: {region_id}[/blue]")
-                    logger.debug(f"[blue]Distributor ID: {distributor_id}[/blue]")
-
-                # use reverse to reverse map the id to the name
-                if not meta.region and region_id:
-                    region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
-                    if region_name:
-                        meta.region = region_name
-                        if meta.debug:
-                            logger.debug(f"[green]Mapped region_id {region_id} to '{region_name}'[/green]")
-
-                # use reverse to reverse map the id to the name
-                if not meta.distributor and distributor_id:
-                    distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
-                    if distributor_name:
-                        meta.distributor = distributor_name
-                        if meta.debug:
-                            logger.debug(f"[green]Mapped distributor_id {distributor_id} to '{distributor_name}'[/green]")
+                await self._apply_region_distributor(meta, attributes)
                 return
-
             else:
                 # Handle direct attributes from JSON response (when not in a list)
-                attributes = json_response.get('attributes', {})
+                attributes = json_response.get("attributes", {})
                 if attributes:
-                    region_id = attributes.get('region_id')
-                    distributor_id = attributes.get('distributor_id')
-
-                    if meta.debug:
-                        logger.debug(f"[blue]Region ID: {region_id}[/blue]")
-                        logger.debug(f"[blue]Distributor ID: {distributor_id}[/blue]")
-
-                    if not meta.region and region_id:
-                        region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
-                        if region_name:
-                            meta.region = region_name
-                            if meta.debug:
-                                logger.debug(f"[green]Mapped region_id {region_id} to '{region_name}'[/green]")
-
-                    if not meta.distributor and distributor_id:
-                        distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
-                        if distributor_name:
-                            meta.distributor = distributor_name
-                            if meta.debug:
-                                logger.debug(f"[green]Mapped distributor_id {distributor_id} to '{distributor_name}'[/green]")
+                    await self._apply_region_distributor(meta, attributes)
         except Exception as e:
             console.print_exception()
             logger.info(f"[yellow]Invalid Response from {tracker} API. Error: {str(e)}[/yellow]")
@@ -663,23 +640,20 @@ class COMMON:
         imagelist: list[dict[str, str]] = []
 
         # Build the params for the API request
-        raw_api_key = self.config['TRACKERS'][tracker].get('api_key')
-        api_key = str(raw_api_key).strip() if raw_api_key else ''
-        params: dict[str, Any] = {'api_token': api_key}
+        raw_api_key = self.config["TRACKERS"][tracker].get("api_key")
+        api_key = str(raw_api_key).strip() if raw_api_key else ""
+        params: dict[str, Any] = {"api_token": api_key}
 
         # Determine the search method and add parameters accordingly
         if file_name:
-            params['file_name'] = file_name  # Add file_name to params
-            if meta.debug:
-                logger.debug(f"[green]Searching {tracker} by file name: [bold yellow]{file_name}[/bold yellow]")
+            params["file_name"] = file_name  # Add file_name to params
+            logger.debug(f"[green]Searching {tracker} by file name: [bold yellow]{file_name}[/bold yellow]")
             url = search_url
         elif id:
             url = f"{torrent_url}{id}"
-            if meta.debug:
-                logger.debug(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow] via {url}")
+            logger.debug(f"[green]Searching {tracker} by ID: [bold yellow]{id}[/bold yellow] via {url}")
         else:
-            if meta.debug:
-                logger.debug("[red]No ID or file name provided for search.[/red]")
+            logger.debug("[red]No ID or file name provided for search.[/red]")
             return None, None, None, None, None, None, None, [], None
 
         # Make the GET request with proper encoding handled by 'params'
@@ -696,70 +670,69 @@ class COMMON:
 
         try:
             # Handle response when searching by file name (which might return a 'data' array)
-            data: list[dict[str, Any]] | str = json_response.get('data', [])
+            data: list[dict[str, Any]] | str = json_response.get("data", [])
             if data == "404":
                 logger.info("[yellow]No data found (404). Returning None.[/yellow]")
                 return None, None, None, None, None, None, None, [], None
 
             if data and isinstance(data, list):  # Ensure data is a list before accessing it
-                attributes = data[0].get('attributes', {})
+                attributes = data[0].get("attributes", {})
 
                 # Extract data from the attributes
-                category = attributes.get('category')
-                description = attributes.get('description')
-                tmdb = int(attributes.get('tmdb_id') or 0)
-                tvdb = int(attributes.get('tvdb_id') or 0)
-                mal = int(attributes.get('mal_id') or 0)
-                imdb = int(attributes.get('imdb_id') or 0)
-                infohash = attributes.get('info_hash')
+                category = attributes.get("category")
+                description = attributes.get("description")
+                tmdb = int(attributes.get("tmdb_id") or 0)
+                tvdb = int(attributes.get("tvdb_id") or 0)
+                mal = int(attributes.get("mal_id") or 0)
+                imdb = int(attributes.get("imdb_id") or 0)
+                infohash = attributes.get("info_hash")
                 tmdb = 0 if tmdb == 0 else tmdb
                 tvdb = 0 if tvdb == 0 else tvdb
                 mal = 0 if mal == 0 else mal
                 imdb = 0 if imdb == 0 else imdb
                 if not meta.region and meta.is_disc == "BDMV":
-                    region_id = attributes.get('region_id')
+                    region_id = attributes.get("region_id")
                     region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                     if region_name:
                         meta.region = region_name
                 if not meta.distributor and meta.is_disc == "BDMV":
-                    distributor_id = attributes.get('distributor_id')
+                    distributor_id = attributes.get("distributor_id")
                     distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                     if distributor_name:
                         meta.distributor = distributor_name
             else:
                 # Handle response when searching by ID
                 if id and not data:
-                    attributes = json_response.get('attributes', {})
+                    attributes = json_response.get("attributes", {})
 
                     # Extract data from the attributes
-                    category = attributes.get('category')
-                    description = attributes.get('description')
-                    tmdb = int(attributes.get('tmdb_id') or 0)
-                    tvdb = int(attributes.get('tvdb_id') or 0)
-                    mal = int(attributes.get('mal_id') or 0)
-                    imdb = int(attributes.get('imdb_id') or 0)
-                    infohash = attributes.get('info_hash')
+                    category = attributes.get("category")
+                    description = attributes.get("description")
+                    tmdb = int(attributes.get("tmdb_id") or 0)
+                    tvdb = int(attributes.get("tvdb_id") or 0)
+                    mal = int(attributes.get("mal_id") or 0)
+                    imdb = int(attributes.get("imdb_id") or 0)
+                    infohash = attributes.get("info_hash")
                     tmdb = 0 if tmdb == 0 else tmdb
                     tvdb = 0 if tvdb == 0 else tvdb
                     mal = 0 if mal == 0 else mal
                     imdb = 0 if imdb == 0 else imdb
                     if not meta.region and meta.is_disc == "BDMV":
-                        region_id = attributes.get('region_id')
+                        region_id = attributes.get("region_id")
                         region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                         if region_name:
                             meta.region = region_name
                     if not meta.distributor and meta.is_disc == "BDMV":
-                        distributor_id = attributes.get('distributor_id')
+                        distributor_id = attributes.get("distributor_id")
                         distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                         if distributor_name:
                             meta.distributor = distributor_name
                     # Handle file name extraction
-                    files = attributes.get('files', [])
+                    files = attributes.get("files", [])
                     if files:
-                        file_name = files[0]['name'] if len(files) == 1 else [file['name'] for file in files[:5]]
+                        file_name = files[0]["name"] if len(files) == 1 else [file["name"] for file in files[:5]]
 
-                    if meta.debug:
-                        logger.debug(f"[blue]Extracted filename(s): {file_name}[/blue]")  # Print the extracted filename(s)
+                    logger.debug(f"[blue]Extracted filename(s): {file_name}[/blue]")  # Print the extracted filename(s)
 
             if (tmdb or imdb or tvdb) and not id:
                 # Only prompt the user for ID selection if not searching by ID
@@ -786,7 +759,7 @@ class COMMON:
                         edit_choice = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is:")
 
                         if (edit_choice or "").lower() == 'e':
-                            edited_description = click.edit(description)
+                            edited_description = cast(str | None, click.edit(cast(Any, description)))
                             if edited_description:
                                 description = edited_description.strip()
                         elif (edit_choice or "").lower() == 'd':
@@ -1160,11 +1133,10 @@ class COMMON:
         if meta.is_disc == "BDMV":
             # 1. Generate/Load initial MediaInfo (Playlist) if not exists
             if not os.path.isfile(mi_path):
-                if meta.debug:
-                    logger.debug("[blue]Generating MediaInfo for BDMV...[/blue]")
+                logger.debug("[blue]Generating MediaInfo for BDMV...[/blue]")
 
                 path = meta.discs[0]["playlists"][0]["path"]
-                await exportInfo(path, False, meta.uuid, meta.base_dir, is_dvd=False, debug=meta.debug)
+                await exportInfo(path, False, meta.uuid, meta.base_dir, is_dvd=False)
 
             # Helper to read and filter lines from the export file
             async def read_and_clean() -> str:
@@ -1186,8 +1158,7 @@ class COMMON:
 
             # 2. Check char_limit and fallback to largest M2TS if necessary
             if char_limit and len(mediainfo) > char_limit:
-                if meta.debug:
-                    logger.debug(f"[yellow]MediaInfo length ({len(mediainfo)}) exceeds limit ({char_limit}). Falling back to largest M2TS...[/yellow]")
+                logger.debug(f"[yellow]MediaInfo length ({len(mediainfo)}) exceeds limit ({char_limit}). Falling back to largest M2TS...[/yellow]")
 
                 items = meta.discs[0]["playlists"][0].get("items", [])
 
@@ -1196,10 +1167,9 @@ class COMMON:
                     largest_m2ts = largest_item.get('file')
 
                     if largest_m2ts:
-                        if meta.debug:
-                            logger.debug(f"[blue]Selected largest M2TS from meta: {os.path.basename(largest_m2ts)}[/blue]")
+                        logger.debug(f"[blue]Selected largest M2TS from meta: {os.path.basename(largest_m2ts)}[/blue]")
 
-                        await exportInfo(largest_m2ts, False, meta.uuid, meta.base_dir, is_dvd=False, debug=meta.debug)
+                        await exportInfo(largest_m2ts, False, meta.uuid, meta.base_dir, is_dvd=False)
 
                         mediainfo = await read_and_clean()
 
@@ -1320,11 +1290,10 @@ class COMMON:
                 or any(lang in subtitle_languages for lang in languages_to_check)
             )
 
-            if meta.debug:
-                logger.debug(f"[blue]Debug: Audio Languages Found: {audio_languages}[/blue]")
-                logger.debug(f"[blue]Debug: Subtitle Languages Found: {subtitle_languages}[/blue]")
-                logger.debug(f"[blue]Debug: Original Audio Language: {language_display}[/blue]")
-                logger.debug(f"[blue]Debug: Audio OK: {audio_ok}, Subtitle OK: {subtitle_ok}, Original OK: {original_ok}[/blue]")
+            logger.debug(f"[blue]Debug: Audio Languages Found: {audio_languages}[/blue]")
+            logger.debug(f"[blue]Debug: Subtitle Languages Found: {subtitle_languages}[/blue]")
+            logger.debug(f"[blue]Debug: Original Audio Language: {language_display}[/blue]")
+            logger.debug(f"[blue]Debug: Audio OK: {audio_ok}, Subtitle OK: {subtitle_ok}, Original OK: {original_ok}[/blue]")
 
             if not audio_ok and original_ok:
                 if subtitle_ok:

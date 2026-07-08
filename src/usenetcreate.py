@@ -79,24 +79,23 @@ async def check_binary(binary_name: str, config_path: str | None = None, meta: M
     # If the binary is not found, attempt to download it automatically if meta is provided
     if meta and meta.base_dir:
         base_dir = meta.base_dir
-        debug = meta.debug
         try:
             if binary_name == "7z":
                 from bin.get_7z import SevenZipBinaryManager
 
-                return await SevenZipBinaryManager.ensure_7z_binary(base_dir, debug)
+                return await SevenZipBinaryManager.ensure_7z_binary(base_dir)
             elif binary_name == "nyuu":
                 from bin.get_nyuu import NyuuBinaryManager
 
-                return await NyuuBinaryManager.ensure_nyuu_binary(base_dir, debug, path_7z=path_7z)
+                return await NyuuBinaryManager.ensure_nyuu_binary(base_dir, path_7z=path_7z)
             elif binary_name == "par2":
                 from bin.get_par2 import Par2BinaryManager
 
-                return await Par2BinaryManager.ensure_par2_binary(base_dir, debug)
+                return await Par2BinaryManager.ensure_par2_binary(base_dir)
             elif binary_name == "pesto":
                 from bin.get_pesto import PestoBinaryManager
 
-                return await PestoBinaryManager.ensure_pesto_binary(base_dir, debug)
+                return await PestoBinaryManager.ensure_pesto_binary(base_dir)
         except Exception as e:
             logger.debug(f"[yellow]Automatic download of '{binary_name}' failed: {e}[/yellow]")
 
@@ -605,8 +604,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 archive_password = secrets.token_urlsafe(16)
                 if not archive_password.startswith("-"):
                     break
-            if meta.debug:
-                logger.debug(f"[cyan]Generated random Usenet archive password: {archive_password}[/cyan]")
+            logger.debug(f"[cyan]Generated random Usenet archive password: {archive_password}[/cyan]")
         else:
             logger.info("[cyan]Using configured static password for Usenet archive encryption.[/cyan]")
         meta.archive_password = archive_password
@@ -633,8 +631,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     archive_name = safe_name
     if archive_password:
         archive_name = secrets.token_hex(16)
-        if meta.debug:
-            logger.debug(f"[cyan]Obfuscating archive filenames to: {archive_name}[/cyan]")
+        logger.debug(f"[cyan]Obfuscating archive filenames to: {archive_name}[/cyan]")
 
     # NZB filename: prefer meta name (already properly constructed by UA).
     # For directories, fall back to the directory basename only when meta name is absent.

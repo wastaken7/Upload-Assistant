@@ -76,12 +76,12 @@ class DiscParse:
 
         return score
 
-    def setup_mediainfo_for_dvd(self, base_dir: str | None, debug: bool = False) -> str | None:
+    def setup_mediainfo_for_dvd(self, base_dir: str | None) -> str | None:
         """Setup MediaInfo binary for DVD processing using the complete setup from exportmi"""
         if self.mediainfo_config is None:
             if base_dir is None:
                 return None
-            self.mediainfo_config = setup_mediainfo_library(base_dir, debug)
+            self.mediainfo_config = setup_mediainfo_library(base_dir)
 
         if self.mediainfo_config and self.mediainfo_config['cli']:
             return self.mediainfo_config['cli']
@@ -122,8 +122,7 @@ class DiscParse:
                     logger.info(f"[bold red]PLAYLIST directory not found for disc {path}")
                     continue
 
-                if meta.debug:
-                    logger.debug(f"[cyan]Parsing playlists from: {playlists_path}")
+                logger.debug(f"[cyan]Parsing playlists from: {playlists_path}")
 
                 def _load_mpls(mpls_path: str) -> tuple[Any, Any]:
                     with open(mpls_path, "rb") as mpls_file:
@@ -140,8 +139,7 @@ class DiscParse:
                         continue
 
                     mpls_path = os.path.join(playlists_path, file_name)
-                    if meta.debug:
-                        logger.debug(f"[cyan]Processing playlist: {file_name}")
+                    logger.debug(f"[cyan]Processing playlist: {file_name}")
 
                     try:
                         _, playlist_data = await asyncio.to_thread(_load_mpls, mpls_path)
@@ -153,12 +151,10 @@ class DiscParse:
 
                         play_items = getattr(playlist_data, "play_items", None)
                         if not play_items:
-                            if meta.debug:
-                                logger.debug(f"[yellow]  No play_items found in {file_name}")
+                            logger.debug(f"[yellow]  No play_items found in {file_name}")
                             continue
 
-                        if meta.debug:
-                            logger.debug(f"[cyan]  Found {len(play_items)} play items in {file_name}")
+                        logger.debug(f"[cyan]  Found {len(play_items)} play items in {file_name}")
 
                         for item in play_items:
                             intime = getattr(item, "intime", None)
@@ -185,8 +181,7 @@ class DiscParse:
                                 logger.info(f"[bold red]Error accessing clip information for item in {file_name}: {e}")
 
                         if not file_sizes:
-                            if meta.debug:
-                                logger.debug(f"[yellow]  No m2ts files found for {file_name}")
+                            logger.debug(f"[yellow]  No m2ts files found for {file_name}")
                             continue
 
                         items = [{"file": file, "size": file_sizes[file]} for file in file_counts]
@@ -394,8 +389,7 @@ class DiscParse:
                                     simplified_playlists.sort(key=lambda x: float(x["duration"]), reverse=True)
                                     discs[i]['all_valid_playlists'] = simplified_playlists
 
-                                    if meta.debug:
-                                        logger.debug(f"[cyan]Stored {len(simplified_playlists)} unique playlists by duration (from {len(valid_playlists)} total)")
+                                    logger.debug(f"[cyan]Stored {len(simplified_playlists)} unique playlists by duration (from {len(valid_playlists)} total)")
                             else:
                                 discs[i][f'summary_{idx}'] = bd_summary_cleaned
                                 discs[i][f'bdinfo_{idx}'] = bdinfo
@@ -546,8 +540,8 @@ class DiscParse:
     Parse VIDEO_TS and get mediainfos
     """
 
-    async def get_dvdinfo(self, discs: list[dict[str, Any]], base_dir: str | None = None, debug: bool = False) -> list[dict[str, Any]]:
-        mediainfo_binary = self.setup_mediainfo_for_dvd(base_dir, debug=debug)
+    async def get_dvdinfo(self, discs: list[dict[str, Any]], base_dir: str | None = None) -> list[dict[str, Any]]:
+        mediainfo_binary = self.setup_mediainfo_for_dvd(base_dir)
 
         for each in discs:
             path = each.get('path')
@@ -708,10 +702,9 @@ class DiscParse:
 
             try:
                 # Define the playlist path
-                playlist_path = os.path.join(meta.path, "ADV_OBJ")
+                playlist_path = os.path.join(path, "ADV_OBJ")
                 xpl_files = glob(f"{playlist_path}/*.xpl")
-                if meta.debug:
-                    logger.debug(f"Found {xpl_files} in {playlist_path}")
+                logger.debug(f"Found {xpl_files} in {playlist_path}")
 
                 if not xpl_files:
                     raise FileNotFoundError(f"No .xpl files found in {playlist_path}")

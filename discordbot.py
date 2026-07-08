@@ -123,7 +123,6 @@ class DiscordNotifier:
         bot: BotLike | None,
         message: str,
         meta: Meta,
-        debug: bool = False,
     ) -> bool:
         """
         Send a notification message to Discord channel.
@@ -224,9 +223,8 @@ async def send_discord_notification(
     bot: BotLike | None,
     message: str,
     meta: Meta,
-    debug: bool = False,
 ) -> bool:
-    return await DiscordNotifier.send_discord_notification(config, bot, message, debug=debug, meta=meta)
+    return await DiscordNotifier.send_discord_notification(config, bot, message, meta=meta)
 
 
 async def send_upload_status_notification(

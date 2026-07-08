@@ -21,12 +21,12 @@ Config = dict[str, Any]
 
 class SUIO:
     supported_categories = ("MOVIE", "TV", "XXX", "GAME", "MUSIC", "BOOK")
+    is_usenet = True
 
     def __init__(self, config: Config) -> None:
         self.config = config
         self.common = COMMON(config)
         self.tracker = "SUIO"
-        self.is_usenet = True
         self.upload_url: str | None = None
         self.torrent_url: str | None = None
         tracker_cfg = config.get("TRACKERS", {}).get(self.tracker, {})
