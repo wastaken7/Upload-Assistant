@@ -642,6 +642,7 @@ class ASC:
             "DREAMCAST": "52",
             "EMULATOR": "109",
             "DS": "58",
+            "NDS": "58",
             "SWITCH": "110",
             "PC": "47",
             "MAC": "48",

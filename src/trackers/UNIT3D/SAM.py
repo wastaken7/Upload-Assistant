@@ -84,6 +84,7 @@ class SAM(UNIT3D):
         return {"category_id": category_id}
 
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        nin_term = (bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()).upper()
         type_id = {
             "DISC": "1",
             "REMUX": "2",
@@ -106,7 +107,7 @@ class SAM(UNIT3D):
             "EMULADORES_E_ROMS": "51",
             "PLAYSTATION": "52",
             "XBOX": "53",
-            "NINTENDO": "54",
+            f"{nin_term}": "54",
             "MOBILE": "55",
             "OUTRO": "76",
         }

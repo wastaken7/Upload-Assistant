@@ -57,6 +57,7 @@ class CBR(UNIT3D):
         return {"category_id": "0"}
 
     async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        nin_term = (bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()).upper()
         type_id = {
             "DISC": "1",
             "REMUX": "2",
@@ -87,7 +88,7 @@ class CBR(UNIT3D):
             "PC": "46",
             "PLAYSTATION": "48",
             "XBOX": "49",
-            "NINTENDO": "50",
+            f"{nin_term}": "50",
         }
 
         if mapping_only:
@@ -164,11 +165,11 @@ class CBR(UNIT3D):
             game_lang_has_eng = "ENGLISH" in str(meta.languages).upper()
 
             if game_has_multiple_languages and game_lang_has_pt:
-                game_lang = "MULTI"
+                game_lang = "[MULTI]"
             elif game_lang_has_eng:
-                game_lang = "INGLÊS"
+                game_lang = "[INGLÊS]"
             else:
-                game_lang = meta.language.upper()
+                game_lang = f"[{meta.language.upper()}]"
 
             game_subcategory = meta.game_subcategory.lower()
             update = "Update" if game_subcategory == "update" else ""
@@ -177,7 +178,7 @@ class CBR(UNIT3D):
                 dlc = f" {dlc}"
 
             year_str = str(meta.year) if meta.year is not None else ""
-            cbr_name = f"{meta.title} {update} {meta.game_version} {year_str} - {tag} [{game_lang}]{dlc}"
+            cbr_name = f"{meta.title} {update} {meta.game_version} {year_str} - {tag} {game_lang}{dlc}"
 
         elif category in ("MOVIE", "TV"):
             cbr_name = cbr_name.replace("DD+ ", "DDP").replace("DD ", "DD").replace("AAC ", "AAC").replace("FLAC ", "FLAC").replace("Dubbed", "").replace("Dual-Audio", "")

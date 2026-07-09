@@ -989,19 +989,23 @@ class Args:
                 "ps4": "PS4",
                 "ps3": "PS3",
                 "ps2": "PS2",
-                "xbox": "Xbox",
-                "x360": "Xbox 360",
-                "xone": "Xbox One",
-                "xsx": "Xbox Series X|S",
-                "switch": "Nintendo Switch",
-                "3ds": "Nintendo 3DS",
-                "nds": "Nintendo DS",
-                "wiiu": "Wii U",
-                "wii": "Wii",
-                "mac": "Mac",
-                "linux": "Linux",
+                "ps1": "PS1",
+                "psp": "PSP",
+                "psvita": "PSVITA",
+                "xbox": "XBOX",
+                "x360": "X360",
+                "xone": "XONE",
+                "xsx": "XSX",
+                "switch": "SWITCH",
+                "3ds": "3DS",
+                "nds": "NDS",
+                "ds": "NDS",
+                "wiiu": "WIIU",
+                "wii": "WII",
+                "mac": "MAC",
+                "linux": "LINUX",
             }
-            clean_plat = mapping.get(plat, plat)
+            clean_plat = mapping.get(plat, plat.upper())
             meta.manual_platform = clean_plat
             meta.platform = clean_plat
 

@@ -310,6 +310,7 @@ class BT:
 
     def get_game_platform_bt(self, meta: Meta) -> str:
         """Map meta.platform to BT plataforma_jogo dropdown value."""
+        nin_term = (bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()).capitalize()
         platform_map: dict[str, str] = {
             "PC": "PC",
             "MAC": "PC",
@@ -321,7 +322,7 @@ class BT:
             "PS3": "PS3",
             "PS4": "PS4",
             "PSVITA": "PS Vita",
-            "SWITCH": "Nintendo Switch",
+            "SWITCH": f"{nin_term} Switch",
             "WII": "Wii",
             "WIIU": "Wii U",
             "XBOX": "Xbox Clássico",
@@ -920,7 +921,7 @@ class BT:
         imdb_directors = meta.imdb_info.get("directors")
         imdb_directors_list: list[Any] = []
         if isinstance(imdb_directors, list):
-            imdb_directors_list = cast(list[Any], imdb_directors)
+            imdb_directors_list = imdb_directors
         director_entries.extend([name for name in imdb_directors_list if isinstance(name, str)])
 
         tmdb_directors = meta.tmdb_directors

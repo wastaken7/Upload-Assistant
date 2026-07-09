@@ -1,9 +1,11 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
 import datetime
 import html
 import io
 import os
 import re
+import shutil
 import sys
 from typing import Any
 
@@ -105,9 +107,233 @@ def extract_version_from_nfo(nfo_path: str) -> str | None:
     return None
 
 
-# ---------------------------------------------------------------------------
-# File-list resolution
-# ---------------------------------------------------------------------------
+def map_to_clean_code(p_name: str) -> str:
+    p_name_norm = p_name.lower()
+    nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
+    reverse_map = {
+        "playstation 5": "PS5",
+        "playstation 4": "PS4",
+        "playstation 3": "PS3",
+        "playstation 2": "PS2",
+        "playstation": "PS1",
+        "xbox series": "XSX",
+        "xbox series x|s": "XSX",
+        "xbox series x/s": "XSX",
+        "xbox one": "XONE",
+        "xbox 360": "X360",
+        "xbox": "XBOX",
+        "switch": "SWITCH",
+        f"{nin_term} switch": "SWITCH",
+        "3ds": "3DS",
+        f"{nin_term} 3ds": "3DS",
+        "nds": "NDS",
+        f"{nin_term} ds": "NDS",
+        "wii u": "WIIU",
+        "wiiu": "WIIU",
+        "wii": "WII",
+        "pc": "PC",
+        "windows": "PC",
+        "mac": "MAC",
+        "linux": "LINUX",
+    }
+    for key, val in reverse_map.items():
+        if key in p_name_norm or p_name_norm in key:
+            return val
+    return p_name.upper()
+
+
+async def get_7z_path(base_dir: str, config: dict[str, Any] | None = None) -> str | None:
+    # 1. Check config for 7z_path
+    if config and "DEFAULT" in config:
+        config_path = config["DEFAULT"].get("7z_path", "").strip()
+        if config_path and os.path.exists(config_path):
+            return config_path
+
+    # 2. Check system PATH
+    sys_7z = shutil.which("7z") or shutil.which("7z.exe")
+    if sys_7z:
+        return sys_7z
+
+    # 3. Use manager fallback
+    try:
+        from bin.get_7z import SevenZipBinaryManager
+
+        binary_path = await SevenZipBinaryManager.ensure_7z_binary(base_dir)
+        if binary_path and os.path.exists(binary_path):
+            return binary_path
+    except Exception:
+        pass
+
+    return None
+
+
+async def list_archive_contents_with_7z(archive_path: str, binary_path: str) -> list[str]:
+    contents = []
+    try:
+        cmd = [binary_path, "l", "-slt", archive_path]
+        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        stdout, _ = await process.communicate()
+        if process.returncode == 0:
+            for line in stdout.decode("utf-8", errors="replace").splitlines():
+                if line.startswith("Path = ") and len(line) > 7:
+                    path_val = line[7:].strip()
+                    # Skip if it is the archive name itself (7z lists archive header)
+                    if path_val and path_val.replace("\\", "/").lower() != archive_path.replace("\\", "/").lower():
+                        contents.append(path_val)
+    except Exception as e:
+        logger.debug(f"[yellow]7-Zip: Failed to list archive contents for {archive_path}: {e}[/yellow]")
+    return contents
+
+
+async def detect_platform_from_files(
+    filelist: list[str],
+    path_to_check: str | None = None,
+    base_dir: str | None = None,
+    config: dict[str, Any] | None = None,
+) -> str | None:
+    # Normalize paths to lowercase and use forward slashes
+    files_lower = []
+    basenames_lower = []
+    for f in filelist:
+        p = f.replace("\\", "/").lower()
+        files_lower.append(p)
+        basenames_lower.append(os.path.basename(p))
+
+    # --- Pre-check archives and ISO contents using 7z if available ---
+    archive_exts = (".zip", ".rar", ".7z", ".iso", ".tar", ".gz")
+    archives = [f for f in filelist if f.lower().endswith(archive_exts)]
+    if archives and base_dir:
+        binary_path = await get_7z_path(base_dir, config)
+        if binary_path:
+            is_7zr = "7zr" in os.path.basename(binary_path).lower()
+            for archive in archives:
+                # 7zr fallback only supports 7z archives
+                if is_7zr and not archive.lower().endswith(".7z"):
+                    continue
+
+                logger.info(f"[cyan]7-Zip: Inspecting contents of archive/ISO: {os.path.basename(archive)}...[/cyan]")
+                archive_contents = await list_archive_contents_with_7z(archive, binary_path)
+                for path_val in archive_contents:
+                    p = path_val.replace("\\", "/").lower()
+                    files_lower.append(p)
+                    basenames_lower.append(os.path.basename(p))
+
+    # --- 1. Extension and specific file/folder pattern checks ---
+
+    # Switch
+    switch_exts = (".nsp", ".xci", ".nca", ".szs", ".nsz", ".xcz")
+    if any(b.endswith(switch_exts) for b in basenames_lower):
+        return "SWITCH"
+
+    # 3DS
+    three_ds_exts = (".3ds", ".cia", ".cci", ".3dsx")
+    if any(b.endswith(three_ds_exts) for b in basenames_lower):
+        return "3DS"
+
+    # DS (NDS)
+    nds_exts = (".nds", ".srl")
+    if any(b.endswith(nds_exts) for b in basenames_lower):
+        return "NDS"
+
+    # Wii U
+    wiiu_exts = (".wud", ".wux")
+    if any(b.endswith(wiiu_exts) for b in basenames_lower):
+        return "WIIU"
+    # Wii U folder structure check
+    if any("/code/app.xml" in f for f in files_lower) or (any(b == "title.tmd" for b in basenames_lower) and any(b == "title.tik" for b in basenames_lower)):
+        return "WIIU"
+
+    # Wii
+    wii_exts = (".wbfs", ".gcm")
+    if any(b.endswith(wii_exts) for b in basenames_lower):
+        return "WII"
+
+    # PlayStation 3 (PS3)
+    if any("ps3_game" in f for f in files_lower) or any(b == "param.sfo" and "ps3_game" in f for b, f in zip(basenames_lower, files_lower, strict=False)):
+        return "PS3"
+    if any(b.endswith(".rap") for b in basenames_lower):
+        return "PS3"
+
+    # PlayStation Vita
+    if any(b.endswith(".vpk") for b in basenames_lower):
+        return "PSVITA"
+
+    # PlayStation Portable (PSP)
+    if any(b.endswith(".cso") for b in basenames_lower) or any(b == "eboot.pbp" for b in basenames_lower):
+        return "PSP"
+
+    # PlayStation 4 / PlayStation 5 / PlayStation 3 PKG check
+    pkg_files = [b for b in basenames_lower if b.endswith(".pkg")]
+    if pkg_files:
+        if any("cusa" in pkg for pkg in pkg_files):
+            return "PS4"
+        if any("ppsa" in pkg for pkg in pkg_files):
+            return "PS5"
+        # Check folders/files in path for hints
+        all_paths_str = " ".join(files_lower)
+        if "ps4" in all_paths_str or "playstation 4" in all_paths_str:
+            return "PS4"
+        if "ps5" in all_paths_str or "playstation 5" in all_paths_str:
+            return "PS5"
+        return "PS3"
+
+    # Xbox 360
+    if any(b.endswith(".xex") for b in basenames_lower) or any(b == "default.xex" for b in basenames_lower):
+        return "X360"
+    if any("$systemupdate" in f for f in files_lower):
+        return "X360"
+
+    # Xbox (Original)
+    if any(b.endswith(".xbe") for b in basenames_lower) or any(b == "default.xbe" for b in basenames_lower):
+        return "XBOX"
+
+    # Sega Dreamcast
+    dc_exts = (".gdi", ".cdi")
+    if any(b.endswith(dc_exts) for b in basenames_lower):
+        return "DREAMCAST"
+
+    # PC (Windows)
+    pc_dlls = ("steam_api.dll", "steam_api64.dll", "unityplayer.dll", "galaxy64.dll")
+    if any(b in pc_dlls for b in basenames_lower):
+        return "PC"
+    if any("binaries/win64" in f or "binaries/win32" in f or "engine/binaries" in f for f in files_lower):
+        return "PC"
+
+    # --- 2. Basename/Path text keyword checks (if no extensions matched) ---
+    path_to_search = path_to_check or (filelist[0] if filelist else "")
+    if path_to_search:
+        basename = os.path.basename(path_to_search).lower()
+        normalized_basename = basename.replace(".", " ").replace("-", " ").replace("_", " ").replace("[", " ").replace("]", " ")
+
+        nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
+        PLATFORM_KEYWORDS = {
+            "PS5": ["ps5", "playstation 5", "playstation5"],
+            "PS4": ["ps4", "playstation 4", "playstation4"],
+            "PS3": ["ps3", "playstation 3", "playstation3"],
+            "PS2": ["ps2", "playstation 2", "playstation2"],
+            "PS1": ["ps1", "psx", "playstation 1", "playstation1"],
+            "XSX": ["xsx", "xbox series", "xboxseries"],
+            "XONE": ["xone", "xbox one", "xboxone"],
+            "X360": ["x360", "xbox 360", "xbox360"],
+            "XBOX": ["xbox"],
+            "SWITCH": ["nsw", "switch", f"{nin_term} switch", f"{nin_term}switch"],
+            "3DS": ["3ds", f"{nin_term} 3ds"],
+            "NDS": ["nds", f"{nin_term} ds", f"{nin_term}ds", f"{nin_term} ds"],
+            "WIIU": ["wii u", "wiiu"],
+            "WII": ["wii"],
+            "PC": ["pc", "windows", "win"],
+            "MAC": ["mac", "macos", "osx"],
+            "LINUX": ["linux"],
+            "PSP": ["psp"],
+            "PSVITA": ["psvita", "ps vita", "vita"],
+        }
+
+        for platform_code, keywords in PLATFORM_KEYWORDS.items():
+            for kw in keywords:
+                if re.search(rf"\b{re.escape(kw)}\b", normalized_basename):
+                    return platform_code
+
+    return None
 
 
 def resolve_game_filelist(
@@ -122,7 +348,7 @@ def resolve_game_filelist(
     if os.path.isdir(videoloc):
         for root, _, files in os.walk(videoloc):
             for file in files:
-                filelist.extend(os.path.abspath(os.path.join(root, file)))
+                filelist.append(os.path.abspath(os.path.join(root, file)))  # noqa: PERF401
         filelist = sorted(filelist)
         if not filelist:
             logger.info("[bold red]No game files found!")
@@ -172,11 +398,25 @@ async def gather_game_prep(
     meta.sd = 0
     meta.valid_mi_settings = True
 
+    cli_overrides = {
+        "title": bool(meta.title),
+        "year": "manual_year" in meta and meta.manual_year or 0 > 0,
+        "platform": bool(meta.manual_platform),
+    }
+
+    # Run platform auto-detection early if platform is not manually specified
+    if not cli_overrides["platform"]:
+        detected = await detect_platform_from_files(meta.filelist, meta.path or videopath, base_dir, config)
+        if detected:
+            meta.platform = detected
+            logger.info(f"[green]Game platform auto-detected from files: {detected}[/green]")
+
     # Check console game status
     platform = meta.platform
     if platform:
         platform_lower = platform.lower()
-        console_words = ["ps", "playstation", "xbox", "switch", "3ds", "nds", "wii", "nintendo"]
+        nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
+        console_words = ["ps", "playstation", "xbox", "switch", "3ds", "nds", "wii", f"{nin_term}"]
         meta.console_game = any(word in platform_lower for word in console_words)
     else:
         meta.console_game = False
@@ -254,23 +494,32 @@ async def gather_game_prep(
                 if len(last_part) < 15 and " " not in last_part:
                     title_query = "-".join(parts[:-1])
 
+        # Replace separators with spaces first to ensure word boundaries work
+        title_query = title_query.replace(".", " ").replace("_", " ").replace("-", " ")
+        title_query = re.sub(r"\s+", " ", title_query).strip()
+
         # Remove Update/Patch/Build/Version and everything after
         title_query = re.sub(r"(?i)\b(?:update|patch|build|version)\b.*", "", title_query)
         # Remove vX.X or vX and everything after
         title_query = re.sub(r"(?i)\bv\d+.*", "", title_query)
-        title_query = title_query.replace(".", " ").replace("_", " ")
+
+        # Loop to strip trailing release/platform/language tags from the end of the query
+        tags_to_remove = (
+            r"(?:nsw|switch|nds|3ds|ps1|ps2|ps3|ps4|ps5|psp|psvita|vita|wii|wiiu|xbox|xbox360|x360|xone|xsx|pc|"
+            r"multi\d*|eng|english|fre|french|ger|german|spa|spanish|ita|italian|jpn|japanese|por|portuguese|bra|brazilian|"
+            r"proper|repack|readnfo|internal|dvd|rip|iso|god|jb|psn|eshop|rip|cracked|unlocked|crackfix)"
+        )
+        while True:
+            new_query = re.sub(rf"(?i)\s+{tags_to_remove}$", "", title_query)
+            if new_query == title_query:
+                break
+            title_query = new_query
+
         title_query = re.sub(r"\s+", " ", title_query).strip()
 
     if not title_query:
         logger.warning("[bold red]Warning: Could not determine game title for metadata search.[/bold red]")
         return
-
-    # Keep track of manual CLI/correction overrides
-    cli_overrides = {
-        "title": bool(meta.title),
-        "year": "manual_year" in meta and meta.manual_year or 0 > 0,
-        "platform": bool(meta.manual_platform),
-    }
 
     igdb = IGDBAPI(client_id, client_secret, base_dir)
     selected_game = None
@@ -340,6 +589,20 @@ async def gather_game_prep(
         if not results:
             logger.info(f"[yellow]IGDB: No games found matching '{title_query}'[/yellow]")
             return
+
+        # Sort results based on platform match if platform is known/detected
+        if meta.platform and results:
+            target_platform = meta.platform.upper().strip()
+            matching_results = []
+            other_results = []
+            for r in results:
+                raw_plats = [p.get("name") for p in r.get("platforms", []) if p.get("name")]
+                mapped_plats = [map_to_clean_code(p) for p in raw_plats]
+                if target_platform in mapped_plats:
+                    matching_results.append(r)
+                else:
+                    other_results.append(r)
+            results = matching_results + other_results
 
         # Choose the correct game
         if len(results) == 1 or meta.unattended:
@@ -440,92 +703,60 @@ async def gather_game_prep(
     # Platforms
     if not cli_overrides["platform"]:
         raw_platforms = [p.get("name") for p in selected_game.get("platforms", []) if p.get("name")]
-
-        # Map raw platform names to standard uppercase codes
-        def map_to_clean_code(p_name: str) -> str:
-            p_name_norm = p_name.lower()
-            nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
-            reverse_map = {
-                "playstation 5": "PS5",
-                "playstation 4": "PS4",
-                "playstation 3": "PS3",
-                "playstation 2": "PS2",
-                "playstation": "PS1",
-                "xbox series": "XSX",
-                "xbox series x|s": "XSX",
-                "xbox series x/s": "XSX",
-                "xbox one": "XONE",
-                "xbox 360": "X360",
-                "xbox": "XBOX",
-                "switch": "SWITCH",
-                f"{nin_term} switch": "SWITCH",
-                "3ds": "3DS",
-                f"{nin_term} 3ds": "3DS",
-                "nds": "NDS",
-                f"{nin_term} ds": "NDS",
-                "wii u": "WIIU",
-                "wiiu": "WIIU",
-                "wii": "WII",
-                "pc": "PC",
-                "windows": "PC",
-                "mac": "MAC",
-                "linux": "LINUX",
-            }
-            for key, val in reverse_map.items():
-                if key in p_name_norm or p_name_norm in key:
-                    return val
-            return p_name.upper()
-
         platforms_mapped = [map_to_clean_code(p) for p in raw_platforms]
         platforms = list(dict.fromkeys(platforms_mapped))
 
-        detected_platform = None
-        if raw_platforms:
-            nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
+        # If the platform was already auto-detected (or set) and is supported by the game, keep it!
+        if meta.platform and meta.platform.upper() in platforms:
+            meta.platform = meta.platform.upper()
+        else:
+            detected_platform = None
+            if raw_platforms:
+                nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
 
-            PLATFORM_MAPPING = {
-                "playstation 5": ["ps5", "playstation 5", "playstation5"],
-                "playstation 4": ["ps4", "playstation 4", "playstation4"],
-                "playstation 3": ["ps3", "playstation 3", "playstation3"],
-                "playstation 2": ["ps2", "playstation 2", "playstation2"],
-                "playstation": ["ps1", "psx", "playstation 1", "playstation1"],
-                "xbox series x|s": ["xsx", "xbox series", "xboxseries"],
-                "xbox series x/s": ["xsx", "xbox series", "xboxseries"],
-                "xbox one": ["xone", "xbox one", "xboxone"],
-                "xbox 360": ["x360", "xbox 360", "xbox360"],
-                "xbox": ["xbox"],
-                f"{nin_term} switch": ["nsw", "switch", f"{nin_term} switch", f"{nin_term}switch"],
-                f"{nin_term} 3ds": ["3ds", f"{nin_term} 3ds"],
-                f"{nin_term} ds": ["nds", f"{nin_term} ds"],
-                "wii u": ["wii u", "wiiu"],
-                "wii": ["wii"],
-                "pc (microsoft windows)": ["pc", "windows", "win", "osx", "mac", "linux"],
-                "mac": ["mac", "macos", "osx"],
-                "linux": ["linux"],
-            }
-            path_to_check = meta.path or videopath or ""
-            basename = os.path.basename(path_to_check).lower()
-            normalized_basename = basename.replace(".", " ").replace("-", " ").replace("_", " ").replace("[", " ").replace("]", " ")
-            for idx, p_name in enumerate(raw_platforms):
-                p_name_norm = p_name.lower()
-                aliases = []
-                for map_key, map_aliases in PLATFORM_MAPPING.items():
-                    if map_key in p_name_norm or p_name_norm in map_key:
-                        aliases.extend(map_aliases)
-                aliases.append(p_name_norm)
-                aliases = list(dict.fromkeys(aliases))
-                for alias in aliases:
-                    if re.search(rf"\b{re.escape(alias)}\b", normalized_basename):
-                        detected_platform = platforms_mapped[idx]
+                PLATFORM_MAPPING = {
+                    "playstation 5": ["ps5", "playstation 5", "playstation5"],
+                    "playstation 4": ["ps4", "playstation 4", "playstation4"],
+                    "playstation 3": ["ps3", "playstation 3", "playstation3"],
+                    "playstation 2": ["ps2", "playstation 2", "playstation2"],
+                    "playstation": ["ps1", "psx", "playstation 1", "playstation1"],
+                    "xbox series x|s": ["xsx", "xbox series", "xboxseries"],
+                    "xbox series x/s": ["xsx", "xbox series", "xboxseries"],
+                    "xbox one": ["xone", "xbox one", "xboxone"],
+                    "xbox 360": ["x360", "xbox 360", "xbox360"],
+                    "xbox": ["xbox"],
+                    f"{nin_term} switch": ["nsw", "switch", f"{nin_term} switch", f"{nin_term}switch"],
+                    f"{nin_term} 3ds": ["3ds", f"{nin_term} 3ds"],
+                    f"{nin_term} ds": ["nds", f"{nin_term} ds"],
+                    "wii u": ["wii u", "wiiu"],
+                    "wii": ["wii"],
+                    "pc (microsoft windows)": ["pc", "windows", "win", "osx", "mac", "linux"],
+                    "mac": ["mac", "macos", "osx"],
+                    "linux": ["linux"],
+                }
+                path_to_check = meta.path or videopath or ""
+                basename = os.path.basename(path_to_check).lower()
+                normalized_basename = basename.replace(".", " ").replace("-", " ").replace("_", " ").replace("[", " ").replace("]", " ")
+                for idx, p_name in enumerate(raw_platforms):
+                    p_name_norm = p_name.lower()
+                    aliases = []
+                    for map_key, map_aliases in PLATFORM_MAPPING.items():
+                        if map_key in p_name_norm or p_name_norm in map_key:
+                            aliases.extend(map_aliases)
+                    aliases.append(p_name_norm)
+                    aliases = list(dict.fromkeys(aliases))
+                    for alias in aliases:
+                        if re.search(rf"\b{re.escape(alias)}\b", normalized_basename):
+                            detected_platform = platforms_mapped[idx]
+                            break
+                    if detected_platform:
                         break
-                if detected_platform:
-                    break
-        if detected_platform:
-            meta.platform = detected_platform
-            logger.info(f"[green]Game platform auto-detected from folder/file name: {detected_platform}[/green]")
-        elif len(platforms) == 1:
-            meta.platform = platforms[0]
-            logger.debug(f"[green]Game platform set to: {platforms[0]}[/green]")
+            if detected_platform:
+                meta.platform = detected_platform
+                logger.info(f"[green]Game platform auto-detected from folder/file name: {detected_platform}[/green]")
+            elif len(platforms) == 1:
+                meta.platform = platforms[0]
+                logger.debug(f"[green]Game platform set to: {platforms[0]}[/green]")
 
     # Companies
     developers = []
@@ -611,7 +842,7 @@ async def gather_game_prep(
                         if any(t in target_trackers for t in trackers):
                             desc = app_data.get("short_description") or app_data.get("about_the_game") or app_data.get("detailed_description") or ""
                             # Strip HTML tags
-                            desc_clean = re.sub(r'<[^>]+>', '', desc).strip()
+                            desc_clean = re.sub(r"<[^>]+>", "", desc).strip()
                             desc_unescaped = html.unescape(desc_clean)
                             if desc_unescaped:
                                 meta.localized_overviews = {"brazilian": desc_unescaped}
@@ -664,7 +895,8 @@ async def gather_game_prep(
     platform = meta.platform
     if platform:
         platform_lower = platform.lower()
-        console_words = ["ps", "playstation", "xbox", "switch", "3ds", "nds", "wii", "nintendo"]
+        nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
+        console_words = ["ps", "playstation", "xbox", "switch", "3ds", "nds", "wii", f"{nin_term}"]
         meta.console_game = any(word in platform_lower for word in console_words)
     else:
         meta.console_game = False

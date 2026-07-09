@@ -707,22 +707,33 @@ class DescriptionBuilder:
         str_support = "Support" if not use_pt_br else "Suporte"
 
         # 1. Technical Details
-        details_lines: list[str] = []
-        details_lines.append(f"{header}{str_technical_details}{header_end}")
+        fields = []
         if meta.platform:
-            details_lines.append(f"[b]{str_platform}[/b] {meta.platform}")
+            fields.append((str_platform, meta.platform))
         if meta.game_version:
-            details_lines.append(f"[b]{str_version}[/b] {meta.game_version}")
+            fields.append((str_version, meta.game_version))
         if meta.genres:
-            details_lines.append(f"[b]{str_genre}[/b] {', '.join(meta.genres)}")
+            fields.append((str_genre, ", ".join(meta.genres)))
         if meta.developer:
-            details_lines.append(f"[b]{str_developer}[/b] {meta.developer}")
+            fields.append((str_developer, meta.developer))
         if meta.publisher:
-            details_lines.append(f"[b]{str_publisher}[/b] {meta.publisher}")
+            fields.append((str_publisher, meta.publisher))
         if meta.steam_url:
-            details_lines.append(f"[b]Steam[/b] [url]{meta.steam_url}[/url]")
+            fields.append(("Steam", f"[url]{meta.steam_url}[/url]"))
 
-        game_parts.append("\n".join(details_lines))
+        if fields:
+            details_lines = []
+            details_lines.append(f"{header}{str_technical_details}{header_end}")
+            if table:
+                table_lines = ["[table]"]
+                for label, val in fields:
+                    table_lines.append(f"[tr][td][b]{label}[/b][/td][td]{val}[/td][/tr]")
+                table_lines.append("[/table]")
+                details_lines.append("\n".join(table_lines))
+            else:
+                for label, val in fields:
+                    details_lines.append(f"[b]{label}[/b] {val}")
+            game_parts.append("\n".join(details_lines))
 
         # 2. Overview Section
         overview_text = ""

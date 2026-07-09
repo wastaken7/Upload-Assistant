@@ -608,9 +608,21 @@ async def _prompt_game_meta(meta: Meta) -> None:
         is_console = platform not in pc_platforms
 
         if is_console:
-            # Sistema (FREE/NTSC/PAL)
-            if not meta.game_system:
-                system_choices = ["FREE", "NTSC", "PAL", "Skip"]
+            needs_game_system = meta.game_system in ("PS1", "PS2", "PSP", "WII", "WIIU", "X360")
+            needs_game_region = meta.game_system in (
+                "3DS",
+                "NDS",
+                "PSVITA",
+                "PS1",
+                "PS2",
+                "PS3",
+            )
+            needs_container = meta.game_system in ("SWITCH")
+
+            if needs_game_system and not meta.game_system:
+                system_choices = ["PAL", "NTSC-U", "NTSC-J", "Skip"]
+                if meta.platform.upper() == "PSP":
+                    system_choices = ["FREE", "NTSC", "PAL", "Skip"]
                 try:
                     choice = cli_ui.ask_choice(
                         "BJS: Select game system (TV standard):",
@@ -621,8 +633,7 @@ async def _prompt_game_meta(meta: Meta) -> None:
                 except EOFError:
                     pass
 
-            # Região (USA/EUR/JPN)
-            if not meta.game_region:
+            if needs_game_region and not meta.game_region:
                 region_choices = ["USA", "EUR", "JPN", "Skip"]
                 try:
                     choice = cli_ui.ask_choice(
@@ -633,6 +644,22 @@ async def _prompt_game_meta(meta: Meta) -> None:
                         meta.game_region = choice
                 except EOFError:
                     pass
+
+            if needs_container:
+                container_choices = ["NSP", "XCI", "NSZ", "XCZ", "Skip"]
+                if meta.game_system == "X360":
+                    container_choices = ["LT", "JTAG/RGH", "Skip"]
+
+                if meta.container.upper() not in container_choices:
+                    try:
+                        choice = cli_ui.ask_choice(
+                            "BJS: Select container format ('Destravamento'):",
+                            choices=container_choices,
+                        )
+                        if choice != "Skip":
+                            meta.container = choice
+                    except EOFError:
+                        pass
 
     except EOFError:
         logger.info("[yellow]Input cancelled — continuing with current game fields.[/yellow]")

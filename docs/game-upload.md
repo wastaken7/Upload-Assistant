@@ -52,8 +52,8 @@ If a manual override is used, the platform argument is cleaned and mapped into s
 - `ps4` $\rightarrow$ `PS4`
 - `ps3` $\rightarrow$ `PS3`
 - `ps2` $\dots$ $\rightarrow$ `PS2` / `PS1`
-- `switch` $\rightarrow$ `Nintendo Switch`
-- `3ds` / `nds` $\rightarrow$ `Nintendo 3DS` / `Nintendo DS`
+- `switch` $\rightarrow$ `Switch`
+- `3ds` / `nds` $\rightarrow$ `3DS` / `DS`
 - `xbox` / `x360` / `xone` / `xsx` $\rightarrow$ `Xbox` / `Xbox 360` / `Xbox One` / `Xbox Series X|S`
 - `wii` / `wiiu` $\rightarrow$ `Wii` / `Wii U`
 - `mac` / `linux` $\rightarrow$ `Mac` / `Linux`

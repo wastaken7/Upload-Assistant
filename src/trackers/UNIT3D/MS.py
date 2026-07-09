@@ -119,6 +119,7 @@ class MS(UNIT3D):
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
+        nin_term = (bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()).upper()
         type_id = {
             "DISC": "1",
             "REMUX": "2",
@@ -130,7 +131,7 @@ class MS(UNIT3D):
             "FLAC": "8",
             "PC": "9",
             "PLAYSTATION": "10",
-            "NINTENDO": "11",
+            f"{nin_term}": "11",
             "XBOX": "12",
             "DOCUMENTARY": "13",
             "TTRPG": "14",

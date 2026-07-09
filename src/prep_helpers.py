@@ -188,7 +188,38 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
     # Auto-detect GAME category if category/manual_category is not already set and it's not a disc
     if not meta.category and not meta.manual_category and not meta.is_disc:
         is_game = False
-        game_extensions = {".exe", ".iso", ".rar"}
+        game_extensions = {
+            ".3ds",
+            ".3dsx",
+            ".cci",
+            ".cdi",
+            ".chd",
+            ".cia",
+            ".cso",
+            ".exe",
+            ".gcm",
+            ".gdi",
+            ".hdf",
+            ".iso",
+            ".nca",
+            ".nds",
+            ".nsp",
+            ".nsz",
+            ".pbp",
+            ".pkg",
+            ".rap",
+            ".rar",
+            ".srl",
+            ".szs",
+            ".vpk",
+            ".wbfs",
+            ".wud",
+            ".wux",
+            ".xbe",
+            ".xci",
+            ".xcz",
+            ".xex",
+        }
         video_extensions = {".mkv", ".mp4", ".ts"}
         game_groups = {"tenoke", "rune", "flt", "plaza", "codex", "skidrow", "prophet", "gog", "darkzer0", "doge", "tinyiso", "razor1911", "outlaws", "alias", "simplex"}
 

@@ -257,6 +257,7 @@ class BJS:
             "3DS": "13",
             "MOBILE": "2",
             "DS": "12",
+            "NDS": "12",
             "EMULATOR": "1",
             "PC": "3",
             "MAC": "3",
@@ -328,12 +329,6 @@ class BJS:
                     return bjs_value
 
         return "Outro"
-
-    def is_console_platform(self, meta: Meta) -> bool:
-        """Check if the platform is a console (not PC/Mac/Linux/Emulator)."""
-        pc_platforms = {"PC", "MAC", "LINUX", "EMULATOR"}
-        platform = meta.platform.upper().strip()
-        return platform not in pc_platforms and platform != ""
 
     def get_game_subcategory(self, meta: Meta) -> str:
         """Get the game subcategory for BJS."""
@@ -1372,13 +1367,16 @@ class BJS:
                 data["repack"] = "on"
 
             # Console-specific fields
-            if self.is_console_platform(meta):
+            if meta.platform.upper().strip() not in ("PC", "MAC", "LINUX", "EMULATOR"):
                 game_system = meta.game_system
                 game_region = meta.game_region
+                destravamento = meta.container.upper() if meta.container.upper() in ("NSP", "XCI", "NSZ", "XCZ", "LT", "JTAG/RGH") else ""
                 if game_system:
                     data["sistema"] = game_system
                 if game_region:
                     data["regiao"] = game_region
+                if destravamento:
+                    data["destravamento"] = destravamento
 
         elif category in ("MOVIE", "TV"):
             width, height = self.get_resolution(meta)
