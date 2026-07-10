@@ -2145,23 +2145,27 @@ async def do_the_thing(base_dir: str) -> None:
                     elif upload_order == "tracker":
                         await upload_torrent_flow(meta, torrent_trackers)
 
-                        qbit_bw_control = meta.qbit_bandwidth_control or config["DEFAULT"].get("qbit_bandwidth_control", False)
-                        if qbit_bw_control and need_usenet_post and torrent_trackers:
+                        if need_usenet_post and torrent_trackers:
                             logger.info("\n[yellow]Torrent uploads completed. Checking bandwidth before starting Usenet upload...[/yellow]")
                             from src.qbitwait import Wait
 
-                            waiter = Wait(config)
-                            bw_thresh = meta.qbit_bandwidth_threshold or config["DEFAULT"].get("qbit_bandwidth_threshold", 0)
-                            bw_time = meta.qbit_bandwidth_time or config["DEFAULT"].get("qbit_bandwidth_time", 0)
                             try:
-                                bw_thresh = int(bw_thresh)
-                                bw_time = int(bw_time)
-                            except (ValueError, TypeError) as e:
-                                logger.info(f"[red]Invalid bandwidth settings: {e}, skipping bandwidth wait before Usenet upload.[/red]")
-                                bw_thresh = 0
-                                bw_time = 0
-                            if bw_thresh > 0 and bw_time > 0:
-                                await waiter.wait_for_bandwidth(bw_thresh, bw_time)
+                                waiter = Wait(config)
+                                bw_thresh = meta.qbit_bandwidth_threshold or config["DEFAULT"].get("qbit_bandwidth_threshold", 0)
+                                bw_time = meta.qbit_bandwidth_time or config["DEFAULT"].get("qbit_bandwidth_time", 0)
+                                try:
+                                    bw_thresh = int(bw_thresh)
+                                    bw_time = int(bw_time)
+                                except (ValueError, TypeError) as e:
+                                    logger.info(f"[red]Invalid bandwidth settings: {e}, skipping bandwidth wait before Usenet upload.[/red]")
+                                    bw_thresh = 0
+                                    bw_time = 0
+                                if bw_thresh > 0 and bw_time > 0:
+                                    await waiter.wait_for_bandwidth(bw_thresh, bw_time)
+                                else:
+                                    logger.info("[yellow]Bandwidth control threshold or time is 0 or not configured. Skipping bandwidth check.[/yellow]")
+                            except Exception as e:
+                                logger.info(f"[red]Error initializing bandwidth check: {e}, skipping bandwidth wait before Usenet upload.[/red]")
 
                         await upload_usenet_flow(meta, usenet_trackers, need_usenet_post)
                     else:

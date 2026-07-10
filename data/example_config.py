@@ -332,7 +332,7 @@ config = {
         # Configures the order of uploads when both torrent trackers and Usenet are selected.
         # "concurrent" (default) -> Upload to Usenet and torrent trackers at the same time.
         # "usenet"               -> Upload to Usenet first. Torrent tracker uploads will start after Usenet upload finishes.
-        # "tracker"              -> Upload to torrent trackers first. Once finished, we run the bandwidth check (if qbit_bandwidth_control is enabled), and then start the Usenet upload.
+        # "tracker"              -> Upload to torrent trackers first. Once finished, we run the bandwidth check, and then start the Usenet upload.
         "upload_order": "concurrent",
 
         # Enable bandwidth control to wait for lower qBittorrent upload speed before uploading next tracker
