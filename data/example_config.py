@@ -2792,6 +2792,10 @@ config = {
         "pesto_check_retries": 3,
         # Parallel connections used for the verification pass (empty = same as "connections")
         "pesto_check_connections": "",
+        # Number of repost+reverify rounds to attempt for articles still missing
+        # after the check (pesto --check-post-retries). Raise this on providers
+        # with slower or less reliable propagation.
+        "pesto_check_post_retries": 1,
         # nyuu only: verify every article is retrievable on the server while
         # posting is still in progress. Missing articles are reposted and
         # reverified automatically; the upload is only considered successful

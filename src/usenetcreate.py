@@ -974,9 +974,10 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             cmd_pesto.extend(["--nzb-password", archive_password])
 
         # --check: after posting, verify every article is retrievable via STAT.
-        # Missing articles are reposted automatically and reverified; pesto
-        # exits non-zero if any are still missing after that, so we know the
-        # NZB is trustworthy whenever this command succeeds.
+        # Missing articles are reposted and reverified in a loop (up to
+        # --check-post-retries rounds); pesto exits non-zero if any are still
+        # missing after that, so we know the NZB is trustworthy whenever this
+        # command succeeds.
         if usenet_cfg.get("pesto_check", True):
             cmd_pesto.append("--check")
             check_delay = usenet_cfg.get("pesto_check_delay")
@@ -988,6 +989,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             check_connections = usenet_cfg.get("pesto_check_connections")
             if check_connections is not None and str(check_connections).strip() != "":
                 cmd_pesto.extend(["--check-connections", str(check_connections)])
+            check_post_retries = usenet_cfg.get("pesto_check_post_retries")
+            if check_post_retries is not None and str(check_post_retries).strip() != "":
+                cmd_pesto.extend(["--check-post-retries", str(check_post_retries)])
 
         cmd_pesto.extend(all_upload_files)
 
