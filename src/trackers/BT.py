@@ -627,6 +627,9 @@ class BT:
 
     async def get_tags(self, meta: Meta) -> str:
         """Map genres from meta.genres or TMDB to Portuguese tags."""
+        if meta.category == "BOOK":
+            return ""
+
         matched_tags: list[str] = []
 
         genres_list = meta.genres or meta.keywords or []
