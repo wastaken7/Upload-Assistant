@@ -561,9 +561,10 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                         check_missing_count = failed
                         if "check" in tasks and check_total:
                             progress.update(tasks["check"], completed=check_total)
-                        if failed:
-                            logger.info(f"[yellow]Article check: {failed} article(s) missing on server — pesto is reposting them automatically...[/yellow]")
-                        else:
+                        # Only announce success here; a missing count is always
+                        # immediately followed by a "repost_round_started" event
+                        # (below), which reports it with round context instead.
+                        if not failed:
                             logger.info("[green]Article check: all articles verified on server.[/green]")
                     elif etype == "check_retrying":
                         attempt = event.get("attempt", 0)
@@ -571,6 +572,25 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                         delay = event.get("delay_secs", 0)
                         check_wait_total = delay
                         logger.debug(f"[cyan]Article check: retry {attempt}/{max_attempts} in {delay}s...[/cyan]")
+                    elif etype == "repost_round_started":
+                        round_num = event.get("round", 0)
+                        max_rounds = event.get("max_rounds", 0)
+                        missing = event.get("missing", 0)
+                        logger.info(
+                            f"[yellow]Article check: round {round_num}/{max_rounds} — "
+                            f"{missing} article(s) missing, reposting automatically...[/yellow]"
+                        )
+                    elif etype == "repost_round_done":
+                        round_num = event.get("round", 0)
+                        max_rounds = event.get("max_rounds", 0)
+                        reposted = event.get("reposted", 0)
+                        still_missing = event.get("still_missing", 0)
+                        check_missing_count = still_missing
+                        if still_missing:
+                            logger.info(
+                                f"[yellow]Article check: round {round_num}/{max_rounds} — "
+                                f"reposted {reposted} article(s), {still_missing} still missing[/yellow]"
+                            )
                 except json.JSONDecodeError:
                     pass
 
