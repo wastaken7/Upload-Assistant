@@ -5,6 +5,7 @@ import hashlib
 import io
 import os
 import re
+import unicodedata
 from typing import Any
 from urllib.parse import urlparse
 
@@ -292,7 +293,9 @@ class SUIO:
         return files
 
     async def get_name(self, meta: Meta) -> str:
-        return meta.scene_name or meta.basename_no_ext
+        name = meta.scene_name or meta.basename_no_ext or ""
+        normalized = unicodedata.normalize("NFKD", name)
+        return "".join(char for char in normalized if not unicodedata.combining(char))
 
     async def _prepare_data(self, meta: Meta) -> dict[str, Any]:
         data = {
