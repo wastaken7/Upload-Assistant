@@ -1009,8 +1009,17 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             check_connections = usenet_cfg.get("pesto_check_connections")
             if check_connections is not None and str(check_connections).strip() != "":
                 cmd_pesto.extend(["--check-connections", str(check_connections)])
-            check_post_retries = usenet_cfg.get("pesto_check_post_retries")
-            if check_post_retries is not None and str(check_post_retries).strip() != "":
+            # Unlike the other check_* options above, this one is NOT left to
+            # pesto's own default: pesto defaults to a single repost round
+            # (1) for backwards compatibility with older callers, but that
+            # gives no real protection against a server that needs more than
+            # one attempt to keep an article. Default to 3 rounds here so
+            # --check is meaningfully resilient out of the box, matching
+            # pesto_check itself already defaulting to on. Set
+            # pesto_check_post_retries to "" explicitly to defer to pesto's
+            # own default instead.
+            check_post_retries = usenet_cfg.get("pesto_check_post_retries", 3)
+            if str(check_post_retries).strip() != "":
                 cmd_pesto.extend(["--check-post-retries", str(check_post_retries)])
 
         cmd_pesto.extend(all_upload_files)

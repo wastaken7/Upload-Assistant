@@ -2794,8 +2794,10 @@ config = {
         "pesto_check_connections": "",
         # Number of repost+reverify rounds to attempt for articles still missing
         # after the check (pesto --check-post-retries). Raise this on providers
-        # with slower or less reliable propagation.
-        "pesto_check_post_retries": 1,
+        # with slower or less reliable propagation. Unlike the other
+        # pesto_check_* options, "" here does not disable this — it defers to
+        # pesto's own default of 1 round instead of 3.
+        "pesto_check_post_retries": 3,
         # nyuu only: verify every article is retrievable on the server while
         # posting is still in progress. Missing articles are reposted and
         # reverified automatically; the upload is only considered successful
