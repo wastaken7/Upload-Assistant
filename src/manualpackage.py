@@ -78,7 +78,7 @@ class ManualPackageManager:
                     await generic.write(f"{each['img_url']}\n")
         title = re.sub(r"[^0-9a-zA-Z\[\\]]+", "", meta.title)
         archive = f"{meta.base_dir}/tmp/{meta.uuid}/{title}"
-        torrent_files = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", "*.torrent"))]
+        torrent_files = [os.path.basename(f) for f in glob.glob(os.path.join(glob.escape(f"{meta.base_dir}/tmp/{meta.uuid}"), "*.torrent"))]
         if len(torrent_files) > 1:
             for each in torrent_files:
                 if not each.startswith(('BASE', '[RAND')):

@@ -50,6 +50,13 @@ class UNIT3D:
         should_continue = True
         return should_continue
 
+    async def get_search_urls(self, meta: Meta, request_params: ParamsList) -> list[tuple[str, ParamsList, bool]]:
+        _ = meta
+        urls: list[tuple[str, ParamsList, bool]] = [(self.search_url, request_params, False)]
+        if getattr(self, "pending_url", None):
+            urls.append((self.pending_url, request_params, True))
+        return urls
+
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
         params_list: ParamsList | None = None
@@ -118,16 +125,12 @@ class UNIT3D:
         request_params: ParamsList
         request_params = params_list if params_list is not None else list(params_dict.items())
 
-        urls_to_check = [self.search_url]
-        if getattr(self, "pending_url", None):
-            urls_to_check.append(self.pending_url)
+        urls_to_check = await self.get_search_urls(meta, request_params)
 
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-            for url in urls_to_check:
-                check_pending = False
-                if "api/torrents/pending" in url:
-                    check_pending = True
-                response = await client.get(url=url, headers=headers, params=request_params)
+            for url, params, check_pending in urls_to_check:
+                logger.debug(f"{self.tracker}: Searching URL: {url} with params: {params} (pending={check_pending})")
+                response = await client.get(url=url, headers=headers, params=params)
                 response.raise_for_status()
 
                 if response.status_code == 200:

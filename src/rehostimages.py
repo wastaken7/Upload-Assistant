@@ -357,13 +357,15 @@ async def _handle_image_upload(
     if len(all_screenshots) < multi_screens:
         for _file in filelist:
             sanitized_title = await sanitize_filename(filename)
-            filename_pattern = f"{sanitized_title}*.png"
+            filename_pattern = f"{glob.escape(sanitized_title)}*.png"
             logger.debug(f"[yellow]Searching for screenshots with pattern: {filename_pattern}")
 
             if meta.is_disc == "DVD":
-                existing_screens: list[str] = await asyncio.to_thread(glob.glob, f"{meta.base_dir}/tmp/{meta.uuid}/{meta.discs[0]['name']}-*.png")
+                existing_screens: list[str] = await asyncio.to_thread(
+                    glob.glob, f"{glob.escape(f'{meta.base_dir}/tmp/{meta.uuid}')}/{glob.escape(meta.discs[0]['name'])}-*.png"
+                )
             else:
-                existing_screens = await asyncio.to_thread(glob.glob, os.path.join(screenshots_dir, filename_pattern))
+                existing_screens = await asyncio.to_thread(glob.glob, os.path.join(glob.escape(screenshots_dir), filename_pattern))
 
             # Add any new screenshots to our list
             for screen in existing_screens:
@@ -408,7 +410,7 @@ async def _handle_image_upload(
 
     if tracker == "covers":
         all_screenshots = []
-        existing_screens = await asyncio.to_thread(glob.glob, f"{meta.base_dir}/tmp/{meta.uuid}/cover_*.jpg")
+        existing_screens = await asyncio.to_thread(glob.glob, f"{glob.escape(f'{meta.base_dir}/tmp/{meta.uuid}')}/cover_*.jpg")
         for screen in existing_screens:
             if screen not in all_screenshots:
                 all_screenshots.append(screen)

@@ -3,7 +3,7 @@ from typing import Any
 from src.console import logger
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
-from src.trackers.UNIT3D import UNIT3D
+from src.trackers.UNIT3D import UNIT3D, ParamsList
 
 Config = dict[str, Any]
 
@@ -37,6 +37,15 @@ class ZNTH(UNIT3D):
 
         return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
+    async def get_search_urls(self, meta: Meta, request_params: ParamsList) -> list[tuple[str, ParamsList, bool]]:
+        urls = await super().get_search_urls(meta, request_params)
+        if meta.category == "BOOK":
+            if meta.isbn:
+                urls.append((self.search_url, [("bookId", meta.isbn), ("perPage", "100")], False))
+            if meta.asin:
+                urls.append((self.search_url, [("bookId", meta.asin), ("perPage", "100")], False))
+        return urls
+
     async def get_name(self, meta: Meta) -> dict[str, str]:
         category = meta.category
         audiobook = meta.audiobook
@@ -45,12 +54,12 @@ class ZNTH(UNIT3D):
             author = meta.author or "".strip()
             title = meta.title or meta.name or "".strip()
             year = str(meta.year) if meta.year is not None else ""
-            format_val = str(meta.type or meta.container or "").strip().upper()
+            format_val = (meta.type or meta.container or "").strip().upper()
             tag = meta.tag or "".strip().lstrip("-")
 
             # Determine source/retail
             source = meta.source or "".strip().upper()
-            manual_source = str(meta.manual_source or "").strip().upper()
+            manual_source = (meta.manual_source or "").strip().upper()
             if manual_source in ("RETAIL", "SCAN", "HYBRID"):
                 source = manual_source
 

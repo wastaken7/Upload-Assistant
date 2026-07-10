@@ -7,7 +7,7 @@ import re
 import shutil
 import traceback
 from collections import OrderedDict, defaultdict
-from glob import glob
+from glob import escape, glob
 from pathlib import Path
 from typing import Any, cast
 
@@ -703,7 +703,7 @@ class DiscParse:
             try:
                 # Define the playlist path
                 playlist_path = os.path.join(path, "ADV_OBJ")
-                xpl_files = glob(f"{playlist_path}/*.xpl")
+                xpl_files = glob(f"{escape(playlist_path)}/*.xpl")
                 logger.debug(f"Found {xpl_files} in {playlist_path}")
 
                 if not xpl_files:

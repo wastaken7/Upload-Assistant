@@ -679,7 +679,7 @@ def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
         requires more images than actually exist.
     """
     tmp_dir = f"{meta.base_dir}/tmp/{meta.uuid}"
-    img_files = glob.glob(f"{tmp_dir}/*.png")
+    img_files = glob.glob(glob.escape(tmp_dir) + "/*.png")
     screenshot_files = [f for f in img_files if not os.path.basename(f).startswith("POSTER")]
     actual_screens = len(screenshot_files)
     capped_min = min(min_successful_uploads, actual_screens)
