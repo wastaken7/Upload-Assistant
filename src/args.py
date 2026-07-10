@@ -474,6 +474,15 @@ class Args:
         parser.add_argument(
             "-qbctime", "--qbit-bw-time", nargs=1, required=False, help="Time to stay under qBittorrent threshold (seconds)", type=int, dest="qbit_bandwidth_time"
         )
+        parser.add_argument(
+            "-uo",
+            "--upload-order",
+            dest="upload_order",
+            nargs=1,
+            required=False,
+            choices=["concurrent", "usenet", "tracker"],
+            help="Set the upload order when both torrent trackers and Usenet are selected ('concurrent', 'usenet', 'tracker')",
+        )
         parser.add_argument("-rtl", "--rtorrent-label", dest="rtorrent_label", nargs=1, required=False, help="Add to rtorrent with this label")
         parser.add_argument("-tk", "--trackers", nargs=1, required=False, help="Upload to these trackers, comma separated (--trackers blu,bhd) including manual")
         parser.add_argument(

@@ -99,6 +99,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "mam_id": (str,),
     "twitch_client_id": (str,),
     "twitch_client_secret": (str,),
+    "upload_order": (str,),
 }
 
 # Valid image hosts
@@ -487,6 +488,17 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
                     key=key,
                     section="DEFAULT"
                 ))
+
+    # Validate upload_order value if present
+    upload_order = default.get("upload_order")
+    if isinstance(upload_order, str):
+        upload_order_lower = upload_order.strip().lower()
+        if upload_order_lower not in {"concurrent", "usenet", "tracker"}:
+            warnings.append(
+                ConfigValidationWarning(
+                    f"Invalid value '{upload_order}' for upload_order. Must be one of: 'concurrent', 'usenet', 'tracker'", key="upload_order", section="DEFAULT"
+                )
+            )
 
     # Validate image hosts
     for i in range(1, 10):

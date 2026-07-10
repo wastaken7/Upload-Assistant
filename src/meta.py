@@ -301,6 +301,7 @@ class Meta:
     PTP_images_key: list[dict[str, Any]] = field(default_factory=list)
     ptp: str | int | None = None
     publisher: str = ""
+    upload_order: str | None = None
     qbit_bandwidth_control: bool = False
     qbit_bandwidth_threshold: int = 0
     qbit_bandwidth_time: int = 0
