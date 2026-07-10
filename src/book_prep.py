@@ -137,6 +137,14 @@ def sanitize_book_language(meta: Meta) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _unescape_meta_val(val: Any) -> str | None:
+    if val is None or isinstance(val, (dict, list)):
+        return None
+    import html
+
+    return html.unescape(str(val)).strip()
+
+
 async def gather_book_prep(
     meta: Meta,
     videopath: str,
@@ -270,14 +278,14 @@ async def gather_book_prep(
             general_track = next((t for t in tracks if t.get("@type") == "General"), None)
             if general_track:
                 # 1. Title/Album
-                album = general_track.get("Album") or general_track.get("album")
-                track_name = general_track.get("Track_name") or general_track.get("track_name")
+                album = _unescape_meta_val(general_track.get("Album") or general_track.get("album"))
+                track_name = _unescape_meta_val(general_track.get("Track_name") or general_track.get("track_name"))
 
                 # Detect if the audiobook is Unabridged or Abridged from file metadata
                 detected_edition = None
                 for val in (album, track_name):
-                    if val and not isinstance(val, dict):
-                        match = re.search(r'\b(unabridged|abridged)\b', str(val), re.IGNORECASE)
+                    if val:
+                        match = re.search(r"\b(unabridged|abridged)\b", val, re.IGNORECASE)
                         if match:
                             detected_edition = match.group(1).capitalize()
                             break
@@ -285,10 +293,10 @@ async def gather_book_prep(
                     meta.edition = detected_edition
 
                 if not meta.title:
-                    if album and str(album).strip() and not isinstance(album, dict):
-                        meta.title = str(album).strip()
-                    elif track_name and str(track_name).strip() and not isinstance(track_name, dict):
-                        meta.title = str(track_name).strip()
+                    if album:
+                        meta.title = album
+                    elif track_name:
+                        meta.title = track_name
 
                 # Clean the edition from the title if it's not a CLI override
                 if not cli_overrides["title"] and meta.title:
@@ -301,59 +309,61 @@ async def gather_book_prep(
                     meta.title = cleaned_title
 
                 # 2. Author
-                performer = general_track.get("Performer") or general_track.get("performer")
-                album_performer = general_track.get("Album_Performer") or general_track.get("album_performer")
+                performer = _unescape_meta_val(general_track.get("Performer") or general_track.get("performer"))
+                album_performer = _unescape_meta_val(general_track.get("Album_Performer") or general_track.get("album_performer"))
                 if not meta.author:
-                    if performer and str(performer).strip() and not isinstance(performer, dict):
-                        meta.author = str(performer).strip()
-                    elif album_performer and str(album_performer).strip() and not isinstance(album_performer, dict):
-                        meta.author = str(album_performer).strip()
+                    if performer:
+                        meta.author = performer
+                    elif album_performer:
+                        meta.author = album_performer
 
                 # 3. Narrator
-                composer = general_track.get("Composer") or general_track.get("composer")
-                if composer and str(composer).strip() and not isinstance(composer, dict) and not meta.narrator:
-                    meta.narrator = str(composer).strip()
+                composer = _unescape_meta_val(general_track.get("Composer") or general_track.get("composer"))
+                if composer and not meta.narrator:
+                    meta.narrator = composer
 
                 # 4. Publisher
-                publisher = general_track.get("Publisher") or general_track.get("publisher")
-                if publisher and str(publisher).strip() and not isinstance(publisher, dict) and not meta.publisher:
-                    meta.publisher = str(publisher).strip()
+                publisher = _unescape_meta_val(general_track.get("Publisher") or general_track.get("publisher"))
+                if publisher and not meta.publisher:
+                    meta.publisher = publisher
 
                 # 5. ISBN
                 isbn_val = general_track.get("ISBN") or general_track.get("isbn")
                 if not isbn_val and isinstance(general_track.get("extra"), dict):
                     isbn_val = general_track["extra"].get("ISBN") or general_track["extra"].get("isbn")
-                if isbn_val and str(isbn_val).strip() and not isinstance(isbn_val, dict) and not meta.isbn:
-                    meta.isbn = str(isbn_val).strip()
+                isbn_val = _unescape_meta_val(isbn_val)
+                if isbn_val and not meta.isbn:
+                    meta.isbn = isbn_val
 
                 # 5b. ASIN
                 asin_val = general_track.get("ASIN") or general_track.get("asin")
                 if not asin_val and isinstance(general_track.get("extra"), dict):
                     asin_val = general_track["extra"].get("ASIN") or general_track["extra"].get("asin")
-                if asin_val and str(asin_val).strip() and not isinstance(asin_val, dict) and not meta.asin:
-                    meta.asin = str(asin_val).strip()
+                asin_val = _unescape_meta_val(asin_val)
+                if asin_val and not meta.asin:
+                    meta.asin = asin_val
 
                 # 6. Overview/Comment
-                comment = general_track.get("Comment") or general_track.get("comment")
-                description = general_track.get("Description") or general_track.get("description")
+                comment = _unescape_meta_val(general_track.get("Comment") or general_track.get("comment"))
+                description = _unescape_meta_val(general_track.get("Description") or general_track.get("description"))
                 if not meta.overview:
-                    if comment and str(comment).strip() and not isinstance(comment, dict):
-                        meta.overview = str(comment).strip()
-                    elif description and str(description).strip() and not isinstance(description, dict):
-                        meta.overview = str(description).strip()
+                    if comment:
+                        meta.overview = comment
+                    elif description:
+                        meta.overview = description
 
                 # 7. Year (extract 4-digit number)
-                rec_date = general_track.get("Recorded_Date") or general_track.get("recorded_date")
-                if rec_date and str(rec_date).strip() and not isinstance(rec_date, dict) and not meta.year:
-                    match = re.search(r"\b\d{4}\b", str(rec_date))
+                rec_date = _unescape_meta_val(general_track.get("Recorded_Date") or general_track.get("recorded_date"))
+                if rec_date and not meta.year:
+                    match = re.search(r"\b\d{4}\b", rec_date)
                     if match:
                         meta.year = int(match.group(0))
                         meta.search_year = int(match.group(0))
 
                 # 8. Genre -> Keywords
-                genre = general_track.get("Genre") or general_track.get("genre")
-                if genre and str(genre).strip() and not isinstance(genre, dict):
-                    words = re.split(r"[;,]", str(genre))
+                genre = _unescape_meta_val(general_track.get("Genre") or general_track.get("genre"))
+                if genre:
+                    words = re.split(r"[;,]", genre)
                     cleaned_words = [w.strip().lower() for w in words if w.strip()]
                     if cleaned_words:
                         existing_keywords = meta.keywords
@@ -368,9 +378,9 @@ async def gather_book_prep(
 
                 # 9. Language
                 if not meta.book_language:
-                    lang_val = general_track.get("Language") or general_track.get("language")
-                    if lang_val and str(lang_val).strip() and not isinstance(lang_val, dict):
-                        full, iso3 = _resolve_book_language(str(lang_val).strip())
+                    lang_val = _unescape_meta_val(general_track.get("Language") or general_track.get("language"))
+                    if lang_val:
+                        full, iso3 = _resolve_book_language(lang_val)
                         if is_valid_book_language(full, iso3):
                             meta.book_language = full
                             meta.book_language_iso = iso3
@@ -379,9 +389,9 @@ async def gather_book_prep(
                     # Fallback: Audio track language (audiobooks)
                     for t in tracks:
                         if t.get("@type") == "Audio":
-                            lang_val = t.get("Language") or t.get("language")
-                            if lang_val and str(lang_val).strip() and not isinstance(lang_val, dict):
-                                full, iso3 = _resolve_book_language(str(lang_val).strip())
+                            lang_val = _unescape_meta_val(t.get("Language") or t.get("language"))
+                            if lang_val:
+                                full, iso3 = _resolve_book_language(lang_val)
                                 if is_valid_book_language(full, iso3):
                                     meta.book_language = full
                                     meta.book_language_iso = iso3
@@ -391,9 +401,9 @@ async def gather_book_prep(
                     # Fallback: Text track language (ebooks like PDF/EPUB)
                     for t in tracks:
                         if t.get("@type") == "Text":
-                            lang_val = t.get("Language") or t.get("language")
-                            if lang_val and str(lang_val).strip() and not isinstance(lang_val, dict):
-                                full, iso3 = _resolve_book_language(str(lang_val).strip())
+                            lang_val = _unescape_meta_val(t.get("Language") or t.get("language"))
+                            if lang_val:
+                                full, iso3 = _resolve_book_language(lang_val)
                                 if is_valid_book_language(full, iso3):
                                     meta.book_language = full
                                     meta.book_language_iso = iso3
@@ -724,14 +734,14 @@ def sanitize_book_author(meta: Meta) -> None:
             meta.author = ""
             return
 
-    author = str(author)
+    author = author
     has_underscores = "_" in author and " " not in author
     normalized_author = author.replace("_", " ") if has_underscores else author
 
     manual_translator = meta.book_translator
     if manual_translator:
         # Also replace underscores in manual translator names in case they entered underscores
-        manual_translator_str = str(manual_translator)
+        manual_translator_str = manual_translator
         names_to_remove = [n.replace("_", " ").strip() for n in manual_translator_str.split(",") if n.strip()]
         for name in names_to_remove:
             pattern = r"\b" + re.escape(name) + r"\b"
