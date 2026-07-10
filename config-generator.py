@@ -884,7 +884,11 @@ def configure_discord(
     return discord_config
 
 
-def generate_config_file(config_data: ConfigDict, existing_path: Path | None = None) -> bool:
+def generate_config_file(
+    config_data: ConfigDict,
+    existing_path: Path | None = None,
+    comments: ConfigComments | None = None,
+) -> bool:
     """Generate the config.py file from the config dictionary"""
     # Create output directory if it doesn't exist
     os.makedirs("data", exist_ok=True)
@@ -934,17 +938,25 @@ def generate_config_file(config_data: ConfigDict, existing_path: Path | None = N
 
     # Generate the config file with properly formatted Python syntax
     with open(config_path, "w", encoding="utf-8") as file:
+        file.write("# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0\n")
         file.write("config = {\n")
 
         # Custom formatting function to create Python dict with trailing commas
-        def write_dict(d: ConfigDict, indent_level: int = 1) -> None:
+        def write_dict(d: ConfigDict, indent_level: int = 1, key_stack: list[str] | None = None) -> None:
+            if key_stack is None:
+                key_stack = []
             indent = "    " * indent_level
             for key, value in d.items():
+                fq_key = ".".join(key_stack + [key]) if key_stack else key
+                if comments and fq_key in comments:
+                    for comment in comments[fq_key]:
+                        file.write(f"{indent}{comment}\n")
+
                 file.write(f"{indent}{json.dumps(key)}: ")
 
                 if isinstance(value, dict):
                     file.write("{\n")
-                    write_dict(cast(ConfigDict, value), indent_level + 1)
+                    write_dict(cast(ConfigDict, value), indent_level + 1, key_stack + [key])
                     file.write(f"{indent}}},\n")
                 elif isinstance(value, bool):
                     # Ensure booleans are capitalized
@@ -1008,7 +1020,7 @@ if __name__ == "__main__":
                 example_discord = example_config.get("DISCORD", {})
                 config_data["DISCORD"] = configure_discord({}, example_discord, config_comments)
 
-                generate_config_file(config_data)
+                generate_config_file(config_data, comments=config_comments)
             else:
                 console.print("\n[i] Using existing configuration as a template.", markup=False)
                 console.print("[i] Existing config will be renamed config.py.bak.", markup=False)
@@ -1080,7 +1092,7 @@ if __name__ == "__main__":
                     console.print("", markup=False)
 
                 # Generate the updated config file
-                generate_config_file(config_data, existing_path)
+                generate_config_file(config_data, existing_path, comments=config_comments)
         else:
             existing_config = validate_config(existing_config, example_config)
             config_data = existing_config.copy()
@@ -1089,7 +1101,7 @@ if __name__ == "__main__":
             autofill_missing_keys(config_data, example_config)
 
             # Generate the updated config file
-            generate_config_file(config_data, existing_path)
+            generate_config_file(config_data, existing_path, comments=config_comments)
 
     else:
         console.print("\n[i] No existing configuration found. Creating a new one.", markup=False)
@@ -1120,4 +1132,4 @@ if __name__ == "__main__":
         example_discord = example_config.get("DISCORD", {})
         config_data["DISCORD"] = configure_discord({}, example_discord, config_comments)
 
-        generate_config_file(config_data)
+        generate_config_file(config_data, comments=config_comments)
