@@ -89,7 +89,9 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
                     tag_norm = "".join(c for c in release_group.lower() if c.isalnum())
                     title_norm = "".join(c for c in (meta.title or "").lower() if c.isalnum())
                     author_norm = "".join(c for c in (meta.author or "").lower() if c.isalnum())
-                    if tag_norm and (tag_norm in (title_norm, author_norm) or (title_norm and title_norm in tag_norm) or (author_norm and author_norm in tag_norm)):
+                    if tag_norm and (
+                        tag_norm in (title_norm, author_norm) or (len(title_norm) >= 4 and title_norm in tag_norm) or (len(author_norm) >= 4 and author_norm in tag_norm)
+                    ):
                         release_group = None
 
             if release_group:
