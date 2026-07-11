@@ -21,10 +21,6 @@ def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, A
 
 
 async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> str:
-    # books have no release group; a user --tag is applied upstream (runs only when meta.tag is None)
-    if meta.category == "BOOK":
-        return ""
-
     # Using regex from cross-seed (https://github.com/cross-seed/cross-seed/tree/master?tab=Apache-2.0-1-ov-file)
     release_group = None
     basename = os.path.basename(video)
@@ -84,10 +80,23 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
         non_anime_match = re.search(r'(?<=-)((?!\s*(?:WEB-DL|Blu-ray|H-264|H-265))(?:\W|\b)(?!(?:\d{3,4}[ip]))(?!\d+\b)(?:\W|\b)([\w .]+?))(?:\[.+\])?(?:\))?(?:\s\[.+\])?$', basename_stripped)
         if non_anime_match:
             release_group = non_anime_match.group(1).strip()
-            if "Z0N3" in release_group:
-                release_group = release_group.replace("Z0N3", "D-Z0N3")
-            if not meta.scene and release_group and len(release_group) > 12:
-                release_group = None
+            # Prevent misinterpreting "Author - Title" space-hyphen-space separators as release groups
+            if meta.category in ("BOOK", "GAME") and release_group:
+                hyphen_idx = non_anime_match.start() - 1
+                if hyphen_idx > 0 and basename_stripped[hyphen_idx - 1].isspace():
+                    release_group = None
+                else:
+                    tag_norm = "".join(c for c in release_group.lower() if c.isalnum())
+                    title_norm = "".join(c for c in (meta.title or "").lower() if c.isalnum())
+                    author_norm = "".join(c for c in (meta.author or "").lower() if c.isalnum())
+                    if tag_norm and (tag_norm in (title_norm, author_norm) or (title_norm and title_norm in tag_norm) or (author_norm and author_norm in tag_norm)):
+                        release_group = None
+
+            if release_group:
+                if "Z0N3" in release_group:
+                    release_group = release_group.replace("Z0N3", "D-Z0N3")
+                if not meta.scene and len(release_group) > 12:
+                    release_group = None
             logger.debug(f"Non-anime regex match: {release_group}")
 
     # If regex patterns didn't work, fall back to guessit
