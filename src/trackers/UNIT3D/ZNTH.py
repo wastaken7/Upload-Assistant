@@ -146,7 +146,7 @@ class ZNTH(UNIT3D):
                     edition_lower = edition.lower()
                     if "1st" in edition_lower or "first" in edition_lower:
                         edition = ""
-                    elif not any(x in edition_lower for x in ["edition", "ed.", "ed"]):
+                    elif not any(t in ("edition", "ed") for t in edition_lower.replace(".", " ").split()):
                         edition = f"{edition} Edition"
 
                 source = str(meta.source or "").strip().upper()
@@ -262,7 +262,7 @@ class ZNTH(UNIT3D):
             if category == "GAME":
                 resolved_id = "16"
             elif category == "BOOK":
-                resolved_id = type_id.get(meta_type or "", "16")
+                resolved_id = type_id.get(_book_format(meta) or "", "16")
             else:
                 resolved_id = type_id.get(meta_type or "", "0")
 

@@ -495,8 +495,10 @@ class Meta:
             setattr(self, k, v)
 
     def copy(self) -> Meta:
-        """Ensure copy returns a Meta instance."""
-        return Meta(self.to_dict())
+        """Ensure copy returns a Meta instance with deep copied attributes."""
+        import copy
+
+        return copy.deepcopy(self)
 
     def __copy__(self) -> Meta:
         return Meta(self.to_dict())
