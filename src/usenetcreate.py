@@ -561,9 +561,10 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                         check_missing_count = failed
                         if "check" in tasks and check_total:
                             progress.update(tasks["check"], completed=check_total)
-                        if failed:
-                            logger.info(f"[yellow]Article check: {failed} article(s) missing on server — pesto is reposting them automatically...[/yellow]")
-                        else:
+                        # Only announce success here; a missing count is always
+                        # immediately followed by a "repost_round_started" event
+                        # (below), which reports it with round context instead.
+                        if not failed:
                             logger.info("[green]Article check: all articles verified on server.[/green]")
                     elif etype == "check_retrying":
                         attempt = event.get("attempt", 0)
@@ -571,6 +572,25 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                         delay = event.get("delay_secs", 0)
                         check_wait_total = delay
                         logger.debug(f"[cyan]Article check: retry {attempt}/{max_attempts} in {delay}s...[/cyan]")
+                    elif etype == "repost_round_started":
+                        round_num = event.get("round", 0)
+                        max_rounds = event.get("max_rounds", 0)
+                        missing = event.get("missing", 0)
+                        logger.info(
+                            f"[yellow]Article check: round {round_num}/{max_rounds} — "
+                            f"{missing} article(s) missing, reposting automatically...[/yellow]"
+                        )
+                    elif etype == "repost_round_done":
+                        round_num = event.get("round", 0)
+                        max_rounds = event.get("max_rounds", 0)
+                        reposted = event.get("reposted", 0)
+                        still_missing = event.get("still_missing", 0)
+                        check_missing_count = still_missing
+                        if still_missing:
+                            logger.info(
+                                f"[yellow]Article check: round {round_num}/{max_rounds} — "
+                                f"reposted {reposted} article(s), {still_missing} still missing[/yellow]"
+                            )
                 except json.JSONDecodeError:
                     pass
 
@@ -974,9 +994,10 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             cmd_pesto.extend(["--nzb-password", archive_password])
 
         # --check: after posting, verify every article is retrievable via STAT.
-        # Missing articles are reposted automatically and reverified; pesto
-        # exits non-zero if any are still missing after that, so we know the
-        # NZB is trustworthy whenever this command succeeds.
+        # Missing articles are reposted and reverified in a loop (up to
+        # --check-post-retries rounds); pesto exits non-zero if any are still
+        # missing after that, so we know the NZB is trustworthy whenever this
+        # command succeeds.
         if usenet_cfg.get("pesto_check", True):
             cmd_pesto.append("--check")
             check_delay = usenet_cfg.get("pesto_check_delay")
@@ -988,6 +1009,18 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             check_connections = usenet_cfg.get("pesto_check_connections")
             if check_connections is not None and str(check_connections).strip() != "":
                 cmd_pesto.extend(["--check-connections", str(check_connections)])
+            # Unlike the other check_* options above, this one is NOT left to
+            # pesto's own default: pesto defaults to a single repost round
+            # (1) for backwards compatibility with older callers, but that
+            # gives no real protection against a server that needs more than
+            # one attempt to keep an article. Default to 3 rounds here so
+            # --check is meaningfully resilient out of the box, matching
+            # pesto_check itself already defaulting to on. Set
+            # pesto_check_post_retries to "" explicitly to defer to pesto's
+            # own default instead.
+            check_post_retries = usenet_cfg.get("pesto_check_post_retries", 3)
+            if str(check_post_retries).strip() != "":
+                cmd_pesto.extend(["--check-post-retries", str(check_post_retries)])
 
         cmd_pesto.extend(all_upload_files)
 
