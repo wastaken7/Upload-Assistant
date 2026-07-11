@@ -60,6 +60,8 @@ class Meta:
     book_language_iso: str = ""
     book_language: str = ""
     book_publisher: str | None = None
+    book_series: str = ""
+    book_series_index: str = ""
     book_title: str | None = None
     book_translator: str | None = None
     btn: str | int | None = None
@@ -493,10 +495,8 @@ class Meta:
             setattr(self, k, v)
 
     def copy(self) -> Meta:
-        """Ensure copy returns a Meta instance with deep copied attributes."""
-        import copy
-
-        return copy.deepcopy(self)
+        """Ensure copy returns a Meta instance."""
+        return Meta(self.to_dict())
 
     def __copy__(self) -> Meta:
         return Meta(self.to_dict())

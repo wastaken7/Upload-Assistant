@@ -21,6 +21,10 @@ def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, A
 
 
 async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> str:
+    # books have no release group; a user --tag is applied upstream (runs only when meta.tag is None)
+    if meta.category == "BOOK":
+        return ""
+
     # Using regex from cross-seed (https://github.com/cross-seed/cross-seed/tree/master?tab=Apache-2.0-1-ov-file)
     release_group = None
     basename = os.path.basename(video)

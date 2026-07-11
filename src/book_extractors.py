@@ -13,6 +13,15 @@ from typing import Any
 from src.console import logger
 
 
+def normalize_series_index(value: str) -> str:
+    """Drop a trailing .0 from a series index ("5.0" -> "5"), keeping "5.5"/"0.5"."""
+    try:
+        idx = float(value)
+    except (TypeError, ValueError):
+        return str(value).strip()
+    return str(int(idx)) if idx.is_integer() else str(idx)
+
+
 def extract_epub_metadata(epub_path: str) -> dict[str, Any]:
     """Extract metadata from an EPUB zip container's OPF file."""
     metadata: dict[str, Any] = {}
@@ -56,6 +65,8 @@ def extract_epub_metadata(epub_path: str) -> dict[str, Any]:
             identifier = ""
             description = ""
             publisher = ""
+            series = ""
+            series_index = ""
 
             for elem in root.iter():
                 tag_local = elem.tag.split("}")[-1]
@@ -79,6 +90,12 @@ def extract_epub_metadata(epub_path: str) -> dict[str, Any]:
                     description = (elem.text or "").strip()
                 elif tag_local == "publisher":
                     publisher = (elem.text or "").strip()
+                elif tag_local == "meta":
+                    meta_name = (elem.attrib.get("name") or "").lower()
+                    if meta_name == "calibre:series":
+                        series = (elem.attrib.get("content") or "").strip()
+                    elif meta_name == "calibre:series_index":
+                        series_index = (elem.attrib.get("content") or "").strip()
 
             if title:
                 metadata["title"] = title
@@ -98,11 +115,24 @@ def extract_epub_metadata(epub_path: str) -> dict[str, Any]:
                 metadata["overview"] = description
             if publisher:
                 metadata["publisher"] = publisher
+            if series:
+                metadata["book_series"] = series
+            if series_index:
+                metadata["book_series_index"] = normalize_series_index(series_index)
 
     except Exception as e:
         logger.debug(f"[yellow]Warning: Error parsing EPUB metadata: {e}[/yellow]")
 
     return metadata
+
+
+def extract_series_from_filename(filename: str) -> tuple[str, str]:
+    """Parse (series, index) from a filename like "Author - Series #5 - Title", or ("", "")."""
+    name = os.path.splitext(os.path.basename(filename))[0]
+    match = re.search(r"[-–]\s*([^-–#\[\]]+?)\s*#\s*(\d+(?:\.\d+)?)", name)
+    if not match:
+        return "", ""
+    return match.group(1).strip(), normalize_series_index(match.group(2))
 
 
 def extract_cbr_cbz_metadata(filepath: str) -> dict[str, Any]:
