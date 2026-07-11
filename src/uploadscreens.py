@@ -731,6 +731,22 @@ async def _upload_screens(
         image_glob = [file for file in image_glob if file not in unwanted_files]
         image_glob = list(set(image_glob))
 
+        # Filter out menu screenshots from normal screenshot upload
+        menu_basenames = set()
+        if hasattr(meta, "menu_images") and meta.menu_images:
+            for img in meta.menu_images:
+                if isinstance(img, dict):
+                    local_path = img.get("local_file_path") or img.get("raw_url")
+                    if local_path:
+                        menu_basenames.add(os.path.basename(local_path))
+
+        def is_menu_screenshot(filename: str) -> bool:
+            if filename in menu_basenames:
+                return True
+            return "-VIDEO_TS-" in filename or "-VTS_" in filename
+
+        image_glob = [file for file in image_glob if not is_menu_screenshot(file)]
+
         # Sort images by numeric suffix
         def extract_numeric_suffix(filename: str) -> float:
             match = re.search(r"-(\d+)\.png$", filename)

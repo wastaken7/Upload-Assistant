@@ -980,7 +980,11 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
         bdmv_filename = meta.filename
         bdinfo = meta.bdinfo
         file_list = [str(p) for p in meta.filelist if str(p)]
-        videopath: str = file_list[0] if file_list else ""
+        videopath: str = ""
+        if file_list:
+            videopath = file_list[0]
+        elif meta.is_disc == "HDDVD" and meta.discs:
+            videopath = meta.discs[0].get("largest_evo", "")
         logger.info(f"Processing {filename} for upload.....")
 
         meta.frame_overlay = config["DEFAULT"].get("frame_overlay", False)
@@ -1044,7 +1048,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
 
                         except Exception as e:
                             logger.info(f"[yellow]Could not load saved menu image data: {str(e)}")
-                    elif meta.path_to_menu_screenshots:
+                    elif meta.path_to_menu_screenshots or config["DEFAULT"].get("auto_dvd_menus", False):
                         await process_disc_menus(meta, config)
 
                 if meta.audio_spectrogram or meta.audio_spectrogram_tracks or config["DEFAULT"].get("add_audio_spectrogram", False):
@@ -1897,7 +1901,7 @@ async def do_the_thing(base_dir: str) -> None:
 
                 # Ensure tmp subdirectory exists with secure permissions
                 ensure_secure_tmp_subdir(tmp_path)
-                current_release_log_path.set(os.path.join(tmp_path, "upload.log"))
+                current_release_log_path.set(os.path.join(tmp_path, f"upload_{int(time.time())}.log"))
 
                 if meta.delete_tmp and os.path.exists(tmp_path):
                     try:

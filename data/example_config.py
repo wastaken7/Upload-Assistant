@@ -178,6 +178,12 @@ config = {
         # Number of screenshots to capture
         "screens": "4",
 
+        # Set true to automatically capture DVD menu screenshots from menu VOBs
+        "auto_dvd_menus": True,
+
+        # Max number of disc menu screenshots to upload
+        "max_menu_screens": "6",
+
         # Minimum successful image uploads required to continue
         "min_successful_image_uploads": "3",
 

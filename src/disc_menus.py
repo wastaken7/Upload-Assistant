@@ -1,13 +1,43 @@
 import asyncio
+import contextlib
+import glob
 import json
 import os
+import platform
+import re
 from collections.abc import MutableMapping, Sequence
 from pathlib import Path
 from typing import Any, cast
 
+from PIL import Image
+from pymediainfo import MediaInfo
+
 from src.console import logger
 from src.meta import Meta
 from src.uploadscreens import UploadScreensManager
+
+
+def select_evenly_spaced(items: list[Any], num_to_select: int) -> list[Any]:
+    if len(items) <= num_to_select:
+        return items
+    if num_to_select <= 0:
+        return []
+    if num_to_select == 1:
+        return [items[0]]
+
+    indices = [(round(i * (len(items) - 1) / (num_to_select - 1))) for i in range(num_to_select)]
+    # Ensure indices are unique and sorted
+    unique_indices = sorted(set(indices))
+
+    # Fill in any missing slots in rare rounding edge cases
+    if len(unique_indices) < num_to_select:
+        all_indices = set(range(len(items)))
+        needed = num_to_select - len(unique_indices)
+        available = sorted(all_indices - set(unique_indices))
+        unique_indices.extend(available[:needed])
+        unique_indices.sort()
+
+    return [items[idx] for idx in unique_indices]
 
 
 class DiscMenus:
@@ -25,12 +55,297 @@ class DiscMenus:
         Processes disc menu images from a local directory and uploads them.
         """
         if not self.path_to_menu_screenshots:
-            return
+            default_section = self.config.get("DEFAULT", {})
+            if hasattr(default_section, "get") and default_section.get("auto_dvd_menus", False):
+                self.path_to_menu_screenshots = "auto"
+            else:
+                return
 
-        if os.path.isdir(self.path_to_menu_screenshots):
+        if self.path_to_menu_screenshots.lower() == "auto":
+            await self.auto_capture_dvd_menus(meta)
+        elif os.path.isdir(self.path_to_menu_screenshots):
             await self.get_local_images(meta)
         else:
             logger.info(f"[red]Invalid disc menus path: {self.path_to_menu_screenshots}[/red]")
+
+    async def auto_capture_dvd_menus(self, meta: Meta) -> None:
+        """
+        Automatically captures screenshots of DVD menus from VOB files and uploads them.
+        HD-DVD menus are skipped and warning is logged.
+        """
+        # Check if there are any supported discs in metadata
+        has_supported_discs = any(disc.get("type") in ("DVD", "HDDVD") for disc in meta.discs)
+        if not has_supported_discs:
+            logger.debug("No supported DVD/HDDVD discs found in metadata; skipping menu auto-capture.")
+            return
+
+        # Load max_menu_screens from config
+        default_section = self.config.get("DEFAULT", {})
+        try:
+            max_menu_screens = int(default_section.get("max_menu_screens", 6))
+        except ValueError, TypeError:
+            max_menu_screens = 6
+
+        captured_images = []
+        output_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Get ffmpeg path
+        ffmpeg_path = "ffmpeg"
+        if platform.system() == "Linux":
+            ff_bin_dir = os.path.join(meta.base_dir, "bin", "ffmpeg")
+            machine = platform.machine().lower()
+            arch = "amd" if machine in ("x86_64", "amd64") else ("arm" if machine in ("aarch64", "arm64") else None)
+            if arch:
+                candidate = os.path.join(ff_bin_dir, arch, "ffmpeg")
+                if os.path.exists(candidate):
+                    ffmpeg_path = candidate
+
+        def round_to_even(value: float) -> int:
+            rounded = round(value)
+            if rounded % 2 != 0:
+                rounded += 1
+            return rounded
+
+        for disc in meta.discs:
+            disc_type = disc.get("type")
+            if disc_type == "HDDVD":
+                logger.warning(f"[yellow]HD-DVD menu capture is not supported. Skipping HD-DVD: {disc.get('name', 'Unknown')}[/yellow]")
+                continue
+            if disc_type != "DVD":
+                continue
+
+            disc_path = disc.get("path")
+            if not disc_path or not os.path.isdir(disc_path):
+                continue
+
+            # List and filter menu files
+            menu_files = []
+            try:
+                for file in os.listdir(disc_path):
+                    file_lower = file.lower()
+                    if disc_type == "DVD" and file_lower.endswith(".vob"):
+                        file_name = file.upper()
+                        if file_name == "VIDEO_TS.VOB" or re.match(r"^VTS_\d{2}_0\.VOB$", file_name):
+                            file_path = os.path.join(disc_path, file)
+                            if os.path.isfile(file_path) and os.path.getsize(file_path) > 50000:
+                                menu_files.append((file, file_path))
+            except Exception as e:
+                logger.error(f"[red]Error scanning directory {disc_path} for menus: {e}[/red]")
+                continue
+
+            # Sort alphabetically to process deterministically
+            menu_files.sort(key=lambda x: x[0].upper())
+
+            for file, file_path in menu_files:
+                try:
+                    mi = MediaInfo.parse(file_path)
+                    video_track = None
+                    for track in mi.tracks:
+                        if track.track_type == "Video":
+                            video_track = track
+                            break
+                    if not video_track:
+                        logger.debug(f"Skipping {file} because it does not have a video track.")
+                        continue
+
+                    # Extract details
+                    width = int(video_track.width) if video_track.width else 720
+                    height = int(video_track.height) if video_track.height else 480
+                    par = float(video_track.pixel_aspect_ratio) if video_track.pixel_aspect_ratio else 1.0
+                    dar = float(video_track.display_aspect_ratio) if video_track.display_aspect_ratio else 1.3333
+                    duration_ms = video_track.duration
+                except Exception as e:
+                    logger.error(f"[red]Error parsing MediaInfo for {file}: {e}[/red]")
+                    width, height, par, dar, duration_ms = 720, 480, 1.0, 1.3333, None
+
+                # Calculate DAR-corrected resolution (following takescreens.py logic)
+                w_sar = 1.0
+                h_sar = 1.0
+                if par < 1:
+                    new_height = dar * height
+                    sar = width / new_height
+                    w_sar = 1.0
+                    h_sar = sar
+                else:
+                    sar = par
+                    w_sar = sar
+                    h_sar = 1.0
+
+                # Determine duration
+                duration_sec = 0.0
+                if duration_ms:
+                    with contextlib.suppress(ValueError, TypeError):
+                        duration_sec = float(duration_ms) / 1000.0
+
+                vf_filters = []
+                if duration_sec < 2.0:
+                    vf_filters.append("mpdecimate")
+
+                if w_sar != 1 or h_sar != 1:
+                    scaled_w = round_to_even(width * w_sar)
+                    scaled_h = round_to_even(height * h_sar)
+                    vf_filters.append(f"scale={scaled_w}:{scaled_h}")
+
+                vf_filters.append("format=rgb24")
+                vf_chain = ",".join(vf_filters)
+
+                # Setup output file patterns
+                sanitized_disc_name = re.sub(r'[<>:"/\\|?*]', "_", disc.get("name", "dvd"))
+                vob_base = os.path.splitext(file)[0]
+                image_pattern = os.path.join(output_dir, f"{sanitized_disc_name}-{vob_base}-%03d.png")
+
+                # Run ffmpeg
+                if duration_sec < 2.0:
+                    # Static menu: extract all distinct frames up to a safety limit
+                    limit = max(10, max_menu_screens)
+                    cmd = [ffmpeg_path, "-y", "-t", "5.0", "-i", file_path, "-vf", vf_chain, "-fps_mode", "passthrough", "-vframes", str(limit), image_pattern]
+                    logger.info(f"Extracting static menu frames from {file} (limit: {limit})...")
+                else:
+                    # Motion menu: try scene detection first
+                    limit = max(30, max_menu_screens * 3)
+                    scene_vf_chain = ",".join(["select='gt(scene,0.25)'"] + vf_filters)
+                    cmd = [ffmpeg_path, "-y", "-i", file_path, "-vf", scene_vf_chain, "-fps_mode", "vfr", "-vframes", str(limit), image_pattern]
+                    logger.info(f"Extracting motion menu frames via scene detection from {file} (limit: {limit})...")
+
+                logger.debug(f"FFmpeg command: {' '.join(cmd)}")
+
+                try:
+                    process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                    try:
+                        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30.0)
+                    except TimeoutError:
+                        with contextlib.suppress(Exception):
+                            process.kill()
+                        stdout, stderr = await process.communicate()
+                        logger.error(f"[red]FFmpeg timed out processing {file}[/red]")
+
+                    # Gather generated screenshots
+                    glob_pattern = os.path.join(output_dir, f"{sanitized_disc_name}-{vob_base}-*.png")
+                    found_images = sorted(glob.glob(glob_pattern))
+
+                    # Filter out blank/black frames
+                    valid_images = []
+                    for img_path in found_images:
+                        try:
+                            with Image.open(img_path) as img:
+                                extrema = img.convert("L").getextrema()
+                                if extrema and isinstance(extrema[1], (int, float)) and extrema[1] < 10:
+                                    logger.debug(f"Skipping {os.path.basename(img_path)} because it is a blank/black frame.")
+                                    os.remove(img_path)
+                                    continue
+                            valid_images.append(img_path)
+                        except Exception as e:
+                            logger.debug(f"Failed to check if {img_path} is black: {e}")
+                            valid_images.append(img_path)
+                    found_images = valid_images
+
+                    # Fallback to interval sampling if scene detection yielded nothing for motion menus
+                    if duration_sec >= 2.0 and not found_images:
+                        logger.info(f"Scene detection returned no valid frames for {file}. Falling back to interval sampling...")
+                        fallback_vf_chain = ",".join(["fps=1/5"] + vf_filters)
+                        cmd_fallback = [
+                            ffmpeg_path,
+                            "-y",
+                            "-ss",
+                            "2.0",
+                            "-i",
+                            file_path,
+                            "-vf",
+                            fallback_vf_chain,
+                            "-fps_mode",
+                            "vfr",
+                            "-vframes",
+                            str(max_menu_screens),
+                            image_pattern,
+                        ]
+                        logger.debug(f"Fallback FFmpeg command: {' '.join(cmd_fallback)}")
+                        process_fallback = await asyncio.create_subprocess_exec(*cmd_fallback, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                        try:
+                            await asyncio.wait_for(process_fallback.communicate(), timeout=30.0)
+                        except TimeoutError:
+                            with contextlib.suppress(Exception):
+                                process_fallback.kill()
+                            await process_fallback.communicate()
+                            logger.error(f"[red]FFmpeg fallback timed out processing {file}[/red]")
+
+                        found_images = sorted(glob.glob(glob_pattern))
+                        valid_images = []
+                        for img_path in found_images:
+                            try:
+                                with Image.open(img_path) as img:
+                                    extrema = img.convert("L").getextrema()
+                                    if extrema and isinstance(extrema[1], (int, float)) and extrema[1] < 10:
+                                        logger.debug(f"Skipping fallback frame {os.path.basename(img_path)} because it is a blank/black frame.")
+                                        os.remove(img_path)
+                                        continue
+                                valid_images.append(img_path)
+                            except Exception as e:
+                                logger.debug(f"Failed to check if fallback frame {img_path} is black: {e}")
+                                valid_images.append(img_path)
+                        found_images = valid_images
+
+                    # Final retry: if still no images, retry from seek_time = 0
+                    if not found_images and duration_sec >= 2.0:
+                        logger.debug(f"FFmpeg fallback/scene detection failed for {file}. Retrying from start (seek_time=0).")
+                        image_path = os.path.join(output_dir, f"{sanitized_disc_name}-{vob_base}-001.png")
+                        cmd_retry = [ffmpeg_path, "-y", "-i", file_path, "-vframes", "1", "-vf", vf_chain, "-update", "1", image_path]
+                        process_retry = await asyncio.create_subprocess_exec(*cmd_retry, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                        try:
+                            await asyncio.wait_for(process_retry.communicate(), timeout=15.0)
+                        except TimeoutError:
+                            with contextlib.suppress(Exception):
+                                process_retry.kill()
+                            await process_retry.communicate()
+                            logger.error(f"[red]FFmpeg retry timed out processing {file}[/red]")
+
+                        found_images = sorted(glob.glob(glob_pattern))
+                        valid_images = []
+                        for img_path in found_images:
+                            try:
+                                with Image.open(img_path) as img:
+                                    extrema = img.convert("L").getextrema()
+                                    if extrema and isinstance(extrema[1], (int, float)) and extrema[1] < 10:
+                                        logger.debug(f"Skipping retry frame {os.path.basename(img_path)} because it is a blank/black frame.")
+                                        os.remove(img_path)
+                                        continue
+                                valid_images.append(img_path)
+                            except Exception as e:
+                                logger.debug(f"Failed to check if retry frame {img_path} is black: {e}")
+                                valid_images.append(img_path)
+                        found_images = valid_images
+
+                    if found_images:
+                        logger.info(f"[green]Successfully captured {len(found_images)} menu screenshot(s) for {file}[/green]")
+                        captured_images.extend(found_images)
+                    else:
+                        logger.info(f"[yellow]No valid menu frames captured for {file} (file may contain only blank/black placeholder screens)[/yellow]")
+                except Exception as e:
+                    logger.error(f"[red]Error running ffmpeg for {file}: {e}[/red]")
+
+        # Apply configurable limit using even spacing
+        if len(captured_images) > max_menu_screens:
+            logger.info(f"[yellow]Captured {len(captured_images)} screenshots, limiting to {max_menu_screens} (configured by max_menu_screens) using even spacing.[/yellow]")
+            keep_images = select_evenly_spaced(captured_images, max_menu_screens)
+            keep_set = set(keep_images)
+            for img in captured_images:
+                if img not in keep_set:
+                    with contextlib.suppress(Exception):
+                        os.remove(img)
+            captured_images = keep_images
+
+        if not captured_images:
+            logger.info("[yellow]No disc menu images could be auto-captured.[/yellow]")
+            return
+
+        # Upload captured images
+        logger.info(f"[cyan]Uploading {len(captured_images)} auto-captured disc menu screenshots...[/cyan]")
+        uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
+            meta, screens=len(captured_images), img_host_num=1, i=0, total_screens=len(captured_images), custom_img_list=captured_images, return_dict={}, retry_mode=False
+        )
+        meta.menu_images = uploaded_images
+
+        await self.save_images_to_json(meta, uploaded_images)
 
     async def get_local_images(self, meta: Meta) -> None:
         """

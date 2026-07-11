@@ -185,6 +185,7 @@ async def disc_screenshots(
     logger.debug(f"File: {file_path}, Length: {length}, Frame Rate: {frame_rate}", extra={"markup": False})
     os.chdir(f"{base_dir}/tmp/{folder_id}")
     existing_screens = glob.glob(f"{sanitized_filename}-*.png")
+    existing_screens = [f for f in existing_screens if re.match(r"^-\d+\.png$", os.path.basename(f)[len(sanitized_filename) :])]
     total_existing = len(existing_screens) + len(existing_images)
     num_screens = max(0, screens - total_existing) if not force_screenshots else num_screens
 
@@ -491,7 +492,9 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
         return
 
     sanitized_disc_name = await sanitize_filename(meta.discs[disc_num]["name"])
-    if len(glob.glob(f"{meta.base_dir}/tmp/{meta.uuid}/{sanitized_disc_name}-*.png")) >= num_screens:
+    existing_screens = glob.glob(f"{meta.base_dir}/tmp/{meta.uuid}/{sanitized_disc_name}-*.png")
+    normal_screens = [f for f in existing_screens if re.match(r"^-\d+\.png$", os.path.basename(f)[len(sanitized_disc_name) :])]
+    if len(normal_screens) >= num_screens:
         i = num_screens
         logger.info('[bold green]Reusing screenshots')
         return
@@ -638,7 +641,9 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
         if capture_results and len(capture_results) > num_screens:
             smallest = None
             smallest_size = float('inf')
-            for screens in [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}/", f"{meta.discs[disc_num]['name']}-*"))]:
+            matching_files = glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}/", f"{sanitized_disc_name}-*"))
+            normal_screens = [os.path.basename(f) for f in matching_files if re.match(r"^-\d+\.png$", os.path.basename(f)[len(sanitized_disc_name) :])]
+            for screens in normal_screens:
                 screen_path = os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}/", screens)
                 try:
                     screen_size = os.path.getsize(screen_path)

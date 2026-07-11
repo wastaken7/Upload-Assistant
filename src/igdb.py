@@ -15,7 +15,7 @@ class IGDBAPI:
         self.client_id = client_id
         self.client_secret = client_secret
         self.base_dir = base_dir
-        self.token_file = os.path.join(base_dir, "tmp", "igdb_token.json") if base_dir else ""
+        self.token_file = os.path.join(base_dir, "tmp", "igdb_cache", "igdb_token.json") if base_dir else ""
         self.access_token = None
 
     async def get_access_token(self) -> str | None:

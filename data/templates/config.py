@@ -190,6 +190,12 @@ config = {
         'skip_auto_torrent': True,
 
         # NOT RECOMMENDED UNLESS YOU KNOW WHAT YOU ARE DOING
+        # Set true to automatically capture DVD menu screenshots from menu VOBs
+        "auto_dvd_menus": False,
+
+        # Max number of disc menu screenshots to upload
+        "max_menu_screens": "6",
+
         # set true to not delete existing meta.json file before running
         "keep_meta": False,
 

@@ -376,7 +376,7 @@ class Args:
             dest="path_to_menu_screenshots",
             nargs=1,
             required=False,
-            help="Raw Disc only (Blu-ray/DVD). Path to the folder containing screenshots of the disc menus. All image files found in the folder will be used. Files should preferably be in PNG format (due to restrictions on some trackers), but other formats can be used (jpg, jpeg, webp)",
+            help="Raw Disc only (Blu-ray/DVD). Path to the folder containing screenshots of the disc menus (or pass 'auto' to automatically capture DVD menu screenshots). All image files found in the folder will be used. Files should preferably be in PNG format (due to restrictions on some trackers), but other formats can be used (jpg, jpeg, webp)",
             type=str,
             default="",
         )
