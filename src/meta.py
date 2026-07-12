@@ -60,6 +60,8 @@ class Meta:
     book_language_iso: str = ""
     book_language: str = ""
     book_publisher: str | None = None
+    book_series: str = ""
+    book_series_index: str = ""
     book_title: str | None = None
     book_translator: str | None = None
     btn: str | int | None = None
@@ -128,6 +130,7 @@ class Meta:
     episode_tmdb_data: dict[str, Any] = field(default_factory=dict)
     episode: str = ""
     episodes: list[dict[str, Any]] | None = None
+    epubmeta_output: str | None = None
     exclusive: bool = False
     ext_torrenthash: str | None = None
     extra_openlibrary_ids: int | None = None
