@@ -1,8 +1,8 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import glob
-import os
 import platform
 import re
+from pathlib import Path
 from typing import Any
 
 import aiofiles
@@ -19,11 +19,11 @@ Config = dict[str, Any]
 class IS:
     tracker = "IS"
     source_flag = "https://immortalseed.me"
-    banned_groups = [""]
+    banned_groups = ("",)
     base_url = "https://immortalseed.me"
     torrent_url = "https://immortalseed.me/details.php?hash="
-    supported_categories = ('TV', 'MOVIE', 'BOOK')
-    tracker_urls = ['https://immortalseed.me']
+    supported_categories = ("TV", "MOVIE", "BOOK")
+    tracker_urls = ("https://immortalseed.me",)
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
@@ -41,7 +41,7 @@ class IS:
 
     async def generate_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        description = await builder.general_description_generator(
+        return await builder.general_description_generator(
             meta,
             audio_spectrogram=True,
             bluray=True,
@@ -62,8 +62,6 @@ class IS:
             user_description=True,
         )
 
-        return description
-
     async def search_existing(self, meta: Meta) -> list[dict[str, str | None]]:
         cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         self.session.cookies.clear()
@@ -71,16 +69,16 @@ class IS:
             self.session.cookies.update(cookies)
         dupes: list[dict[str, str | None]] = []
 
-        search_type = ''
-        search_query = ''
+        search_type = ""
+        search_query = ""
         category = str(meta.category)
 
         if category == "MOVIE":
-            search_type = 't_genre'
+            search_type = "t_genre"
             search_query = str(meta.imdb_info.get("imdbID", ""))
 
         elif category == "TV":
-            search_type = 't_name'
+            search_type = "t_name"
             search_query = f"{meta.title} {meta.season}{meta.episode}"
         elif category == "BOOK":
             search_type = "t_name"
@@ -88,7 +86,7 @@ class IS:
         else:
             return dupes
 
-        search_url = f'{self.base_url}/browse.php?do=search&keywords={search_query}&search_type={search_type}'
+        search_url = f"{self.base_url}/browse.php?do=search&keywords={search_query}&search_type={search_type}"
 
         response = await self.session.get(search_url)
         if "Forget your password" in response.text or "login.php" in str(response.url) or "login.php" in response.text:
@@ -96,14 +94,14 @@ class IS:
             meta.skipping = self.tracker
             return dupes
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(response.text, "html.parser")
 
-        torrent_table = soup.find('table', id='sortabletable')
+        torrent_table = soup.find("table", id="sortabletable")
 
         if not torrent_table:
             return dupes
 
-        torrent_rows = torrent_table.select('tbody > tr')[1:]
+        torrent_rows = torrent_table.select("tbody > tr")[1:]
 
         for row in torrent_rows:
             name_tag = row.select_one('a[href*="details.php?id="]')
@@ -111,19 +109,14 @@ class IS:
                 continue
 
             name = name_tag.get_text(strip=True)
-            href_value = name_tag.get('href')
-            torrent_link = href_value if isinstance(href_value, str) else ''
+            href_value = name_tag.get("href")
+            torrent_link = href_value if isinstance(href_value, str) else ""
 
-            size_tag = row.select_one('td:nth-of-type(5)')
+            size_tag = row.select_one("td:nth-of-type(5)")
             size = size_tag.get_text(strip=True) if size_tag else None
 
-            duplicate_entry = {
-                'name': name,
-                'size': size,
-                'link': torrent_link
-            }
+            duplicate_entry = {"name": name, "size": size, "link": torrent_link}
             dupes.append(duplicate_entry)
-
 
         return dupes
 
@@ -174,98 +167,84 @@ class IS:
             if "documentary" in genres or "documentary" in keywords:
                 if sd:
                     return documentary_sd
-                else:
-                    return documentary_hd
-            elif is_anime:
+                return documentary_hd
+            if is_anime:
                 return anime
-            elif resolution == "2160p":
+            if resolution == "2160p":
                 if non_eng:
                     return movies_4k_non_english
-                else:
-                    return movies_4k
-            elif not sd:
+                return movies_4k
+            if not sd:
                 if non_eng:
                     return movies_hd_non_english
-                else:
-                    return movies_hd
-            elif sd:
+                return movies_hd
+            if sd:
                 if non_eng:
                     return movies_sd_non_english
-                else:
-                    return movies_sd
-            else:
-                if non_eng:
-                    return movies_low_def_non_english
-                else:
-                    return movies_low_def
+                return movies_sd
+            if non_eng:
+                return movies_low_def_non_english
+            return movies_low_def
 
-        elif category == "TV":
+        if category == "TV":
             if "documentary" in genres or "documentary" in keywords:
                 if sd:
                     return documentary_sd
-                else:
-                    return documentary_hd
-            elif is_anime:
+                return documentary_hd
+            if is_anime:
                 return anime
-            elif "children" in genres or "cartoons" in genres or "children" in keywords or "cartoons" in keywords or "cartoon" in keywords:
+            if "children" in genres or "cartoons" in genres or "children" in keywords or "cartoons" in keywords or "cartoon" in keywords:
                 return childrens_cartoons
-            elif meta.tv_pack:
+            if meta.tv_pack:
                 if resolution == "2160p":
                     return tv_season_packs_4k
-                elif sd:
+                if sd:
                     return tv_season_packs_sd
-                else:
-                    return tv_season_packs_hd
-            elif resolution == "2160p":
+                return tv_season_packs_hd
+            if resolution == "2160p":
                 return tv_4k
-            elif resolution in ["1080p", "1080i", "720p"]:
+            if resolution in ["1080p", "1080i", "720p"]:
                 return tv_hd
-            elif sd:
+            if sd:
                 if "xvid" in meta.video_encode.lower():
                     return tv_sd_xvid
-                else:
-                    return tv_sd_x264
-            else:
-                return tv_480p
+                return tv_sd_x264
+            return tv_480p
 
-        elif category == "BOOK":
+        if category == "BOOK":
             if meta.audiobook:
                 return audiobooks
-            elif meta.comic or meta.manga:
+            if meta.comic or meta.manga:
                 return comics
-            elif meta.magazine:
+            if meta.magazine:
                 return magazines
-            else:
-                return ebooks
+            return ebooks
 
         return 0
 
     async def get_nfo(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
-        nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
-        nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
+        nfo_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        nfo_files = glob.glob(Path(nfo_dir) / "*.nfo")
 
         if nfo_files:
             nfo_path = nfo_files[0]
             async with aiofiles.open(nfo_path, "rb") as nfo_file:
                 nfo_bytes = await nfo_file.read()
-            return {'nfofile': (os.path.basename(nfo_path), nfo_bytes, "application/octet-stream")}
-        else:
-            nfo_content = await self.generate_description(meta)
-            nfo_bytes = nfo_content.encode('utf-8')
-            nfo_filename = f"{(meta.scene_name if meta.scene_name is not None else meta.basename_no_ext)}.nfo"
-            return {'nfofile': (nfo_filename, nfo_bytes, "application/octet-stream")}
+            return {"nfofile": (Path(nfo_path).name, nfo_bytes, "application/octet-stream")}
+        nfo_content = await self.generate_description(meta)
+        nfo_bytes = nfo_content.encode("utf-8")
+        nfo_filename = f"{(meta.scene_name if meta.scene_name is not None else meta.basename_no_ext)}.nfo"
+        return {"nfofile": (nfo_filename, nfo_bytes, "application/octet-stream")}
 
     async def get_name(self, meta: Meta) -> str:
         scene_name = meta.scene_name
         if scene_name:
             return scene_name
-        else:
-            name_value = meta.name
-            aka_value = meta.aka
-            is_name = name_value.replace(aka_value, '').replace('Dubbed', '').replace('Dual-Audio', '')
-            is_name = re.sub(r"\s{2,}", " ", is_name)
-            is_name = is_name.replace(' ', '.')
-        return is_name
+        name_value = meta.name
+        aka_value = meta.aka
+        is_name = name_value.replace(aka_value, "").replace("Dubbed", "").replace("Dual-Audio", "")
+        is_name = re.sub(r"\s{2,}", " ", is_name)
+        return is_name.replace(" ", ".")
 
     async def get_book_cover(self, meta: Meta) -> str:
         covers = meta.covers
@@ -315,7 +294,7 @@ class IS:
         data = await self.get_data(meta)
         files = await self.get_nfo(meta)
 
-        is_uploaded = await self.cookie_auth_uploader.handle_upload(
+        return await self.cookie_auth_uploader.handle_upload(
             meta=meta,
             tracker=self.tracker,
             source_flag=self.source_flag,
@@ -329,5 +308,3 @@ class IS:
             additional_files=files,
             success_list=["Download Torrent (SSL)", "Thank you for uploading"],
         )
-
-        return is_uploaded

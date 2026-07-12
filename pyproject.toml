@@ -1,7 +1,15 @@
 [tool.ruff]
 line-length = 176
 target-version = "py314"
-exclude = ["tests", "data"]
+exclude = [
+  ".git",
+  "__pycache__",
+  ".pytest_cache",
+  ".ruff_cache",
+  "tests",
+  "data",
+  "tmp",
+]
 
 [tool.ruff.lint]
 select = [
@@ -15,11 +23,16 @@ select = [
   "I",
   "UP",
 
-  # Code quality
+  # Code quality & safety
   "C4",
   "SIM",
   "PERF",
   "ARG",
+  "RUF",
+  "S",
+  "PTH",
+  "N",
+  "RET",
 
   # Dates & time
   "DTZ",
@@ -43,7 +56,12 @@ reportMissingImports = true
 reportMissingTypeStubs = false
 reportUnknownMemberType = true
 reportUnknownVariableType = true
-exclude = ["data"]
+exclude = [
+  "tests",
+  "data",
+  "tmp",
+  "**/__pyrefly_virtual__/**"
+]
 
 [tool.pyrefly]
 disable-search-path-heuristics = true

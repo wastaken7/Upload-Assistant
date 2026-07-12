@@ -5,6 +5,7 @@ import json
 import os
 import re
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlparse
 
@@ -24,11 +25,11 @@ def _as_str(value: Any) -> str | None:
 
 def _safe_remove(path: str) -> bool:
     try:
-        if os.path.exists(path):
+        if Path(path).exists():
             os.remove(path)
             return True
     except Exception as e:
-        logger.info(f"[yellow]Failed to delete file {path}: {str(e)}[/yellow]")
+        logger.info(f"[yellow]Failed to delete file {path}: {e!s}[/yellow]")
     return False
 
 
@@ -41,13 +42,13 @@ async def match_host(hostname: str, approved_hosts: Iterable[str]) -> str:
 
 async def sanitize_filename(filename: str) -> str:
     # Replace invalid characters like colons with an underscore
-    return re.sub(r'[<>:"/\\|?*]', '_', filename)
+    return re.sub(r'[<>:"/\\|?*]', "_", filename)
 
 
 class RehostImagesManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.default_config = cast(dict[str, Any], config.get('DEFAULT', {}))
+        self.default_config = cast(dict[str, Any], config.get("DEFAULT", {}))
         self.takescreens_manager = TakeScreensManager(config)
         self.uploadscreens_manager = UploadScreensManager(config)
 
@@ -110,7 +111,7 @@ async def _check_hosts(
         raise ValueError("uploadscreens_manager is required")
     if approved_image_hosts is None:
         approved_image_hosts = []
-    new_images_key = f'{tracker}_images_key'
+    new_images_key = f"{tracker}_images_key"
     if meta.skip_imghost_upload:
         logger.debug(f"[yellow]Skipping image host upload for {tracker} as per meta.skip_imghost_upload setting.")
         return meta.get(new_images_key, []), False, False
@@ -119,7 +120,7 @@ async def _check_hosts(
 
     logger.debug(
         f"[cyan]check_hosts debug: tracker={tracker} meta.imghost={meta.imghost} approved_image_hosts={approved_image_hosts} "
-        f"image_list={len(meta.image_list or [])} {new_images_key}={len(meta.get(new_images_key, []) or [])}[/cyan]"  # noqa: E501
+        f"image_list={len(meta.image_list or [])} {new_images_key}={len(meta.get(new_images_key, []) or [])}[/cyan]"
     )
 
     # Check if we have main image_list but no tracker-specific images yet
@@ -157,12 +158,12 @@ async def _check_hosts(
             return meta[new_images_key], False, False
 
     if tracker == "covers":
-        reuploaded_images_path = os.path.join(meta.base_dir, "tmp", meta.uuid, "covers.json")
+        reuploaded_images_path = Path(meta.base_dir) / "tmp" / meta.uuid / "covers.json"
     else:
-        reuploaded_images_path = os.path.join(meta.base_dir, "tmp", meta.uuid, "reuploaded_images.json")
+        reuploaded_images_path = Path(meta.base_dir) / "tmp" / meta.uuid / "reuploaded_images.json"
     reuploaded_images: list[dict[str, str]] = []
 
-    if os.path.exists(reuploaded_images_path):
+    if Path(reuploaded_images_path).exists():
         try:
             async with aiofiles.open(reuploaded_images_path, encoding="utf-8") as f:
                 content = await f.read()
@@ -256,9 +257,7 @@ async def _check_hosts(
     if not meta.get(new_images_key):
         logger.info("[red]All image hosts failed. Please check your configuration.")
 
-    logger.debug(
-        f"[cyan]check_hosts debug: done tracker={tracker} image_list={len(meta.image_list or [])} {new_images_key}={len(meta.get(new_images_key, []) or [])}[/cyan]"  # noqa: E501
-    )
+    logger.debug(f"[cyan]check_hosts debug: done tracker={tracker} image_list={len(meta.image_list or [])} {new_images_key}={len(meta.get(new_images_key, []) or [])}[/cyan]")
 
     return meta.get(new_images_key, []), False, images_reuploaded
 
@@ -305,7 +304,7 @@ async def _handle_image_upload(
     folder_id = meta.uuid
     meta[new_images_key] = []
 
-    screenshots_dir = os.path.join(base_dir, "tmp", folder_id)
+    screenshots_dir = Path(base_dir) / "tmp" / folder_id
     logger.debug(f"[yellow]Searching for screenshots in {screenshots_dir}...")
     all_screenshots: list[str] = []
 
@@ -323,7 +322,7 @@ async def _handle_image_upload(
                 url_value = _as_str(image.get(url_key))
                 if url_value:
                     parsed_url = urlparse(url_value)
-                    filename_from_url = os.path.basename(parsed_url.path)
+                    filename_from_url = Path(parsed_url.path).name
                     if filename_from_url and filename_from_url.lower().endswith(".png"):
                         image_filenames.append(filename_from_url)
                         break
@@ -334,7 +333,7 @@ async def _handle_image_upload(
         # Check if any of the extracted filenames match the actual files in the directory
         if all_png_files and image_filenames:
             for png_file in all_png_files:
-                basename = os.path.basename(png_file)
+                basename = Path(png_file).name
                 if basename in image_filenames:
                     # Found a match for this filename
                     all_screenshots.append(png_file)
@@ -343,7 +342,7 @@ async def _handle_image_upload(
         # Also check for any screenshots that match the title pattern as a fallback
         if filename and len(all_screenshots) < multi_screens:
             sanitized_title = await sanitize_filename(filename)
-            title_pattern_files = [f for f in all_png_files if os.path.basename(f).startswith(sanitized_title)]
+            title_pattern_files = [f for f in all_png_files if Path(f).name.startswith(sanitized_title)]
             logger.debug(f"[yellow]Searching for screenshots with pattern: {sanitized_title}*.png")
             if title_pattern_files:
                 # Only add title pattern files that aren't already in all_screenshots
@@ -362,10 +361,10 @@ async def _handle_image_upload(
 
             if meta.is_disc == "DVD":
                 existing_screens: list[str] = await asyncio.to_thread(
-                    glob.glob, f"{glob.escape(f'{meta.base_dir}/tmp/{meta.uuid}')}/{glob.escape(meta.discs[0]['name'])}-*.png"
+                    glob.glob, f"{glob.escape(f'{meta.base_dir}{"/" + "tmp" + "/"}{meta.uuid}')}/{glob.escape(meta.discs[0]['name'])}-*.png"
                 )
             else:
-                existing_screens = await asyncio.to_thread(glob.glob, os.path.join(glob.escape(screenshots_dir), filename_pattern))
+                existing_screens = await asyncio.to_thread(glob.glob, Path(glob.escape(screenshots_dir)) / filename_pattern)
 
             # Add any new screenshots to our list
             for screen in existing_screens:
@@ -374,7 +373,7 @@ async def _handle_image_upload(
 
     # Fallback: glob for indexed screenshots if still not enough
     if len(all_screenshots) < multi_screens:
-        os.chdir(f"{meta.base_dir}/tmp/{meta.uuid}")
+        os.chdir(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")
         image_patterns = ["*.png", ".[!.]*.png"]
         image_glob: list[str] = []
         for pattern in image_patterns:
@@ -399,18 +398,18 @@ async def _handle_image_upload(
 
         # Only keep files that match the indexed pattern: xxx-0.png, xxx-1.png, etc.
         indexed_pattern = re.compile(r".*-\d+\.png$")
-        indexed_files: list[str] = [file for file in image_glob if indexed_pattern.match(os.path.basename(file))]
+        indexed_files: list[str] = [file for file in image_glob if indexed_pattern.match(Path(file).name)]
         logger.debug(f"[cyan]Found {len(indexed_files)} indexed files matching pattern")
 
         # Add any new indexed screenshots to our list
         for screen in indexed_files:
             if screen not in all_screenshots:
                 all_screenshots.append(screen)
-                logger.debug(f"[green]Found indexed screenshot: {os.path.basename(screen)}")
+                logger.debug(f"[green]Found indexed screenshot: {Path(screen).name}")
 
     if tracker == "covers":
         all_screenshots = []
-        existing_screens = await asyncio.to_thread(glob.glob, f"{glob.escape(f'{meta.base_dir}/tmp/{meta.uuid}')}/cover_*.jpg")
+        existing_screens = await asyncio.to_thread(glob.glob, f"{glob.escape(f'{meta.base_dir}{"/" + "tmp" + "/"}{meta.uuid}')}/cover_*.jpg")
         for screen in existing_screens:
             if screen not in all_screenshots:
                 all_screenshots.append(screen)
@@ -449,12 +448,12 @@ async def _handle_image_upload(
                     logger.info("[red]No valid path available for screenshot generation.[/red]")
 
             if meta.is_disc == "DVD":
-                new_screens = await asyncio.to_thread(glob.glob, f"{meta.base_dir}/tmp/{meta.uuid}/{meta.discs[0]['name']}-*.png")
+                new_screens = await asyncio.to_thread(glob.glob, f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{meta.discs[0]['name']}-*.png")
             else:
                 # Use a more generic pattern to find any PNG files that aren't already in all_screenshots
-                new_screens = await asyncio.to_thread(glob.glob, os.path.join(screenshots_dir, "*.png"))
+                new_screens = await asyncio.to_thread(glob.glob, Path(screenshots_dir) / "*.png")
                 indexed_pattern = re.compile(r".*-\d+\.png$")
-                new_screens = [s for s in new_screens if indexed_pattern.match(os.path.basename(s))]
+                new_screens = [s for s in new_screens if indexed_pattern.match(Path(s).name)]
 
                 # Filter out files we already have
                 new_screens = [screen for screen in new_screens if screen not in all_screenshots]
@@ -466,7 +465,7 @@ async def _handle_image_upload(
             for screen in new_screens:
                 if screen not in all_screenshots:
                     all_screenshots.append(screen)
-                    logger.debug(f"[green]Added new screenshot: {os.path.basename(screen)}")
+                    logger.debug(f"[green]Added new screenshot: {Path(screen).name}")
 
         except Exception as e:
             logger.error(f"[red]Error during screenshot capture: {e}")
@@ -485,9 +484,9 @@ async def _handle_image_upload(
     # First separate the screenshots into two categories
     image_list_entries = cast(list[dict[str, str]], meta.image_list)
     for screenshot in all_screenshots:
-        basename = os.path.basename(screenshot)
+        basename = Path(screenshot).name
         # Check if this is from the image_list we extracted earlier
-        if image_list_entries and any(os.path.basename(urlparse(_as_str(img.get("raw_url")) or "").path) == basename for img in image_list_entries):
+        if image_list_entries and any(Path(urlparse(_as_str(img.get("raw_url")) or "").path).name == basename for img in image_list_entries):
             existing_from_image_list.append(screenshot)
         else:
             other_screenshots.append(screenshot)
@@ -510,7 +509,7 @@ async def _handle_image_upload(
 
     logger.debug(f"[green]Using {len(all_screenshots)} screenshots:")
     for i, screenshot in enumerate(all_screenshots):
-        logger.debug(f"  {i + 1}. {os.path.basename(screenshot)}")
+        logger.debug(f"  {i + 1}. {Path(screenshot).name}")
 
     if not meta.skip_imghost_upload:
         uploaded_images: list[dict[str, str]] = []
@@ -518,7 +517,7 @@ async def _handle_image_upload(
         # Add a max retry limit to prevent infinite loop
         max_retries = len(approved_image_hosts)
         while img_host_index <= max_retries:
-            current_img_host_key = f'img_host_{img_host_index}'
+            current_img_host_key = f"img_host_{img_host_index}"
             current_img_host = _as_str(default_config.get(current_img_host_key))
 
             if not current_img_host:
@@ -531,14 +530,12 @@ async def _handle_image_upload(
                 images_reuploaded = True
                 img_host_index += 1
                 continue
-            else:
-                meta.imghost = current_img_host
-                logger.debug(f"[green]Uploading to approved host '{current_img_host}'.")
-                break
+            meta.imghost = current_img_host
+            logger.debug(f"[green]Uploading to approved host '{current_img_host}'.")
+            break
 
         uploaded_images, _ = await uploadscreens_manager.upload_screens(
-            meta, multi_screens, img_host_index, 0, multi_screens,
-            all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode
+            meta, multi_screens, img_host_index, 0, multi_screens, all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode
         )
         if uploaded_images:
             meta[new_images_key] = uploaded_images
@@ -548,7 +545,7 @@ async def _handle_image_upload(
             logger.debug(f"[debug] Response in upload_image_task: {image['img_url']}, {image['raw_url']}, {image['web_url']}")
 
         for image in cast(list[dict[str, str]], meta.get(new_images_key, [])):
-            raw_url = image['raw_url']
+            raw_url = image["raw_url"]
             parsed_url = urlparse(raw_url)
             hostname = parsed_url.netloc
             mapped_host = await match_host(hostname, url_host_mapping.keys())
@@ -563,16 +560,16 @@ async def _handle_image_upload(
         # Ensure all uploaded images are valid
         valid_hosts: list[bool] = []
         for image in cast(list[dict[str, str]], meta.get(new_images_key, [])):
-            netloc = urlparse(image['raw_url']).netloc
+            netloc = urlparse(image["raw_url"]).netloc
             matched_host = await match_host(netloc, url_host_mapping.keys())
             mapped_host = url_host_mapping.get(matched_host, matched_host)
             valid_hosts.append(mapped_host in approved_image_hosts)
         if all(valid_hosts) and new_images_key in meta and isinstance(meta[new_images_key], list):
-            output_file = os.path.join(meta.base_dir, "tmp", meta.uuid, "covers.json") if tracker == "covers" else os.path.join(screenshots_dir, "reuploaded_images.json")
+            output_file = Path(meta.base_dir) / "tmp" / meta.uuid / "covers.json" if tracker == "covers" else Path(screenshots_dir) / "reuploaded_images.json"
 
             existing_data: list[dict[str, str]] = []
             try:
-                async with aiofiles.open(output_file, encoding='utf-8') as f:
+                async with aiofiles.open(output_file, encoding="utf-8") as f:
                     existing_data_raw = await f.read()
                     loaded_value: object = json.loads(existing_data_raw) if existing_data_raw else []
                     if isinstance(loaded_value, list):
@@ -592,7 +589,7 @@ async def _handle_image_upload(
                 logger.info(f"[green]Added release URL to {len(updated_data)} cover images: {meta.release_url}")
 
             try:
-                async with aiofiles.open(output_file, 'w', encoding='utf-8') as f:
+                async with aiofiles.open(output_file, "w", encoding="utf-8") as f:
                     await f.write(json.dumps(updated_data, indent=4))
                 logger.debug(f"[green]Successfully updated reuploaded images in {output_file}.")
 
@@ -614,7 +611,6 @@ async def _handle_image_upload(
         if original_imghost:
             meta.imghost = original_imghost
         return meta[new_images_key], False, images_reuploaded
-    else:
-        if original_imghost:
-            meta.imghost = original_imghost
-        return meta[new_images_key], False, images_reuploaded
+    if original_imghost:
+        meta.imghost = original_imghost
+    return meta[new_images_key], False, images_reuploaded

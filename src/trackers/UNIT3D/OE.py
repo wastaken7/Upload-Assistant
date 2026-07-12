@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import re
+from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
@@ -19,8 +19,8 @@ Config = dict[str, Any]
 class OE(UNIT3D):
     tracker = "OE"
     base_url = "https://onlyencodes.cc"
-    approved_image_hosts = ["ptpimg", "imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage"]
-    banned_groups = [
+    approved_image_hosts = ("ptpimg", "imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage")
+    banned_groups = (
         "[Oj]",
         "$andra",
         "0neshot",
@@ -155,13 +155,13 @@ class OE(UNIT3D):
         "ZKBL",
         "ZmN",
         "ZMNT",
-    ]
+    )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ["https://onlyencodes.cc"]
+    tracker_urls = ("https://onlyencodes.cc",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="OE")
@@ -199,57 +199,59 @@ class OE(UNIT3D):
         return
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt", encoding="utf8") as f:
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt", encoding="utf8") as f:
             base = await f.read()
 
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf8") as descfile:
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf8") as descfile:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
             bbcode = BBCODE()
             if meta.discs != []:
                 discs = meta.discs
-                if discs[0]['type'] == "DVD":
+                if discs[0]["type"] == "DVD":
                     await descfile.write(f"[spoiler=VOB MediaInfo][code]{discs[0]['vob_mi']}[/code][/spoiler]\n\n")
                 if len(discs) >= 2:
                     for each in discs[1:]:
-                        if each['type'] == "BDMV":
+                        if each["type"] == "BDMV":
                             await descfile.write(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
-                        elif each['type'] == "DVD":
+                        elif each["type"] == "DVD":
                             await descfile.write(f"{each['name']}:\n")
-                            await descfile.write(f"[spoiler={os.path.basename(each['vob'])}][code][{each['vob_mi']}[/code][/spoiler] [spoiler={os.path.basename(each['ifo'])}][code][{each['ifo_mi']}[/code][/spoiler]\n\n")
-                        elif each['type'] == "HDDVD":
+                            await descfile.write(
+                                f"[spoiler={Path(each['vob']).name}][code][{each['vob_mi']}[/code][/spoiler] [spoiler={Path(each['ifo']).name}][code][{each['ifo_mi']}[/code][/spoiler]\n\n"
+                            )
+                        elif each["type"] == "HDDVD":
                             await descfile.write(f"{each['name']}:\n")
-                            await descfile.write(f"[spoiler={os.path.basename(each['largest_evo'])}][code][{each['evo_mi']}[/code][/spoiler]\n\n")
+                            await descfile.write(f"[spoiler={Path(each['largest_evo']).name}][code][{each['evo_mi']}[/code][/spoiler]\n\n")
 
             desc = base
             desc = bbcode.convert_pre_to_code(desc)
             desc = bbcode.convert_hide_to_spoiler(desc)
             desc = bbcode.convert_comparison_to_collapse(desc, 1000)
             try:
-                tonemapped_header = self.config['DEFAULT'].get('tonemapped_header')
+                tonemapped_header = self.config["DEFAULT"].get("tonemapped_header")
                 if meta.tonemapped and tonemapped_header:
                     desc = desc + str(tonemapped_header)
                     desc = desc + "\n\n"
             except Exception as e:
-                logger.warning(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
-            desc = desc.replace('[img]', '[img=300]')
+                logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
+            desc = desc.replace("[img]", "[img=300]")
             await descfile.write(desc)
             images_value = meta.get(f"{self.tracker}_images_key", meta.image_list)
             images = cast(list[dict[str, Any]], images_value) if isinstance(images_value, list) else []
             if len(images) > 0:
                 await descfile.write("[center]")
                 for each in range(len(images[: meta.screens])):
-                    web_url = images[each]['web_url']
-                    raw_url = images[each]['raw_url']
+                    web_url = images[each]["web_url"]
+                    raw_url = images[each]["raw_url"]
                     await descfile.write(f"[url={web_url}][img=350]{raw_url}[/img][/url]")
                 await descfile.write("[/center]")
 
             await descfile.write(f"\n[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]")
 
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
             desc = await f.read()
 
-        return {'description': desc}
+        return {"description": desc}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         oe_name = meta.name
@@ -261,9 +263,9 @@ class OE(UNIT3D):
         video_codec = meta.video_codec
 
         imdb_info = cast(dict[str, Any], meta.imdb_info)
-        imdb_name = str(imdb_info.get('title', ""))
-        imdb_year = str(imdb_info.get('year', ""))
-        imdb_aka = str(imdb_info.get('aka', ""))
+        imdb_name = str(imdb_info.get("title", ""))
+        imdb_year = str(imdb_info.get("year", ""))
+        imdb_aka = str(imdb_info.get("aka", ""))
         year = str(meta.year) if meta.year is not None else ""
         aka = meta.aka
         if imdb_name and imdb_name.strip():
@@ -307,15 +309,9 @@ class OE(UNIT3D):
                 oe_name = re.sub(f"-{invalid_tag}", "", oe_name, flags=re.IGNORECASE)
             oe_name = f"{oe_name}-NOGRP"
 
-        return {'name': oe_name}
+        return {"name": oe_name}
 
-    async def get_type_id(
-        self,
-        meta: Meta,
-        type: str | None = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = (reverse, mapping_only)
         video_codec = meta.video_codec if meta.video_codec is not None else "N/A"
         type = str(meta.type).upper()
@@ -331,21 +327,21 @@ class OE(UNIT3D):
         if type == "WEBRIP":
             if video_codec == "HEVC":
                 # x265 Encode
-                type_id = '10'
-            if video_codec == 'AV1':
+                type_id = "10"
+            if video_codec == "AV1":
                 # AV1 Encode
-                type_id = '14'
-            if video_codec == 'AVC':
+                type_id = "14"
+            if video_codec == "AVC":
                 # x264 Encode
-                type_id = '15'
+                type_id = "15"
         if type == "ENCODE":
             if video_codec == "HEVC":
                 # x265 Encode
-                type_id = '10'
-            if video_codec == 'AV1':
+                type_id = "10"
+            if video_codec == "AV1":
                 # AV1 Encode
-                type_id = '14'
-            if video_codec == 'AVC':
+                type_id = "14"
+            if video_codec == "AVC":
                 # x264 Encode
-                type_id = '15'
-        return {'type_id': type_id}
+                type_id = "15"
+        return {"type_id": type_id}

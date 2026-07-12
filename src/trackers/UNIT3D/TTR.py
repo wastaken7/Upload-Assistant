@@ -15,24 +15,24 @@ Config = dict[str, Any]
 class TTR(UNIT3D):
     tracker = "TTR"
     base_url = "https://torrenteros.org"
-    banned_groups = []
+    banned_groups = ()
     ttr_name = ""  # Initialize instance variable
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://torrenteros.org']
+    tracker_urls = ("https://torrenteros.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='TTR')
+        super().__init__(config, tracker_name="TTR")
         self.config: Config = config
         self.common = COMMON(config)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         name = self.ttr_name or self.build_name(meta)
 
-        return {'name': name}
+        return {"name": name}
 
     def build_name(self, meta: Meta) -> str:
         name = meta.name_notag
@@ -48,10 +48,10 @@ class TTR(UNIT3D):
             if not lang_code:
                 return None
             lang_code = lang_code.lower()
-            if lang_code in ('es-es', 'es', 'spa'):
-                return 'Castellano'
-            if lang_code.startswith('es-'):
-                return 'Latino'
+            if lang_code in ("es-es", "es", "spa"):
+                return "Castellano"
+            if lang_code.startswith("es-"):
+                return "Latino"
             return None
 
         if meta.is_disc == "BDMV":
@@ -62,18 +62,18 @@ class TTR(UNIT3D):
 
             if spanish_audio:
                 if unattended or confirm:
-                    suffix = 'Castellano'
+                    suffix = "Castellano"
                 else:
                     user_choice = ask_spanish_type("audio")
-                    suffix = {'1': 'Castellano', '2': 'Latino', '3': 'Castellano Latino'}.get(user_choice, 'Castellano')
+                    suffix = {"1": "Castellano", "2": "Latino", "3": "Castellano Latino"}.get(user_choice, "Castellano")
                 name += f" {suffix}"
 
             elif spanish_subtitle:
                 if unattended or confirm:
-                    suffix = 'Castellano Subs'
+                    suffix = "Castellano Subs"
                 else:
                     user_choice = ask_spanish_type("subtitle")
-                    suffix = {'1': 'Castellano Subs', '2': 'Latino Subs', '3': 'Castellano Latino Subs'}.get(user_choice, 'Castellano Subs')
+                    suffix = {"1": "Castellano Subs", "2": "Latino Subs", "3": "Castellano Latino Subs"}.get(user_choice, "Castellano Subs")
 
                 name += f" {suffix}"
 
@@ -86,19 +86,19 @@ class TTR(UNIT3D):
             spanish_subs_type = None
 
             for track in tracks:
-                if track.get('@type') == 'Audio':
-                    lang = track.get('Language', '')
+                if track.get("@type") == "Audio":
+                    lang = track.get("Language", "")
                     if isinstance(lang, dict):
-                        lang = ''
+                        lang = ""
                     spanish_audio_type = get_spanish_type(str(lang).strip())
                     if spanish_audio_type:
                         break
 
             for track in tracks:
-                if track.get('@type') == 'Text':
-                    lang = track.get('Language', '')
+                if track.get("@type") == "Text":
+                    lang = track.get("Language", "")
                     if isinstance(lang, dict):
-                        lang = ''
+                        lang = ""
                     spanish_subs_type = get_spanish_type(str(lang).strip())
                     if spanish_subs_type:
                         break
@@ -118,7 +118,7 @@ class TTR(UNIT3D):
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
-            'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
+            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
 
         return data
@@ -129,17 +129,14 @@ class TTR(UNIT3D):
 
         if "Spanish" not in (meta.audio_languages or []):
             if "Spanish" not in (meta.subtitle_languages or []):
-                logger.info(
-                    "[bold red]TTR requires at least one Spanish audio or subtitle track."
-                )
+                logger.info("[bold red]TTR requires at least one Spanish audio or subtitle track.")
                 return False
+            if meta.unattended:
+                if not meta.unattended_confirm:
+                    return False
             else:
-                if meta.unattended:
-                    if not meta.unattended_confirm:
-                        return False
-                else:
-                    logger.info(f"{self.tracker}: [yellow]No Spanish audio track found, but Spanish subtitles are present.[/yellow]")
-                    if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
-                        return False
+                logger.info(f"{self.tracker}: [yellow]No Spanish audio track found, but Spanish subtitles are present.[/yellow]")
+                if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                    return False
 
         return True

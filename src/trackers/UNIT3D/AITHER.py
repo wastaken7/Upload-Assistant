@@ -11,7 +11,7 @@ from src.trackers.UNIT3D import UNIT3D
 class AITHER(UNIT3D):
     tracker = "AITHER"
     base_url = "https://aither.cc"
-    banned_groups: list[str] = []
+    banned_groups: tuple[str, ...] = ()
     banned_url = f"{base_url}/api/blacklists/releasegroups"
     claims_url = f"{base_url}/api/internals/claim"
     id_url = f"{base_url}/api/torrents/"
@@ -21,10 +21,10 @@ class AITHER(UNIT3D):
     requests_url = f"{base_url}/api/requests/filter"
     trumping_url = f"{base_url}/api/trumping-reports/filter"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://aither.cc']
+    tracker_urls = ("https://aither.cc",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name='AITHER')
+        super().__init__(config, tracker_name="AITHER")
         self.config = config
         self.common = COMMON(config)
 
@@ -44,17 +44,17 @@ class AITHER(UNIT3D):
 
     async def get_additional_data(self, meta: Meta):
         hdr_value = meta.hdr or ""
-        has_hdr10p = 'HDR10+' in hdr_value
+        has_hdr10p = "HDR10+" in hdr_value
 
         data: dict[str, Any] = {
             "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
         if "DV" in hdr_value:
-            data['dv'] = 1
+            data["dv"] = 1
         if has_hdr10p:
-            data['hdr10p'] = 1
-        elif not has_hdr10p and any(flag in hdr_value for flag in ['HDR', 'HLG']):
-            data['hdr'] = 1
+            data["hdr10p"] = 1
+        elif not has_hdr10p and any(flag in hdr_value for flag in ["HDR", "HLG"]):
+            data["hdr"] = 1
 
         return data
 
@@ -81,7 +81,7 @@ class AITHER(UNIT3D):
         audio_languages: list[str] = [] if not meta.audio_languages else meta.audio_languages
         if audio_languages and not await languages_manager.has_english_language(audio_languages):
             foreign_lang = audio_languages[0].upper()
-            if (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
+            if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
                 if year:
                     aither_name = aither_name.replace(year, f"{year} {foreign_lang}", 1)
             elif meta.is_disc != "BDMV":
@@ -104,4 +104,4 @@ class AITHER(UNIT3D):
         if alt_title:
             aither_name = aither_name.replace(f"{year} {alt_title}", f"{alt_title} {year}", 1)
 
-        return {'name': aither_name}
+        return {"name": aither_name}

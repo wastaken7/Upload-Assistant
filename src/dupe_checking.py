@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import re
 from collections.abc import Callable, MutableMapping, Sequence
+from pathlib import Path
 from typing import Any, TypedDict, cast
 
 from cogs.redaction import Redaction
@@ -52,13 +52,13 @@ class DupeChecker:
             if dupes:
                 dupes_to_print: list[dict[str, Any]] = []
                 for dupe in dupes:
-                    if isinstance(dupe, dict) and 'files' in dupe and isinstance(dupe['files'], list):
+                    if isinstance(dupe, dict) and "files" in dupe and isinstance(dupe["files"], list):
                         # Limit files list to first 10 items
                         limited_dupe = Redaction.redact_private_info(dupe).copy()
-                        limited_files = cast(list[str], limited_dupe.get('files', []))
+                        limited_files = cast(list[str], limited_dupe.get("files", []))
                         if len(limited_files) > 10:
-                            dupe_files = cast(list[str], dupe.get('files', []))
-                            limited_dupe['files'] = limited_files[:10] + [f"... and {len(dupe_files) - 10} more files"]
+                            dupe_files = cast(list[str], dupe.get("files", []))
+                            limited_dupe["files"] = limited_files[:10] + [f"... and {len(dupe_files) - 10} more files"]
                         dupes_to_print.append(limited_dupe)
                     else:
                         dupes_to_print.append(Redaction.redact_private_info(dupe))
@@ -71,61 +71,63 @@ class DupeChecker:
         for d in dupes:
             if isinstance(d, str):
                 # Case 1: Simple string (just name)
-                processed_dupes.append({
-                    'name': d,
-                    'size': None,
-                    'files': [],
-                    'file_count': 0,
-                    'trumpable': False,
-                    'link': None,
-                    'download': None,
-                    'flags': [],
-                    'id': None,
-                    'type': None,
-                    'res': None,
-                    'internal': 0,
-                    'bd_info': None,
-                    'description': None,
-                })
+                processed_dupes.append(
+                    {
+                        "name": d,
+                        "size": None,
+                        "files": [],
+                        "file_count": 0,
+                        "trumpable": False,
+                        "link": None,
+                        "download": None,
+                        "flags": [],
+                        "id": None,
+                        "type": None,
+                        "res": None,
+                        "internal": 0,
+                        "bd_info": None,
+                        "description": None,
+                    }
+                )
             elif isinstance(d, dict):
                 # Create a base entry with default values
                 entry: DupeEntry = {
-                    'name': str(d.get('name', '')),
-                    'size': d.get('size'),
-                    'files': [],
-                    'file_count': 0,
-                    'trumpable': bool(d.get('trumpable', False)),
-                    'link': d.get('link', None),
-                    'download': d.get('download', None),
-                    'flags': d.get('flags', []),
-                    'id': d.get('id', None),
-                    'type': d.get('type', None),
-                    'res': d.get('res', None),
-                    'internal': d.get('internal', 0),
-                    'bd_info': d.get('bd_info', ''),
-                    'description': d.get('description', ''),
+                    "name": str(d.get("name", "")),
+                    "size": d.get("size"),
+                    "files": [],
+                    "file_count": 0,
+                    "trumpable": bool(d.get("trumpable", False)),
+                    "link": d.get("link", None),
+                    "download": d.get("download", None),
+                    "flags": d.get("flags", []),
+                    "id": d.get("id", None),
+                    "type": d.get("type", None),
+                    "res": d.get("res", None),
+                    "internal": d.get("internal", 0),
+                    "bd_info": d.get("bd_info", ""),
+                    "description": d.get("description", ""),
                 }
 
                 # Case 3: Dict with files and file_count
-                if 'files' in d:
-                    if isinstance(d['files'], list):
-                        entry_files = d['files']
-                        entry['files'] = [str(file) for file in entry_files]
-                    elif isinstance(d['files'], str) and d['files']:
-                        entry['files'] = [d['files']]
-                    entry['file_count'] = len(entry['files'])
-                if 'file_count' in d:
+                if "files" in d:
+                    if isinstance(d["files"], list):
+                        entry_files = d["files"]
+                        entry["files"] = [str(file) for file in entry_files]
+                    elif isinstance(d["files"], str) and d["files"]:
+                        entry["files"] = [d["files"]]
+                    entry["file_count"] = len(entry["files"])
+                if "file_count" in d:
                     try:
-                        entry['file_count'] = int(d['file_count'])
-                    except (ValueError, TypeError):
-                        entry['file_count'] = 0
+                        entry["file_count"] = int(d["file_count"])
+                    except ValueError, TypeError:
+                        entry["file_count"] = 0
 
                 processed_dupes.append(entry)
 
         def coerce_int(value: Any) -> int | None:
             try:
                 return int(value) if value is not None else None
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None
 
         new_dupes: list[DupeEntry]
@@ -139,9 +141,9 @@ class DupeChecker:
         file_size: int | None = None
         if meta.is_disc != "BDMV":
             mediainfo = meta.mediainfo
-            tracks = cast(list[dict[str, Any]], mediainfo.get('media', {}).get('track', []))
+            tracks = cast(list[dict[str, Any]], mediainfo.get("media", {}).get("track", []))
             if tracks:
-                file_size = coerce_int(tracks[0].get('FileSize'))
+                file_size = coerce_int(tracks[0].get("FileSize"))
 
         has_is_disc = bool(meta.is_disc)
         target_hdr = await DupeChecker.refine_hdr_terms(cast(str | None, meta.hdr))
@@ -156,7 +158,7 @@ class DupeChecker:
         target_source = str(meta.source)
         is_sd = int(meta.sd or 0)
         is_tv_pack = meta.category == "TV" and (coerce_int(meta.tv_pack) or 0) == 1
-        target_season_match = re.search(r'[sS](\d+)', str(target_season or ""))
+        target_season_match = re.search(r"[sS](\d+)", str(target_season or ""))
         target_season_number = int(target_season_match.group(1)) if target_season_match else None
 
         filenames: list[str] = []
@@ -167,7 +169,7 @@ class DupeChecker:
                 filelist = [str(file_path) for file_path in cast(Sequence[Any], filelist_value)]
                 for file_path in filelist:
                     # Extract just the filename without the path
-                    filename = os.path.basename(file_path)
+                    filename = Path(file_path).name
                     filenames.append(filename)
             if meta.debug:
                 logger.debug(f"dupe checking filenames: {filenames[:10]}{'...' if len(filenames) > 10 else ''}")
@@ -196,8 +198,8 @@ class DupeChecker:
             Determine if an entry should be excluded.
             Returns True if the entry should be excluded, otherwise allowed as dupe.
             """
-            each = entry.get('name', '')
-            sized = entry.get('size')  # This may come as a string, such as "1.5 GB"
+            each = entry.get("name", "")
+            sized = entry.get("size")  # This may come as a string, such as "1.5 GB"
 
             # Check dupe size difference tolerance
             tolerance = meta.dupe_size_difference_tolerance
@@ -221,22 +223,22 @@ class DupeChecker:
                 except Exception as e:
                     logger.debug(f"[debug] Error in dupe size tolerance check: {e}")
 
-            files_value = cast(list[Any], entry.get('files') or [])
+            files_value = cast(list[Any], entry.get("files") or [])
             files = [str(file) for file in files_value]
 
             # Handle case where files might be comma-separated strings in a list
-            if files and len(files) == 1 and ',' in files[0]:
+            if files and len(files) == 1 and "," in files[0]:
                 # Split comma-separated string into individual filenames
-                files = [f.strip() for f in files[0].split(',')]
+                files = [f.strip() for f in files[0].split(",")]
 
-            file_count_raw = entry.get('file_count', 0)
+            file_count_raw = entry.get("file_count", 0)
             file_count = coerce_int(file_count_raw) or 0
             normalized = await DupeChecker.normalize_filename(each)
-            type_id = entry.get('type', None)
-            res_id = entry.get('res', None)
+            type_id = entry.get("type", None)
+            res_id = entry.get("res", None)
 
             # Use flags field if available for more accurate HDR detection
-            flags_value = cast(list[Any], entry.get('flags') or [])
+            flags_value = cast(list[Any], entry.get("flags") or [])
             flags = [str(flag) for flag in flags_value]
 
             if flags:
@@ -244,10 +246,10 @@ class DupeChecker:
                 file_hdr: set[str] = set()
                 for flag in flags:
                     flag_upper = flag.upper()
-                    if flag_upper == 'DV':
-                        file_hdr.add('DV')
-                    elif flag_upper in ['HDR', 'HDR10', 'HDR10+']:
-                        file_hdr.add('HDR')
+                    if flag_upper == "DV":
+                        file_hdr.add("DV")
+                    elif flag_upper in ["HDR", "HDR10", "HDR10+"]:
+                        file_hdr.add("HDR")
                 logger.debug(f"[debug] Using flags for HDR detection: {flags} -> {file_hdr}")
             else:
                 # Fall back to parsing filename for HDR terms
@@ -283,16 +285,16 @@ class DupeChecker:
                 matched_count_key = f"{tracker_name}_matched_file_count"
                 matched_torrent_id = f"{tracker_name}_matched_id"
 
-                meta[matched_name_key] = entry.get('name')
-                if entry.get('link'):
-                    meta[matched_link_key] = entry.get('link')
-                if entry.get('download'):
-                    meta[matched_download_key] = entry.get('download')
+                meta[matched_name_key] = entry.get("name")
+                if entry.get("link"):
+                    meta[matched_link_key] = entry.get("link")
+                if entry.get("download"):
+                    meta[matched_download_key] = entry.get("download")
                 meta[matched_reason_key] = reason
                 if file_count:
                     meta[matched_count_key] = file_count
-                if entry.get('id'):
-                    meta[matched_torrent_id] = entry.get('id')
+                if entry.get("id"):
+                    meta[matched_torrent_id] = entry.get("id")
 
             if meta.category == "GAME":
                 target_title = meta.title or meta.name
@@ -374,8 +376,7 @@ class DupeChecker:
                     name = re.sub(r"[._\[\]()\-:+]", " ", name)
 
                     # Collapse multiple spaces and strip
-                    name = re.sub(r"\s+", " ", name).strip()
-                    return name
+                    return re.sub(r"\s+", " ", name).strip()
 
                 clean_target = clean_game_title(target_title)
                 clean_each = clean_game_title(each)
@@ -385,9 +386,7 @@ class DupeChecker:
                 is_match = False
                 if (
                     clean_target == clean_each
-                    or clean_target
-                    and clean_each
-                    and re.search(rf"\b{re.escape(clean_target)}\b", clean_each)
+                    or (clean_target and clean_each and re.search(rf"\b{re.escape(clean_target)}\b", clean_each))
                     or re.search(rf"\b{re.escape(clean_each)}\b", clean_target)
                 ):
                     is_match = True
@@ -516,9 +515,9 @@ class DupeChecker:
                 return False
 
             # Aither-specific trumping logic - no internal checking, if it's marked trumpable, it's trumpable
-            if tracker_name in ["AITHER", "LST"] and entry.get('trumpable', False) and res_id and target_resolution == res_id:
+            if tracker_name in ["AITHER", "LST"] and entry.get("trumpable", False) and res_id and target_resolution == res_id:
                 meta.trumpable_id = entry.get("id")
-                remember_match('trumpable_id')
+                remember_match("trumpable_id")
 
             if not meta.is_disc:
                 for file in filenames:
@@ -526,16 +525,16 @@ class DupeChecker:
                         # MTV: check if any dupe file is a substring of our file (ignoring extension)
                         if any(f.lower() in file.lower() for f in files):
                             meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
-                            remember_match('filename')
+                            remember_match("filename")
                             if file_count and file_count == len(filelist):
                                 meta.file_count_match = file_count
-                                remember_match('file_count')
+                                remember_match("file_count")
                                 return False
-                        entry_size = coerce_int(entry.get('size'))
+                        entry_size = coerce_int(entry.get("size"))
                         source_size = coerce_int(meta.source_size)
                         if entry_size is not None and source_size is not None and entry_size == source_size:
                             meta.size_match = f"{entry.get('name')} = {entry.get('link', None)}"
-                            remember_match('size')
+                            remember_match("size")
                             return False
                         if meta.debug and entry_size is None and meta.source_size is not None:
                             logger.debug(f"[debug] Size comparison failed due to ValueError: entry_size={entry.get('size')}, source_size={meta.source_size}")
@@ -545,34 +544,34 @@ class DupeChecker:
                         if any(file.lower() == f.lower() for f in files):
                             meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
                             logger.debug(f"[debug] Filename match found: {meta.filename_match}")
-                            remember_match('filename')
-                            remember_match('id')
+                            remember_match("filename")
+                            remember_match("id")
                             if file_count and file_count == len(filelist):
                                 meta.file_count_match = file_count
                                 logger.debug(f"[debug] File count match found: {meta.file_count_match}")
-                                remember_match('file_count')
+                                remember_match("file_count")
                                 return False
                 if tracker_name in ["BHD"]:
                     # BHD: compare sizes
-                    entry_size = coerce_int(entry.get('size'))
+                    entry_size = coerce_int(entry.get("size"))
                     source_size = coerce_int(meta.source_size)
                     if entry_size is not None and source_size is not None:
                         logger.debug(f"[debug] Comparing sizes: Entry size {entry_size} vs Source size {source_size}")
                         if entry_size == source_size:
                             meta.size_match = f"{entry.get('name')} = {entry.get('link', None)}"
-                            remember_match('size')
+                            remember_match("size")
                             return False
                     elif meta.debug and entry_size is None and meta.source_size is not None:
                         logger.debug(f"[debug] Size comparison failed due to ValueError: entry_size={entry.get('size')}, source_size={meta.source_size}")
 
             else:
-                entry_size = coerce_int(entry.get('size'))
+                entry_size = coerce_int(entry.get("size"))
                 source_size = coerce_int(meta.source_size)
                 if entry_size is not None and source_size is not None:
                     logger.debug(f"[debug] Comparing sizes: Entry size {entry_size} vs Source size {source_size}")
                     if entry_size == source_size:
                         meta.size_match = f"{entry.get('name')} = {entry.get('link', None)}"
-                        remember_match('size')
+                        remember_match("size")
                         return False
                 elif meta.debug and entry_size is None and meta.source_size is not None:
                     logger.debug(f"[debug] Size comparison failed due to ValueError: entry_size={entry.get('size')}, source_size={meta.source_size}")
@@ -582,20 +581,19 @@ class DupeChecker:
                 return True
 
             if has_repack_in_uuid and "repack" not in normalized and meta.tag and meta.tag.lower() in normalized:
-                await log_exclusion('repack release', each)
+                await log_exclusion("repack release", each)
                 return True
 
             if tracker_name == "MTV":
                 target_name = meta.name.replace(" ", ".").replace("DD+", "DDP")
-                dupe_name = entry.get('name', '')
+                dupe_name = entry.get("name", "")
 
                 def normalize_mtv_name(name: str) -> str:
                     # Handle audio format variations: DDP.5.1 <-> DDP5.1
-                    name = re.sub(r'\.DDP\.(\d)', r'.DDP\1', name)
-                    name = re.sub(r'\.DD\.(\d)', r'.DD\1', name)
-                    name = re.sub(r'\.AC3\.(\d)', r'.AC3\1', name)
-                    name = re.sub(r'\.DTS\.(\d)', r'.DTS\1', name)
-                    return name
+                    name = re.sub(r"\.DDP\.(\d)", r".DDP\1", name)
+                    name = re.sub(r"\.DD\.(\d)", r".DD\1", name)
+                    name = re.sub(r"\.AC3\.(\d)", r".AC3\1", name)
+                    return re.sub(r"\.DTS\.(\d)", r".DTS\1", name)
 
                 normalized_target = normalize_mtv_name(target_name)
                 if normalized_target == dupe_name:
@@ -604,7 +602,7 @@ class DupeChecker:
 
             if tracker_name == "BHD":
                 target_name = meta.name.replace("DD+", "DDP")
-                if str(entry.get('name')) == target_name:
+                if str(entry.get("name")) == target_name:
                     meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
                     return False
 
@@ -612,8 +610,8 @@ class DupeChecker:
                 huno = HUNO(config=self.config)
                 huno_name_result: Any = await huno.get_name(meta)
                 huno_name_map = cast(dict[str, Any], huno_name_result)
-                huno_name = str(huno_name_map.get('name', huno_name_result)) if isinstance(huno_name_result, dict) else str(huno_name_result)
-                if str(entry.get('name')) == huno_name:
+                huno_name = str(huno_name_map.get("name", huno_name_result)) if isinstance(huno_name_result, dict) else str(huno_name_result)
+                if str(entry.get("name")) == huno_name:
                     meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
                     return False
 
@@ -625,14 +623,14 @@ class DupeChecker:
             if has_is_disc and each.lower().endswith(".m2ts"):
                 return False
 
-            if has_is_disc and re.search(r'\.\w{2,4}$', each):
+            if has_is_disc and re.search(r"\.\w{2,4}$", each):
                 await log_exclusion("file extension mismatch (is_disc=True)", each)
                 return True
 
             if is_sd == 1 and tracker_name in {"BHD", "AITHER"} and any(str(res) in each for res in [1080, 720, 2160]) and not has_is_disc:
                 return False
 
-            if target_hdr and '1080p' in target_resolution and '2160p' in each:
+            if target_hdr and "1080p" in target_resolution and "2160p" in each:
                 await log_exclusion("No 1080p HDR when 4K exists", each)
                 return False
 
@@ -645,7 +643,7 @@ class DupeChecker:
                 if "hdtv" in normalized and not any(web_term in normalized for web_term in ["web-dl", "web -dl", "webdl", "web dl"]):
                     await log_exclusion("source mismatch: WEB-DL vs HDTV", each)
                     return True
-                if any(term in normalized for term in ['blu-ray', 'blu ray', 'bluray', 'blu -ray']) and not any(
+                if any(term in normalized for term in ["blu-ray", "blu ray", "bluray", "blu -ray"]) and not any(
                     web_term in normalized for web_term in ["web-dl", "web -dl", "webdl", "web dl"]
                 ):
                     await log_exclusion("source mismatch: WEB-DL vs BluRay", each)
@@ -657,13 +655,10 @@ class DupeChecker:
             skip_resolution_check = is_dvd or "DVD" in target_source or is_dvdrip
 
             if tracker_name == "OTW" and not is_tv_pack and meta.category == "TV" and target_episode and target_resolution:
-                dupe_season_match = re.search(r'[sS](\d+)', each)
-                dupe_has_episode = bool(re.search(r'[eE]\d{2}', each))
+                dupe_season_match = re.search(r"[sS](\d+)", each)
+                dupe_has_episode = bool(re.search(r"[eE]\d{2}", each))
                 same_season_episode_dupe = (
-                    target_season_number is not None
-                    and dupe_season_match is not None
-                    and int(dupe_season_match.group(1)) == target_season_number
-                    and dupe_has_episode
+                    target_season_number is not None and dupe_season_match is not None and int(dupe_season_match.group(1)) == target_season_number and dupe_has_episode
                 )
 
                 if same_season_episode_dupe and (target_resolution.lower() not in each.lower()):
@@ -722,11 +717,11 @@ class DupeChecker:
                             logger.debug(f"[debug] Episode with matching source and resolution found for trumping: {each}")
 
                             is_internal = False
-                            if entry.get('internal', 0) == 1:
-                                trackers_section: dict[str, Any] = cast(dict[str, Any], self.config.get('TRACKERS', {}))
-                                aither_settings: dict[str, Any] = trackers_section.get('AITHER', {})
-                                if aither_settings.get('internal') is True:
-                                    internal_groups = aither_settings.get('internal_groups', [])
+                            if entry.get("internal", 0) == 1:
+                                trackers_section: dict[str, Any] = cast(dict[str, Any], self.config.get("TRACKERS", {}))
+                                aither_settings: dict[str, Any] = trackers_section.get("AITHER", {})
+                                if aither_settings.get("internal") is True:
+                                    internal_groups = aither_settings.get("internal_groups", [])
                                     if isinstance(internal_groups, list):
                                         tag_without_prefix = tag[1:] if tag else ""
                                         if tag_without_prefix in internal_groups and tag_without_prefix.lower() in normalized:
@@ -734,20 +729,19 @@ class DupeChecker:
                                 if not is_internal and meta.debug:
                                     logger.debug("[debug] Skipping internal episode for trumping since you're not the internal uploader.")
 
-                            if not entry.get('internal', False) or is_internal:
+                            if not entry.get("internal", False) or is_internal:
                                 # Store the matched episode ID/s for later use
                                 # is_season=True means seasons match, which is sufficient for trump targeting
                                 # (season pack can trump individual episodes from same season)
-                                matched_episode_ids = cast(list[dict[str, Any]], meta.setdefault(f'{tracker_name}_matched_episode_ids', []))
+                                matched_episode_ids = cast(list[dict[str, Any]], meta.setdefault(f"{tracker_name}_matched_episode_ids", []))
 
-                                entry_id = entry.get('id')
-                                entry_link = entry.get('link')
+                                entry_id = entry.get("id")
+                                entry_link = entry.get("link")
 
                                 # De-duplication guard: check if this entry already exists
                                 already_exists = (
                                     any(
-                                        existing.get('id') == entry_id
-                                        or (existing.get('link') == entry_link and existing.get('tracker') == tracker_name)
+                                        existing.get("id") == entry_id or (existing.get("link") == entry_link and existing.get("tracker") == tracker_name)
                                         for existing in matched_episode_ids
                                     )
                                     if entry_id or entry_link
@@ -755,16 +749,18 @@ class DupeChecker:
                                 )
 
                                 if entry_id and not already_exists:
-                                    matched_episode_ids.append({
-                                        'id': entry_id,
-                                        'name': each,
-                                        'link': entry_link,
-                                        'tracker': tracker_name,
-                                        'internal': entry.get('internal', 0),
-                                    })
+                                    matched_episode_ids.append(
+                                        {
+                                            "id": entry_id,
+                                            "name": each,
+                                            "link": entry_link,
+                                            "tracker": tracker_name,
+                                            "internal": entry.get("internal", 0),
+                                        }
+                                    )
                                     logger.debug(f"[debug] Added episode ID {entry_id} to matched list")
                                     # Ensure this matched dupe is recorded for later use
-                                    remember_match('season_pack_contains_episode')
+                                    remember_match("season_pack_contains_episode")
                                     # Don't exclude this entry - it's a valid trump target
                                     return False
                                 if already_exists and meta.debug:
@@ -784,7 +780,7 @@ class DupeChecker:
                     meta.season_pack_id = entry.get("id")
                     logger.debug(f"[yellow]Season pack detected for episode upload: {each}")
                     logger.debug(f"[yellow]Your episode {target_season}{target_episode} is contained in existing season pack")
-                    remember_match('season_pack_contains_episode')
+                    remember_match("season_pack_contains_episode")
                     return False
 
             if is_hdtv and any(web_term in normalized for web_term in ["web-dl", "web -dl", "webdl", "web dl"]):
@@ -829,13 +825,13 @@ class DupeChecker:
             for dupe in new_dupes:
                 limited_dupe = Redaction.redact_private_info(dupe).copy()
                 # Limit files list to first 10 items
-                limited_files = limited_dupe.get('files', [])
+                limited_files = limited_dupe.get("files", [])
                 if len(limited_files) > 10:
-                    dupe_files = dupe.get('files', [])
-                    limited_dupe['files'] = limited_files[:10] + [f"... and {len(dupe_files) - 10} more files"]
+                    dupe_files = dupe.get("files", [])
+                    limited_dupe["files"] = limited_files[:10] + [f"... and {len(dupe_files) - 10} more files"]
 
-                if isinstance(limited_dupe.get('description'), str) and len(limited_dupe['description']) > 200:
-                    limited_dupe['description'] = limited_dupe['description'][:200] + "..."
+                if isinstance(limited_dupe.get("description"), str) and len(limited_dupe["description"]) > 200:
+                    limited_dupe["description"] = limited_dupe["description"][:200] + "..."
 
                 filtered_dupes_to_print.append(limited_dupe)
 
@@ -847,12 +843,10 @@ class DupeChecker:
     @staticmethod
     async def normalize_filename(filename: str | MutableMapping[str, Any]) -> str:
         if isinstance(filename, dict):
-            filename = str(filename.get('name', ''))
+            filename = str(filename.get("name", ""))
         if not isinstance(filename, str):
             raise ValueError(f"Expected a string or a dictionary with a 'name' key, but got: {type(filename)}")
-        normalized = filename.lower().replace("-", " -").replace(" ", " ").replace(".", " ")
-
-        return normalized
+        return filename.lower().replace("-", " -").replace(" ", " ").replace(".", " ")
 
     @staticmethod
     async def is_season_episode_match(
@@ -863,12 +857,12 @@ class DupeChecker:
         """
         Check if the filename matches the given season and episode.
         """
-        season_match = re.search(r'[sS](\d+)', str(target_season))
+        season_match = re.search(r"[sS](\d+)", str(target_season))
         target_season_value = int(season_match.group(1)) if season_match else None
 
         # Handle daily-style episodes where the episode value is a date (YYYY-MM-DD / YYYY.MM.DD).
         target_episode_str = str(target_episode or "")
-        date_match = re.search(r'(?<!\d)((?:19|20)\d{2})[.\-_/\s](\d{1,2})[.\-_/\s](\d{1,2})(?!\d)', target_episode_str)
+        date_match = re.search(r"(?<!\d)((?:19|20)\d{2})[.\-_/\s](\d{1,2})[.\-_/\s](\d{1,2})(?!\d)", target_episode_str)
         if date_match:
             year = int(date_match.group(1))
             month = int(date_match.group(2))
@@ -879,7 +873,7 @@ class DupeChecker:
             return (False, False)
 
         if target_episode:
-            episode_matches = re.findall(r'\d+', str(target_episode))
+            episode_matches = re.findall(r"\d+", str(target_episode))
             target_episodes = [int(ep) for ep in episode_matches]
         else:
             target_episodes = []
@@ -901,8 +895,7 @@ class DupeChecker:
                 return (bool(re.search(season_pattern, filename, re.IGNORECASE)), True)  # Match season pack
             if episode_patterns:
                 return (
-                    bool(re.search(season_pattern, filename, re.IGNORECASE))
-                    and any(re.search(ep, filename, re.IGNORECASE) for ep in episode_patterns),
+                    bool(re.search(season_pattern, filename, re.IGNORECASE)) and any(re.search(ep, filename, re.IGNORECASE) for ep in episode_patterns),
                     False,
                 )  # Match episode file
 
@@ -929,6 +922,7 @@ class DupeChecker:
         """
         Check if the HDR terms match or are compatible.
         """
+
         def simplify_hdr(hdr_set: set[str], tracker_name: str | None = None) -> set[str]:
             """Simplify HDR terms to just HDR and DV."""
             simplified: set[str] = set()
@@ -937,7 +931,7 @@ class DupeChecker:
             if any(h == "DV" or "DV" in h for h in hdr_set):
                 simplified.add("DV")
                 meta_type = str(meta.type).lower()
-                if 'web' not in meta_type:
+                if "web" not in meta_type:
                     simplified.add("HDR")
                 if tracker_name == "ANT":
                     simplified.add("HDR")

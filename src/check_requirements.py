@@ -39,7 +39,7 @@ def check_dependencies() -> None:
         missing_packages.append("  - packaging: not installed (required by Upload Assistant)")
 
     try:
-        with open(requirements_file, encoding="utf-8") as f:
+        with Path(requirements_file).open(encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 # Ignore empty lines, comments or pip flags

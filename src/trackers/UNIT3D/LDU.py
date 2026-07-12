@@ -16,22 +16,22 @@ Config = dict[str, Any]
 class LDU(UNIT3D):
     tracker = "LDU"
     base_url = "https://theldu.to"
-    banned_groups = []
+    banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK")
-    tracker_urls = ['theldu.to']
+    tracker_urls = ("theldu.to",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='LDU')
+        super().__init__(config, tracker_name="LDU")
         self.config: Config = config
         self.common = COMMON(config)
 
     async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         genres = f"{', '.join(meta.keywords)} {meta.combined_genres}"
-        adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy']
+        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
         sound_mixes_value = meta.imdb_info.get("sound_mixes", [])
         sound_mixes = cast(list[Any], sound_mixes_value) if isinstance(sound_mixes_value, list) else []
 
@@ -46,7 +46,7 @@ class LDU(UNIT3D):
         }
         if mapping_only:
             return cat_map
-        elif reverse:
+        if reverse:
             return {v: k for k, v in cat_map.items()}
 
         resolved_category = category if category is not None else meta.category
@@ -55,51 +55,55 @@ class LDU(UNIT3D):
 
         category_id = cat_map.get(resolved_category, "0")
 
-        if 'hentai' in genres.lower():
-            category_id = '10'
-        elif any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
+        if "hentai" in genres.lower():
+            category_id = "10"
+        elif any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
             category_id = "45" if not await languages_manager.has_english_language(meta.subtitle_languages or []) else "6"
 
         if meta.category == "MOVIE":
             if meta.three_d or "3D" in meta.edition:
-                category_id = '21'
+                category_id = "21"
             elif any(x in meta.edition.lower() for x in ["fanedit", "fanres"]):
-                category_id = '12'
+                category_id = "12"
             elif meta.anime or meta.mal_id != 0:
-                category_id = '8'
+                category_id = "8"
             elif any("silent film" in mix.lower() for mix in sound_mixes if isinstance(mix, str)) or meta.silent:
-                category_id = '18'
+                category_id = "18"
             elif "musical" in genres.lower():
-                category_id = '25'
-            elif any(x in genres.lower() for x in ['holiday', 'easter', 'christmas', 'halloween', 'thanksgiving']):
-                category_id = '24'
+                category_id = "25"
+            elif any(x in genres.lower() for x in ["holiday", "easter", "christmas", "halloween", "thanksgiving"]):
+                category_id = "24"
             elif "documentary" in genres.lower():
-                category_id = '17'
-            elif any(x in genres.lower() for x in ['stand-up', 'standup']):
-                category_id = '20'
+                category_id = "17"
+            elif any(x in genres.lower() for x in ["stand-up", "standup"]):
+                category_id = "20"
             elif "short film" in genres.lower() or int(meta.imdb_info.get("runtime", 0) or 0) < 5:
-                category_id = '19'
-            elif not await languages_manager.has_english_language(meta.audio_languages or []) and not await languages_manager.has_english_language(meta.subtitle_languages or []):
-                category_id = '22'
+                category_id = "19"
+            elif not await languages_manager.has_english_language(meta.audio_languages or []) and not await languages_manager.has_english_language(
+                meta.subtitle_languages or []
+            ):
+                category_id = "22"
             elif "dubbed" in meta.audio.lower():
-                category_id = '27'
+                category_id = "27"
             else:
-                category_id = '1'
+                category_id = "1"
         elif meta.category == "TV":
             if meta.anime or meta.mal_id != 0:
-                category_id = '9'
+                category_id = "9"
             elif "documentary" in genres.lower():
-                category_id = '40'
-            elif not await languages_manager.has_english_language(meta.audio_languages or []) and not await languages_manager.has_english_language(meta.subtitle_languages or []):
-                category_id = '29'
+                category_id = "40"
+            elif not await languages_manager.has_english_language(meta.audio_languages or []) and not await languages_manager.has_english_language(
+                meta.subtitle_languages or []
+            ):
+                category_id = "29"
             elif meta.tv_pack:
-                category_id = '2'
+                category_id = "2"
             elif "dubbed" in meta.audio.lower():
-                category_id = '31'
+                category_id = "31"
             else:
-                category_id = '41'
+                category_id = "41"
 
-        return {'category_id': category_id}
+        return {"category_id": category_id}
 
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
@@ -128,7 +132,7 @@ class LDU(UNIT3D):
         }
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
 
         resolved_type = type if type is not None else meta.type
@@ -142,10 +146,9 @@ class LDU(UNIT3D):
 
         return {"type_id": val}
 
-
     async def get_name(self, meta: Meta) -> dict[str, str]:
         ldu_name = meta.name
-        cat_id = (await self.get_category_id(meta))['category_id']
+        cat_id = (await self.get_category_id(meta))["category_id"]
         non_eng = False
         non_eng_audio = False
         iso_audio: str | None = None
@@ -185,7 +188,7 @@ class LDU(UNIT3D):
                     except (LookupError, AttributeError, ValueError) as e:
                         logger.info(f"[bold red]Error extracting subtitle language: {e}[/bold red]")
 
-        if cat_id == '18' and iso_subtitle:
+        if cat_id == "18" and iso_subtitle:
             ldu_name = f"{ldu_name} [{iso_subtitle}]"
 
         elif non_eng or non_eng_audio:
@@ -198,4 +201,4 @@ class LDU(UNIT3D):
             if language_parts:
                 ldu_name = f"{ldu_name} {' '.join(language_parts)}"
 
-        return {'name': ldu_name}
+        return {"name": ldu_name}

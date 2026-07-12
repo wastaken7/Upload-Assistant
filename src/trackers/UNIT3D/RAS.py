@@ -11,7 +11,7 @@ Config = dict[str, Any]
 class RAS(UNIT3D):
     tracker = "RAS"
     base_url = "https://rastastugan.org"
-    banned_groups = [
+    banned_groups = (
         "GalaxyRG",
         "INFINITY",
         "LAMA",
@@ -20,14 +20,14 @@ class RAS(UNIT3D):
         "RARBG",
         "YiFY",
         "YTS",
-    ]
+    )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     requests_url = f"{base_url}/api/requests/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ['https://rastastugan.org']
+    tracker_urls = ("https://rastastugan.org",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="RAS")
@@ -48,16 +48,15 @@ class RAS(UNIT3D):
         }
         if mapping_only:
             return category_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in category_id.items()}
-        elif category:
+        if category:
             return {"category_id": category_id.get(category, "0")}
-        else:
-            meta_category = meta.category
-            if meta.audiobook:
-                meta_category = "AUDIOBOOK"
-            resolved_id = category_id.get(meta_category, "0")
-            return {"category_id": resolved_id}
+        meta_category = meta.category
+        if meta.audiobook:
+            meta_category = "AUDIOBOOK"
+        resolved_id = category_id.get(meta_category, "0")
+        return {"category_id": resolved_id}
 
     async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
@@ -90,34 +89,33 @@ class RAS(UNIT3D):
         }
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
-        elif type:
+        if type:
             resolved_type = type.upper().strip()
             return {"type_id": type_id.get(resolved_type, "0")}
-        else:
-            category = meta.category
-            meta_type = meta.type
-            if isinstance(meta_type, str):
-                meta_type = meta_type.upper().strip().lstrip(".")
+        category = meta.category
+        meta_type = meta.type
+        if isinstance(meta_type, str):
+            meta_type = meta_type.upper().strip().lstrip(".")
 
-            resolved_id = type_id.get(meta_type or "", "0")
+        resolved_id = type_id.get(meta_type or "", "0")
 
-            if category == "GAME":
-                platform = meta.platform.lower()
-                if "mac" in platform:
-                    resolved_id = "9"
-                elif "linux" in platform:
-                    resolved_id = "18"
-                elif any(word in platform for word in ["windows", "pc"]):
-                    resolved_id = "10"
-                elif meta.console_game:
-                    resolved_id = "11"
-                elif meta_type in type_id:
-                    resolved_id = type_id[meta_type]
-                else:
-                    resolved_id = "19"
-            elif category in ("BOOK", "AUDIOBOOK") and resolved_id == "0":
+        if category == "GAME":
+            platform = meta.platform.lower()
+            if "mac" in platform:
+                resolved_id = "9"
+            elif "linux" in platform:
+                resolved_id = "18"
+            elif any(word in platform for word in ["windows", "pc"]):
+                resolved_id = "10"
+            elif meta.console_game:
+                resolved_id = "11"
+            elif meta_type in type_id:
+                resolved_id = type_id[meta_type]
+            else:
                 resolved_id = "19"
+        elif category in ("BOOK", "AUDIOBOOK") and resolved_id == "0":
+            resolved_id = "19"
 
-            return {"type_id": resolved_id}
+        return {"type_id": resolved_id}

@@ -8,6 +8,7 @@ import time
 import traceback
 import xmlrpc.client  # nosec B411 - Secured with defusedxml.xmlrpc.monkey_patch() below
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, cast
 
 import bencode
@@ -76,9 +77,9 @@ class RtorrentClientMixin:
                 # On Unix/Linux, use the root directory or first directory component
                 src_drive = "/"
                 # Extract the first directory component for more specific matching
-                src_parts = src.strip('/').split('/')
+                src_parts = src.strip("/").split("/")
                 if src_parts:
-                    src_root_dir = '/' + src_parts[0]
+                    src_root_dir = "/" + src_parts[0]
                     # Check if any linked folder contains this root
                     for folder in linked_folder:
                         if src_root_dir in folder or folder in src_root_dir:
@@ -121,18 +122,18 @@ class RtorrentClientMixin:
                 link_dir_name = str(tracker_cfg.get("link_dir_name", "")).strip()
                 if link_target is None:
                     raise RuntimeError("link_target cannot be None")
-                tracker_dir = os.path.join(link_target, link_dir_name or tracker)
-                os.makedirs(tracker_dir, exist_ok=True)
+                tracker_dir = Path(link_target) / link_dir_name or tracker
+                Path(tracker_dir).mkdir(parents=True, exist_ok=True)
 
                 logger.debug(f"[bold yellow]Linking to tracker directory: {tracker_dir}")
                 logger.debug(f"[cyan]Source path: {src}")
 
                 # Extract only the folder or file name from `src`
-                src_name = os.path.basename(src.rstrip(os.sep))  # Ensure we get just the name
-                dst = os.path.join(tracker_dir, src_name)  # Destination inside linked folder
+                src_name = Path(src.rstrip(os.sep)).name  # Ensure we get just the name
+                dst = Path(tracker_dir) / src_name  # Destination inside linked folder
 
                 # path magic
-                if os.path.exists(dst) or os.path.islink(dst):
+                if Path(dst).exists() or os.path.islink(dst):
                     logger.debug(f"[yellow]Skipping linking, path already exists: {dst}")
                 else:
                     if use_hardlink:
@@ -151,7 +152,7 @@ class RtorrentClientMixin:
                                     logger.info(f"[green]File copied instead: {dst}")
                             else:
                                 # For directories, we need to link each file inside
-                                os.makedirs(dst, exist_ok=True)
+                                Path(dst).mkdir(parents=True, exist_ok=True)
 
                                 for root, _, files in os.walk(src):
                                     # Get the relative path from source
@@ -161,13 +162,13 @@ class RtorrentClientMixin:
 
                                     # Create corresponding directory in destination
                                     if rel_path != ".":
-                                        dst_dir = os.path.join(dst, rel_path)
-                                        os.makedirs(dst_dir, exist_ok=True)
+                                        dst_dir = Path(dst) / rel_path
+                                        Path(dst_dir).mkdir(parents=True, exist_ok=True)
 
                                     # Create hardlinks for each file
                                     for idx, file in enumerate(files):
-                                        src_file = os.path.join(root, file)
-                                        dst_file = os.path.join(dst if rel_path == "." else dst_dir, file)
+                                        src_file = Path(root) / file
+                                        dst_file = Path(dst if rel_path == "." else dst_dir) / file
                                         try:
                                             os.link(src_file, dst_file)
                                             if meta.debug and idx == 0:
@@ -183,7 +184,7 @@ class RtorrentClientMixin:
                             error_msg = f"Failed to create link: {e}"
                             logger.info(f"[bold red]{error_msg}")
                             if meta.debug:
-                                logger.debug(f"[yellow]Source: {src} (exists: {os.path.exists(src)})")
+                                logger.debug(f"[yellow]Source: {src} (exists: {Path(src).exists()})")
                                 logger.debug(f"[yellow]Destination: {dst}")
                             # Don't raise exception - just warn and continue
                             logger.info("[yellow]Continuing with rTorrent addition despite linking failure")
@@ -191,7 +192,7 @@ class RtorrentClientMixin:
                     elif use_symlink:
                         try:
                             if platform.system() == "Windows":
-                                os.symlink(src, dst, target_is_directory=os.path.isdir(src))
+                                os.symlink(src, dst, target_is_directory=Path(src).is_dir())
                             else:
                                 os.symlink(src, dst)
 
@@ -204,7 +205,7 @@ class RtorrentClientMixin:
                             logger.info("[yellow]Continuing with rTorrent addition despite linking failure")
 
                 # Use the linked path for rTorrent if linking was successful
-                if (use_symlink or use_hardlink) and os.path.exists(dst):
+                if (use_symlink or use_hardlink) and Path(dst).exists():
                     path = dst
 
         # Apply remote pathing to `tracker_dir` before assigning `save_path`
@@ -226,7 +227,7 @@ class RtorrentClientMixin:
                 # Get the relative part of the path
                 rel_path = os.path.relpath(save_path, local_path)
                 # Combine remote path with relative path
-                save_path = os.path.join(remote_path, rel_path)
+                save_path = Path(remote_path) / rel_path
 
             # For direct replacement if the above approach doesn't work
             elif local_path.lower() in save_path.lower():
@@ -243,7 +244,7 @@ class RtorrentClientMixin:
         original_meta_bytes = _bencode_bencode(metainfo)
         try:
             # Use dst path if linking was successful, otherwise use original path
-            resume_path = dst if (use_symlink or use_hardlink) and os.path.exists(dst) else path
+            resume_path = dst if (use_symlink or use_hardlink) and Path(dst).exists() else path
             logger.debug(f"[cyan]Using resume path: {resume_path}")
             fast_resume = self.add_fast_resume(metainfo, resume_path, torrent)
         except OSError as exc:
@@ -258,9 +259,9 @@ class RtorrentClientMixin:
             _bencode_bwrite(fast_resume, fr_file)
 
         # Use dst path if linking was successful, otherwise use original path
-        path = dst if (use_symlink or use_hardlink) and os.path.exists(dst) else path
+        path = dst if (use_symlink or use_hardlink) and Path(dst).exists() else path
 
-        isdir = os.path.isdir(path)
+        isdir = Path(path).is_dir()
         # Remote path mount
         modified_fr = False
         path_dir = ""
@@ -304,11 +305,11 @@ class RtorrentClientMixin:
         files = metainfo["info"].get("files", None)
         single = files is None
         if single:
-            if os.path.isdir(datapath):
-                datapath = os.path.join(datapath, metainfo["info"]["name"])
+            if Path(datapath).is_dir():
+                datapath = Path(datapath) / metainfo["info"]["name"]
             files = [
                 {
-                    "path": [os.path.abspath(datapath)],
+                    "path": [str(Path(datapath).resolve())],
                     "length": metainfo["info"]["length"],
                 }
             ]
@@ -325,9 +326,9 @@ class RtorrentClientMixin:
 
         for fileinfo in files:
             # Get the path into the filesystem
-            filepath = os.sep.join(fileinfo["path"])
+            filepath = str(Path(*fileinfo["path"]))
             if not single:
-                filepath = os.path.join(datapath, filepath.strip(os.sep))
+                filepath = Path(datapath) / filepath.strip(os.sep)
 
             # Check file size
             file_length_value = fileinfo["length"]
@@ -339,11 +340,13 @@ class RtorrentClientMixin:
                 )
 
             # Add resume data for this file
-            resume["files"].append({
-                "priority": 1,
-                "mtime": int(os.path.getmtime(filepath)),
-                "completed": ((offset + file_length + piece_length - 1) // piece_length - offset // piece_length),
-            })
+            resume["files"].append(
+                {
+                    "priority": 1,
+                    "mtime": int(os.path.getmtime(filepath)),
+                    "completed": ((offset + file_length + piece_length - 1) // piece_length - offset // piece_length),
+                }
+            )
             offset += file_length
 
         return metainfo
@@ -367,31 +370,31 @@ class RtorrentClientMixin:
 
         # Normalize info hash format for rTorrent (uppercase)
         info_hash_v1 = info_hash_v1.upper().strip()
-        torrent_path = os.path.join(torrent_storage_dir, f"{info_hash_v1}.torrent")
+        torrent_path = Path(torrent_storage_dir) / f"{info_hash_v1}.torrent"
 
         # Extract folder ID for use in temporary file path
-        folder_id = os.path.basename(meta.path)
+        folder_id = Path(meta.path).name
         if not meta.uuid:
             meta.uuid = folder_id
 
-        extracted_torrent_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
-        os.makedirs(extracted_torrent_dir, exist_ok=True)
+        extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
         # Check if the torrent file exists directly
-        if os.path.exists(torrent_path):
+        if Path(torrent_path).exists():
             logger.info(f"[green]Found matching torrent file: {torrent_path}")
         else:
             # Try to find the torrent file in storage directory (case insensitive)
             found = False
             logger.info(f"[yellow]Searching for torrent file with hash {info_hash_v1} in {torrent_storage_dir}")
 
-            if os.path.exists(torrent_storage_dir):
+            if Path(torrent_storage_dir).exists():
                 for filename in os.listdir(torrent_storage_dir):
                     filename_str = filename
                     if filename_str.lower().endswith(".torrent"):
                         file_hash = os.path.splitext(filename_str)[0]  # Remove .torrent extension
                         if file_hash.upper() == info_hash_v1:
-                            torrent_path = os.path.join(torrent_storage_dir, filename_str)
+                            torrent_path = Path(torrent_storage_dir) / filename_str
                             found = True
                             logger.info(f"[green]Found torrent file with matching hash: {filename_str}")
                             break
@@ -427,7 +430,7 @@ class RtorrentClientMixin:
             meta.update(tracker_ids)
 
             # If we found a tracker ID, log it
-            for tracker in ['ptp', 'bhd', 'btn', 'blu', 'aither', 'lst', 'oe', 'hdb']:
+            for tracker in ["ptp", "bhd", "btn", "blu", "aither", "lst", "oe", "hdb"]:
                 if meta.get(tracker):
                     logger.info(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
 
@@ -435,12 +438,10 @@ class RtorrentClientMixin:
                 logger.info(f"[green]Stored {len(torrent_comments)} torrent comments for later use")
 
             if not pathed:
-                valid, resolved_path = await self.is_valid_torrent(
-                    meta, torrent_path, info_hash_v1, 'rtorrent', client
-                )
+                valid, resolved_path = await self.is_valid_torrent(meta, torrent_path, info_hash_v1, "rtorrent", client)
 
                 if valid:
-                    base_torrent_path = os.path.join(extracted_torrent_dir, "BASE.torrent")
+                    base_torrent_path = Path(extracted_torrent_dir) / "BASE.torrent"
 
                     try:
                         await TorrentCreator.create_base_from_existing_torrent(resolved_path, meta.base_dir, meta.uuid)

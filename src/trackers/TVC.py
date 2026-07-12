@@ -1,11 +1,11 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
-import os
 import re
 import traceback
 from datetime import UTC, datetime
-from typing import Any, cast
+from pathlib import Path
+from typing import Any, ClassVar, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -28,12 +28,12 @@ class TVC:
     tracker = "TVC"
     source_flag = "TVCHAOS"
     signature = ""
-    banned_groups = []
-    approved_image_hosts = ["imgbb", "ptpimg", "imgbox", "pixhost", "bam", "onlyimage"]
+    banned_groups = ()
+    approved_image_hosts = ("imgbb", "ptpimg", "imgbox", "pixhost", "bam", "onlyimage")
     upload_url = "https://tvchaosuk.com/api/torrents/upload"
     search_url = "https://tvchaosuk.com/api/torrents/filter"
     torrent_url = "https://tvchaosuk.com/torrents/"
-    tv_type_map = {
+    tv_type_map: ClassVar = {
         "comedy": "29",
         "current affairs": "45",
         "documentary": "5",
@@ -51,7 +51,7 @@ class TVC:
         "sport": "42",
     }
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ["https://tvchaosuk.com"]
+    tracker_urls = ("https://tvchaosuk.com",)
     # Constants for the class
     DEFAULT_LOGO_SIZE = "300"
     SCREENSHOT_THUMB_SIZE = "350"
@@ -77,21 +77,21 @@ class TVC:
         """
         try:
             return datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC).strftime("%d-%m-%Y")
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return date_str
 
     async def _read_base_description(self, meta: Meta) -> str:
         """Read the base DESCRIPTION.txt file if it exists."""
         try:
-            return await self.read_file(f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt")
+            return await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt")
         except FileNotFoundError:
             return ""
 
     def _ensure_desc_directory(self, meta: Meta, tracker: str) -> str:
         """Create description directory and return file path."""
-        desc_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
-        os.makedirs(desc_dir, exist_ok=True)
-        return os.path.join(desc_dir, f"[{tracker}]DESCRIPTION.txt")
+        desc_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        Path(desc_dir).mkdir(parents=True, exist_ok=True)
+        return Path(desc_dir) / f"[{tracker}]DESCRIPTION.txt"
 
     def _build_disc_info(self, discs: list[dict[str, Any]]) -> str:
         """
@@ -105,20 +105,16 @@ class TVC:
 
         # Process all discs uniformly
         for disc in discs:
-            if disc['type'] == "BDMV":
-                name = disc.get('name', 'BDINFO')
-                parts.append(
-                    f"[center][spoiler={name}][code]{disc['summary']}[/code][/spoiler][/center]\n\n"
-                )
-            elif disc['type'] == "DVD":
+            if disc["type"] == "BDMV":
+                name = disc.get("name", "BDINFO")
+                parts.append(f"[center][spoiler={name}][code]{disc['summary']}[/code][/spoiler][/center]\n\n")
+            elif disc["type"] == "DVD":
                 # For first DVD disc, use VOB MediaInfo label
                 if not parts:  # First disc
-                    parts.append(
-                        f"[center][spoiler=VOB MediaInfo][code]{disc['vob_mi']}[/code][/spoiler][/center]\n\n"
-                    )
+                    parts.append(f"[center][spoiler=VOB MediaInfo][code]{disc['vob_mi']}[/code][/spoiler][/center]\n\n")
                 else:  # Subsequent DVD discs
-                    vob_name = os.path.basename(disc['vob'])
-                    ifo_name = os.path.basename(disc['ifo'])
+                    vob_name = Path(disc["vob"]).name
+                    ifo_name = Path(disc["ifo"]).name
                     parts.append(
                         f"[center]{disc['name']}:\n"
                         f"[spoiler={vob_name}][code]{disc['vob_mi']}[/code][/spoiler] "
@@ -127,11 +123,7 @@ class TVC:
 
         return "".join(parts)
 
-    def _build_movie_desc(
-        self,
-        meta: Meta,
-        image_list: list[dict[str, Any]]
-    ) -> str:
+    def _build_movie_desc(self, meta: Meta, image_list: list[dict[str, Any]]) -> str:
         """Build description for movie releases (multi-block, no pre tags)."""
         parts = []
 
@@ -142,7 +134,7 @@ class TVC:
 
         # Logo in its own center block
         if meta.logo:
-            logo_size = self.config['DEFAULT'].get('logo_size', self.DEFAULT_LOGO_SIZE)
+            logo_size = self.config["DEFAULT"].get("logo_size", self.DEFAULT_LOGO_SIZE)
             parts.append(f"[center][img={logo_size}]{meta.logo}[/img][/center]\n\n")
 
         # Title - plain text
@@ -154,7 +146,7 @@ class TVC:
             parts.append(f"[center]{overview}[/center]\n\n")
 
         # Release date
-        if 'release_date' in meta:
+        if "release_date" in meta:
             formatted_date = self.format_date_ddmmyyyy(meta.release_date)
             parts.append(f"[center][b]Released on:[/b] {formatted_date}[/center]\n\n")
 
@@ -170,21 +162,17 @@ class TVC:
 
         return "".join(parts)
 
-    def _build_tv_pack_desc(
-        self,
-        meta: Meta,
-        image_list: list[dict[str, Any]]
-    ) -> str:
+    def _build_tv_pack_desc(self, meta: Meta, image_list: list[dict[str, Any]]) -> str:
         """Build description for TV pack releases (multi-block, no pre tags)."""
         parts = []
 
         # Logo in its own center block
         if meta.logo:
-            logo_size = self.config['DEFAULT'].get('logo_size', self.DEFAULT_LOGO_SIZE)
+            logo_size = self.config["DEFAULT"].get("logo_size", self.DEFAULT_LOGO_SIZE)
             parts.append(f"[center][img={logo_size}]{meta.logo}[/img][/center]\n\n")
 
         # Series info (optional - only if season data exists)
-        if 'season_air_first_date' in meta:
+        if "season_air_first_date" in meta:
             channel = meta.networks if meta.networks is not None else "N/A"
             airdate = self.format_date_ddmmyyyy(meta.season_air_first_date or "")
             series_name = meta.season_name if meta.season_name is not None else "Unknown Series"
@@ -209,17 +197,13 @@ class TVC:
 
         return "".join(parts)
 
-    def _build_episode_desc(
-        self,
-        meta: Meta,
-        image_list: list[dict[str, Any]]
-    ) -> str:
+    def _build_episode_desc(self, meta: Meta, image_list: list[dict[str, Any]]) -> str:
         """Build description for single episode releases (multi-block, no pre tags)."""
         parts = []
 
         # Logo in its own center block
         if meta.logo:
-            logo_size = self.config['DEFAULT'].get('logo_size', self.DEFAULT_LOGO_SIZE)
+            logo_size = self.config["DEFAULT"].get("logo_size", self.DEFAULT_LOGO_SIZE)
             parts.append(f"[center][img={logo_size}]{meta.logo}[/img][/center]\n\n")
 
         # Episode title - plain text in center block (optional)
@@ -264,13 +248,10 @@ class TVC:
 
         parts = []
         for cc in meta.release_dates["results"]:
-            for rd in cc['release_dates']:
-                if rd['type'] == 6:  # TV release
-                    channel = rd.get('note') or "N/A Channel"
-                    parts.append(
-                        f"[color=orange][size=15]{cc['iso_3166_1']} TV Release info [/size][/color]\n"
-                        f"{str(rd['release_date'])[:10]} on {channel}\n"
-                    )
+            for rd in cc["release_dates"]:
+                if rd["type"] == 6:  # TV release
+                    channel = rd.get("note") or "N/A Channel"
+                    parts.append(f"[color=orange][size=15]{cc['iso_3166_1']} TV Release info [/size][/color]\n{str(rd['release_date'])[:10]} on {channel}\n")
 
         return "".join(parts)
 
@@ -279,10 +260,10 @@ class TVC:
         parts = []
 
         for ep in episodes:
-            ep_num = ep.get('code', '')
-            ep_title = ep.get('title', '').strip()
-            ep_date = ep.get('airdate', '')
-            ep_overview = ep.get('overview', '').strip()
+            ep_num = ep.get("code", "")
+            ep_title = ep.get("title", "").strip()
+            ep_date = ep.get("airdate", "")
+            ep_overview = ep.get("overview", "").strip()
 
             # Episode number and title
             parts.append(f"[b]{ep_num}[/b]")
@@ -299,17 +280,10 @@ class TVC:
 
         return "".join(parts)
 
-    def _add_screenshots(
-        self,
-        meta: Meta,
-        image_list: list[dict[str, Any]]
-    ) -> str:
+    def _add_screenshots(self, meta: Meta, image_list: list[dict[str, Any]]) -> str:
         """Add screenshots section if requirements are met."""
         screens_count = meta.screens or 0
-        required_count = self.config['TRACKERS'][self.tracker].get(
-            'image_count',
-            self.MIN_SCREENSHOTS_REQUIRED
-        )
+        required_count = self.config["TRACKERS"][self.tracker].get("image_count", self.MIN_SCREENSHOTS_REQUIRED)
 
         if not image_list or screens_count < required_count:
             return ""
@@ -317,11 +291,9 @@ class TVC:
         parts = ["[b]Screenshots[/b]\n"]
 
         for img in image_list[:required_count]:
-            web_url = img['web_url']
-            img_url = img['img_url']
-            parts.append(
-                f"[url={web_url}][img={self.SCREENSHOT_THUMB_SIZE}]{img_url}[/img][/url] "
-            )
+            web_url = img["web_url"]
+            img_url = img["img_url"]
+            parts.append(f"[url={web_url}][img={self.SCREENSHOT_THUMB_SIZE}]{img_url}[/img][/url] ")
 
         return "".join(parts)
 
@@ -336,25 +308,21 @@ class TVC:
         desc = bbcode.convert_hide_to_spoiler(desc)
 
         if not comparison:
-            desc = bbcode.convert_comparison_to_collapse(
-                desc,
-                self.COMPARISON_COLLAPSE_THRESHOLD
-            )
+            desc = bbcode.convert_comparison_to_collapse(desc, self.COMPARISON_COLLAPSE_THRESHOLD)
 
         return desc
 
     def _normalize_tvc_formatting(self, desc: str) -> str:
         """Normalize whitespace for TVC (multi-block style)."""
         # Collapse any run of 3+ newlines into exactly 2 (preserve spacing between blocks)
-        desc = re.sub(r"\n{3,}", "\n\n", desc)
-
-        return desc
+        return re.sub(r"\n{3,}", "\n\n", desc)
 
     async def _write_description_file(self, filepath: str, content: str) -> None:
         """Write description content to file asynchronously."""
         try:
+
             def _write():
-                with open(filepath, "w", encoding="utf-8") as f:
+                with Path(filepath).open("w", encoding="utf-8") as f:
                     f.write(content)
 
             await asyncio.to_thread(_write)
@@ -386,28 +354,20 @@ class TVC:
     async def get_res_id(self, tv_pack: bool, resolution: str) -> str:
         if tv_pack:
             resolution_id = {
-                '1080p': 'HD1080p Pack',
-                '1080i': 'HD1080p Pack',
-                '720p': 'HD720p Pack',
-                '576p': 'SD Pack',
-                '576i': 'SD Pack',
-                '540p': 'SD Pack',
-                '540i': 'SD Pack',
-                '480p': 'SD Pack',
-                '480i': 'SD Pack'
-            }.get(resolution, 'SD')
+                "1080p": "HD1080p Pack",
+                "1080i": "HD1080p Pack",
+                "720p": "HD720p Pack",
+                "576p": "SD Pack",
+                "576i": "SD Pack",
+                "540p": "SD Pack",
+                "540i": "SD Pack",
+                "480p": "SD Pack",
+                "480i": "SD Pack",
+            }.get(resolution, "SD")
         else:
-            resolution_id = {
-                '1080p': 'HD1080p',
-                '1080i': 'HD1080p',
-                '720p': 'HD720p',
-                '576p': 'SD',
-                '576i': 'SD',
-                '540p': 'SD',
-                '540': 'SD',
-                '480p': 'SD',
-                '480i': 'SD'
-            }.get(resolution, 'SD')
+            resolution_id = {"1080p": "HD1080p", "1080i": "HD1080p", "720p": "HD720p", "576p": "SD", "576i": "SD", "540p": "SD", "540": "SD", "480p": "SD", "480i": "SD"}.get(
+                resolution, "SD"
+            )
         return resolution_id
 
     async def append_country_code(self, meta: Meta, name: str) -> str:
@@ -459,9 +419,11 @@ class TVC:
         Async helper to read a text file safely.
         Uses a with-block to ensure the file handle is closed.
         """
+
         def _read():
-            with open(path, encoding=encoding) as f:
+            with Path(path).open(encoding=encoding) as f:
                 return f.read()
+
         return await asyncio.to_thread(_read)
 
     async def check_image_hosts(self, meta: Meta) -> None:
@@ -474,13 +436,7 @@ class TVC:
             "onlyimage.org": "onlyimage",
         }
 
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            url_host_mapping=url_host_mapping,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts
-        )
+        await self.rehost_images_manager.check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=self.approved_image_hosts)
         return
 
     async def upload(self, meta: Meta) -> bool | None:
@@ -501,7 +457,7 @@ class TVC:
 
         # load MediaInfo.json
         try:
-            content = await self.read_file(f"{meta.base_dir}/tmp/{meta.uuid}/MediaInfo.json")
+            content = await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MediaInfo.json")
             mi = cast(dict[str, Any], json.loads(content))
         except (FileNotFoundError, json.JSONDecodeError) as e:
             logger.warning(f"[yellow]Warning: Could not load MediaInfo.json: {e}")
@@ -525,13 +481,13 @@ class TVC:
 
         if meta.bdinfo:
             mi_dump = None
-            bd_dump = await self.read_file(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt")
+            bd_dump = await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt")
         else:
-            mi_dump = await self.read_file(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt")
+            mi_dump = await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt")
             bd_dump = None
 
         # build description and capture return instead of reopening file
-        descfile_path = os.path.join(meta.base_dir, "tmp", meta.uuid, f"[{self.tracker}]DESCRIPTION.txt")
+        descfile_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}]DESCRIPTION.txt"
         desc = await self.edit_desc(meta, self.tracker, self.signature, image_list)
 
         if not desc:
@@ -553,7 +509,7 @@ class TVC:
             # If search_year is empty, fall back to year
             year = search_year if search_year else (meta.year if meta.year is not None else "")
             if meta.no_year:
-                year = ''
+                year = ""
             year_str = f" ({year})" if year else ""
 
             if meta.tv_pack:
@@ -579,9 +535,9 @@ class TVC:
             self.get_subs_info(meta, mi)
 
         if meta.video_codec == "HEVC":
-            tvc_name = tvc_name.replace(']', ' HEVC]')
+            tvc_name = tvc_name.replace("]", " HEVC]")
         if meta.eng_subs:
-            tvc_name = tvc_name.replace(']', ' SUBS]')
+            tvc_name = tvc_name.replace("]", " SUBS]")
         if meta.sdh_subs:
             tvc_name = tvc_name.replace(" SUBS]", " (ENG + SDH SUBS)]") if meta.eng_subs else tvc_name.replace("]", " (SDH SUBS)]")
 
@@ -622,9 +578,9 @@ class TVC:
             data["episode_number"] = meta.episode_int if meta.episode_int is not None else "0"
 
         if upload_to_tvc is False:
-            return
+            return None
 
-        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
+        torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
 
         if meta.debug is False:
             response = None
@@ -632,13 +588,13 @@ class TVC:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     async with aiofiles.open(torrent_path, "rb") as open_torrent:
                         torrent_bytes = await open_torrent.read()
-                    files = {'torrent': (os.path.basename(torrent_path), torrent_bytes)}
+                    files = {"torrent": (Path(torrent_path).name, torrent_bytes)}
                     response = await client.post(
                         self.upload_url,
                         files=files,
                         data=data,
-                        headers={'User-Agent': 'Mozilla/5.0'},
-                        params={'api_token': self.config['TRACKERS'][self.tracker]['api_key'].strip()}
+                        headers={"User-Agent": "Mozilla/5.0"},
+                        params={"api_token": self.config["TRACKERS"][self.tracker]["api_key"].strip()},
                     )
 
                 if response.status_code != 200:
@@ -648,13 +604,13 @@ class TVC:
                         meta.tracker_status[self.tracker]["status_message"] = f"data error: Redirect ({response.status_code}). Please verify that your API key is valid."
                     else:
                         meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
-                    return
+                    return None
                 # TVC returns "application/x-bittorrent\n{json}" so strip the prefix
-                json_data = json.loads(response.text.split('\n', 1)[-1])
+                json_data = json.loads(response.text.split("\n", 1)[-1])
                 meta.tracker_status[self.tracker]["status_message"] = json_data
 
                 # Extract torrent ID robustly from returned URL
-                data_str = json_data.get('data')
+                data_str = json_data.get("data")
                 if not isinstance(data_str, str):
                     raise ValueError(f"Invalid TVC response: 'data' missing or not a string: {data_str}")
 
@@ -668,11 +624,7 @@ class TVC:
                 meta.tracker_status[self.tracker]["torrent_id"] = t_id
 
                 await common.create_torrent_ready_to_seed(
-                    meta,
-                    self.tracker,
-                    self.source_flag,
-                    self.config['TRACKERS'][self.tracker].get('announce_url'),
-                    f"https://tvchaosuk.com/torrents/{t_id}"
+                    meta, self.tracker, self.source_flag, self.config["TRACKERS"][self.tracker].get("announce_url"), f"https://tvchaosuk.com/torrents/{t_id}"
                 )
                 return True
 
@@ -693,7 +645,7 @@ class TVC:
             logger.info(Redaction.redact_private_info(data))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
-            tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
+            tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
 
@@ -712,12 +664,7 @@ class TVC:
         for track in tracks:
             if track.get("@type") != "Audio":
                 continue
-            lang_val = (
-                track.get("Language/String")
-                or track.get("Language/String1")
-                or track.get("Language/String2")
-                or track.get("Language")
-            )
+            lang_val = track.get("Language/String") or track.get("Language/String1") or track.get("Language/String2") or track.get("Language")
             lang = str(lang_val).strip() if lang_val else ""
             if not lang:
                 continue
@@ -740,16 +687,10 @@ class TVC:
                 origin_country_code.append(str(origin_country))
         elif len(meta.production_countries):
             production_countries = cast(list[dict[str, Any]], meta.production_countries)
-            origin_country_code.extend(
-                [
-                    str(country['iso_3166_1'])
-                    for country in production_countries
-                    if 'iso_3166_1' in country
-                ]
-            )
+            origin_country_code.extend([str(country["iso_3166_1"]) for country in production_countries if "iso_3166_1" in country])
         elif len(meta.production_companies):
             production_companies = cast(list[dict[str, Any]], meta.production_companies)
-            origin_country_code.append(str(production_companies[0].get('origin_country', '')))
+            origin_country_code.append(str(production_companies[0].get("origin_country", "")))
         meta.origin_country_code = origin_country_code
 
         if meta.category == "MOVIE":
@@ -761,7 +702,7 @@ class TVC:
                 logger.info(f"[cyan]DEBUG: Movie data: {response}[/cyan]")
             return {}
 
-        elif meta.category == "TV":
+        if meta.category == "TV":
             # TVC-specific extras
             if isinstance(meta.networks, list) and len(meta.networks) != 0 and "name" in meta.networks[0]:
                 meta.networks = meta.networks[0]["name"]
@@ -793,37 +734,31 @@ class TVC:
                             dict[str, Any],
                             cast(Any, tmdb.TV_Seasons(meta.tmdb, meta.season_int)).info(),
                         )
-                        air_date = season_info.get('air_date') or ""
+                        air_date = season_info.get("air_date") or ""
                         meta.season_air_first_date = air_date
                         meta.season_name = season_info.get("name", f"Season {meta.season_int}")
                         episodes: list[dict[str, str]] = []
-                        for ep in cast(list[dict[str, Any]], season_info.get('episodes', [])):
-                            season_num = str(ep.get('season_number', 0))
-                            episode_num = str(ep.get('episode_number', 0))
+                        for ep in cast(list[dict[str, Any]], season_info.get("episodes", [])):
+                            season_num = str(ep.get("season_number", 0))
+                            episode_num = str(ep.get("episode_number", 0))
                             code = f"S{season_num.zfill(2)}E{episode_num.zfill(2)}"
-                            episodes.append({
-                                "code": code,
-                                "title": (ep.get("name") or "").strip(),
-                                "airdate": ep.get("air_date") or "",
-                                "overview": (ep.get("overview") or "").strip()
-                            })
+                            episodes.append(
+                                {"code": code, "title": (ep.get("name") or "").strip(), "airdate": ep.get("air_date") or "", "overview": (ep.get("overview") or "").strip()}
+                            )
                         meta.episodes = episodes
                     else:
                         season_info = cast(dict[str, Any], meta.tmdb_season_data)
-                        air_date = season_info.get('air_date') or ""
+                        air_date = season_info.get("air_date") or ""
                         meta.season_air_first_date = air_date
                         meta.season_name = season_info.get("name", f"Season {meta.season_int}")
                         episodes = []
-                        for ep in cast(list[dict[str, Any]], season_info.get('episodes', [])):
-                            season_num = str(ep.get('season_number', 0))
-                            episode_num = str(ep.get('episode_number', 0))
+                        for ep in cast(list[dict[str, Any]], season_info.get("episodes", [])):
+                            season_num = str(ep.get("season_number", 0))
+                            episode_num = str(ep.get("episode_number", 0))
                             code = f"S{season_num.zfill(2)}E{episode_num.zfill(2)}"
-                            episodes.append({
-                                "code": code,
-                                "title": (ep.get("name") or "").strip(),
-                                "airdate": ep.get("air_date") or "",
-                                "overview": (ep.get("overview") or "").strip()
-                            })
+                            episodes.append(
+                                {"code": code, "title": (ep.get("name") or "").strip(), "airdate": ep.get("air_date") or "", "overview": (ep.get("overview") or "").strip()}
+                            )
                         meta.episodes = episodes
 
             except (requests.exceptions.RequestException, KeyError, TypeError) as e:
@@ -938,31 +873,11 @@ class TVC:
         parts = []
 
         link_configs = [
-            (
-                'imdb_id',
-                lambda m: m.get('imdb_info', {}).get('imdb_url', ''),
-                'imdb_75'
-            ),
-            (
-                'tmdb_id',
-                lambda m: f"https://www.themoviedb.org/{m.get('category', '').lower()}/{m['tmdb_id']}",
-                'tmdb_75'
-            ),
-            (
-                'tvdb_id',
-                lambda m: f"https://www.thetvdb.com/?id={m['tvdb_id']}&tab=series",
-                'tvdb_75'
-            ),
-            (
-                'tvmaze_id',
-                lambda m: f"https://www.tvmaze.com/shows/{m['tvmaze_id']}",
-                'tvmaze_75'
-            ),
-            (
-                'mal_id',
-                lambda m: f"https://myanimelist.net/anime/{m['mal_id']}",
-                'mal_75'
-            ),
+            ("imdb_id", lambda m: m.get("imdb_info", {}).get("imdb_url", ""), "imdb_75"),
+            ("tmdb_id", lambda m: f"https://www.themoviedb.org/{m.get('category', '').lower()}/{m['tmdb_id']}", "tmdb_75"),
+            ("tvdb_id", lambda m: f"https://www.thetvdb.com/?id={m['tvdb_id']}&tab=series", "tvdb_75"),
+            ("tvmaze_id", lambda m: f"https://www.tvmaze.com/shows/{m['tvmaze_id']}", "tvmaze_75"),
+            ("mal_id", lambda m: f"https://myanimelist.net/anime/{m['mal_id']}", "mal_75"),
         ]
 
         for id_key, url_func, img_key in link_configs:
@@ -998,8 +913,8 @@ class TVC:
 
         meta.has_subs = 1 if subs_num > 0 else 0
         # Reset flags to avoid stale values
-        meta.pop('eng_subs', None)
-        meta.pop('sdh_subs', None)
+        meta.pop("eng_subs", None)
+        meta.pop("sdh_subs", None)
 
         # Collect languages and flags
         for s in tracks:

@@ -1,5 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 """Extractors for book and audiobook files metadata."""
+
 from __future__ import annotations
 
 import contextlib
@@ -8,6 +9,7 @@ import re
 import shutil
 import xml.etree.ElementTree as ET
 import zipfile
+from pathlib import Path
 from typing import Any
 
 from src.console import logger
@@ -230,13 +232,13 @@ def extract_mobi_metadata(mobi_path: str) -> dict[str, Any]:
         for root, _, files in os.walk(tempdir):
             for file in files:
                 if file.endswith(".opf"):
-                    opf_path = os.path.join(root, file)
+                    opf_path = Path(root) / file
                     break
             if opf_path:
                 break
 
         if opf_path and os.path.isfile(opf_path):
-            with open(opf_path, "rb") as f:
+            with Path(opf_path).open("rb") as f:
                 opf_data = f.read()
 
             try:
@@ -305,7 +307,7 @@ def extract_mobi_metadata(mobi_path: str) -> dict[str, Any]:
     except Exception as e:
         logger.debug(f"[yellow]Warning: Error parsing MOBI metadata: {e}[/yellow]")
     finally:
-        if tempdir and os.path.exists(tempdir):
+        if tempdir and Path(tempdir).exists():
             with contextlib.suppress(Exception):
                 shutil.rmtree(tempdir)
 
@@ -372,11 +374,7 @@ def extract_isbn_from_pdf(pdf_path: str) -> str | None:
                     continue
 
                 # Find ISBN candidates
-                candidates = re.findall(
-                    r"\b(?:ISBN(?:-1[03])?:?\s*)?((?:97[89][- ]?)?\d(?:[- ]?\d){8,11}[- ]?[\dX])\b",
-                    text,
-                    re.IGNORECASE
-                )
+                candidates = re.findall(r"\b(?:ISBN(?:-1[03])?:?\s*)?((?:97[89][- ]?)?\d(?:[- ]?\d){8,11}[- ]?[\dX])\b", text, re.IGNORECASE)
                 for cand in candidates:
                     validated = validate_isbn_checksum(cand)
                     if validated:

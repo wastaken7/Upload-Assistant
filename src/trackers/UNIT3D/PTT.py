@@ -11,7 +11,7 @@ Config = dict[str, Any]
 class PTT(UNIT3D):
     tracker = "PTT"
     base_url = "https://polishtorrent.top"
-    banned_groups = ["ViP", "BiRD", "M@RTiNU$", "inTGrity", "CiNEMAET", "MusicET", "TeamET", "R2D2"]
+    banned_groups = ("ViP", "BiRD", "M@RTiNU$", "inTGrity", "CiNEMAET", "MusicET", "TeamET", "R2D2")
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
@@ -19,7 +19,7 @@ class PTT(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='PTT')
+        super().__init__(config, tracker_name="PTT")
         self.config: Config = config
         self.common = COMMON(config)
 
@@ -29,4 +29,4 @@ class PTT(UNIT3D):
         if meta.original_language == "pl" and imdb_info:
             ptt_name = ptt_name.replace(meta.aka, "")
             ptt_name = ptt_name.replace(meta.title, str(imdb_info.get("aka", "")))
-        return {'name': ptt_name.strip()}
+        return {"name": ptt_name.strip()}

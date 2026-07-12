@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import re
+from pathlib import Path
 from typing import Any, cast
 
 from src.console import logger
@@ -14,37 +14,25 @@ Config = dict[str, Any]
 class PT(UNIT3D):
     tracker = "PT"
     base_url = "https://portugas.org"
-    banned_groups = []
+    banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://portugas.org']
+    tracker_urls = ("https://portugas.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='PT')
+        super().__init__(config, tracker_name="PT")
         self.config: Config = config
         self.common = COMMON(config)
 
-    async def get_type_id(
-        self,
-        meta: Meta,
-        type: str | None = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
         type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "39", "HDTV": "6", "ENCODE": "3"}.get(str(meta.type), "0")
-        return {'type_id': type_id}
+        return {"type_id": type_id}
 
-    async def get_resolution_id(
-        self,
-        meta: Meta,
-        resolution: str | None = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
+    async def get_resolution_id(self, meta: Meta, resolution: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = (resolution, reverse, mapping_only)
         resolution_id = {
             "4320p": "1",
@@ -59,7 +47,7 @@ class PT(UNIT3D):
             "480p": "8",
             "480i": "9",
         }.get(meta.resolution, "10")
-        return {'resolution_id': resolution_id}
+        return {"resolution_id": resolution_id}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         name = meta.name.replace(" ", ".")
@@ -74,7 +62,7 @@ class PT(UNIT3D):
                 pt_name = re.sub(f"-{invalid_tag}", "", pt_name, flags=re.IGNORECASE)
             pt_name = f"{pt_name}-NOGROUP"
 
-        return {'name': pt_name}
+        return {"name": pt_name}
 
     def get_audio(self, meta: Meta) -> int:
         found_portuguese_audio = False
@@ -94,23 +82,23 @@ class PT(UNIT3D):
         if needs_mediainfo_check:
             base_dir = meta.base_dir if meta.base_dir is not None else "."
             uuid = meta.uuid if meta.uuid is not None else "default_uuid"
-            media_info_path = os.path.join(base_dir, 'tmp', uuid, 'MEDIAINFO.txt')
+            media_info_path = Path(base_dir) / "tmp" / uuid / "MEDIAINFO.txt"
 
             try:
-                if os.path.exists(media_info_path):
-                    with open(media_info_path, encoding='utf-8') as f:
+                if Path(media_info_path).exists():
+                    with Path(media_info_path).open(encoding="utf-8") as f:
                         media_info_text = f.read()
 
                     if not found_portuguese_audio:
-                        audio_sections = re.findall(r'Audio(?: #\d+)?\s*\n(.*?)(?=\n\n(?:Audio|Video|Text|Menu)|$)', media_info_text, re.DOTALL | re.IGNORECASE)
+                        audio_sections = re.findall(r"Audio(?: #\d+)?\s*\n(.*?)(?=\n\n(?:Audio|Video|Text|Menu)|$)", media_info_text, re.DOTALL | re.IGNORECASE)
                         for section in audio_sections:
-                            language_match = re.search(r'Language\s*:\s*(.+)', section, re.IGNORECASE)
-                            title_match = re.search(r'Title\s*:\s*(.+)', section, re.IGNORECASE)
+                            language_match = re.search(r"Language\s*:\s*(.+)", section, re.IGNORECASE)
+                            title_match = re.search(r"Title\s*:\s*(.+)", section, re.IGNORECASE)
 
                             lang_raw = language_match.group(1).strip() if language_match else ""
                             title_raw = title_match.group(1).strip() if title_match else ""
 
-                            text = f'{lang_raw} {title_raw}'.lower()
+                            text = f"{lang_raw} {title_raw}".lower()
 
                             if "portuguese" in text and not any(keyword in text for keyword in ["(br)", "brazilian"]):
                                 found_portuguese_audio = True
@@ -141,26 +129,26 @@ class PT(UNIT3D):
         if needs_mediainfo_check:
             base_dir = meta.base_dir if meta.base_dir is not None else "."
             uuid = meta.uuid if meta.uuid is not None else "default_uuid"
-            media_info_path = os.path.join(base_dir, 'tmp', uuid, 'MEDIAINFO.txt')
+            media_info_path = Path(base_dir) / "tmp" / uuid / "MEDIAINFO.txt"
 
             try:
-                if os.path.exists(media_info_path):
-                    with open(media_info_path, encoding='utf-8') as f:
+                if Path(media_info_path).exists():
+                    with Path(media_info_path).open(encoding="utf-8") as f:
                         media_info_text = f.read()
 
                     if not found_portuguese_subtitle:
-                        text_sections = re.findall(r'Text(?: #\d+)?\s*\n(.*?)(?=\n\n(?:Audio|Video|Text|Menu)|$)', media_info_text, re.DOTALL | re.IGNORECASE)
+                        text_sections = re.findall(r"Text(?: #\d+)?\s*\n(.*?)(?=\n\n(?:Audio|Video|Text|Menu)|$)", media_info_text, re.DOTALL | re.IGNORECASE)
                         if not text_sections:
-                            text_sections = re.findall(r'Subtitle(?: #\d+)?\s*\n(.*?)(?=\n\n(?:Audio|Video|Text|Menu)|$)', media_info_text, re.DOTALL | re.IGNORECASE)
+                            text_sections = re.findall(r"Subtitle(?: #\d+)?\s*\n(.*?)(?=\n\n(?:Audio|Video|Text|Menu)|$)", media_info_text, re.DOTALL | re.IGNORECASE)
 
                         for section in text_sections:
-                            language_match = re.search(r'Language\s*:\s*(.+)', section, re.IGNORECASE)
-                            title_match = re.search(r'Title\s*:\s*(.+)', section, re.IGNORECASE)
+                            language_match = re.search(r"Language\s*:\s*(.+)", section, re.IGNORECASE)
+                            title_match = re.search(r"Title\s*:\s*(.+)", section, re.IGNORECASE)
 
                             lang_raw = language_match.group(1).strip() if language_match else ""
                             title_raw = title_match.group(1).strip() if title_match else ""
 
-                            text = f'{lang_raw} {title_raw}'.lower()
+                            text = f"{lang_raw} {title_raw}".lower()
 
                             if "portuguese" in text and not any(keyword in text for keyword in ["(br)", "brazilian"]):
                                 found_portuguese_subtitle = True
@@ -185,8 +173,8 @@ class PT(UNIT3D):
         subtitle_flag = self.get_subtitles(meta)
 
         data: dict[str, str] = {
-            'audio_pt': str(audio_flag),
-            'legenda_pt': str(subtitle_flag),
+            "audio_pt": str(audio_flag),
+            "legenda_pt": str(subtitle_flag),
         }
 
         return data

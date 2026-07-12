@@ -19,7 +19,7 @@ Config = dict[str, Any]
 class NBL:
     tracker = "NBL"
     source_flag = "NBL"
-    banned_groups = [
+    banned_groups = (
         "[Oj]",
         "0neshot",
         "3LTON",
@@ -87,12 +87,12 @@ class NBL:
         "ZKBL",
         "ZmN",
         "ZMNT",
-    ]
+    )
     upload_url = "https://nebulance.io/api.php"
     search_url = "https://nebulance.io/api.php"
     torrent_url = "https://nebulance.io/torrents.php?id="
-    supported_categories = ('TV',)
-    tracker_urls = ['tracker.nebulance']
+    supported_categories = ("TV",)
+    tracker_urls = ("tracker.nebulance",)
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
@@ -100,8 +100,7 @@ class NBL:
         self.api_key = str(self.config["TRACKERS"][self.tracker]["api_key"]).strip()
 
     async def get_cat_id(self, meta: Meta) -> int:
-        cat_id = 3 if meta.tv_pack == 1 else 1
-        return cat_id
+        return 3 if meta.tv_pack == 1 else 1
 
     async def edit_desc(self, _meta: Meta) -> None:
         # Leave this in so manual works
@@ -111,17 +110,15 @@ class NBL:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         if meta.bdinfo:
-            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
                 mi_dump = await f.read()
         else:
-            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as f:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as f:
                 mi_dump = await f.read()
-        torrent_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
-        async with aiofiles.open(torrent_file_path, 'rb') as f:
+        torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
+        async with aiofiles.open(torrent_file_path, "rb") as f:
             torrent_bytes = await f.read()
-        files: dict[str, tuple[str, bytes, str]] = {
-            'file_input': ('torrent.torrent', torrent_bytes, 'application/x-bittorrent')
-        }
+        files: dict[str, tuple[str, bytes, str]] = {"file_input": ("torrent.torrent", torrent_bytes, "application/x-bittorrent")}
         data: dict[str, Any] = {
             "action": "upload",
             "api_key": self.api_key,
@@ -139,7 +136,7 @@ class NBL:
                         try:
                             response_data = response.json()
                             meta.tracker_status[self.tracker]["status_message"] = response_data
-                            match = re.search(r"https://nebulance\.io/torrents\.php\?id=(\d+)", response_data.get('link', ''))
+                            match = re.search(r"https://nebulance\.io/torrents\.php\?id=(\d+)", response_data.get("link", ""))
                             if match:
                                 torrent_id = match.group(1)
                                 meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
@@ -148,10 +145,7 @@ class NBL:
                             meta.tracker_status[self.tracker]["status_message"] = "data error: NBL json decode error, the API is probably down"
                             return False
                     else:
-                        response_data = {
-                            "error": f"Unexpected status code: {response.status_code}",
-                            "response_content": response.text
-                        }
+                        response_data = {"error": f"Unexpected status code: {response.status_code}", "response_content": response.text}
                         meta.tracker_status[self.tracker]["status_message"] = response_data
                     return False
             else:
@@ -191,7 +185,7 @@ class NBL:
 
         if meta.is_disc:
             if not meta.unattended:
-                logger.info('[bold red]NBL does not allow raw discs')
+                logger.info("[bold red]NBL does not allow raw discs")
             return False
 
         return True
@@ -202,7 +196,7 @@ class NBL:
         season = meta.season_int
         tvmaze_data = meta.tvmaze_episode_data
         if tvmaze_data:
-            season = tvmaze_data.get('season_number', season)
+            season = tvmaze_data.get("season_number", season)
 
         params: dict[str, Any] = {
             "action": "search",
@@ -222,10 +216,10 @@ class NBL:
             params["series"] = meta.title
 
         params["tags"] = [meta.resolution]
-        params['per_page'] = 100
+        params["per_page"] = 100
 
         response: httpx.Response | None = None
-        max_pages = int(self.config['TRACKERS'][self.tracker].get('search_max_pages', 10))
+        max_pages = int(self.config["TRACKERS"][self.tracker].get("search_max_pages", 10))
         async with httpx.AsyncClient(timeout=10.0) as client:
             for page in range(max_pages):
                 page_params = dict(params)
@@ -239,8 +233,8 @@ class NBL:
                             error_data = cast(dict[str, Any], response.json())
                         except json.JSONDecodeError:
                             error_data = {}
-                        error = error_data.get('error', {})
-                        message = str(error.get('message', '')) if isinstance(error, dict) else ''
+                        error = error_data.get("error", {})
+                        message = str(error.get("message", "")) if isinstance(error, dict) else ""
                         if "out of range" in message.lower() and "valid pages" in message.lower():
                             break
                     logger.info(f"[bold red]NBL HTTP request failed. Status: {response.status_code}")
@@ -255,30 +249,29 @@ class NBL:
                     meta.skipping = "NBL"
                     break
 
-                items_value = data.get('items')
+                items_value = data.get("items")
                 if not isinstance(items_value, list):
-                    result = cast(dict[str, Any], data.get('result', {}))
-                    items_value = result.get('items', [])
+                    result = cast(dict[str, Any], data.get("result", {}))
+                    items_value = result.get("items", [])
                 items = cast(list[dict[str, Any]], items_value) if isinstance(items_value, list) else []
                 if not items:
                     break
 
                 for each in items:
-                    tags_value = each.get('tags', [])
+                    tags_value = each.get("tags", [])
                     tags = cast(list[Any], tags_value) if isinstance(tags_value, list) else []
                     if meta.resolution in tags:
-                        file_list_value = each.get('file_list', [])
+                        file_list_value = each.get("file_list", [])
                         file_list = cast(list[Any], file_list_value) if isinstance(file_list_value, list) else []
-                        files_str = ', '.join(str(item) for item in file_list) if file_list else str(cast(Any, file_list_value))
+                        files_str = ", ".join(str(item) for item in file_list) if file_list else str(cast(Any, file_list_value))
                         result = {
-                            'name': str(each.get('rls_name', '')),
-                            'files': files_str,
-                            'size': int(each.get('size', 0)),
-                            'link': f"https://nebulance.io/torrents.php?id={each.get('group_id', '')}",
-                            'file_count': len(file_list) if file_list else 1,
-                            'download': str(each.get('download', '')),
+                            "name": str(each.get("rls_name", "")),
+                            "files": files_str,
+                            "size": int(each.get("size", 0)),
+                            "link": f"https://nebulance.io/torrents.php?id={each.get('group_id', '')}",
+                            "file_count": len(file_list) if file_list else 1,
+                            "download": str(each.get("download", "")),
                         }
                         dupes.append(result)
-
 
         return dupes

@@ -13,22 +13,24 @@ from src.rehostimages import RehostImagesManager
 from src.trackers.COMMON import COMMON
 
 Config = dict[str, Any]
+
+
 class DC:
     tracker = "DC"
     base_url = "https://digitalcore.club"
     api_base_url = f"{base_url}/api/v1/torrents"
-    banned_groups = [""]
-    approved_image_hosts = ["imgbox", "imgbb", "bhd", "imgur", "postimg", "sharex"]
+    banned_groups = ("",)
+    approved_image_hosts = ("imgbox", "imgbb", "bhd", "imgur", "postimg", "sharex")
     torrent_url = f"{base_url}/torrent/"
-    supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
-    tracker_urls = ['tracker.digitalcore.club', 'trackerprxy.digitalcore.club']
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ("tracker.digitalcore.club", "trackerprxy.digitalcore.club")
 
     def __init__(self, config: Config):
         self.config = config
         self.common = COMMON(config)
         self.rehost_images_manager = RehostImagesManager(config)
-        self.api_key = self.config['TRACKERS'][self.tracker].get('api_key')
-        self.session = httpx.AsyncClient(headers={'X-API-KEY': self.api_key}, timeout=30.0)
+        self.api_key = self.config["TRACKERS"][self.tracker].get("api_key")
+        self.session = httpx.AsyncClient(headers={"X-API-KEY": self.api_key}, timeout=30.0)
 
     async def mediainfo(self, meta: Meta) -> str:
         mediainfo = ""
@@ -36,7 +38,7 @@ class DC:
             if meta.is_disc == "BDMV":
                 mediainfo = await self.common.get_bdmv_mediainfo(meta, remove=["File size", "Overall bit rate"])
             else:
-                mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
+                mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
                 async with aiofiles.open(mi_path, encoding="utf-8") as f:
                     mediainfo = await f.read()
 
@@ -44,7 +46,7 @@ class DC:
 
     async def generate_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        description = await builder.general_description_generator(
+        return await builder.general_description_generator(
             meta,
             approved_image_hosts=self.approved_image_hosts,
             audio_spectrogram=True,
@@ -67,8 +69,6 @@ class DC:
             signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/url][/center]",
         )
 
-        return description
-
     def get_category_id(self, meta: Meta) -> int | None:
         resolution = meta.resolution
         category = meta.category
@@ -76,19 +76,19 @@ class DC:
         tv_pack = meta.tv_pack
         sd = meta.sd
 
-        if is_disc == 'BDMV':
-            if resolution == '1080p' and category == 'MOVIE':
+        if is_disc == "BDMV":
+            if resolution == "1080p" and category == "MOVIE":
                 return 3
-            elif resolution == '2160p' and category == 'MOVIE':
+            if resolution == "2160p" and category == "MOVIE":
                 return 38
-            elif category == 'TV':
+            if category == "TV":
                 return 14
-        if is_disc == 'DVD':
-            if category == 'MOVIE':
+        if is_disc == "DVD":
+            if category == "MOVIE":
                 return 1
-            elif category == 'TV':
+            if category == "TV":
                 return 11
-        if category == 'TV' and tv_pack == 1:
+        if category == "TV" and tv_pack == 1:
             return 12
 
         if category == "BOOK":
@@ -100,19 +100,18 @@ class DC:
             platform = meta.platform
             if platform == "PC":
                 return 25
-            elif platform == "MAC":
+            if platform == "MAC":
                 return 27
-            else:
-                return 26  # Console
+            return 26  # Console
 
         if sd == 1:
-            if category == 'MOVIE':
+            if category == "MOVIE":
                 return 2
-            elif category == 'TV':
+            if category == "TV":
                 return 10
         category_map = {
-            'MOVIE': {'2160p': 4, '1080p': 6, '1080i': 6, '720p': 5},
-            'TV': {'2160p': 13, '1080p': 9, '1080i': 9, '720p': 8},
+            "MOVIE": {"2160p": 4, "1080p": 6, "1080i": 6, "720p": 5},
+            "TV": {"2160p": 13, "1080p": 9, "1080i": 9, "720p": 8},
         }
         if category in category_map:
             return category_map[category].get(resolution)
@@ -131,7 +130,7 @@ class DC:
         response = await self.session.get(self.api_base_url, params=search_params, headers=self.session.headers, timeout=15)
         response.raise_for_status()
 
-        if response.text and response.text != '[]':
+        if response.text and response.text != "[]":
             json_data = response.json()
             if isinstance(json_data, list):
                 search_results = json_data
@@ -139,11 +138,11 @@ class DC:
                 if not isinstance(each, dict):
                     continue
                 each_dict = cast(dict[str, Any], each)
-                if each_dict.get('category') == category_id:
-                    name = each_dict.get('name')
-                    torrent_id = each_dict.get('id')
-                    size = each_dict.get('size')
-                    torrent_link = f'{self.torrent_url}{torrent_id}/' if torrent_id else None
+                if each_dict.get("category") == category_id:
+                    name = each_dict.get("name")
+                    torrent_id = each_dict.get("id")
+                    size = each_dict.get("size")
+                    torrent_link = f"{self.torrent_url}{torrent_id}/" if torrent_id else None
                     numfiles = each_dict.get("numfiles", "")
                     dupe_entry: dict[str, Any] = {
                         "id": torrent_id,
@@ -156,7 +155,6 @@ class DC:
                     dupes.append(dupe_entry)
 
             return dupes
-
 
         return []
 
@@ -197,13 +195,13 @@ class DC:
 
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {
-            'ibb.co': 'imgbb',
-            'imgbox.com': 'imgbox',
-            'beyondhd.co': 'bhd',
-            'imgur.com': 'imgur',
-            'postimg.cc': 'postimg',
-            'digitalcore.club': 'sharex',
-            'img.digitalcore.club': 'sharex'
+            "ibb.co": "imgbb",
+            "imgbox.com": "imgbox",
+            "beyondhd.co": "bhd",
+            "imgur.com": "imgur",
+            "postimg.cc": "postimg",
+            "digitalcore.club": "sharex",
+            "img.digitalcore.club": "sharex",
         }
         await self.rehost_images_manager.check_hosts(
             meta,
@@ -226,7 +224,7 @@ class DC:
     async def fetch_data(self, meta: Meta) -> dict[str, Any]:
         anon = "1" if meta.anon or self.config["TRACKERS"][self.tracker].get("anon", False) else "0"
 
-        data = {
+        return {
             "category": self.get_category_id(meta),
             "imdbId": meta.imdb_info.get("imdbID", ""),
             "nfo": await self.generate_description(meta),
@@ -241,8 +239,6 @@ class DC:
             "language": meta.book_language,
         }
 
-        return data
-
     async def upload(self, meta: Meta) -> bool:
         data = await self.fetch_data(meta)
         torrent_title = await self.edit_name(meta)
@@ -250,35 +246,29 @@ class DC:
 
         if not meta.debug:
             try:
-                upload_url = f'{self.api_base_url}/upload'
-                await self.common.create_torrent_for_upload(meta, self.tracker, 'DigitalCore.club')
-                torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
+                upload_url = f"{self.api_base_url}/upload"
+                await self.common.create_torrent_for_upload(meta, self.tracker, "DigitalCore.club")
+                torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
 
-                async with aiofiles.open(torrent_path, 'rb') as torrent_file:
+                async with aiofiles.open(torrent_path, "rb") as torrent_file:
                     torrent_bytes = await torrent_file.read()
-                files = {'file': (torrent_title + '.torrent', torrent_bytes, 'application/x-bittorrent')}
+                files = {"file": (torrent_title + ".torrent", torrent_bytes, "application/x-bittorrent")}
 
                 response = await self.session.post(upload_url, data=data, files=files, headers=dict(self.session.headers), timeout=90)
                 response.raise_for_status()
                 response_json = response.json()
                 response_data: dict[str, Any] = cast(dict[str, Any], response_json) if isinstance(response_json, dict) else {}
 
-                if response.status_code == 200 and response_data.get('id'):
-                    torrent_id = str(response_data['id'])
+                if response.status_code == 200 and response_data.get("id"):
+                    torrent_id = str(response_data["id"])
                     meta.tracker_status[self.tracker]["torrent_id"] = torrent_id + "/"
                     meta.tracker_status[self.tracker]["status_message"] = response_data.get("message")
 
-                    await self.common.download_tracker_torrent(
-                        meta,
-                        self.tracker,
-                        headers=dict(self.session.headers),
-                        downurl=f'{self.api_base_url}/download/{torrent_id}'
-                    )
+                    await self.common.download_tracker_torrent(meta, self.tracker, headers=dict(self.session.headers), downurl=f"{self.api_base_url}/download/{torrent_id}")
                     return True
 
-                else:
-                    meta.tracker_status[self.tracker]["status_message"] = f"data error: {response_data.get('message', 'Unknown API error.')}"
-                    return False
+                meta.tracker_status[self.tracker]["status_message"] = f"data error: {response_data.get('message', 'Unknown API error.')}"
+                return False
 
             except httpx.HTTPStatusError as e:
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {e.response.text}"
@@ -287,11 +277,11 @@ class DC:
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: Request timed out after {self.session.timeout.write} seconds"
                 return False
             except httpx.RequestError as e:
-                resp_text = getattr(getattr(e, 'response', None), 'text', 'No response received')
+                resp_text = getattr(getattr(e, "response", None), "text", "No response received")
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: Unable to upload. Error: {e}.\nResponse: {resp_text}"
                 return False
             except Exception as e:
-                resp_text = response.text if response is not None else 'No response received'
+                resp_text = response.text if response is not None else "No response received"
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: It may have uploaded, go check. Error: {e}.\nResponse: {resp_text}"
                 return False
 

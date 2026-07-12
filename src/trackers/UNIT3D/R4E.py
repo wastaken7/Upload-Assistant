@@ -22,44 +22,32 @@ class R4E(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='R4E')
+        super().__init__(config, tracker_name="R4E")
         self.config: Config = config
         self.common = COMMON(config)
 
-    async def get_category_id(
-        self,
-        meta: Meta,
-        category: str | None = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
+    async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = (category, reverse, mapping_only)
-        category_id = '24'
+        category_id = "24"
         # Use stored genre IDs if available
         if meta and meta.genre_ids:
             genre_ids = str(meta.genre_ids).split(",")
-            is_docu = '99' in genre_ids
+            is_docu = "99" in genre_ids
 
             if meta.category == "MOVIE":
-                category_id = '70'  # Motorsports Movie
+                category_id = "70"  # Motorsports Movie
                 if is_docu:
-                    category_id = '66'  # Documentary
+                    category_id = "66"  # Documentary
             elif meta.category == "TV":
-                category_id = '79'  # TV Series
+                category_id = "79"  # TV Series
                 if is_docu:
-                    category_id = '2'  # TV Documentary
+                    category_id = "2"  # TV Documentary
             else:
-                category_id = '24'
+                category_id = "24"
 
-        return {'category_id': category_id}
+        return {"category_id": category_id}
 
-    async def get_type_id(
-        self,
-        meta: Meta,
-        type: str | None = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
         type_id = {
             "8640p": "2160p",
@@ -74,7 +62,7 @@ class R4E(UNIT3D):
             "480p": "SD",
             "480i": "SD",
         }.get(str(meta.type), "10")
-        return {'type_id': type_id}
+        return {"type_id": type_id}
 
     async def get_personal_release(self, meta: Meta) -> dict[str, str]:
         _ = meta
@@ -100,13 +88,7 @@ class R4E(UNIT3D):
         _ = meta
         return {}
 
-    async def get_resolution_id(
-        self,
-        meta: Meta,
-        resolution: str | None = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
+    async def get_resolution_id(self, meta: Meta, resolution: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = (meta, resolution, reverse, mapping_only)
         return {}
 
@@ -128,18 +110,11 @@ class R4E(UNIT3D):
             response = await client.get(url=url, params=params)
             if response.status_code == 200:
                 data = cast(dict[str, Any], response.json())
-                items = cast(list[dict[str, Any]], data.get('data', []))
+                items = cast(list[dict[str, Any]], data.get("data", []))
                 for each in items:
-                    attributes = cast(dict[str, Any], each.get('attributes', {}))
-                    result_name = str(attributes.get('name', ''))
-                    dupes.append({
-                        'name': result_name,
-                        'files': result_name,
-                        'size': 0,
-                        'link': '',
-                        'file_count': 0,
-                        'download': ''
-                    })
+                    attributes = cast(dict[str, Any], each.get("attributes", {}))
+                    result_name = str(attributes.get("name", ""))
+                    dupes.append({"name": result_name, "files": result_name, "size": 0, "link": "", "file_count": 0, "download": ""})
             else:
                 logger.info(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
 

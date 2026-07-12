@@ -40,18 +40,15 @@ class PTS:
 
     async def get_type(self, meta: Meta) -> str | None:
         if meta.anime:
-            return '407'
+            return "407"
 
-        category_map = {
-            'TV': '405',
-            'MOVIE': '404'
-        }
+        category_map = {"TV": "405", "MOVIE": "404"}
 
         return category_map.get(meta.category)
 
     async def generate_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
-        desc = await builder.general_description_generator(
+        return await builder.general_description_generator(
             meta,
             audio_spectrogram=True,
             bluray=True,
@@ -73,16 +70,12 @@ class PTS:
             signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta.ua_signature}[/size][/url][/right]",
         )
 
-        return desc
-
     async def get_additional_checks(self, meta: Meta) -> bool:
-        mandarin = await self.common.check_language_requirements(
-            meta, self.tracker, languages_to_check=['mandarin', 'chinese'], check_audio=True, check_subtitle=True
-        )
+        mandarin = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["mandarin", "chinese"], check_audio=True, check_subtitle=True)
 
         if not mandarin:
             user_input = await asyncio.to_thread(input, "Warning: Mandarin subtitle or audio not found. Do you want to continue with the upload anyway? (y/n): ")
-            if user_input.lower() not in ['y', 'yes']:
+            if user_input.lower() not in ["y", "yes"]:
                 logger.info("Upload cancelled by user.", extra={"markup": False})
                 return False
         return True
@@ -99,19 +92,18 @@ class PTS:
             return found_items
         response.raise_for_status()
 
-        soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(response.text, "html.parser")
 
-        torrents_table = soup.find('table', class_='torrents')
+        torrents_table = soup.find("table", class_="torrents")
 
         if torrents_table:
-            torrent_name_tables = torrents_table.find_all('table', class_='torrentname')
+            torrent_name_tables = torrents_table.find_all("table", class_="torrentname")
 
             for torrent_table in torrent_name_tables:
-                name_tag = torrent_table.find('b')
+                name_tag = torrent_table.find("b")
                 if name_tag:
                     torrent_name = name_tag.get_text(strip=True)
                     found_items.append(torrent_name)
-
 
         return found_items
 
@@ -130,17 +122,15 @@ class PTS:
         self.session.cookies = cast(Any, cookies)
         data = await self.get_data(meta)
 
-        is_uploaded = await self.cookie_auth_uploader.handle_upload(
+        return await self.cookie_auth_uploader.handle_upload(
             meta=meta,
             tracker=self.tracker,
             source_flag=self.source_flag,
             torrent_url=self.torrent_url,
             data=data,
-            torrent_field_name='file',
+            torrent_field_name="file",
             upload_cookies=self.session.cookies,
             upload_url=f"{self.base_url}/takeupload.php",
-            id_pattern=r'download\.php\?id=([^&]+)',
+            id_pattern=r"download\.php\?id=([^&]+)",
             success_status_code="302, 303",
         )
-
-        return is_uploaded

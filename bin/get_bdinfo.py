@@ -14,6 +14,7 @@ import httpx
 try:
     from src.console import console, logger
 except ImportError:
+
     class SimpleConsole:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
             print(message)
@@ -128,6 +129,7 @@ class BDInfoBinaryManager:
             try:
                 if file_pattern.endswith(".zip"):
                     with zipfile.ZipFile(temp_archive, "r") as zip_ref:
+
                         def safe_extract_zip(zip_file: zipfile.ZipFile, path: str = ".") -> None:
                             for member in zip_file.namelist():
                                 info = zip_file.getinfo(member)
@@ -137,12 +139,12 @@ class BDInfoBinaryManager:
                                     continue
 
                                 # Check for absolute paths and directory traversal
-                                if os.path.isabs(member) or ".." in member or member.startswith("/"):
+                                if Path(member).is_absolute() or ".." in member or member.startswith("/"):
                                     logger.debug(f"[yellow]Warning: Skipping dangerous path: {member}[/yellow]")
                                     continue
 
                                 # Verify final path is inside target directory
-                                full_path = os.path.realpath(os.path.join(path, member))
+                                full_path = os.path.realpath(Path(path) / member)
                                 base_path = os.path.realpath(path)
                                 if not full_path.startswith(base_path + os.sep) and full_path != base_path:
                                     logger.debug(f"[yellow]Warning: Skipping path outside target directory: {member}[/yellow]")
@@ -166,15 +168,16 @@ class BDInfoBinaryManager:
 
                 elif file_pattern.endswith(".tar.gz"):
                     with tarfile.open(temp_archive, "r:gz") as tar_ref:
+
                         def safe_extract_tar(tar_file: tarfile.TarFile, path: str = ".") -> None:
                             for member in tar_file.getmembers():
                                 if member.islnk() or member.issym():
                                     logger.debug(f"[yellow]Warning: Skipping link entry: {member.name}[/yellow]")
                                     continue
-                                if os.path.isabs(member.name) or ".." in member.name or member.name.startswith("/"):
+                                if Path(member.name).is_absolute() or ".." in member.name or member.name.startswith("/"):
                                     logger.debug(f"[yellow]Warning: Skipping dangerous path: {member.name}[/yellow]")
                                     continue
-                                full_path = os.path.realpath(os.path.join(path, member.name))
+                                full_path = os.path.realpath(Path(path) / member.name)
                                 base_path = os.path.realpath(path)
                                 if not full_path.startswith(base_path + os.sep) and full_path != base_path:
                                     logger.debug(f"[yellow]Warning: Skipping path outside target directory: {member.name}[/yellow]")

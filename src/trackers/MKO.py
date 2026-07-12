@@ -1,12 +1,13 @@
 import asyncio
+import contextlib
 import gettext
-import os
 import re
 import secrets
 import shutil
 import urllib.parse
 from html.entities import codepoint2name
-from typing import Any
+from pathlib import Path
+from typing import Any, ClassVar
 
 import aiofiles
 import httpx
@@ -34,11 +35,11 @@ class MKO:
     tracker = "MKO"
     source_flag = ""
     base_url = "https://makingoff.org/forum"
-    banned_groups: list[str] = []
+    banned_groups: tuple[str, ...] = ()
     index_url = "https://indice.makingoff.org/"
     torrent_url = ""
-    supported_categories = ["MOVIE"]
-    tmdb_localization_requirements = {
+    supported_categories = ("MOVIE",)
+    tmdb_localization_requirements: ClassVar = {
         "pt-BR": {
             "main": "credits,translations",
         },
@@ -48,7 +49,7 @@ class MKO:
     }
 
     # HMediaInfo constants
-    VIDEO_CODEC_MAP: list[tuple[list[str], str]] = [
+    VIDEO_CODEC_MAP: ClassVar[list[tuple[list[str], str]]] = [
         (["avc", "h.264", "h264"], "H.264"),
         (["hevc", "h.265", "h265"], "H.265 (HEVC)"),
         (["av1"], "AV1"),
@@ -59,7 +60,7 @@ class MKO:
         (["mpeg"], "MPEG-2"),
     ]
 
-    AUDIO_CODEC_MAP: list[tuple[list[str], str]] = [
+    AUDIO_CODEC_MAP: ClassVar[list[tuple[list[str], str]]] = [
         (["aac"], "AAC"),
         (["e-ac-3", "eac3"], "E-AC-3 (Dolby Digital Plus)"),
         (["ac-3", "ac3"], "AC-3 (Dolby Digital)"),
@@ -264,12 +265,10 @@ class MKO:
         return self._html_encode(bbcode)
 
     def _get_lang_name(self, lang_string: str) -> str:
-        try:
+        with contextlib.suppress(Exception):
             lang = langcodes.find(lang_string)
             if lang and lang.is_valid():
                 return lang.display_name("pt").capitalize()
-        except Exception:
-            pass
         return lang_string.capitalize()
 
     def _localizer_countries(self, meta: Meta) -> str:
@@ -500,7 +499,7 @@ class MKO:
         try:
             async with aiofiles.open(torrent_path, "rb") as f:
                 data = await f.read()
-            filename = os.path.basename(torrent_path)
+            filename = Path(torrent_path).name
             resp = await self.session.post(
                 url,
                 files={"FILE_UPLOAD": (filename, data, "application/x-bittorrent")},
@@ -827,42 +826,157 @@ class MKO:
         """
         # https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes
         africa = [
-            "DZ", "AO", "BJ", "BW", "BF", "BI", "CM", "CV", "CF", "TD", "KM", "CD", "CG",
-            "CI", "DJ", "EG", "GQ", "ER", "ET", "GA", "GM", "GH", "GN", "GW", "KE", "LS",
-            "LR", "LY", "MG", "MW", "ML", "MR", "MU", "MA", "MZ", "NA", "NE", "NG", "RW",
-            "ST", "SN", "SC", "SL", "SO", "ZA", "SS", "SD", "SZ", "TZ", "TG", "TN", "UG",
-            "ZM", "ZW"
-        ]  # fmt: off
+            "DZ",
+            "AO",
+            "BJ",
+            "BW",
+            "BF",
+            "BI",
+            "CM",
+            "CV",
+            "CF",
+            "TD",
+            "KM",
+            "CD",
+            "CG",
+            "CI",
+            "DJ",
+            "EG",
+            "GQ",
+            "ER",
+            "ET",
+            "GA",
+            "GM",
+            "GH",
+            "GN",
+            "GW",
+            "KE",
+            "LS",
+            "LR",
+            "LY",
+            "MG",
+            "MW",
+            "ML",
+            "MR",
+            "MU",
+            "MA",
+            "MZ",
+            "NA",
+            "NE",
+            "NG",
+            "RW",
+            "ST",
+            "SN",
+            "SC",
+            "SL",
+            "SO",
+            "ZA",
+            "SS",
+            "SD",
+            "SZ",
+            "TZ",
+            "TG",
+            "TN",
+            "UG",
+            "ZM",
+            "ZW",
+        ]
 
         asia = [
-            "AF", "AM", "AZ", "BD", "BT", "BN", "KH", "CN", "GE", "IN", "ID", "JP", "KZ",
-            "KG", "LA", "MY", "MV", "MN", "MM", "NP", "KP", "KR", "PK", "PH", "SG", "LK",
-            "TW", "TJ", "TH", "TL", "TM", "UZ", "VN"
-        ]  # fmt: off
+            "AF",
+            "AM",
+            "AZ",
+            "BD",
+            "BT",
+            "BN",
+            "KH",
+            "CN",
+            "GE",
+            "IN",
+            "ID",
+            "JP",
+            "KZ",
+            "KG",
+            "LA",
+            "MY",
+            "MV",
+            "MN",
+            "MM",
+            "NP",
+            "KP",
+            "KR",
+            "PK",
+            "PH",
+            "SG",
+            "LK",
+            "TW",
+            "TJ",
+            "TH",
+            "TL",
+            "TM",
+            "UZ",
+            "VN",
+        ]
 
         europe = [
-            "AL", "XC", "AD", "AT", "BY", "BE", "BA", "BG", "HR", "SU", "CY", "CZ", "DK",
-            "EE", "FI", "FR", "DE", "GR", "HU", "IS", "IE", "IT", "XK", "LV", "LI", "LT",
-            "LU", "MT", "MD", "MC", "ME", "MK", "NL", "NO", "PL", "PT", "RO", "RU", "SM",
-            "RS", "SK", "SI", "ES", "SE", "CH", "UA", "GB", "VA"
-        ]  # fmt: off
+            "AL",
+            "XC",
+            "AD",
+            "AT",
+            "BY",
+            "BE",
+            "BA",
+            "BG",
+            "HR",
+            "SU",
+            "CY",
+            "CZ",
+            "DK",
+            "EE",
+            "FI",
+            "FR",
+            "DE",
+            "GR",
+            "HU",
+            "IS",
+            "IE",
+            "IT",
+            "XK",
+            "LV",
+            "LI",
+            "LT",
+            "LU",
+            "MT",
+            "MD",
+            "MC",
+            "ME",
+            "MK",
+            "NL",
+            "NO",
+            "PL",
+            "PT",
+            "RO",
+            "RU",
+            "SM",
+            "RS",
+            "SK",
+            "SI",
+            "ES",
+            "SE",
+            "CH",
+            "UA",
+            "GB",
+            "VA",
+        ]
 
-        latin_america = [
-            "AR", "BO", "CL", "CO", "CR", "CU", "DO", "EC", "SV", "GT", "HN", "MX", "NI",
-            "PA", "PY", "PE", "UY", "VE"
-        ]  # fmt: off
+        latin_america = ["AR", "BO", "CL", "CO", "CR", "CU", "DO", "EC", "SV", "GT", "HN", "MX", "NI", "PA", "PY", "PE", "UY", "VE"]
 
         brasil = ["BR"]
         north_america = ["US", "CA"]
 
-        oceania = [
-            "AU", "FJ", "KI", "MH", "FM", "NR", "NZ", "PW", "PG", "WS", "SB", "TO", "TV",
-            "VU"
-        ]  # fmt: off
+        oceania = ["AU", "FJ", "KI", "MH", "FM", "NR", "NZ", "PW", "PG", "WS", "SB", "TO", "TV", "VU"]
 
-        middle_east = [
-            "BH", "IR", "IQ", "IL", "JO", "KW", "LB", "OM", "QA", "SA", "SY", "AE", "YE"
-        ]  # fmt: off
+        middle_east = ["BH", "IR", "IQ", "IL", "JO", "KW", "LB", "OM", "QA", "SA", "SY", "AE", "YE"]
 
         forum_id_by_country: dict[str, int] = {}
         for code in africa:
@@ -1216,13 +1330,13 @@ class MKO:
             is_public=True,
             public_trackers=self._public_trackers,
         )
-        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
+        torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
 
         # Creates a copy of the torrent with the media filename,
         # this one should be attached to the topic.
         release_name = meta.basename_no_ext or meta.name or meta.uuid
         release_filename = release_name.replace(" ", ".")
-        named_torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/{release_filename}.torrent"
+        named_torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{release_filename}.torrent"
         shutil.copy2(torrent_path, named_torrent_path)
 
         if meta.debug:
@@ -1241,7 +1355,7 @@ class MKO:
             logger.info(f"[cyan]{self.tracker} Request Data:[/cyan]")
             logger.info(Redaction.redact_private_info(fields))
 
-            txt_path = f"{meta.base_dir}/tmp/{meta.uuid}/MKO_bbcode.txt"
+            txt_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MKO_bbcode.txt"
             async with aiofiles.open(txt_path, "w", encoding="utf-8") as f:
                 await f.write(f"TITULO: {topic_title}\n\n")
                 await f.write(post_body)

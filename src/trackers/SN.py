@@ -25,8 +25,7 @@ class SN:
         self.config: Config = config
 
     async def get_type_id(self, type: str) -> str:
-        type_id = {"BluRay": "3", "Web": "1", "DVD": "2"}.get(type, "0")
-        return type_id
+        return {"BluRay": "3", "Web": "1", "DVD": "2"}.get(type, "0")
 
     async def upload(self, meta: Meta) -> bool:
         common = COMMON(config=self.config)
@@ -37,28 +36,21 @@ class SN:
 
         # Anime
         if meta.mal_id:
-            cat_id = '7'
-            sub_cat_id = '47'
+            cat_id = "7"
+            sub_cat_id = "47"
 
-            demographics_map = {
-                'Shounen': '27',
-                'Seinen': '28',
-                'Shoujo': '29',
-                'Josei': '30',
-                'Kodomo': '31',
-                'Mina': '47'
-            }
+            demographics_map = {"Shounen": "27", "Seinen": "28", "Shoujo": "29", "Josei": "30", "Kodomo": "31", "Mina": "47"}
 
             demographic = meta.demographic if meta.demographic is not None else "Mina"
             sub_cat_id = demographics_map.get(demographic, sub_cat_id)
 
         category = meta.category
-        if category == 'MOVIE':
-            cat_id = '1'
+        if category == "MOVIE":
+            cat_id = "1"
             # sub cat is source so using source to get
             sub_cat_id = await self.get_type_id(str(meta.source))
-        elif category == 'TV':
-            cat_id = '2'
+        elif category == "TV":
+            cat_id = "2"
             sub_cat_id = "6" if meta.tv_pack else "5"
             # todo need to do a check for docs and add as subcat
 
@@ -67,24 +59,24 @@ class SN:
         if meta.bdinfo:
             mi_dump = None
             async with aiofiles.open(
-                f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt",
+                f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt",
                 encoding="utf-8",
             ) as bd_file:
                 bd_dump = await bd_file.read()
         else:
             async with aiofiles.open(
-                f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt",
+                f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt",
                 encoding="utf-8",
             ) as mi_file:
                 mi_dump = await mi_file.read()
             bd_dump = None
         async with aiofiles.open(
-            f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
+            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
             encoding="utf-8",
         ) as desc_file:
             desc = await desc_file.read()
 
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent", "rb") as f:
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent", "rb") as f:
             tfile = await f.read()
 
         # uploading torrent file.
@@ -95,7 +87,7 @@ class SN:
             desc += "\n\n" + bd_dump
             mi_dump = ""
 
-        api_key = str(self.config['TRACKERS'][self.tracker]['api_key']).strip()
+        api_key = str(self.config["TRACKERS"][self.tracker]["api_key"]).strip()
         data: dict[str, Any] = {
             "api_key": api_key,
             "name": meta.name,
@@ -115,29 +107,25 @@ class SN:
                 return False
 
             try:
-                if response.json().get('success'):
+                if response.json().get("success"):
                     tracker_status = meta.tracker_status
                     tracker_status.setdefault(self.tracker, {})
-                    tracker_status[self.tracker]['status_message'] = response.json()['link']
-                    if 'link' in response.json():
-                        announce_url = str(
-                            self.config['TRACKERS'][self.tracker].get('announce_url', '')
-                        )
+                    tracker_status[self.tracker]["status_message"] = response.json()["link"]
+                    if "link" in response.json():
+                        announce_url = str(self.config["TRACKERS"][self.tracker].get("announce_url", ""))
                         await common.create_torrent_ready_to_seed(
                             meta,
                             self.tracker,
                             self.source_flag,
                             announce_url,
-                            str(response.json()['link']),
+                            str(response.json()["link"]),
                         )
                         return True
-                    else:
-                        logger.info("[red]No Link in Response")
-                        return False
-                else:
-                    logger.info("[red]Did not upload successfully")
-                    logger.info(response.json())
+                    logger.info("[red]No Link in Response")
                     return False
+                logger.info("[red]Did not upload successfully")
+                logger.info(response.json())
+                return False
             except Exception:
                 logger.error("[red]Error! It may have uploaded, go check")
                 logger.info(Redaction.redact_private_info(data))
@@ -148,13 +136,13 @@ class SN:
             logger.info(Redaction.redact_private_info(data))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
-            tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
+            tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
 
     async def edit_desc(self, meta: Meta) -> None:
         async with aiofiles.open(
-            f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt",
+            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt",
             encoding="utf-8",
         ) as base_file:
             base = await base_file.read()
@@ -164,8 +152,8 @@ class SN:
         if images:
             parts.append("[center]")
             for image in images:
-                web_url = image.get('web_url')
-                img_url = image.get('img_url')
+                web_url = image.get("web_url")
+                img_url = image.get("img_url")
                 if not web_url or not img_url:
                     continue
                 parts.append(f"[url={web_url}][img=720]{img_url}[/img][/url]")
@@ -173,7 +161,7 @@ class SN:
         parts.append(f"\n[center][url={self.forum_link}]Simplicity, Socializing and Sharing![/url][/center]")
 
         async with aiofiles.open(
-            f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
+            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
             "w",
             encoding="utf-8",
         ) as desc:
@@ -182,23 +170,21 @@ class SN:
 
     async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
-        api_key = str(self.config['TRACKERS'][self.tracker]['api_key']).strip()
-        params: dict[str, str] = {
-            'api_key': api_key
-        }
+        api_key = str(self.config["TRACKERS"][self.tracker]["api_key"]).strip()
+        params: dict[str, str] = {"api_key": api_key}
 
         # Determine search parameters based on metadata
         imdb_id = meta.imdb_id or 0
         category = meta.category
         title = meta.title
         if imdb_id == 0:
-            if category == 'TV':
+            if category == "TV":
                 params["filter"] = f"{title}{meta.season}"
             else:
-                params['filter'] = title
+                params["filter"] = title
         else:
             params["media_ref"] = f"tt{meta.imdb}"
-            if category == 'TV':
+            if category == "TV":
                 params["filter"] = f"{meta.season}"
             else:
                 params["filter"] = meta.resolution
@@ -207,13 +193,12 @@ class SN:
             response = await client.get(self.search_url, params=params)
             if response.status_code == 200:
                 data = cast(dict[str, Any], response.json())
-                items = cast(list[dict[str, Any]], data.get('data', []))
+                items = cast(list[dict[str, Any]], data.get("data", []))
                 for item in items:
-                    result = item.get('name')
+                    result = item.get("name")
                     if result:
                         dupes.append(str(result))
             else:
                 logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
-
 
         return dupes

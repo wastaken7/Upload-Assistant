@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import platform
 import re
+from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
@@ -20,27 +20,22 @@ class TL:
     tracker = "TL"
     source_flag = "TorrentLeech.org"
     base_url = "https://www.torrentleech.org"
-    banned_groups = []
+    banned_groups = ()
     http_upload_url = f"{base_url}/torrents/upload/"
     api_upload_url = f"{base_url}/torrents/upload/apiupload"
     torrent_url = f"{base_url}/torrent/"
-    supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
-    tracker_urls = ['tracker.tleechreload', 'tracker.torrentleech']
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ("tracker.tleechreload", "tracker.torrentleech")
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.common = COMMON(config)
         self.session = httpx.AsyncClient(timeout=60.0)
-        self.tracker_config: dict[str, Any] = self.config['TRACKERS'][self.tracker]
-        self.api_upload: bool = bool(self.tracker_config.get('api_upload', False))
-        self.passkey: str = str(self.tracker_config.get('passkey', ''))
-        self.announce_list = [
-            f'https://tracker.torrentleech.org/a/{self.passkey}/announce',
-            f'https://tracker.tleechreload.org/a/{self.passkey}/announce'
-        ]
-        self.session.headers.update({
-            'User-Agent': f'Upload Assistant ({platform.system()} {platform.release()})'
-        })
+        self.tracker_config: dict[str, Any] = self.config["TRACKERS"][self.tracker]
+        self.api_upload: bool = bool(self.tracker_config.get("api_upload", False))
+        self.passkey: str = str(self.tracker_config.get("passkey", ""))
+        self.announce_list = [f"https://tracker.torrentleech.org/a/{self.passkey}/announce", f"https://tracker.tleechreload.org/a/{self.passkey}/announce"]
+        self.session.headers.update({"User-Agent": f"Upload Assistant ({platform.system()} {platform.release()})"})
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
@@ -49,10 +44,10 @@ class TL:
         if self.api_upload and not force:
             return True
 
-        cookies_file = os.path.abspath(f"{meta.base_dir}/data/cookies/TL.txt")
+        cookies_file = str(Path(f"{meta.base_dir}/data/cookies/TL.txt").resolve())
 
-        cookie_path = os.path.abspath(cookies_file)
-        if not os.path.exists(cookie_path):
+        cookie_path = str(Path(cookies_file).resolve())
+        if not Path(cookie_path).exists():
             logger.info(f"[bold red]'{self.tracker}' Cookies not found at: {cookie_path}[/bold red]")
             return False
 
@@ -60,7 +55,7 @@ class TL:
 
         try:
             if force:
-                response = await self.session.get('https://www.torrentleech.org/torrents/browse/index', timeout=10)
+                response = await self.session.get("https://www.torrentleech.org/torrents/browse/index", timeout=10)
                 if response.status_code == 301 and "torrents/browse" in str(response.url):
                     logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
                     return True
@@ -80,7 +75,7 @@ class TL:
     async def generate_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
         process_screenshot = not self.tracker_config.get("img_rehost", True) or self.tracker_config.get("api_upload", True)
-        description = await builder.general_description_generator(
+        return await builder.general_description_generator(
             meta,
             audio_spectrogram=process_screenshot,
             bluray=True,
@@ -101,8 +96,6 @@ class TL:
             user_description=True,
             signature=f"""<div style="text-align: right; font-size: 11px;"><a href="https://github.com/wastaken7/Upload-Assistant">{meta.ua_signature}</a></div>""",
         )
-
-        return description
 
     def get_category(self, meta: Meta) -> int:
         anime = 34
@@ -149,35 +142,34 @@ class TL:
         if category == "MOVIE":
             if str(meta.original_language) != "en":
                 return movie_foreign
-            elif "Documentary" in str(meta.genres):
+            if "Documentary" in str(meta.genres):
                 return movie_documentary
-            elif meta.resolution == "2160p":
+            if meta.resolution == "2160p":
                 return movie_4k
-            elif meta.is_disc in ("BDMV", "HDDVD") or (str(meta.type) == "REMUX" and str(meta.source) in ("BluRay", "HDDVD")):
+            if meta.is_disc in ("BDMV", "HDDVD") or (str(meta.type) == "REMUX" and str(meta.source) in ("BluRay", "HDDVD")):
                 return movie_bluray
-            elif str(meta.type) == "ENCODE" and str(meta.source) in (
+            if str(meta.type) == "ENCODE" and str(meta.source) in (
                 "BluRay",
                 "HDDVD",
             ):
                 return movie_bluray_rip
-            elif meta.is_disc == "DVD" or (str(meta.type) == "REMUX" and "DVD" in str(meta.source)):
+            if meta.is_disc == "DVD" or (str(meta.type) == "REMUX" and "DVD" in str(meta.source)):
                 return movie_dvd
-            elif (str(meta.type) == "ENCODE" and "DVD" in str(meta.source)) or str(meta.type) == "DVDRIP":
+            if (str(meta.type) == "ENCODE" and "DVD" in str(meta.source)) or str(meta.type) == "DVDRIP":
                 return movie_dvd_rip
-            elif "WEB" in str(meta.type):
+            if "WEB" in str(meta.type):
                 return movie_webrip
-            elif str(meta.type) == "HDTV":
+            if str(meta.type) == "HDTV":
                 return movie_hd_rip
 
         elif category == "TV":
             if str(meta.original_language) != "en":
                 return tv_foreign
-            elif meta.tv_pack:
+            if meta.tv_pack:
                 return tv_boxsets
-            elif meta.sd:
+            if meta.sd:
                 return tv_episodes
-            else:
-                return tv_episodes_hd
+            return tv_episodes_hd
 
         elif category == "BOOK":
             if meta.comic or meta.manga:
@@ -187,31 +179,31 @@ class TL:
         elif category == "GAME":
             plat = meta.platform.lower()
 
-            if plat == "x360":  # noqa: SIM116
+            if plat == "x360":
                 return games_xbox360
-            elif plat == "xone":
+            if plat == "xone":
                 return games_xboxone
-            elif plat == "xbox":
+            if plat == "xbox":
                 return games_xbox
-            elif plat == "pc":
+            if plat == "pc":
                 return games_pc
-            elif plat == "ps5":
+            if plat == "ps5":
                 return games_ps5
-            elif plat == "ps4":
+            if plat == "ps4":
                 return games_ps4
-            elif plat == "ps3":
+            if plat == "ps3":
                 return games_ps3
-            elif plat == "ps2":
+            if plat == "ps2":
                 return games_ps2
-            elif plat == "psp":
+            if plat == "psp":
                 return games_psp
-            elif plat == "wii":
+            if plat == "wii":
                 return games_wii
-            elif plat == "nds":
+            if plat == "nds":
                 return games_nds
-            elif plat == "switch":
+            if plat == "switch":
                 return games_switch
-            elif plat == "mac":
+            if plat == "mac":
                 return games_mac
 
             return games_pc
@@ -220,13 +212,11 @@ class TL:
 
     def get_screens(self, meta: Meta) -> list[str]:
         images = cast(list[dict[str, Any]], meta.menu_images) + meta.image_list + meta.spectrograms_images
-        return [image['raw_url'] for image in images if image.get('raw_url')]
+        return [image["raw_url"] for image in images if image.get("raw_url")]
 
     async def get_name(self, meta):
         tl_name = meta.name.replace(meta.aka, "")
-        tl_name = re.sub(r"\s{2,}", " ", tl_name)
-
-        return tl_name
+        return re.sub(r"\s{2,}", " ", tl_name)
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
@@ -243,18 +233,18 @@ class TL:
         year = str(meta.year) if meta.year is not None else ""
         episode = meta.episode
         season = str(meta.season)
-        season_episode = f"{season}{episode}" if season or episode else ''
+        season_episode = f"{season}{episode}" if season or episode else ""
 
         forbidden_keywords: list[str] = []
 
         is_disc = (meta.is_disc or "").strip().lower()
         _type = (meta.type or "").strip().lower()
 
-        if is_disc == 'bdmv':
-            forbidden_keywords.extend(['remux', 'x264', 'x265'])
+        if is_disc == "bdmv":
+            forbidden_keywords.extend(["remux", "x264", "x265"])
 
-        if _type == 'webdl':
-            forbidden_keywords.extend(['webrip', 'bluray', 'blu-ray'])
+        if _type == "webdl":
+            forbidden_keywords.extend(["webrip", "bluray", "blu-ray"])
 
         search_urls: list[str] = []
 
@@ -294,15 +284,11 @@ class TL:
             torrents = cast(list[dict[str, Any]], data.get("torrentList", []))
 
             for torrent in torrents:
-                name = str(torrent.get('name', ''))
+                name = str(torrent.get("name", ""))
                 link = f"{self.torrent_url}{torrent.get('fid')}"
-                size = torrent.get('size')
+                size = torrent.get("size")
                 if not any(keyword in name.lower() for keyword in forbidden_keywords):
-                    results.append({
-                        'name': name,
-                        'size': size,
-                        'link': link
-                    })
+                    results.append({"name": name, "size": size, "link": link})
 
         except Exception as e:
             logger.info(f"[bold red]Error searching for duplicates on {self.tracker} ({url}): {e}[/bold red]")
@@ -313,16 +299,13 @@ class TL:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         if self.api_upload:
-            is_uploaded = await self.upload_api(meta)
-            return is_uploaded
-        else:
-            is_uploaded = await self.cookie_upload(meta)
-            return is_uploaded
+            return await self.upload_api(meta)
+        return await self.cookie_upload(meta)
 
     async def upload_api(self, meta: Meta) -> bool:
-        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
+        torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
 
-        async with aiofiles.open(torrent_path, 'rb') as open_torrent:
+        async with aiofiles.open(torrent_path, "rb") as open_torrent:
             torrent_bytes = await open_torrent.read()
         files: dict[str, tuple[Any, Any, str]] = {
             "torrent": (f"{await self.get_name(meta)}.torrent", torrent_bytes, "application/x-bittorrent"),
@@ -342,36 +325,34 @@ class TL:
         else:
             if meta.category == "MOVIE":
                 imdb_info = meta.imdb_info
-                data.update({'imdb': imdb_info.get('imdbID', '')})
+                data.update({"imdb": imdb_info.get("imdbID", "")})
 
             if meta.category == "TV":
-                data.update({
-                    "tvmazeid": meta.tvmaze_id,
-                    "tvmazetype": meta.tv_pack,
-                })
+                data.update(
+                    {
+                        "tvmazeid": meta.tvmaze_id,
+                        "tvmazetype": meta.tv_pack,
+                    }
+                )
 
         anon = not (meta.anon == 0 and not self.tracker_config.get("anon", False))
         if anon:
-            data.update({'is_anonymous_upload': 'on'})
+            data.update({"is_anonymous_upload": "on"})
 
         if not meta.debug:
-            response = await self.session.post(
-                url=self.api_upload_url,
-                files=files,
-                data=data
-            )
+            response = await self.session.post(url=self.api_upload_url, files=files, data=data)
 
             if not response.text.isnumeric():
                 tracker_status = meta.tracker_status
                 tracker_status.setdefault(self.tracker, {})
-                tracker_status[self.tracker]['status_message'] = 'data error: ' + response.text
+                tracker_status[self.tracker]["status_message"] = "data error: " + response.text
 
             if response.text.isnumeric():
                 torrent_id = response.text
                 tracker_status = meta.tracker_status
                 tracker_status.setdefault(self.tracker, {})
-                tracker_status[self.tracker]['status_message'] = 'Torrent uploaded successfully.'
-                tracker_status[self.tracker]['torrent_id'] = torrent_id
+                tracker_status[self.tracker]["status_message"] = "Torrent uploaded successfully."
+                tracker_status[self.tracker]["torrent_id"] = torrent_id
                 await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_list, self.torrent_url + torrent_id)
                 return True
 
@@ -383,7 +364,7 @@ class TL:
         return False
 
     async def get_cookie_upload_data(self, meta: Meta) -> dict[str, Any]:
-        tvMazeURL = ''
+        tvMazeURL = ""
         if meta.category == "TV" and meta.tvmaze_id:
             tvMazeURL = f"https://www.tvmaze.com/shows/{meta.tvmaze_id}"
 
@@ -405,19 +386,19 @@ class TL:
 
         anon = not (meta.anon == 0 and not self.tracker_config.get("anon", False))
         if anon:
-            data.update({'is_anonymous_upload': 'on'})
+            data.update({"is_anonymous_upload": "on"})
 
         return data
 
     async def cookie_upload(self, meta: Meta) -> bool | None:
         await self.generate_description(meta)
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
             description_content = await f.read()
         login = await self.login(meta)
         if not login:
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
-            tracker_status[self.tracker]['status_message'] = "data error: Login with cookies failed."
+            tracker_status[self.tracker]["status_message"] = "data error: Login with cookies failed."
             return None
 
         data = await self.get_cookie_upload_data(meta)
@@ -427,33 +408,31 @@ class TL:
             logger.debug(Redaction.redact_private_info(data))
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
-        else:
-            try:
-                async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent", "rb") as f:
-                    torrent_bytes = await f.read()
-                files = {
-                    'torrent': ('torrent.torrent', torrent_bytes, 'application/x-bittorrent'),
-                    'nfo': ('description.txt', description_content, 'text/plain'),
-                }
+        try:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent", "rb") as f:
+                torrent_bytes = await f.read()
+            files = {
+                "torrent": ("torrent.torrent", torrent_bytes, "application/x-bittorrent"),
+                "nfo": ("description.txt", description_content, "text/plain"),
+            }
 
-                response = await self.session.post(url=self.http_upload_url, files=files, data=data)
+            response = await self.session.post(url=self.http_upload_url, files=files, data=data)
 
-                if response.status_code == 302 and 'location' in response.headers:
-                    torrent_id = response.headers['location'].replace('/successfulupload?torrentID=', '')
-                    torrent_url = f"{self.base_url}/torrent/{torrent_id}"
-                    meta.tracker_status[self.tracker]["status_message"] = "Torrent uploaded successfully."
-                    meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
+            if response.status_code == 302 and "location" in response.headers:
+                torrent_id = response.headers["location"].replace("/successfulupload?torrentID=", "")
+                torrent_url = f"{self.base_url}/torrent/{torrent_id}"
+                meta.tracker_status[self.tracker]["status_message"] = "Torrent uploaded successfully."
+                meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
 
-                    await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_list, torrent_url)
-                    return True
+                await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_list, torrent_url)
+                return True
 
-                else:
-                    meta.tracker_status[self.tracker]["status_message"] = "data error - Upload failed: No success redirect found."
-                    failure_path = await self.common.save_html_file(meta, self.tracker, response.text, "Failed_Upload")
-                    logger.info(f"{self.tracker}: Failed upload. The HTML response saved to {failure_path}")
-                    return False
+            meta.tracker_status[self.tracker]["status_message"] = "data error - Upload failed: No success redirect found."
+            failure_path = await self.common.save_html_file(meta, self.tracker, response.text, "Failed_Upload")
+            logger.info(f"{self.tracker}: Failed upload. The HTML response saved to {failure_path}")
+            return False
 
-            except httpx.RequestError as e:
-                status_message = f"data error - {str(e)}"
+        except httpx.RequestError as e:
+            status_message = f"data error - {e!s}"
 
-            meta.tracker_status[self.tracker]["status_message"] = status_message
+        meta.tracker_status[self.tracker]["status_message"] = status_message

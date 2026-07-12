@@ -11,7 +11,7 @@ Config = dict[str, Any]
 class ZNTH(UNIT3D):
     tracker = "ZNTH"
     base_url = "https://znth.cx"
-    banned_groups: list[str] = []
+    banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     requests_url = f"{base_url}/api/requests/filter"
@@ -19,7 +19,7 @@ class ZNTH(UNIT3D):
     torrent_url = f"{base_url}/torrents/"
     banned_url = f"{base_url}/api/bannedReleaseGroups"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ['https://znth.cx']
+    tracker_urls = ("https://znth.cx",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="ZNTH")
@@ -157,7 +157,7 @@ class ZNTH(UNIT3D):
 
             return {"name": znth_name}
 
-        elif category in ("TV", "MOVIE"):
+        if category in ("TV", "MOVIE"):
             znth_name = meta.name
             if meta.category == "TV" and meta.episode_title != "":
                 znth_name = znth_name.replace(f"{meta.episode_title} {meta.resolution}", f"{meta.resolution}", 1)
@@ -167,8 +167,7 @@ class ZNTH(UNIT3D):
                 znth_name = znth_name.replace(f"{year}", imdb_year, 1)
             return {"name": znth_name}
 
-        else:
-            return {"name": meta.name}
+        return {"name": meta.name}
 
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {
@@ -180,16 +179,15 @@ class ZNTH(UNIT3D):
         }
         if mapping_only:
             return category_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in category_id.items()}
-        elif category:
+        if category:
             return {"category_id": category_id.get(category, "0")}
-        else:
-            meta_category = meta.category
-            if meta.audiobook:
-                meta_category = "AUDIOBOOK"
-            resolved_id = category_id.get(meta_category, "0")
-            return {"category_id": resolved_id}
+        meta_category = meta.category
+        if meta.audiobook:
+            meta_category = "AUDIOBOOK"
+        resolved_id = category_id.get(meta_category, "0")
+        return {"category_id": resolved_id}
 
     async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
@@ -206,24 +204,23 @@ class ZNTH(UNIT3D):
         }
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
-        elif type:
+        if type:
             resolved_type = type.upper().strip()
             return {"type_id": type_id.get(resolved_type, "0")}
-        else:
-            category = meta.category
-            meta_type = meta.type
-            if isinstance(meta_type, str):
-                meta_type = meta_type.upper().strip().lstrip(".")
+        category = meta.category
+        meta_type = meta.type
+        if isinstance(meta_type, str):
+            meta_type = meta_type.upper().strip().lstrip(".")
 
-            resolved_id = type_id.get(meta_type or "", "0")
+        resolved_id = type_id.get(meta_type or "", "0")
 
-            if category == "GAME":
-                resolved_id = "16"
-            elif meta.audiobook:
-                resolved_id = "10"
-            elif category == "BOOK":
-                resolved_id = "9"
+        if category == "GAME":
+            resolved_id = "16"
+        elif meta.audiobook:
+            resolved_id = "10"
+        elif category == "BOOK":
+            resolved_id = "9"
 
-            return {"type_id": resolved_id}
+        return {"type_id": resolved_id}

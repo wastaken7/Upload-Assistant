@@ -38,9 +38,9 @@ class ApplyOverrides:
                 current_tvdb_id = int(current_tvdb_id)
 
             if not other_id:
-                for entry in cast(list[UserArgsEntry], user_args.get('entries', [])):
-                    entry_tmdb_id = entry.get('tmdb_id')
-                    args = cast(list[str], entry.get('args', []))
+                for entry in cast(list[UserArgsEntry], user_args.get("entries", [])):
+                    entry_tmdb_id = entry.get("tmdb_id")
+                    args = cast(list[str], entry.get("args", []))
 
                     if not entry_tmdb_id:
                         continue
@@ -60,23 +60,23 @@ class ApplyOverrides:
                         break
 
             else:
-                for entry in cast(list[UserArgsEntry], user_args.get('other_ids', [])):
+                for entry in cast(list[UserArgsEntry], user_args.get("other_ids", [])):
                     # Check for TVDB ID match
-                    if 'tvdb_id' in entry and str(entry['tvdb_id']) == str(current_tvdb_id) and current_tvdb_id != 0:
-                        args = cast(list[str], entry.get('args', []))
+                    if "tvdb_id" in entry and str(entry["tvdb_id"]) == str(current_tvdb_id) and current_tvdb_id != 0:
+                        args = cast(list[str], entry.get("args", []))
                         logger.info(f"[green]Found matching override for TVDb ID: {current_tvdb_id}")
                         logger.info(f"[yellow]Applying arguments: {' '.join(args)}")
                         meta = await self.apply_args_to_meta(meta, args)
                         break
 
                     # Check for IMDB ID match (without tt prefix)
-                    if 'imdb_id' in entry:
-                        entry_imdb = entry['imdb_id']
-                        if str(entry_imdb).startswith('tt'):
+                    if "imdb_id" in entry:
+                        entry_imdb = entry["imdb_id"]
+                        if str(entry_imdb).startswith("tt"):
                             entry_imdb = entry_imdb[2:]
 
                         if str(entry_imdb) == str(current_imdb_id) and current_imdb_id != 0:
-                            args = cast(list[str], entry.get('args', []))
+                            args = cast(list[str], entry.get("args", []))
                             logger.info(f"[green]Found matching override for IMDb ID: {current_imdb_id}")
                             logger.info(f"[yellow]Applying arguments: {' '.join(args)}")
                             meta = await self.apply_args_to_meta(meta, args)
@@ -95,16 +95,16 @@ class ApplyOverrides:
         if not tmdb_id:
             return category, 0
 
-        if '/' in tmdb_id:
-            parts = tmdb_id.split('/')
+        if "/" in tmdb_id:
+            parts = tmdb_id.split("/")
             if len(parts) >= 2:
                 prefix = parts[0]
                 id_part = parts[1]
 
-                if prefix == 'tv':
-                    category = 'TV'
-                elif prefix == 'movie':
-                    category = 'MOVIE'
+                if prefix == "tv":
+                    category = "TV"
+                elif prefix == "movie":
+                    category = "MOVIE"
 
                 try:
                     normalized_id = int(id_part)
@@ -126,13 +126,13 @@ class ApplyOverrides:
             i = 0
             while i < len(args):
                 arg = args[i]
-                if arg.startswith('--'):
+                if arg.startswith("--"):
                     # Remove '--' prefix and convert dashes to underscores
-                    key = arg[2:].replace('-', '_')
+                    key = arg[2:].replace("-", "_")
                     arg_keys_to_track.add(key)
 
                     # Store the value if it exists
-                    if i + 1 < len(args) and not args[i + 1].startswith('--'):
+                    if i + 1 < len(args) and not args[i + 1].startswith("--"):
                         arg_values[key] = args[i + 1]  # Store the value with its key
                         i += 1
                 i += 1
@@ -141,17 +141,17 @@ class ApplyOverrides:
 
             # Create a new Args instance and process the arguments
             arg_processor = Args(self.config)
-            full_args = ['upload.py'] + args
+            full_args = ["upload.py"] + args
             updated_meta, _, _ = arg_processor.parse(full_args, meta.copy())
             updated_meta["path"] = meta.path
             modified_keys: list[str] = []
 
             # Handle ID arguments specifically
             id_mappings = {
-                'tmdb': ['tmdb_id', 'tmdb', 'tmdb_manual'],
-                'tvmaze': ['tvmaze_id', 'tvmaze', 'tvmaze_manual'],
-                'imdb': ['imdb_id', 'imdb', 'imdb_manual'],
-                'tvdb': ['tvdb_id', 'tvdb', 'tvdb_manual'],
+                "tmdb": ["tmdb_id", "tmdb", "tmdb_manual"],
+                "tvmaze": ["tvmaze_id", "tvmaze", "tvmaze_manual"],
+                "imdb": ["imdb_id", "imdb", "imdb_manual"],
+                "tvdb": ["tvdb_id", "tvdb", "tvdb_manual"],
             }
 
             for key in arg_keys_to_track:
@@ -163,7 +163,7 @@ class ApplyOverrides:
                         try:
                             if isinstance(value, str) and value.isdigit():
                                 value = int(value)
-                            elif isinstance(value, str) and key == 'imdb' and value.startswith('tt'):
+                            elif isinstance(value, str) and key == "imdb" and value.startswith("tt"):
                                 value = int(value[2:])  # Remove 'tt' prefix and convert to int
                         except ValueError:
                             pass
@@ -176,7 +176,7 @@ class ApplyOverrides:
                 # Handle regular fields
                 elif key in updated_meta and key in meta:
                     # Skip path to preserve original
-                    if key == 'path':
+                    if key == "path":
                         continue
 
                     new_value = updated_meta[key]

@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import collections
+import contextlib
 import os
 import platform
 import re
@@ -24,7 +25,9 @@ from src.torrentcreate import TorrentCreator
 
 # These have to be global variables to be shared across all instances since a new instance is made every time
 qbittorrent_cached_clients: dict[tuple[str, int, str], qbittorrentapi.Client] = {}  # Cache for qbittorrent clients that have been successfully logged into
-qbittorrent_locks: collections.defaultdict[tuple[str, int, str], asyncio.Lock] = collections.defaultdict(asyncio.Lock)  # Locks for qbittorrent clients to prevent concurrent logins
+qbittorrent_locks: collections.defaultdict[tuple[str, int, str], asyncio.Lock] = collections.defaultdict(
+    asyncio.Lock
+)  # Locks for qbittorrent clients to prevent concurrent logins
 
 
 class _CandidateEntry(TypedDict):
@@ -49,25 +52,21 @@ class QbittorrentClientMixin:
         raise NotImplementedError
 
     async def get_ptp_from_hash_qbit(self, meta: Meta, client: dict[str, Any], pathed: bool = False) -> Meta:
-        proxy_url = client.get('qui_proxy_url')
+        proxy_url = client.get("qui_proxy_url")
         qbt_proxy_url = ""
         qbt_client: qbittorrentapi.Client | None = None
         qbt_session: httpx.AsyncClient | None = None
 
         if proxy_url:
-            qbt_proxy_url = proxy_url.rstrip('/')
+            qbt_proxy_url = proxy_url.rstrip("/")
             ssl_context = self.create_ssl_context_for_client(client)
-            qbt_session = httpx.AsyncClient(
-                timeout=10.0,
-                verify=ssl_context
-            )
-            qbt_proxy_url = proxy_url.rstrip('/')
+            qbt_session = httpx.AsyncClient(timeout=10.0, verify=ssl_context)
+            qbt_proxy_url = proxy_url.rstrip("/")
         else:
             potential_qbt_client = await self.init_qbittorrent_client(client)
             if not potential_qbt_client:
                 return meta
-            else:
-                qbt_client = potential_qbt_client
+            qbt_client = potential_qbt_client
 
         info_hash_v1 = meta.infohash
         if not isinstance(info_hash_v1, str) or not info_hash_v1 or not meta.path:
@@ -76,19 +75,18 @@ class QbittorrentClientMixin:
 
         class TorrentInfo:
             def __init__(self, properties_data: dict[str, Any]) -> None:
-                self.hash = properties_data.get('hash', info_hash_v1)
-                self.infohash_v1 = properties_data.get('infohash_v1', info_hash_v1)
-                self.name = properties_data.get('name', '')
-                self.comment = properties_data.get('comment', '')
-                self.tracker = ''
+                self.hash = properties_data.get("hash", info_hash_v1)
+                self.infohash_v1 = properties_data.get("infohash_v1", info_hash_v1)
+                self.name = properties_data.get("name", "")
+                self.comment = properties_data.get("comment", "")
+                self.tracker = ""
                 self.files: list[Any] = []
 
         try:
             if proxy_url:
                 if qbt_session is None:
                     raise RuntimeError("qbt_session should not be None")
-                response = await qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/properties",
-                                                 params={'hash': info_hash_v1}, timeout=14.0)
+                response = await qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/properties", params={"hash": info_hash_v1}, timeout=14.0)
                 if response.status_code == 200:
                     torrent_properties = response.json()
                     logger.debug(f"[cyan]Retrieved torrent properties via proxy for hash: {info_hash_v1}")
@@ -126,17 +124,17 @@ class QbittorrentClientMixin:
             return meta
         found = False
 
-        folder_id = os.path.basename(meta.path)
+        folder_id = Path(meta.path).name
         if not meta.uuid:
             meta.uuid = folder_id
 
-        extracted_torrent_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
-        os.makedirs(extracted_torrent_dir, exist_ok=True)
+        extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
         for torrent in torrents:
             try:
-                if getattr(torrent, 'infohash_v1', '') == info_hash_v1:
-                    comment = getattr(torrent, 'comment', "")
+                if getattr(torrent, "infohash_v1", "") == info_hash_v1:
+                    comment = getattr(torrent, "comment", "")
 
                     torrent_comments = meta.torrent_comments
                     if not isinstance(torrent_comments, list):
@@ -144,9 +142,9 @@ class QbittorrentClientMixin:
                         meta.torrent_comments = torrent_comments
 
                     comment_data = {
-                        'hash': getattr(torrent, 'infohash_v1', ''),
-                        'name': getattr(torrent, 'name', ''),
-                        'comment': comment,
+                        "hash": getattr(torrent, "infohash_v1", ""),
+                        "name": getattr(torrent, "name", ""),
+                        "comment": comment,
                     }
                     cast(list[dict[str, Any]], torrent_comments).append(comment_data)
 
@@ -187,7 +185,7 @@ class QbittorrentClientMixin:
                                         lambda qbt_client=qbt_client, torrent_hash=torrent_hash: asyncio.to_thread(qbt_client.torrents_export, torrent_hash=torrent_hash),
                                         f"Export torrent {torrent_hash}",
                                     )
-                                torrent_file_path = os.path.join(extracted_torrent_dir, f"{torrent_hash}.torrent")
+                                torrent_file_path = Path(extracted_torrent_dir) / f"{torrent_hash}.torrent"
 
                                 await asyncio.to_thread(Path(torrent_file_path).write_bytes, torrent_file_content)
 
@@ -316,7 +314,7 @@ class QbittorrentClientMixin:
         logger.debug("[green]Searching qBittorrent for an existing .torrent")
 
         torrent_storage_dir = client.get("torrent_storage_dir")
-        extracted_torrent_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
+        extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid
 
         if not extracted_torrent_dir or extracted_torrent_dir.strip() == "tmp/":
             logger.info("[bold red]Invalid extracted torrent directory path. Check `meta.base_dir` and `meta.uuid`.")
@@ -351,7 +349,7 @@ class QbittorrentClientMixin:
                 return None
 
             # Ensure extracted torrent directory exists
-            os.makedirs(extracted_torrent_dir, exist_ok=True)
+            Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
             # **Step 1: Find correct torrents using content_path**
             best_match: dict[str, Any] | None = None
@@ -384,9 +382,9 @@ class QbittorrentClientMixin:
                         response_data = response.json()
 
                         torrents_data: list[dict[str, Any]]
-                        if isinstance(response_data, dict) and 'torrents' in response_data:
+                        if isinstance(response_data, dict) and "torrents" in response_data:
                             response_data_dict = cast(dict[str, Any], response_data)
-                            torrents_value = response_data_dict.get('torrents', [])
+                            torrents_value = response_data_dict.get("torrents", [])
                             torrents_data = cast(list[dict[str, Any]], torrents_value) if isinstance(torrents_value, list) else []
                         elif isinstance(response_data, list):
                             torrents_data = cast(list[dict[str, Any]], response_data)
@@ -410,11 +408,7 @@ class QbittorrentClientMixin:
                     if qbt_client is None:
                         logger.info("[bold red]qBittorrent client not initialized")
                         return None
-                    torrents = await self.retry_qbt_operation(
-                        lambda: asyncio.to_thread(qbt_client.torrents_info),
-                        "Get torrents list",
-                        initial_timeout=14.0
-                    )
+                    torrents = await self.retry_qbt_operation(lambda: asyncio.to_thread(qbt_client.torrents_info), "Get torrents list", initial_timeout=14.0)
             except TimeoutError:
                 logger.info("[bold red]Getting torrents list timed out after retries")
                 return None
@@ -468,8 +462,8 @@ class QbittorrentClientMixin:
 
                 # **Use `torrent_storage_dir` if available**
                 if torrent_storage_dir:
-                    torrent_file_path = os.path.join(torrent_storage_dir, f"{torrent_hash}.torrent")
-                    if not os.path.exists(torrent_file_path):
+                    torrent_file_path = Path(torrent_storage_dir) / f"{torrent_hash}.torrent"
+                    if not Path(torrent_file_path).exists():
                         logger.info(f"[yellow]Torrent file not found in storage directory: {torrent_file_path}")
                         continue
                 else:
@@ -500,7 +494,7 @@ class QbittorrentClientMixin:
                         )
 
                     if torrent_file_content is not None:
-                        torrent_file_path = os.path.join(extracted_torrent_dir, f"{torrent_hash}.torrent")
+                        torrent_file_path = Path(extracted_torrent_dir) / f"{torrent_hash}.torrent"
 
                         await asyncio.to_thread(Path(torrent_file_path).write_bytes, torrent_file_content)
                         logger.debug(f"[green]Successfully saved .torrent file: {torrent_file_path}")
@@ -568,7 +562,7 @@ class QbittorrentClientMixin:
         if meta.keep_folder:
             path = os.path.dirname(path)
         else:
-            isdir = os.path.isdir(path)
+            isdir = Path(path).is_dir()
             if len(filelist) != 1 or not isdir:
                 path = os.path.dirname(path)
 
@@ -602,7 +596,7 @@ class QbittorrentClientMixin:
             mounted_volumes: list[str] = []
             try:
                 # Read mount points from /proc/mounts or use 'mount' command output
-                if os.path.exists("/proc/mounts"):
+                if Path("/proc/mounts").exists():
                     mounts_text = await asyncio.to_thread(Path("/proc/mounts").read_text)
                     for line in mounts_text.splitlines():
                         parts = line.split()
@@ -618,7 +612,7 @@ class QbittorrentClientMixin:
                             mount_point = parts[2]
                             mounted_volumes.append(mount_point)
             except Exception as e:
-                logger.debug(f"[yellow]Error getting mount points: {str(e)}")
+                logger.debug(f"[yellow]Error getting mount points: {e!s}")
 
             # Sort mount points by length (descending) to find most specific match first
             mounted_volumes.sort(key=len, reverse=True)
@@ -665,8 +659,8 @@ class QbittorrentClientMixin:
 
                 # Check if both are mounted under the same parent directory
                 if len(folder_parts) >= 2 and len(src_drive_parts) >= 2 and folder_parts[1] == src_drive_parts[1]:
-                    potential_match = os.path.join(src_drive, folder_parts[-1])
-                    if os.path.exists(potential_match):
+                    potential_match = Path(src_drive) / folder_parts[-1]
+                    if Path(potential_match).exists():
                         link_target = potential_match
                         logger.debug(f"[cyan]Found sibling mount point linked folder: {link_target}")
                         break
@@ -688,14 +682,14 @@ class QbittorrentClientMixin:
             link_dir_name = str(tracker_cfg.get("link_dir_name", "")).strip()
             if link_target is None:
                 raise RuntimeError("link_target cannot be None")
-            tracker_dir = os.path.join(link_target, link_dir_name or tracker)
+            tracker_dir = Path(link_target) / link_dir_name or tracker
             await asyncio.to_thread(os.makedirs, tracker_dir, exist_ok=True)
 
             if cross:
                 linking_success = await create_cross_seed_links(meta=meta, torrent=torrent, tracker_dir=tracker_dir, use_hardlink=use_hardlink)
             else:
-                src_name = os.path.basename(src.rstrip(os.sep))
-                dst = os.path.join(tracker_dir, src_name)
+                src_name = Path(src.rstrip(os.sep)).name
+                dst = Path(tracker_dir) / src_name
                 linking_success = await async_link_directory(src=src, dst=dst, use_hardlink=use_hardlink)
 
             allow_fallback = client.get("allow_fallback", True)
@@ -721,8 +715,7 @@ class QbittorrentClientMixin:
             potential_qbt_client = await self.init_qbittorrent_client(client)
             if not potential_qbt_client:
                 return
-            else:
-                qbt_client = potential_qbt_client
+            qbt_client = potential_qbt_client
 
         logger.debug("[bold yellow]Adding and rechecking torrent")
 
@@ -745,7 +738,7 @@ class QbittorrentClientMixin:
                 # Get the relative part of the path
                 rel_path = os.path.relpath(save_path, local_path)
                 # Combine remote path with relative path
-                save_path = os.path.join(remote_path, rel_path)
+                save_path = Path(remote_path) / rel_path
 
             # For direct replacement if the above approach doesn't work
             elif local_path.lower() in save_path.lower():
@@ -878,7 +871,7 @@ class QbittorrentClientMixin:
                         break
             except TimeoutError:
                 pass  # Continue waiting
-            except Exception:
+            except Exception:  # noqa: S110
                 pass  # Continue waiting
             await asyncio.sleep(1)
         else:
@@ -980,7 +973,7 @@ class QbittorrentClientMixin:
         except TimeoutError:
             raise
         except Exception as e:
-            logger.error(f"[red]Error searching for torrents: {str(e)}[/red]")
+            logger.error(f"[red]Error searching for torrents: {e!s}[/red]")
             logger.info(f"[dim]{traceback.format_exc()}[/dim]")
 
     async def find_qbit_torrents_by_path(self, content_path: str, meta: Meta) -> list[dict[str, Any]]:
@@ -1053,9 +1046,9 @@ class QbittorrentClientMixin:
 
                     stop_due_to_constraints = (
                         not constraints_enabled
-                        or found_piece_size == 'no_constraints'
-                        or found_piece_size == 'MTV'
-                        or (found_piece_size == '16MiB' and constraints_enabled == '16MiB')
+                        or found_piece_size == "no_constraints"
+                        or found_piece_size == "MTV"
+                        or (found_piece_size == "16MiB" and constraints_enabled == "16MiB")
                     )
                     should_stop = stop_due_to_constraints
 
@@ -1069,8 +1062,8 @@ class QbittorrentClientMixin:
             seen_hashes: set[str] = set()
             unique_torrents: list[dict[str, Any]] = []
             for torrent in all_matching_torrents:
-                if torrent['hash'] not in seen_hashes:
-                    seen_hashes.add(torrent['hash'])
+                if torrent["hash"] not in seen_hashes:
+                    seen_hashes.add(torrent["hash"])
                     unique_torrents.append(torrent)
 
             end_time = time.time()
@@ -1096,30 +1089,25 @@ class QbittorrentClientMixin:
         except TimeoutError:
             raise
         except Exception as e:
-            logger.info(f"[bold red]Error finding torrents: {str(e)}")
+            logger.info(f"[bold red]Error finding torrents: {e!s}")
             logger.debug(traceback.format_exc())
             end_time = time.time()
             logger.debug(f"Searching qBittorrent client data processed in {end_time - start_time:.2f} seconds")
             return []
 
     def _build_proxy_search_url(self, qbt_proxy_url: str, search_term: str, qui_filters: dict[str, list[str]]) -> str:
-        query_parts = [
-            f"search={urllib.parse.quote(search_term)}",
-            "sort=added_on",
-            "reverse=true",
-            "limit=100"
-        ]
+        query_parts = [f"search={urllib.parse.quote(search_term)}", "sort=added_on", "reverse=true", "limit=100"]
 
-        if qui_filters.get('excludeStatus'):
-            filter_value = ','.join(qui_filters['excludeStatus'])
+        if qui_filters.get("excludeStatus"):
+            filter_value = ",".join(qui_filters["excludeStatus"])
             query_parts.append(f"filter={urllib.parse.quote(filter_value)}")
 
-        if qui_filters.get('categories'):
-            category_value = ','.join(qui_filters['categories'])
+        if qui_filters.get("categories"):
+            category_value = ",".join(qui_filters["categories"])
             query_parts.append(f"category={urllib.parse.quote(category_value)}")
 
-        if qui_filters.get('tags'):
-            tag_value = ','.join(qui_filters['tags'])
+        if qui_filters.get("tags"):
+            tag_value = ",".join(qui_filters["tags"])
             query_parts.append(f"tag={urllib.parse.quote(tag_value)}")
 
         query_string = "&".join(query_parts)
@@ -1130,12 +1118,12 @@ class QbittorrentClientMixin:
             def __init__(self, data: dict[str, Any]):
                 for key, value in data.items():
                     setattr(self, key, value)
-                if not hasattr(self, 'files'):
+                if not hasattr(self, "files"):
                     self.files: list[Any] = []
-                if not hasattr(self, 'tracker'):
-                    self.tracker = ''
-                if not hasattr(self, 'comment'):
-                    self.comment = ''
+                if not hasattr(self, "tracker"):
+                    self.tracker = ""
+                if not hasattr(self, "comment"):
+                    self.comment = ""
 
             def __getattr__(self, name: str) -> Any:
                 return None
@@ -1146,8 +1134,8 @@ class QbittorrentClientMixin:
         is_disc = meta.is_disc
         if is_disc in ("", None) and len(meta.filelist) == 1:
             file_path = meta.filelist[0]
-            file_name = os.path.basename(file_path)
-            parent_dir = os.path.basename(os.path.dirname(file_path))
+            file_name = Path(file_path).name
+            parent_dir = Path(os.path.dirname(file_path)).name
             return torrent_name.lower() == file_name.lower() or torrent_name.lower() == meta.uuid.lower() or (parent_dir and torrent_name.lower() == parent_dir.lower())
         return torrent_name.lower() == meta.uuid.lower()
 
@@ -1166,35 +1154,36 @@ class QbittorrentClientMixin:
                 match = re.search(tracker_info["pattern"], torrent.comment)
                 if match:
                     tracker_id_value = match.group(1)
-                    tracker_id_matches.append({
-                        'id': tracker_id,
-                        'tracker_id': tracker_id_value
-                    })
+                    tracker_id_matches.append({"id": tracker_id, "tracker_id": tracker_id_value})
                     meta[tracker_id] = tracker_id_value
                     tracker_found = True
 
-        if torrent.tracker and 'hawke.uno' in torrent.tracker and has_working_tracker:
+        if torrent.tracker and "hawke.uno" in torrent.tracker and has_working_tracker:
             huno_id = None
             if "/torrents/" in torrent.comment:
-                match = re.search(r'/torrents/(\d+)', torrent.comment)
+                match = re.search(r"/torrents/(\d+)", torrent.comment)
                 if match:
                     huno_id = match.group(1)
 
             if huno_id:
-                tracker_id_matches.append({
-                    'id': 'huno',
-                    'tracker_id': huno_id,
-                })
+                tracker_id_matches.append(
+                    {
+                        "id": "huno",
+                        "tracker_id": huno_id,
+                    }
+                )
                 meta.huno = huno_id
                 tracker_found = True
 
-        if torrent.tracker and 'tracker.anthelion.me' in torrent.tracker:
+        if torrent.tracker and "tracker.anthelion.me" in torrent.tracker:
             ant_id = 1
             if has_working_tracker:
-                tracker_id_matches.append({
-                    'id': 'ant',
-                    'tracker_id': ant_id,
-                })
+                tracker_id_matches.append(
+                    {
+                        "id": "ant",
+                        "tracker_id": ant_id,
+                    }
+                )
                 meta.ant = ant_id
                 tracker_found = True
 
@@ -1203,18 +1192,14 @@ class QbittorrentClientMixin:
     def _sort_matching_torrents(self, matching_torrents: list[dict[str, Any]], tracker_priority: list[str]) -> None:
         def get_priority_score(torrent: dict[str, Any]) -> tuple[bool, int, bool]:
             priority_score = 100
-            if torrent.get('tracker_urls'):
-                for tracker_url in torrent['tracker_urls']:
-                    tracker_id = tracker_url.get('id')
+            if torrent.get("tracker_urls"):
+                for tracker_url in torrent["tracker_urls"]:
+                    tracker_id = tracker_url.get("id")
                     if tracker_id in tracker_priority:
                         score = tracker_priority.index(tracker_id)
                         priority_score = min(priority_score, score)
 
-            return (
-                not torrent['has_working_tracker'],
-                priority_score,
-                not torrent['has_tracker']
-            )
+            return (not torrent["has_working_tracker"], priority_score, not torrent["has_tracker"])
 
         matching_torrents.sort(key=get_priority_score)
 
@@ -1226,11 +1211,9 @@ class QbittorrentClientMixin:
             # Determine URL
             url = ""
             if name in tracker_class_map:
-                try:
+                with contextlib.suppress(Exception):
                     tracker_instance = tracker_class_map[name](self.config)
                     url = getattr(tracker_instance, "base_url", "")
-                except Exception:
-                    pass
             if not url:
                 url = self.config.get("TRACKERS", {}).get(name, {}).get("announce_url", "")
             if not url:
@@ -1316,16 +1299,14 @@ class QbittorrentClientMixin:
                         logger.debug("[cyan]No matching torrents found via proxy search")
 
                     return self._build_mock_torrents(torrents_data)
+                if response.status_code == 404:
+                    logger.debug(f"[yellow]No torrents found via proxy search for '[green]{search_term}' [yellow]Maybe tracker errors?")
                 else:
-                    if response.status_code == 404:
-                        logger.debug(f"[yellow]No torrents found via proxy search for '[green]{search_term}' [yellow]Maybe tracker errors?")
-                    else:
-                        logger.debug(f"[bold red]Failed to get torrents list via proxy: {response.status_code}")
-                    return []
-            else:
-                if qbt_client is None:
-                    return []
-                return await self.retry_qbt_operation(lambda: asyncio.to_thread(qbt_client.torrents_info), "Get torrents list", initial_timeout=14.0)
+                    logger.debug(f"[bold red]Failed to get torrents list via proxy: {response.status_code}")
+                return []
+            if qbt_client is None:
+                return []
+            return await self.retry_qbt_operation(lambda: asyncio.to_thread(qbt_client.torrents_info), "Get torrents list", initial_timeout=14.0)
         except TimeoutError:
             logger.info("[bold red]Getting torrents list timed out after retries")
             return []
@@ -1431,7 +1412,7 @@ class QbittorrentClientMixin:
                     "hash": torrent.hash,
                     "name": torrent.name,
                     "save_path": torrent.save_path,
-                    "content_path": os.path.normpath(os.path.join(str(torrent.save_path), str(torrent.name))),
+                    "content_path": os.path.normpath(Path(str(torrent.save_path)) / str(torrent.name)),
                     "size": torrent.size,
                     "category": torrent.category,
                     "seeders": torrent.num_complete,
@@ -1454,7 +1435,7 @@ class QbittorrentClientMixin:
                 matching_torrents.append(match_info)
 
             except Exception as e:
-                logger.debug(f"[yellow]Error processing torrent {torrent.name}: {str(e)}")
+                logger.debug(f"[yellow]Error processing torrent {torrent.name}: {e!s}")
                 continue
 
         return matching_torrents
@@ -1474,8 +1455,8 @@ class QbittorrentClientMixin:
         prefix = "alternative " if is_alternative else ""
 
         if torrent_storage_dir:
-            potential_path = os.path.join(torrent_storage_dir, f"{torrent_hash}.torrent")
-            if os.path.exists(potential_path):
+            potential_path = Path(torrent_storage_dir) / f"{torrent_hash}.torrent"
+            if Path(potential_path).exists():
                 torrent_file_path = potential_path
                 logger.debug(f"[cyan]Found existing {prefix}.torrent file: {torrent_file_path}")
 
@@ -1505,7 +1486,7 @@ class QbittorrentClientMixin:
                 )
 
             if torrent_file_content is not None:
-                torrent_file_path = os.path.join(extracted_torrent_dir, f"{torrent_hash}.torrent")
+                torrent_file_path = Path(extracted_torrent_dir) / f"{torrent_hash}.torrent"
                 await asyncio.to_thread(Path(torrent_file_path).write_bytes, torrent_file_content)
                 logger.debug(f"[green]Exported {prefix}.torrent file to: {torrent_file_path}")
             else:
@@ -1526,8 +1507,8 @@ class QbittorrentClientMixin:
         if not meta.base_torrent_created:
             torrent_storage_dir = client_config.get("torrent_storage_dir")
 
-            extracted_torrent_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
-            os.makedirs(extracted_torrent_dir, exist_ok=True)
+            extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+            Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
             # Set up piece size preference logic
             mtv_config = self.config.get("TRACKERS", {}).get("MTV", {})
@@ -1573,7 +1554,7 @@ class QbittorrentClientMixin:
                                 logger.debug(f"[green]Updated best match: {piece_size_best_match}")
                         except Exception as e:
                             logger.info(f"[bold red]Error reading torrent data for {torrent_hash}: {e}")
-                            if os.path.exists(torrent_file_path) and torrent_file_path.startswith(extracted_torrent_dir):
+                            if Path(torrent_file_path).exists() and torrent_file_path.startswith(extracted_torrent_dir):
                                 os.remove(torrent_file_path)
                     else:
                         # If piece preference is disabled, return first valid torrent
@@ -1587,7 +1568,7 @@ class QbittorrentClientMixin:
                             logger.info(f"[bold red]Error creating BASE.torrent: {e}")
                 else:
                     logger.debug(f"[bold red]{torrent_hash} failed validation")
-                    if os.path.exists(torrent_file_path) and torrent_file_path.startswith(extracted_torrent_dir):
+                    if Path(torrent_file_path).exists() and torrent_file_path.startswith(extracted_torrent_dir):
                         os.remove(torrent_file_path)
 
                     # If first torrent fails validation, continue to try other matches
@@ -1649,7 +1630,7 @@ class QbittorrentClientMixin:
                                     logger.info(f"[bold red]Error creating BASE.torrent for alternative: {e}")
                         else:
                             logger.debug(f"[bold red]{alt_torrent_hash} failed validation")
-                            if os.path.exists(alt_torrent_file_path) and alt_torrent_file_path.startswith(extracted_torrent_dir):
+                            if Path(alt_torrent_file_path).exists() and alt_torrent_file_path.startswith(extracted_torrent_dir):
                                 os.remove(alt_torrent_file_path)
 
                 if not found_valid_torrent:
@@ -1712,8 +1693,7 @@ class QbittorrentClientMixin:
                 potential_qbt_client = await self.init_qbittorrent_client(client_config)
                 if not potential_qbt_client:
                     return []
-                else:
-                    qbt_client = potential_qbt_client
+                qbt_client = potential_qbt_client
 
             search_term = meta.uuid.replace("[", ".").replace("]", ".")
             torrents = await self._fetch_torrents(proxy_url, qbt_proxy_url, qbt_session, qbt_client, search_term)
@@ -1753,12 +1733,13 @@ class QbittorrentClientMixin:
         except TimeoutError:
             raise
         except Exception as e:
-            logger.info(f"[bold red]Error finding torrents in {client_name}: {str(e)}")
+            logger.info(f"[bold red]Error finding torrents in {client_name}: {e!s}")
             logger.debug(traceback.format_exc())
             return []
         finally:
             if qbt_session is not None:
                 await qbt_session.aclose()
+
 
 _cached_tracker_url_patterns: dict[str, list[str]] | None = None
 
@@ -1784,7 +1765,7 @@ async def match_tracker_url(tracker_urls: list[str], meta: Meta) -> None:
                 if pattern in tracker:
                     found_ids.add(tracker_id.upper())
                     logger.debug(f"[bold cyan]Matched {tracker_id.upper()} in tracker URL: {Redaction.redact_private_info(tracker)}")
-                    if tracker_id.upper() == 'PTP' and 'passthepopcorn.me' in tracker and tracker.startswith('http://'):
+                    if tracker_id.upper() == "PTP" and "passthepopcorn.me" in tracker and tracker.startswith("http://"):
                         logger.info("[red]Found PTP announce URL using plaintext HTTP.\n")
                         logger.info(
                             "[red]PTP is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PTP/forums.php?page=1&action=viewthread&threadid=46663"
@@ -1801,53 +1782,47 @@ async def match_tracker_url(tracker_urls: list[str], meta: Meta) -> None:
 
 
 async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str, use_hardlink: bool) -> bool:
-    metainfo_raw = getattr(torrent, 'metainfo', {})
+    metainfo_raw = getattr(torrent, "metainfo", {})
     metainfo: dict[str, Any] = cast(dict[str, Any], metainfo_raw) if isinstance(metainfo_raw, dict) else cast(dict[str, Any], {})
-    info_raw = metainfo.get('info')
+    info_raw = metainfo.get("info")
     info = cast(dict[str, Any], info_raw) if isinstance(info_raw, dict) else {}
-    raw_torrent_name = info.get('name.utf-8') or info.get('name') or getattr(torrent, 'name', None)
+    raw_torrent_name = info.get("name.utf-8") or info.get("name") or getattr(torrent, "name", None)
     torrent_name = str(raw_torrent_name) if raw_torrent_name else None
     if not torrent_name:
         logger.info("[bold red]Cross-seed torrent is missing an info name; cannot build link structure")
         return False
 
-    multi_file = bool(info.get('files'))
+    multi_file = bool(info.get("files"))
     torrent_files: list[_TorrentFileEntry] = []
 
     def decode_component(value: Any) -> str:
         if isinstance(value, bytes):
-            return value.decode('utf-8', errors='ignore')
+            return value.decode("utf-8", errors="ignore")
         return str(value)
 
     if multi_file:
-        files_raw = info.get('files', [])
+        files_raw = info.get("files", [])
         files_list = cast(list[dict[str, Any]], files_raw) if isinstance(files_raw, list) else []
         for file_entry in files_list:
-            raw_path: Any = file_entry.get('path.utf-8') or file_entry.get('path') or []
+            raw_path: Any = file_entry.get("path.utf-8") or file_entry.get("path") or []
             if isinstance(raw_path, (list, tuple)):
                 raw_path_list = cast(list[Any], raw_path)
                 components = [decode_component(part) for part in raw_path_list]
-                rel_path = os.path.join(*components) if components else ''
+                rel_path = Path(*components) if components else ""
             else:
                 rel_path = decode_component(raw_path)
-            rel_path = rel_path.replace('/', os.sep)
-            rel_path = rel_path.replace('\\', os.sep)
+            rel_path = rel_path.replace("/", os.sep)
+            rel_path = rel_path.replace("\\", os.sep)
             rel_path = os.path.normpath(rel_path)
-            if rel_path.startswith('..'):
-                rel_path = rel_path.lstrip('.\\/')
-            length_value = file_entry.get('length')
-            torrent_files.append({
-                'relative_path': rel_path,
-                'length': length_value if isinstance(length_value, int) else None
-            })
+            if rel_path.startswith(".."):
+                rel_path = rel_path.lstrip(".\\/")
+            length_value = file_entry.get("length")
+            torrent_files.append({"relative_path": rel_path, "length": length_value if isinstance(length_value, int) else None})
     else:
-        length_value = info.get('length')
-        torrent_files.append({
-            'relative_path': torrent_name,
-            'length': length_value if isinstance(length_value, int) else None
-        })
+        length_value = info.get("length")
+        torrent_files.append({"relative_path": torrent_name, "length": length_value if isinstance(length_value, int) else None})
 
-    destination_root = os.path.join(tracker_dir, torrent_name) if multi_file else tracker_dir
+    destination_root = Path(tracker_dir) / torrent_name if multi_file else tracker_dir
     if multi_file:
         await asyncio.to_thread(os.makedirs, destination_root, exist_ok=True)
     else:
@@ -1856,9 +1831,9 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
     release_root_value = meta.path
     release_root = release_root_value if isinstance(release_root_value, str) else None
     candidate_paths: list[str] = []
-    if release_root and os.path.isdir(release_root):
+    if release_root and Path(release_root).is_dir():
         for root, _, files in os.walk(release_root):
-            candidate_paths.extend([os.path.join(root, file) for file in files])
+            candidate_paths.extend([Path(root) / file for file in files])
     else:
         filelist_value = meta.filelist
         if isinstance(filelist_value, list):
@@ -1872,18 +1847,18 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
             candidate_paths.extend(filelist)
             parent_guess = os.path.dirname(filelist[0])
         else:
-            parent_guess = os.path.dirname(release_root or '')
-        if parent_guess and os.path.isdir(parent_guess):
+            parent_guess = os.path.dirname(release_root or "")
+        if parent_guess and Path(parent_guess).is_dir():
             for root, _, files in os.walk(parent_guess):
-                candidate_paths.extend([os.path.join(root, file) for file in files])
+                candidate_paths.extend([Path(root) / file for file in files])
 
     unique_candidates: list[_CandidateEntry] = []
     seen: set[str] = set()
-    tracker_abs = os.path.abspath(tracker_dir) if tracker_dir else None
+    tracker_abs = str(Path(tracker_dir).resolve()) if tracker_dir else None
     for candidate in candidate_paths:
         if not candidate:
             continue
-        abs_candidate = os.path.abspath(candidate)
+        abs_candidate = str(Path(candidate).resolve())
         if abs_candidate in seen:
             continue
         seen.add(abs_candidate)
@@ -1899,70 +1874,65 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
             size = os.path.getsize(abs_candidate)
         except OSError:
             size = None
-        unique_candidates.append({
-            'path': abs_candidate,
-            'name': os.path.basename(abs_candidate).lower(),
-            'size': size,
-            'used': False
-        })
+        unique_candidates.append({"path": abs_candidate, "name": Path(abs_candidate).name.lower(), "size": size, "used": False})
 
     if not unique_candidates:
         logger.info("[bold red]Unable to find source files for cross-seed linking")
         return False
 
     def pick_candidate(filename: str | None, length: int | None) -> tuple[str | None, str | None]:
-        lower_name = (filename or '').lower()
+        lower_name = (filename or "").lower()
 
         if lower_name:
             for entry in unique_candidates:
-                if entry['used']:
+                if entry["used"]:
                     continue
-                if entry['name'] == lower_name and length is not None and entry['size'] == length:
-                    entry['used'] = True
-                    return entry['path'], 'name_size'
+                if entry["name"] == lower_name and length is not None and entry["size"] == length:
+                    entry["used"] = True
+                    return entry["path"], "name_size"
 
         if lower_name:
             for entry in unique_candidates:
-                if entry['used']:
+                if entry["used"]:
                     continue
-                if entry['name'] == lower_name:
-                    entry['used'] = True
-                    return entry['path'], 'name_only'
+                if entry["name"] == lower_name:
+                    entry["used"] = True
+                    return entry["path"], "name_only"
 
         if length is not None:
             for entry in unique_candidates:
-                if entry['used']:
+                if entry["used"]:
                     continue
-                if entry['size'] == length:
-                    entry['used'] = True
-                    return entry['path'], 'size_only'
+                if entry["size"] == length:
+                    entry["used"] = True
+                    return entry["path"], "size_only"
 
         for entry in unique_candidates:
-            if entry['used']:
+            if entry["used"]:
                 continue
-            entry['used'] = True
-            return entry['path'], 'fallback'
+            entry["used"] = True
+            return entry["path"], "fallback"
 
         return None, None
 
     for torrent_file in torrent_files:
-        relative_path = torrent_file['relative_path']
-        dest_file_path = os.path.join(tracker_dir, torrent_name, relative_path) if multi_file else os.path.join(tracker_dir, torrent_name)
+        relative_path = torrent_file["relative_path"]
+        dest_file_path = Path(tracker_dir) / torrent_name / relative_path if multi_file else Path(tracker_dir) / torrent_name
         dest_file_path = os.path.normpath(dest_file_path)
-        tracker_root = os.path.abspath(tracker_dir)
+        tracker_root = str(Path(tracker_dir).resolve())
         try:
-            if os.path.commonpath([tracker_root, os.path.abspath(dest_file_path)]) != tracker_root:
+            if os.path.commonpath([tracker_root, str(Path(dest_file_path).resolve())]) != tracker_root:
                 logger.info(f"[bold red]Refusing to create link outside tracker directory: {dest_file_path}")
                 return False
         except ValueError:
             logger.info(f"[bold red]Refusing to create link outside tracker directory: {dest_file_path}")
             return False
 
-        source_file, match_reason = pick_candidate(os.path.basename(relative_path), torrent_file.get('length'))
+        source_file, match_reason = pick_candidate(Path(relative_path).name, torrent_file.get("length"))
         if not source_file:
             logger.info(f"[bold red]Failed to map cross-seed file: {relative_path}")
             return False
-        if match_reason == 'fallback':
+        if match_reason == "fallback":
             logger.debug(f"[yellow]Cross-seed mapping fallback used for: {relative_path}")
 
         dest_parent = os.path.dirname(dest_file_path)
@@ -1977,7 +1947,7 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
             logger.info(f"[bold red]Linking failed for cross-seed file: {relative_path}")
             return False
 
-    logger.debug(f"[green]Prepared cross-seed link tree at {os.path.join(tracker_dir, torrent_name) if multi_file else tracker_dir}")
+    logger.debug(f"[green]Prepared cross-seed link tree at {Path(tracker_dir) / torrent_name if multi_file else tracker_dir}")
     return True
 
 
@@ -2025,9 +1995,9 @@ async def async_link_directory(src: str, dst: str, use_hardlink: bool = True) ->
                     items: list[tuple[str, str, str]] = []
                     for root, _dirs, files in os.walk(src):
                         for file in files:
-                            src_path = os.path.join(root, file)
+                            src_path = Path(root) / file
                             rel_path = os.path.relpath(src_path, src)
-                            items.append((src_path, os.path.join(dst, rel_path), rel_path))
+                            items.append((src_path, Path(dst) / rel_path, rel_path))
                     return items
 
                 all_items = await asyncio.to_thread(_collect_files, src, dst)
@@ -2058,19 +2028,18 @@ async def async_link_directory(src: str, dst: str, use_hardlink: bool = True) ->
                         break
 
                 return success
-            else:
-                # For symlinks, just link the directory itself
-                try:
-                    if platform.system() == "Windows":
-                        await asyncio.to_thread(os.symlink, src, dst, target_is_directory=True)
-                    else:
-                        await asyncio.to_thread(os.symlink, src, dst)
+            # For symlinks, just link the directory itself
+            try:
+                if platform.system() == "Windows":
+                    await asyncio.to_thread(os.symlink, src, dst, target_is_directory=True)
+                else:
+                    await asyncio.to_thread(os.symlink, src, dst)
 
-                    logger.debug(f"[green]Symbolic link created: {dst} -> {src}")
-                    return True
-                except OSError as e:
-                    logger.info(f"[yellow]Symlink failed: {e}")
-                    return False
+                logger.debug(f"[green]Symbolic link created: {dst} -> {src}")
+                return True
+            except OSError as e:
+                logger.info(f"[yellow]Symlink failed: {e}")
+                return False
 
     except Exception as e:
         logger.info(f"[bold red]Error during linking: {e}")

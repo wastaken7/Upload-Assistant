@@ -9,12 +9,12 @@ Config = dict[str, Any]
 
 
 class LPT(NEXUSPHP):
-    banned_groups = []
+    banned_groups = ()
     base_url = "https://longpt.org"
     source_flag = "[longpt.org] LongPT"
     torrent_url = f"{base_url}/details.php?id="
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://longpt.org']
+    tracker_urls = ("https://longpt.org",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, "LPT")
@@ -54,8 +54,7 @@ class LPT(NEXUSPHP):
             ]
             if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in game_show_keywords):
                 return tv_shows
-            else:
-                return tv_series
+            return tv_series
 
         return movies
 
@@ -76,8 +75,7 @@ class LPT(NEXUSPHP):
         if is_disc == "bdmv":
             if resolution == "2160p":
                 return uhd_master_disc
-            else:
-                return blu_ray
+            return blu_ray
 
         if "dvd" in is_disc:
             return dvd

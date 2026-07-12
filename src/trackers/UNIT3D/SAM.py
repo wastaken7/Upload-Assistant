@@ -13,14 +13,14 @@ Config = dict[str, Any]
 class SAM(UNIT3D):
     tracker = "SAM"
     base_url = "https://samaritano.cc"
-    banned_groups = []
+    banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     requests_url = f"{base_url}/api/requests/filter"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ['https://samaritano.cc']
+    tracker_urls = ("https://samaritano.cc",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="SAM")
@@ -37,14 +37,13 @@ class SAM(UNIT3D):
         }
         if mapping_only:
             return resolution_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in resolution_id.items()}
-        elif resolution:
+        if resolution:
             return {"resolution_id": resolution_id.get(resolution, "10")}
-        else:
-            meta_resolution = meta.resolution
-            resolved_id = resolution_id.get(meta_resolution, "10")
-            return {"resolution_id": resolved_id}
+        meta_resolution = meta.resolution
+        resolved_id = resolution_id.get(meta_resolution, "10")
+        return {"resolution_id": resolved_id}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         cbr = CBR(self.config)
@@ -68,7 +67,7 @@ class SAM(UNIT3D):
         }
         if mapping_only:
             return cat_map
-        elif reverse:
+        if reverse:
             return {v: k for k, v in cat_map.items()}
 
         resolved_category = category if category is not None and category != "" else meta.category
@@ -113,7 +112,7 @@ class SAM(UNIT3D):
         }
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
 
         resolved_type = type if type is not None and type != "" else meta.type
@@ -153,9 +152,7 @@ class SAM(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK":
             return True
-        return await self.common.check_language_requirements(
-            meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True
-        )
+        return await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/size][/url][/right]"

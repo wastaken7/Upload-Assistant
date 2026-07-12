@@ -63,7 +63,7 @@ class DiscMenus:
 
         if self.path_to_menu_screenshots.lower() == "auto":
             await self.auto_capture_dvd_menus(meta)
-        elif os.path.isdir(self.path_to_menu_screenshots):
+        elif Path(self.path_to_menu_screenshots).is_dir():
             await self.get_local_images(meta)
         else:
             logger.info(f"[red]Invalid disc menus path: {self.path_to_menu_screenshots}[/red]")
@@ -87,18 +87,18 @@ class DiscMenus:
             max_menu_screens = 6
 
         captured_images = []
-        output_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
 
         # Get ffmpeg path
         ffmpeg_path = "ffmpeg"
         if platform.system() == "Linux":
-            ff_bin_dir = os.path.join(meta.base_dir, "bin", "ffmpeg")
+            ff_bin_dir = Path(meta.base_dir) / "bin" / "ffmpeg"
             machine = platform.machine().lower()
             arch = "amd" if machine in ("x86_64", "amd64") else ("arm" if machine in ("aarch64", "arm64") else None)
             if arch:
-                candidate = os.path.join(ff_bin_dir, arch, "ffmpeg")
-                if os.path.exists(candidate):
+                candidate = Path(ff_bin_dir) / arch / "ffmpeg"
+                if Path(candidate).exists():
                     ffmpeg_path = candidate
 
         def round_to_even(value: float) -> int:
@@ -116,7 +116,7 @@ class DiscMenus:
                 continue
 
             disc_path = disc.get("path")
-            if not disc_path or not os.path.isdir(disc_path):
+            if not disc_path or not Path(disc_path).is_dir():
                 continue
 
             # List and filter menu files
@@ -127,7 +127,7 @@ class DiscMenus:
                     if disc_type == "DVD" and file_lower.endswith(".vob"):
                         file_name = file.upper()
                         if file_name == "VIDEO_TS.VOB" or re.match(r"^VTS_\d{2}_0\.VOB$", file_name):
-                            file_path = os.path.join(disc_path, file)
+                            file_path = Path(disc_path) / file
                             if os.path.isfile(file_path) and os.path.getsize(file_path) > 50000:
                                 menu_files.append((file, file_path))
             except Exception as e:
@@ -193,7 +193,7 @@ class DiscMenus:
                 # Setup output file patterns
                 sanitized_disc_name = re.sub(r'[<>:"/\\|?*]', "_", disc.get("name", "dvd"))
                 vob_base = os.path.splitext(file)[0]
-                image_pattern = os.path.join(output_dir, f"{sanitized_disc_name}-{vob_base}-%03d.png")
+                image_pattern = Path(output_dir) / f"{sanitized_disc_name}-{vob_base}-%03d.png"
 
                 # Run ffmpeg
                 if duration_sec < 2.0:
@@ -221,7 +221,7 @@ class DiscMenus:
                         logger.error(f"[red]FFmpeg timed out processing {file}[/red]")
 
                     # Gather generated screenshots
-                    glob_pattern = os.path.join(output_dir, f"{sanitized_disc_name}-{vob_base}-*.png")
+                    glob_pattern = Path(output_dir) / f"{sanitized_disc_name}-{vob_base}-*.png"
                     found_images = sorted(glob.glob(glob_pattern))
 
                     # Filter out blank/black frames
@@ -231,7 +231,7 @@ class DiscMenus:
                             with Image.open(img_path) as img:
                                 extrema = img.convert("L").getextrema()
                                 if extrema and isinstance(extrema[1], (int, float)) and extrema[1] < 10:
-                                    logger.debug(f"Skipping {os.path.basename(img_path)} because it is a blank/black frame.")
+                                    logger.debug(f"Skipping {Path(img_path).name} because it is a blank/black frame.")
                                     os.remove(img_path)
                                     continue
                             valid_images.append(img_path)
@@ -276,7 +276,7 @@ class DiscMenus:
                                 with Image.open(img_path) as img:
                                     extrema = img.convert("L").getextrema()
                                     if extrema and isinstance(extrema[1], (int, float)) and extrema[1] < 10:
-                                        logger.debug(f"Skipping fallback frame {os.path.basename(img_path)} because it is a blank/black frame.")
+                                        logger.debug(f"Skipping fallback frame {Path(img_path).name} because it is a blank/black frame.")
                                         os.remove(img_path)
                                         continue
                                 valid_images.append(img_path)
@@ -288,7 +288,7 @@ class DiscMenus:
                     # Final retry: if still no images, retry from seek_time = 0
                     if not found_images and duration_sec >= 2.0:
                         logger.debug(f"FFmpeg fallback/scene detection failed for {file}. Retrying from start (seek_time=0).")
-                        image_path = os.path.join(output_dir, f"{sanitized_disc_name}-{vob_base}-001.png")
+                        image_path = Path(output_dir) / f"{sanitized_disc_name}-{vob_base}-001.png"
                         cmd_retry = [ffmpeg_path, "-y", "-i", file_path, "-vframes", "1", "-vf", vf_chain, "-update", "1", image_path]
                         process_retry = await asyncio.create_subprocess_exec(*cmd_retry, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
                         try:
@@ -306,7 +306,7 @@ class DiscMenus:
                                 with Image.open(img_path) as img:
                                     extrema = img.convert("L").getextrema()
                                     if extrema and isinstance(extrema[1], (int, float)) and extrema[1] < 10:
-                                        logger.debug(f"Skipping retry frame {os.path.basename(img_path)} because it is a blank/black frame.")
+                                        logger.debug(f"Skipping retry frame {Path(img_path).name} because it is a blank/black frame.")
                                         os.remove(img_path)
                                         continue
                                 valid_images.append(img_path)
@@ -352,9 +352,7 @@ class DiscMenus:
         Uploads disc menu images from a local directory.
         """
         image_paths = [
-            os.path.join(self.path_to_menu_screenshots, file)
-            for file in os.listdir(self.path_to_menu_screenshots)
-            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))
+            Path(self.path_to_menu_screenshots) / file for file in os.listdir(self.path_to_menu_screenshots) if file.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
         ]
 
         if not image_paths:
@@ -362,14 +360,7 @@ class DiscMenus:
             return
 
         uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
-            meta,
-            screens=len(image_paths),
-            img_host_num=1,
-            i=0,
-            total_screens=len(image_paths),
-            custom_img_list=image_paths,
-            return_dict={},
-            retry_mode=False
+            meta, screens=len(image_paths), img_host_num=1, i=0, total_screens=len(image_paths), custom_img_list=image_paths, return_dict={}, retry_mode=False
         )
         meta.menu_images = uploaded_images
 
@@ -383,14 +374,12 @@ class DiscMenus:
             logger.info("[yellow]No menu images found.[/yellow]")
             return
 
-        menu_images = {
-            "menu_images": list(image_list)
-        }
+        menu_images = {"menu_images": list(image_list)}
 
         base_dir = meta.base_dir
         uuid_value = meta.uuid
-        json_path = os.path.join(base_dir, 'tmp', uuid_value, 'menu_images.json')
-        os.makedirs(os.path.dirname(json_path), exist_ok=True)
+        json_path = Path(base_dir) / "tmp" / uuid_value / "menu_images.json"
+        Path(os.path.dirname(json_path)).mkdir(parents=True, exist_ok=True)
 
         menu_json = json.dumps(menu_images, indent=4)
         await asyncio.to_thread(Path(json_path).write_text, menu_json)

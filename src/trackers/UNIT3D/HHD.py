@@ -12,7 +12,7 @@ Config = dict[str, Any]
 class HHD(UNIT3D):
     tracker = "HHD"
     base_url = "https://homiehelpdesk.net"
-    banned_groups = [
+    banned_groups = (
         "aXXo",
         "BONE",
         "BRrip",
@@ -62,14 +62,14 @@ class HHD(UNIT3D):
         "YAWNiX",
         "YIFY",
         "YTS",
-    ]
+    )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     requests_url = f"{base_url}/api/requests/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ['https://homiehelpdesk.net']
+    tracker_urls = ("https://homiehelpdesk.net",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="HHD")
@@ -101,7 +101,7 @@ class HHD(UNIT3D):
         }
         if mapping_only:
             return category_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in category_id.items()}
 
         resolved_category = category if category else meta.category
@@ -154,7 +154,7 @@ class HHD(UNIT3D):
         }
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
 
         resolved_type = type if type else meta.type
@@ -169,33 +169,14 @@ class HHD(UNIT3D):
 
         return {"type_id": type_id.get(str(resolved_type), "0")}
 
-    async def get_resolution_id(
-        self,
-        meta: Meta,
-        resolution: str | None = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
-        resolution_id = {
-            '4320p': '1',
-            '2160p': '2',
-            '1440p': '3',
-            '1080p': '3',
-            '1080i': '4',
-            '720p': '5',
-            '576p': '6',
-            '576i': '7',
-            '480p': '8',
-            '480i': '9',
-            'Other': '10'
-        }
+    async def get_resolution_id(self, meta: Meta, resolution: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        resolution_id = {"4320p": "1", "2160p": "2", "1440p": "3", "1080p": "3", "1080i": "4", "720p": "5", "576p": "6", "576i": "7", "480p": "8", "480i": "9", "Other": "10"}
         if mapping_only:
             return resolution_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in resolution_id.items()}
-        elif resolution is not None:
-            return {'resolution_id': resolution_id.get(resolution, '10')}
-        else:
-            meta_resolution = meta.resolution
-            resolved_id = resolution_id.get(meta_resolution, '10')
-            return {'resolution_id': resolved_id}
+        if resolution is not None:
+            return {"resolution_id": resolution_id.get(resolution, "10")}
+        meta_resolution = meta.resolution
+        resolved_id = resolution_id.get(meta_resolution, "10")
+        return {"resolution_id": resolved_id}

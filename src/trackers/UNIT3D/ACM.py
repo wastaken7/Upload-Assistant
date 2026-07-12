@@ -11,14 +11,14 @@ class ACM(UNIT3D):
     tracker = "ACM"
     source_flag = "AsianCinema"
     base_url = "https://eiga.moi"
-    banned_groups: list[str] = []
+    banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     requests_url = f"{base_url}/api/requests/filter"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://eiga.moi']
+    tracker_urls = ("https://eiga.moi",)
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="ACM")
@@ -27,11 +27,58 @@ class ACM(UNIT3D):
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         asia = [
-            'AE', 'AF', 'AM', 'AZ', 'BD', 'BH', 'BN', 'BT', 'CN', 'CY', 'GE', 'HK', 'ID', 'IL', 'IN',
-            'IQ', 'IR', 'JO', 'JP', 'KG', 'KH', 'KP', 'KR', 'KW', 'KZ', 'LA', 'LB', 'LK', 'MM', 'MN',
-            'MO', 'MV', 'MY', 'NP', 'OM', 'PH', 'PK', 'PS', 'QA', 'SA', 'SG', 'SY', 'TH', 'TJ', 'TL',
-            'TM', 'TR', 'TW', 'UZ', 'VN', 'YE'
-        ]  # fmt: off
+            "AE",
+            "AF",
+            "AM",
+            "AZ",
+            "BD",
+            "BH",
+            "BN",
+            "BT",
+            "CN",
+            "CY",
+            "GE",
+            "HK",
+            "ID",
+            "IL",
+            "IN",
+            "IQ",
+            "IR",
+            "JO",
+            "JP",
+            "KG",
+            "KH",
+            "KP",
+            "KR",
+            "KW",
+            "KZ",
+            "LA",
+            "LB",
+            "LK",
+            "MM",
+            "MN",
+            "MO",
+            "MV",
+            "MY",
+            "NP",
+            "OM",
+            "PH",
+            "PK",
+            "PS",
+            "QA",
+            "SA",
+            "SG",
+            "SY",
+            "TH",
+            "TJ",
+            "TL",
+            "TM",
+            "TR",
+            "TW",
+            "UZ",
+            "VN",
+            "YE",
+        ]
 
         origin_country = meta.origin_country
         if origin_country and any(country not in asia for country in origin_country):
@@ -53,22 +100,21 @@ class ACM(UNIT3D):
         }
         if mapping_only:
             return resolution_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in resolution_id.items()}
-        elif resolution:
+        if resolution:
             return {"resolution_id": resolution_id.get(resolution, "6")}
-        else:
-            meta_resolution = meta.resolution
-            resolved_id = resolution_id.get(meta_resolution, "6")
-            return {"resolution_id": resolved_id}
+        meta_resolution = meta.resolution
+        resolved_id = resolution_id.get(meta_resolution, "6")
+        return {"resolution_id": resolved_id}
 
     def get_subs_tag(self, meta: Meta) -> str:
         subs = meta.subtitle_languages
         if not subs:
             return " [No subs]"
-        elif "English" in subs:
+        if "English" in subs:
             return ""
-        elif len(subs) > 1:
+        if len(subs) > 1:
             return " [No Eng subs]"
         return f" [{subs[0][:3]} subs only]"
 

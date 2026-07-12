@@ -179,8 +179,7 @@ def remove_formatting(content: str) -> str:
     content = re.sub(r"(?i)<br\s*/?>", "\n", content)
     content = re.sub(r"(?i)</p\s*>", "\n", content)
     content = re.sub(BBCODE_PATTERN, "", content)
-    content = re.sub(HTML_PATTERN, "", content)
-    return content
+    return re.sub(HTML_PATTERN, "", content)
 
 
 def sorting_priority(item: dict[str, str]) -> tuple[int, str]:

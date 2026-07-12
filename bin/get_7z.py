@@ -12,6 +12,7 @@ import httpx
 try:
     from src.console import console, logger
 except ImportError:
+
     class SimpleConsole:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
             print(message)
@@ -108,9 +109,9 @@ class SevenZipBinaryManager:
                         for member in tar_ref.getmembers():
                             if member.islnk() or member.issym():
                                 continue
-                            if os.path.isabs(member.name) or ".." in member.name or member.name.startswith("/"):
+                            if Path(member.name).is_absolute() or ".." in member.name or member.name.startswith("/"):
                                 continue
-                            full_path = os.path.realpath(os.path.join(bin_dir, member.name))
+                            full_path = os.path.realpath(Path(bin_dir) / member.name)
                             base_path = os.path.realpath(bin_dir)
                             if not full_path.startswith(base_path + os.sep) and full_path != base_path:
                                 continue

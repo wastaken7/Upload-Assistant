@@ -35,9 +35,9 @@ expected_images = 0
 def _apply_config(next_config: dict[str, Any]) -> None:
     global config, default_config, trackers_config, expected_images
     config = next_config
-    default_config = cast(Mapping[str, Any], next_config.get('DEFAULT', {}))
-    trackers_config = cast(Mapping[str, Any], next_config.get('TRACKERS', {}))
-    expected_images = to_int(default_config.get('screens', 0))
+    default_config = cast(Mapping[str, Any], next_config.get("DEFAULT", {}))
+    trackers_config = cast(Mapping[str, Any], next_config.get("TRACKERS", {}))
+    expected_images = to_int(default_config.get("screens", 0))
 
 
 class TrackerMetaManager:
@@ -75,9 +75,7 @@ class TrackerMetaManager:
             skip_tracker_descriptions,
         )
 
-    async def handle_image_list(
-        self, meta: Meta, tracker_name: str, valid_images: Sequence[ImageDict] | None = None
-    ) -> None:
+    async def handle_image_list(self, meta: Meta, tracker_name: str, valid_images: Sequence[ImageDict] | None = None) -> None:
         await handle_image_list(meta, tracker_name, valid_images)
 
 
@@ -92,14 +90,14 @@ async def prompt_user_for_confirmation(message: str) -> bool:
 
 async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) -> list[ImageDict]:
     # Ensure meta.image_sizes exists
-    if 'image_sizes' not in meta:
+    if "image_sizes" not in meta:
         meta.image_sizes = {}
 
     seen_urls: set[str] = set()
     unique_images: list[ImageDict] = []
 
     for img in imagelist:
-        img_url = cast(str | None, img.get('raw_url'))
+        img_url = cast(str | None, img.get("raw_url"))
         if img_url and img_url not in seen_urls:
             seen_urls.add(img_url)
             unique_images.append(img)
@@ -111,17 +109,17 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
 
     # Map fixed resolution names to vertical resolutions
     resolution_map = {
-        '8640p': 8640,
-        '4320p': 4320,
-        '2160p': 2160,
-        '1440p': 1440,
-        '1080p': 1080,
-        '1080i': 1080,
-        '720p': 720,
-        '576p': 576,
-        '576i': 576,
-        '480p': 480,
-        '480i': 480,
+        "8640p": 8640,
+        "4320p": 4320,
+        "2160p": 2160,
+        "1440p": 1440,
+        "1080p": 1080,
+        "1080i": 1080,
+        "720p": 720,
+        "576p": 576,
+        "576i": 576,
+        "480p": 480,
+        "480i": 480,
     }
 
     # Get expected vertical resolution
@@ -134,19 +132,19 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
         return []
 
     # Function to check each image's URL, host, and log resolution
-    save_directory = os.path.join(meta.base_dir, "tmp", meta.uuid)
+    save_directory = Path(meta.base_dir) / "tmp" / meta.uuid
 
     timeout = httpx.Timeout(15.0, connect=5.0, read=5.0)
 
     async def check_and_collect(image_dict: ImageDict) -> ImageDict | None:
-        img_url = cast(str | None, image_dict.get('raw_url'))
+        img_url = cast(str | None, image_dict.get("raw_url"))
         if not img_url:
             return None
 
         if "ptpimg.me" in img_url and img_url.startswith("http://"):
             img_url = img_url.replace("http://", "https://")
-            image_dict['raw_url'] = img_url
-            image_dict['web_url'] = img_url
+            image_dict["raw_url"] = img_url
+            image_dict["web_url"] = img_url
 
         # Handle when pixhost url points to web_url and convert to raw_url
         if img_url.startswith("https://pixhost.to/show/"):
@@ -180,18 +178,15 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
                                         return None
 
                                     # Save image
-                                    os.makedirs(save_directory, exist_ok=True)
-                                    image_filename = os.path.join(save_directory, os.path.basename(img_url))
+                                    Path(save_directory).mkdir(parents=True, exist_ok=True)
+                                    image_filename = Path(save_directory) / Path(img_url).name
                                     await asyncio.to_thread(Path(image_filename).write_bytes, image_content)
 
                                     logger.info(f"Saved {img_url} as {image_filename}")
 
                                     meta.image_sizes[img_url] = len(image_content)
 
-                                    logger.debug(
-                                            f"Valid image {img_url} with resolution {image.width}x{image.height} "
-                                            f"and size {len(image_content) / 1024:.2f} KiB"
-                                        )
+                                    logger.debug(f"Valid image {img_url} with resolution {image.width}x{image.height} and size {len(image_content) / 1024:.2f} KiB")
                                     return image_dict
                                 except Exception as e:
                                     logger.error(f"[red]Failed to process image {img_url}: {e}")
@@ -249,8 +244,8 @@ async def check_image_link(url: str, timeout: httpx.Timeout | None = None) -> bo
             try:
                 response = await session.get(url)
                 if response.status_code == 200:
-                    content_type = response.headers.get('Content-Type', '').lower()
-                    if 'image' in content_type:
+                    content_type = response.headers.get("Content-Type", "").lower()
+                    if "image" in content_type:
                         # Attempt to load the image
                         image_data = response.content
                         try:
@@ -270,10 +265,10 @@ async def check_image_link(url: str, timeout: httpx.Timeout | None = None) -> bo
                 logger.info(f"[red]Timeout checking image link: {url}[/red]")
                 return False
             except Exception as e:
-                logger.info(f"[red]Exception occurred while checking image: {url} - {str(e)}[/red]")
+                logger.info(f"[red]Exception occurred while checking image: {url} - {e!s}[/red]")
                 return False
     except Exception as e:
-        logger.info(f"[red]Session creation failed for: {url} - {str(e)}[/red]")
+        logger.info(f"[red]Session creation failed for: {url} - {e!s}[/red]")
         return False
 
 
@@ -315,7 +310,7 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
                 await handle_image_list(meta, tracker_name, valid_images)
 
     if filename:
-        meta[f'{tracker_name.lower()}_filename'] = filename
+        meta[f"{tracker_name.lower()}_filename"] = filename
 
     logger.debug(f"[green]{tracker_name} data successfully updated in meta[/green]")
     return True
@@ -407,14 +402,14 @@ async def update_metadata_from_tracker(
                 found_match = False
 
     elif tracker_name == "BHD":
-        trackers_cfg = cast(Mapping[str, Any], config.get('TRACKERS', {}))
-        tracker_cfg = cast(dict[str, Any], trackers_cfg.get('BHD', {}))
-        bhd_api = tracker_cfg.get('api_key')
+        trackers_cfg = cast(Mapping[str, Any], config.get("TRACKERS", {}))
+        tracker_cfg = cast(dict[str, Any], trackers_cfg.get("BHD", {}))
+        bhd_api = tracker_cfg.get("api_key")
         bhd_api = bhd_api if isinstance(bhd_api, str) else None
         if bhd_api and len(bhd_api) < 25:
             bhd_api = None
 
-        bhd_rss_key = tracker_cfg.get('bhd_rss_key')
+        bhd_rss_key = tracker_cfg.get("bhd_rss_key")
         bhd_rss_key = bhd_rss_key if isinstance(bhd_rss_key, str) else None
         if bhd_rss_key and len(bhd_rss_key) < 25:
             bhd_rss_key = None
@@ -432,7 +427,7 @@ async def update_metadata_from_tracker(
         elif use_foldername:
             # Use folder name from path if available, fall back to UUID
             folder_path = meta.path
-            foldername = os.path.basename(folder_path) if folder_path else meta.uuid
+            foldername = Path(folder_path).name if folder_path else meta.uuid
             imdb, tmdb = cast(
                 tuple[int | None, int | None],
                 await BtnIdManager.get_bhd_torrents(bhd_api, bhd_rss_key, meta, skip_tracker_descriptions=skip_tracker_descriptions, foldername=foldername),
@@ -440,7 +435,7 @@ async def update_metadata_from_tracker(
         else:
             # Only use filename if none of the folder conditions are met
             filelist = cast(list[str], meta.filelist or [])
-            filename = os.path.basename(filelist[0]) if filelist else None
+            filename = Path(filelist[0]).name if filelist else None
             imdb, tmdb = cast(
                 tuple[int | None, int | None],
                 await BtnIdManager.get_bhd_torrents(bhd_api, bhd_rss_key, meta, skip_tracker_descriptions=skip_tracker_descriptions, filename=filename),
@@ -463,7 +458,7 @@ async def update_metadata_from_tracker(
                             logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                             edit_choice = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
 
-                            if (edit_choice or "").lower() == 'e':
+                            if (edit_choice or "").lower() == "e":
                                 # pyrefly: ignore [bad-argument-type]
                                 edited_description = str(click.edit(text=description) or "")
                                 if edited_description:
@@ -471,7 +466,7 @@ async def update_metadata_from_tracker(
                                     meta.description = desc
                                     meta.saved_description = True
                                 logger.info(f"[green]Final description after editing:[/green] {meta.description}", extra={"markup": False})
-                            elif (edit_choice or "").lower() == 'd':
+                            elif (edit_choice or "").lower() == "d":
                                 meta.description = ""
                                 meta.image_list = []
                                 logger.info("[yellow]Description discarded.[/yellow]")
@@ -484,21 +479,22 @@ async def update_metadata_from_tracker(
                             meta.saved_description = True
                     elif meta.bhd_nfo:
                         if not meta.skipit:
-                            nfo_file_path = os.path.join(meta.base_dir, "tmp", meta.uuid, "bhd.nfo")
-                            if os.path.exists(nfo_file_path):
+                            nfo_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / "bhd.nfo"
+                            if Path(nfo_file_path).exists():
                                 nfo_content = await asyncio.to_thread(Path(nfo_file_path).read_text, encoding="utf-8")
                                 logger.info("[bold green]Successfully grabbed FraMeSToR description")
                                 logger.info(f"Description content:\n{nfo_content[:1000]}...", extra={"markup": False})
                                 logger.info("[cyan]Do you want to discard or keep the description?[/cyan]")
                                 edit_choice = cli_ui.ask_string("Enter 'd' to discard, or press Enter to keep it as is: ")
 
-                                if (edit_choice or "").lower() == 'd':
+                                if (edit_choice or "").lower() == "d":
                                     meta.description = ""
                                     meta.image_list = []
-                                    nfo_file_path = os.path.join(meta.base_dir, "tmp", meta.uuid, "bhd.nfo")
+                                    nfo_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / "bhd.nfo"
 
                                     try:
                                         import gc
+
                                         gc.collect()  # Force garbage collection to close any lingering handles
                                         for attempt in range(3):
                                             try:
@@ -507,7 +503,7 @@ async def update_metadata_from_tracker(
                                                 break
                                             except Exception as e:
                                                 if attempt < 2:
-                                                    logger.info(f"[yellow]Attempt {attempt+1}: Could not delete file, retrying in 1 second...[/yellow]")
+                                                    logger.info(f"[yellow]Attempt {attempt + 1}: Could not delete file, retrying in 1 second...[/yellow]")
                                                     await asyncio.sleep(1)
                                                 else:
                                                     logger.error(f"[red]Failed to delete BHD NFO file after 3 attempts: {e}[/red]")
@@ -539,9 +535,9 @@ async def update_metadata_from_tracker(
                     meta.image_list = []
                     meta.nfo = False
                     meta.bhd_nfo = False
-                    save_path = os.path.join(meta.base_dir, "tmp", meta.uuid)
-                    nfo_file_path = os.path.join(save_path, "bhd.nfo")
-                    if os.path.exists(nfo_file_path):
+                    save_path = Path(meta.base_dir) / "tmp" / meta.uuid
+                    nfo_file_path = Path(save_path) / "bhd.nfo"
+                    if Path(nfo_file_path).exists():
                         try:
                             os.remove(nfo_file_path)
                         except Exception as e:
@@ -678,7 +674,7 @@ async def update_metadata_from_tracker(
                             edit_choice_raw = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
                             edit_choice = (edit_choice_raw or "").strip().lower()
 
-                            if edit_choice.lower() == 'e':
+                            if edit_choice.lower() == "e":
                                 # pyrefly: ignore [bad-argument-type]
                                 edited_description = str(click.edit(text=description) or "")
                                 if edited_description:
@@ -686,7 +682,7 @@ async def update_metadata_from_tracker(
                                     meta.description = description
                                     meta.saved_description = True
                                 logger.info(f"[green]Final description after editing:[/green] {description}", extra={"markup": False})
-                            elif edit_choice.lower() == 'd':
+                            elif edit_choice.lower() == "d":
                                 meta.hdb_description = ""
                                 logger.info("[yellow]Description discarded.[/yellow]")
                             else:
@@ -750,10 +746,11 @@ async def handle_image_list(meta: Meta, tracker_name: str, valid_images: Sequenc
             if not keep_images:
                 meta.image_list = []
                 meta.image_sizes = {}
-                save_path = os.path.join(meta.base_dir, "tmp", meta.uuid)
+                save_path = Path(meta.base_dir) / "tmp" / meta.uuid
                 try:
                     import glob
-                    png_files = glob.glob(os.path.join(save_path, "*.png"))
+
+                    png_files = glob.glob(Path(save_path) / "*.png")
                     for png_file in png_files:
                         os.remove(png_file)
 

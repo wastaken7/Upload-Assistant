@@ -53,6 +53,7 @@ except Exception:
 
 access_logger = AccessLogger(cfg_dir) if AccessLogger is not None else None
 
+
 # Helper: simple file-backed config store under the auth config dir. Values
 # are stored as raw text. This replaces OS keyring usage and allows Docker
 # and non-Docker deployments to persist credentials via the configured
@@ -105,12 +106,12 @@ def _sanitize_relpath(rel: str) -> str:
         if re.search(r"[\x00-\x1f]", p):
             raise ValueError("Invalid path component")
         # Reject path-separator characters
-        if '/' in p or '\\' in p:
+        if "/" in p or "\\" in p:
             raise ValueError("Invalid path component")
 
         clean_parts.append(p)
 
-    return os.sep.join(clean_parts)
+    return str(Path(*clean_parts))
 
 
 def _assert_safe_resolved_path(path: str) -> None:
@@ -123,7 +124,7 @@ def _assert_safe_resolved_path(path: str) -> None:
         raise ValueError("Invalid path")
 
     # Ensure absolute and normalized
-    abs_path = os.path.abspath(path)
+    abs_path = str(Path(path).resolve())
     real_path = os.path.realpath(abs_path)
 
     roots = _get_browse_roots()
@@ -133,7 +134,7 @@ def _assert_safe_resolved_path(path: str) -> None:
 
     allowed = False
     for root in roots:
-        root_abs = os.path.abspath(root)
+        root_abs = str(Path(root).resolve())
         root_real = os.path.realpath(root_abs)
         safe_root_prefix = root_real if root_real.endswith(os.sep) else (root_real + os.sep)
         if real_path == root_real or real_path.startswith(safe_root_prefix):
@@ -142,6 +143,7 @@ def _assert_safe_resolved_path(path: str) -> None:
 
     if not allowed:
         raise ValueError("Path outside allowed roots")
+
 
 Flask = cast(Any, Flask)
 Response = cast(Any, Response)
@@ -210,6 +212,7 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
+
 def _rate_limit_key_func():
     """Rate limit key function that considers authentication status."""
     if _is_authenticated():
@@ -242,15 +245,13 @@ def _load_session_dict() -> dict:
 
 
 def _commit_session_dict(d: dict) -> None:
-    try:
+    with contextlib.suppress(Exception):
         key = _derive_aes_key()
         if not key:
             return
         raw = json.dumps(d, separators=(",", ":"), ensure_ascii=False)
         enc = auth_mod.encrypt_text(key, raw)
         session["enc"] = enc
-    except Exception:
-        pass
 
 
 def _session_get(key: str, default: Any = None) -> Any:
@@ -273,21 +274,19 @@ def _session_pop(key: str, default: Any = None) -> Any:
 # IP control helpers --------------------------------------------------
 def _get_ip_whitelist() -> list[str]:
     """Get the list of whitelisted IPs."""
-    try:
+    with contextlib.suppress(Exception):
         path = cfg_dir / "webui_auth.json"
         if path.exists():
             data = json.loads(path.read_text(encoding="utf-8"))
             val = data.get("ip_whitelist")
             if isinstance(val, list):
                 return val
-    except Exception:
-        pass
     return []
 
 
 def _set_ip_whitelist(ips: list[str]) -> None:
     """Set the list of whitelisted IPs."""
-    try:
+    with contextlib.suppress(Exception):
         path = cfg_dir / "webui_auth.json"
         data = {}
         if path.exists():
@@ -297,27 +296,23 @@ def _set_ip_whitelist(ips: list[str]) -> None:
                 return
         data["ip_whitelist"] = ips
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    except Exception:
-        pass
 
 
 def _get_ip_blacklist() -> list[str]:
     """Get the list of blacklisted IPs."""
-    try:
+    with contextlib.suppress(Exception):
         path = cfg_dir / "webui_auth.json"
         if path.exists():
             data = json.loads(path.read_text(encoding="utf-8"))
             val = data.get("ip_blacklist")
             if isinstance(val, list):
                 return val
-    except Exception:
-        pass
     return []
 
 
 def _set_ip_blacklist(ips: list[str]) -> None:
     """Set the list of blacklisted IPs."""
-    try:
+    with contextlib.suppress(Exception):
         path = cfg_dir / "webui_auth.json"
         data = {}
         if path.exists():
@@ -327,8 +322,6 @@ def _set_ip_blacklist(ips: list[str]) -> None:
                 return
         data["ip_blacklist"] = ips
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    except Exception:
-        pass
 
 
 def _get_ip_failures() -> dict[str, list[int]]:
@@ -338,7 +331,7 @@ def _get_ip_failures() -> dict[str, list[int]]:
     compatibility any integer legacy counts are converted into recent
     timestamps so they behave as recent failures.
     """
-    try:
+    with contextlib.suppress(Exception):
         path = cfg_dir / "webui_auth.json"
         if path.exists():
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -357,14 +350,12 @@ def _get_ip_failures() -> dict[str, list[int]]:
                         # Legacy count: treat as recent failures
                         out[k] = [now] * v
                 return out
-    except Exception:
-        pass
     return {}
 
 
 def _set_ip_failures(failures: dict[str, list[int]]) -> None:
     """Set the dict of IP failure timestamps (ip -> list[timestamps])."""
-    try:
+    with contextlib.suppress(Exception):
         path = cfg_dir / "webui_auth.json"
         data = {}
         if path.exists():
@@ -374,8 +365,6 @@ def _set_ip_failures(failures: dict[str, list[int]]) -> None:
                 return
         data["ip_failures"] = failures
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    except Exception:
-        pass
 
 
 def _is_ip_allowed(ip: str) -> bool:
@@ -431,7 +420,7 @@ def _cleanup_duplicate_sessions(username: str) -> None:
     `SESSION_FILE_DIR` and attempts to decrypt stored `enc` payloads using
     the current derived AES key.
     """
-    try:
+    with contextlib.suppress(Exception):
         key = _derive_aes_key()
         if not key:
             return
@@ -483,17 +472,16 @@ def _cleanup_duplicate_sessions(username: str) -> None:
                     # Remove stale session file
                     with contextlib.suppress(Exception):
                         p.unlink()
-    except Exception:
-        pass
+
 
 # Supported video file extensions for WebUI file browser
-SUPPORTED_VIDEO_EXTS = {'.mkv', '.mp4', '.ts'}
+SUPPORTED_VIDEO_EXTS = {".mkv", ".mp4", ".ts"}
 
 # Supported description file extensions for WebUI description file browser
-SUPPORTED_DESC_EXTS = {'.txt', '.nfo', '.md'}
+SUPPORTED_DESC_EXTS = {".txt", ".nfo", ".md"}
 
 # Regex for splitting filenames on common separators (dots, dashes, underscores, spaces)
-_BROWSE_SEARCH_SEP_RE = re.compile(r'[\s.\-_]+')
+_BROWSE_SEARCH_SEP_RE = re.compile(r"[\s.\-_]+")
 
 # Lock to prevent concurrent in-process uploads (avoids cross-session interference)
 inproc_lock = threading.Lock()
@@ -503,6 +491,7 @@ _runtime_browse_roots: str | None = None
 
 # Runtime flags and stored totp
 saved_totp_secret: str | None = None
+
 
 # CSRF helpers ---------------------------------------------------------------
 def _verify_csrf_header() -> bool:
@@ -554,24 +543,20 @@ def _verify_same_origin() -> bool:
 
         origin = request.headers.get("Origin")
         if origin:
-            try:
+            with contextlib.suppress(Exception):
                 parsed = urlparse(origin)
                 if parsed.netloc:
                     return parsed.netloc == request.host
-            except Exception:
-                pass
             # Fallback to strict host_url match if parsing fails
             host_url = (request.host_url or "").rstrip("/") + "/"
             return origin.rstrip("/") + "/" == host_url
 
         referer = request.headers.get("Referer") or request.headers.get("Referrer")
         if referer:
-            try:
+            with contextlib.suppress(Exception):
                 parsed = urlparse(referer)
                 if parsed.netloc:
                     return parsed.netloc == request.host
-            except Exception:
-                pass
             host_url = (request.host_url or "").rstrip("/") + "/"
             return referer.startswith(host_url)
 
@@ -586,20 +571,19 @@ try:
 except Exception:
     saved_totp_secret = None
 
+
 # Persistent cookie key helpers -------------------------------------------------
 def _get_persistent_cookie_key() -> bytes | None:
     """Return a bytes key used to HMAC-sign remember-me cookies.
     Attempt to read from keyring; if missing and not in Docker, generate and store one.
     """
-    try:
+    with contextlib.suppress(Exception):
         raw = _cfg_read("session_key")
         if raw:
             try:
                 return bytes.fromhex(raw)
             except Exception:
                 return raw.encode("utf-8")
-    except Exception:
-        pass
 
     # Generate and persist to config if no persisted key found
     try:
@@ -610,11 +594,13 @@ def _get_persistent_cookie_key() -> bytes | None:
     except Exception:
         return None
 
+
 def _load_token_store() -> dict[str, Any]:
     try:
         return auth_mod.get_api_tokens() or {}
     except Exception:
         return {}
+
 
 def _persist_token_store(store: dict[str, Any]) -> None:
     with suppress(Exception):
@@ -769,9 +755,8 @@ def _verify_remember_token(token: str) -> str | None:
         return None
 
 
-
 def _hash_code(code: str) -> str:
-    return hashlib.pbkdf2_hmac('sha256', code.encode('utf-8'), b'upload-assistant-recovery-salt', 100000).hex()
+    return hashlib.pbkdf2_hmac("sha256", code.encode("utf-8"), b"upload-assistant-recovery-salt", 100000).hex()
 
 
 def _generate_recovery_codes(n: int = 10, length: int = 10) -> list[str]:
@@ -958,7 +943,7 @@ def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
         return jsonify({"error": "Access denied", "success": False}), 403
 
     # Try to restore session from a long-lived remember-me cookie if present
-    try:
+    with contextlib.suppress(Exception):
         if not _is_authenticated():
             token = request.cookies.get("ua_remember")
             if token:
@@ -975,9 +960,7 @@ def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
                         # No persisted user yet: accept remembered username as provisional
                         g.authenticated = True
                         g.username = username
-    except Exception:
         # Any failure to validate the cookie should not block request flow; fallback to normal auth
-        pass
 
     if request.path.startswith("/api/"):
         # For API, allow basic auth
@@ -986,12 +969,10 @@ def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
         # Or session auth
         if _is_authenticated():
             # Set username in g for logging if available
-            try:
+            with contextlib.suppress(Exception):
                 username = _session_get("username")
                 if username:
                     g.username = username
-            except Exception:
-                pass
             return None
         # If request accepts HTML (browser), redirect to login; else 401 for API clients
         if "text/html" in request.headers.get("Accept", ""):
@@ -1002,12 +983,10 @@ def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
     # For web routes
     if _is_authenticated():
         # Set username in g for logging if available
-        try:
+        with contextlib.suppress(Exception):
             username = _session_get("username")
             if username:
                 g.username = username
-        except Exception:
-            pass
         return None
     if _webui_auth_configured() and _webui_auth_ok():
         return None
@@ -1025,7 +1004,7 @@ def _maybe_log_api_access(response):
     When level=access all accesses are logged.
     When level=disabled no logging occurs.
     """
-    try:
+    with contextlib.suppress(Exception):
         if access_logger is None:
             return response
 
@@ -1061,7 +1040,7 @@ def _maybe_log_api_access(response):
         # Minimal headers for context
         headers = dict(request.headers) if request.headers else None
 
-        remote = request.remote_addr or request.environ.get('REMOTE_ADDR')
+        remote = request.remote_addr or request.environ.get("REMOTE_ADDR")
 
         access_logger.log(
             endpoint=path,
@@ -1073,8 +1052,6 @@ def _maybe_log_api_access(response):
             headers=headers,
             details=None,
         )
-    except Exception:
-        pass
     return response
 
 
@@ -1085,6 +1062,8 @@ def _totp_enabled() -> bool:
     if persisted:
         return bool(auth_mod.get_totp_secret())
     return bool(saved_totp_secret)
+
+
 def _verify_totp_code(code: str) -> bool:
     """Verify a TOTP code against the stored secret."""
     persisted = auth_mod.load_user()
@@ -1099,6 +1078,7 @@ def _verify_totp_code(code: str) -> bool:
     except Exception:
         return False
 
+
 def _get_browse_roots() -> list[str]:
     # Check environment first, then runtime browse roots (set by upload.py)
     global _runtime_browse_roots
@@ -1112,7 +1092,7 @@ def _get_browse_roots() -> list[str]:
         part = part.strip()
         if not part:
             continue
-        root = os.path.abspath(part)
+        root = str(Path(part).resolve())
         roots.append(root)
 
     return roots
@@ -1147,24 +1127,20 @@ def _load_config_from_file(path: Path) -> dict[str, Any] | None:
         return None
 
     try:
-        with open(path, encoding='utf-8') as f:
+        with Path(path).open(encoding="utf-8") as f:
             content = f.read()
         tree = ast.parse(content)
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
                 for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id == 'config':
+                    if isinstance(target, ast.Name) and target.id == "config":
                         config_value = ast.literal_eval(node.value)
                         if isinstance(config_value, dict):
                             return config_value
-        console.print(
-            f"[yellow]Config file {path.name} does not contain a valid 'config' dict assignment.[/yellow]"
-        )
+        console.print(f"[yellow]Config file {path.name} does not contain a valid 'config' dict assignment.[/yellow]")
         return None
     except Exception as exc:
-        console.print(
-            f"[yellow]Failed to parse config file {path.name}: {exc}[/yellow]"
-        )
+        console.print(f"[yellow]Failed to parse config file {path.name}: {exc}[/yellow]")
         return None
 
 
@@ -1217,7 +1193,12 @@ def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: An
         audit_path = base_dir / "data" / "config_audit.log"
         # Determine acting user: session -> Basic auth username -> persisted user -> remote_addr
         persisted = auth_mod.load_user()
-        user = _session_get("username") or (request.authorization.username if request.authorization is not None else None) or (persisted.get("username") if persisted else None) or request.remote_addr
+        user = (
+            _session_get("username")
+            or (request.authorization.username if request.authorization is not None else None)
+            or (persisted.get("username") if persisted else None)
+            or request.remote_addr
+        )
         # Redact sensitive fields from values before serializing to the audit log.
         audit = {
             "timestamp": datetime.now(UTC).isoformat(),
@@ -1230,7 +1211,7 @@ def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: An
             "success": success,
             "error": error,
         }
-        with open(audit_path, "a", encoding="utf-8") as af:
+        with Path(audit_path).open("a", encoding="utf-8") as af:
             # codeql[py/clear-text-storage-sensitive-data]
             af.write(json.dumps(audit, ensure_ascii=False) + "\n")
     except Exception as ae:
@@ -1282,8 +1263,7 @@ def _coerce_config_value(raw: Any, example_value: Any) -> Any:
             if not raw_str:
                 return [] if isinstance(example_value, list) else {}
             try:
-                parsed = json.loads(raw_str)
-                return parsed
+                return json.loads(raw_str)
             except json.JSONDecodeError:
                 return raw
         return raw
@@ -1376,10 +1356,10 @@ def _replace_config_value_in_source(source: str, key_path: list[str], new_value:
                         current_dict = v_node
                         found = True
                         break
-                    else:  # Final key - update existing value
-                        target_node = v_node
-                        found = True
-                        break
+                    # Final key - update existing value
+                    target_node = v_node
+                    found = True
+                    break
                 target_node = v_node
                 found = True
                 break
@@ -1395,8 +1375,7 @@ def _replace_config_value_in_source(source: str, key_path: list[str], new_value:
 
                 # Reconstruct the source with the new key using proper formatting
                 return _format_config_tree(tree)
-            else:
-                raise ValueError(f"Key not found in config: {key}")
+            raise ValueError(f"Key not found in config: {key}")
 
         if target_node is not None and i < len(key_path) - 1:
             raise ValueError("Invalid path for config update")
@@ -1452,17 +1431,16 @@ def _remove_config_key_in_source(source: str, key_path: list[str]) -> str:
                         current_dict = v_node
                         found = True
                         break
-                    else:  # Final key - remove it
-                        # Remove the key-value pair
-                        del current_dict.keys[j]
-                        del current_dict.values[j]
-                        # Reconstruct the source
-                        return _format_config_tree(tree)
-                else:
-                    if i == len(key_path) - 1:  # Final key - remove it
-                        del current_dict.keys[j]
-                        del current_dict.values[j]
-                        return _format_config_tree(tree)
+                    # Final key - remove it
+                    # Remove the key-value pair
+                    del current_dict.keys[j]
+                    del current_dict.values[j]
+                    # Reconstruct the source
+                    return _format_config_tree(tree)
+                if i == len(key_path) - 1:  # Final key - remove it
+                    del current_dict.keys[j]
+                    del current_dict.values[j]
+                    return _format_config_tree(tree)
                 found = True
                 break
 
@@ -1686,12 +1664,12 @@ def _resolve_user_path(
     matched_root: str | None = None
     candidate_norm: str | None = None
 
-    if expanded and os.path.isabs(expanded):
+    if expanded and Path(expanded).is_absolute():
         # If a user supplies an absolute path, only allow it if it is under
         # one of the configured browse roots (or their realpath equivalents,
         # since the browse API returns realpath-resolved paths to the frontend).
         for root in roots:
-            root_abs = os.path.abspath(root)
+            root_abs = str(Path(root).resolve())
             root_real = os.path.realpath(root_abs)
 
             # Check against both the configured root and its realpath.
@@ -1714,7 +1692,7 @@ def _resolve_user_path(
                 except ValueError:
                     continue
 
-                if rel == os.pardir or rel.startswith(os.pardir + os.sep) or os.path.isabs(rel):
+                if rel == os.pardir or rel.startswith(os.pardir + os.sep) or Path(rel).is_absolute():
                     continue
 
                 # Handle the case where the path equals the root exactly.
@@ -1730,8 +1708,8 @@ def _resolve_user_path(
                 # None for Windows backslash paths. Fall back to os.path.join on
                 # Windows since we already validated rel above and commonpath check
                 # below provides additional symlink-escape protection.
-                if joined is None and sys.platform == 'win32':
-                    joined = os.path.join(check_root, rel)
+                if joined is None and sys.platform == "win32":
+                    joined = Path(check_root) / rel
 
                 if joined is None:
                     continue
@@ -1743,7 +1721,7 @@ def _resolve_user_path(
             if matched_root:
                 break
     else:
-        matched_root = os.path.abspath(default_root)
+        matched_root = str(Path(default_root).resolve())
         # Handle empty path (initial browse request) - use the root directly.
         # safe_join may return None for empty strings in some Werkzeug versions.
         if not expanded:
@@ -1753,18 +1731,18 @@ def _resolve_user_path(
             try:
                 sanitized_expanded = _sanitize_relpath(expanded)
             except ValueError as err:
-                raise ValueError('Browsing this path is not allowed') from err
+                raise ValueError("Browsing this path is not allowed") from err
 
             joined = safe_join(matched_root, sanitized_expanded)
 
             # Windows fallback: safe_join uses posixpath internally and returns
             # None for Windows backslash paths. Fall back to manual validation
             # and os.path.join. The commonpath check below provides additional security.
-            if joined is None and sys.platform == 'win32':
+            if joined is None and sys.platform == "win32":
                 expanded_norm = os.path.normpath(sanitized_expanded)
-                if expanded_norm == os.pardir or expanded_norm.startswith(os.pardir + os.sep) or os.path.isabs(expanded_norm):
-                    raise ValueError('Browsing this path is not allowed')
-                joined = os.path.join(matched_root, expanded_norm)
+                if expanded_norm == os.pardir or expanded_norm.startswith(os.pardir + os.sep) or Path(expanded_norm).is_absolute():
+                    raise ValueError("Browsing this path is not allowed")
+                joined = Path(matched_root) / expanded_norm
 
             if joined is None:
                 raise ValueError("Browsing this path is not allowed")
@@ -1788,7 +1766,7 @@ def _resolve_user_path(
     # operations. This defends against accidental use of unvalidated
     # user-controlled data (helps static analysis tools and provides a
     # clear guard at the call site).
-    if '\x00' in candidate:
+    if "\x00" in candidate:
         raise ValueError("Browsing this path is not allowed")
 
     # Ensure the resolved candidate path is within the resolved root path.
@@ -1808,11 +1786,11 @@ def _resolve_user_path(
     safe_candidate = os.path.realpath(candidate)
 
     # codeql[py/path-injection]
-    if require_exists and not os.path.exists(safe_candidate):
+    if require_exists and not Path(safe_candidate).exists():
         raise ValueError("Path does not exist")
 
     # codeql[py/path-injection]
-    if require_dir and not os.path.isdir(safe_candidate):
+    if require_dir and not Path(safe_candidate).is_dir():
         raise ValueError("Not a directory")
 
     return safe_candidate
@@ -1867,58 +1845,51 @@ def login_page():
                     session.permanent = True
                 resp = redirect(url_for("config_page"))
                 if remember:
-                    try:
+                    with contextlib.suppress(Exception):
                         token = _create_remember_token(username)
                         if token:
                             resp.set_cookie("ua_remember", token, max_age=30 * 86400, httponly=True, secure=True, samesite="Lax")
-                    except Exception:
-                        pass
                 with suppress(Exception):
                     _cleanup_duplicate_sessions(username)
                 return resp
-            else:
-                # Credentials don't match persisted user
+            # Credentials don't match persisted user
+            _handle_failed_auth(get_remote_address())
+            return render_template("login.html", error="Credentials did not match")
+        # No persisted user: allow UI-driven creation (first-run setup)
+        if username and password:
+            if _totp_enabled() and not (totp_code and _verify_totp_code(totp_code)):
                 _handle_failed_auth(get_remote_address())
-                return render_template("login.html", error="Credentials did not match")
-        else:
-            # No persisted user: allow UI-driven creation (first-run setup)
-            if username and password:
-                if _totp_enabled() and not (totp_code and _verify_totp_code(totp_code)):
-                    _handle_failed_auth(get_remote_address())
-                    return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled())
-                try:
-                    auth_mod.create_user(username, password)
-                except ValueError as exc:
-                    return render_template("login.html", error=str(exc), show_2fa=_totp_enabled())
-                except Exception:
-                    # Non-fatal persistence error; continue without persisting.
-                    pass
+                return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled())
+            try:
+                auth_mod.create_user(username, password)
+            except ValueError as exc:
+                return render_template("login.html", error=str(exc), show_2fa=_totp_enabled())
+            except Exception:  # noqa: S110
+                # Non-fatal persistence error; continue without persisting.
+                pass
 
-                _session_set("authenticated", True)
+            _session_set("authenticated", True)
+            with contextlib.suppress(Exception):
+                _session_set("username", username)
+            with contextlib.suppress(Exception):
+                _session_set("csrf_token", secrets.token_urlsafe(32))
+            if remember:
+                session.permanent = True
                 with contextlib.suppress(Exception):
-                    _session_set("username", username)
-                with contextlib.suppress(Exception):
-                    _session_set("csrf_token", secrets.token_urlsafe(32))
-                if remember:
-                    session.permanent = True
-                    try:
-                        token = _create_remember_token(username)
-                        if token:
-                            resp = redirect(url_for("config_page"))
-                            resp.set_cookie("ua_remember", token, max_age=30 * 86400, httponly=True, secure=True, samesite="Lax")
-                            with suppress(Exception):
-                                _cleanup_duplicate_sessions(username)
-                            return resp
-                    except Exception:
-                        pass
+                    token = _create_remember_token(username)
+                    if token:
+                        resp = redirect(url_for("config_page"))
+                        resp.set_cookie("ua_remember", token, max_age=30 * 86400, httponly=True, secure=True, samesite="Lax")
+                        with suppress(Exception):
+                            _cleanup_duplicate_sessions(username)
+                        return resp
 
-                with suppress(Exception):
-                    _cleanup_duplicate_sessions(username)
-                return redirect(url_for("config_page"))
-            else:
-                # No username/password provided
-                _handle_failed_auth(get_remote_address())
-                return render_template("login.html", error="Credentials did not match")
+            with suppress(Exception):
+                _cleanup_duplicate_sessions(username)
+            return redirect(url_for("config_page"))
+        # No username/password provided
+        _handle_failed_auth(get_remote_address())
+        return render_template("login.html", error="Credentials did not match")
 
     # Show 2FA field if enabled
     show_2fa = _totp_enabled()
@@ -1989,14 +1960,12 @@ def login_recovery():
                 _session_set("csrf_token", secrets.token_urlsafe(32))
             if remember:
                 session.permanent = True
-                try:
+                with contextlib.suppress(Exception):
                     token = _create_remember_token(username)
                     if token:
                         resp = redirect(url_for("config_page"))
                         resp.set_cookie("ua_remember", token, max_age=30 * 86400, httponly=True, secure=True, samesite="Lax")
                         return resp
-                except Exception:
-                    pass
             return redirect(url_for("config_page"))
         # Failed recovery attempt -> record and show recovery page
         _handle_failed_auth(get_remote_address())
@@ -2008,7 +1977,7 @@ def login_recovery():
             auth_mod.create_user(username, password)
         except ValueError as exc:
             return render_template("login_recovery.html", error=str(exc), show_2fa=_totp_enabled())
-        except Exception:
+        except Exception:  # noqa: S110
             pass
 
         _session_set("authenticated", True)
@@ -2018,7 +1987,7 @@ def login_recovery():
             _session_set("csrf_token", secrets.token_urlsafe(32))
         if remember:
             session.permanent = True
-            try:
+            with contextlib.suppress(Exception):
                 token = _create_remember_token(username)
                 if token:
                     resp = redirect(url_for("config_page"))
@@ -2026,8 +1995,6 @@ def login_recovery():
                     with suppress(Exception):
                         _cleanup_duplicate_sessions(username)
                     return resp
-            except Exception:
-                pass
 
         with suppress(Exception):
             _cleanup_duplicate_sessions(username)
@@ -2087,11 +2054,13 @@ def config_page():
             console.print(f"[yellow]CSRF check failed for /config: host_url={effective_host_url}, Referer={referer}")
             # Return a helpful error including the observed host_url and referer
             return (
-                jsonify({
-                    "error": "CSRF token missing or invalid",
-                    "success": False,
-                    "debug": {"host_url": effective_host_url, "referer": referer, "request_host": request.host},
-                }),
+                jsonify(
+                    {
+                        "error": "CSRF token missing or invalid",
+                        "success": False,
+                        "debug": {"host_url": effective_host_url, "referer": referer, "request_host": request.host},
+                    }
+                ),
                 403,
             )
 
@@ -2211,11 +2180,11 @@ def access_log_entries_api():
         return jsonify({"success": False, "error": "Access logging unavailable"}), 500
 
     try:
-        n = request.args.get('n', '50')
+        n = request.args.get("n", "50")
         n = int(n)
         if n < 1 or n > 200:
             n = 50
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         n = 50
 
     try:
@@ -2265,6 +2234,7 @@ def ip_control_api():
 
             # Validate IP addresses
             import ipaddress
+
             for ip in whitelist + blacklist:
                 if not isinstance(ip, str):
                     return jsonify({"success": False, "error": f"Invalid IP format: {ip}"}), 400
@@ -2279,7 +2249,6 @@ def ip_control_api():
         except Exception as e:
             console.print(f"Error updating IP control: {e}", markup=False)
             return jsonify({"success": False, "error": "Failed to update IP control settings"}), 500
-
 
 
 @app.route("/api/2fa/setup", methods=["POST"])
@@ -2392,7 +2361,7 @@ def browse_roots():
     # First pass: collect all display names to detect duplicates
     name_to_roots: dict[str, list[str]] = {}
     for root in roots:
-        display_name = os.path.basename(root.rstrip(os.sep)) or root
+        display_name = Path(root.rstrip(os.sep)).name or root
         if display_name not in name_to_roots:
             name_to_roots[display_name] = []
         name_to_roots[display_name].append(root)
@@ -2400,7 +2369,7 @@ def browse_roots():
     # Second pass: build items with subtitles when needed
     items: list[BrowseItem] = []
     for root in roots:
-        display_name = os.path.basename(root.rstrip(os.sep)) or root
+        display_name = Path(root.rstrip(os.sep)).name or root
         item: BrowseItem = {"name": display_name, "path": root, "type": "folder", "children": []}
 
         # Add subtitle if multiple roots share the same folder name
@@ -2447,11 +2416,7 @@ def config_options():
     # instead of silently showing defaults.
     config_warning: str | None = None
     if not config_path.exists():
-        config_warning = (
-            "No config.py found — showing example defaults. "
-            "Configure your settings and save, or place your config.py "
-            "into the mounted data/ directory."
-        )
+        config_warning = "No config.py found — showing example defaults. Configure your settings and save, or place your config.py into the mounted data/ directory."
     elif user_config is None:
         config_warning = (
             "config.py exists but could not be loaded — showing example defaults. "
@@ -2508,7 +2473,7 @@ def config_options():
         if section_name == "TORRENT_CLIENTS":
             client_types = set()
             for item in items:
-                if "children" in item and item["children"]:
+                if item.get("children"):
                     client_type_item = next((c for c in item["children"] if c.get("key") == "torrent_client"), None)
                     if client_type_item:
                         client_types.add(client_type_item.get("value", "unknown"))
@@ -2678,8 +2643,7 @@ def api_tokens():
         store = _list_api_tokens()
         # Return metadata only (do not leak token values)
         tokens = [
-            {"id": tid, "user": info.get("user"), "label": info.get("label"), "created": info.get("created"), "expiry": info.get("expiry")}
-            for tid, info in store.items()
+            {"id": tid, "user": info.get("user"), "label": info.get("label"), "created": info.get("created"), "expiry": info.get("expiry")} for tid, info in store.items()
         ]
         read_only = False
         return jsonify({"success": True, "tokens": tokens, "read_only": read_only})
@@ -2690,7 +2654,9 @@ def api_tokens():
         label = data.get("label", "")
         # No expiry: tokens are non-expiring by default;
         persisted = auth_mod.load_user()
-        username = _session_get("username") or (request.authorization.username if request.authorization is not None else None) or (persisted.get("username") if persisted else None)
+        username = (
+            _session_get("username") or (request.authorization.username if request.authorization is not None else None) or (persisted.get("username") if persisted else None)
+        )
         if not username:
             return jsonify({"success": False, "error": "Unable to determine username for token"}), 400
 
@@ -2744,12 +2710,12 @@ def browse_path():
         return jsonify({"error": "Invalid path specified", "success": False}), 400
 
     # Defensive sanity checks before using `path` in filesystem operations.
-    safe_path = os.path.abspath(path)
-    if '\x00' in safe_path:
+    safe_path = str(Path(path).resolve())
+    if "\x00" in safe_path:
         console.print("Path contains invalid characters", markup=False)
         return jsonify({"error": "Invalid path specified", "success": False}), 400
     # codeql[py/path-injection]
-    if not os.path.isdir(safe_path):
+    if not Path(safe_path).is_dir():
         console.print("Requested path is not a directory", markup=False)
         return jsonify({"error": "Invalid path specified", "success": False}), 400
 
@@ -2764,7 +2730,7 @@ def browse_path():
             real_safe = os.path.realpath(safe_path)
             allowed = False
             for root in _get_browse_roots():
-                root_real = os.path.realpath(os.path.abspath(root))
+                root_real = os.path.realpath(str(Path(root).resolve()))
                 try:
                     if os.path.commonpath([real_safe, root_real]) == root_real:
                         allowed = True
@@ -2781,7 +2747,7 @@ def browse_path():
                 # Skip hidden files
                 if item.startswith("."):
                     continue
-                full_path = os.path.join(safe_path, item)
+                full_path = Path(safe_path) / item
                 # Explicitly assert each resolved child path is safe. If the
                 # assertion fails for a specific entry, skip it rather than
                 # failing the whole browse operation.
@@ -2791,7 +2757,7 @@ def browse_path():
                     continue
                 try:
                     # codeql[py/path-injection]
-                    is_dir = os.path.isdir(full_path)
+                    is_dir = Path(full_path).is_dir()
 
                     # Skip files based on filter type
                     if not is_dir:
@@ -2805,7 +2771,7 @@ def browse_path():
                                 continue
 
                     items.append({"name": item, "path": full_path, "type": "folder" if is_dir else "file", "children": [] if is_dir else None})
-                except (PermissionError, OSError):
+                except PermissionError, OSError:
                     continue
 
             console.print(f"Found {len(items)} items in {path}", markup=False)
@@ -2845,7 +2811,7 @@ def browse_search():
         max_results = min(int(request.args.get("max_results", "100")), 500)
         if max_results < 1:
             max_results = 100
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         max_results = 100
 
     if not query:
@@ -2891,8 +2857,8 @@ def browse_search():
 
     try:
         for root in roots:
-            root_abs = os.path.abspath(root)
-            if not os.path.isdir(root_abs):
+            root_abs = str(Path(root).resolve())
+            if not Path(root_abs).is_dir():
                 continue
             try:
                 for dirpath, dirnames, filenames in os.walk(root_abs):
@@ -2902,7 +2868,7 @@ def browse_search():
                     # Check dirs
                     for dirname in dirnames:
                         if name_matches(dirname):
-                            full_path = os.path.join(dirpath, dirname)
+                            full_path = Path(dirpath) / dirname
                             try:
                                 _assert_safe_resolved_path(full_path)
                             except ValueError:
@@ -2923,7 +2889,7 @@ def browse_search():
                         _, ext = os.path.splitext(filename.lower())
                         if ext not in allowed_exts:
                             continue
-                        full_path = os.path.join(dirpath, filename)
+                        full_path = Path(dirpath) / filename
                         try:
                             _assert_safe_resolved_path(full_path)
                         except ValueError:
@@ -3003,7 +2969,7 @@ def execute_command():
                     # Quick normalization: single -> double quotes
                     candidate = raw.replace("'", '"')
                     # Quote unquoted keys like: {path:...} -> {"path":...}
-                    candidate = re.sub(r'([\{\s,])([A-Za-z0-9_]+)\s*:', r'\1"\2":', candidate)
+                    candidate = re.sub(r"([\{\s,])([A-Za-z0-9_]+)\s*:", r'\1"\2":', candidate)
                     try:
                         data = json.loads(candidate)
                     except Exception:
@@ -3013,9 +2979,9 @@ def execute_command():
                         m_sess = re.search(r'session_id\s*[:=]\s*["\']?([^"\'\},]+)', raw)
                         m_args = re.search(r'args\s*[:=]\s*["\']?([^"\'\}]+)', raw)
                         if m_path:
-                            d['path'] = m_path.group(1)
+                            d["path"] = m_path.group(1)
                         if m_sess:
-                            d['session_id'] = m_sess.group(1)
+                            d["session_id"] = m_sess.group(1)
                         if m_args:
                             # Trim any trailing quote/comma characters and preserve spacing
                             raw_args = m_args.group(1).strip()
@@ -3025,8 +2991,8 @@ def execute_command():
                             # comma followed by a session_id key so args remain
                             # clean.
                             raw_args = re.split(r',\s*(?:"?session_id|session_id)\b', raw_args)[0]
-                            raw_args = raw_args.rstrip(',').strip().strip('"').strip("'")
-                            d['args'] = raw_args
+                            raw_args = raw_args.rstrip(",").strip().strip('"').strip("'")
+                            d["args"] = raw_args
                         if d:
                             data = d
             except Exception:
@@ -3187,47 +3153,45 @@ def execute_command():
                         orig_ask_yes_no = _cli_ui.ask_yes_no
 
                         def wrapped_ask_yes_no(*args, default: bool = False, **kwargs) -> bool:
-                                # Support both signatures used across the codebase:
-                                #   ask_yes_no(question, default=...)
-                                #   ask_yes_no(color, question, default=...)
-                                # Extract the question and default value from args/kwargs.
-                                if len(args) >= 2:
-                                    question = args[1]
-                                elif len(args) == 1:
-                                    question = args[0]
-                                else:
-                                    question = kwargs.get('question', '')
+                            # Support both signatures used across the codebase:
+                            #   ask_yes_no(question, default=...)
+                            #   ask_yes_no(color, question, default=...)
+                            # Extract the question and default value from args/kwargs.
+                            if len(args) >= 2:
+                                question = args[1]
+                            elif len(args) == 1:
+                                question = args[0]
+                            else:
+                                question = kwargs.get("question", "")
 
-                                # If default was passed positionally (third arg), use it.
-                                default_val = args[2] if len(args) >= 3 else kwargs.get('default', default)
+                            # If default was passed positionally (third arg), use it.
+                            default_val = args[2] if len(args) >= 3 else kwargs.get("default", default)
 
-                                with contextlib.suppress(Exception):
-                                    wrapped_print(str(question))
-                                # Wait for a response or cancellation
-                                while True:
-                                    if cancel_event.is_set():
-                                        raise EOFError()
-                                    try:
-                                        resp = input_queue.get(timeout=0.5)
-                                    except queue.Empty:
-                                        continue
-                                    except Exception:
-                                        raise
-                                    resp = (resp or "").strip().lower()
-                                    if resp in ("y", "yes"):
-                                        return True
-                                    if resp in ("n", "no"):
-                                        return False
-                                    return default_val
+                            with contextlib.suppress(Exception):
+                                wrapped_print(str(question))
+                            # Wait for a response or cancellation
+                            while True:
+                                if cancel_event.is_set():
+                                    raise EOFError()
+                                try:
+                                    resp = input_queue.get(timeout=0.5)
+                                except queue.Empty:
+                                    continue
+                                except Exception:
+                                    raise
+                                resp = (resp or "").strip().lower()
+                                if resp in ("y", "yes"):
+                                    return True
+                                if resp in ("n", "no"):
+                                    return False
+                                return default_val
 
                         _cli_ui.ask_yes_no = wrapped_ask_yes_no
                         # Save original ask_yes_no so external cleaners (eg. /api/kill)
                         # can restore it if the inproc run is terminated early.
-                        try:
+                        with contextlib.suppress(Exception):
                             if console_key in _ua_console_store:
                                 _ua_console_store[console_key]["orig_ask_yes_no"] = orig_ask_yes_no
-                        except Exception:
-                            pass
 
                         # ask_string: prompt user for an arbitrary string
                         try:
@@ -3242,8 +3206,7 @@ def execute_command():
                                     if cancel_event.is_set():
                                         raise EOFError()
                                     try:
-                                        resp = input_queue.get(timeout=0.5)
-                                        return resp
+                                        return input_queue.get(timeout=0.5)
                                     except queue.Empty:
                                         continue
                                     except Exception:
@@ -3251,11 +3214,9 @@ def execute_command():
 
                             _cli_ui.ask_string = wrapped_ask_string
                             # Save original ask_string for external cleanup
-                            try:
+                            with contextlib.suppress(Exception):
                                 if console_key in _ua_console_store:
                                     _ua_console_store[console_key]["orig_ask_string"] = orig_ask_string
-                            except Exception:
-                                pass
                         except Exception:
                             orig_ask_string = None
                     except Exception:
@@ -3330,16 +3291,12 @@ def execute_command():
                                     if "orig_input" in origs and origs["orig_input"] is not None:
                                         src_console.console.input = origs["orig_input"]
                                     # Restore cli_ui patched functions if present
-                                    try:
+                                    with contextlib.suppress(Exception):
                                         if "orig_ask_yes_no" in origs and origs["orig_ask_yes_no"] is not None:
                                             _cli_ui.ask_yes_no = origs["orig_ask_yes_no"]
-                                    except Exception:
-                                        pass
-                                    try:
+                                    with contextlib.suppress(Exception):
                                         if "orig_ask_string" in origs and origs["orig_ask_string"] is not None:
                                             _cli_ui.ask_string = origs["orig_ask_string"]
-                                    except Exception:
-                                        pass
                                     del _ua_console_store[console_key]
                                 # Release lock to allow next inproc run
                                 inproc_lock.release()
@@ -3362,11 +3319,9 @@ def execute_command():
                         worker.start()
 
                         # Record worker thread for debugging/cleanup
-                        try:
+                        with contextlib.suppress(Exception):
                             if session_id in active_processes:
                                 cast(Any, active_processes[session_id])["worker"] = worker
-                        except Exception:
-                            pass
 
                         console.print(f"Started inproc worker for session {session_id}: {worker.name}", markup=False)
 
@@ -3421,14 +3376,12 @@ def execute_command():
                                 with contextlib.suppress(Exception):
                                     record_console.print(*r_args, **r_kwargs)
 
-                            try:
+                            with contextlib.suppress(Exception):
                                 html_doc = record_console.export_html(inline_styles=True)
                                 m = re.search(r"<body[^>]*>(.*?)</body>", html_doc, re.S | re.I)
                                 body = m.group(1).strip() if m else html_doc
                                 if body != last_body:
                                     yield f"data: {json.dumps({'type': 'html_full', 'data': body})}\n\n"
-                            except Exception:
-                                pass
                         except Exception:
                             # Ensure generator continues and yields a final keepalive on error
                             yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
@@ -3480,10 +3433,10 @@ def execute_command():
                     # `base_dir` is computed from the application `__file__`, but
                     # perform lightweight validation to satisfy static analysis
                     # tools and ensure we do not pass uncontrolled input here.
-                    if '\x00' in str(base_dir) or not str(base_dir):
+                    if "\x00" in str(base_dir) or not str(base_dir):
                         raise ValueError("Invalid execution directory")
-                    if not os.path.isabs(str(base_dir)):
-                        base_dir = os.path.abspath(str(base_dir))
+                    if not Path(str(base_dir)).is_absolute():
+                        base_dir = str(Path(str(base_dir)).resolve())
 
                     # Extra validation for the constructed command to guard
                     # against command-injection and to make validation explicit
@@ -3577,14 +3530,12 @@ def execute_command():
                         stderr_thread.start()
 
                         # Record threads and output queue for debugging/cleanup
-                        try:
+                        with contextlib.suppress(Exception):
                             if session_id in active_processes:
                                 info = cast(Any, active_processes[session_id])
                                 info["stdout_thread"] = stdout_thread
                                 info["stderr_thread"] = stderr_thread
                                 info["output_queue"] = output_queue
-                        except Exception:
-                            pass
 
                         console.print(f"Started subprocess reader threads for session {session_id}: stdout={stdout_thread.name}, stderr={stderr_thread.name}", markup=False)
 
@@ -3655,8 +3606,7 @@ def execute_command():
                         process.wait()
 
                         # Clean up (normal path)
-                        if session_id in active_processes:
-                            del active_processes[session_id]
+                        active_processes.pop(session_id, None)
 
                         yield f"data: {json.dumps({'type': 'exit', 'code': process.returncode})}\n\n"
                     finally:
@@ -3672,8 +3622,7 @@ def execute_command():
                                 process.stderr.close()
                         # Ensure we remove tracking entry if still present
                         with contextlib.suppress(Exception):
-                            if session_id in active_processes:
-                                del active_processes[session_id]
+                            active_processes.pop(session_id, None)
 
             except Exception as e:
                 console.print(f"Execution error for session {session_id}: {e}", markup=False)
@@ -3681,8 +3630,7 @@ def execute_command():
                 yield f"data: {json.dumps({'type': 'error', 'data': 'Execution error'})}\n\n"
 
                 # Clean up on error
-                if session_id in active_processes:
-                    del active_processes[session_id]
+                active_processes.pop(session_id, None)
 
         return Response(generate(), mimetype="text/event-stream")
 
@@ -3713,7 +3661,7 @@ def send_input():
         else:
             # Require a web session for non-token callers
             if not _is_authenticated():
-                return jsonify({"error": "Authentication required (web session)" , "success": False}), 401
+                return jsonify({"error": "Authentication required (web session)", "success": False}), 401
 
         if session_id not in active_processes:
             return jsonify({"error": "No active process", "success": False}), 404
@@ -3776,77 +3724,70 @@ def kill_process():
                 return jsonify({"error": "Forbidden (invalid token)", "success": False}), 403
         else:
             if not _is_authenticated():
-                return jsonify({"error": "Authentication required (web session)" , "success": False}), 401
+                return jsonify({"error": "Authentication required (web session)", "success": False}), 401
 
         if session_id not in active_processes:
             return jsonify({"error": "No active process", "success": False}), 404
 
         process_info = active_processes[session_id]
-        mode = process_info.get('mode')
+        mode = process_info.get("mode")
 
         # If this is an in-process run, perform best-effort cleanup of patched
         # console state and release the inproc lock so future inproc runs can start.
-        if mode == 'inproc':
+        if mode == "inproc":
             # Signal cancellation to the inproc worker and attempt to join it
-            try:
+            with contextlib.suppress(Exception):
                 cancel_event = process_info.get("cancel_event")
                 if isinstance(cancel_event, threading.Event):
                     cancel_event.set()
                 worker = process_info.get("worker")
                 if isinstance(worker, threading.Thread):
                     worker.join(timeout=2)
-            except Exception:
-                pass
 
             # Attempt to restore any patched console/cli state from the
             # module-level store so future runs have working print/input.
-            try:
-                with contextlib.suppress(Exception):
-                    # Prefer restoring originals tied to the current src.console
-                    try:
-                        from src import console as _src_console
-                        ck = id(_src_console.console)
+            with contextlib.suppress(Exception), contextlib.suppress(Exception):
+                # Prefer restoring originals tied to the current src.console
+                try:
+                    from src import console as _src_console
+
+                    ck = id(_src_console.console)
+                    if ck in _ua_console_store:
+                        origs = _ua_console_store.pop(ck)
+                        with contextlib.suppress(Exception):
+                            _src_console.console.print = origs.get("orig_print", _src_console.console.print)
+                        with contextlib.suppress(Exception):
+                            orig_in = origs.get("orig_input", None)
+                            if orig_in is not None:
+                                _src_console.console.input = orig_in
+                        # Restore any cli_ui wrappers if we have originals
+                        with contextlib.suppress(Exception):
+                            import cli_ui as _cli_ui
+
+                            with contextlib.suppress(Exception):
+                                if "orig_ask_yes_no" in origs and origs["orig_ask_yes_no"] is not None:
+                                    _cli_ui.ask_yes_no = origs["orig_ask_yes_no"]
+                            with contextlib.suppress(Exception):
+                                if "orig_ask_string" in origs and origs["orig_ask_string"] is not None:
+                                    _cli_ui.ask_string = origs["orig_ask_string"]
+                except Exception:
+                    # Best-effort: if we can't import src.console, fall back to
+                    # restoring any stored callables into the module-level
+                    # `console` we imported at module import time.
+                    with contextlib.suppress(Exception):
+                        ck = id(console)
                         if ck in _ua_console_store:
                             origs = _ua_console_store.pop(ck)
                             with contextlib.suppress(Exception):
-                                _src_console.console.print = origs.get("orig_print", _src_console.console.print)
+                                console.print = origs.get("orig_print", console.print)
                             with contextlib.suppress(Exception):
                                 orig_in = origs.get("orig_input", None)
                                 if orig_in is not None:
-                                    _src_console.console.input = orig_in
-                            # Restore any cli_ui wrappers if we have originals
-                            try:
-                                import cli_ui as _cli_ui
-                                with contextlib.suppress(Exception):
-                                    if "orig_ask_yes_no" in origs and origs["orig_ask_yes_no"] is not None:
-                                        _cli_ui.ask_yes_no = origs["orig_ask_yes_no"]
-                                with contextlib.suppress(Exception):
-                                    if "orig_ask_string" in origs and origs["orig_ask_string"] is not None:
-                                        _cli_ui.ask_string = origs["orig_ask_string"]
-                            except Exception:
-                                pass
-                    except Exception:
-                        # Best-effort: if we can't import src.console, fall back to
-                        # restoring any stored callables into the module-level
-                        # `console` we imported at module import time.
-                        try:
-                            ck = id(console)
-                            if ck in _ua_console_store:
-                                origs = _ua_console_store.pop(ck)
-                                with contextlib.suppress(Exception):
-                                    console.print = origs.get("orig_print", console.print)
-                                with contextlib.suppress(Exception):
-                                    orig_in = origs.get("orig_input", None)
-                                    if orig_in is not None:
-                                        console.input = orig_in
-                        except Exception:
-                            pass
+                                    console.input = orig_in
 
-                    # If any other entries remain in the store, drop them to avoid
-                    # leaking references — they are unlikely to be useful now.
-                    _ua_console_store.clear()
-            except Exception:
-                pass
+                # If any other entries remain in the store, drop them to avoid
+                # leaking references — they are unlikely to be useful now.
+                _ua_console_store.clear()
 
             # Release inproc lock if held; best-effort only.
             with contextlib.suppress(Exception):
@@ -3855,8 +3796,7 @@ def kill_process():
 
             # Remove tracking entry
             with contextlib.suppress(Exception):
-                if session_id in active_processes:
-                    del active_processes[session_id]
+                active_processes.pop(session_id, None)
 
             console.print(f"In-process run terminated for session {session_id}", markup=False)
             return jsonify({"success": True, "message": "In-process run terminated and console state wiped"})
@@ -3892,7 +3832,7 @@ def kill_process():
         finally:
             # Clean up tracking entry regardless
             # Attempt to join reader threads if present
-            try:
+            with contextlib.suppress(Exception):
                 info = active_processes.get(session_id, {})
                 stdout_t = info.get("stdout_thread")
                 stderr_t = info.get("stderr_thread")
@@ -3902,12 +3842,9 @@ def kill_process():
                 if isinstance(stderr_t, threading.Thread):
                     console.print(f"Joining stderr thread for session {session_id}", markup=False)
                     stderr_t.join(timeout=1)
-            except Exception:
-                pass
 
             with contextlib.suppress(Exception):
-                if session_id in active_processes:
-                    del active_processes[session_id]
+                active_processes.pop(session_id, None)
 
         console.print(f"Process killed for session {session_id}", markup=False)
         console.print(f"Post-kill snapshot: {_debug_process_snapshot(session_id)}", markup=False)
@@ -3926,6 +3863,6 @@ def not_found(_e: Exception):
 
 @app.errorhandler(500)
 def internal_error(e: Exception):
-    console.print(f"500 error: {str(e)}", markup=False)
+    console.print(f"500 error: {e!s}", markup=False)
     console.print(traceback.format_exc(), markup=False)
     return jsonify({"error": "Internal server error", "success": False}), 500

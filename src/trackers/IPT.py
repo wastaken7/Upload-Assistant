@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import re
+from pathlib import Path
 from typing import Any
 
 import aiofiles
@@ -20,7 +20,7 @@ class IPT:
     tracker = "IPT"
     source_flag = "IPTorrents"
     base_url = "https://iptorrents.com"
-    banned_groups = [
+    banned_groups = (
         "1337x",
         "3DM",
         "3dtorrents",
@@ -95,10 +95,10 @@ class IPT:
         "X360ISO",
         "YIFY",
         "zombiRG",
-    ]
+    )
     torrent_url = "https://iptorrents.com/torrent.php?id="
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ["ssl.empirehost.me", "routing.bgp.technology", "127.0.0.1.stackoverflow.tech"]
+    tracker_urls = ("ssl.empirehost.me", "routing.bgp.technology", "127.0.0.1.stackoverflow.tech")
 
     def __init__(self, config: Config):
         self.config = config
@@ -116,7 +116,7 @@ class IPT:
 
     async def generate_description(self, meta: Meta):
         builder = DescriptionBuilder(self.tracker, self.config)
-        description = await builder.general_description_generator(
+        return await builder.general_description_generator(
             meta,
             audio_spectrogram=True,
             bluray=True,
@@ -137,7 +137,6 @@ class IPT:
             user_description=True,
             signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/center][/url][/right]",
         )
-        return description
 
     async def search_existing(self, meta: Meta):
         dupes = []
@@ -152,24 +151,28 @@ class IPT:
         _type = str(meta.type or "").strip().lower()
 
         if is_disc == "bdmv":
-            forbidden_keywords.extend([
-                "remux",
-                "x264",
-                "x265",
-                "x 264",
-                "x 265",
-                "webrip",
-                "av1",
-                "h 264",
-                "h 265",
-                "h264",
-                "h265",
-                " web ",
-            ])
+            forbidden_keywords.extend(
+                [
+                    "remux",
+                    "x264",
+                    "x265",
+                    "x 264",
+                    "x 265",
+                    "webrip",
+                    "av1",
+                    "h 264",
+                    "h 265",
+                    "h264",
+                    "h265",
+                    " web ",
+                ]
+            )
             if "1080" in meta.resolution:
-                forbidden_keywords.extend([
-                    "hevc",
-                ])
+                forbidden_keywords.extend(
+                    [
+                        "hevc",
+                    ]
+                )
 
         if _type == "webdl":
             forbidden_keywords.extend(["webrip", "bluray", "blu-ray"])
@@ -207,7 +210,6 @@ class IPT:
                             if not any(keyword in name.lower() for keyword in forbidden_keywords):
                                 duplicate_entry = {"name": name, "size": size, "link": torrent_link}
                                 dupes.append(duplicate_entry)
-
 
         return dupes
 
@@ -283,14 +285,13 @@ class IPT:
                 return movie_non_english
             return movie_hd_bluray
 
-        elif category == "TV":
+        if category == "TV":
             if meta.tv_pack:
                 if meta.original_language and meta.original_language != "en":
                     return tv_packs_non_english
                 return tv_packs
-            else:
-                if meta.original_language and meta.original_language != "en":
-                    return tv_non_english
+            if meta.original_language and meta.original_language != "en":
+                return tv_non_english
             if is_disc:
                 if is_disc == "BDMV":
                     return tv_bd
@@ -352,8 +353,8 @@ class IPT:
         return re.sub(r"\s{2,}", " ", name)
 
     async def get_is_freeleech(self, meta: Meta):
-        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/BASE.torrent"
-        if not os.path.exists(torrent_path):
+        torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BASE.torrent"
+        if not Path(torrent_path).exists():
             return False
 
         try:

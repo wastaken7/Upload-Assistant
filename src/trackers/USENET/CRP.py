@@ -1,7 +1,8 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
+import contextlib
 import glob
 import json
-import os
+from pathlib import Path
 from typing import Any
 
 import aiofiles
@@ -30,8 +31,8 @@ class CRP:
 
     async def search_existing(self, meta: Meta) -> list[Any]:
         release_name = await self.get_name(meta)
-        cache_file = os.path.join(meta.base_dir, "tmp", meta.uuid, f"{self.tracker}_upload_ok")
-        if release_name and os.path.exists(cache_file):
+        cache_file = Path(meta.base_dir) / "tmp" / meta.uuid / f"{self.tracker}_upload_ok"
+        if release_name and Path(cache_file).exists():
             logger.info(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
             return [release_name]
 
@@ -55,25 +56,22 @@ class CRP:
         if category == "MOVIE":
             if resolution in uhd_resolutions:
                 return "2045"
-            elif resolution in hd_resolutions:
+            if resolution in hd_resolutions:
                 return "2040"
-            else:
-                return "2030"
-        elif category == "TV":
+            return "2030"
+        if category == "TV":
             if resolution in uhd_resolutions:
                 return "5045"
-            elif resolution in hd_resolutions:
+            if resolution in hd_resolutions:
                 return "5040"
-            else:
-                return "5030"
-        elif category == "BOOK":
+            return "5030"
+        if category == "BOOK":
             if meta.audiobook:
                 return "3030"
-            else:
-                return "7020"
-        elif category == "GAME":
+            return "7020"
+        if category == "GAME":
             return "4050"
-        elif category == "MUSIC":
+        if category == "MUSIC":
             return "3000"
 
         # Fallback to general TV HD or Movies HD/SD depending on category
@@ -85,12 +83,10 @@ class CRP:
         return meta.scene_name or meta.basename_no_ext
 
     def get_iso_639_1(self, lang_name: str) -> str | None:
-        try:
+        with contextlib.suppress(Exception):
             lang = langcodes.find(lang_name)
             if lang and lang.is_valid():
                 return lang.language
-        except Exception:
-            pass
         return None
 
     def get_source(self, meta: Meta) -> str | None:
@@ -102,11 +98,11 @@ class CRP:
             if meta.is_disc:
                 return "Full Disc"
             return "BluRay"
-        elif "WEB" in source_upper:
+        if "WEB" in source_upper:
             return "WEBRip" if meta.type == "WEBRIP" else "WEB-DL"
-        elif "HDTV" in source_upper:
+        if "HDTV" in source_upper:
             return "HDTV"
-        elif "DVD" in source_upper:
+        if "DVD" in source_upper:
             return "DVD"
         return source
 
@@ -114,30 +110,34 @@ class CRP:
         nzb_path = meta.nzb_path
 
         if not nzb_path or not await self.common.check_nzb_file(self.tracker, meta):
-            return
+            return None
 
         # Prepare multipart/form-data
         async with aiofiles.open(nzb_path, "rb") as f:
             nzb_content = await f.read()
 
-        files = {"nzb_file": (os.path.basename(nzb_path), nzb_content, "application/x-nzb")}
+        files = {"nzb_file": (Path(nzb_path).name, nzb_content, "application/x-nzb")}
 
         # NFO file (optional)
-        nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
-        nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
+        nfo_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        nfo_files = glob.glob(Path(nfo_dir) / "*.nfo")
         nfo_path = nfo_files[0] if nfo_files else None
-        if nfo_path and os.path.exists(nfo_path):
+        if nfo_path and Path(nfo_path).exists():
             async with aiofiles.open(nfo_path, "rb") as f:
                 nfo_content = await f.read()
-            files["nfo_file"] = (os.path.basename(nfo_path), nfo_content, "application/octet-stream")
+            files["nfo_file"] = (Path(nfo_path).name, nfo_content, "application/octet-stream")
 
         return files
 
     async def get_media_info(self, meta: Meta) -> str:
         info_file_path = ""
-        info_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt" if meta.is_disc == "BDMV" else f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
+        info_file_path = (
+            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt"
+            if meta.is_disc == "BDMV"
+            else f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
+        )
 
-        if os.path.exists(info_file_path):
+        if Path(info_file_path).exists():
             try:
                 async with aiofiles.open(info_file_path, encoding="utf-8") as f:
                     return await f.read()
@@ -303,9 +303,9 @@ class CRP:
             response_json = response.json()
             status_dict["status_message"] = "Upload successful"
 
-            cache_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
-            os.makedirs(cache_dir, exist_ok=True)
-            async with aiofiles.open(os.path.join(cache_dir, f"{self.tracker}_upload_ok"), "w", encoding="utf-8") as cache_handle:
+            cache_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+            Path(cache_dir).mkdir(parents=True, exist_ok=True)
+            async with aiofiles.open(Path(cache_dir) / f"{self.tracker}_upload_ok", "w", encoding="utf-8") as cache_handle:
                 await cache_handle.write("ok")
 
             # Try to grab release ID from response

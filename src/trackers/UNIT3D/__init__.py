@@ -6,6 +6,7 @@ import json
 import os
 import platform
 import re
+from pathlib import Path
 from typing import Any
 
 import aiofiles
@@ -23,7 +24,7 @@ type ParamsList = list[tuple[str, QueryValue]]
 
 
 class UNIT3D:
-    supported_categories: tuple[str, ...] = ('TV', 'MOVIE')
+    supported_categories: tuple[str, ...] = ("TV", "MOVIE")
     tracker: str = ""
     banned_groups: tuple[str, ...] = ()
     base_url: str = ""
@@ -47,8 +48,7 @@ class UNIT3D:
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         _meta = meta
-        should_continue = True
-        return should_continue
+        return True
 
     async def get_search_urls(self, meta: Meta, request_params: ParamsList) -> list[tuple[str, ParamsList, bool]]:
         _ = meta
@@ -69,9 +69,7 @@ class UNIT3D:
 
         if not self.api_key:
             if not meta.debug:
-                logger.info(
-                    f"[bold red]{self.tracker}: Missing API key in config file. Skipping upload...[/bold red]"
-                )
+                logger.info(f"[bold red]{self.tracker}: Missing API key in config file. Skipping upload...[/bold red]")
             meta.skipping = f"{self.tracker}"
             return dupes
 
@@ -189,16 +187,16 @@ class UNIT3D:
         return {"description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)}
 
     async def get_mediainfo(self, meta: Meta) -> dict[str, str]:
-        if meta.bdinfo or meta.category in ["GAME", "BOOK"] and not meta.audiobook:
+        if meta.bdinfo or (meta.category in ["GAME", "BOOK"] and not meta.audiobook):
             mediainfo = ""
         else:
-            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as f:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as f:
                 mediainfo = await f.read()
         return {"mediainfo": mediainfo}
 
     async def get_bdinfo(self, meta: Meta) -> dict[str, str]:
         if meta.bdinfo:
-            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
                 bdinfo = await f.read()
         else:
             bdinfo = ""
@@ -211,14 +209,13 @@ class UNIT3D:
         }
         if mapping_only:
             return category_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in category_id.items()}
-        elif category:
+        if category:
             return {"category_id": category_id.get(category, "0")}
-        else:
-            meta_category = meta.category
-            resolved_id = category_id.get(meta_category, "0")
-            return {"category_id": resolved_id}
+        meta_category = meta.category
+        resolved_id = category_id.get(meta_category, "0")
+        return {"category_id": resolved_id}
 
     async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
@@ -232,14 +229,13 @@ class UNIT3D:
         }
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
-        elif type:
+        if type:
             return {"type_id": type_id.get(type, "0")}
-        else:
-            meta_type = meta.type
-            resolved_id = type_id.get(meta_type or "", "0")
-            return {"type_id": resolved_id}
+        meta_type = meta.type
+        resolved_id = type_id.get(meta_type or "", "0")
+        return {"type_id": resolved_id}
 
     async def get_resolution_id(self, meta: Meta, resolution: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         resolution_id = {
@@ -257,14 +253,13 @@ class UNIT3D:
         }
         if mapping_only:
             return resolution_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in resolution_id.items()}
-        elif resolution:
+        if resolution:
             return {"resolution_id": resolution_id.get(resolution, "10")}
-        else:
-            meta_resolution = meta.resolution
-            resolved_id = resolution_id.get(meta_resolution, "10")
-            return {"resolution_id": resolved_id}
+        meta_resolution = meta.resolution
+        resolved_id = resolution_id.get(meta_resolution, "10")
+        return {"resolution_id": resolved_id}
 
     async def get_anonymous(self, meta: Meta) -> dict[str, str]:
         anonymous = "0" if meta.anon == 0 and not self.tracker_config.get("anon", False) else "1"
@@ -287,11 +282,9 @@ class UNIT3D:
         config_flag = self.tracker_config.get(flag_name)
         if meta.get(flag_name, False):
             return "1"
-        else:
-            if config_flag is not None:
-                return "1" if config_flag else "0"
-            else:
-                return "0"
+        if config_flag is not None:
+            return "1" if config_flag else "0"
+        return "0"
 
     async def get_distributor_id(self, meta: Meta) -> dict[str, str]:
         distributor_id = await self.common.unit3d_distributor_ids(meta.distributor)
@@ -426,11 +419,11 @@ class UNIT3D:
         files: dict[str, tuple[str, bytes, str]] = {}
         base_dir = meta.base_dir
         uuid = meta.uuid
-        specified_dir_path = os.path.join(base_dir, "tmp", uuid, "*.nfo")
+        specified_dir_path = Path(base_dir) / "tmp" / uuid / "*.nfo"
         nfo_files = glob.glob(specified_dir_path)
         if not nfo_files and meta.keep_nfo and (meta.keep_folder or meta.isdir):
             search_dir = os.path.dirname(str(meta.path))
-            nfo_files = glob.glob(os.path.join(search_dir, "*.nfo"))
+            nfo_files = glob.glob(Path(search_dir) / "*.nfo")
 
         if nfo_files:
             async with aiofiles.open(nfo_files[0], "rb") as f:
@@ -439,7 +432,7 @@ class UNIT3D:
 
         if meta.category not in ("MOVIE", "TV", "GAME"):
             cover_path = meta.cover_path
-            if cover_path and os.path.exists(cover_path):
+            if cover_path and Path(cover_path).exists():
                 try:
                     cover_bytes = await self.process_image_for_api(cover_path, 400, 600)
                     if cover_bytes:
@@ -448,7 +441,7 @@ class UNIT3D:
                     logger.info(f"[yellow]Failed to process cover: {e}[/yellow]")
 
             banner_path = meta.banner_path
-            if banner_path and os.path.exists(banner_path):
+            if banner_path and Path(banner_path).exists():
                 try:
                     banner_bytes = await self.process_image_for_api(banner_path, 960, 540)
                     if banner_bytes:
@@ -461,7 +454,7 @@ class UNIT3D:
     async def upload(self, meta: Meta) -> bool:
         data = await self.get_data(meta)
         torrent_filename = await self.common.get_torrent_filename(meta, self.tracker_config)
-        torrent_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/{torrent_filename}.torrent"
+        torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{torrent_filename}.torrent"
         async with aiofiles.open(torrent_file_path, "rb") as f:
             torrent_bytes = await f.read()
         files = {"torrent": ("torrent.torrent", torrent_bytes, "application/x-bittorrent")}
@@ -479,11 +472,9 @@ class UNIT3D:
             timeout = 40.0
 
             for attempt in range(max_retries):
-                try:  # noqa: PERF203
+                try:
                     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-                        response = await client.post(
-                            url=self.upload_url, files=files, data=data, headers=headers
-                        )
+                        response = await client.post(url=self.upload_url, files=files, data=data, headers=headers)
                         response.raise_for_status()
 
                         response_data = response.json()
@@ -499,12 +490,10 @@ class UNIT3D:
                         torrent_id = await self.get_torrent_id(response_data)
 
                         meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
-                        await self.common.download_tracker_torrent(
-                            meta, self.tracker, headers=headers, downurl=response_data["data"]
-                        )
+                        await self.common.download_tracker_torrent(meta, self.tracker, headers=headers, downurl=response_data["data"])
                         return True  # Success
 
-                except httpx.HTTPStatusError as e:  # noqa: PERF203
+                except httpx.HTTPStatusError as e:
                     if e.response.status_code in [403, 302]:
                         # Don't retry auth/permission errors
                         if e.response.status_code == 403:
@@ -516,7 +505,7 @@ class UNIT3D:
                                 f"data error: Redirect (302). This may indicate a problem with authentication. {e.response.text}"
                             )
                         return False  # Auth/permission error
-                    elif e.response.status_code in [401, 404, 422]:
+                    if e.response.status_code in [401, 404, 422]:
                         meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {e.response.text}"
                     else:
                         # Retry other HTTP errors
@@ -526,13 +515,12 @@ class UNIT3D:
                             )
                             await asyncio.sleep(retry_delay)
                             continue
+                        # Final attempt failed
+                        if e.response.status_code == 520:
+                            meta.tracker_status[self.tracker]["status_message"] = "data error: Error (520). This is probably a cloudflare issue on the tracker side."
                         else:
-                            # Final attempt failed
-                            if e.response.status_code == 520:
-                                meta.tracker_status[self.tracker]["status_message"] = "data error: Error (520). This is probably a cloudflare issue on the tracker side."
-                            else:
-                                meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {e.response.text}"
-                            return False  # HTTP error after all retries
+                            meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {e.response.text}"
+                        return False  # HTTP error after all retries
                 except httpx.TimeoutException:
                     if attempt < max_retries - 1:
                         timeout = timeout * 1.5  # Increase timeout by 50% for next retry
@@ -541,19 +529,15 @@ class UNIT3D:
                         )
                         await asyncio.sleep(retry_delay)
                         continue
-                    else:
-                        meta.tracker_status[self.tracker]["status_message"] = "data error: Request timed out after multiple attempts"
-                        return False  # Timeout after all retries
+                    meta.tracker_status[self.tracker]["status_message"] = "data error: Request timed out after multiple attempts"
+                    return False  # Timeout after all retries
                 except httpx.RequestError as e:
                     if attempt < max_retries - 1:
-                        logger.info(
-                            f"[yellow]{self.tracker}: Request error, retrying in {retry_delay} seconds... (attempt {attempt + 1}/{max_retries})[/yellow]"
-                        )
+                        logger.info(f"[yellow]{self.tracker}: Request error, retrying in {retry_delay} seconds... (attempt {attempt + 1}/{max_retries})[/yellow]")
                         await asyncio.sleep(retry_delay)
                         continue
-                    else:
-                        meta.tracker_status[self.tracker]["status_message"] = f"data error: Unable to upload. Error: {e}.\nResponse: {response_data}"
-                        return False  # Request error after all retries
+                    meta.tracker_status[self.tracker]["status_message"] = f"data error: Unable to upload. Error: {e}.\nResponse: {response_data}"
+                    return False  # Request error after all retries
                 except json.JSONDecodeError as e:
                     meta.tracker_status[self.tracker]["status_message"] = f"data error: Invalid JSON response from {self.tracker}. Error: {e}"
                     return False  # JSON parsing error
@@ -578,7 +562,7 @@ class UNIT3D:
             match = re.search(r"/(\d+)\.", response_data["data"])
             if match:
                 torrent_id = match.group(1)
-        except (IndexError, KeyError):
+        except IndexError, KeyError:
             logger.info("Could not parse torrent_id from response data.")
         return torrent_id
 

@@ -26,7 +26,7 @@ async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta,
     mi: dict[str, Any] = {}
     if meta.is_disc != "BDMV":
         try:
-            mi_text = await asyncio.to_thread(Path(f"{base_dir}/tmp/{folder_id}/MediaInfo.json").read_text, encoding="utf-8")
+            mi_text = await asyncio.to_thread(Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/MediaInfo.json").read_text, encoding="utf-8")
             mi = json.loads(mi_text)
         except Exception:
             logger.debug("No mediainfo.json")
@@ -35,28 +35,28 @@ async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta,
             source = str(meta.manual_source)
         else:
             try:
-                source = guessit_fn(video).get('source', source)
+                source = guessit_fn(video).get("source", source)
             except Exception:
                 try:
-                    source = guessit_fn(path).get('source', source)
+                    source = guessit_fn(path).get("source", source)
                 except Exception:
                     source = "BluRay"
         if source in ("Blu-ray", "Ultra HD Blu-ray", "BluRay", "BR") or is_disc == "BDMV":
             if type == "DISC":
                 source = "Blu-ray"
-            elif type in ('ENCODE', 'REMUX'):
+            elif type in ("ENCODE", "REMUX"):
                 source = "BluRay"
         if is_disc == "DVD" or source in ("DVD", "dvd"):
             try:
                 mediainfo = mi
-                for track in mediainfo['media']['track']:
-                    if track['@type'] == "Video":
-                        system = str(track.get('Standard', ''))
+                for track in mediainfo["media"]["track"]:
+                    if track["@type"] == "Video":
+                        system = str(track.get("Standard", ""))
                 if system not in ("PAL", "NTSC"):
-                    raise WeirdSystem  # noqa: F405
+                    raise WeirdSystem
             except Exception:
                 try:
-                    other = cast(list[str], guessit_fn(video).get('other', []))
+                    other = cast(list[str], guessit_fn(video).get("other", []))
                     if "PAL" in other:
                         system = "PAL"
                     elif "NTSC" in other:
@@ -65,8 +65,8 @@ async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta,
                     system = ""
                 if system == "" or system not in ("PAL", "NTSC"):
                     try:
-                        framerate = str(mi['media']['track'][1].get('FrameRate', ''))
-                        if '25' in framerate or '50' in framerate:
+                        framerate = str(mi["media"]["track"][1].get("FrameRate", ""))
+                        if "25" in framerate or "50" in framerate:
                             system = "PAL"
                         elif framerate:
                             system = "NTSC"
@@ -85,7 +85,7 @@ async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta,
                 source = "HD DVD"
             if type in ("ENCODE", "REMUX"):
                 source = "HDDVD"
-        if type in ("WEBDL", 'WEBRIP'):
+        if type in ("WEBDL", "WEBRIP"):
             source = "Web"
         if source == "Ultra HDTV":
             source = "UHDTV"

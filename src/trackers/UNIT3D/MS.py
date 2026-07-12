@@ -12,7 +12,7 @@ Config = dict[str, Any]
 class MS(UNIT3D):
     tracker = "MS"
     base_url = "https://midnightscene.cc"
-    banned_groups = [
+    banned_groups = (
         "4K4U",
         "AROMA",
         "aXXo",
@@ -77,14 +77,14 @@ class MS(UNIT3D):
         "YIFY",
         "YTS",
         "ZMNT",
-    ]
+    )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     requests_url = f"{base_url}/api/requests/filter"
     supported_categories = ("TV", "MOVIE", "GAME")
-    tracker_urls = ["midnightscene.cc"]
+    tracker_urls = ("midnightscene.cc",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="MS")
@@ -105,7 +105,7 @@ class MS(UNIT3D):
         }
         if mapping_only:
             return category_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in category_id.items()}
 
         resolved_category = category if category is not None and category != "" else meta.category
@@ -142,7 +142,7 @@ class MS(UNIT3D):
         }
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
 
         if type:
@@ -190,7 +190,7 @@ class MS(UNIT3D):
             foreign_lang = audio_languages[0].upper()
             if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
                 if meta.year:
-                    ms_name = ms_name.replace(str(meta.year), f"{str(meta.year)} {foreign_lang}", 1)
+                    ms_name = ms_name.replace(str(meta.year), f"{meta.year!s} {foreign_lang}", 1)
             elif meta.is_disc != "BDMV":
                 ms_name = ms_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
 

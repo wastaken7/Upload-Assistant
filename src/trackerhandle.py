@@ -28,30 +28,30 @@ async def check_mod_q_and_draft(
     meta: Meta,
 ) -> tuple[str | None, str | None, dict[str, Any]]:
     tracker_capabilities = {
-        'A4K': {'mod_q': True, 'draft': False},
-        'AITHER': {'mod_q': True, 'draft': False},
-        'BHD': {'draft_live': True},
-        'BLU': {'mod_q': True, 'draft': False},
-        'LST': {'mod_q': True, 'draft': True},
-        'LT': {'mod_q': True, 'draft': False},
-        'LUME': {'mod_q': True, 'draft': False},
+        "A4K": {"mod_q": True, "draft": False},
+        "AITHER": {"mod_q": True, "draft": False},
+        "BHD": {"draft_live": True},
+        "BLU": {"mod_q": True, "draft": False},
+        "LST": {"mod_q": True, "draft": True},
+        "LT": {"mod_q": True, "draft": False},
+        "LUME": {"mod_q": True, "draft": False},
     }
 
     modq, draft = None, None
     tracker_caps = tracker_capabilities.get(tracker_class.tracker, {})
-    if tracker_class.tracker == 'BHD' and tracker_caps.get('draft_live'):
+    if tracker_class.tracker == "BHD" and tracker_caps.get("draft_live"):
         draft_int = await tracker_class.get_live(meta)
         draft = "Draft" if draft_int == 0 else "Live"
 
     else:
-        if tracker_caps.get('mod_q'):
-            modq_flag = await tracker_class.get_flag(meta, 'modq')
+        if tracker_caps.get("mod_q"):
+            modq_flag = await tracker_class.get_flag(meta, "modq")
             modq_enabled = str(modq_flag).lower() in ["1", "true", "yes"]
-            modq = 'Yes' if modq_enabled else 'No'
-        if tracker_caps.get('draft'):
-            draft_flag = await tracker_class.get_flag(meta, 'draft')
+            modq = "Yes" if modq_enabled else "No"
+        if tracker_caps.get("draft"):
+            draft_flag = await tracker_class.get_flag(meta, "draft")
             draft_enabled = str(draft_flag).lower() in ["1", "true", "yes"]
-            draft = 'Yes' if draft_enabled else 'No'
+            draft = "Yes" if draft_enabled else "No"
 
     return modq, draft, tracker_caps
 
@@ -88,26 +88,22 @@ async def process_trackers(
 
             message = None
             if is_success:
-                if tracker == "MTV" and 'status_message' in status and "data error" not in str(status['status_message']):
+                if tracker == "MTV" and "status_message" in status and "data error" not in str(status["status_message"]):
                     if print_links:
-                        message = f"[green]{str(status['status_message'])}[/green]"
-                elif 'torrent_id' in status and print_links:
+                        message = f"[green]{status['status_message']!s}[/green]"
+                elif "torrent_id" in status and print_links:
                     torrent_url = str(getattr(tracker_class, "torrent_url", ""))
                     message = f"[green]{torrent_url}{status['torrent_id']}[/green]"
-                elif (
-                    'status_message' in status
-                    and "data error" not in str(status['status_message'])
-                    and (print_messages or (print_links and 'torrent_id' not in status))
-                ):
+                elif "status_message" in status and "data error" not in str(status["status_message"]) and (print_messages or (print_links and "torrent_id" not in status)):
                     message = f"{tracker}: {Redaction.redact_private_info(status['status_message'])}"
             else:
-                if 'status_message' in status and "data error" in str(status['status_message']):
-                    logger.info(f"[red]{tracker}: {str(status['status_message'])}[/red]")
+                if "status_message" in status and "data error" in str(status["status_message"]):
+                    logger.info(f"[red]{tracker}: {status['status_message']!s}[/red]")
                     return
 
             if message is not None:
                 if config["DEFAULT"].get("show_upload_duration", True) or meta.upload_timer:
-                    duration = meta.get(f'{tracker}_upload_duration')
+                    duration = meta.get(f"{tracker}_upload_duration")
                     if duration and isinstance(duration, (int, float)):
                         color = "#21ff00" if duration < 5 else "#9fd600" if duration < 10 else "#cfaa00" if duration < 15 else "#f17100" if duration < 20 else "#ff0000"
                         message += f" [[{color}]{duration:.2f}s[/{color}]]"
@@ -188,13 +184,13 @@ async def process_trackers(
 
         if tracker in api_trackers:
             tracker_status = meta.tracker_status
-            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
+            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
             if upload_status:
                 try:
                     modq, draft, tracker_caps = await check_mod_q_and_draft(tracker_class, meta)
-                    if tracker_caps.get('mod_q') and modq == "Yes":
+                    if tracker_caps.get("mod_q") and modq == "Yes":
                         logger.info(f"{tracker} (modq: {modq})")
-                    if (tracker_caps.get('draft') or tracker_caps.get('draft_live')) and draft in ["Yes", "Draft"]:
+                    if (tracker_caps.get("draft") or tracker_caps.get("draft_live")) and draft in ["Yes", "Draft"]:
                         logger.info(f"{tracker} (draft: {draft})")
                     is_uploaded = False
                     try:
@@ -206,7 +202,7 @@ async def process_trackers(
                         upload_start_time = time.time()
                         is_uploaded = await tracker_class.upload(meta)
                         upload_duration = time.time() - upload_start_time
-                        meta[f'{tracker}_upload_duration'] = upload_duration
+                        meta[f"{tracker}_upload_duration"] = upload_duration
                     except Exception as e:
                         logger.info(f"[red]Upload failed: {e}")
                         logger.info(traceback.format_exc())
@@ -221,7 +217,7 @@ async def process_trackers(
 
                 status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                 if is_uploaded and "data error" not in str(status.get("status_message", "")):
-                    if not getattr(tracker_class, 'is_usenet', False):
+                    if not getattr(tracker_class, "is_usenet", False):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:
@@ -230,7 +226,7 @@ async def process_trackers(
 
         elif tracker in other_api_trackers:
             tracker_status = meta.tracker_status
-            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
+            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
             if upload_status:
                 try:
                     is_uploaded = False
@@ -243,12 +239,12 @@ async def process_trackers(
                         upload_start_time = time.time()
                         is_uploaded = await tracker_class.upload(meta)
                         upload_duration = time.time() - upload_start_time
-                        meta[f'{tracker}_upload_duration'] = upload_duration
+                        meta[f"{tracker}_upload_duration"] = upload_duration
                     except Exception as e:
                         logger.info(f"[red]Upload failed: {e}")
                         logger.info(traceback.format_exc())
                         return
-                    if tracker == 'SN':
+                    if tracker == "SN":
                         await asyncio.sleep(16)
                 except Exception:
                     logger.info(traceback.format_exc())
@@ -261,7 +257,7 @@ async def process_trackers(
 
                 status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                 if is_uploaded and "data error" not in str(status.get("status_message", "")):
-                    if not getattr(tracker_class, 'is_usenet', False):
+                    if not getattr(tracker_class, "is_usenet", False):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:
@@ -270,7 +266,7 @@ async def process_trackers(
 
         elif tracker in http_trackers:
             tracker_status = meta.tracker_status
-            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
+            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
             if upload_status:
                 try:
                     is_uploaded = False
@@ -283,7 +279,7 @@ async def process_trackers(
                         upload_start_time = time.time()
                         is_uploaded = await tracker_class.upload(meta)
                         upload_duration = time.time() - upload_start_time
-                        meta[f'{tracker}_upload_duration'] = upload_duration
+                        meta[f"{tracker}_upload_duration"] = upload_duration
                     except Exception as e:
                         logger.info(f"[red]Upload failed: {e}")
                         logger.info(traceback.format_exc())
@@ -300,7 +296,7 @@ async def process_trackers(
 
                 status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                 if is_uploaded and "data error" not in str(status.get("status_message", "")):
-                    if not getattr(tracker_class, 'is_usenet', False):
+                    if not getattr(tracker_class, "is_usenet", False):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:
@@ -320,7 +316,7 @@ async def process_trackers(
                     sys.exit(1)
             if do_manual:
                 for manual_tracker in enabled_trackers:
-                    if manual_tracker != 'MANUAL':
+                    if manual_tracker != "MANUAL":
                         manual_tracker = manual_tracker.replace(" ", "").upper().strip()
                         tracker_class = tracker_class_map[manual_tracker](config=config)
                         if manual_tracker in api_trackers:
@@ -336,7 +332,7 @@ async def process_trackers(
 
         elif tracker == "THR":
             tracker_status = meta.tracker_status or {}
-            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
+            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
             if upload_status:
                 thr = THR(config=config)
                 thr_any = cast(Any, thr)
@@ -345,7 +341,7 @@ async def process_trackers(
                     upload_start_time = time.time()
                     is_uploaded = await thr_any.upload(meta)
                     upload_duration = time.time() - upload_start_time
-                    meta[f'{tracker}_upload_duration'] = upload_duration
+                    meta[f"{tracker}_upload_duration"] = upload_duration
                 except Exception as e:
                     logger.info(f"[red]Upload failed: {e}")
                     logger.info(traceback.format_exc())
@@ -361,7 +357,7 @@ async def process_trackers(
 
         elif tracker == "PTP":
             tracker_status = meta.tracker_status
-            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get('upload', False)
+            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
             if upload_status:
                 try:
                     ptp = PTP(config=config)
@@ -372,7 +368,7 @@ async def process_trackers(
                         upload_start_time = time.time()
                         is_uploaded = await ptp.upload(meta, ptpUrl, ptpData)
                         upload_duration = time.time() - upload_start_time
-                        meta[f'{tracker}_upload_duration'] = upload_duration
+                        meta[f"{tracker}_upload_duration"] = upload_duration
                     except Exception as e:
                         logger.info(f"[red]Upload failed: {e}")
                         logger.info(traceback.format_exc())
@@ -388,7 +384,7 @@ async def process_trackers(
                     logger.info(traceback.format_exc())
                     return
 
-    multi_screens = int(config['DEFAULT'].get('multiScreens', 2))
+    multi_screens = int(config["DEFAULT"].get("multiScreens", 2))
     discs = meta.discs or []
     one_disc = True
     if discs and len(discs) == 1:

@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import random
 from functools import partial
+from pathlib import Path
 from typing import Any, cast
 
 import awsmfunc as awsmfunc  # pyright: ignore[reportMissingImports] # pyrefly: ignore [missing-import]
@@ -36,12 +37,14 @@ def CustomFrameInfo(clip: Any, _text: str) -> Any:
 
 def optimize_images(image: str, config: dict[str, Any]) -> None:
     import platform  # Ensure platform is imported here
-    if config.get('optimize_images', True) and os.path.exists(image):
+
+    if config.get("optimize_images", True) and Path(image).exists():
         oxipng: Any | None
         try:
             pyver = platform.python_version_tuple()
             if int(pyver[0]) == 3 and int(pyver[1]) >= 7:
                 import oxipng  # pyright: ignore[reportMissingImports] # pyrefly: ignore [missing-import]
+
                 oxipng = oxipng
             else:
                 oxipng = None
@@ -58,13 +61,13 @@ def optimize_images(image: str, config: dict[str, Any]) -> None:
 
 def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str = ".", config: dict[str, Any] | None = None) -> None:
     if config is None:
-        config = {'optimize_images': True}  # Default configuration
+        config = {"optimize_images": True}  # Default configuration
 
-    screens_file = os.path.join(dir, "screens.txt")
+    screens_file = Path(dir) / "screens.txt"
 
     # Check if screens.txt already exists and use it if valid
-    if os.path.exists(screens_file):
-        with open(screens_file) as txt:
+    if Path(screens_file).exists():
+        with Path(screens_file).open() as txt:
             frames: list[int] = [int(line.strip()) for line in txt.readlines()]
         if len(frames) == num and all(f >= 0 for f in frames):
             logger.info(f"Using existing frame numbers from {screens_file}", extra={"markup": False})
@@ -78,15 +81,15 @@ def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str =
         logger.info(f"Indexing {source} with LSMASHSource... This may take a while.", extra={"markup": False})
         src: Any = core.lsmas.LWLibavSource(source)
     else:
-        cachefile = f"{os.path.abspath(dir)}{os.sep}ffms2.ffms2"
-        if not os.path.exists(cachefile):
+        cachefile = f"{Path(dir).resolve()!s}{os.sep}ffms2.ffms2"
+        if not Path(cachefile).exists():
             logger.info(f"Indexing {source} with ffms2... This may take a while.", extra={"markup": False})
         try:
             src = core.ffms2.Source(source, cachefile=cachefile)
         except Exception as e:
-            logger.info(f"Error during indexing: {str(e)}", extra={"markup": False})
+            logger.info(f"Error during indexing: {e!s}", extra={"markup": False})
             raise
-        if os.path.exists(cachefile):
+        if Path(cachefile).exists():
             logger.info(f"Indexing completed and cached at: {cachefile}", extra={"markup": False})
         else:
             logger.info("Indexing did not complete as expected.", extra={"markup": False})
@@ -94,7 +97,7 @@ def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str =
     # Check if encode is provided
     enc: Any | None = None
     if encode:
-        if not os.path.exists(encode):
+        if not Path(encode).exists():
             logger.info(f"Encode file {encode} not found. Skipping encode processing.", extra={"markup": False})
             encode = None
         else:
@@ -112,7 +115,7 @@ def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str =
         frame_lines = [f"{x}\n" for x in frames]
 
         # Write the frame numbers to a file for reuse
-        with open(screens_file, "w") as txt:
+        with Path(screens_file).open("w") as txt:
             txt.writelines(frame_lines)
         logger.info(f"Generated and saved new frame numbers to {screens_file}", extra={"markup": False})
 
@@ -152,5 +155,5 @@ def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str =
 
     # Optimize images
     for i in range(1, num + 1):
-        image_path = os.path.join(dir, f"{str(i).zfill(2)}a.png")
+        image_path = Path(dir) / f"{str(i).zfill(2)}a.png"
         optimize_images(image_path, config)

@@ -15,85 +15,65 @@ Config = dict[str, Any]
 class IHD(UNIT3D):
     tracker = "IHD"
     base_url = "https://infinityhd.net"
-    banned_groups = []
+    banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     requests_url = f"{base_url}/api/requests/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://infinityhd.net']
+    tracker_urls = ("https://infinityhd.net",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='IHD')
+        super().__init__(config, tracker_name="IHD")
         self.config: Config = config
         self.common = COMMON(config)
 
-    async def get_category_id(
-        self,
-        meta: Meta,
-        category: str | None = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
+    async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_name = meta.category
         anime = meta.anime
         category_id = {
-            'MOVIE': '1',
-            'TV': '2',
-            'ANIME': '3',
-            'ANIME MOVIE': '4',
+            "MOVIE": "1",
+            "TV": "2",
+            "ANIME": "3",
+            "ANIME MOVIE": "4",
         }
 
         is_anime_movie = False
         is_anime = False
 
-        if category_name == 'MOVIE' and anime is True:
+        if category_name == "MOVIE" and anime is True:
             is_anime_movie = True
 
-        if category_name == 'TV' and anime is True:
+        if category_name == "TV" and anime is True:
             is_anime = True
 
         if is_anime:
-            return {'category_id': '3'}
+            return {"category_id": "3"}
         if is_anime_movie:
-            return {'category_id': '4'}
+            return {"category_id": "4"}
 
         if mapping_only:
             return category_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in category_id.items()}
-        elif category is not None:
-            return {'category_id': category_id.get(category, '0')}
-        else:
-            meta_category = meta.category
-            resolved_id = category_id.get(meta_category, '0')
-            return {'category_id': resolved_id}
+        if category is not None:
+            return {"category_id": category_id.get(category, "0")}
+        meta_category = meta.category
+        resolved_id = category_id.get(meta_category, "0")
+        return {"category_id": resolved_id}
 
-    async def get_resolution_id(
-        self,
-        meta: Meta,
-        resolution: str | None = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
-        resolution_id = {
-            '4320p': '1',
-            '2160p': '2',
-            '1440p': '3',
-            '1080p': '3',
-            '1080i': '4'
-        }
+    async def get_resolution_id(self, meta: Meta, resolution: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        resolution_id = {"4320p": "1", "2160p": "2", "1440p": "3", "1080p": "3", "1080i": "4"}
         if mapping_only:
             return resolution_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in resolution_id.items()}
-        elif resolution is not None:
-            return {'resolution_id': resolution_id.get(resolution, '10')}
-        else:
-            meta_resolution = meta.resolution
-            resolved_id = resolution_id.get(meta_resolution, '10')
-            return {'resolution_id': resolved_id}
+        if resolution is not None:
+            return {"resolution_id": resolution_id.get(resolution, "10")}
+        meta_resolution = meta.resolution
+        resolved_id = resolution_id.get(meta_resolution, "10")
+        return {"resolution_id": resolved_id}
 
     def _get_language_code(self, track_or_string: Any) -> str:
         """Extract and normalize language to ISO alpha-2 code"""
@@ -118,13 +98,9 @@ class IHD(UNIT3D):
         if len(lang_str) == 2:
             return lang_str
         try:
-            lang_obj = (
-                pycountry.languages.get(name=lang_str.title())
-                or pycountry.languages.get(alpha_2=lang_str)
-                or pycountry.languages.get(alpha_3=lang_str)
-            )
+            lang_obj = pycountry.languages.get(name=lang_str.title()) or pycountry.languages.get(alpha_2=lang_str) or pycountry.languages.get(alpha_3=lang_str)
             return lang_obj.alpha_2.lower() if lang_obj else lang_str
-        except (AttributeError, KeyError, LookupError):
+        except AttributeError, KeyError, LookupError:
             return lang_str
 
     def original_language_check(self, meta: Meta) -> bool:
@@ -165,12 +141,12 @@ class IHD(UNIT3D):
             foreign_lang = audio_languages[0].upper()
             ihd_name = ihd_name.replace(resolution, f"{foreign_lang} {resolution}", 1)
 
-        return {'name': ihd_name}
+        return {"name": ihd_name}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.resolution not in ["4320p", "2160p", "1440p", "1080p", "1080i"]:
             if not meta.unattended or meta.debug:
-                logger.info(f'[bold red]Uploads must be at least 1080 resolution for {self.tracker}.[/bold red]')
+                logger.info(f"[bold red]Uploads must be at least 1080 resolution for {self.tracker}.[/bold red]")
             return False
 
         if not meta.valid_mi_settings:
@@ -196,8 +172,8 @@ class IHD(UNIT3D):
                 subtitle_languages = [str(item) for item in subtitle_languages_list]
             else:
                 subtitle_languages = []
-            has_eng_audio = await languages_manager.has_english_language(audio_languages if audio_languages else '')
-            has_eng_subs = await languages_manager.has_english_language(subtitle_languages if subtitle_languages else '')
+            has_eng_audio = await languages_manager.has_english_language(audio_languages if audio_languages else "")
+            has_eng_subs = await languages_manager.has_english_language(subtitle_languages if subtitle_languages else "")
             # Require at least one English audio/subtitle track or an original language audio track
             if not (original_language or has_eng_audio or has_eng_subs):
                 if not meta.unattended or meta.debug:

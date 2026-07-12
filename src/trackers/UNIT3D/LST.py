@@ -12,7 +12,7 @@ Config = dict[str, Any]
 class LST(UNIT3D):
     tracker = "LST"
     base_url = "https://lst.gg"
-    banned_groups = []
+    banned_groups = ()
     banned_url = f"{base_url}/api/bannedReleaseGroups"
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
@@ -20,10 +20,10 @@ class LST(UNIT3D):
     torrent_url = f"{base_url}/torrents/"
     trumping_url = f"{base_url}/api/reports/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK")
-    tracker_urls = ['https://lst.gg']
+    tracker_urls = ("https://lst.gg",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='LST')
+        super().__init__(config, tracker_name="LST")
         self.config: Config = config
         self.common = COMMON(config)
 
@@ -51,7 +51,7 @@ class LST(UNIT3D):
         }
         if mapping_only:
             return category_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in category_id.items()}
 
         resolved_category = category if category is not None and category != "" else meta.category
@@ -79,7 +79,7 @@ class LST(UNIT3D):
         }
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
 
         resolved_type = type if type is not None and type != "" else meta.type
@@ -94,14 +94,14 @@ class LST(UNIT3D):
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
-            'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
-            'draft_queue_opt_in': await self.get_flag(meta, 'draft'),
+            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
+            "draft_queue_opt_in": await self.get_flag(meta, "draft"),
         }
 
         # Only add edition_id if we have a valid edition
         edition_id = await self.get_edition(meta)
         if edition_id is not None:
-            data['edition_id'] = edition_id
+            data["edition_id"] = edition_id
 
         if meta.category == "BOOK":
             openlibrary_id = meta.openlibrary or meta.openlibrary_id or meta.openlibrary_book_id or ""
@@ -116,25 +116,24 @@ class LST(UNIT3D):
 
     async def get_edition(self, meta: Meta) -> int | None:
         edition_mapping = {
-            'Alternative Cut': 12,
-            'Collector\'s Edition': 1,
-            'Director\'s Cut': 2,
-            'Extended Cut': 3,
-            'Extended Uncut': 4,
-            'Extended Unrated': 5,
-            'Limited Edition': 6,
-            'Special Edition': 7,
-            'Theatrical Cut': 8,
-            'Uncut': 9,
-            'Unrated': 10,
-            'X Cut': 11,
-            'Other': 0  # Default value for "Other"
+            "Alternative Cut": 12,
+            "Collector's Edition": 1,
+            "Director's Cut": 2,
+            "Extended Cut": 3,
+            "Extended Uncut": 4,
+            "Extended Unrated": 5,
+            "Limited Edition": 6,
+            "Special Edition": 7,
+            "Theatrical Cut": 8,
+            "Uncut": 9,
+            "Unrated": 10,
+            "X Cut": 11,
+            "Other": 0,  # Default value for "Other"
         }
         edition = meta.edition
         if edition in edition_mapping:
             return edition_mapping[edition]
-        else:
-            return None
+        return None
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         lst_name = meta.name
@@ -153,4 +152,4 @@ class LST(UNIT3D):
         if meta.trump_reason == "exact_match":
             lst_name = lst_name + " - TRUMP"
 
-        return {'name': lst_name}
+        return {"name": lst_name}

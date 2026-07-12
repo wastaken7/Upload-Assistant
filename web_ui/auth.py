@@ -6,9 +6,11 @@ Provides:
 - AES-GCM encrypt/decrypt helpers that return base64 payloads
 - File-backed user and credential storage under XDG config dir
 """
+
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 import logging
 import math
@@ -26,6 +28,7 @@ log = logging.getLogger(__name__)
 class EncryptionError(Exception):
     """Raised when encryption or key derivation fails."""
 
+
 # Defaults and env var names
 # These are environment variable *names* and not actual secrets — suppress
 # Bandit's hardcoded-password detection for these constants (B105).
@@ -41,19 +44,14 @@ def get_config_dir() -> Path:
         if v and v.lower() in ("1", "true", "yes"):
             return True
         # Common Docker indicator file
-        try:
+        with contextlib.suppress(Exception):
             if Path("/.dockerenv").exists():
                 return True
-        except Exception:
-            pass
         # Check cgroup for container hints
-        try:
-            with open("/proc/1/cgroup") as f:
-                txt = f.read()
-                if any(k in txt for k in ("docker", "kubepods", "containerd")):
-                    return True
-        except Exception:
-            pass
+        with contextlib.suppress(Exception), Path("/proc/1/cgroup").open() as f:
+            txt = f.read()
+            if any(k in txt for k in ("docker", "kubepods", "containerd")):
+                return True
         return False
 
     # Repository data dir
@@ -84,13 +82,11 @@ def get_config_dir() -> Path:
     # Unix-like: prefer XDG_CONFIG_HOME, fall back to repo data/config or ~/.config/upload-assistant
     xdg = os.environ.get("XDG_CONFIG_HOME")
     if xdg:
-        try:
+        with contextlib.suppress(Exception):
             p = Path(xdg) / "upload-assistant"
             p.mkdir(parents=True, exist_ok=True)
             return p
-        except Exception:
             # Fall through to repo/data or home-based fallback
-            pass
     # fallback to repository data/config when available (developer mode)
     if repo_dir.exists():
         return repo_dir
@@ -118,7 +114,7 @@ def load_session_secret() -> bytes:
     - `SECRET_KEY` env var (compat fallback)
     - Otherwise generate new random 64-byte secret
     """
-    global _cached_session_secret  # noqa: PLW0603
+    global _cached_session_secret
     if _cached_session_secret is not None:
         return _cached_session_secret
 
@@ -175,15 +171,13 @@ def _resolve_session_secret() -> bytes:
                 except Exception as e:
                     log.error("failed to create session secret inside directory: %s", e)
                     raise OSError(
-                        f"SESSION_SECRET_FILE points to a directory ({f}) and "
-                        f"we could not create a session_secret file inside it; "
-                        f"check permissions or mount a file instead"
+                        f"SESSION_SECRET_FILE points to a directory ({f}) and we could not create a session_secret file inside it; check permissions or mount a file instead"
                     ) from e
             else:
                 log.debug(
-                    "SESSION_SECRET_FILE (%s) is a directory; using "
-                    "existing file at %s",
-                    f, p,
+                    "SESSION_SECRET_FILE (%s) is a directory; using existing file at %s",
+                    f,
+                    p,
                 )
 
         try:
@@ -222,7 +216,7 @@ def _resolve_session_secret() -> bytes:
     # Generate and persist
     try:
         b = token_bytes(64)
-        with open(secret_file, "w", encoding="utf-8") as fobj:
+        with Path(secret_file).open("w", encoding="utf-8") as fobj:
             fobj.write(b.hex())
         with suppress(Exception):
             # Tighten permissions when possible
@@ -348,14 +342,11 @@ def _unpack_field(extras: dict, field: str) -> str | None:
         master = None
 
     if key_enc and master:
-        try:
+        with contextlib.suppress(Exception):
             fk_hex = decrypt_text(master, key_enc)
             if fk_hex:
                 fk = bytes.fromhex(fk_hex)
-                val = decrypt_text(fk, enc) if enc else None
-                return val
-        except Exception:
-            pass
+                return decrypt_text(fk, enc) if enc else None
 
     return None
 
@@ -365,6 +356,7 @@ def create_user(username: str, password: str) -> None:
     # Prevent creating a new user if one already exists. Persisted user is authoritative.
     if path.exists():
         raise ValueError("a user account already exists")
+
     # Enforce minimum password entropy to ensure user-chosen secrets are strong.
     # Estimate entropy by character-class pool size heuristic: lowercase, uppercase,
     # digits, punctuation. This provides a conservative approximation of bits.
@@ -391,7 +383,7 @@ def create_user(username: str, password: str) -> None:
     _pack_field(extras, "username", username)
 
     key = _get_master_key()
-    extras_enc = encrypt_text(key, json.dumps(extras, separators=(",",":"), ensure_ascii=False))
+    extras_enc = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
     username_enc = encrypt_text(key, username)
 
     data = {"username_enc": username_enc, "password_hash": hash_password(password), "extras_enc": extras_enc}
@@ -410,7 +402,7 @@ def load_user() -> dict | None:
         return None
 
     # Attempt to decrypt extras blob (contains per-field encrypted values)
-    try:
+    with contextlib.suppress(Exception):
         key = _get_master_key()
         extras = {}
         extras_enc = data.get("extras_enc")
@@ -434,14 +426,10 @@ def load_user() -> dict | None:
                 data["username"] = plain_username
             else:
                 # Try unpack from extras
-                try:
+                with contextlib.suppress(Exception):
                     username = _unpack_field(extras, "username")
                     if username:
                         data["username"] = username
-                except Exception:
-                    pass
-    except Exception:
-        pass
 
     return data
 
@@ -484,7 +472,7 @@ def set_totp_secret(secret: str | None) -> None:
     _pack_field(extras, "totp_secret", secret)
 
     key = _get_master_key()
-    raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",",":"), ensure_ascii=False))
+    raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
     path.write_text(json.dumps(raw), encoding="utf-8")
     with suppress(Exception):
         os.chmod(path, 0o600)
@@ -497,12 +485,10 @@ def get_recovery_hashes() -> list[str]:
     extras = u.get("extras") or {}
     val = _unpack_field(extras, "recovery_hashes")
     if val is not None:
-        try:
+        with contextlib.suppress(Exception):
             parsed = json.loads(val)
             if isinstance(parsed, list):
                 return parsed
-        except Exception:
-            pass
     # Backwards compat
     return extras.get("recovery_hashes") or []
 
@@ -526,10 +512,10 @@ def set_recovery_hashes(hashes: list[str]) -> None:
             raise EncryptionError("failed to decrypt existing extras_enc; aborting write to preserve data")
         extras = json.loads(dec)
 
-    _pack_field(extras, "recovery_hashes", json.dumps(hashes, separators=(",",":"), ensure_ascii=False))
+    _pack_field(extras, "recovery_hashes", json.dumps(hashes, separators=(",", ":"), ensure_ascii=False))
 
     key = _get_master_key()
-    raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",",":"), ensure_ascii=False))
+    raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
     path.write_text(json.dumps(raw), encoding="utf-8")
     with suppress(Exception):
         os.chmod(path, 0o600)
@@ -542,12 +528,10 @@ def get_api_tokens() -> dict:
     extras = u.get("extras") or {}
     val = _unpack_field(extras, "api_tokens")
     if val is not None:
-        try:
+        with contextlib.suppress(Exception):
             parsed = json.loads(val)
             if isinstance(parsed, dict):
                 return parsed
-        except Exception:
-            pass
     return extras.get("api_tokens") or {}
 
 
@@ -570,10 +554,10 @@ def set_api_tokens(store: dict) -> None:
             raise EncryptionError("failed to decrypt existing extras_enc; aborting write to preserve data")
         extras = json.loads(dec)
 
-    _pack_field(extras, "api_tokens", json.dumps(store, separators=(",",":"), ensure_ascii=False))
+    _pack_field(extras, "api_tokens", json.dumps(store, separators=(",", ":"), ensure_ascii=False))
 
     key = _get_master_key()
-    raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",",":"), ensure_ascii=False))
+    raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
     path.write_text(json.dumps(raw), encoding="utf-8")
     with suppress(Exception):
         os.chmod(path, 0o600)

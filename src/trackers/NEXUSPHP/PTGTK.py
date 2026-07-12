@@ -9,12 +9,12 @@ Config = dict[str, Any]
 
 
 class PTGTK(NEXUSPHP):
-    banned_groups = []
+    banned_groups = ()
     base_url = "https://pt.gtkpw.xyz"
     source_flag = "[pt.gtkpw.xyz] PT GTK"
     torrent_url = f"{base_url}/details.php?id="
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://t.myaltbox.com']
+    tracker_urls = ("https://t.myaltbox.com",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, "PTGTK")
@@ -54,8 +54,7 @@ class PTGTK(NEXUSPHP):
             ]
             if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in game_show_keywords):
                 return tv_shows
-            else:
-                return tv_series
+            return tv_series
 
         return movies
 
@@ -184,5 +183,4 @@ class PTGTK(NEXUSPHP):
         return checkboxes
 
     def get_anonymous(self, meta: Meta) -> bool:
-        anon = not (meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
-        return anon
+        return not (meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))

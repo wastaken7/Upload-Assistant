@@ -1,8 +1,8 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import glob
-import os
 import platform
 import re
+from pathlib import Path
 from typing import Any
 
 import aiofiles
@@ -20,12 +20,12 @@ Config = dict[str, Any]
 class HDS:
     tracker = "HDS"
     source_flag = "HD-Space"
-    banned_groups = [""]
+    banned_groups = ("",)
     base_url = "https://hd-space.org"
     torrent_url = f"{base_url}/index.php?page=torrent-details&id="
     requests_url = f"{base_url}/index.php?page=viewrequests"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['hd-space.pw']
+    tracker_urls = ("hd-space.pw",)
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
@@ -86,8 +86,8 @@ class HDS:
             self.session.cookies.update(cookies)
 
         imdb_id = str(meta.imdb)
-        if imdb_id == '0':
-            logger.info(f'IMDb ID not found, cannot search for duplicates on {self.tracker}.')
+        if imdb_id == "0":
+            logger.info(f"IMDb ID not found, cannot search for duplicates on {self.tracker}.")
             return dupes
 
         search_url = f"{self.base_url}/index.php"
@@ -155,7 +155,6 @@ class HDS:
             else:
                 break
 
-
         logger.info(f"[bold green]Found {len(dupes)} duplicates on {self.tracker}[/bold green]")
         return dupes
 
@@ -168,38 +167,22 @@ class HDS:
         keywords = [k.lower() for k in meta.keywords]
         is_anime = meta.anime
 
-        if is_disc == 'BDMV':
+        if is_disc == "BDMV":
             return 15  # Blu-Ray
-        if type_ == 'REMUX':
+        if type_ == "REMUX":
             return 40  # Remux
 
         category_map = {
-            'MOVIE': {
-                '2160p': 46,
-                '1080p': 19, '1080i': 19,
-                '720p': 18
-            },
-            'TV': {
-                '2160p': 45,
-                '1080p': 22, '1080i': 22,
-                '720p': 21
-            },
-            'DOCUMENTARY': {
-                '2160p': 47,
-                '1080p': 25, '1080i': 25,
-                '720p': 24
-            },
-            'ANIME': {
-                '2160p': 48,
-                '1080p': 28, '1080i': 28,
-                '720p': 27
-            }
+            "MOVIE": {"2160p": 46, "1080p": 19, "1080i": 19, "720p": 18},
+            "TV": {"2160p": 45, "1080p": 22, "1080i": 22, "720p": 21},
+            "DOCUMENTARY": {"2160p": 47, "1080p": 25, "1080i": 25, "720p": 24},
+            "ANIME": {"2160p": 48, "1080p": 28, "1080i": 28, "720p": 27},
         }
 
-        if 'documentary' in genres or 'documentary' in keywords:
-            return category_map['DOCUMENTARY'].get(resolution, 38)
+        if "documentary" in genres or "documentary" in keywords:
+            return category_map["DOCUMENTARY"].get(resolution, 38)
         if is_anime:
-            return category_map['ANIME'].get(resolution, 38)
+            return category_map["ANIME"].get(resolution, 38)
 
         if category in category_map:
             return category_map[category].get(resolution, 38)
@@ -209,59 +192,56 @@ class HDS:
     async def get_requests(self, meta: Meta) -> list[dict[str, str | None]] | bool:
         if not self.config["DEFAULT"].get("search_requests", False) and not meta.search_requests:
             return False
-        else:
-            try:
-                cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
-                self.session.cookies.clear()
-                if cookies is not None:
-                    self.session.cookies.update(cookies)
-                query = meta.title
-                search_url = f'{self.base_url}/index.php?'
+        try:
+            cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+            self.session.cookies.clear()
+            if cookies is not None:
+                self.session.cookies.update(cookies)
+            query = meta.title
+            search_url = f"{self.base_url}/index.php?"
 
-                params: dict[str, str] = {
-                    'page': 'viewrequests',
-                    'search': query,
-                    'filter': 'true'
-                }
+            params: dict[str, str] = {"page": "viewrequests", "search": query, "filter": "true"}
 
-                response = await self.session.get(search_url, params=params, cookies=self.session.cookies)
-                response.raise_for_status()
-                response_results_text = response.text
+            response = await self.session.get(search_url, params=params, cookies=self.session.cookies)
+            response.raise_for_status()
+            response_results_text = response.text
 
-                soup = BeautifulSoup(response_results_text, 'html.parser')
-                request_rows = soup.select('form[action="index.php?page=takedelreq"] table.lista tr')
+            soup = BeautifulSoup(response_results_text, "html.parser")
+            request_rows = soup.select('form[action="index.php?page=takedelreq"] table.lista tr')
 
-                results: list[dict[str, str | None]] = []
-                for row in request_rows:
-                    if row.find('td', class_='header'):
-                        continue
+            results: list[dict[str, str | None]] = []
+            for row in request_rows:
+                if row.find("td", class_="header"):
+                    continue
 
-                    name_element = row.select_one('td.lista a b')
-                    if not name_element:
-                        continue
+                name_element = row.select_one("td.lista a b")
+                if not name_element:
+                    continue
 
-                    name = name_element.text.strip()
-                    link_element = name_element.find_parent('a')
-                    raw_link = link_element.get('href') if link_element else None
-                    link = str(raw_link) if raw_link else None
+                name = name_element.text.strip()
+                link_element = name_element.find_parent("a")
+                raw_link = link_element.get("href") if link_element else None
+                link = str(raw_link) if raw_link else None
 
-                    results.append({
-                        'Name': name,
-                        'Link': link,
-                    })
+                results.append(
+                    {
+                        "Name": name,
+                        "Link": link,
+                    }
+                )
 
-                if results:
-                    message = f"\n{self.tracker}: [bold yellow]Your upload may fulfill the following request(s), check it out:[/bold yellow]\n\n"
-                    for r in results:
-                        message += f"[bold green]Name:[/bold green] {r['Name']}\n"
-                        message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
-                    logger.info(message)
+            if results:
+                message = f"\n{self.tracker}: [bold yellow]Your upload may fulfill the following request(s), check it out:[/bold yellow]\n\n"
+                for r in results:
+                    message += f"[bold green]Name:[/bold green] {r['Name']}\n"
+                    message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
+                logger.info(message)
 
-                return results
+            return results
 
-            except Exception as e:
-                logger.info(f'An error occurred while fetching requests: {e}', extra={"markup": False})
-                return []
+        except Exception as e:
+            logger.info(f"An error occurred while fetching requests: {e}", extra={"markup": False})
+            return []
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -282,25 +262,21 @@ class HDS:
         # Anon
         anon = not (int(meta.anon or 0) == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
         if anon:
-            data.update({
-                'anonymous': 'true'
-            })
+            data.update({"anonymous": "true"})
         else:
-            data.update({
-                'anonymous': 'false'
-            })
+            data.update({"anonymous": "false"})
 
         return data
 
     async def get_nfo(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
-        nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
-        nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
+        nfo_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        nfo_files = glob.glob(Path(nfo_dir) / "*.nfo")
 
         if nfo_files:
             nfo_path = nfo_files[0]
             async with aiofiles.open(nfo_path, "rb") as nfo_file:
                 nfo_bytes = await nfo_file.read()
-            return {'nfo': (os.path.basename(nfo_path), nfo_bytes, "application/octet-stream")}
+            return {"nfo": (Path(nfo_path).name, nfo_bytes, "application/octet-stream")}
         return {}
 
     async def upload(self, meta: Meta) -> bool:
@@ -311,18 +287,16 @@ class HDS:
         data = await self.get_data(meta)
         files = await self.get_nfo(meta)
 
-        is_uploaded = await self.cookie_auth_uploader.handle_upload(
+        return await self.cookie_auth_uploader.handle_upload(
             meta=meta,
             tracker=self.tracker,
             source_flag=self.source_flag,
             torrent_url=self.torrent_url,
             data=data,
-            torrent_field_name='torrent',
+            torrent_field_name="torrent",
             upload_cookies=self.session.cookies,
             upload_url="https://hd-space.org/index.php?page=upload",
             hash_is_id=True,
             success_text="download.php?id=",
             additional_files=files,
         )
-
-        return is_uploaded

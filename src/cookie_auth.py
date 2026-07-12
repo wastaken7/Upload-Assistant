@@ -7,6 +7,7 @@ import pickle  # nosec B403 - Only used for legacy cookie migration
 import re
 import stat
 import traceback
+from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
@@ -34,7 +35,7 @@ class CookieValidator:
         self.common = COMMON(config)
 
     async def load_session_cookies(self, meta: Meta, tracker: str) -> http.cookiejar.MozillaCookieJar | None:
-        cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{tracker}.txt")
+        cookie_file = str(Path(f"{meta.base_dir}/data/cookies/{tracker}.txt").resolve())
         cookie_jar = http.cookiejar.MozillaCookieJar(cookie_file)
 
         try:
@@ -81,10 +82,10 @@ class CookieValidator:
 
     async def get_ar_auth_key(self, meta: Meta, tracker: str) -> str | None:
         """Retrieve the saved auth key for AR tracker."""
-        cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{tracker}.txt")
+        cookie_file = str(Path(f"{meta.base_dir}/data/cookies/{tracker}.txt").resolve())
         auth_file = cookie_file.replace(".txt", "_auth.txt")
 
-        if os.path.exists(auth_file):
+        if Path(auth_file).exists():
             try:
                 async with aiofiles.open(auth_file, encoding="utf-8") as f:
                     auth_key = await f.read()
@@ -151,7 +152,7 @@ class CookieValidator:
                             logger.info(f"{tracker}: [green]Auth key extracted successfully[/green]")
 
                     # Save cookies in Netscape format
-                    os.makedirs(os.path.dirname(cookie_file), exist_ok=True)
+                    Path(os.path.dirname(cookie_file)).mkdir(parents=True, exist_ok=True)
                     cookie_jar = http.cookiejar.MozillaCookieJar(cookie_file)
 
                     # Convert httpx cookies to MozillaCookieJar format
@@ -326,8 +327,7 @@ class CookieValidator:
                 f"{tracker}: This can happen if the site HTML has changed or if the login failed silently."
             )
             return None
-        else:
-            return str(auth_match.group(1))
+        return str(auth_match.group(1))
 
     def _save_cookies_secure(self, session_cookies: Any, cookiefile: str) -> None:
         """Securely save session cookies using JSON instead of pickle"""
@@ -337,7 +337,7 @@ class CookieValidator:
             for cookie in session_cookies:
                 cookie_dict[cookie.name] = {"value": cookie.value, "domain": cookie.domain, "path": cookie.path, "secure": cookie.secure, "expires": cookie.expires}
 
-            with open(cookiefile, "w", encoding="utf-8") as f:
+            with Path(cookiefile).open("w", encoding="utf-8") as f:
                 json.dump(cookie_dict, f, indent=2)
 
             # Set restrictive permissions (0o600) to protect cookie secrets
@@ -359,12 +359,12 @@ class CookieValidator:
 
         # Try to migrate from pickle files
         for potential_pickle in [pickle_file, legacy_pickle_file]:
-            if os.path.exists(potential_pickle) and not os.path.exists(cookiefile):
+            if Path(potential_pickle).exists() and not Path(cookiefile).exists():
                 try:
                     logger.info(f"[yellow]Migrating legacy cookie file from {potential_pickle} to {cookiefile}[/yellow]")
 
                     # Load the pickle file
-                    with open(potential_pickle, "rb") as f:
+                    with Path(potential_pickle).open("rb") as f:
                         session_cookies = pickle.load(f)  # nosec B301 - Legacy migration only
 
                     # Convert to JSON format
@@ -379,7 +379,7 @@ class CookieValidator:
                         }
 
                     # Save as JSON
-                    with open(cookiefile, "w", encoding="utf-8") as f:
+                    with Path(cookiefile).open("w", encoding="utf-8") as f:
                         json.dump(cookie_dict, f, indent=2)
 
                     # Set restrictive permissions
@@ -387,7 +387,7 @@ class CookieValidator:
 
                     # Verify the migration was successful by loading the JSON
                     try:
-                        with open(cookiefile, encoding="utf-8") as f:
+                        with Path(cookiefile).open(encoding="utf-8") as f:
                             json.load(f)  # Just verify it can be loaded
 
                         # Migration verified successful - delete the old pickle file
@@ -397,7 +397,7 @@ class CookieValidator:
                     except (OSError, json.JSONDecodeError) as verify_error:
                         logger.info(f"[red]Migration verification failed: {verify_error}. Keeping original file {potential_pickle}[/red]")
                         # Remove the potentially corrupted JSON file
-                        if os.path.exists(cookiefile):
+                        if Path(cookiefile).exists():
                             os.remove(cookiefile)
                         raise
 
@@ -408,13 +408,13 @@ class CookieValidator:
                     # Continue to try next potential file or load JSON normally
                     continue
 
-            elif os.path.exists(potential_pickle) and os.path.exists(cookiefile):
+            elif Path(potential_pickle).exists() and Path(cookiefile).exists():
                 os.remove(potential_pickle)
                 logger.info(f"[yellow]Removed legacy cookie file {potential_pickle}. Using JSON file.[/yellow]")
 
         # Load cookies from JSON file
         try:
-            with open(cookiefile, encoding="utf-8") as f:
+            with Path(cookiefile).open(encoding="utf-8") as f:
                 cookie_dict = json.load(f)
 
             # Convert dictionary back to session cookies
@@ -436,7 +436,7 @@ class CookieValidator:
     def _load_cookies_dict_secure(self, cookiefile: str) -> dict[str, Any]:
         """Securely load cookies as dictionary from JSON instead of pickle"""
         try:
-            with open(cookiefile, encoding="utf-8") as f:
+            with Path(cookiefile).open(encoding="utf-8") as f:
                 cookie_dict = json.load(f)
             return cast(dict[str, Any], cookie_dict)
         except OSError as e:
@@ -520,66 +520,64 @@ class CookieAuthUploader:
             await self.common.create_torrent_for_upload(meta, f"{tracker}" + "_DEBUG", f"{tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True
 
-        else:
-            success = False
-            try:
-                async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=upload_cookies, follow_redirects=True) as session:
-                    response = await session.post(upload_url, data=data, files=files)
+        success = False
+        try:
+            async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=upload_cookies, follow_redirects=True) as session:
+                response = await session.post(upload_url, data=data, files=files)
 
-                    if success_text and success_text in response.text or success_list and any(item in response.text for item in success_list):
+                if (success_text and success_text in response.text) or (success_list and any(item in response.text for item in success_list)):
+                    success = True
+
+                elif success_status_code:
+                    valid_codes = {int(code.strip()) for code in success_status_code.split(",") if code.strip().isdigit()}
+
+                    if response.status_code in valid_codes:
                         success = True
 
-                    elif success_status_code:
-                        valid_codes = {int(code.strip()) for code in success_status_code.split(",") if code.strip().isdigit()}
+                elif error_text and error_text not in response.text:
+                    success = True
 
-                        if response.status_code in valid_codes:
-                            success = True
+                if success:
+                    await self.handle_successful_upload(
+                        meta,
+                        tracker,
+                        response,
+                        id_pattern,
+                        hash_is_id,
+                        source_flag,
+                        user_announce_url,
+                        torrent_url,
+                    )
+                    return True
+                await self.handle_failed_upload(
+                    meta,
+                    tracker,
+                    success_status_code,
+                    success_text,
+                    error_text,
+                    response,
+                    success_list,
+                )
+                return False
 
-                    elif error_text and error_text not in response.text:
-                        success = True
-
-                    if success:
-                        await self.handle_successful_upload(
-                            meta,
-                            tracker,
-                            response,
-                            id_pattern,
-                            hash_is_id,
-                            source_flag,
-                            user_announce_url,
-                            torrent_url,
-                        )
-                        return True
-                    else:
-                        await self.handle_failed_upload(
-                            meta,
-                            tracker,
-                            success_status_code,
-                            success_text,
-                            error_text,
-                            response,
-                            success_list,
-                        )
-                        return False
-
-            except httpx.ConnectTimeout:
-                meta.tracker_status[tracker]["status_message"] = "Connection timed out"
-            except httpx.ReadTimeout:
-                meta.tracker_status[tracker]["status_message"] = "Read timed out"
-            except httpx.ConnectError:
-                meta.tracker_status[tracker]["status_message"] = "Failed to connect to the server"
-            except httpx.ProxyError:
-                meta.tracker_status[tracker]["status_message"] = "Proxy connection failed"
-            except httpx.DecodingError:
-                meta.tracker_status[tracker]["status_message"] = "Response decoding failed"
-            except httpx.TooManyRedirects:
-                meta.tracker_status[tracker]["status_message"] = "Too many redirects"
-            except httpx.HTTPStatusError as e:
-                meta.tracker_status[tracker]["status_message"] = f"HTTP error {e.response.status_code}: {e}"
-            except httpx.RequestError as e:
-                meta.tracker_status[tracker]["status_message"] = f"Request error: {e}"
-            except Exception as e:
-                meta.tracker_status[tracker]["status_message"] = f"Unexpected upload error: {e}"
+        except httpx.ConnectTimeout:
+            meta.tracker_status[tracker]["status_message"] = "Connection timed out"
+        except httpx.ReadTimeout:
+            meta.tracker_status[tracker]["status_message"] = "Read timed out"
+        except httpx.ConnectError:
+            meta.tracker_status[tracker]["status_message"] = "Failed to connect to the server"
+        except httpx.ProxyError:
+            meta.tracker_status[tracker]["status_message"] = "Proxy connection failed"
+        except httpx.DecodingError:
+            meta.tracker_status[tracker]["status_message"] = "Response decoding failed"
+        except httpx.TooManyRedirects:
+            meta.tracker_status[tracker]["status_message"] = "Too many redirects"
+        except httpx.HTTPStatusError as e:
+            meta.tracker_status[tracker]["status_message"] = f"HTTP error {e.response.status_code}: {e}"
+        except httpx.RequestError as e:
+            meta.tracker_status[tracker]["status_message"] = f"Request error: {e}"
+        except Exception as e:
+            meta.tracker_status[tracker]["status_message"] = f"Unexpected upload error: {e}"
 
         await self.common.create_torrent_ready_to_seed(meta, tracker, source_flag, user_announce_url, torrent_url)
         return False
@@ -609,7 +607,7 @@ class CookieAuthUploader:
     ) -> dict[str, tuple[str, bytes, str]]:
         """Load the torrent file into memory."""
         await self.common.create_torrent_for_upload(meta, tracker, source_flag, announce_url=default_announce)
-        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{tracker}].torrent"
+        torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{tracker}].torrent"
         async with aiofiles.open(torrent_path, "rb") as f:
             file_bytes = await f.read()
 

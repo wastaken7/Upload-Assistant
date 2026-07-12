@@ -24,6 +24,6 @@ def to_int(value: Any, fallback: int = 0) -> int:
     if isinstance(value, str):
         try:
             return int(value)
-        except (ValueError, OverflowError):
+        except ValueError, OverflowError:
             return fallback
     return fallback

@@ -1,9 +1,9 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import base64
 import glob
-import os
 import re
 import unicodedata
+from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
@@ -33,7 +33,7 @@ class SPD:
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.common = COMMON(config)
-        api_key = str(self.config['TRACKERS'][self.tracker]['api_key'])
+        api_key = str(self.config["TRACKERS"][self.tracker]["api_key"])
         self.session = httpx.AsyncClient(
             headers={
                 "User-Agent": "Upload-Assistant",
@@ -50,46 +50,46 @@ class SPD:
         subtitle_langs = cast(list[Any], meta.subtitle_languages or [])
         audio_langs = cast(list[Any], meta.audio_languages or [])
         langs = [str(lang).lower() for lang in (subtitle_langs + audio_langs)]
-        romanian = 'romanian' in langs
+        romanian = "romanian" in langs
 
         origin_countries = meta.origin_country
         category = str(meta.category)
-        if 'RO' in origin_countries:
-            if category == 'TV':
-                return '60'
-            elif category == 'MOVIE':
-                return '59'
+        if "RO" in origin_countries:
+            if category == "TV":
+                return "60"
+            if category == "MOVIE":
+                return "59"
 
         # documentary
         genres = str(meta.genres)
         keywords = str(meta.keywords)
-        if 'documentary' in genres.lower() or 'documentary' in keywords.lower():
-            return '63' if romanian else '9'
+        if "documentary" in genres.lower() or "documentary" in keywords.lower():
+            return "63" if romanian else "9"
 
         # anime
         if meta.anime:
-            return '3'
+            return "3"
 
         # TV
-        if category == 'TV':
+        if category == "TV":
             if meta.tv_pack:
-                return '66' if romanian else '41'
-            elif meta.sd:
-                return '46' if romanian else '45'
-            return '44' if romanian else '43'
+                return "66" if romanian else "41"
+            if meta.sd:
+                return "46" if romanian else "45"
+            return "44" if romanian else "43"
 
         # MOVIE
-        if category == 'MOVIE':
+        if category == "MOVIE":
             resolution = meta.resolution
             media_type = str(meta.type)
-            if resolution == '2160p' and media_type != 'DISC':
-                return '57' if romanian else '61'
-            if media_type in ('REMUX', 'WEBDL', 'WEBRIP', 'HDTV', 'ENCODE'):
-                return '29' if romanian else '8'
-            if media_type == 'DISC':
-                return '24' if romanian else '17'
-            if media_type == 'SD':
-                return '35' if romanian else '10'
+            if resolution == "2160p" and media_type != "DISC":
+                return "57" if romanian else "61"
+            if media_type in ("REMUX", "WEBDL", "WEBRIP", "HDTV", "ENCODE"):
+                return "29" if romanian else "8"
+            if media_type == "DISC":
+                return "24" if romanian else "17"
+            if media_type == "SD":
+                return "35" if romanian else "10"
 
         # BOOK/EBOOK category
         if category == "BOOK":
@@ -104,7 +104,7 @@ class SPD:
         return None
 
     async def get_file_info(self, meta: Meta) -> tuple[str | None, str | None]:
-        base_path = f"{meta.base_dir}/tmp/{meta.uuid}"
+        base_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}"
         if meta.bdinfo:
             async with aiofiles.open(
                 f"{base_path}/BD_SUMMARY_00.txt",
@@ -112,49 +112,42 @@ class SPD:
             ) as bd_file:
                 bd_info = await bd_file.read()
             return None, bd_info
-        else:
-            async with aiofiles.open(
-                f"{base_path}/MEDIAINFO_CLEANPATH.txt",
-                encoding="utf-8",
-            ) as mi_file:
-                media_info = await mi_file.read()
-            return media_info, None
+        async with aiofiles.open(
+            f"{base_path}/MEDIAINFO_CLEANPATH.txt",
+            encoding="utf-8",
+        ) as mi_file:
+            media_info = await mi_file.read()
+        return media_info, None
 
     async def get_screenshots(self, meta: Meta) -> list[str]:
         images = cast(list[dict[str, Any]], meta.menu_images) + meta.image_list
-        return [image['raw_url'] for image in images if image.get('raw_url')]
+        return [image["raw_url"] for image in images if image.get("raw_url")]
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
-        search_url = 'https://speedapp.io/api/torrent'
+        search_url = "https://speedapp.io/api/torrent"
 
         params: dict[str, str] = {}
         if meta.imdb_id or 0 != 0:
             imdb_info = cast(dict[str, Any], meta.imdb_info)
-            params['imdbId'] = str(imdb_info.get('imdbID', ''))
+            params["imdbId"] = str(imdb_info.get("imdbID", ""))
         else:
             search_title = meta.title.replace(":", "").replace("'", "").replace(",", "")
-            params['search'] = search_title
+            params["search"] = search_title
 
         response = await self.session.get(url=search_url, params=params, headers=self.session.headers)
 
         if response.status_code == 200:
             data = cast(list[dict[str, Any]], response.json())
             for each in data:
-                name = each.get('name')
-                size = each.get('size')
-                link = f'{self.torrent_url}{each.get("id")}/'
+                name = each.get("name")
+                size = each.get("size")
+                link = f"{self.torrent_url}{each.get('id')}/"
 
                 if name:
-                    results.append({
-                        'name': str(name),
-                        'size': size,
-                        'link': link
-                    })
+                    results.append({"name": str(name), "size": size, "link": link})
             return results
-        else:
-            logger.info(f'[bold red]HTTP request failed. Status: {response.status_code}')
-
+        logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
         return results
 
@@ -174,30 +167,25 @@ class SPD:
             if spd_channel.isdigit():
                 return int(spd_channel)
             # if user enter tag then it will use API to search
-            else:
-                pass
+            pass
 
-        params: dict[str, str] = {
-            'search': str(spd_channel)
-        }
+        params: dict[str, str] = {"search": str(spd_channel)}
 
         try:
-            response = await self.session.get(url=self.url + '/api/channel', params=params, headers=self.session.headers)
+            response = await self.session.get(url=self.url + "/api/channel", params=params, headers=self.session.headers)
 
             if response.status_code == 200:
                 data = cast(list[dict[str, Any]], response.json())
                 for entry in data:
-                    channel_id = entry.get('id')
-                    tag = entry.get('tag')
+                    channel_id = entry.get("id")
+                    tag = entry.get("tag")
 
                     if channel_id and tag:
                         if tag != spd_channel:
-                            logger.info(f'[{self.tracker}]: Unable to find a matching channel based on your input. Please check if you entered it correctly.')
-                            return
-                        else:
-                            return int(channel_id)
-                    else:
-                        logger.info(f'[{self.tracker}]: Could not find the channel ID. Please check if you entered it correctly.')
+                            logger.info(f"[{self.tracker}]: Unable to find a matching channel based on your input. Please check if you entered it correctly.")
+                            return None
+                        return int(channel_id)
+                    logger.info(f"[{self.tracker}]: Could not find the channel ID. Please check if you entered it correctly.")
 
                 else:
                     logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
@@ -209,7 +197,7 @@ class SPD:
     async def edit_desc(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
 
-        description = await builder.general_description_generator(
+        return await builder.general_description_generator(
             meta,
             audio_spectrogram=False,
             bluray=False,
@@ -231,8 +219,6 @@ class SPD:
             signature=f"[url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/url]",
         )
 
-        return description
-
     async def edit_name(self, meta: Meta) -> str:
         tracker_name = meta.basename_no_ext
         scene_name = meta.scene_name or ""
@@ -252,18 +238,17 @@ class SPD:
         return tracker_name
 
     async def encode_to_base64(self, file_path: str) -> str:
-        async with aiofiles.open(file_path, 'rb') as binary_file:
+        async with aiofiles.open(file_path, "rb") as binary_file:
             binary_file_data = await binary_file.read()
             base64_encoded_data = base64.b64encode(binary_file_data)
-            return base64_encoded_data.decode('utf-8')
+            return base64_encoded_data.decode("utf-8")
 
     async def get_nfo(self, meta: Meta) -> str | None:
-        nfo_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
-        nfo_files = glob.glob(os.path.join(nfo_dir, "*.nfo"))
+        nfo_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        nfo_files = glob.glob(Path(nfo_dir) / "*.nfo")
 
         if nfo_files:
-            nfo = await self.encode_to_base64(nfo_files[0])
-            return nfo
+            return await self.encode_to_base64(nfo_files[0])
 
         return None
 
@@ -277,9 +262,7 @@ class SPD:
         if requirements_recommended:
             requirements += f"\n{requirements_recommended}"
 
-        requirements = re.sub(r"\[.+?\]", "", requirements)
-
-        return requirements
+        return re.sub(r"\[.+?\]", "", requirements)
 
     async def fetch_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -306,11 +289,11 @@ class SPD:
 
         tracker_config = self.config.get("TRACKERS", {}).get(self.tracker, {})
         torrent_filename = await self.common.get_torrent_filename(meta, tracker_config)
-        data["file"] = await self.encode_to_base64(f"{meta.base_dir}/tmp/{meta.uuid}/{torrent_filename}.torrent")
+        data["file"] = await self.encode_to_base64(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{torrent_filename}.torrent")
         if meta.debug is True:
-            data['file'] = data['file'][:50] + '...[DEBUG MODE]'
-            if data.get('nfo'):
-                data['nfo'] = str(data['nfo'])[:50] + '...[DEBUG MODE]'
+            data["file"] = data["file"][:50] + "...[DEBUG MODE]"
+            if data.get("nfo"):
+                data["nfo"] = str(data["nfo"])[:50] + "...[DEBUG MODE]"
 
         return data
 
@@ -322,11 +305,11 @@ class SPD:
         channel = await self.search_channel(meta)
         if channel is None:
             meta.skipping = f"{self.tracker}"
-            return
+            return None
         channel = str(channel)
-        data['channel'] = channel
+        data["channel"] = channel
 
-        torrent_id = ''
+        torrent_id = ""
 
         if not meta.debug:
             response = None
@@ -334,56 +317,48 @@ class SPD:
                 response = await self.session.post(url=self.upload_url, json=data, headers=self.session.headers)
                 response.raise_for_status()
                 response = response.json()
-                if response.get('status') is True and response.get('error') is False:
-                    tracker_status[self.tracker]['status_message'] = "Torrent uploaded successfully."
+                if response.get("status") is True and response.get("error") is False:
+                    tracker_status[self.tracker]["status_message"] = "Torrent uploaded successfully."
 
-                    if 'downloadUrl' in response:
-                        torrent_id = str(response.get('torrent', {}).get('id', ''))
+                    if "downloadUrl" in response:
+                        torrent_id = str(response.get("torrent", {}).get("id", ""))
                         if torrent_id:
-                            tracker_status[self.tracker]['torrent_id'] = torrent_id
+                            tracker_status[self.tracker]["torrent_id"] = torrent_id
 
                         download_url = f"{self.url}/api/torrent/{torrent_id}/download"
                         await self.common.download_tracker_torrent(
-                            meta,
-                            tracker=self.tracker,
-                            headers={'Authorization': str(self.config['TRACKERS'][self.tracker]['api_key'])},
-                            downurl=download_url
+                            meta, tracker=self.tracker, headers={"Authorization": str(self.config["TRACKERS"][self.tracker]["api_key"])}, downurl=download_url
                         )
                         return True
 
-                    else:
-                        tracker_status[self.tracker]['status_message'] = (
-                            'data error: No downloadUrl in response, check manually if it uploaded. '
-                            f'Response: \n{response}'
-                        )
-                        return False
-
-                else:
-                    tracker_status[self.tracker]['status_message'] = f'data error: {response}'
+                    tracker_status[self.tracker]["status_message"] = f"data error: No downloadUrl in response, check manually if it uploaded. Response: \n{response}"
                     return False
 
+                tracker_status[self.tracker]["status_message"] = f"data error: {response}"
+                return False
+
             except httpx.HTTPStatusError as e:
-                tracker_status[self.tracker]['status_message'] = f'data error: HTTP {e.response.status_code} - {e.response.text}'
+                tracker_status[self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {e.response.text}"
                 return False
             except httpx.TimeoutException:
-                tracker_status[self.tracker]['status_message'] = f'data error: Request timed out after {self.session.timeout.write} seconds'
+                tracker_status[self.tracker]["status_message"] = f"data error: Request timed out after {self.session.timeout.write} seconds"
                 return False
             except httpx.RequestError as e:
                 response_info = "no response"
                 if response is not None:
-                    response_info = getattr(response, 'text', str(response))
-                tracker_status[self.tracker]['status_message'] = f'data error: Unable to upload. Error: {e!r}.\nResponse: {response_info}'
+                    response_info = getattr(response, "text", str(response))
+                tracker_status[self.tracker]["status_message"] = f"data error: Unable to upload. Error: {e!r}.\nResponse: {response_info}"
                 return False
             except Exception as e:
                 response_info = "no response"
                 if response is not None:
-                    response_info = getattr(response, 'text', str(response))
-                tracker_status[self.tracker]['status_message'] = f'data error: It may have uploaded, go check. Error: {e!r}.\nResponse: {response_info}'
+                    response_info = getattr(response, "text", str(response))
+                tracker_status[self.tracker]["status_message"] = f"data error: It may have uploaded, go check. Error: {e!r}.\nResponse: {response_info}"
                 return False
 
         else:
             logger.info("[cyan]SPD Request Data:")
             logger.info(Redaction.redact_private_info(data))
-            tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
+            tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success

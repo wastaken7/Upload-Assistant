@@ -13,7 +13,7 @@ class TOS(UNIT3D):
     tracker = "TOS"
     source_flag = "TheOldSchool"
     base_url = "https://theoldschool.cc"
-    banned_groups = [
+    banned_groups = (
         "FL3ER",
         "SUNS3T",
         "WoLFHD",
@@ -21,13 +21,13 @@ class TOS(UNIT3D):
         "Slay3R",
         "3T3AM",
         "BARBiE",
-    ]
+    )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ["https://theoldschool.cc"]
+    tracker_urls = ("https://theoldschool.cc",)
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="TOS")
@@ -89,12 +89,12 @@ class TOS(UNIT3D):
 
         # Hook into this function for torrent file recreation if needed
         if meta.keep_nfo:
-            tracker_config = self.config['TRACKERS'].get(self.tracker, {})
-            tracker_url = str(tracker_config.get('announce_url', "https://fake.tracker")).strip()
+            tracker_config = self.config["TRACKERS"].get(self.tracker, {})
+            tracker_url = str(tracker_config.get("announce_url", "https://fake.tracker")).strip()
             torrent_create = f"[{self.tracker}]"
             try:
-                cooldown = int(self.config.get('DEFAULT', {}).get('rehash_cooldown', 0) or 0)
-            except (ValueError, TypeError):
+                cooldown = int(self.config.get("DEFAULT", {}).get("rehash_cooldown", 0) or 0)
+            except ValueError, TypeError:
                 cooldown = 0
             if cooldown > 0:
                 await asyncio.sleep(cooldown)  # Small cooldown before rehashing
@@ -123,8 +123,6 @@ class TOS(UNIT3D):
         has_nfo = meta.nfo or meta.auto_nfo
 
         if is_scene and not has_nfo:
-            logger.info(
-                f"[red]{self.tracker}: Scene release detected but no NFO file found. TOS requires NFO files for Scene releases.[/red]"
-            )
+            logger.info(f"[red]{self.tracker}: Scene release detected but no NFO file found. TOS requires NFO files for Scene releases.[/red]")
             return False
         return True

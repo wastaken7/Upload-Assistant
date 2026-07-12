@@ -68,7 +68,7 @@ class PTP:
         "LAMA",
         "WORLD",
     )
-    approved_image_hosts = ["ptpimg", "pixhost"]
+    approved_image_hosts = ("ptpimg", "pixhost")
     sub_lang_map: ClassVar[dict[tuple[str, ...], int]] = {
         ("Arabic", "ara", "ar"): 22,
         ("Brazilian Portuguese", "Brazilian", "Portuguese-BR", "pt-br", "pt-BR"): 49,
@@ -119,21 +119,22 @@ class PTP:
         self.rehost_images_manager = RehostImagesManager(config)
         self.takescreens_manager = TakeScreensManager(config)
         self.uploadscreens_manager = UploadScreensManager(config)
-        self.api_user = config['TRACKERS']['PTP'].get('ApiUser', '').strip()
+        self.api_user = config["TRACKERS"]["PTP"].get("ApiUser", "").strip()
         self.api_key = config["TRACKERS"]["PTP"].get("api_key", "").strip()
-        announce_url = config['TRACKERS']['PTP'].get('announce_url', '').strip()
-        if announce_url and announce_url.startswith('http://'):
+        announce_url = config["TRACKERS"]["PTP"].get("announce_url", "").strip()
+        if announce_url and announce_url.startswith("http://"):
             logger.info("[red]PTP announce URL is using plaintext HTTP.\n")
-            logger.info("[red]PTP is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PTP/forums.php?page=1&action=viewthread&threadid=46663")
+            logger.info(
+                "[red]PTP is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PTP/forums.php?page=1&action=viewthread&threadid=46663"
+            )
             logger.info("[yellow]Modifying the url to use HTTPS. Update your config file to avoid this message in the future.")
-            self.announce_url = announce_url.replace('http://', 'https://').replace(':2710', '')
+            self.announce_url = announce_url.replace("http://", "https://").replace(":2710", "")
         else:
             self.announce_url = announce_url
-        self.username = config['TRACKERS']['PTP'].get('username', '').strip()
-        self.password = config['TRACKERS']['PTP'].get('password', '').strip()
-        self.web_source = self._is_true(config['TRACKERS']['PTP'].get('add_web_source_to_desc', True))
+        self.username = config["TRACKERS"]["PTP"].get("username", "").strip()
+        self.password = config["TRACKERS"]["PTP"].get("password", "").strip()
+        self.web_source = self._is_true(config["TRACKERS"]["PTP"].get("add_web_source_to_desc", True))
         self.user_agent = f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"
-
 
         self.cookie_validator = CookieValidator(config)
 
@@ -174,10 +175,10 @@ class PTP:
             "api_key": self.api_key,
             "User-Agent": self.user_agent,
         }
-        url = 'https://passthepopcorn.me/torrents.php'
+        url = "https://passthepopcorn.me/torrents.php"
         search_value = search_term or _search_file_folder
         params = {
-            'searchstr': search_value,
+            "searchstr": search_value,
         }
 
         try:
@@ -186,81 +187,74 @@ class PTP:
 
             if response.status_code == 200:
                 data = response.json()
-                movies = cast(list[dict[str, Any]], data.get('Movies', []))
+                movies = cast(list[dict[str, Any]], data.get("Movies", []))
                 for movie in movies:
-                    imdb_value = movie.get('ImdbId')
-                    torrents = cast(list[dict[str, Any]], movie.get('Torrents', []) or [])
+                    imdb_value = movie.get("ImdbId")
+                    torrents = cast(list[dict[str, Any]], movie.get("Torrents", []) or [])
                     ptp_torrent_id: int | str | None = None
                     ptp_torrent_hash: str | None = None
 
-                    normalized_search = search_value or ''.lower()
+                    normalized_search = search_value or "".lower()
                     if normalized_search:
                         for torrent in torrents:
-                            release_name = str(torrent.get('ReleaseName', '')).lower()
+                            release_name = str(torrent.get("ReleaseName", "")).lower()
                             if normalized_search in release_name:
-                                ptp_torrent_id = torrent.get('Id')
-                                ptp_torrent_hash = torrent.get('InfoHash')
+                                ptp_torrent_id = torrent.get("Id")
+                                ptp_torrent_hash = torrent.get("InfoHash")
                                 break
 
                     if ptp_torrent_id is None and torrents:
                         first = torrents[0]
-                        ptp_torrent_id = first.get('Id')
-                        ptp_torrent_hash = first.get('InfoHash')
+                        ptp_torrent_id = first.get("Id")
+                        ptp_torrent_hash = first.get("InfoHash")
 
                     if imdb_value:
                         return int(imdb_value or 0), ptp_torrent_id, ptp_torrent_hash
 
-                logger.info(f'[yellow]Could not find any release matching [bold yellow]{search_value}[/bold yellow] on PTP')
+                logger.info(f"[yellow]Could not find any release matching [bold yellow]{search_value}[/bold yellow] on PTP")
                 return None, None, None
 
-            elif response.status_code in [400, 401, 403]:
+            if response.status_code in [400, 401, 403]:
                 logger.info("[bold red]PTP Error: 400/401/403 - Invalid request or authentication failed[/bold red]")
                 return None, None, None
-            elif response.status_code == 503:
+            if response.status_code == 503:
                 logger.info("[bold yellow]PTP Unavailable (503)")
                 return None, None, None
-            else:
-                return None, None, None
+            return None, None, None
         except Exception as e:
-            logger.info(f'[red]An error occurred: {str(e)}[/red]')
+            logger.info(f"[red]An error occurred: {e!s}[/red]")
             return None, None, None
 
     async def get_imdb_from_torrent_id(self, ptp_torrent_id: int | str) -> tuple[int | None, str | None]:
-        params = {
-            'torrentid': ptp_torrent_id
-        }
+        params = {"torrentid": ptp_torrent_id}
         headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
-        url = 'https://passthepopcorn.me/torrents.php'
+        url = "https://passthepopcorn.me/torrents.php"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url, params=params, headers=headers)
         await asyncio.sleep(1)
         try:
             if response.status_code == 200:
                 response = response.json()
-                imdb_id = int(response.get('ImdbId', 0) or 0)
+                imdb_id = int(response.get("ImdbId", 0) or 0)
                 ptp_infohash = None
-                for torrent in response['Torrents']:
-                    if torrent.get('Id', 0) == str(ptp_torrent_id):
-                        ptp_infohash = torrent.get('InfoHash', None)
+                for torrent in response["Torrents"]:
+                    if torrent.get("Id", 0) == str(ptp_torrent_id):
+                        ptp_infohash = torrent.get("InfoHash", None)
                 return imdb_id, ptp_infohash
-            elif response.status_code in [400, 401, 403]:
+            if response.status_code in [400, 401, 403]:
                 logger.info(response.text)
                 return None, None
-            elif response.status_code == 503:
+            if response.status_code == 503:
                 logger.info("[bold yellow]PTP Unavailable (503)")
                 return None, None
-            else:
-                return None, None
+            return None, None
         except Exception:
             return None, None
 
     async def get_ptp_description(self, ptp_torrent_id: int | str, meta: Meta, is_disc: str) -> list[Any]:
-        params = {
-            'id': ptp_torrent_id,
-            'action': 'get_description'
-        }
+        params = {"id": ptp_torrent_id, "action": "get_description"}
         headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
-        url = 'https://passthepopcorn.me/torrents.php'
+        url = "https://passthepopcorn.me/torrents.php"
         logger.info(f"[yellow]Requesting description from {url} with ID {ptp_torrent_id}")
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url, params=params, headers=headers)
@@ -282,14 +276,14 @@ class PTP:
                 logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                 edit_choice = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
 
-                if (edit_choice or "").lower() == 'e':
+                if (edit_choice or "").lower() == "e":
                     edited_description = cast(str | None, click.edit(cast(Any, desc)))
                     if edited_description:
                         desc = edited_description.strip()
                         meta.description = desc
                         meta.saved_description = True
                     logger.info(f"[green]Final description after editing:[/green] {desc}")
-                elif (edit_choice or "").lower() == 'd':
+                elif (edit_choice or "").lower() == "d":
                     desc = None
                     logger.info("[yellow]Description discarded.[/yellow]")
                 else:
@@ -299,16 +293,14 @@ class PTP:
             else:
                 meta.description = desc
                 meta.saved_description = True
-        imagelist = imagelist if meta.keep_images else []
-
-        return imagelist
+        return imagelist if meta.keep_images else []
 
     async def get_group_by_imdb(self, imdb: int | str) -> str | None:
         params = {
-            'imdb': imdb,
+            "imdb": imdb,
         }
         headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
-        url = 'https://passthepopcorn.me/torrents.php'
+        url = "https://passthepopcorn.me/torrents.php"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url=url, headers=headers, params=params)
         await asyncio.sleep(1)
@@ -328,60 +320,59 @@ class PTP:
                     logger.info(f"[red]Response body (truncated): {response.text[:200]}[/red]")
                 return None
 
-            if response_data.get('TotalResults'):  # Search results page
-                total_results = int(response_data.get('TotalResults', 0))
+            if response_data.get("TotalResults"):  # Search results page
+                total_results = int(response_data.get("TotalResults", 0))
                 if total_results == 0:
                     logger.info(f"[yellow]No results found for IMDb: tt{imdb}[/yellow]")
                     return None
-                elif total_results == 1:
+                if total_results == 1:
                     # Single result - use it
-                    movie = response_data.get('Movies', [{}])[0]
-                    groupID: str | None = str(movie.get('GroupId')) if movie.get('GroupId') is not None else None
-                    title = movie.get('Title', 'Unknown')
-                    year = movie.get('Year', 'Unknown')
+                    movie = response_data.get("Movies", [{}])[0]
+                    groupID: str | None = str(movie.get("GroupId")) if movie.get("GroupId") is not None else None
+                    title = movie.get("Title", "Unknown")
+                    year = movie.get("Year", "Unknown")
                     logger.info(f"[green]Found single match for IMDb: [yellow]tt{imdb}[/yellow] -> Group ID: [yellow]{groupID}[/yellow][/green]")
                     logger.info(f"[green]Title: [yellow]{title}[/yellow] ([yellow]{year}[/yellow])")
                     return groupID
-                else:
-                    # Multiple results - let user choose
-                    logger.info(f"[yellow]Found {total_results} matches for IMDb: tt{imdb}[/yellow]")
-                    movies = cast(list[dict[str, Any]], response_data.get('Movies', []))
-                    choices: list[str] = []
-                    for _i, movie in enumerate(movies):
-                        title = movie.get('Title', 'Unknown')
-                        year = movie.get('Year', 'Unknown')
-                        group_id = movie.get('GroupId', 'Unknown')
-                        choice_text = f"{title} ({year}) - Group ID: {group_id}"
-                        choices.append(choice_text)
+                # Multiple results - let user choose
+                logger.info(f"[yellow]Found {total_results} matches for IMDb: tt{imdb}[/yellow]")
+                movies = cast(list[dict[str, Any]], response_data.get("Movies", []))
+                choices: list[str] = []
+                for _i, movie in enumerate(movies):
+                    title = movie.get("Title", "Unknown")
+                    year = movie.get("Year", "Unknown")
+                    group_id = movie.get("GroupId", "Unknown")
+                    choice_text = f"{title} ({year}) - Group ID: {group_id}"
+                    choices.append(choice_text)
 
-                    choices.append("Skip - Don't use any of these matches")
+                choices.append("Skip - Don't use any of these matches")
 
-                    try:
-                        selected = cli_ui.ask_choice("Select the correct movie:", choices=choices)
-                        if selected == "Skip - Don't use any of these matches":
-                            logger.info("[yellow]User chose to skip all matches[/yellow]")
-                            return None
-
-                        # Match selection directly to movie data to avoid index issues from cli_ui sorting
-                        groupID = None
-                        for movie in movies:
-                            title = movie.get('Title', 'Unknown')
-                            year = movie.get('Year', 'Unknown')
-                            group_id = movie.get('GroupId', 'Unknown')
-                            if f"{title} ({year}) - Group ID: {group_id}" == selected:
-                                groupID = str(group_id)
-                                break
-
-                        logger.info(f"[green]User selected: Group ID [yellow]{groupID}[/yellow][/green]")
-                        return groupID
-
-                    except KeyboardInterrupt:
-                        logger.info("[yellow]Selection cancelled by user[/yellow]")
+                try:
+                    selected = cli_ui.ask_choice("Select the correct movie:", choices=choices)
+                    if selected == "Skip - Don't use any of these matches":
+                        logger.info("[yellow]User chose to skip all matches[/yellow]")
                         return None
+
+                    # Match selection directly to movie data to avoid index issues from cli_ui sorting
+                    groupID = None
+                    for movie in movies:
+                        title = movie.get("Title", "Unknown")
+                        year = movie.get("Year", "Unknown")
+                        group_id = movie.get("GroupId", "Unknown")
+                        if f"{title} ({year}) - Group ID: {group_id}" == selected:
+                            groupID = str(group_id)
+                            break
+
+                    logger.info(f"[green]User selected: Group ID [yellow]{groupID}[/yellow][/green]")
+                    return groupID
+
+                except KeyboardInterrupt:
+                    logger.info("[yellow]Selection cancelled by user[/yellow]")
+                    return None
             elif response_data.get("Page") == "Browse":  # No Releases on Site with ID
                 return None
-            elif response_data.get('Page') == "Details":  # Group Found
-                groupID = response_data.get('GroupId')
+            elif response_data.get("Page") == "Details":  # Group Found
+                groupID = response_data.get("GroupId")
                 logger.info(f"[green]Matched IMDb: [yellow]tt{imdb}[/yellow] to Group ID: [yellow]{groupID}[/yellow][/green]")
                 logger.info(f"[green]Title: [yellow]{response_data.get('Name')}[/yellow] ([yellow]{response_data.get('Year')}[/yellow])")
                 return str(groupID) if groupID is not None else None
@@ -393,27 +384,21 @@ class PTP:
         return None
 
     async def get_torrent_info(self, imdb: int | str, meta: Meta) -> dict[str, Any]:
-        params = {
-            'imdb': imdb,
-            'action': 'torrent_info',
-            'fast': 1
-        }
+        params = {"imdb": imdb, "action": "torrent_info", "fast": 1}
         headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
         url = "https://passthepopcorn.me/ajax.php"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url=url, params=params, headers=headers)
         await asyncio.sleep(1)
         tinfo = {}
-        try:
+        with contextlib.suppress(Exception):
             response = response.json()
             # console.print(f"[blue]Raw info API Response: {response}[/blue]")
             # title, plot, art, year, tags, Countries, Languages
             tinfo = {key: value for key, value in response[0].items() if value not in (None, "")}
-            if tinfo['tags'] == "":
+            if tinfo["tags"] == "":
                 tags = await self.get_tags([meta.genres, meta.keywords, meta.imdb_info["genres"]])
-                tinfo['tags'] = ", ".join(tags)
-        except Exception:
-            pass
+                tinfo["tags"] = ", ".join(tags)
         return tinfo
 
     async def get_torrent_info_tmdb(self, meta: Meta) -> dict[str, Any]:
@@ -423,16 +408,46 @@ class PTP:
             "album_desc": meta.overview,
         }
         tags = await self.get_tags([meta.genres, meta.keywords])
-        tinfo['tags'] = ", ".join(tags)
+        tinfo["tags"] = ", ".join(tags)
         return tinfo
 
     async def get_tags(self, check_against: Any) -> list[str]:
         tags: list[str] = []
         ptp_tags = [
-            "action", "adventure", "animation", "arthouse", "asian", "biography", "camp", "comedy",
-            "crime", "cult", "documentary", "drama", "experimental", "exploitation", "family", "fantasy", "film.noir",
-            "history", "horror", "martial.arts", "musical", "mystery", "performance", "philosophy", "politics", "romance",
-            "sci.fi", "short", "silent", "sport", "thriller", "video.art", "war", "western"
+            "action",
+            "adventure",
+            "animation",
+            "arthouse",
+            "asian",
+            "biography",
+            "camp",
+            "comedy",
+            "crime",
+            "cult",
+            "documentary",
+            "drama",
+            "experimental",
+            "exploitation",
+            "family",
+            "fantasy",
+            "film.noir",
+            "history",
+            "horror",
+            "martial.arts",
+            "musical",
+            "mystery",
+            "performance",
+            "philosophy",
+            "politics",
+            "romance",
+            "sci.fi",
+            "short",
+            "silent",
+            "sport",
+            "thriller",
+            "video.art",
+            "war",
+            "western",
         ]
 
         check_against_list = check_against if isinstance(check_against, list) else [check_against]
@@ -443,11 +458,11 @@ class PTP:
                     if isinstance(x, str) and x.strip():
                         normalized_check_against.extend(x.lower().replace(" ", "").replace("-", ""))
             elif isinstance(item, str) and item.strip():
-                for x in item.split(','):
+                for x in item.split(","):
                     if x.strip():
                         normalized_check_against.extend(x.strip().lower().replace(" ", "").replace("-", ""))
         for each in ptp_tags:
-            clean_tag = each.replace('.', '')
+            clean_tag = each.replace(".", "")
             if any(clean_tag in item for item in normalized_check_against):
                 tags.append(each)
 
@@ -465,10 +480,10 @@ class PTP:
 
         # Prepare request parameters and headers
         params = {
-            'id': groupID,
+            "id": groupID,
         }
         headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
-        url = 'https://passthepopcorn.me/torrents.php'
+        url = "https://passthepopcorn.me/torrents.php"
 
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             response = await client.get(url, headers=headers, params=params)
@@ -477,35 +492,30 @@ class PTP:
                 existing: list[str] = []
                 try:
                     data = response.json()
-                    torrents = cast(list[dict[str, Any]], data.get('Torrents', []))
+                    torrents = cast(list[dict[str, Any]], data.get("Torrents", []))
                     existing.extend(
                         f"[{torrent.get('Resolution')}] {torrent.get('ReleaseName', 'RELEASE NAME NOT FOUND')}"
                         for torrent in torrents
-                        if torrent.get('Quality') == quality and quality is not None
+                        if torrent.get("Quality") == quality and quality is not None
                     )
                 except ValueError:
                     logger.error("[red]Failed to parse JSON response from API.")
                 return existing
-            else:
-                logger.info(f"[bold red]HTTP request failed with status code {response.status_code}")
+            logger.info(f"[bold red]HTTP request failed with status code {response.status_code}")
 
         return []
 
     async def ptpimg_url_rehost(self, image_url: str) -> str:
-        payload = {
-            'format': 'json',
-            'api_key': self.config["DEFAULT"]["ptpimg_api"],
-            'link-upload': image_url
-        }
-        headers = {'referer': 'https://ptpimg.me/index.php'}
+        payload = {"format": "json", "api_key": self.config["DEFAULT"]["ptpimg_api"], "link-upload": image_url}
+        headers = {"referer": "https://ptpimg.me/index.php"}
         url = "https://ptpimg.me/upload.php"
 
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.post(url, headers=headers, data=payload)
         try:
             response = response.json()
-            ptpimg_code = response[0]['code']
-            ptpimg_ext = response[0]['ext']
+            ptpimg_code = response[0]["code"]
+            ptpimg_ext = response[0]["ext"]
             img_url = f"https://ptpimg.me/{ptpimg_code}.{ptpimg_ext}"
         except Exception:
             logger.info("[red]PTPIMG image rehost failed")
@@ -514,40 +524,40 @@ class PTP:
         return img_url
 
     def _selected_poster_host(self, meta: Meta) -> str:
-        default_config = cast(dict[str, Any], self.config.get('DEFAULT', {}))
+        default_config = cast(dict[str, Any], self.config.get("DEFAULT", {}))
         return str(meta.imghost or default_config.get("img_host_1") or "").strip()
 
     def _poster_already_on_selected_host(self, image_url: str, selected_host: str) -> bool:
         if not selected_host:
             return False
-        hostname = (urlparse(image_url).hostname or '').lower()
+        hostname = (urlparse(image_url).hostname or "").lower()
         host_aliases = {
-            'imgbb': ('ibb.co', 'imgbb.com'),
-            'imgbox': ('imgbox.com',),
-            'pixhost': ('pixhost.to',),
-            'lensdump': ('lensdump.com',),
-            'onlyimage': ('onlyimage.org',),
-            'ptpimg': ('ptpimg.me',),
-            'ptscreens': ('ptscreens.com',),
-            'passtheimage': ('passtheima.ge',),
-            'seedpool_cdn': ('cdn.seedpool.org',),
-            'utppm': ('utp.pm',),
+            "imgbb": ("ibb.co", "imgbb.com"),
+            "imgbox": ("imgbox.com",),
+            "pixhost": ("pixhost.to",),
+            "lensdump": ("lensdump.com",),
+            "onlyimage": ("onlyimage.org",),
+            "ptpimg": ("ptpimg.me",),
+            "ptscreens": ("ptscreens.com",),
+            "passtheimage": ("passtheima.ge",),
+            "seedpool_cdn": ("cdn.seedpool.org",),
+            "utppm": ("utp.pm",),
         }
         aliases = host_aliases.get(selected_host, (selected_host,))
         return any(hostname == alias or hostname.endswith(f".{alias}") for alias in aliases)
 
     def _poster_extension(self, image_url: str, content_type: str) -> str:
         url_extension = Path(urlparse(image_url).path).suffix.lower()
-        if url_extension in {'.jpg', '.jpeg', '.png', '.webp'}:
+        if url_extension in {".jpg", ".jpeg", ".png", ".webp"}:
             return url_extension
 
-        content_type = content_type.split(';', 1)[0].strip().lower()
+        content_type = content_type.split(";", 1)[0].strip().lower()
         content_type_extensions = {
-            'image/jpeg': '.jpg',
-            'image/png': '.png',
-            'image/webp': '.webp',
+            "image/jpeg": ".jpg",
+            "image/png": ".png",
+            "image/webp": ".webp",
         }
-        return content_type_extensions.get(content_type, '.jpg')
+        return content_type_extensions.get(content_type, ".jpg")
 
     async def rehost_poster_to_selected_host(self, meta: Meta, image_url: str) -> str:
         selected_host = self._selected_poster_host(meta)
@@ -571,12 +581,12 @@ class PTP:
                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [str(poster_path)], {})
             finally:
                 if original_imghost is None:
-                    meta.pop('imghost', None)
+                    meta.pop("imghost", None)
                 else:
                     meta.imghost = original_imghost
 
             if uploaded_images:
-                uploaded_url = uploaded_images[0].get('raw_url') or uploaded_images[0].get('img_url')
+                uploaded_url = uploaded_images[0].get("raw_url") or uploaded_images[0].get("img_url")
                 if isinstance(uploaded_url, str) and uploaded_url:
                     return uploaded_url
         except Exception as e:
@@ -586,10 +596,10 @@ class PTP:
 
     def get_type(self, imdb_info: dict[str, Any], meta: Meta) -> str | None:
         ptpType = None
-        if imdb_info['type'] is not None:
-            imdbType = imdb_info.get('type', 'movie').lower()
-            if imdbType in ("movie", "tv movie", 'tvmovie'):
-                ptpType = "Feature Film" if int(imdb_info.get('runtime', '60')) >= 45 or int(imdb_info.get('runtime', '60')) == 0 else "Short Film"
+        if imdb_info["type"] is not None:
+            imdbType = imdb_info.get("type", "movie").lower()
+            if imdbType in ("movie", "tv movie", "tvmovie"):
+                ptpType = "Feature Film" if int(imdb_info.get("runtime", "60")) >= 45 or int(imdb_info.get("runtime", "60")) == 0 else "Short Film"
             if imdbType == "short":
                 ptpType = "Short Film"
             elif imdbType == "tv mini series":
@@ -604,7 +614,7 @@ class PTP:
             if tmdb_type == "movie":
                 try:
                     runtime = (meta.runtime) if meta.runtime is not None else 60
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     runtime = 60
                 ptpType = "Feature Film" if runtime >= 45 or runtime == 0 else "Short Film"
             if tmdb_type == "miniseries" or "miniseries" in keywords:
@@ -628,7 +638,7 @@ class PTP:
             bdinfo = meta.bdinfo
             bd_sizes = [25, 50, 66, 100]
             for each in bd_sizes:
-                if bdinfo['size'] < each:
+                if bdinfo["size"] < each:
                     codec = f"BD{each}"
                     break
             if not codec:
@@ -646,7 +656,7 @@ class PTP:
                 "H.265": "H.265",
             }
             searchcodec_value = meta.video_codec if meta.video_codec is not None else meta.video_encode
-            searchcodec = searchcodec_value if isinstance(searchcodec_value, str) else ''
+            searchcodec = searchcodec_value if isinstance(searchcodec_value, str) else ""
             codec = codecmap.get(searchcodec, searchcodec)
             if meta.has_encode_settings is True:
                 codec = codec.replace("H.", "x")
@@ -670,27 +680,13 @@ class PTP:
             container = "VOB IFO"
         else:
             ext = os.path.splitext(meta.filelist[0])[1]
-            containermap = {
-                '.mkv': "MKV",
-                '.mp4': 'MP4'
-            }
-            container = containermap.get(ext, 'Other')
+            containermap = {".mkv": "MKV", ".mp4": "MP4"}
+            container = containermap.get(ext, "Other")
         return container
 
     def get_source(self, source: str) -> str:
-        sources = {
-            "Blu-ray": "Blu-ray",
-            "BluRay": "Blu-ray",
-            "HD DVD": "HD-DVD",
-            "HDDVD": "HD-DVD",
-            "Web": "WEB",
-            "HDTV": "HDTV",
-            'UHDTV': 'HDTV',
-            "NTSC": "DVD",
-            "PAL": "DVD"
-        }
-        source_id = sources.get(source, "OtherR")
-        return source_id
+        sources = {"Blu-ray": "Blu-ray", "BluRay": "Blu-ray", "HD DVD": "HD-DVD", "HDDVD": "HD-DVD", "Web": "WEB", "HDTV": "HDTV", "UHDTV": "HDTV", "NTSC": "DVD", "PAL": "DVD"}
+        return sources.get(source, "OtherR")
 
     def get_subtitles(self, meta: Meta) -> list[int]:
         sub_lang_map = self.sub_lang_map
@@ -700,13 +696,13 @@ class PTP:
             mi = meta.mediainfo
             if meta.is_disc == "DVD":
                 mi = json.loads(MediaInfo.parse(meta.discs[0]["ifo"], output="JSON"))
-            for track in mi['media']['track']:
-                if track['@type'] == "Text":
-                    language = track.get('Language_String2', track.get('Language'))
+            for track in mi["media"]["track"]:
+                if track["@type"] == "Text":
+                    language = track.get("Language_String2", track.get("Language"))
                     if language == "en":
-                        if track.get('Forced', "") == "Yes":
+                        if track.get("Forced", "") == "Yes":
                             language = "en (Forced)"
-                        title = track.get('Title', "")
+                        title = track.get("Title", "")
                         if isinstance(title, str) and "intertitles" in title.lower():
                             language = "en (Intertitles)"
                     for lang, subID in sub_lang_map.items():
@@ -728,7 +724,7 @@ class PTP:
             "English Hardcoded Subs (Forced)": 50,
             "No English Subs": 14,
             "English Softsubs Exist (Mislabeled)": None,
-            "Hardcoded Subs (Non-English)": "OTHER"
+            "Hardcoded Subs (Non-English)": "OTHER",
         }
         opts = cli_ui.select_choices("Please select any/all applicable options:", choices=list(trumpable_values.keys()))
         trumpable_list: list[int] = []
@@ -736,7 +732,7 @@ class PTP:
             v = trumpable_values.get(opt)
             if v is None:
                 continue
-            elif v == 4:
+            if v == 4:
                 trumpable_list.append(4)
                 if 3 not in sub_langs:
                     sub_langs.append(3)
@@ -767,11 +763,11 @@ class PTP:
         # Collections
         # Masters of Cinema, The Criterion Collection, Warner Archive Collection
         if meta.distributor in ("WARNER ARCHIVE", "WARNER ARCHIVE COLLECTION", "WAC"):
-            remaster_title.append('Warner Archive Collection')
+            remaster_title.append("Warner Archive Collection")
         elif meta.distributor in ("CRITERION", "CRITERION COLLECTION", "CC"):
-            remaster_title.append('The Criterion Collection')
+            remaster_title.append("The Criterion Collection")
         elif meta.distributor in ("MASTERS OF CINEMA", "MOC"):
-            remaster_title.append('Masters of Cinema')
+            remaster_title.append("Masters of Cinema")
 
         # Editions
         # Director's Cut, Extended Edition, Rifftrax, Theatrical Cut, Uncut, Unrated
@@ -798,35 +794,34 @@ class PTP:
 
         # DTS:X, Dolby Atmos, Dual Audio, English Dub, With Commentary,
         if "DTS:X" in meta.audio:
-            remaster_title.append('DTS:X')
+            remaster_title.append("DTS:X")
         if "Atmos" in meta.audio:
-            remaster_title.append('Dolby Atmos')
+            remaster_title.append("Dolby Atmos")
         if "Dual" in meta.audio:
-            remaster_title.append('Dual Audio')
+            remaster_title.append("Dual Audio")
         if "Dubbed" in meta.audio:
-            remaster_title.append('English Dub')
+            remaster_title.append("English Dub")
 
         # HDR10, HDR10+, Dolby Vision, 10-bit,
         # if "Hi10P" in meta.video_encode:
         #     remaster_title.append('10-bit')
         if meta.hdr.strip() == "" and meta.bit_depth == "10":
-            remaster_title.append('10-bit')
+            remaster_title.append("10-bit")
         if "DV" in meta.hdr:
-            remaster_title.append('Dolby Vision')
+            remaster_title.append("Dolby Vision")
         if "HDR" in meta.hdr:
             if "HDR10+" in meta.hdr:
-                remaster_title.append('HDR10+')
+                remaster_title.append("HDR10+")
             else:
-                remaster_title.append('HDR10')
+                remaster_title.append("HDR10")
         if "HLG" in meta.hdr:
-            remaster_title.append('HLG')
+            remaster_title.append("HLG")
 
         # with commentary always last
         if meta.has_commentary is True:
-            remaster_title.append('With Commentary')
+            remaster_title.append("With Commentary")
 
-        output = " / ".join(remaster_title) if remaster_title != [] else ""
-        return output
+        return " / ".join(remaster_title) if remaster_title != [] else ""
 
     def convert_bbcode(self, desc: str) -> str:
         desc = desc.replace("[spoiler", "[hide").replace("[/spoiler]", "[/hide]")
@@ -843,8 +838,7 @@ class PTP:
         desc = desc.replace("[list]", "").replace("[/list]", "")
         desc = desc.replace("[ul]", "").replace("[/ul]", "")
         desc = desc.replace("[ol]", "").replace("[/ol]", "")
-        desc = re.sub(r"\[img=[^\]]+\]", "[img]", desc)
-        return desc
+        return re.sub(r"\[img=[^\]]+\]", "[img]", desc)
 
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {
@@ -862,7 +856,7 @@ class PTP:
         return
 
     async def edit_desc(self, meta: Meta) -> None:
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt", encoding="utf-8") as base_file:
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt", encoding="utf-8") as base_file:
             base = await base_file.read()
         if meta.scene_nfo_file:
             # Remove NFO from description
@@ -873,7 +867,7 @@ class PTP:
                 flags=re.DOTALL,
             )
             base = meta_description
-        multi_screens = int(self.config['DEFAULT'].get('multiScreens', 2))
+        multi_screens = int(self.config["DEFAULT"].get("multiScreens", 2))
         if multi_screens < 2:
             multi_screens = 2
             logger.info("[yellow]PTP requires at least 2 screenshots for multi disc/file content, overriding config")
@@ -883,28 +877,28 @@ class PTP:
         images: list[dict[str, Any]] = image_list
 
         # Check for saved pack_image_links.json file
-        pack_images_file = os.path.join(meta.base_dir, "tmp", meta.uuid, "pack_image_links.json")
+        pack_images_file = Path(meta.base_dir) / "tmp" / meta.uuid / "pack_image_links.json"
         pack_images_data: dict[str, Any] = {}
-        if os.path.exists(pack_images_file):
+        if Path(pack_images_file).exists():
             try:
-                async with aiofiles.open(pack_images_file, encoding='utf-8') as f:
+                async with aiofiles.open(pack_images_file, encoding="utf-8") as f:
                     content = await f.read()
                     pack_images_data = cast(dict[str, Any], json.loads(content)) if content.strip() else {}
 
                     # Filter out keys with non-approved image hosts
-                    keys = cast(dict[str, Any], pack_images_data.get('keys', {}))
+                    keys = cast(dict[str, Any], pack_images_data.get("keys", {}))
                     keys_to_remove: list[str] = []
                     for key_name, key_data in keys.items():
                         key_data_dict = cast(dict[str, Any], key_data)
                         images_to_keep: list[dict[str, Any]] = []
-                        for img in cast(list[dict[str, Any]], key_data_dict.get('images', [])):
-                            raw_url = str(img.get('raw_url', ''))
+                        for img in cast(list[dict[str, Any]], key_data_dict.get("images", [])):
+                            raw_url = str(img.get("raw_url", ""))
                             # Extract hostname from URL (e.g., ptpimg.me -> ptpimg)
                             try:
                                 parsed_url = urlparse(raw_url)
                                 hostname = parsed_url.netloc
                                 # Get the main domain name (first part before the dot)
-                                host_key = hostname.split('.')[0] if hostname else ''
+                                host_key = hostname.split(".")[0] if hostname else ""
 
                                 if host_key in self.approved_image_hosts:
                                     images_to_keep.append(img)
@@ -917,8 +911,8 @@ class PTP:
 
                         if images_to_keep:
                             # Update the key with only approved images
-                            pack_images_data['keys'][key_name]['images'] = images_to_keep
-                            pack_images_data['keys'][key_name]['count'] = len(images_to_keep)
+                            pack_images_data["keys"][key_name]["images"] = images_to_keep
+                            pack_images_data["keys"][key_name]["count"] = len(images_to_keep)
                         else:
                             # Mark key for removal if no approved images
                             keys_to_remove.append(key_name)
@@ -929,17 +923,17 @@ class PTP:
                         logger.debug(f"[yellow]Removed key '{key_name}' - no approved image hosts[/yellow]")
 
                     # Recalculate total count
-                    keys = cast(dict[str, Any], pack_images_data.get('keys', {}))
-                    pack_images_data['total_count'] = sum(cast(dict[str, Any], key_data).get('count', 0) for key_data in keys.values())
+                    keys = cast(dict[str, Any], pack_images_data.get("keys", {}))
+                    pack_images_data["total_count"] = sum(cast(dict[str, Any], key_data).get("count", 0) for key_data in keys.values())
 
-                    if pack_images_data.get('total_count', 0) < 3:
+                    if pack_images_data.get("total_count", 0) < 3:
                         pack_images_data = {}  # Invalidate if less than 3 images total
                         logger.debug("[yellow]Invalidating pack images - less than 3 approved images total[/yellow]")
                     else:
                         logger.debug(f"[green]Loaded previously uploaded images from {pack_images_file}")
                         logger.debug(f"[blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]")
             except Exception as e:
-                logger.warning(f"[yellow]Warning: Could not load pack image data: {str(e)}[/yellow]")
+                logger.warning(f"[yellow]Warning: Could not load pack image data: {e!s}[/yellow]")
 
         desc = io.StringIO()
         discs = cast(list[dict[str, Any]], meta.discs)
@@ -950,7 +944,7 @@ class PTP:
             each = discs[0]
             new_screens: list[str] = []
             bdinfo_keys: list[str] = []
-            if each['type'] == "BDMV":
+            if each["type"] == "BDMV":
                 bdinfo_keys = [key for key in each if key.startswith("bdinfo")]
                 bdinfo = meta.bdinfo
                 if len(bdinfo_keys) > 1:
@@ -963,17 +957,17 @@ class PTP:
                     desc.write("\n\n")
                 try:
                     if meta.tonemapped and self.config["DEFAULT"].get("tonemapped_header", None):
-                        tonemapped_header = self.config['DEFAULT'].get('tonemapped_header')
+                        tonemapped_header = self.config["DEFAULT"].get("tonemapped_header")
                         tonemapped_header = self.convert_bbcode(tonemapped_header)
                         desc.write(tonemapped_header)
                         desc.write("\n\n")
                 except Exception as e:
-                    logger.warning(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
+                    logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
                 for img_index in range(len(images[: meta.screens])):
-                    raw_url = str(image_list[img_index].get('raw_url', ''))
+                    raw_url = str(image_list[img_index].get("raw_url", ""))
                     desc.write(f"[img]{raw_url}[/img]\n")
                 desc.write("\n")
-            elif each['type'] == "DVD":
+            elif each["type"] == "DVD":
                 desc.write(f"[b][size=3]{each['name']}:[/size][/b]\n")
                 desc.write(f"[mediainfo]{each['ifo_mi_full']}[/mediainfo]\n")
                 desc.write(f"[mediainfo]{each['vob_mi_full']}[/mediainfo]\n\n")
@@ -982,14 +976,14 @@ class PTP:
                     desc.write(base2ptp)
                     desc.write("\n\n")
                 for img_index in range(len(images[: meta.screens])):
-                    raw_url = image_list[img_index]['raw_url']
+                    raw_url = image_list[img_index]["raw_url"]
                     desc.write(f"[img]{raw_url}[/img]\n")
                 desc.write("\n")
             if len(bdinfo_keys) > 1:
                 meta.retry_count = meta.retry_count
 
                 for i, key in enumerate(bdinfo_keys[1:], start=1):  # Skip the first bdinfo
-                    new_images_key = f'new_images_playlist_{i}'
+                    new_images_key = f"new_images_playlist_{i}"
                     bdinfo = each[key]
                     edition = bdinfo.get("edition", "Unknown Edition")
 
@@ -998,26 +992,24 @@ class PTP:
                     summary = each.get(summary_key, "No summary available")
 
                     # Check for saved images first
-                    if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
-                        saved_images = cast(list[dict[str, Any]], pack_images_data['keys'][new_images_key]['images'])
+                    if pack_images_data and "keys" in pack_images_data and new_images_key in pack_images_data["keys"]:
+                        saved_images = cast(list[dict[str, Any]], pack_images_data["keys"][new_images_key]["images"])
                         if saved_images:
                             logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                             meta[new_images_key] = []
                             for img in saved_images:
-                                meta[new_images_key].append({
-                                    'img_url': str(img.get('img_url', '')),
-                                    'raw_url': str(img.get('raw_url', '')),
-                                    'web_url': str(img.get('web_url', ''))
-                                })
+                                meta[new_images_key].append(
+                                    {"img_url": str(img.get("img_url", "")), "raw_url": str(img.get("raw_url", "")), "web_url": str(img.get("web_url", ""))}
+                                )
 
-                    if new_images_key in meta and meta[new_images_key]:
+                    if meta.get(new_images_key):
                         desc.write(f"\n[b]{edition}[/b]\n\n")
                         # Use the summary corresponding to the current bdinfo
                         desc.write(f"[mediainfo]{summary}[/mediainfo]\n\n")
                         logger.debug("[yellow]Using original uploaded images for first disc")
                         for img in meta[new_images_key]:
-                            raw_url = str(img.get('raw_url', ''))
+                            raw_url = str(img.get("raw_url", ""))
                             desc.write(f"[img]{raw_url}[/img]\n")
                     else:
                         desc.write(f"\n[b]{edition}[/b]\n")
@@ -1025,7 +1017,7 @@ class PTP:
                         desc.write(f"[mediainfo]{summary}[/mediainfo]\n\n")
                         meta.retry_count += 1
                         meta[new_images_key] = []
-                        new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"PLAYLIST_{i}-*.png"))]
+                        new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"PLAYLIST_{i}-*.png")]
                         if not new_screens:
                             use_vs = meta.vapoursynth
                             try:
@@ -1034,34 +1026,34 @@ class PTP:
                                 )
                             except Exception as e:
                                 logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
-                            new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"PLAYLIST_{i}-*.png"))]
+                            new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"PLAYLIST_{i}-*.png")]
                         uploaded_images: list[dict[str, Any]] = []
                         if new_screens and not meta.skip_imghost_upload:
-                            uploaded_images, _ = await self.uploadscreens_manager.upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts)
+                            uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
+                                meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts
+                            )
                             if uploaded_images and not meta.skip_imghost_upload:
                                 await self.save_image_links(meta, new_images_key, uploaded_images)
                             for img in uploaded_images:
-                                meta[new_images_key].append({
-                                    'img_url': str(img.get('img_url', '')),
-                                    'raw_url': str(img.get('raw_url', '')),
-                                    'web_url': str(img.get('web_url', ''))
-                                })
+                                meta[new_images_key].append(
+                                    {"img_url": str(img.get("img_url", "")), "raw_url": str(img.get("raw_url", "")), "web_url": str(img.get("web_url", ""))}
+                                )
 
                             for img in uploaded_images:
-                                raw_url = str(img.get('raw_url', ''))
+                                raw_url = str(img.get("raw_url", ""))
                                 desc.write(f"[img]{raw_url}[/img]\n")
 
-                        meta_filename = f"{meta.base_dir}/tmp/{meta.uuid}/meta.json"
-                        async with aiofiles.open(meta_filename, 'w', encoding='utf-8') as f:
+                        meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
+                        async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
                             await f.write(json.dumps(meta.to_dict(), indent=4))
 
         # Handle multiple discs case
         elif len(discs) > 1:
-            if 'retry_count' not in meta:
+            if "retry_count" not in meta:
                 meta.retry_count = 0
             for i, each in enumerate(discs):
-                new_images_key = f'new_images_disc_{i}'
-                if each['type'] == "BDMV":
+                new_images_key = f"new_images_disc_{i}"
+                if each["type"] == "BDMV":
                     if i == 0:
                         desc.write(f"[mediainfo]{each['summary']}[/mediainfo]\n\n")
                         base2ptp = self.convert_bbcode(base)
@@ -1070,14 +1062,14 @@ class PTP:
                             desc.write("\n\n")
                         try:
                             if meta.tonemapped and self.config["DEFAULT"].get("tonemapped_header", None):
-                                tonemapped_header = self.config['DEFAULT'].get('tonemapped_header')
+                                tonemapped_header = self.config["DEFAULT"].get("tonemapped_header")
                                 tonemapped_header = self.convert_bbcode(tonemapped_header)
                                 desc.write(tonemapped_header)
                                 desc.write("\n\n")
                         except Exception as e:
-                            logger.warning(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
+                            logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
                         for img_index in range(min(multi_screens, len(image_list))):
-                            raw_url = str(image_list[img_index].get('raw_url', ''))
+                            raw_url = str(image_list[img_index].get("raw_url", ""))
                             desc.write(f"[img]{raw_url}[/img]\n")
                         desc.write("\n")
                     else:
@@ -1087,27 +1079,25 @@ class PTP:
                             desc.write(base2ptp)
                             desc.write("\n\n")
                         # Check for saved images first
-                        if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
-                            saved_images = cast(list[dict[str, Any]], pack_images_data['keys'][new_images_key]['images'])
+                        if pack_images_data and "keys" in pack_images_data and new_images_key in pack_images_data["keys"]:
+                            saved_images = cast(list[dict[str, Any]], pack_images_data["keys"][new_images_key]["images"])
                             if saved_images:
                                 logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
-                                    meta[new_images_key].append({
-                                        'img_url': str(img.get('img_url', '')),
-                                        'raw_url': str(img.get('raw_url', '')),
-                                        'web_url': str(img.get('web_url', ''))
-                                    })
-                        if new_images_key in meta and meta[new_images_key]:
+                                    meta[new_images_key].append(
+                                        {"img_url": str(img.get("img_url", "")), "raw_url": str(img.get("raw_url", "")), "web_url": str(img.get("web_url", ""))}
+                                    )
+                        if meta.get(new_images_key):
                             for img in meta[new_images_key]:
-                                raw_url = str(img.get('raw_url', ''))
+                                raw_url = str(img.get("raw_url", ""))
                                 desc.write(f"[img]{raw_url}[/img]\n")
                             desc.write("\n")
                         else:
                             meta.retry_count += 1
                             meta[new_images_key] = []
-                            new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"FILE_{i}-*.png"))]
+                            new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"FILE_{i}-*.png")]
                             if not new_screens:
                                 try:
                                     await self.takescreens_manager.disc_screenshots(
@@ -1115,27 +1105,27 @@ class PTP:
                                     )
                                 except Exception as e:
                                     logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
-                            new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"FILE_{i}-*.png"))]
+                            new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"FILE_{i}-*.png")]
                             uploaded_images: list[dict[str, Any]] = []
                             if new_screens and not meta.skip_imghost_upload:
-                                uploaded_images, _ = await self.uploadscreens_manager.upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts)
+                                uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
+                                    meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts
+                                )
                             if uploaded_images and not meta.skip_imghost_upload:
                                 await self.save_image_links(meta, new_images_key, uploaded_images)
                                 for img in uploaded_images:
-                                    meta[new_images_key].append({
-                                        'img_url': str(img.get('img_url', '')),
-                                        'raw_url': str(img.get('raw_url', '')),
-                                        'web_url': str(img.get('web_url', ''))
-                                    })
-                                    raw_url = str(img.get('raw_url', ''))
+                                    meta[new_images_key].append(
+                                        {"img_url": str(img.get("img_url", "")), "raw_url": str(img.get("raw_url", "")), "web_url": str(img.get("web_url", ""))}
+                                    )
+                                    raw_url = str(img.get("raw_url", ""))
                                     desc.write(f"[img]{raw_url}[/img]\n")
                                 desc.write("\n")
 
-                            meta_filename = f"{meta.base_dir}/tmp/{meta.uuid}/meta.json"
-                            async with aiofiles.open(meta_filename, 'w', encoding='utf-8') as f:
+                            meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
+                            async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
                                 await f.write(json.dumps(meta.to_dict(), indent=4))
 
-                elif each['type'] == "DVD":
+                elif each["type"] == "DVD":
                     if i == 0:
                         desc.write(f"[b][size=3]{each['name']}:[/size][/b]\n")
                         desc.write(f"[mediainfo]{each['ifo_mi_full']}[/mediainfo]\n")
@@ -1145,7 +1135,7 @@ class PTP:
                             desc.write(base2ptp)
                             desc.write("\n\n")
                         for img_index in range(min(multi_screens, len(image_list))):
-                            raw_url = image_list[img_index]['raw_url']
+                            raw_url = image_list[img_index]["raw_url"]
                             desc.write(f"[img]{raw_url}[/img]\n")
                         desc.write("\n")
                     else:
@@ -1157,57 +1147,51 @@ class PTP:
                             desc.write(base2ptp)
                             desc.write("\n\n")
                         # Check for saved images first
-                        if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
-                            saved_images = pack_images_data['keys'][new_images_key]['images']
+                        if pack_images_data and "keys" in pack_images_data and new_images_key in pack_images_data["keys"]:
+                            saved_images = pack_images_data["keys"][new_images_key]["images"]
                             if saved_images:
                                 logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
-                                    meta[new_images_key].append({
-                                        'img_url': img.get('img_url', ''),
-                                        'raw_url': img.get('raw_url', ''),
-                                        'web_url': img.get('web_url', '')
-                                    })
-                        if new_images_key in meta and meta[new_images_key]:
+                                    meta[new_images_key].append({"img_url": img.get("img_url", ""), "raw_url": img.get("raw_url", ""), "web_url": img.get("web_url", "")})
+                        if meta.get(new_images_key):
                             for img in meta[new_images_key]:
-                                raw_url = img['raw_url']
+                                raw_url = img["raw_url"]
                                 desc.write(f"[img]{raw_url}[/img]\n")
                             desc.write("\n")
                         else:
                             meta.retry_count += 1
                             meta[new_images_key] = []
-                            new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"{meta.discs[i]['name']}-*.png"))]
+                            new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"{meta.discs[i]['name']}-*.png")]
                             if not new_screens:
                                 try:
                                     await self.takescreens_manager.dvd_screenshots(meta, i, multi_screens, True)
                                 except Exception as e:
                                     logger.info(f"Error during DVD screenshot capture: {e}", extra={"markup": False})
-                            new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"{meta.discs[i]['name']}-*.png"))]
+                            new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"{meta.discs[i]['name']}-*.png")]
                             uploaded_images: list[dict[str, Any]] = []
                             if new_screens and not meta.skip_imghost_upload:
-                                uploaded_images, _ = await self.uploadscreens_manager.upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts)
+                                uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
+                                    meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts
+                                )
                             if uploaded_images and not meta.skip_imghost_upload:
                                 await self.save_image_links(meta, new_images_key, uploaded_images)
                                 for img in uploaded_images:
-                                    meta[new_images_key].append({
-                                        'img_url': img['img_url'],
-                                        'raw_url': img['raw_url'],
-                                        'web_url': img['web_url']
-                                    })
-                                    raw_url = img['raw_url']
+                                    meta[new_images_key].append({"img_url": img["img_url"], "raw_url": img["raw_url"], "web_url": img["web_url"]})
+                                    raw_url = img["raw_url"]
                                     desc.write(f"[img]{raw_url}[/img]\n")
                                 desc.write("\n")
 
-                        meta_filename = f"{meta.base_dir}/tmp/{meta.uuid}/meta.json"
-                        async with aiofiles.open(meta_filename, 'w', encoding='utf-8') as f:
+                        meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
+                        async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
                             await f.write(json.dumps(meta.to_dict(), indent=4))
 
         # Handle single file case
         elif len(filelist) == 1:
             if meta.type == "WEBDL" and meta.service_longname != "" and meta.description is None and self.web_source is True:
                 desc.write(f"[quote][align=center]This release is sourced from {meta.service_longname}[/align][/quote]")
-            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as mi_file:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as mi_file:
                 mi_dump = await mi_file.read()
             desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
             base2ptp = self.convert_bbcode(base)
@@ -1219,18 +1203,18 @@ class PTP:
 
                 comparison_groups = meta.comparison_groups if isinstance(meta.comparison_groups, dict) else {}
                 group_keys = sorted(comparison_groups.keys(), key=lambda x: int(x))
-                comparison_names = [comparison_groups[key].get('name', f'Group {key}') for key in group_keys]
-                comparison_header = ', '.join(comparison_names)
+                comparison_names = [comparison_groups[key].get("name", f"Group {key}") for key in group_keys]
+                comparison_header = ", ".join(comparison_names)
                 desc.write(f"[comparison={comparison_header}]\n")
 
-                num_images = min([len(comparison_groups[key]['urls']) for key in group_keys])
+                num_images = min([len(comparison_groups[key]["urls"]) for key in group_keys])
 
                 for img_index in range(num_images):
                     for key in group_keys:
                         group = comparison_groups[key]
-                        if img_index < len(group['urls']):
-                            img_data = group['urls'][img_index]
-                            raw_url = img_data.get('raw_url', '')
+                        if img_index < len(group["urls"]):
+                            img_data = group["urls"][img_index]
+                            raw_url = img_data.get("raw_url", "")
                             if raw_url:
                                 desc.write(f"[img]{raw_url}[/img] ")
                     desc.write("\n")
@@ -1239,15 +1223,15 @@ class PTP:
 
             try:
                 if meta.tonemapped and self.config["DEFAULT"].get("tonemapped_header", None):
-                    tonemapped_header = self.config['DEFAULT'].get('tonemapped_header')
+                    tonemapped_header = self.config["DEFAULT"].get("tonemapped_header")
                     tonemapped_header = self.convert_bbcode(tonemapped_header)
                     desc.write(tonemapped_header)
                     desc.write("\n\n")
             except Exception as e:
-                logger.warning(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
+                logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
 
             for img_index in range(len(images[: meta.screens])):
-                raw_url = image_list[img_index]['raw_url']
+                raw_url = image_list[img_index]["raw_url"]
                 desc.write(f"[img]{raw_url}[/img]\n")
             desc.write("\n")
 
@@ -1261,78 +1245,72 @@ class PTP:
                     if base2ptp.strip() != "":
                         desc.write(base2ptp)
                         desc.write("\n\n")
-                    async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as mi_file:
+                    async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as mi_file:
                         mi_dump = await mi_file.read()
                     desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
                     try:
                         if meta.tonemapped and self.config["DEFAULT"].get("tonemapped_header", None):
-                            tonemapped_header = self.config['DEFAULT'].get('tonemapped_header')
+                            tonemapped_header = self.config["DEFAULT"].get("tonemapped_header")
                             tonemapped_header = self.convert_bbcode(tonemapped_header)
                             desc.write(tonemapped_header)
                             desc.write("\n\n")
                     except Exception as e:
-                        logger.warning(f"[yellow]Warning: Error setting tonemapped header: {str(e)}[/yellow]")
+                        logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
                     for img_index in range(min(multi_screens, len(image_list))):
-                        raw_url = image_list[img_index]['raw_url']
+                        raw_url = image_list[img_index]["raw_url"]
                         desc.write(f"[img]{raw_url}[/img]\n")
                     desc.write("\n")
                 else:
                     mi_dump = MediaInfo.parse(file, output="STRING", full=False)
-                    temp_mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/TEMP_PTP_MEDIAINFO.txt"
+                    temp_mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/TEMP_PTP_MEDIAINFO.txt"
                     async with aiofiles.open(temp_mi_path, "w", newline="", encoding="utf-8") as f:
-                        await f.write(mi_dump.replace(file, os.path.basename(file)))
+                        await f.write(mi_dump.replace(file, Path(file).name))
                     async with aiofiles.open(temp_mi_path, encoding="utf-8") as mi_file:
                         mi_dump = await mi_file.read()
                     desc.write(f"[mediainfo]{mi_dump}[/mediainfo]\n")
-                    new_images_key = f'new_images_file_{i}'
+                    new_images_key = f"new_images_file_{i}"
                     # Check for saved images first
-                    if pack_images_data and 'keys' in pack_images_data and new_images_key in pack_images_data['keys']:
-                        saved_images = pack_images_data['keys'][new_images_key]['images']
+                    if pack_images_data and "keys" in pack_images_data and new_images_key in pack_images_data["keys"]:
+                        saved_images = pack_images_data["keys"][new_images_key]["images"]
                         if saved_images:
                             logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                             meta[new_images_key] = []
                             for img in saved_images:
-                                meta[new_images_key].append({
-                                    'img_url': img.get('img_url', ''),
-                                    'raw_url': img.get('raw_url', ''),
-                                    'web_url': img.get('web_url', '')
-                                })
-                    if new_images_key in meta and meta[new_images_key]:
+                                meta[new_images_key].append({"img_url": img.get("img_url", ""), "raw_url": img.get("raw_url", ""), "web_url": img.get("web_url", "")})
+                    if meta.get(new_images_key):
                         for img in meta[new_images_key]:
-                            raw_url = img['raw_url']
+                            raw_url = img["raw_url"]
                             desc.write(f"[img]{raw_url}[/img]\n")
                         desc.write("\n")
                     else:
                         meta.retry_count = meta.retry_count + 1
                         meta[new_images_key] = []
-                        new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"FILE_{i}-*.png"))]
+                        new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"FILE_{i}-*.png")]
                         if not new_screens:
                             try:
                                 await self.takescreens_manager.screenshots(file, f"FILE_{i}", meta.uuid, meta.base_dir, meta, multi_screens, True, "")
                             except Exception as e:
                                 logger.info(f"Error during generic screenshot capture: {e}", extra={"markup": False})
-                        new_screens = [os.path.basename(f) for f in glob.glob(os.path.join(f"{meta.base_dir}/tmp/{meta.uuid}", f"FILE_{i}-*.png"))]
+                        new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"FILE_{i}-*.png")]
                         if new_screens and not meta.skip_imghost_upload:
-                            uploaded_images, _ = await self.uploadscreens_manager.upload_screens(meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts)
+                            uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
+                                meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts
+                            )
                             if uploaded_images and not meta.skip_imghost_upload:
                                 await self.save_image_links(meta, new_images_key, uploaded_images)
                             for img in uploaded_images:
-                                meta[new_images_key].append({
-                                    'img_url': img['img_url'],
-                                    'raw_url': img['raw_url'],
-                                    'web_url': img['web_url']
-                                })
-                                raw_url = img['raw_url']
+                                meta[new_images_key].append({"img_url": img["img_url"], "raw_url": img["raw_url"], "web_url": img["web_url"]})
+                                raw_url = img["raw_url"]
                                 desc.write(f"[img]{raw_url}[/img]\n")
                             desc.write("\n")
 
-                    meta_filename = f"{meta.base_dir}/tmp/{meta.uuid}/meta.json"
-                    async with aiofiles.open(meta_filename, 'w', encoding='utf-8') as f:
+                    meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
+                    async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
                         await f.write(json.dumps(meta.to_dict(), indent=4))
 
         async with aiofiles.open(
-            f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
+            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
             "w",
             encoding="utf-8",
         ) as desc_file:
@@ -1348,34 +1326,28 @@ class PTP:
             logger.info("[yellow]No image links to save.[/yellow]")
             return None
 
-        output_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
-        os.makedirs(output_dir, exist_ok=True)
-        output_file = os.path.join(output_dir, "pack_image_links.json")
+        output_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        output_file = Path(output_dir) / "pack_image_links.json"
 
         # Load existing data if the file exists
         existing_data: dict[str, Any] = {}
-        if os.path.exists(output_file):
+        if Path(output_file).exists():
             try:
-                async with aiofiles.open(output_file, encoding='utf-8') as f:
+                async with aiofiles.open(output_file, encoding="utf-8") as f:
                     content = await f.read()
                     existing_data = cast(dict[str, Any], json.loads(content)) if content.strip() else {}
             except Exception as e:
-                logger.warning(f"[yellow]Warning: Could not load existing image data: {str(e)}[/yellow]")
+                logger.warning(f"[yellow]Warning: Could not load existing image data: {e!s}[/yellow]")
 
         # Create data structure if it doesn't exist yet
         if not existing_data:
-            existing_data = {
-                "keys": {},
-                "total_count": 0
-            }
+            existing_data = {"keys": {}, "total_count": 0}
 
         # Update the data with the new images under the specific key
         keys = cast(dict[str, Any], existing_data.get("keys", {}))
         if image_key not in keys:
-            keys[image_key] = {
-                "count": 0,
-                "images": []
-            }
+            keys[image_key] = {"count": 0, "images": []}
             existing_data["keys"] = keys
 
         # Add new images to the specific key
@@ -1394,7 +1366,7 @@ class PTP:
         existing_data["total_count"] = sum(cast(dict[str, Any], key_data).get("count", 0) for key_data in keys.values())
 
         try:
-            async with aiofiles.open(output_file, 'w', encoding='utf-8') as f:
+            async with aiofiles.open(output_file, "w", encoding="utf-8") as f:
                 await f.write(json.dumps(existing_data, indent=2))
 
             logger.debug(f"[green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
@@ -1406,13 +1378,13 @@ class PTP:
             return None
 
     async def get_AntiCsrfToken(self, meta: Meta) -> str:
-        if not os.path.exists(f"{meta.base_dir}/data/cookies"):
+        if not Path(f"{meta.base_dir}/data/cookies").exists():
             Path(f"{meta.base_dir}/data/cookies").mkdir(parents=True, exist_ok=True)
         cookiefile = f"{meta.base_dir}/data/cookies/PTP.json"
         loggedIn = False
         uploadresponse: httpx.Response | None = None
         cookies: dict[str, str] = {}
-        if os.path.exists(cookiefile):
+        if Path(cookiefile).exists():
             raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # pyright: ignore[reportPrivateUsage]
             cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
@@ -1421,8 +1393,7 @@ class PTP:
                 if loggedIn is True:
                     token_match = re.search(r'data-AntiCsrfToken="(.*)"', uploadresponse.text)
                     if token_match:
-                        AntiCsrfToken = token_match.group(1)
-                        return AntiCsrfToken
+                        return token_match.group(1)
             # Cookies are expired/invalid — discard them so the login POST is clean
             logger.info("[yellow]PTP session expired. Clearing cookies and re-authenticating.")
             cookies = {}
@@ -1489,7 +1460,7 @@ class PTP:
     async def fill_upload_form(self, groupID: int | str | None, meta: Meta) -> tuple[str, dict[str, Any]]:
         resolution, other_resolution = self.get_resolution(meta)
         await self.edit_desc(meta)
-        file_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
+        file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         desc = ""
         try:
             os.stat(file_path)  # Ensures the file is accessible
@@ -1584,7 +1555,7 @@ class PTP:
         if meta.personalrelease is True:
             data["internalrip"] = "on"
         # IF SPECIAL (idk how to check for this automatically)
-            # data["special"] = "on"
+        # data["special"] = "on"
         imdb_id_value = meta.imdb_id
         imdb_id_int = imdb_id_value if isinstance(imdb_id_value, (int, str)) else 0
         if imdb_id_int == 0:
@@ -1593,7 +1564,7 @@ class PTP:
             data["imdb"] = str(imdb_id_int).zfill(7)
         if groupID is None:  # If need to make new group
             url = "https://passthepopcorn.me/upload.php"
-            if data["imdb"] == '0':
+            if data["imdb"] == "0":
                 tinfo = await self.get_torrent_info_tmdb(meta)
             else:
                 imdb_value = meta.imdb or "0"
@@ -1616,7 +1587,7 @@ class PTP:
                 cover_input = cli_ui.ask_string("No Cover was found. Please input a link to a cover: \n", default="") or "".strip()
                 if not cover_input:
                     continue
-                if not cover_input.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                if not cover_input.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
                     logger.info("[red]Cover URL must end with .jpg, .jpeg, .png, or .webp")
                     continue
                 cover = await self.rehost_poster_to_selected_host(meta, cover_input)
@@ -1632,17 +1603,15 @@ class PTP:
                 new_data["year"] = meta.manual_year
             while new_data["tags"] == "":
                 if (meta.mode if meta.mode is not None else "discord") == "cli":
-                    logger.info('[yellow]Unable to match any tags')
+                    logger.info("[yellow]Unable to match any tags")
                     logger.info("Valid tags can be found on the PTP upload form")
                     new_data["tags"] = console.input("Please enter at least one tag. Comma separated (action, animation, short):")
             data.update(new_data)
             imdb_info = meta.imdb_info
             directors: list[str] | tuple[str, ...] | None = None
-            directors_value = imdb_info.get('directors')
+            directors_value = imdb_info.get("directors")
             if isinstance(directors_value, (list, tuple)):
-                director_names = [
-                    director for director in cast(list[Any], directors_value) if isinstance(director, str)
-                ]
+                director_names = [director for director in cast(list[Any], directors_value) if isinstance(director, str)]
                 directors = tuple(director_names)
             if directors:
                 data["artist[]"] = directors
@@ -1656,7 +1625,7 @@ class PTP:
     async def upload(self, meta: Meta, url: str, data: dict[str, Any]) -> bool:
         common = COMMON(config=self.config)
         base_piece_mb = meta.base_torrent_piece_mb or 0
-        torrent_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
+        torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
 
         # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
         if base_piece_mb > 16 and not meta.nohash:
@@ -1665,8 +1634,8 @@ class PTP:
             piece_size = 16
             torrent_create = f"[{self.tracker}]"
             try:
-                cooldown = int(self.config.get('DEFAULT', {}).get('rehash_cooldown', 0) or 0)
-            except (ValueError, TypeError):
+                cooldown = int(self.config.get("DEFAULT", {}).get("rehash_cooldown", 0) or 0)
+            except ValueError, TypeError:
                 cooldown = 0
             if cooldown > 0:
                 await asyncio.sleep(cooldown)  # Small cooldown before rehashing
@@ -1677,11 +1646,9 @@ class PTP:
             await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         # Proceed with the upload process
-        async with aiofiles.open(torrent_file_path, 'rb') as torrentFile:
+        async with aiofiles.open(torrent_file_path, "rb") as torrentFile:
             torrent_bytes = await torrentFile.read()
-        files = {
-            "file_input": ("placeholder.torrent", torrent_bytes, "application/x-bittorent")
-        }
+        files = {"file_input": ("placeholder.torrent", torrent_bytes, "application/x-bittorent")}
         headers = {
             # 'ApiUser' : self.api_user,
             # 'api_key' : self.api_key,
@@ -1690,45 +1657,44 @@ class PTP:
         if meta.debug:
             debug_data = data.copy()
             # Redact the AntiCsrfToken
-            if 'AntiCsrfToken' in debug_data:
-                debug_data['AntiCsrfToken'] = '[REDACTED]'
+            if "AntiCsrfToken" in debug_data:
+                debug_data["AntiCsrfToken"] = "[REDACTED]"
             logger.debug(url)
             logger.debug(Redaction.redact_private_info(debug_data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
-        else:
-            failure_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]PTP_upload_failure.html"
-            cookiefile = f"{meta.base_dir}/data/cookies/PTP.json"
-            raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # pyright: ignore[reportPrivateUsage]
-            cookies = {name: str(data.get('value', '')) for name, data in raw_cookies.items()}
-            async with httpx.AsyncClient(cookies=cookies, timeout=60.0, follow_redirects=True) as client:
-                response = await client.post(url=url, data=data, headers=headers, files=files)
-            logger.info(f"[cyan]{response.url}")
-            responsetext = response.text
-            # If the response contains our announce URL, then we are on the upload page and the upload wasn't successful.
-            if responsetext.find(self.announce_url) != -1:
-                # Get the error message.
-                errorMessage = ""
-                match = re.search(r"""<div class="alert alert--error.*?>(.+?)</div>""", responsetext)
-                if match is not None:
-                    errorMessage = match.group(1)
+        failure_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]PTP_upload_failure.html"
+        cookiefile = f"{meta.base_dir}/data/cookies/PTP.json"
+        raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # pyright: ignore[reportPrivateUsage]
+        cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
+        async with httpx.AsyncClient(cookies=cookies, timeout=60.0, follow_redirects=True) as client:
+            response = await client.post(url=url, data=data, headers=headers, files=files)
+        logger.info(f"[cyan]{response.url}")
+        responsetext = response.text
+        # If the response contains our announce URL, then we are on the upload page and the upload wasn't successful.
+        if responsetext.find(self.announce_url) != -1:
+            # Get the error message.
+            errorMessage = ""
+            match = re.search(r"""<div class="alert alert--error.*?>(.+?)</div>""", responsetext)
+            if match is not None:
+                errorMessage = match.group(1)
 
-                async with aiofiles.open(failure_path, 'w', encoding='utf-8') as f:
-                    await f.write(responsetext)
-                meta.tracker_status[self.tracker]["status_message"] = f"data error: see {failure_path} | {errorMessage}"
+            async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
+                await f.write(responsetext)
+            meta.tracker_status[self.tracker]["status_message"] = f"data error: see {failure_path} | {errorMessage}"
 
-            # URL format in case of successful upload: https://passthepopcorn.me/torrents.php?id=9329&torrentid=91868
-            match = re.match(r".*?passthepopcorn\.me/torrents\.php\?id=(\d+)&torrentid=(\d+)", str(response.url))
-            if match is None:
-                async with aiofiles.open(failure_path, 'w', encoding='utf-8') as f:
-                    await f.write(responsetext)
-                meta.tracker_status[self.tracker]["status_message"] = f"data error: see {failure_path}"
-                return False
+        # URL format in case of successful upload: https://passthepopcorn.me/torrents.php?id=9329&torrentid=91868
+        match = re.match(r".*?passthepopcorn\.me/torrents\.php\?id=(\d+)&torrentid=(\d+)", str(response.url))
+        if match is None:
+            async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
+                await f.write(responsetext)
+            meta.tracker_status[self.tracker]["status_message"] = f"data error: see {failure_path}"
+            return False
 
-            # having UA add the torrent link as a comment.
-            if match:
-                meta.tracker_status[self.tracker]["status_message"] = str(response.url)
-                await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_url, str(response.url))
-                return True
+        # having UA add the torrent link as a comment.
+        if match:
+            meta.tracker_status[self.tracker]["status_message"] = str(response.url)
+            await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.announce_url, str(response.url))
+            return True
         return False

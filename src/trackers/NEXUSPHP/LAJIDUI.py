@@ -9,12 +9,12 @@ Config = dict[str, Any]
 
 
 class LAJIDUI(NEXUSPHP):
-    banned_groups = []
+    banned_groups = ()
     base_url = "https://pt.lajidui.top"
     source_flag = "[pt.lajidui.top] lajidui"
     torrent_url = f"{base_url}/details.php?id="
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://pt.lajidui.top']
+    tracker_urls = ("https://pt.lajidui.top",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, "LAJIDUI")
@@ -54,8 +54,7 @@ class LAJIDUI(NEXUSPHP):
             ]
             if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in game_show_keywords):
                 return tv_shows
-            else:
-                return tv_series
+            return tv_series
 
         return movies
 
@@ -79,18 +78,120 @@ class LAJIDUI(NEXUSPHP):
 
     def get_region(self, meta: Meta) -> int:
         america = [
-            'AG', 'AI', 'AR', 'AW', 'BB', 'BL', 'BM', 'BO', 'BQ', 'BR', 'BS', 'BV', 'BZ', 'CA', 'CL',
-            'CO', 'CR', 'CU', 'CW', 'DM', 'DO', 'EC', 'FK', 'GD', 'GF', 'GL', 'GP', 'GS', 'GT', 'GY',
-            'HN', 'HT', 'JM', 'KN', 'KY', 'LC', 'MF', 'MQ', 'MS', 'MX', 'NI', 'PA', 'PE', 'PM', 'PR',
-            'PY', 'SR', 'SV', 'SX', 'TC', 'TT', 'US', 'UY', 'VC', 'VE', 'VG', 'VI'
-        ]  # fmt: off
+            "AG",
+            "AI",
+            "AR",
+            "AW",
+            "BB",
+            "BL",
+            "BM",
+            "BO",
+            "BQ",
+            "BR",
+            "BS",
+            "BV",
+            "BZ",
+            "CA",
+            "CL",
+            "CO",
+            "CR",
+            "CU",
+            "CW",
+            "DM",
+            "DO",
+            "EC",
+            "FK",
+            "GD",
+            "GF",
+            "GL",
+            "GP",
+            "GS",
+            "GT",
+            "GY",
+            "HN",
+            "HT",
+            "JM",
+            "KN",
+            "KY",
+            "LC",
+            "MF",
+            "MQ",
+            "MS",
+            "MX",
+            "NI",
+            "PA",
+            "PE",
+            "PM",
+            "PR",
+            "PY",
+            "SR",
+            "SV",
+            "SX",
+            "TC",
+            "TT",
+            "US",
+            "UY",
+            "VC",
+            "VE",
+            "VG",
+            "VI",
+        ]
 
         europe = [
-            'AD', 'AL', 'AT', 'AX', 'BA', 'BE', 'BG', 'BY', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI',
-            'FO', 'FR', 'GB', 'GG', 'GI', 'GR', 'HR', 'HU', 'IE', 'IM', 'IS', 'IT', 'JE', 'LI', 'LT',
-            'LU', 'LV', 'MC', 'MD', 'ME', 'MK', 'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'RU', 'SE',
-            'SI', 'SJ', 'SK', 'SM', 'SU', 'UA', 'VA', 'XC'
-        ]  # fmt: off
+            "AD",
+            "AL",
+            "AT",
+            "AX",
+            "BA",
+            "BE",
+            "BG",
+            "BY",
+            "CH",
+            "CZ",
+            "DE",
+            "DK",
+            "EE",
+            "ES",
+            "FI",
+            "FO",
+            "FR",
+            "GB",
+            "GG",
+            "GI",
+            "GR",
+            "HR",
+            "HU",
+            "IE",
+            "IM",
+            "IS",
+            "IT",
+            "JE",
+            "LI",
+            "LT",
+            "LU",
+            "LV",
+            "MC",
+            "MD",
+            "ME",
+            "MK",
+            "MT",
+            "NL",
+            "NO",
+            "PL",
+            "PT",
+            "RO",
+            "RS",
+            "RU",
+            "SE",
+            "SI",
+            "SJ",
+            "SK",
+            "SM",
+            "SU",
+            "UA",
+            "VA",
+            "XC",
+        ]
 
         country = meta.origin_country[0].upper()
         if country in america or country in europe:

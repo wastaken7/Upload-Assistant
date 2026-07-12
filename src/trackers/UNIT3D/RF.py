@@ -12,17 +12,17 @@ Config = dict[str, Any]
 class RF(UNIT3D):
     tracker = "RF"
     base_url = "https://reelflix.cc"
-    banned_groups = []
+    banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     requests_url = f"{base_url}/api/requests/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("MOVIE",)
-    tracker_urls = ['https://reelflix.xyz', 'https://reelflix.cc']
+    tracker_urls = ("https://reelflix.xyz", "https://reelflix.cc")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='RF')
+        super().__init__(config, tracker_name="RF")
         self.config: Config = config
         self.common = COMMON(config)
 
@@ -40,54 +40,42 @@ class RF(UNIT3D):
                 rf_name = re.sub(f"-{invalid_tag}", "", rf_name, flags=re.IGNORECASE)
             rf_name = f"{rf_name}-NoGroup"
 
-        return {'name': rf_name}
+        return {"name": rf_name}
 
-    async def get_type_id(
-        self,
-        meta: Meta,
-        type: str | None = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
-            'DISC': '43',
-            'REMUX': '40',
-            'WEBDL': '42',
-            'WEBRIP': '45',
+            "DISC": "43",
+            "REMUX": "40",
+            "WEBDL": "42",
+            "WEBRIP": "45",
             # 'FANRES': '6',
-            'ENCODE': '41',
-            'HDTV': '35',
+            "ENCODE": "41",
+            "HDTV": "35",
         }
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
         type_value = type if type is not None else str(meta.type)
-        return {'type_id': type_id.get(type_value, '0')}
+        return {"type_id": type_id.get(type_value, "0")}
 
-    async def get_resolution_id(
-        self,
-        meta: Meta,
-        resolution: str | None = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
+    async def get_resolution_id(self, meta: Meta, resolution: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         resolution_id = {
             # '8640p':'10',
-            '4320p': '1',
-            '2160p': '2',
+            "4320p": "1",
+            "2160p": "2",
             # '1440p' : '3',
-            '1080p': '3',
-            '1080i': '4',
-            '720p': '5',
-            '576p': '6',
-            '576i': '7',
-            '480p': '8',
-            '480i': '9'
+            "1080p": "3",
+            "1080i": "4",
+            "720p": "5",
+            "576p": "6",
+            "576i": "7",
+            "480p": "8",
+            "480i": "9",
         }
         if mapping_only:
             return resolution_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in resolution_id.items()}
         resolution_value = resolution if resolution is not None else meta.resolution
-        return {'resolution_id': resolution_id.get(resolution_value, '10')}
+        return {"resolution_id": resolution_id.get(resolution_value, "10")}

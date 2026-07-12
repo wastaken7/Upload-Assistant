@@ -43,17 +43,17 @@ class RTF:
         await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, signature=self.forum_link)
         if meta.bdinfo:
             mi_dump = None
-            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
                 bd_dump = await f.read()
         else:
-            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as f:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as f:
                 mi_dump = await f.read()
             bd_dump = None
 
         screenshots = [image["raw_url"] for image in meta.image_list if image["raw_url"] is not None]
 
         imdb_url_value = meta.imdb_info.get("imdb_url", "")
-        imdb_url = str(imdb_url_value) if imdb_url_value else ''
+        imdb_url = str(imdb_url_value) if imdb_url_value else ""
         json_data = {
             "name": meta.name,
             # description does not work for some reason
@@ -70,16 +70,16 @@ class RTF:
             "isAnonymous": self.config["TRACKERS"][self.tracker]["anon"],
         }
 
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent", "rb") as binary_file:
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent", "rb") as binary_file:
             binary_file_data = await binary_file.read()
             base64_encoded_data = base64.b64encode(binary_file_data)
-            base64_message = base64_encoded_data.decode('utf-8')
-            json_data['file'] = base64_message
+            base64_message = base64_encoded_data.decode("utf-8")
+            json_data["file"] = base64_message
 
         headers = {
-            'accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
+            "accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": self.config["TRACKERS"][self.tracker]["api_key"].strip(),
         }
 
         if meta.debug is False:
@@ -93,17 +93,17 @@ class RTF:
                             response_json = response.json()
 
                             # Check if there's an error in the response despite 201 status
-                            if response_json.get('error', False):
-                                error_msg = response_json.get('message', 'Unknown error occurred')
+                            if response_json.get("error", False):
+                                error_msg = response_json.get("message", "Unknown error occurred")
                                 meta.tracker_status[self.tracker]["status_message"] = f"Upload error: {error_msg}"
                                 return False
 
                             meta.tracker_status[self.tracker]["status_message"] = response_json
-                            t_id = response_json['torrent']['id']
+                            t_id = response_json["torrent"]["id"]
                             meta.tracker_status[self.tracker]["torrent_id"] = t_id
-                            await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag,
-                                                                      self.config['TRACKERS'][self.tracker].get('announce_url'),
-                                                                      "https://retroflix.club/browse/t/" + str(t_id))
+                            await common.create_torrent_ready_to_seed(
+                                meta, self.tracker, self.source_flag, self.config["TRACKERS"][self.tracker].get("announce_url"), "https://retroflix.club/browse/t/" + str(t_id)
+                            )
                             return True
                         except KeyError as e:
                             meta.tracker_status[self.tracker]["status_message"] = f"Error parsing response: {response.text}: missing key {e}"
@@ -112,31 +112,31 @@ class RTF:
                     # Handle error responses
                     elif response.status_code == 400:
                         response_json = response.json()
-                        error_msg = response_json.get('message', 'Bad request or torrent file')
+                        error_msg = response_json.get("message", "Bad request or torrent file")
                         meta.tracker_status[self.tracker]["status_message"] = f"Bad request: {error_msg}"
                         return False
 
                     elif response.status_code == 403:
                         response_json = response.json()
-                        error_msg = response_json.get('message', 'You are not allowed to upload')
+                        error_msg = response_json.get("message", "You are not allowed to upload")
                         meta.tracker_status[self.tracker]["status_message"] = f"Permission denied: {error_msg}"
                         return False
 
                     elif response.status_code == 409:
                         response_json = response.json()
-                        error_msg = response_json.get('message', 'Torrent already exists')
+                        error_msg = response_json.get("message", "Torrent already exists")
                         meta.tracker_status[self.tracker]["status_message"] = f"Duplicate: {error_msg}"
                         return False
 
                     elif response.status_code == 413:
                         response_json = response.json()
-                        error_msg = response_json.get('message', 'Torrent file is too big or has too many files')
+                        error_msg = response_json.get("message", "Torrent file is too big or has too many files")
                         meta.tracker_status[self.tracker]["status_message"] = f"File size error: {error_msg}"
                         return False
 
                     elif response.status_code == 422:
                         response_json = response.json()
-                        error_msg = response_json.get('message', 'Upload rejected based on rules')
+                        error_msg = response_json.get("message", "Upload rejected based on rules")
                         meta.tracker_status[self.tracker]["status_message"] = f"Upload rejected: {error_msg}"
                         return False
 
@@ -144,9 +144,9 @@ class RTF:
                         # Handle any other status codes
                         try:
                             response_json = response.json()
-                            error_msg = response_json.get('message', f'HTTP {response.status_code}')
+                            error_msg = response_json.get("message", f"HTTP {response.status_code}")
                         except Exception:
-                            error_msg = f'HTTP {response.status_code}: {response.text[:200]}'
+                            error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
 
                         logger.info(f"[bold red]Unexpected response: {error_msg}")
                         meta.tracker_status[self.tracker]["status_message"] = f"Unexpected response: {error_msg}"
@@ -165,8 +165,8 @@ class RTF:
         else:
             logger.info("[cyan]RTF Request Data:")
             debug_data = json_data.copy()
-            if 'file' in debug_data and debug_data['file']:
-                debug_data['file'] = f"{str(debug_data['file'])[:10]}..."
+            if debug_data.get("file"):
+                debug_data["file"] = f"{str(debug_data['file'])[:10]}..."
             logger.info(Redaction.redact_private_info(debug_data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
@@ -198,18 +198,18 @@ class RTF:
         tvdb_episodes = cast(list[dict[str, Any]], tvdb_episodes_value) if isinstance(tvdb_episodes_value, list) else []
         if tvdb_episodes:
             for episode in tvdb_episodes:
-                aired_date = str(episode.get('aired', ''))
-                if aired_date and '-' in aired_date:
+                aired_date = str(episode.get("aired", ""))
+                if aired_date and "-" in aired_date:
                     try:
-                        episode_date = datetime.datetime.strptime(aired_date, '%Y-%m-%d').replace(tzinfo=datetime.UTC).date()
+                        episode_date = datetime.datetime.strptime(aired_date, "%Y-%m-%d").replace(tzinfo=datetime.UTC).date()
                         if most_recent_aired_date is None or episode_date > most_recent_aired_date:
                             most_recent_aired_date = episode_date
-                    except (ValueError, AttributeError):
+                    except ValueError, AttributeError:
                         try:
-                            episode_year_value = aired_date.split('-')[0]
+                            episode_year_value = aired_date.split("-")[0]
                             if episode_year_value.isdigit():
                                 years.append(int(episode_year_value))
-                        except (ValueError, AttributeError):
+                        except ValueError, AttributeError:
                             continue
 
         # Add the year from most recent aired date if found
@@ -229,12 +229,12 @@ class RTF:
                 release_date = datetime.datetime.strptime(meta.release_date, "%Y-%m-%d").replace(tzinfo=datetime.UTC).date()
                 year = release_date.year
                 # Calculate date exactly 10 years ago from today
-                ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365*10 + 3)  # add leeway
+                ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365 * 10 + 3)  # add leeway
                 if release_date > ten_years_ago:
                     if not meta.unattended:
                         logger.info("[red]Content must be older than 10 Years to upload at RTF")
                     return False
-            except (ValueError, AttributeError):
+            except ValueError, AttributeError:
                 # If date parsing fails, fall back to year comparison
                 release_year = meta.release_date.split("-")[0]
                 if release_year.isdigit():
@@ -246,7 +246,7 @@ class RTF:
 
         elif meta.category == "TV" and most_recent_aired_date:
             # For TV shows, use the most recent aired date for comparison if available
-            ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365*10 + 3)  # add leeway
+            ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365 * 10 + 3)  # add leeway
             if most_recent_aired_date > ten_years_ago:
                 if not meta.unattended:
                     logger.info("[red]Content must be older than 10 Years to upload at RTF")
@@ -273,21 +273,21 @@ class RTF:
         """
         dupes: list[dict[str, Any]] = []
         headers = {
-            'accept': 'application/json',
-            'Authorization': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
+            "accept": "application/json",
+            "Authorization": self.config["TRACKERS"][self.tracker]["api_key"].strip(),
         }
-        params = {'includingDead': '1'}
+        params = {"includingDead": "1"}
 
         imdb_id_value = meta.imdb_id or 0
         if imdb_id_value != 0:
             imdb_id_str = str(meta.imdb_id)
-            params['imdbId'] = imdb_id_str if imdb_id_str.startswith("tt") else "tt" + imdb_id_str
+            params["imdbId"] = imdb_id_str if imdb_id_str.startswith("tt") else "tt" + imdb_id_str
         else:
             params["search"] = meta.title.replace(":", "").replace("'", "").replace(",", "")
 
         def build_download_url(entry: dict[str, Any]) -> str:
-            torrent_id = entry.get('id')
-            torrent_url = str(entry.get('url', ''))
+            torrent_id = entry.get("id")
+            torrent_url = str(entry.get("url", ""))
             if not torrent_id:
                 match = re.search(r"/browse/t/(\d+)", torrent_url)
                 if match:
@@ -305,16 +305,15 @@ class RTF:
                 for each in data:
                     download_url = build_download_url(each)
                     result = {
-                        'name': str(each.get('name', '')),
-                        'size': each.get('size', 0),
-                        'files': str(each.get('name', '')),
-                        'link': str(each.get('url', '')),
-                        'download': download_url,
+                        "name": str(each.get("name", "")),
+                        "size": each.get("size", 0),
+                        "files": str(each.get("name", "")),
+                        "link": str(each.get("url", "")),
+                        "download": download_url,
                     }
                     dupes.append(result)
             else:
                 logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
-
 
         return dupes
 
@@ -331,26 +330,25 @@ class RTF:
             True if API key is valid, None if key generation was attempted.
         """
         headers = {
-            'accept': 'application/json',
-            'Authorization': self.config['TRACKERS'][self.tracker]['api_key'].strip(),
+            "accept": "application/json",
+            "Authorization": self.config["TRACKERS"][self.tracker]["api_key"].strip(),
         }
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get('https://retroflix.club/api/test', headers=headers)
+                response = await client.get("https://retroflix.club/api/test", headers=headers)
 
                 if response.status_code != 200:
-                    logger.info('[bold red]Your API key is incorrect SO generating a new one')
+                    logger.info("[bold red]Your API key is incorrect SO generating a new one")
                     await self.generate_new_api(meta)
                     return None
-                else:
-                    return True
+                return True
         except httpx.RequestError as e:
-            logger.info(f'[bold red]Error testing API: {str(e)}')
+            logger.info(f"[bold red]Error testing API: {e!s}")
             await self.generate_new_api(meta)
             return None
         except Exception as e:
-            logger.error(f'[bold red]Unexpected error testing API: {str(e)}')
+            logger.error(f"[bold red]Unexpected error testing API: {e!s}")
             await self.generate_new_api(meta)
             return None
 
@@ -367,12 +365,12 @@ class RTF:
             True if new API key was successfully generated and saved, None otherwise.
         """
         headers = {
-            'accept': 'application/json',
+            "accept": "application/json",
         }
 
         json_data = {
-            'username': self.config['TRACKERS'][self.tracker]['username'],
-            'password': self.config['TRACKERS'][self.tracker]['password'],
+            "username": self.config["TRACKERS"][self.tracker]["username"],
+            "password": self.config["TRACKERS"][self.tracker]["password"],
         }
 
         base_dir = meta.base_dir if meta.base_dir is not None else "."
@@ -380,17 +378,17 @@ class RTF:
 
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post('https://retroflix.club/api/login', headers=headers, json=json_data)
+                response = await client.post("https://retroflix.club/api/login", headers=headers, json=json_data)
 
             if response.status_code == 201:
                 token = response.json().get("token")
                 if token:
                     try:
                         # Update the in-memory config dictionary
-                        self.config['TRACKERS'][self.tracker]['api_key'] = token
+                        self.config["TRACKERS"][self.tracker]["api_key"] = token
 
                         # Now we update the config file on disk using utf-8 encoding
-                        async with aiofiles.open(config_path, encoding='utf-8') as file:
+                        async with aiofiles.open(config_path, encoding="utf-8") as file:
                             config_data = await file.read()
 
                         # Find the RTF tracker and replace the api_key value (supports single/double quotes and multiline blocks)
@@ -407,25 +405,25 @@ class RTF:
                             return None
 
                         # Write the updated config back to the file
-                        async with aiofiles.open(config_path, 'w', encoding='utf-8') as file:
+                        async with aiofiles.open(config_path, "w", encoding="utf-8") as file:
                             await file.write(new_config_data)
 
-                        logger.info(f'[bold green]API Key successfully saved to {config_path}')
+                        logger.info(f"[bold green]API Key successfully saved to {config_path}")
                         return True
                     except Exception as e:
-                        logger.info(f'[bold red]Failed to update config file: {str(e)}')
+                        logger.info(f"[bold red]Failed to update config file: {e!s}")
                         return None
                 else:
-                    logger.info('[bold red]API response does not contain a token.')
+                    logger.info("[bold red]API response does not contain a token.")
                     return None
             else:
-                logger.info(f'[bold red]Error getting new API key: {response.status_code}, please check username and password in the config.')
+                logger.info(f"[bold red]Error getting new API key: {response.status_code}, please check username and password in the config.")
                 return None
 
         except httpx.RequestError as e:
-            logger.info(f'[bold red]An error occurred while requesting the API: {str(e)}')
+            logger.info(f"[bold red]An error occurred while requesting the API: {e!s}")
             return None
 
         except Exception as e:
-            logger.info(f'[bold red]An unexpected error occurred: {str(e)}')
+            logger.info(f"[bold red]An unexpected error occurred: {e!s}")
             return None

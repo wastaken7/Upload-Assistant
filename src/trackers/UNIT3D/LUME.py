@@ -12,14 +12,14 @@ from src.trackers.UNIT3D import UNIT3D
 class LUME(UNIT3D):
     tracker = "LUME"
     base_url = "https://luminarr.me"
-    banned_groups: list[str] = []
+    banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     requests_url = f"{base_url}/api/requests/filter"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://luminarr.me']
+    tracker_urls = ("https://luminarr.me",)
 
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name="LUME")
@@ -27,11 +27,9 @@ class LUME(UNIT3D):
         self.common = COMMON(config)
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
-        data = {
-            'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
+        return {
+            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
-
-        return data
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.is_disc not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(

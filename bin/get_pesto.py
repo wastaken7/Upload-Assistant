@@ -11,6 +11,7 @@ import httpx
 try:
     from src.console import console, logger
 except ImportError:
+
     class SimpleConsole:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
             print(message)

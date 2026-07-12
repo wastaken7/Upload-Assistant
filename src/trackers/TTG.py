@@ -2,6 +2,7 @@
 import asyncio
 import os
 import re
+from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlparse
 
@@ -30,23 +31,22 @@ class TTG:
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.username = str(config['TRACKERS']['TTG'].get('username', '')).strip()
-        self.password = str(config['TRACKERS']['TTG'].get('password', '')).strip()
-        self.passid = str(config['TRACKERS']['TTG'].get('login_question', '0')).strip()
-        self.passan = str(config['TRACKERS']['TTG'].get('login_answer', '')).strip()
-        self.uid = str(config['TRACKERS']['TTG'].get('user_id', '')).strip()
+        self.username = str(config["TRACKERS"]["TTG"].get("username", "")).strip()
+        self.password = str(config["TRACKERS"]["TTG"].get("password", "")).strip()
+        self.passid = str(config["TRACKERS"]["TTG"].get("login_question", "0")).strip()
+        self.passan = str(config["TRACKERS"]["TTG"].get("login_answer", "")).strip()
+        self.uid = str(config["TRACKERS"]["TTG"].get("user_id", "")).strip()
         self.passkey = str(config["TRACKERS"]["TTG"].get("announce_url", "")).strip().split("/")[-1]
         self.cookie_validator = CookieValidator(config)
 
     async def edit_name(self, meta: Meta) -> str:
         ttg_name = meta.name
 
-        remove_list = ['Dubbed', 'Dual-Audio']
+        remove_list = ["Dubbed", "Dual-Audio"]
         for each in remove_list:
-            ttg_name = ttg_name.replace(each, '')
-        ttg_name = ttg_name.replace('PQ10', 'HDR')
-        ttg_name = ttg_name.replace('.', '{@}')
-        return ttg_name
+            ttg_name = ttg_name.replace(each, "")
+        ttg_name = ttg_name.replace("PQ10", "HDR")
+        return ttg_name.replace(".", "{@}")
 
     async def get_type_id(self, meta: Meta) -> int:
         type_id = 0
@@ -67,29 +67,29 @@ class TTG:
                 # TV Singles
                 if resolution.startswith("720"):
                     type_id = 69  # 720p TV EU/US
-                    if lang in ('ZH', 'CN', 'CMN'):
+                    if lang in ("ZH", "CN", "CMN"):
                         type_id = 76  # Chinese
                 if resolution.startswith("1080"):
                     type_id = 70  # 1080 TV EU/US
-                    if lang in ('ZH', 'CN', 'CMN'):
+                    if lang in ("ZH", "CN", "CMN"):
                         type_id = 75  # Chinese
-                if lang in ('KR', 'KO'):
+                if lang in ("KR", "KO"):
                     type_id = 75  # Korean
-                if lang in ('JA', 'JP'):
+                if lang in ("JA", "JP"):
                     type_id = 73  # Japanese
             else:
                 # TV Packs
                 type_id = 87  # EN/US
-                if lang in ('KR', 'KO'):
+                if lang in ("KR", "KO"):
                     type_id = 99  # Korean
-                if lang in ('JA', 'JP'):
+                if lang in ("JA", "JP"):
                     type_id = 88  # Japanese
-                if lang in ('ZH', 'CN', 'CMN'):
+                if lang in ("ZH", "CN", "CMN"):
                     type_id = 90  # Chinese
 
         genres_value = str(meta.genres).lower().replace(" ", "").replace("-", "")
         keywords_value = str(meta.keywords).lower().replace(" ", "").replace("-", "")
-        if "documentary" in genres_value or 'documentary' in keywords_value:
+        if "documentary" in genres_value or "documentary" in keywords_value:
             if resolution.startswith("720"):
                 type_id = 62  # 720p
             if resolution.startswith("1080"):
@@ -106,9 +106,9 @@ class TTG:
                 type_id = 109
 
         # I guess complete packs?:
-            # 103 = TV Shows KR
-            # 101 = TV Shows JP
-            # 60 = TV Shows
+        # 103 = TV Shows KR
+        # 101 = TV Shows JP
+        # 60 = TV Shows
         return type_id
 
     async def upload(self, meta: Meta) -> bool | None:
@@ -129,35 +129,30 @@ class TTG:
 
         anon = "no" if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else "yes"
 
-        mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo else f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt"
+        mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo else f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt"
 
         async with aiofiles.open(
-            f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
+            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
             encoding="utf-8",
         ) as desc_file:
             ttg_desc = await desc_file.read()
-        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
+        torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
         filelist = meta.filelist
-        async with aiofiles.open(torrent_path, 'rb') as torrent_file:
+        async with aiofiles.open(torrent_path, "rb") as torrent_file:
             torrent_bytes = await torrent_file.read()
-        torrentFileName = unidecode(os.path.basename(meta.video).replace(" ", ".")) if len(filelist) == 1 else unidecode(os.path.basename(str(meta.path)).replace(" ", "."))
-        async with aiofiles.open(mi_path, encoding='utf-8') as mi_dump:
+        torrentFileName = unidecode(Path(meta.video).name.replace(" ", ".")) if len(filelist) == 1 else unidecode(Path(str(meta.path)).name.replace(" ", "."))
+        async with aiofiles.open(mi_path, encoding="utf-8") as mi_dump:
             mi_text = await mi_dump.read()
-        files = {
-            'file': (f"{torrentFileName}.torrent", torrent_bytes, "application/x-bittorent"),
-            'nfo': ("torrent.nfo", mi_text)
-        }
+        files = {"file": (f"{torrentFileName}.torrent", torrent_bytes, "application/x-bittorent"), "nfo": ("torrent.nfo", mi_text)}
         data: dict[str, Any] = {
-            'MAX_FILE_SIZE': '4000000',
-            'team': '',
-            'hr': 'no',
-            'name': ttg_name,
-            'type': await self.get_type_id(meta),
-            'descr': ttg_desc.rstrip(),
-
-            'anonymity': anon,
-            'nodistr': 'no',
-
+            "MAX_FILE_SIZE": "4000000",
+            "team": "",
+            "hr": "no",
+            "name": ttg_name,
+            "type": await self.get_type_id(meta),
+            "descr": ttg_desc.rstrip(),
+            "anonymity": anon,
+            "nodistr": "no",
         }
         url = "https://totheglory.im/takeupload.php"
         if meta.imdb_id or 0 != 0:
@@ -169,38 +164,36 @@ class TTG:
             logger.debug(Redaction.redact_private_info(data))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
-            tracker_status[self.tracker]['status_message'] = "Debug mode enabled, not uploading."
+            tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
-        else:
-            cookiefile = os.path.abspath(f"{meta.base_dir}/data/cookies/TTG.json")
-            raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
-            cookies = {name: str(data.get('value', '')) for name, data in raw_cookies.items()}
-            async with httpx.AsyncClient(cookies=cookies, follow_redirects=True, timeout=60.0) as client:
-                up = await client.post(url=url, data=data, files=files)
+        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/TTG.json").resolve())
+        raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
+        cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
+        async with httpx.AsyncClient(cookies=cookies, follow_redirects=True, timeout=60.0) as client:
+            up = await client.post(url=url, data=data, files=files)
 
-            if str(up.url).startswith("https://totheglory.im/details.php?id="):
-                tracker_status = meta.tracker_status
-                tracker_status.setdefault(self.tracker, {})
-                tracker_status[self.tracker]['status_message'] = str(up.url)
-                id_match = re.search(r"(id=)(\d+)", urlparse(str(up.url)).query)
-                if not id_match:
-                    raise UploadException(  # noqa #F405
-                        f"Upload to TTG succeeded but torrent id missing from URL {up.url}",
-                        'red',
-                    )
-                torrent_id = id_match.group(2)
-                await self.download_new_torrent(torrent_id, torrent_path)
-                return True
-            else:
-                logger.info(data)
-                logger.info("\n\n")
-                raise UploadException(f"Upload to TTG Failed: result URL {up.url} ({up.status_code}) was not expected", 'red')  # noqa #F405
+        if str(up.url).startswith("https://totheglory.im/details.php?id="):
+            tracker_status = meta.tracker_status
+            tracker_status.setdefault(self.tracker, {})
+            tracker_status[self.tracker]["status_message"] = str(up.url)
+            id_match = re.search(r"(id=)(\d+)", urlparse(str(up.url)).query)
+            if not id_match:
+                raise UploadException(  # noqa #F405
+                    f"Upload to TTG succeeded but torrent id missing from URL {up.url}",
+                    "red",
+                )
+            torrent_id = id_match.group(2)
+            await self.download_new_torrent(torrent_id, torrent_path)
+            return True
+        logger.info(data)
+        logger.info("\n\n")
+        raise UploadException(f"Upload to TTG Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa #F405
 
     async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
-        cookiefile = os.path.abspath(f"{meta.base_dir}/data/cookies/TTG.json")
-        if not os.path.exists(cookiefile):
+        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/TTG.json").resolve())
+        if not Path(cookiefile).exists():
             logger.info("[bold red]Cookie file not found: TTG.json")
             return []
         cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
@@ -218,11 +211,11 @@ class TTG:
         async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
             response = await client.get(search_url)
             if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                find = soup.find_all('a', href=True)
+                soup = BeautifulSoup(response.text, "html.parser")
+                find = soup.find_all("a", href=True)
                 for each in find:
-                    href_value = each.get('href')
-                    if isinstance(href_value, str) and href_value.startswith('/t/'):
+                    href_value = each.get("href")
+                    if isinstance(href_value, str) and href_value.startswith("/t/"):
                         release = re.search(r"(<b>)(<font.*>)?(.*)<br", str(each))
                         if release:
                             dupes.append(release.group(3))
@@ -231,70 +224,58 @@ class TTG:
 
             await asyncio.sleep(0.5)
 
-
         return dupes
 
     async def validate_credentials(self, meta: Meta) -> bool:
-        cookiefile = os.path.abspath(f"{meta.base_dir}/data/cookies/TTG.pkl")
-        if not os.path.exists(cookiefile):
+        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/TTG.pkl").resolve())
+        if not Path(cookiefile).exists():
             await self.login(cookiefile)
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
-            logger.error('[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.')
+            logger.error("[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
             recreate = cli_ui.ask_yes_no("Log in again and create new session?")
             if recreate is True:
-                if os.path.exists(cookiefile):
+                if Path(cookiefile).exists():
                     os.remove(cookiefile)
                 await self.login(cookiefile)
-                vcookie = await self.validate_cookies(meta, cookiefile)
-                return vcookie
-            else:
-                return False
+                return await self.validate_cookies(meta, cookiefile)
+            return False
         return True
 
     async def validate_cookies(self, meta: Meta, cookiefile: str) -> bool:  # noqa: ARG002
         url = "https://totheglory.im"
-        if os.path.exists(cookiefile):
+        if Path(cookiefile).exists():
             raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
-            cookies = {name: str(data.get('value', '')) for name, data in raw_cookies.items()}
+            cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
                 resp = await client.get(url=url)
                 logger.debug("[cyan]Cookies:")
                 logger.debug(resp.url)
-                return resp.text.find('''<a href="/logout.php">Logout</a>''') != -1
+                return resp.text.find("""<a href="/logout.php">Logout</a>""") != -1
         else:
             return False
 
     async def login(self, cookiefile: str) -> None:
         url = "https://totheglory.im/takelogin.php"
-        data: dict[str, Any] = {
-            'username': self.username,
-            'password': self.password,
-            'passid': self.passid,
-            'passan': self.passan
-        }
+        data: dict[str, Any] = {"username": self.username, "password": self.password, "passid": self.passid, "passan": self.passan}
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.post(url, data=data)
             await asyncio.sleep(0.5)
-            if str(response.url).endswith('2fa.php'):
-                soup = BeautifulSoup(response.text, 'html.parser')
-                token_input = soup.find('input', {'name': 'authenticity_token'})
-                auth_token = token_input.get('value') if token_input else None
+            if str(response.url).endswith("2fa.php"):
+                soup = BeautifulSoup(response.text, "html.parser")
+                token_input = soup.find("input", {"name": "authenticity_token"})
+                auth_token = token_input.get("value") if token_input else None
                 if not auth_token:
-                    raise UploadException('Missing authenticity token during TTG login', 'red')  # noqa #F405
-                two_factor_data = {
-                    'otp': console.input('[yellow]TTG 2FA Code: '),
-                    'authenticity_token': auth_token,
-                    'uid': self.uid
-                }
+                    raise UploadException("Missing authenticity token during TTG login", "red")  # noqa #F405
+                two_factor_data = {"otp": console.input("[yellow]TTG 2FA Code: "), "authenticity_token": auth_token, "uid": self.uid}
                 two_factor_url = "https://totheglory.im/take2fa.php"
                 response = await client.post(two_factor_url, data=two_factor_data)
                 await asyncio.sleep(0.5)
-            if str(response.url).endswith('my.php'):
-                logger.info('[green]Successfully logged into TTG')
+            if str(response.url).endswith("my.php"):
+                logger.info("[green]Successfully logged into TTG")
                 self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # type: ignore[reportPrivateUsage]
             else:
-                logger.info('[bold red]Something went wrong')
+                logger.info("[bold red]Something went wrong")
                 await asyncio.sleep(1)
                 logger.info(response.text)
                 logger.info(response.url)
@@ -302,19 +283,20 @@ class TTG:
 
     async def edit_desc(self, meta: Meta) -> None:
         async with aiofiles.open(
-            f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt",
+            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt",
             encoding="utf-8",
         ) as base_file:
             base = await base_file.read()
 
         from src.bbcode import BBCODE
         from src.trackers.COMMON import COMMON
+
         common = COMMON(config=self.config)
 
         parts: list[str] = []
         if meta.imdb_id or 0 != 0:
             ptgen = await common.ptgen(meta)
-            if ptgen.strip() != '':
+            if ptgen.strip() != "":
                 parts.append(ptgen)
 
         # Add This line for all web-dls
@@ -326,19 +308,19 @@ class TTG:
         if meta.discs != []:
             discs = cast(list[dict[str, Any]], meta.discs)
             for each in discs:
-                if each['type'] == "BDMV":
+                if each["type"] == "BDMV":
                     parts.append(f"[quote={each.get('name', 'BDINFO')}]{each['summary']}[/quote]\n")
                     parts.append("\n")
-                if each['type'] == "DVD":
+                if each["type"] == "DVD":
                     parts.append(f"{each.get('name', '')}:\n")
                     parts.append(
-                        f"[quote={os.path.basename(str(each.get('vob', '')))}][{each.get('vob_mi', '')}[/quote] "
-                        f"[quote={os.path.basename(str(each.get('ifo', '')))}][{each.get('ifo_mi', '')}[/quote]\n"
+                        f"[quote={Path(str(each.get('vob', ''))).name}][{each.get('vob_mi', '')}[/quote] "
+                        f"[quote={Path(str(each.get('ifo', ''))).name}][{each.get('ifo_mi', '')}[/quote]\n"
                     )
                     parts.append("\n")
         else:
             async with aiofiles.open(
-                f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt",
+                f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt",
                 encoding="utf-8",
             ) as mi_file:
                 mi = await mi_file.read()
@@ -348,7 +330,7 @@ class TTG:
         desc = bbcode.convert_code_to_quote(desc)
         desc = bbcode.convert_spoiler_to_hide(desc)
         desc = bbcode.convert_comparison_to_centered(desc, 1000)
-        desc = desc.replace('[img]', '[img]')
+        desc = desc.replace("[img]", "[img]")
         desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
         parts.append(desc)
         images = meta.image_list
@@ -356,8 +338,8 @@ class TTG:
             parts.append("[center]")
             screens = meta.screens or 0
             for each in range(len(images[:screens])):
-                web_url = images[each].get('web_url')
-                img_url = images[each].get('img_url')
+                web_url = images[each].get("web_url")
+                img_url = images[each].get("img_url")
                 if not web_url or not img_url:
                     continue
                 parts.append(f"[url={web_url}][img]{img_url}[/img][/url]")
@@ -367,7 +349,7 @@ class TTG:
             parts.append(self.signature)
 
         async with aiofiles.open(
-            f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
+            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",
             "w",
             encoding="utf-8",
         ) as descfile:

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, cast
 
@@ -174,7 +176,7 @@ class Prep:
                 return "TV"
 
         for pattern in filename_patterns:
-            if re.search(pattern, uuid) or re.search(pattern, os.path.basename(path)):
+            if re.search(pattern, uuid) or re.search(pattern, Path(path).name):
                 logger.debug(f"[cyan]Matched TV pattern in filename: {pattern}[/cyan]")
                 return "TV"
 
@@ -187,8 +189,7 @@ class Prep:
         return "MOVIE"
 
     async def stream_optimized(self, stream_opt: bool) -> int:
-        stream = 1 if stream_opt is True else 0
-        return stream
+        return 1 if stream_opt is True else 0
 
     async def parse_scene_nfo(self, meta: Meta) -> None:
         try:

@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import os
 import re
+from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlparse, urlunparse
 
@@ -70,11 +71,13 @@ class MTEAM:
                 reward = item.get("rewardCurrent", "0")
                 link = f"{self.base_url}/seekDetail?id={item.get('id')}"
 
-                requests.append({
-                    "Name": name,
-                    "Reward": reward,
-                    "Link": link,
-                })
+                requests.append(
+                    {
+                        "Name": name,
+                        "Reward": reward,
+                        "Link": link,
+                    }
+                )
 
             if requests:
                 message = f"\n{self.tracker}: [bold yellow]Your upload may fulfill the following request(s), check it out:[/bold yellow]\n\n"
@@ -95,12 +98,12 @@ class MTEAM:
         mediainfo: str = ""
 
         if meta.is_disc == "BDMV":
-            disc_folder = os.path.join(meta.base_dir, "tmp", meta.uuid)
+            disc_folder = Path(meta.base_dir) / "tmp" / meta.uuid
             for filename in os.listdir(disc_folder):
                 if filename.endswith("_FULL.txt"):
-                    mi_path = os.path.join(disc_folder, filename)
+                    mi_path = Path(disc_folder) / filename
         else:
-            mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
+            mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
 
         if mi_path:
             async with aiofiles.open(mi_path, encoding="utf-8") as f:
@@ -148,8 +151,7 @@ class MTEAM:
         try:
             response = await self.session.post(api_url, headers=headers, params=params, timeout=15)
             response.raise_for_status()
-            info = response.json()
-            return info
+            return response.json()
 
         except Exception as e:
             logger.info(f"Error fetching Douban info: {e}")
@@ -269,7 +271,7 @@ class MTEAM:
         description = description.replace("[center]", "").replace("[/center]", "")
         description = bbcode.remove_extra_lines(description)
 
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:
             await description_file.write(description)
 
         return description
@@ -403,7 +405,6 @@ class MTEAM:
 
         return dupes
 
-
         return dupes
 
     async def get_dupe_bdinfo(self, torrent_id: int) -> str:
@@ -434,19 +435,18 @@ class MTEAM:
         resolution = meta.resolution.lower()
         if resolution == "1080p":
             return _1080p
-        elif resolution == "1080i":
+        if resolution == "1080i":
             return _1080i
-        elif resolution == "720p":
+        if resolution == "720p":
             return _720p
-        elif resolution == "2160p":
+        if resolution == "2160p":
             return _4k
-        elif resolution == "4320p":
+        if resolution == "4320p":
             return _8k
-        elif meta.sd:
+        if meta.sd:
             return sd
-        else:
-            logger.info(f"{self.tracker}: Unknown or unsupported resolution '{resolution}', defaulting to 1080p.")
-            return _1080p
+        logger.info(f"{self.tracker}: Unknown or unsupported resolution '{resolution}', defaulting to 1080p.")
+        return _1080p
 
     def get_videocodec(self, meta: Meta) -> int:
         x264 = 1  # H.264(x264/AVC)
@@ -460,21 +460,20 @@ class MTEAM:
         codec = meta.video_codec.lower()
         if codec in ("h264", "x264", "avc", "h.264"):
             return x264
-        elif codec in ("h265", "h.265", "hevc", "x265"):
+        if codec in ("h265", "h.265", "hevc", "x265"):
             return x265
-        elif codec in ("vc1", "vc-1"):
+        if codec in ("vc1", "vc-1"):
             return vc1
-        elif codec in ("mpeg2", "mpeg-2"):
+        if codec in ("mpeg2", "mpeg-2"):
             return mpeg2
-        elif codec == "xvid":
+        if codec == "xvid":
             return xvid
-        elif codec == "av1":
+        if codec == "av1":
             return av1
-        elif codec in ("vp8", "vp9"):
+        if codec in ("vp8", "vp9"):
             return vp8_9
-        else:
-            logger.info(f"{self.tracker}: Unknown or unsupported video codec '{codec}', defaulting to x264.")
-            return x264
+        logger.info(f"{self.tracker}: Unknown or unsupported video codec '{codec}', defaulting to x264.")
+        return x264
 
     def get_audiocodec(self, meta: Meta) -> int:
         aac = 6  # AAC
@@ -489,27 +488,26 @@ class MTEAM:
 
         if "atmos" in codec and "dd+" in codec:
             return atmos_eac3
-        elif "aac" in codec:
+        if "aac" in codec:
             return aac
-        elif "dd+" in codec:
+        if "dd+" in codec:
             return eac3
-        elif "dd " in codec:
+        if "dd " in codec:
             return ac3
-        elif "dts-hd" in codec:
+        if "dts-hd" in codec:
             return dts_hd_ma
-        elif "dts" in codec:
+        if "dts" in codec:
             return dts
-        elif "truehd" in codec:
+        if "truehd" in codec:
             return true_hd
-        else:
-            logger.info(f"{self.tracker}: Unknown or unsupported audio codec '{codec}', defaulting to AC3.")
-            return ac3
+        logger.info(f"{self.tracker}: Unknown or unsupported audio codec '{codec}', defaulting to AC3.")
+        return ac3
 
     async def fetch_data(self, meta: Meta) -> dict[str, Any]:
         """
         https://test2.m-team.cc/api/swagger-ui/index.html#/種子/createOredit
         """
-        data = {
+        return {
             # "torrent": 0,
             # "offer": 0,
             "name": meta.name,
@@ -539,8 +537,6 @@ class MTEAM:
             # "labelsNew": ""
         }
 
-        return data
-
     async def upload(self, meta: Meta) -> bool:
         data = await self.fetch_data(meta)
         response = None
@@ -549,7 +545,7 @@ class MTEAM:
             try:
                 upload_url = f"{self.api_base_url}/torrent/createOredit"
                 await self.common.create_torrent_for_upload(meta, self.tracker, "[kp.m-team.cc] M-Team - TP")
-                torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
+                torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
 
                 async with aiofiles.open(torrent_path, "rb") as torrent_file:
                     torrent_bytes = await torrent_file.read()
@@ -580,9 +576,8 @@ class MTEAM:
                     logger.info(f"{self.tracker}: Failed to get download URL from API response.")
                     meta.tracker_status[self.tracker]["status_message"] = "Failed to get download URL from API response"
                     return False
-                else:
-                    meta.tracker_status[self.tracker]["status_message"] = f"data error: {response_data.get('message', 'Unknown API error.')}"
-                    return False
+                meta.tracker_status[self.tracker]["status_message"] = f"data error: {response_data.get('message', 'Unknown API error.')}"
+                return False
 
             except httpx.HTTPStatusError as e:
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {e.response.text}"

@@ -1,5 +1,6 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
+import contextlib
 import datetime
 import html
 import io
@@ -7,6 +8,7 @@ import os
 import re
 import shutil
 import sys
+from pathlib import Path
 from typing import Any
 
 import aiofiles
@@ -64,13 +66,13 @@ def extract_version_from_text(text: str) -> str | None:
 
 
 def extract_version_from_nfo(nfo_path: str) -> str | None:
-    try:
+    with contextlib.suppress(Exception):
         content = ""
         try:
-            with open(nfo_path, encoding="utf-8") as f:
+            with Path(nfo_path).open(encoding="utf-8") as f:
                 content = f.read()
         except Exception:
-            with open(nfo_path, encoding="latin-1") as f:
+            with Path(nfo_path).open(encoding="latin-1") as f:
                 content = f.read()
 
         lines = content.splitlines()
@@ -102,8 +104,6 @@ def extract_version_from_nfo(nfo_path: str) -> str | None:
                     continue
                 if any(w in line.lower() for w in ("version", "ver", "build", "v.", "v ")):
                     return normalize_version(candidate)
-    except Exception:
-        pass
     return None
 
 
@@ -146,7 +146,7 @@ async def get_7z_path(base_dir: str, config: dict[str, Any] | None = None) -> st
     # 1. Check config for 7z_path
     if config and "DEFAULT" in config:
         config_path = config["DEFAULT"].get("7z_path", "").strip()
-        if config_path and os.path.exists(config_path):
+        if config_path and Path(config_path).exists():
             return config_path
 
     # 2. Check system PATH
@@ -155,14 +155,12 @@ async def get_7z_path(base_dir: str, config: dict[str, Any] | None = None) -> st
         return sys_7z
 
     # 3. Use manager fallback
-    try:
+    with contextlib.suppress(Exception):
         from bin.get_7z import SevenZipBinaryManager
 
         binary_path = await SevenZipBinaryManager.ensure_7z_binary(base_dir)
-        if binary_path and os.path.exists(binary_path):
+        if binary_path and Path(binary_path).exists():
             return binary_path
-    except Exception:
-        pass
 
     return None
 
@@ -197,7 +195,7 @@ async def detect_platform_from_files(
     for f in filelist:
         p = f.replace("\\", "/").lower()
         files_lower.append(p)
-        basenames_lower.append(os.path.basename(p))
+        basenames_lower.append(Path(p).name)
 
     # --- Pre-check archives and ISO contents using 7z if available ---
     archive_exts = (".zip", ".rar", ".7z", ".iso", ".tar", ".gz")
@@ -205,18 +203,18 @@ async def detect_platform_from_files(
     if archives and base_dir:
         binary_path = await get_7z_path(base_dir, config)
         if binary_path:
-            is_7zr = "7zr" in os.path.basename(binary_path).lower()
+            is_7zr = "7zr" in Path(binary_path).name.lower()
             for archive in archives:
                 # 7zr fallback only supports 7z archives
                 if is_7zr and not archive.lower().endswith(".7z"):
                     continue
 
-                logger.info(f"[cyan]7-Zip: Inspecting contents of archive/ISO: {os.path.basename(archive)}...[/cyan]")
+                logger.info(f"[cyan]7-Zip: Inspecting contents of archive/ISO: {Path(archive).name}...[/cyan]")
                 archive_contents = await list_archive_contents_with_7z(archive, binary_path)
                 for path_val in archive_contents:
                     p = path_val.replace("\\", "/").lower()
                     files_lower.append(p)
-                    basenames_lower.append(os.path.basename(p))
+                    basenames_lower.append(Path(p).name)
 
     # --- 1. Extension and specific file/folder pattern checks ---
 
@@ -302,7 +300,7 @@ async def detect_platform_from_files(
     # --- 2. Basename/Path text keyword checks (if no extensions matched) ---
     path_to_search = path_to_check or (filelist[0] if filelist else "")
     if path_to_search:
-        basename = os.path.basename(path_to_search).lower()
+        basename = Path(path_to_search).name.lower()
         normalized_basename = basename.replace(".", " ").replace("-", " ").replace("_", " ").replace("[", " ").replace("]", " ")
 
         nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
@@ -345,10 +343,10 @@ def resolve_game_filelist(
     and falls back to the largest file.
     """
     filelist: list[str] = []
-    if os.path.isdir(videoloc):
+    if Path(videoloc).is_dir():
         for root, _, files in os.walk(videoloc):
             for file in files:
-                filelist.append(os.path.abspath(os.path.join(root, file)))  # noqa: PERF401
+                filelist.append(str(Path(Path(root) / file).resolve()))  # noqa: PERF401
         filelist = sorted(filelist)
         if not filelist:
             logger.info("[bold red]No game files found!")
@@ -374,7 +372,7 @@ def resolve_game_filelist(
     meta.filelist = filelist
     meta.imdb_id = 0
 
-    search_term = os.path.basename(filelist[0]) if filelist else ""
+    search_term = Path(filelist[0]).name if filelist else ""
     search_file_folder = "file"
     return videopath, filelist, search_term, search_file_folder
 
@@ -400,7 +398,7 @@ async def gather_game_prep(
 
     cli_overrides = {
         "title": bool(meta.title),
-        "year": "manual_year" in meta and meta.manual_year or 0 > 0,
+        "year": ("manual_year" in meta and meta.manual_year) or 0 > 0,
         "platform": bool(meta.manual_platform),
     }
 
@@ -431,9 +429,9 @@ async def gather_game_prep(
     else:
         # Attempt to extract from directory name first
         if path_to_check:
-            search_dir = path_to_check if os.path.isdir(path_to_check) else os.path.dirname(path_to_check)
+            search_dir = path_to_check if Path(path_to_check).is_dir() else os.path.dirname(path_to_check)
             if search_dir:
-                folder_name = os.path.basename(search_dir)
+                folder_name = Path(search_dir).name
                 version = extract_version_from_text(folder_name)
                 if version and meta.debug:
                     logger.info(f"[green]Game version extracted from directory name: {version}[/green]")
@@ -442,21 +440,19 @@ async def gather_game_prep(
         if not version:
             nfo_files = [f for f in meta.filelist if f.lower().endswith(".nfo")]
             if path_to_check:
-                search_dir = path_to_check if os.path.isdir(path_to_check) else os.path.dirname(path_to_check)
-                if os.path.isdir(search_dir):
-                    try:
+                search_dir = path_to_check if Path(path_to_check).is_dir() else os.path.dirname(path_to_check)
+                if Path(search_dir).is_dir():
+                    with contextlib.suppress(Exception):
                         for f in os.listdir(search_dir):
                             if f.lower().endswith(".nfo"):
-                                abs_f = os.path.abspath(os.path.join(search_dir, f))
+                                abs_f = str(Path(Path(search_dir) / f).resolve())
                                 if abs_f not in nfo_files:
                                     nfo_files.append(abs_f)
-                    except Exception:
-                        pass
 
             for nfo_path in nfo_files:
                 version = extract_version_from_nfo(nfo_path)
                 if version:
-                    logger.info(f"[green]Game version extracted from NFO file ({os.path.basename(nfo_path)}): {version}[/green]")
+                    logger.info(f"[green]Game version extracted from NFO file ({Path(nfo_path).name}): {version}[/green]")
                     break
 
     if version:
@@ -482,7 +478,7 @@ async def gather_game_prep(
     # Use title in meta (cleaned folder/file name) or extract from videopath
     title_query = meta.title or meta.filename
     if not title_query and videopath:
-        title_query = os.path.splitext(os.path.basename(videopath))[0]
+        title_query = os.path.splitext(Path(videopath).name)[0]
 
     # Clean game release suffixes to get a clean search term for IGDB
     if title_query:
@@ -538,16 +534,14 @@ async def gather_game_prep(
         # Also check the input directory or directory containing the file
         path_to_check = meta.path or videopath
         if path_to_check:
-            search_dir = path_to_check if os.path.isdir(path_to_check) else os.path.dirname(path_to_check)
-            if os.path.isdir(search_dir):
-                try:
+            search_dir = path_to_check if Path(path_to_check).is_dir() else os.path.dirname(path_to_check)
+            if Path(search_dir).is_dir():
+                with contextlib.suppress(Exception):
                     for f in os.listdir(search_dir):
                         if f.lower().endswith(".nfo"):
-                            abs_f = os.path.abspath(os.path.join(search_dir, f))
+                            abs_f = str(Path(Path(search_dir) / f).resolve())
                             if abs_f not in nfo_files:
                                 nfo_files.append(abs_f)
-                except Exception:
-                    pass
 
         # Search for Steam link in found NFO files
         detected_steam_id = None
@@ -678,9 +672,9 @@ async def gather_game_prep(
         meta.cover_path = cover_url
 
         # Download and save cover locally as POSTER.png
-        tmp_dir = os.path.join(base_dir, "tmp", meta.uuid)
-        os.makedirs(tmp_dir, exist_ok=True)
-        poster_png_path = os.path.join(tmp_dir, "POSTER.png")
+        tmp_dir = Path(base_dir) / "tmp" / meta.uuid
+        Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+        poster_png_path = Path(tmp_dir) / "POSTER.png"
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(cover_url)
@@ -735,7 +729,7 @@ async def gather_game_prep(
                     "linux": ["linux"],
                 }
                 path_to_check = meta.path or videopath or ""
-                basename = os.path.basename(path_to_check).lower()
+                basename = Path(path_to_check).name.lower()
                 normalized_basename = basename.replace(".", " ").replace("-", " ").replace("_", " ").replace("[", " ").replace("]", " ")
                 for idx, p_name in enumerate(raw_platforms):
                     p_name_norm = p_name.lower()
@@ -878,9 +872,9 @@ async def gather_game_prep(
             meta.image_list = image_list
             import json
 
-            tmp_dir = os.path.join(base_dir, "tmp", meta.uuid)
-            os.makedirs(tmp_dir, exist_ok=True)
-            image_data_file = os.path.join(tmp_dir, "image_data.json")
+            tmp_dir = Path(base_dir) / "tmp" / meta.uuid
+            Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+            image_data_file = Path(tmp_dir) / "image_data.json"
             image_data = {"image_list": image_list, "image_sizes": {}, "tonemapped": False}
             try:
                 async with aiofiles.open(image_data_file, "w", encoding="utf-8") as img_file:

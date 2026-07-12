@@ -1,6 +1,6 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
-import os
+from pathlib import Path
 from typing import Any
 
 import aiofiles
@@ -27,8 +27,8 @@ class DS:
 
     async def search_existing(self, meta: Meta) -> list[Any]:
         release_name = await self.get_name(meta)
-        cache_file = os.path.join(meta.base_dir, "tmp", meta.uuid, f"{self.tracker}_upload_ok")
-        if release_name and os.path.exists(cache_file):
+        cache_file = Path(meta.base_dir) / "tmp" / meta.uuid / f"{self.tracker}_upload_ok"
+        if release_name and Path(cache_file).exists():
             logger.info(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
             return [release_name]
 
@@ -55,52 +55,49 @@ class DS:
 
         nzb_name = f"{await self.get_name(meta)}.nzb"
 
-        async with aiofiles.open(nzb_path, 'rb') as f:
+        async with aiofiles.open(nzb_path, "rb") as f:
             nzb_content = await f.read()
 
-        files = {
-            'files[]': (nzb_name, nzb_content, 'application/x-nzb')
-        }
+        files = {"files[]": (nzb_name, nzb_content, "application/x-nzb")}
 
         if meta.debug:
             status_dict["status_message"] = "Debug mode enabled, skipping upload."
             return True
-        else:
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(self.upload_url, files=files)
+
+            if response.status_code not in (200, 201):
+                status_dict["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
+                return False
+
             try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(self.upload_url, files=files)
-
-                if response.status_code not in (200, 201):
-                    status_dict["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
+                data = response.json()
+                results = data.get("results", [])
+                if not results:
+                    status_dict["status_message"] = "data error: No results returned from tracker."
                     return False
 
-                try:
-                    data = response.json()
-                    results = data.get("results", [])
-                    if not results:
-                        status_dict["status_message"] = "data error: No results returned from tracker."
-                        return False
+                clean_result = results[0].replace(f"{nzb_name}: ", "")
+                status_dict["status_message"] = clean_result
+                status_dict["torrent_id"] = f"{nzb_name.replace('.nzb', '')} (may take a few minutes to show up)"
 
-                    clean_result = results[0].replace(f"{nzb_name}: ", "")
-                    status_dict["status_message"] = clean_result
-                    status_dict["torrent_id"] = f"{nzb_name.replace('.nzb', '')} (may take a few minutes to show up)"
+                cache_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+                Path(cache_dir).mkdir(parents=True, exist_ok=True)
+                async with aiofiles.open(Path(cache_dir) / f"{self.tracker}_upload_ok", "w", encoding="utf-8") as cache_handle:
+                    await cache_handle.write("ok")
 
-                    cache_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
-                    os.makedirs(cache_dir, exist_ok=True)
-                    async with aiofiles.open(os.path.join(cache_dir, f"{self.tracker}_upload_ok"), "w", encoding="utf-8") as cache_handle:
-                        await cache_handle.write("ok")
-
-                    return True
-                except json.JSONDecodeError:
-                    status_dict["status_message"] = "data error: Could not decode JSON response."
-                    return False
-
-            except httpx.TimeoutException:
-                status_dict["status_message"] = "data error: Request timed out after 60 seconds"
+                return True
+            except json.JSONDecodeError:
+                status_dict["status_message"] = "data error: Could not decode JSON response."
                 return False
-            except httpx.RequestError as e:
-                status_dict["status_message"] = f"data error: Unable to upload. Error: {e}"
-                return False
-            except Exception as e:
-                status_dict["status_message"] = f"data error: Unexpected error. Error: {e}"
-                return False
+
+        except httpx.TimeoutException:
+            status_dict["status_message"] = "data error: Request timed out after 60 seconds"
+            return False
+        except httpx.RequestError as e:
+            status_dict["status_message"] = f"data error: Unable to upload. Error: {e}"
+            return False
+        except Exception as e:
+            status_dict["status_message"] = f"data error: Unexpected error. Error: {e}"
+            return False

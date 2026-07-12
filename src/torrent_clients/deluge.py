@@ -11,7 +11,7 @@ from src.console import logger
 
 class DelugeClientMixin:
     def deluge(self, path: str, torrent_path: str, torrent: Torrent, local_path: str, remote_path: str, client: dict[str, Any]) -> None:
-        deluge_client: Any = DelugeRPCClient(client['deluge_url'], int(client['deluge_port']), client['deluge_user'], client['deluge_pass'])
+        deluge_client: Any = DelugeRPCClient(client["deluge_url"], int(client["deluge_port"]), client["deluge_user"], client["deluge_pass"])
         # deluge_client = LocalDelugeRPCClient()
         deluge_client.connect()
         if deluge_client.connected:
@@ -19,11 +19,11 @@ class DelugeClientMixin:
             # Remote path mount
             if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():
                 path = path.replace(local_path, remote_path)
-                path = path.replace(os.sep, '/')
+                path = path.replace(os.sep, "/")
 
             path = os.path.dirname(path)
 
-            deluge_client.call('core.add_torrent_file', torrent_path, base64.b64encode(torrent.dump()), {'download_location': path, 'seed_mode': True})
+            deluge_client.call("core.add_torrent_file", torrent_path, base64.b64encode(torrent.dump()), {"download_location": path, "seed_mode": True})
             logger.debug(f"[cyan]Path: {path}")
         else:
             logger.info("[bold red]Unable to connect to deluge")

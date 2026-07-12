@@ -113,7 +113,7 @@ class CBR(UNIT3D):
 
         if mapping_only:
             return category_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in category_id.items()}
 
         resolved_category = category if category else meta.category
@@ -165,7 +165,7 @@ class CBR(UNIT3D):
 
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
 
         resolved_type = type if type else meta.type
@@ -188,28 +188,27 @@ class CBR(UNIT3D):
 
     async def get_resolution_id(self, meta: Meta, resolution: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         resolution_id = {
-            '4320p': '1',
-            '2160p': '2',
-            '1080p': '3',
-            '1080i': '4',
-            '720p': '5',
-            '576p': '6',
-            '576i': '7',
-            '480p': '8',
-            '480i': '9',
-            'Other': '10',
+            "4320p": "1",
+            "2160p": "2",
+            "1080p": "3",
+            "1080i": "4",
+            "720p": "5",
+            "576p": "6",
+            "576i": "7",
+            "480p": "8",
+            "480i": "9",
+            "Other": "10",
         }
 
         if mapping_only:
             return resolution_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in resolution_id.items()}
-        elif resolution:
+        if resolution:
             return {"resolution_id": resolution_id.get(resolution, "10")}
-        else:
-            meta_resolution = meta.resolution
-            resolved_id = resolution_id.get(meta_resolution, "10")
-            return {"resolution_id": resolved_id}
+        meta_resolution = meta.resolution
+        resolved_id = resolution_id.get(meta_resolution, "10")
+        return {"resolution_id": resolved_id}
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/size][/url][/right]"
@@ -316,11 +315,9 @@ class CBR(UNIT3D):
         return {"name": re.sub(r"\s{2,}", " ", cbr_name)}
 
     async def get_additional_data(self, meta: Meta) -> dict[str, str]:
-        data = {
-            'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
+        return {
+            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
-
-        return data
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK" and meta.audiobook and not meta.narrator:
@@ -355,10 +352,9 @@ class CBR(UNIT3D):
 
             subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
             if not subtitles and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
-                proceed = await self.common.prompt_user_for_confirmation(
+                return await self.common.prompt_user_for_confirmation(
                     f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
                 )
-                return proceed
             return subtitles
 
         return True

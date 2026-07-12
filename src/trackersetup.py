@@ -102,6 +102,7 @@ from src.trackers.USENET.SUIO import SUIO
 JsonDict = dict[str, Any]
 example_config: dict[str, Any]
 
+
 class TRACKER_SETUP:
     def __init__(self, config: dict[str, Any]):
         self.config: dict[str, Any] = config
@@ -161,7 +162,7 @@ class TRACKER_SETUP:
         trackers_value = meta.trackers if meta.trackers is not None else self.config["TRACKERS"]["default_trackers"]
 
         if isinstance(trackers_value, str):
-            trackers_list = trackers_value.split(',')
+            trackers_list = trackers_value.split(",")
         elif isinstance(trackers_value, list):
             trackers_list = [str(s) for s in cast(list[Any], trackers_value)]
         else:
@@ -186,7 +187,7 @@ class TRACKER_SETUP:
         return valid_trackers
 
     async def get_banned_groups(self, meta: Meta, tracker: str) -> str | None:
-        file_path = os.path.join(meta.base_dir, "data", "banned", f"{tracker}_banned_groups.json")
+        file_path = Path(meta.base_dir) / "data" / "banned" / f"{tracker}_banned_groups.json"
 
         tracker_instance = self._create_tracker_instance(tracker)
         if tracker_instance is None:
@@ -194,9 +195,9 @@ class TRACKER_SETUP:
         if tracker.upper() == "LUME":
             # LUME doesn't expose a banned_url; sync TRaSH groups and use the file if present
             await self.sync_trash_groups(file_path)
-            if os.path.exists(file_path):
+            if Path(file_path).exists():
                 return file_path
-        banned_url = getattr(tracker_instance, 'banned_url', None)
+        banned_url = getattr(tracker_instance, "banned_url", None)
         if not isinstance(banned_url, str):
             return None
 
@@ -204,11 +205,7 @@ class TRACKER_SETUP:
         if not await self.should_update(file_path):
             return file_path
 
-        headers = {
-            'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
+        headers = {"Authorization": f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}", "Content-Type": "application/json", "Accept": "application/json"}
 
         all_data: list[JsonDict] = []
         next_cursor: str | None = None
@@ -217,7 +214,7 @@ class TRACKER_SETUP:
             while True:
                 try:
                     # Add query parameters for pagination
-                    params: JsonDict = {'cursor': next_cursor, 'per_page': 100} if next_cursor else {'per_page': 100}
+                    params: JsonDict = {"cursor": next_cursor, "per_page": 100} if next_cursor else {"per_page": 100}
                     response = await client.get(url=banned_url, headers=headers, params=params)
 
                     if response.status_code == 200:
@@ -229,14 +226,14 @@ class TRACKER_SETUP:
                             break  # No pagination in this case
                         if isinstance(response_json, dict):
                             response_dict = cast(JsonDict, response_json)
-                            page_data_any = response_dict.get('data', [])
+                            page_data_any = response_dict.get("data", [])
                             if not isinstance(page_data_any, list):
                                 logger.info(f"[red]Unexpected 'data' format: {type(page_data_any)}[/red]")
                                 return None
 
                             page_data = cast(list[JsonDict], page_data_any)
                             all_data.extend(page_data)
-                            meta_info_any = response_dict.get('meta', {})
+                            meta_info_any = response_dict.get("meta", {})
                             if not isinstance(meta_info_any, dict):
                                 logger.info(f"[red]Unexpected 'meta' format: {type(meta_info_any)}[/red]")
                                 return None
@@ -244,7 +241,7 @@ class TRACKER_SETUP:
                             meta_info = cast(JsonDict, meta_info_any)
 
                             # Check if there is a next page
-                            next_cursor_value = cast(str | None, meta_info.get('next_cursor'))
+                            next_cursor_value = cast(str | None, meta_info.get("next_cursor"))
                             next_cursor = next_cursor_value if next_cursor_value else None
                             if not next_cursor:
                                 break  # Exit loop if there are no more pages
@@ -276,7 +273,7 @@ class TRACKER_SETUP:
 
     async def write_banned_groups_to_file(self, file_path: str, json_data: list[Any]) -> None:
         try:
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            Path(os.path.dirname(file_path)).mkdir(parents=True, exist_ok=True)
 
             # Extract group names from either object payloads or plain string payloads.
             names: list[str] = []
@@ -357,7 +354,7 @@ class TRACKER_SETUP:
 
     def _write_file(self, file_path: str, data: JsonDict) -> None:
         """Blocking file write operation, runs in a background thread"""
-        with open(file_path, "w", encoding="utf-8") as file:
+        with Path(file_path).open("w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
 
     async def should_update(self, file_path: str) -> bool:
@@ -374,7 +371,7 @@ class TRACKER_SETUP:
 
     def _read_file(self, file_path: str) -> str:
         """Helper function to read the file in a blocking thread"""
-        with open(file_path, encoding="utf-8") as file:
+        with Path(file_path).open(encoding="utf-8") as file:
             return file.read()
 
     async def check_banned_group(self, tracker: str, banned_group_list: list[Any], meta: Meta) -> bool:
@@ -445,7 +442,7 @@ class TRACKER_SETUP:
 
     async def write_internal_claims_to_file(self, file_path: str, data: list[JsonDict]) -> None:
         try:
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            Path(os.path.dirname(file_path)).mkdir(parents=True, exist_ok=True)
 
             extracted_data: list[JsonDict] = []
             for item in data:
@@ -454,13 +451,15 @@ class TRACKER_SETUP:
                     continue
 
                 attributes = cast(JsonDict, item["attributes"])
-                extracted_data.append({
-                    "title": attributes.get("title", "Unknown"),
-                    "season": attributes.get("season", "Unknown"),
-                    "tmdb_id": attributes.get("tmdb_id", "Unknown"),
-                    "resolutions": attributes.get("resolutions", []),
-                    "types": attributes.get("types", []),
-                })
+                extracted_data.append(
+                    {
+                        "title": attributes.get("title", "Unknown"),
+                        "season": attributes.get("season", "Unknown"),
+                        "tmdb_id": attributes.get("tmdb_id", "Unknown"),
+                        "resolutions": attributes.get("resolutions", []),
+                        "types": attributes.get("types", []),
+                    }
+                )
 
             if not extracted_data:
                 logger.debug("No valid claims found to write.")
@@ -476,7 +475,7 @@ class TRACKER_SETUP:
             logger.info(f"An error occurred: {e}")
 
     async def get_torrent_claims(self, meta: Meta, tracker: str) -> bool | None:
-        file_path = os.path.join(meta.base_dir, "data", "banned", f"{tracker}_claimed_releases.json")
+        file_path = Path(meta.base_dir) / "data" / "banned" / f"{tracker}_claimed_releases.json"
         tracker_instance = self._create_tracker_instance(tracker)
         if tracker_instance is None:
             return None
@@ -573,21 +572,21 @@ class TRACKER_SETUP:
                 metaseason = meta.season_int
                 if metaseason:
                     seasonint = metaseason
-                file_path = os.path.join(meta.base_dir, "data", "banned", f"{tracker_name}_claimed_releases.json")
-                if not os.path.exists(file_path):
+                file_path = Path(meta.base_dir) / "data" / "banned" / f"{tracker_name}_claimed_releases.json"
+                if not Path(file_path).exists():
                     logger.info(f"[red]No claim data file found for {tracker_name}[/red]")
                     return False
 
                 file_content = await asyncio.to_thread(Path(file_path).read_text, encoding="utf-8")
-                extracted_data = cast(JsonDict, json.loads(file_content)).get('extracted_data', [])
+                extracted_data = cast(JsonDict, json.loads(file_content)).get("extracted_data", [])
                 extracted_data = cast(list[JsonDict], extracted_data)
 
                 for item in extracted_data:
-                    title = item.get('title')
-                    season = item.get('season')
-                    api_tmdb_id = item.get('tmdb_id')
-                    api_resolutions = cast(list[Any], item.get('resolutions', []))
-                    api_types = cast(list[Any], item.get('types', []))
+                    title = item.get("title")
+                    season = item.get("season")
+                    api_tmdb_id = item.get("tmdb_id")
+                    api_resolutions = cast(list[Any], item.get("resolutions", []))
+                    api_types = cast(list[Any], item.get("types", []))
 
                     if (
                         api_tmdb_id in tmdb_id
@@ -608,17 +607,12 @@ class TRACKER_SETUP:
                 return False
 
         results = await asyncio.gather(*[process_single_tracker(tracker) for tracker in trackers])
-        match_found = any(results)
-
-        return match_found
+        return any(results)
 
     async def get_tracker_requests(self, meta: Meta, tracker: str, url: str) -> list[JsonDict]:
         logger.debug(f"[bold green]Searching for existing requests on {tracker}[/bold green]")
         requests: list[dict[str, Any]] = []
-        headers = {
-            'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
-            'Accept': 'application/json'
-        }
+        headers = {"Authorization": f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}", "Accept": "application/json"}
         if meta.tmdb is None:
             return requests
         params = {"tmdbId": meta.tmdb} if tracker == "HUNO" else {"tmdb": meta.tmdb}
@@ -632,9 +626,9 @@ class TRACKER_SETUP:
                         return requests
                     data_dict = cast(JsonDict, data)
                     results_list: list[Any] = []
-                    if 'data' in data_dict and isinstance(data_dict['data'], list):
+                    if "data" in data_dict and isinstance(data_dict["data"], list):
                         results_list.extend([item for item in data_dict["data"] if isinstance(item, dict)])
-                    elif 'results' in data_dict and isinstance(data_dict['results'], list):
+                    elif "results" in data_dict and isinstance(data_dict["results"], list):
                         results_list.extend([item for item in data_dict["results"] if isinstance(item, dict)])
                     else:
                         logger.info("[bold red]Unexpected response format[/bold red]")
@@ -672,7 +666,7 @@ class TRACKER_SETUP:
         return requests
 
     async def bhd_request_check(self, meta: Meta, tracker: str, url: str) -> list[JsonDict]:
-        if 'BHD' not in self.config['TRACKERS'] or not self.config['TRACKERS']['BHD'].get('api_key'):
+        if "BHD" not in self.config["TRACKERS"] or not self.config["TRACKERS"]["BHD"].get("api_key"):
             logger.info("[red]BHD API key not configured. Skipping BHD request check.[/red]")
             return []
         logger.debug(f"[bold green]Searching for existing requests on {tracker}[/bold green]")
@@ -691,9 +685,9 @@ class TRACKER_SETUP:
                         return requests
                     data_dict = cast(JsonDict, data)
                     results_list: list[Any] = []
-                    if 'data' in data_dict and isinstance(data_dict['data'], list):
+                    if "data" in data_dict and isinstance(data_dict["data"], list):
                         results_list.extend([item for item in data_dict["data"] if isinstance(item, dict)])
-                    elif 'results' in data_dict and isinstance(data_dict['results'], list):
+                    elif "results" in data_dict and isinstance(data_dict["results"], list):
                         results_list.extend([item for item in data_dict["results"] if isinstance(item, dict)])
                     else:
                         logger.info("[bold red]Unexpected response format[/bold red]")
@@ -703,16 +697,16 @@ class TRACKER_SETUP:
                         for each in results_list:
                             attributes = cast(JsonDict, each)
                             result: JsonDict = {
-                                'id': attributes.get('id'),
-                                'name': attributes.get('name'),
-                                'type': attributes.get('source'),
-                                'resolution': attributes.get('type'),
-                                'dv': attributes.get('dv'),
-                                'hdr': attributes.get('hdr'),
-                                'bounty': attributes.get('bounty'),
-                                'status': attributes.get('status'),
-                                'internal': attributes.get('internal'),
-                                'url': attributes.get('url'),
+                                "id": attributes.get("id"),
+                                "name": attributes.get("name"),
+                                "type": attributes.get("source"),
+                                "resolution": attributes.get("type"),
+                                "dv": attributes.get("dv"),
+                                "hdr": attributes.get("hdr"),
+                                "bounty": attributes.get("bounty"),
+                                "status": attributes.get("status"),
+                                "internal": attributes.get("internal"),
+                                "url": attributes.get("url"),
                             }
                             requests.append(result)
                     except Exception as e:
@@ -747,7 +741,7 @@ class TRACKER_SETUP:
             try:
                 url = tracker_instance.requests_url
             except AttributeError:
-                if tracker_name.upper() not in ('ASC', 'BJS', 'FF', 'HDS', 'AZ', 'CZ', 'PHD'):
+                if tracker_name.upper() not in ("ASC", "BJS", "FF", "HDS", "AZ", "CZ", "PHD"):
                     # tracker without requests url not supported
                     return False
 
@@ -783,13 +777,13 @@ class TRACKER_SETUP:
 
             # Initialize request log for this tracker
             common = COMMON(self.config)
-            log_path = f"{meta.base_dir}/tmp/{tracker_name}_request_results.json"
+            log_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{tracker_name}_request_results.json"
             if not await common.path_exists(log_path):
                 await common.makedirs(os.path.dirname(log_path))
 
             request_data: list[JsonDict] = []
             try:
-                async with aiofiles.open(log_path, encoding='utf-8') as f:
+                async with aiofiles.open(log_path, encoding="utf-8") as f:
                     content = await f.read()
                     loaded: object = json.loads(content) if content.strip() else []
                     if isinstance(loaded, list):
@@ -797,7 +791,7 @@ class TRACKER_SETUP:
             except Exception:
                 request_data = []
 
-            existing_uuids = {str(entry.get('uuid')) for entry in request_data}
+            existing_uuids = {str(entry.get("uuid")) for entry in request_data}
             uuid_value = meta.uuid
             uuid_str = uuid_value if uuid_value is not None else ""
 
@@ -807,16 +801,16 @@ class TRACKER_SETUP:
                 season = False
                 episode = False
                 double_check = False
-                api_id = each.get('id')
-                api_category = each.get('category')
-                api_name = str(each.get('name') or '')
-                api_type = each.get('type')
-                api_type_str = str(api_type or '')
-                api_bounty = each.get('bounty')
-                api_status = each.get('status')
-                api_description = str(each.get('description') or '')
-                api_resolution = each.get('resolution')
-                api_resolution_str = str(api_resolution or '')
+                api_id = each.get("id")
+                api_category = each.get("category")
+                api_name = str(each.get("name") or "")
+                api_type = each.get("type")
+                api_type_str = str(api_type or "")
+                api_bounty = each.get("bounty")
+                api_status = each.get("status")
+                api_description = str(each.get("description") or "")
+                api_resolution = each.get("resolution")
+                api_resolution_str = str(api_resolution or "")
                 api_resolution_lower = api_resolution_str.lower()
                 if "BHD" not in tracker_name:
                     if str(api_type) in [str(tid) for tid in type_ids]:
@@ -829,15 +823,15 @@ class TRACKER_SETUP:
                     elif api_resolution is None:
                         resolution = True
                         double_check = True
-                    api_claimed = each.get('claimed')
+                    api_claimed = each.get("claimed")
                     api_season = 0
                     api_episode = 0
                     if meta.category == "TV":
-                        season_value = each.get('season')
+                        season_value = each.get("season")
                         api_season = int(season_value) if season_value is not None else 0
                         if api_season and meta.season_int and api_season == meta.season_int:
                             season = True
-                        episode_value = each.get('episode')
+                        episode_value = each.get("episode")
                         api_episode = int(episode_value) if episode_value is not None else 0
                         if api_episode and meta.episode_int and api_episode == meta.episode_int:
                             episode = True
@@ -917,49 +911,44 @@ class TRACKER_SETUP:
                                 request_data.append(request_entry)
                                 existing_uuids.add(uuid_str)
                 else:
-                    unclaimed = each.get('status') == 1
-                    internal = each.get('internal') == 1
+                    unclaimed = each.get("status") == 1
+                    internal = each.get("internal") == 1
                     claimed_status = ""
-                    if each.get('status') == 1:
+                    if each.get("status") == 1:
                         claimed_status = "Unfilled"
-                    elif each.get('status') == 2:
+                    elif each.get("status") == 2:
                         claimed_status = "Claimed"
-                    elif each.get('status') == 3:
+                    elif each.get("status") == 3:
                         claimed_status = "Pending"
                     dv = False
                     hdr = False
                     season = False
                     meta_hdr = meta.HDR
-                    is_season = re.search(r'S\d{2}', api_name)
+                    is_season = re.search(r"S\d{2}", api_name)
                     if is_season and is_season == meta.season:
                         season = True
-                    if each.get('dv') and meta_hdr == "DV":
+                    if each.get("dv") and meta_hdr == "DV":
                         dv = True
-                    if each.get('hdr') and meta_hdr in ("HDR10", "HDR10+", "HDR"):
+                    if each.get("hdr") and meta_hdr in ("HDR10", "HDR10+", "HDR"):
                         hdr = True
-                    if not each.get('dv') and "DV" not in meta_hdr:
+                    if not each.get("dv") and "DV" not in meta_hdr:
                         dv = True
-                    if not each.get('hdr') and meta_hdr not in ("HDR10", "HDR10+", "HDR"):
+                    if not each.get("hdr") and meta_hdr not in ("HDR10", "HDR10+", "HDR"):
                         hdr = True
-                    if 'remux' in api_resolution_lower:
-                        if (
-                            "uhd" in api_resolution_lower
-                            and meta.resolution == "2160p"
-                            and meta.type == "REMUX"
-                            or "uhd" not in api_resolution_lower
-                            and meta.resolution == "1080p"
-                            and meta.type == "REMUX"
+                    if "remux" in api_resolution_lower:
+                        if ("uhd" in api_resolution_lower and meta.resolution == "2160p" and meta.type == "REMUX") or (
+                            "uhd" not in api_resolution_lower and meta.resolution == "1080p" and meta.type == "REMUX"
                         ):
                             resolution = True
                             type_name = True
                     elif "remux" not in api_resolution_lower and meta.is_disc == "BDMV":
-                        if "uhd" in api_resolution_lower and meta.resolution == "2160p" or "uhd" not in api_resolution_lower and meta.resolution == "1080p":
+                        if ("uhd" in api_resolution_lower and meta.resolution == "2160p") or ("uhd" not in api_resolution_lower and meta.resolution == "1080p"):
                             resolution = True
                             type_name = True
                     elif api_resolution == meta.resolution:
                         resolution = True
                     meta_type = meta.type or ""
-                    if 'Blu-ray' in api_type_str and meta_type == "ENCODE" or 'WEB' in api_type_str and 'WEB' in meta_type:
+                    if ("Blu-ray" in api_type_str and meta_type == "ENCODE") or ("WEB" in api_type_str and "WEB" in meta_type):
                         type_name = True
                     if meta.category == "MOVIE" and type_name and resolution and unclaimed and not internal and dv and hdr:
                         logger.info(
@@ -1016,15 +1005,13 @@ class TRACKER_SETUP:
 
             # Save all logged requests to file
             if request_data:
-                async with aiofiles.open(log_path, 'w', encoding='utf-8') as f:
+                async with aiofiles.open(log_path, "w", encoding="utf-8") as f:
                     await f.write(json.dumps(request_data, indent=4))
 
             return requests
 
         results = await asyncio.gather(*[process_single_tracker(tracker) for tracker in trackers])
-        match_found = any(results)
-
-        return match_found
+        return any(results)
 
     async def process_trumpables(self, meta: Meta, tracker: str) -> bool:
         tracker_instance = self._create_tracker_instance(tracker)
@@ -1032,7 +1019,7 @@ class TRACKER_SETUP:
             logger.info(f"[red]Tracker {tracker} is not registered in tracker_class_map[/red]")
             return False
 
-        url = getattr(tracker_instance, 'trumping_url', None)
+        url = getattr(tracker_instance, "trumping_url", None)
         if not isinstance(url, str):
             logger.info(f"[red]Tracker {tracker} does not support trumping reports.[/red]")
             return False
@@ -1041,14 +1028,13 @@ class TRACKER_SETUP:
         if not reported_torrent_id:
             # Try tracker-specific matched ID
             reported_torrent_id = f"{meta.get(f'{tracker}_matched_id', '')}"
-        if not reported_torrent_id and meta.get(f'{tracker}_matched_episode_ids', []):
+        if not reported_torrent_id and meta.get(f"{tracker}_matched_episode_ids", []):
             reported_torrent_id = f"{meta[f'{tracker}_matched_episode_ids'][0].get('id', '')}"
         if not reported_torrent_id:
             logger.info(f"[red]No reported torrent ID found in meta for trumpable processing on {tracker}[/red]")
             return False
-        else:
-            # Store per-tracker to avoid overwriting across multiple trackers
-            meta[f'{tracker}_reported_torrent_id'] = reported_torrent_id
+        # Store per-tracker to avoid overwriting across multiple trackers
+        meta[f"{tracker}_reported_torrent_id"] = reported_torrent_id
         if tracker == "LST":
             logger.debug("[bold green]LST does not support searching existing trump reports[/bold green]")
             return True
@@ -1065,20 +1051,20 @@ class TRACKER_SETUP:
             if tracker not in meta.skip_upload_trackers:
                 meta.skip_upload_trackers.append(tracker)
             return False
-        elif trumping_reports:
+        if trumping_reports:
             logger.info(f"[bold yellow]Found {len(trumping_reports)} existing trumping report/s on {tracker} for this release[/bold yellow]")
             for report in trumping_reports:
                 logger.info(f"  [cyan]Report ID:[/cyan] {report.get('id')} - [cyan]Title:[/cyan] {report.get('title')}")
-                if report.get('trumping_torrent'):
-                    for torrent in report.get('trumping_torrent', []):
-                        torrent_name = torrent.get('name', 'Unknown')
-                        torrent_id = torrent.get('id', 'N/A')
+                if report.get("trumping_torrent"):
+                    for torrent in report.get("trumping_torrent", []):
+                        torrent_name = torrent.get("name", "Unknown")
+                        torrent_id = torrent.get("id", "N/A")
                         logger.info(f"  [bold green]Already being trumped by:[/bold green] {torrent_name} (ID: {torrent_id})")
                 else:
                     logger.info("  [yellow]The trumping torrent for this report seems to be in modq.....[/yellow]")
             try:
                 upload = cli_ui.ask_yes_no("Do you want to proceed with the upload anyway?", default=False)
-            except (EOFError, KeyboardInterrupt):
+            except EOFError, KeyboardInterrupt:
                 logger.info("[yellow]Prompt cancelled; treating as 'no' for safety.[/yellow]")
                 upload = False
 
@@ -1094,29 +1080,20 @@ class TRACKER_SETUP:
         if not meta.tv_pack:
             logger.info(f"[yellow]{tracker} requires comparisons to be provided for trump reports.\nAre the comparison images in the description or are you adding links?")
             try:
-                where_compare = cli_ui.ask_string(
-                    "Enter 'd' if in description, 'L' if you want to paste links, or press Enter to skip trumping:",
-                    default=""
-                )
-            except (EOFError, KeyboardInterrupt):
+                where_compare = cli_ui.ask_string("Enter 'd' if in description, 'L' if you want to paste links, or press Enter to skip trumping:", default="")
+            except EOFError, KeyboardInterrupt:
                 logger.info("[yellow]Prompt cancelled; skipping trump report creation.[/yellow]")
                 return False
 
             where_compare = (where_compare or "").strip()
-            if where_compare.lower() == 'd':
+            if where_compare.lower() == "d":
                 meta.screenshots_in_description = True
                 return True
-            elif where_compare.upper() == 'L':
+            if where_compare.upper() == "L":
                 try:
-                    reported_screenshots = cli_ui.ask_string(
-                        "Paste screenshot links for the reported torrent (comma-separated):",
-                        default=""
-                    )
-                    trumping_screenshots = cli_ui.ask_string(
-                        "Paste screenshot links for the trumping torrent (comma-separated):",
-                        default=""
-                    )
-                except (EOFError, KeyboardInterrupt):
+                    reported_screenshots = cli_ui.ask_string("Paste screenshot links for the reported torrent (comma-separated):", default="")
+                    trumping_screenshots = cli_ui.ask_string("Paste screenshot links for the trumping torrent (comma-separated):", default="")
+                except EOFError, KeyboardInterrupt:
                     logger.info("[yellow]Prompt cancelled; skipping trump report creation.[/yellow]")
                     return False
 
@@ -1132,24 +1109,19 @@ class TRACKER_SETUP:
                     logger.info("[yellow]No valid screenshot links provided. Skipping trump report creation.[/yellow]")
                     return False
                 return True
-            else:
-                logger.info("[yellow]Skipping trump report creation as no comparison method provided.[/yellow]")
-                return False
-        else:
-            logger.debug(f"[bold green]TV pack upload detected, skipping comparison images for trump report on {tracker}[/bold green]")
-            return True
+            logger.info("[yellow]Skipping trump report creation as no comparison method provided.[/yellow]")
+            return False
+        logger.debug(f"[bold green]TV pack upload detected, skipping comparison images for trump report on {tracker}[/bold green]")
+        return True
 
     async def get_tracker_trumps(self, tracker: str, url: str, reported_torrent_id: str) -> tuple[list[JsonDict], int | None]:
         logger.debug(f"[bold green]Searching for trumps on {tracker}[/bold green]")
         requests: list[JsonDict] = []
         status_code: int | None = None
-        headers = {
-            'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
-            'Accept': 'application/json'
-        }
+        headers = {"Authorization": f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}", "Accept": "application/json"}
 
         params: JsonDict = {
-            'reported_torrent_id': f"{reported_torrent_id}",
+            "reported_torrent_id": f"{reported_torrent_id}",
         }
 
         all_data: list[Any] = []
@@ -1161,7 +1133,7 @@ class TRACKER_SETUP:
                     try:
                         # Add pagination cursor to params if we have one
                         if next_cursor:
-                            params['cursor'] = next_cursor
+                            params["cursor"] = next_cursor
 
                         response = await client.get(url=url, headers=headers, params=params)
                         status_code = response.status_code
@@ -1173,9 +1145,9 @@ class TRACKER_SETUP:
                                 return requests, status_code
                             data_dict = cast(JsonDict, data)
                             page_data: list[Any] = []
-                            if 'data' in data_dict and isinstance(data_dict['data'], list):
+                            if "data" in data_dict and isinstance(data_dict["data"], list):
                                 page_data.extend([item for item in data_dict["data"] if isinstance(item, dict)])
-                            elif 'results' in data_dict and isinstance(data_dict['results'], list):
+                            elif "results" in data_dict and isinstance(data_dict["results"], list):
                                 page_data.extend([item for item in data_dict["results"] if isinstance(item, dict)])
                             else:
                                 logger.info("[bold red]Unexpected response format[/bold red]")
@@ -1184,20 +1156,19 @@ class TRACKER_SETUP:
                             all_data.extend(page_data)
 
                             # Check for pagination
-                            meta_info_any = data_dict.get('meta', {})
+                            meta_info_any = data_dict.get("meta", {})
                             if not isinstance(meta_info_any, dict):
                                 logger.info(f"[bold red]Unexpected 'meta' format: {type(meta_info_any)}[/bold red]")
                                 break
 
                             meta_info = cast(JsonDict, meta_info_any)
 
-                            next_cursor = cast(str | None, meta_info.get('next_cursor'))
+                            next_cursor = cast(str | None, meta_info.get("next_cursor"))
                             if not next_cursor:
                                 break  # Exit loop if there are no more pages
-                            else:
-                                # Rest between page fetches
-                                logger.info(f"[cyan]Fetched {len(page_data)} trumping reports, waiting 1 second before next page...[/cyan]")
-                                await asyncio.sleep(1)
+                            # Rest between page fetches
+                            logger.info(f"[cyan]Fetched {len(page_data)} trumping reports, waiting 1 second before next page...[/cyan]")
+                            await asyncio.sleep(1)
                         else:
                             logger.info(f"[bold red]Failed to search trumps on {tracker}. HTTP Status: {response.status_code} - {response.text}[/bold red]")
                             break
@@ -1211,7 +1182,7 @@ class TRACKER_SETUP:
                     for each in all_data:
                         # Normalize trumping_torrent to always be a list
                         entry = cast(JsonDict, each)
-                        trumping_torrent_value = entry.get('trumping_torrent')
+                        trumping_torrent_value = entry.get("trumping_torrent")
                         if trumping_torrent_value is None:
                             trumping_torrent = []
                         elif isinstance(trumping_torrent_value, dict):
@@ -1222,12 +1193,12 @@ class TRACKER_SETUP:
                             trumping_torrent = []
 
                         result: JsonDict = {
-                            'id': entry.get('id'),
-                            'type': entry.get('type'),
-                            'title': entry.get('title'),
-                            'solved': entry.get('solved'),
-                            'reported_torrents': entry.get('reported_torrents', []),
-                            'trumping_torrent': trumping_torrent,
+                            "id": entry.get("id"),
+                            "type": entry.get("type"),
+                            "title": entry.get("title"),
+                            "solved": entry.get("solved"),
+                            "reported_torrents": entry.get("reported_torrents", []),
+                            "trumping_torrent": trumping_torrent,
                         }
                         requests.append(result)
 
@@ -1255,17 +1226,17 @@ class TRACKER_SETUP:
             logger.info(f"[red]Tracker {tracker} is not registered in tracker_class_map[/red]")
             return False
 
-        base_url = getattr(tracker_instance, 'trumping_url', None)
+        base_url = getattr(tracker_instance, "trumping_url", None)
         if not isinstance(base_url, str):
             logger.info(f"[red]No trumping URL found for {tracker}[/red]")
             return False
 
-        reported_torrent_id = meta.get(f'{tracker}_reported_torrent_id', '')
+        reported_torrent_id = meta.get(f"{tracker}_reported_torrent_id", "")
         if not reported_torrent_id:
             logger.info(f"[red]No reported torrent ID found in meta for trump report creation on {tracker}[/red]")
             return False
         # Replace /filter with /create. For LST the URL requires a numeric ID segment.
-        if tracker == 'LST':
+        if tracker == "LST":
             rt = str(reported_torrent_id).strip()
             if not rt.isdigit():
                 logger.info(f"[red]Invalid or missing reported torrent ID for LST: {reported_torrent_id}[/red]")
@@ -1277,13 +1248,9 @@ class TRACKER_SETUP:
                 return False
             create_url = base_url + f"{rid_int}/trump"
         else:
-            create_url = base_url.replace('/filter', '/create')
+            create_url = base_url.replace("/filter", "/create")
 
-        headers = {
-            'Authorization': f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}",
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
+        headers = {"Authorization": f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}", "Content-Type": "application/json", "Accept": "application/json"}
 
         # Read per-tracker reported_torrent_id, with fallback to legacy key for backwards compatibility
         if not reported_torrent_id:
@@ -1310,20 +1277,20 @@ class TRACKER_SETUP:
         else:
             message = f"{meta.ua_name} is trumping this torrent for reasons {meta.ua_name} has not correctly caught. User selected yes at a prompt."
 
-        if tracker != 'LST':
+        if tracker != "LST":
             payload: JsonDict = {"reported_torrent_id": reported_torrent_id, "trumping_torrent_id": trumping_torrent_id, "message": message}
-            if 'screenshots_reported_torrent' in meta:
+            if "screenshots_reported_torrent" in meta:
                 payload["screenshots_reported_torrent"] = ",".join(cast(list[str], meta.screenshots_reported_torrent))
-            if 'screenshots_trumping_torrent' in meta:
+            if "screenshots_trumping_torrent" in meta:
                 payload["screenshots_trumping_torrent"] = ",".join(cast(list[str], meta.screenshots_trumping_torrent))
             if "screenshots_in_description" in meta and meta.screenshots_in_description:
-                payload['message'] = f"{payload.get('message', '')} - User says comparison screenshots are in description."
+                payload["message"] = f"{payload.get('message', '')} - User says comparison screenshots are in description."
 
         else:
             if not meta.tv_pack:
                 try:
                     user_message = cli_ui.ask_string("Enter a reason for the trump report on LST:")
-                except (EOFError, KeyboardInterrupt):
+                except EOFError, KeyboardInterrupt:
                     logger.info("[yellow]Prompt cancelled; no additional message provided.[/yellow]")
                     user_message = None
                 message = message + ": " + user_message if user_message else message + ": No additional message provided by user"
@@ -1337,9 +1304,8 @@ class TRACKER_SETUP:
                     if response.status_code in (200, 201):
                         logger.info(f"[bold green]Successfully created trump report on {tracker}[/bold green]")
                         return True
-                    else:
-                        logger.info(f"[bold red]Failed to create trump report. HTTP Status: {response.status_code}[/bold red]")
-                        return False
+                    logger.info(f"[bold red]Failed to create trump report. HTTP Status: {response.status_code}[/bold red]")
+                    return False
 
             except httpx.TimeoutException:
                 logger.info("[bold red]Request timed out after 10 seconds[/bold red]")

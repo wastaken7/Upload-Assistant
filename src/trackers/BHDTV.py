@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import traceback
+from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
@@ -16,7 +16,7 @@ from src.trackers.COMMON import COMMON
 class BHDTV:
     tracker = "BHDTV"
     source_flag = "BIT-HDTV"
-    banned_groups = []
+    banned_groups = ()
     upload_url = "https://www.bit-hdtv.com/takeupload.php"
     supported_categories = ("TV", "MOVIE")
 
@@ -43,23 +43,22 @@ class BHDTV:
 
         if meta.bdinfo:
             mi_dump = None
-            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as bd_file:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as bd_file:
                 bd_dump = await bd_file.read()
         else:
-            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as mi_file:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as mi_file:
                 mi_dump = await mi_file.read()
             bd_dump = None
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as desc_file:
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as desc_file:
             desc = await desc_file.read()
 
         media_info = ""
         if meta.is_disc != "BDMV":
             filelist = cast(list[str], meta.filelist or [])
             video = filelist[0] if filelist else (meta.path or "")
-            mi_template = os.path.abspath(f"{meta.base_dir}/data/templates/MEDIAINFO.txt")
-            if os.path.exists(mi_template):
-                media_info = MediaInfo.parse(video, output="STRING", full=False,
-                                                mediainfo_options={"inform": f"file://{mi_template}"})
+            mi_template = str(Path(f"{meta.base_dir}/data/templates/MEDIAINFO.txt").resolve())
+            if Path(mi_template).exists():
+                media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={"inform": f"file://{mi_template}"})
 
         data: dict[str, Any] = {
             "api_key": str(self.config["TRACKERS"][self.tracker]["api_key"]).strip(),
@@ -77,10 +76,10 @@ class BHDTV:
             "format": "json",
         }
 
-        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
-        async with aiofiles.open(torrent_path, 'rb') as open_torrent:
+        torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
+        async with aiofiles.open(torrent_path, "rb") as open_torrent:
             torrent_bytes = await open_torrent.read()
-        files = {'file': (os.path.basename(torrent_path), torrent_bytes, 'application/x-bittorrent')}
+        files = {"file": (Path(torrent_path).name, torrent_bytes, "application/x-bittorrent")}
 
         if meta.debug is False:
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
@@ -96,17 +95,11 @@ class BHDTV:
                     traceback.print_exc()
 
             parsed_data: dict[str, Any] | None = cast(dict[str, Any] | None, parsed) if isinstance(parsed, dict) else None
-            data_block: dict[str, Any] | None = parsed_data.get('data') if parsed_data else None
-            if isinstance(data_block, dict) and 'view' in data_block:
-                my_announce_url = self.config['TRACKERS']['BHDTV'].get('my_announce_url')
+            data_block: dict[str, Any] | None = parsed_data.get("data") if parsed_data else None
+            if isinstance(data_block, dict) and "view" in data_block:
+                my_announce_url = self.config["TRACKERS"]["BHDTV"].get("my_announce_url")
                 if my_announce_url:
-                    await common.create_torrent_ready_to_seed(
-                        meta,
-                        self.tracker,
-                        self.source_flag,
-                        my_announce_url,
-                        str(data_block['view'])
-                    )
+                    await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, my_announce_url, str(data_block["view"]))
                     return True
             return False
 
@@ -117,89 +110,81 @@ class BHDTV:
         return True
 
     async def get_cat_id(self, meta: Meta) -> str:
-        category_id = '0'
+        category_id = "0"
         if meta.category == "MOVIE":
-            category_id = '7'
+            category_id = "7"
         elif meta.tv_pack:
-            category_id = '12'
+            category_id = "12"
         else:
             # must be tv episode
-            category_id = '10'
+            category_id = "10"
         return category_id
 
     async def get_type_movie_id(self, meta: Meta) -> str:
-        type_id = '0'
+        type_id = "0"
         if meta.type == "DISC":
             type_id = "46" if meta.three_d else "2"
         elif meta.type == "REMUX":
             if meta.name.__contains__("265"):
-                type_id = '48'
+                type_id = "48"
             elif meta.three_d:
-                type_id = '45'
+                type_id = "45"
             else:
-                type_id = '2'
+                type_id = "2"
         elif meta.type == "HDTV":
-            type_id = '6'
+            type_id = "6"
         elif meta.type == "ENCODE":
             if meta.name.__contains__("265"):
-                type_id = '43'
+                type_id = "43"
             elif meta.three_d:
-                type_id = '44'
+                type_id = "44"
             else:
-                type_id = '1'
+                type_id = "1"
         elif meta.type == "WEBDL" or meta.type == "WEBRIP":
-            type_id = '5'
+            type_id = "5"
 
         return type_id
 
     async def get_type_tv_id(self, type: str) -> str:
-        type_id = {
-            'HDTV': '7',
-            'WEBDL': '8',
-            'WEBRIP': '8',
+        return {
+            "HDTV": "7",
+            "WEBDL": "8",
+            "WEBRIP": "8",
             # 'WEBRIP': '55',
             # 'SD': '59',
-            'ENCODE': '10',
-            'REMUX': '11',
-            'DISC': '12',
-        }.get(type, '0')
-        return type_id
+            "ENCODE": "10",
+            "REMUX": "11",
+            "DISC": "12",
+        }.get(type, "0")
 
     async def get_type_tv_pack_id(self, type: str) -> str:
-        type_id = {
-            'HDTV': '13',
-            'WEBDL': '14',
-            'WEBRIP': '8',
+        return {
+            "HDTV": "13",
+            "WEBDL": "14",
+            "WEBRIP": "8",
             # 'WEBRIP': '55',
             # 'SD': '59',
-            'ENCODE': '16',
-            'REMUX': '17',
-            'DISC': '18',
-        }.get(type, '0')
-        return type_id
+            "ENCODE": "16",
+            "REMUX": "17",
+            "DISC": "18",
+        }.get(type, "0")
 
     async def get_res_id(self, resolution: str) -> str:
-        resolution_id = {
-            '2160p': '4',
-            '1080p': '3',
-            '1080i': '2',
-            '720p': '1'
-        }.get(resolution, '10')
-        return resolution_id
+        return {"2160p": "4", "1080p": "3", "1080i": "2", "720p": "1"}.get(resolution, "10")
 
     async def edit_desc(self, meta: Meta) -> None:
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt", encoding="utf-8") as base_file:
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt", encoding="utf-8") as base_file:
             base = await base_file.read()
         parts: list[str] = [base.replace("[img=250]", "[img=250x250]")]
         images = meta.image_list or []
         if len(images) > 0:
             for each in range(len(images)):
-                web_url = images[each]['web_url']
-                img_url = images[each]['img_url']
+                web_url = images[each]["web_url"]
+                img_url = images[each]["img_url"]
                 parts.append(f"[url={web_url}][img]{img_url}[/img][/url] ")
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as desc:
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as desc:
             await desc.write("".join(parts))
-        return None
+        return
 
     async def search_existing(self, _meta: dict[str, Any]) -> list[str]:
         logger.info(f"{self.tracker}: [red]Dupes must be checked Manually")

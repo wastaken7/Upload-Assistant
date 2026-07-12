@@ -12,7 +12,7 @@ from src.trackers.UNIT3D import UNIT3D
 class BLU(UNIT3D):
     tracker = "BLU"
     base_url = "https://blutopia.cc"
-    banned_groups = [
+    banned_groups = (
         "[Oj]",
         "3LTON",
         "4yEo",
@@ -100,14 +100,14 @@ class BLU(UNIT3D):
         "ZKBL",
         "ZmN",
         "ZMNT",
-    ]
+    )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     requests_url = f"{base_url}/api/requests/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ["https://blutopia.cc"]
+    tracker_urls = ("https://blutopia.cc",)
 
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name="BLU")
@@ -120,19 +120,19 @@ class BLU(UNIT3D):
         if not meta.is_disc:
             container = meta.container.lower()
             type_name = "" if not meta.type else meta.type.upper()
-            allowed = ['mkv']
-            if type_name == 'HDTV':
-                allowed.append('ts')
+            allowed = ["mkv"]
+            if type_name == "HDTV":
+                allowed.append("ts")
             if type_name in ["WEBDL", "HDTV"] and "DV" in meta.hdr and "HDR" not in meta.hdr:
-                allowed.append('mp4')
+                allowed.append("mp4")
 
             if container not in allowed:
                 logger.info(f"[bold red]For this release, {self.tracker} requires one of the following containers: {', '.join([a.upper() for a in allowed])}[/bold red]")
                 return False
 
         if meta.type in ["ENCODE", "REMUX"] and "HDR" in meta.hdr and "DV" in meta.hdr and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
-            logger.info('[bold red]Releases using a Dolby Vision layer from a different source have specific description requirements.[/bold red]')
-            logger.info('[bold red]See rule 12.5. You must have a correct pre-formatted description if this release has a derived layer[/bold red]')
+            logger.info("[bold red]Releases using a Dolby Vision layer from a different source have specific description requirements.[/bold red]")
+            logger.info("[bold red]See rule 12.5. You must have a correct pre-formatted description if this release has a derived layer[/bold red]")
             if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                 return False
             if cli_ui.ask_yes_no("Is this a derived layer release?", default=False):
@@ -181,14 +181,12 @@ class BLU(UNIT3D):
         if meta.tracker_status[self.tracker].get("other", False):
             blu_name = blu_name.replace(f"{meta.resolution}", f"{meta.resolution} DVP5/DVP8", 1)
 
-        return {'name': blu_name}
+        return {"name": blu_name}
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
-        data = {
-            'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
+        return {
+            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
-
-        return data
 
     async def get_category_id(
         self,
@@ -199,33 +197,28 @@ class BLU(UNIT3D):
     ) -> dict[str, str]:
         edition = meta.edition
         category_name = meta.category
-        category_id = {
-            'MOVIE': '1',
-            'TV': '2',
-            'FANRES': '3'
-        }
+        category_id = {"MOVIE": "1", "TV": "2", "FANRES": "3"}
 
         is_fanres = False
 
-        if category_name == 'MOVIE' and 'FANRES' in edition:
+        if category_name == "MOVIE" and "FANRES" in edition:
             is_fanres = True
 
         if meta.tracker_status[self.tracker].get("other", False):
             is_fanres = True
 
         if is_fanres:
-            return {'category_id': '3'}
+            return {"category_id": "3"}
 
         if mapping_only:
             return category_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in category_id.items()}
-        elif category is not None:
-            return {'category_id': category_id.get(category, '0')}
-        else:
-            meta_category = meta.category
-            resolved_id = category_id.get(meta_category, '0')
-            return {'category_id': resolved_id}
+        if category is not None:
+            return {"category_id": category_id.get(category, "0")}
+        meta_category = meta.category
+        resolved_id = category_id.get(meta_category, "0")
+        return {"category_id": resolved_id}
 
     async def get_type_id(
         self,
@@ -234,25 +227,17 @@ class BLU(UNIT3D):
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
-        type_id = {
-            'DISC': '1',
-            'REMUX': '3',
-            'WEBDL': '4',
-            'WEBRIP': '5',
-            'HDTV': '6',
-            'ENCODE': '12'
-        }
+        type_id = {"DISC": "1", "REMUX": "3", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "12"}
 
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
-        elif type is not None:
-            return {'type_id': type_id.get(type, '0')}
-        else:
-            meta_type = meta.type
-            resolved_id = type_id.get(meta_type or "", "0")
-            return {'type_id': resolved_id}
+        if type is not None:
+            return {"type_id": type_id.get(type, "0")}
+        meta_type = meta.type
+        resolved_id = type_id.get(meta_type or "", "0")
+        return {"type_id": resolved_id}
 
     async def get_resolution_id(
         self,
@@ -261,26 +246,13 @@ class BLU(UNIT3D):
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
-        resolution_id = {
-            '8640p': '10',
-            '4320p': '11',
-            '2160p': '1',
-            '1440p': '2',
-            '1080p': '2',
-            '1080i': '3',
-            '720p': '5',
-            '576p': '6',
-            '576i': '7',
-            '480p': '8',
-            '480i': '9'
-        }
+        resolution_id = {"8640p": "10", "4320p": "11", "2160p": "1", "1440p": "2", "1080p": "2", "1080i": "3", "720p": "5", "576p": "6", "576i": "7", "480p": "8", "480i": "9"}
         if mapping_only:
             return resolution_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in resolution_id.items()}
-        elif resolution is not None:
-            return {'resolution_id': resolution_id.get(resolution, '10')}
-        else:
-            meta_resolution = meta.resolution
-            resolved_id = resolution_id.get(meta_resolution, '10')
-            return {'resolution_id': resolved_id}
+        if resolution is not None:
+            return {"resolution_id": resolution_id.get(resolution, "10")}
+        meta_resolution = meta.resolution
+        resolved_id = resolution_id.get(meta_resolution, "10")
+        return {"resolution_id": resolved_id}

@@ -9,12 +9,12 @@ Config = dict[str, Any]
 
 
 class PTFANS(NEXUSPHP):
-    banned_groups = []
+    banned_groups = ()
     base_url = "https://ptfans.cc"
     source_flag = "[ptfans.cc] PTFans"
     torrent_url = f"{base_url}/details.php?id="
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://ptfans.cc']
+    tracker_urls = ("https://ptfans.cc",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, "PTFANS")
@@ -54,8 +54,7 @@ class PTFANS(NEXUSPHP):
             ]
             if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in game_show_keywords):
                 return tv_shows
-            else:
-                return tv_series
+            return tv_series
 
         return movies
 

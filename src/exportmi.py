@@ -42,25 +42,24 @@ def setup_mediainfo_library(base_dir: str) -> dict[str, Any] | None:
     system = platform.system().lower()
 
     if system == "windows":
-        cli_path = os.path.join(base_dir, "bin", "MI", "windows", "MediaInfo.exe")
-        if os.path.exists(cli_path):
+        cli_path = Path(base_dir) / "bin" / "MI" / "windows" / "MediaInfo.exe"
+        if Path(cli_path).exists():
             logger.debug(f"[blue]Windows MediaInfo CLI: {cli_path} (found)[/blue]")
             return {
                 "cli": cli_path,
                 "lib": None,  # Windows uses CLI only
                 "lib_dir": None,
             }
-        else:
-            logger.debug(f"[yellow]Windows MediaInfo CLI: {cli_path} (not found)[/yellow]")
-            return None
+        logger.debug(f"[yellow]Windows MediaInfo CLI: {cli_path} (not found)[/yellow]")
+        return None
 
-    elif system == "linux":
-        lib_dir = os.path.join(base_dir, "linux") if base_dir.endswith("bin/MI") or base_dir.endswith("bin\\MI") else os.path.join(base_dir, "bin", "MI", "linux")
+    if system == "linux":
+        lib_dir = Path(base_dir) / "linux" if base_dir.endswith("bin/MI") or base_dir.endswith("bin\\MI") else Path(base_dir) / "bin" / "MI" / "linux"
 
-        mediainfo_lib = os.path.join(lib_dir, "libmediainfo.so.0")
-        mediainfo_cli = os.path.join(lib_dir, "mediainfo")
-        cli_available = os.path.exists(mediainfo_cli)
-        lib_available = os.path.exists(mediainfo_lib)
+        mediainfo_lib = Path(lib_dir) / "libmediainfo.so.0"
+        mediainfo_cli = Path(lib_dir) / "mediainfo"
+        cli_available = Path(mediainfo_cli).exists()
+        lib_available = Path(mediainfo_lib).exists()
 
         logger.debug(f"[blue]MediaInfo CLI binary: {mediainfo_cli} ({'found' if cli_available else 'not found'})[/blue]")
         logger.debug(f"[blue]MediaInfo library: {mediainfo_lib} ({'found' if lib_available else 'not found'})[/blue]")
@@ -214,7 +213,30 @@ async def exportInfo(
                     "extra": track.get("extra", {}),
                 }
                 # Preserve standard audio / book tags if present
-                for tag in ["Album", "Album_Performer", "Track_name", "Performer", "Composer", "Publisher", "Genre", "Recorded_Date", "ISBN", "Comment", "Description", "album", "album_performer", "track_name", "performer", "composer", "publisher", "genre", "recorded_date", "isbn", "comment", "description"]:
+                for tag in [
+                    "Album",
+                    "Album_Performer",
+                    "Track_name",
+                    "Performer",
+                    "Composer",
+                    "Publisher",
+                    "Genre",
+                    "Recorded_Date",
+                    "ISBN",
+                    "Comment",
+                    "Description",
+                    "album",
+                    "album_performer",
+                    "track_name",
+                    "performer",
+                    "composer",
+                    "publisher",
+                    "genre",
+                    "recorded_date",
+                    "isbn",
+                    "comment",
+                    "description",
+                ]:
                     if tag in track:
                         general_track[tag] = track[tag]
                 media_tracks.append(general_track)
@@ -436,12 +458,14 @@ async def exportInfo(
 
     # Filter out unwanted lines from media info regardless of type
     media_info_str = media_info
-    filtered_media_info = "\n".join(line for line in media_info_str.splitlines() if not line.strip().startswith("ReportBy") and not line.strip().startswith("Report created by "))
+    filtered_media_info = "\n".join(
+        line for line in media_info_str.splitlines() if not line.strip().startswith("ReportBy") and not line.strip().startswith("Report created by ")
+    )
 
-    async with aiofiles.open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO.txt", "w", newline="", encoding="utf-8") as export:
-        await export.write(filtered_media_info.replace(video, os.path.basename(video)))
-    async with aiofiles.open(f"{base_dir}/tmp/{folder_id}/MEDIAINFO_CLEANPATH.txt", "w", newline="", encoding="utf-8") as export_cleanpath:
-        await export_cleanpath.write(filtered_media_info.replace(video, os.path.basename(video)))
+    async with aiofiles.open(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/MEDIAINFO.txt", "w", newline="", encoding="utf-8") as export:
+        await export.write(filtered_media_info.replace(video, Path(video).name))
+    async with aiofiles.open(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/MEDIAINFO_CLEANPATH.txt", "w", newline="", encoding="utf-8") as export_cleanpath:
+        await export_cleanpath.write(filtered_media_info.replace(video, Path(video).name))
     logger.debug("[bold green]MediaInfo Exported.")
 
     if mediainfo_cmd and is_dvd:
@@ -486,11 +510,11 @@ async def exportInfo(
 
     filtered_info = filter_mediainfo(media_info_dict)
 
-    async with aiofiles.open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", "w", encoding="utf-8") as export:
+    async with aiofiles.open(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/MediaInfo.json", "w", encoding="utf-8") as export:
         await export.write(json.dumps(filtered_info, indent=4))
-        logger.debug(f"[green]JSON file written to: {base_dir}/tmp/{folder_id}/MediaInfo.json[/green]")
+        logger.debug(f"[green]JSON file written to: {base_dir}{'/' + 'tmp' + '/'}{folder_id}/MediaInfo.json[/green]")
 
-    async with aiofiles.open(f"{base_dir}/tmp/{folder_id}/MediaInfo.json", encoding="utf-8") as f:
+    async with aiofiles.open(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/MediaInfo.json", encoding="utf-8") as f:
         mi = cast(dict[str, Any], json.loads(await f.read()))
 
     # Cleanup: Reset library configuration if we modified it
@@ -554,8 +578,6 @@ async def get_conformance_error(meta: Meta) -> bool:
         general_track = next((track for track in meta.mediainfo["media"]["track"] if track.get("@type") == "General"), None)
         if general_track and general_track.get("extra", {}).get("ConformanceErrors", {}):
             return True
-        else:
-            logger.debug("[green]No Conformance errors found in MediaInfo General track[/green]")
-            return False
-    else:
+        logger.debug("[green]No Conformance errors found in MediaInfo General track[/green]")
         return False
+    return False

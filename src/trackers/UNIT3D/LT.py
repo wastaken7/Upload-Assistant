@@ -12,26 +12,20 @@ Config = dict[str, Any]
 class LT(UNIT3D):
     tracker = "LT"
     base_url = "https://lat-team.com"
-    banned_groups = ["EVO"]
+    banned_groups = ("EVO",)
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK")
-    tracker_urls = ['https://lat-team.com']
+    tracker_urls = ("https://lat-team.com",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='LT')
+        super().__init__(config, tracker_name="LT")
         self.config: Config = config
         self.common = COMMON(config)
 
-    async def get_category_id(
-        self,
-        meta: Meta,
-        category: str | None = None,
-        reverse: bool = False,
-        mapping_only: bool = False
-    ) -> dict[str, str]:
+    async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         cat_map = {
             "MOVIE": "1",
             "TV": "2",
@@ -42,7 +36,7 @@ class LT(UNIT3D):
         }
         if mapping_only:
             return cat_map
-        elif reverse:
+        if reverse:
             return {v: k for k, v in cat_map.items()}
 
         resolved_category = category if category is not None and category != "" else meta.category
@@ -61,27 +55,78 @@ class LT(UNIT3D):
         keywords = [k.lower() for k in meta.keywords]
         overview = meta.overview.lower()
         genres = [g.lower() for g in meta.genres]
-        soap_keywords = ['telenovela', 'novela', 'soap', 'culebrón', 'culebron']
+        soap_keywords = ["telenovela", "novela", "soap", "culebrón", "culebron"]
         origin_countries_value = meta.origin_country
         origin_countries = cast(list[str], origin_countries_value) if isinstance(origin_countries_value, list) else []
 
         if resolved_category == "TV":
             # Anime
             if meta.anime:
-                category_id = '5'
+                category_id = "5"
             # Telenovela / Soap
             elif any(kw in keywords for kw in soap_keywords) or any(kw in overview for kw in soap_keywords):
-                category_id = '8'
+                category_id = "8"
             # Turkish & Asian
-            elif 'drama' in genres and any(c in [
-                'AE', 'AF', 'AM', 'AZ', 'BD', 'BH', 'BN', 'BT', 'CN', 'CY', 'GE', 'HK', 'ID', 'IL', 'IN',
-                'IQ', 'IR', 'JO', 'JP', 'KG', 'KH', 'KP', 'KR', 'KW', 'KZ', 'LA', 'LB', 'LK', 'MM', 'MN',
-                'MO', 'MV', 'MY', 'NP', 'OM', 'PH', 'PK', 'PS', 'QA', 'SA', 'SG', 'SY', 'TH', 'TJ', 'TL',
-                'TM', 'TR', 'TW', 'UZ', 'VN', 'YE'
-            ] for c in origin_countries):
-                category_id = '20'
+            elif "drama" in genres and any(
+                c
+                in [
+                    "AE",
+                    "AF",
+                    "AM",
+                    "AZ",
+                    "BD",
+                    "BH",
+                    "BN",
+                    "BT",
+                    "CN",
+                    "CY",
+                    "GE",
+                    "HK",
+                    "ID",
+                    "IL",
+                    "IN",
+                    "IQ",
+                    "IR",
+                    "JO",
+                    "JP",
+                    "KG",
+                    "KH",
+                    "KP",
+                    "KR",
+                    "KW",
+                    "KZ",
+                    "LA",
+                    "LB",
+                    "LK",
+                    "MM",
+                    "MN",
+                    "MO",
+                    "MV",
+                    "MY",
+                    "NP",
+                    "OM",
+                    "PH",
+                    "PK",
+                    "PS",
+                    "QA",
+                    "SA",
+                    "SG",
+                    "SY",
+                    "TH",
+                    "TJ",
+                    "TL",
+                    "TM",
+                    "TR",
+                    "TW",
+                    "UZ",
+                    "VN",
+                    "YE",
+                ]
+                for c in origin_countries
+            ):
+                category_id = "20"
 
-        return {'category_id': category_id}
+        return {"category_id": category_id}
 
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
@@ -110,7 +155,7 @@ class LT(UNIT3D):
         }
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
 
         resolved_type = type if type is not None and type != "" else meta.type
@@ -178,14 +223,30 @@ class LT(UNIT3D):
             # Check if original language is "es" if true replace title for AKA if available
             title_value = meta.title
             if meta.original_language == "es" and aka_value:
-                lt_name = lt_name.replace(title_value, aka_value.replace('AKA', '')).strip()
+                lt_name = lt_name.replace(title_value, aka_value.replace("AKA", "")).strip()
             # Check if audio Spanish exists
 
             audio_latino_check = {
-                "es-419", "es-mx", "es-ar", "es-cl", "es-ve",
-                "es-bo",  "es-co", "es-cr", "es-do", "es-ec",
-                "es-sv",  "es-gt", "es-hn", "es-ni", "es-pa",
-                "es-py",  "es-pe", "es-pr", "es-uy"}
+                "es-419",
+                "es-mx",
+                "es-ar",
+                "es-cl",
+                "es-ve",
+                "es-bo",
+                "es-co",
+                "es-cr",
+                "es-do",
+                "es-ec",
+                "es-sv",
+                "es-gt",
+                "es-hn",
+                "es-ni",
+                "es-pa",
+                "es-py",
+                "es-pe",
+                "es-pr",
+                "es-uy",
+            }
 
             audio_castilian_check = ["es", "es-es"]
             # Use keywords instead of massive exact-match lists
@@ -217,12 +278,12 @@ class LT(UNIT3D):
                 is_castilian_title = any(kw in title for kw in castilian_keywords)
 
                 # 1. Check strict Latino language codes or Edge Case: Language is 'es' but Title contains Latino keywords
-                if lang in audio_latino_check or (lang == 'es' and is_latino_title):
+                if lang in audio_latino_check or (lang == "es" and is_latino_title):
                     has_latino = True
                     audios.append(audio_map)
 
                 # 2. Edge Case: Language is 'es' and Title contains Castilian keywords or Fallback: Check strict Castilian codes (includes 'es' as default)
-                elif (lang == 'es' and is_castilian_title) or lang in audio_castilian_check:
+                elif (lang == "es" and is_castilian_title) or lang in audio_castilian_check:
                     has_castilian = True
                     audios.append(audio_map)
 
@@ -248,7 +309,7 @@ class LT(UNIT3D):
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
-            'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
+            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
 
         return data

@@ -16,8 +16,8 @@ Config = dict[str, Any]
 class A4K(UNIT3D):
     tracker = "A4K"
     base_url = "https://aura4k.net"
-    approved_image_hosts = ["ptpimg", "onlyimage", "imgbox", "ptscreens", "imgbb", "imgur", "postimg"]
-    banned_groups = ["BiTOR", "DepraveD", "Flights", "SasukeducK", "SPDVD", "TEKNO3D"]
+    approved_image_hosts = ("ptpimg", "onlyimage", "imgbox", "ptscreens", "imgbb", "imgur", "postimg")
+    banned_groups = ("BiTOR", "DepraveD", "Flights", "SasukeducK", "SPDVD", "TEKNO3D")
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
@@ -25,7 +25,7 @@ class A4K(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='A4K')
+        super().__init__(config, tracker_name="A4K")
         self.config = config
         self.common = COMMON(config)
         self.rehost_images_manager = RehostImagesManager(config)
@@ -39,7 +39,7 @@ class A4K(UNIT3D):
     ) -> dict[str, str]:
         _ = (type, reverse, mapping_only)
         type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "ENCODE": "3"}.get(meta.type or "", "0")
-        return {'type_id': type_id}
+        return {"type_id": type_id}
 
     async def get_resolution_id(
         self,
@@ -53,7 +53,7 @@ class A4K(UNIT3D):
             "4320p": "1",
             "2160p": "2",
         }.get(meta.resolution, "10")
-        return {'resolution_id': resolution_id}
+        return {"resolution_id": resolution_id}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
@@ -76,15 +76,15 @@ class A4K(UNIT3D):
         if not meta.is_disc and meta.type in ["ENCODE", "WEBDL"]:
             tracks = meta.mediainfo.get("media", {}).get("track", [])
             for track in tracks:
-                if track.get('@type') == "Video":
-                    encoding_settings = track.get('Encoded_Library_Settings', {})
+                if track.get("@type") == "Video":
+                    encoding_settings = track.get("Encoded_Library_Settings", {})
 
                     if encoding_settings:
-                        bit_rate = track.get('BitRate')
+                        bit_rate = track.get("BitRate")
                         if bit_rate:
                             try:
                                 bit_rate_num = int(bit_rate)
-                            except (ValueError, TypeError):
+                            except ValueError, TypeError:
                                 bit_rate_num = None
 
                             if bit_rate_num is not None:
@@ -93,7 +93,7 @@ class A4K(UNIT3D):
                                     if not meta.unattended:
                                         logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K movie uploads.")
                                     return False
-                                elif meta.category == "TV" and bit_rate_kbps < 10000:
+                                if meta.category == "TV" and bit_rate_kbps < 10000:
                                     if not meta.unattended:
                                         logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K TV uploads.")
                                     return False
@@ -125,21 +125,19 @@ class A4K(UNIT3D):
         return should_continue
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
-        data = {
-            'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
+        return {
+            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
-
-        return data
 
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {
-            'ibb.co': 'imgbb',
-            'imgbox.com': 'imgbox',
-            'imgur.com': 'imgur',
-            'postimg.cc': 'postimg',
-            'ptscreens.com': 'ptscreens',
-            'onlyimage.org': 'onlyimage',
-            'ptpimg.me': 'ptpimg',
+            "ibb.co": "imgbb",
+            "imgbox.com": "imgbox",
+            "imgur.com": "imgur",
+            "postimg.cc": "postimg",
+            "ptscreens.com": "ptscreens",
+            "onlyimage.org": "onlyimage",
+            "ptpimg.me": "ptpimg",
         }
         await self.rehost_images_manager.check_hosts(
             meta,
@@ -160,4 +158,4 @@ class A4K(UNIT3D):
             if meta.is_disc != "BDMV":
                 a4k_name = a4k_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
         logger.info(f"[yellow]Generated name for {self.tracker}: [bold]{a4k_name}[/bold][/yellow]")
-        return {'name': a4k_name}
+        return {"name": a4k_name}

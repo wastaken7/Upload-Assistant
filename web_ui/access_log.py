@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -19,7 +20,7 @@ class AccessLogger:
         self.log_file = self.cfg_dir / "access_log.log"
 
     def get_level(self) -> str:
-        try:
+        with contextlib.suppress(Exception):
             if self.user_file.exists():
                 try:
                     doc = json.loads(self.user_file.read_text(encoding="utf-8"))
@@ -29,8 +30,6 @@ class AccessLogger:
                     txt = doc.get("access_log_level")
                     if isinstance(txt, str) and txt in VALID_LEVELS:
                         return txt
-        except Exception:
-            pass
         return DEFAULT_LEVEL
 
     def set_level(self, level: str) -> bool:
@@ -75,8 +74,19 @@ class AccessLogger:
         # access_denied: only log non-success (failed) attempts
         return not success
 
-    def log(self, *, endpoint: str, method: str, remote_addr: str | None, username: str | None, success: bool, status: int, headers: dict[str, Any] | None = None, details: str | None = None) -> None:
-        try:
+    def log(
+        self,
+        *,
+        endpoint: str,
+        method: str,
+        remote_addr: str | None,
+        username: str | None,
+        success: bool,
+        status: int,
+        headers: dict[str, Any] | None = None,
+        details: str | None = None,
+    ) -> None:
+        with contextlib.suppress(Exception):
             record: dict[str, Any] = {
                 "timestamp": datetime.now(UTC).isoformat(),
                 "endpoint": endpoint,
@@ -150,19 +160,17 @@ class AccessLogger:
                     record["user"] = "<REDACTED>"
 
             # Append as JSON line
-            with open(self.log_file, "a", encoding="utf-8") as f:
+            with Path(self.log_file).open("a", encoding="utf-8") as f:
                 # codeql[py/clear-text-storage-sensitive-data]
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
-        except Exception:
             # Best-effort logging: swallow errors
-            pass
 
     def tail(self, n: int = 200) -> list[dict[str, Any]]:
         try:
             if not self.log_file.exists():
                 return []
             # Read last n lines (simple approach)
-            with open(self.log_file, encoding="utf-8") as f:
+            with Path(self.log_file).open(encoding="utf-8") as f:
                 lines = f.read().splitlines()
             lines = lines[-n:]
             out = []

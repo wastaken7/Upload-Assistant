@@ -1,11 +1,11 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import argparse
 import datetime
-import os
 import re
 import sys
 import urllib.parse
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 from src.book_prep import detect_newspaper, sanitize_book_author, sanitize_book_language
@@ -573,10 +573,10 @@ class Args:
             parsed_args["path"] = ["dummy_path_for_site_upload"]
 
         # manual_frames parsing happens after parsed_args are merged into meta
-        if len(before_args) >= 1 and not os.path.exists(" ".join(parsed_args["path"])):
+        if len(before_args) >= 1 and not Path(" ".join(parsed_args["path"])).exists():
             for each in before_args:
                 parsed_args["path"].append(each)
-                if os.path.exists(" ".join(parsed_args["path"])):
+                if Path(" ".join(parsed_args["path"])).exists():
                     if any(".mkv" in x for x in before_args):
                         if ".mkv" in " ".join(parsed_args["path"]):
                             break
@@ -596,7 +596,7 @@ class Args:
                     elif key == "tag":
                         meta[key] = f"-{value2}"
                     elif key == "description_file" or key == "comparison":
-                        meta[key] = os.path.abspath(value2)
+                        meta[key] = str(Path(value2).resolve())
                     elif key == "screens":
                         meta[key] = int(value2)
                     elif key == "season":

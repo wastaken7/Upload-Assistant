@@ -11,7 +11,7 @@ Config = dict[str, Any]
 class UTP(UNIT3D):
     tracker = "UTP"
     base_url = "https://utp.to"
-    banned_groups = []
+    banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
@@ -19,7 +19,7 @@ class UTP(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='UTP')
+        super().__init__(config, tracker_name="UTP")
         self.config = config
         self.common = COMMON(config)
 
@@ -33,10 +33,10 @@ class UTP(UNIT3D):
         _ = (category, reverse, mapping_only)
         category_name = meta.category
         category_id = {
-            'MOVIE': '1',
-            'TV': '2',
-        }.get(category_name, '1')  # Default to MOVIE
-        return {'category_id': category_id}
+            "MOVIE": "1",
+            "TV": "2",
+        }.get(category_name, "1")  # Default to MOVIE
+        return {"category_id": category_id}
 
     async def get_resolution_id(
         self,
@@ -52,7 +52,7 @@ class UTP(UNIT3D):
             "1080p": "3",
             "1080i": "4",
         }.get(meta.resolution, "11")  # Default to Other (11)
-        return {'resolution_id': resolution_id}
+        return {"resolution_id": resolution_id}
 
     async def get_type_id(
         self,
@@ -70,7 +70,7 @@ class UTP(UNIT3D):
             "WEBRIP": "5",
             "HDTV": "6",
         }.get(str(meta.type).upper(), "3")  # Default to ENCODE
-        return {'type_id': type_id}
+        return {"type_id": type_id}
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         """
@@ -85,9 +85,9 @@ class UTP(UNIT3D):
         original_image_list = meta.image_list
         transformed_image_list: list[dict[str, Any]] = [
             {
-                'web_url': img.get('raw_url', ''),   # Link goes to full image
-                'raw_url': img.get('img_url', ''),   # Display shows medium image
-                'img_url': img.get('img_url', ''),
+                "web_url": img.get("raw_url", ""),  # Link goes to full image
+                "raw_url": img.get("img_url", ""),  # Display shows medium image
+                "img_url": img.get("img_url", ""),
             }
             for img in original_image_list
         ]
@@ -99,9 +99,9 @@ class UTP(UNIT3D):
             original_new_images[key] = meta[key]
             meta[key] = [
                 {
-                    'web_url': img.get('raw_url', ''),
-                    'raw_url': img.get('img_url', ''),
-                    'img_url': img.get('img_url', ''),
+                    "web_url": img.get("raw_url", ""),
+                    "raw_url": img.get("img_url", ""),
+                    "img_url": img.get("img_url", ""),
                 }
                 for img in meta[key]
             ]
@@ -148,10 +148,10 @@ class UTP(UNIT3D):
         service = meta.service
         audio_raw = meta.audio
         # Only include audio for Atmos or lossless codecs
-        lossless_indicators = ['Atmos', 'TrueHD', 'DTS-HD MA', 'DTS:X', 'LPCM', 'FLAC', 'PCM']
+        lossless_indicators = ["Atmos", "TrueHD", "DTS-HD MA", "DTS:X", "LPCM", "FLAC", "PCM"]
         if any(indicator in audio_raw for indicator in lossless_indicators):
-            audio = audio_raw.replace('Dual-Audio', '').replace('Dubbed', '').strip()
-            audio = ' '.join(audio.split())
+            audio = audio_raw.replace("Dual-Audio", "").replace("Dubbed", "").strip()
+            audio = " ".join(audio.split())
         else:
             audio = ""  # Don't include lossy audio (AAC, DD, DD+, etc.) in name
         video_codec = meta.video_codec
@@ -187,9 +187,8 @@ class UTP(UNIT3D):
             name = meta.name
 
         # Clean up multiple spaces and add tag
-        name = ' '.join(name.split())
+        name = " ".join(name.split())
         if tag:
             name = f"{name}{tag}"
 
-
-        return {'name': name}
+        return {"name": name}

@@ -13,7 +13,7 @@ from src.trackers.UNIT3D import UNIT3D
 class DP(UNIT3D):
     tracker = "DP"
     base_url = "https://darkpeers.org"
-    banned_groups = [
+    banned_groups = (
         "ARCADE",
         "aXXo",
         "BANDOLEROS",
@@ -76,14 +76,14 @@ class DP(UNIT3D):
         "X0r",
         "YIFY",
         "YTS",
-    ]
+    )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     requests_url = f"{base_url}/api/requests/filter"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ["https://darkpeers.org"]
+    tracker_urls = ("https://darkpeers.org",)
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="DP")
@@ -94,7 +94,7 @@ class DP(UNIT3D):
         should_continue = True
         if meta.keep_folder:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f'[bold red]{self.tracker} does not allow single files in a folder.')
+                logger.info(f"[bold red]{self.tracker} does not allow single files in a folder.")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -102,10 +102,8 @@ class DP(UNIT3D):
             else:
                 return False
 
-        nordic_languages = ['danish', 'swedish', 'norwegian', 'icelandic', 'finnish', 'english']
-        if not await self.common.check_language_requirements(
-            meta, self.tracker, languages_to_check=nordic_languages, check_audio=True, check_subtitle=True
-        ):
+        nordic_languages = ["danish", "swedish", "norwegian", "icelandic", "finnish", "english"]
+        if not await self.common.check_language_requirements(meta, self.tracker, languages_to_check=nordic_languages, check_audio=True, check_subtitle=True):
             return False
 
         if meta.type not in ["WEBDL"] and meta.tag in ["EVO"]:
@@ -120,11 +118,9 @@ class DP(UNIT3D):
         return should_continue
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
-        data = {
-            'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
+        return {
+            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
-
-        return data
 
     async def get_audio(self, meta: Meta) -> str:
         languages_result = "SKIPPED"
@@ -144,7 +140,7 @@ class DP(UNIT3D):
             else:
                 languages_result = next(iter(normalized_languages), "SKIPPED")
 
-        return f'{languages_result}'
+        return f"{languages_result}"
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         dp_name = meta.name
@@ -153,7 +149,7 @@ class DP(UNIT3D):
         if audio and audio != "SKIPPED" and "Dual-Audio" in dp_name:
             dp_name = dp_name.replace("Dual-Audio", audio)
 
-        return {'name': dp_name}
+        return {"name": dp_name}
 
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {
@@ -164,14 +160,13 @@ class DP(UNIT3D):
         }
         if mapping_only:
             return category_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in category_id.items()}
-        elif category:
+        if category:
             return {"category_id": category_id.get(category, "0")}
-        else:
-            meta_category = meta.category
-            resolved_id = category_id.get(meta_category, "0")
-            return {"category_id": resolved_id}
+        meta_category = meta.category
+        resolved_id = category_id.get(meta_category, "0")
+        return {"category_id": resolved_id}
 
     async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
@@ -192,7 +187,7 @@ class DP(UNIT3D):
         }
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
 
         meta_type = "" if not meta.type else meta.type.upper()
@@ -208,14 +203,13 @@ class DP(UNIT3D):
                 elif t_upper in ("MP3", "M4B", "FLAC", "AAC", "M4A", "OGG", "WAV"):
                     t_upper = "AUDIOBOOK"
                 return {"type_id": type_id.get(t_upper, type_id.get(type, "0"))}
-            else:
-                if meta.category == "BOOK":
-                    if meta.audiobook:
-                        meta_type = "AUDIOBOOK"
-                    elif meta.comic or meta_type in ("CBR", "CBZ"):
-                        meta_type = "COMIC"
-                    else:
-                        meta_type = "EBOOK"
+            if meta.category == "BOOK":
+                if meta.audiobook:
+                    meta_type = "AUDIOBOOK"
+                elif meta.comic or meta_type in ("CBR", "CBZ"):
+                    meta_type = "COMIC"
+                else:
+                    meta_type = "EBOOK"
 
         if meta.category == "GAME":
             meta_type = "CONSOLE" if meta.console_game else meta.platform.upper()

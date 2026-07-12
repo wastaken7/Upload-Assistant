@@ -15,7 +15,7 @@ Config = dict[str, Any]
 class YUS(UNIT3D):
     tracker = "YUS"
     base_url = "https://yu-scene.net"
-    banned_groups = [
+    banned_groups = (
         "ADDICTION",
         "B3LLUM",
         "BANDOLEROS",
@@ -62,25 +62,25 @@ class YUS(UNIT3D):
         "ZKBL",
         "ZmN",
         "ZMNT",
-    ]
+    )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ['https://yu-scene.net']
+    tracker_urls = ("https://yu-scene.net",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='YUS')
+        super().__init__(config, tracker_name="YUS")
         self.config = config
         self.common = COMMON(config)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         genres = f"{', '.join(meta.keywords)} {meta.combined_genres}"
-        adult_keywords = ['xxx', 'erotic', 'porn', 'adult', 'orgy', 'hentai', 'adult animation', 'softcore']
-        if any(re.search(rf'(^|,\s*){re.escape(keyword)}(\s*,|$)', genres, re.IGNORECASE) for keyword in adult_keywords):
+        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai", "adult animation", "softcore"]
+        if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info('[bold red]Porn/xxx is not allowed at YUS.')
+                logger.info("[bold red]Porn/xxx is not allowed at YUS.")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -110,7 +110,7 @@ class YUS(UNIT3D):
         }
         if mapping_only:
             return cat_map
-        elif reverse:
+        if reverse:
             return {v: k for k, v in cat_map.items()}
 
         resolved_category = category if category is not None and category != "" else meta.category
@@ -151,7 +151,7 @@ class YUS(UNIT3D):
         }
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
 
         resolved_type = type if type is not None and type != "" else meta.type

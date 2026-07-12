@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
+import contextlib
 import json
-import os
 import sys
 import time
 from collections.abc import Mapping
@@ -25,10 +25,10 @@ from src.trackersetup import tracker_class_map
 class TrackerDataManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        trackers_cfg = cast(Mapping[str, Mapping[str, Any]], config.get('TRACKERS', {}))
+        trackers_cfg = cast(Mapping[str, Mapping[str, Any]], config.get("TRACKERS", {}))
         if not isinstance(trackers_cfg, dict):
             raise ValueError("'TRACKERS' config section must be a dict")
-        default_cfg = cast(Mapping[str, Any], config.get('DEFAULT', {}))
+        default_cfg = cast(Mapping[str, Any], config.get("DEFAULT", {}))
         if not isinstance(default_cfg, dict):
             raise ValueError("'DEFAULT' config section must be a dict")
         self.trackers_config = trackers_cfg
@@ -40,9 +40,9 @@ class TrackerDataManager:
 
     async def get_tracker_timestamps(self, base_dir: str | None = None) -> dict[str, float]:
         """Get tracker timestamps from the log file"""
-        timestamp_file = os.path.join(f"{base_dir}", "data", "banned", "tracker_timestamps.json")
+        timestamp_file = Path(f"{base_dir}") / "data" / "banned" / "tracker_timestamps.json"
         try:
-            if os.path.exists(timestamp_file):
+            if Path(timestamp_file).exists():
                 timestamps_text = await asyncio.to_thread(Path(timestamp_file).read_text)
                 return cast(dict[str, float], json.loads(timestamps_text))
             return {}
@@ -52,9 +52,9 @@ class TrackerDataManager:
 
     async def save_tracker_timestamp(self, tracker_name: str, base_dir: str | None = None) -> None:
         """Save timestamp for when tracker was processed"""
-        timestamp_file = os.path.join(f"{base_dir}", "data", "banned", "tracker_timestamps.json")
+        timestamp_file = Path(f"{base_dir}") / "data" / "banned" / "tracker_timestamps.json"
         try:
-            os.makedirs(f"{base_dir}/data/banned", exist_ok=True)
+            Path(f"{base_dir}/data/banned").mkdir(parents=True, exist_ok=True)
 
             timestamps = await self.get_tracker_timestamps(base_dir)
             timestamps[tracker_name] = time.time()
@@ -111,22 +111,22 @@ class TrackerDataManager:
             tracker_keys = {
                 # preference some unit3d based trackers first
                 # since they can return tmdb/imdb/tvdb ids
-                'aither': 'AITHER',
-                'blu': 'BLU',
-                'lst': 'LST',
-                'ulcx': 'ULCX',
-                'oe': 'OE',
-                'huno': 'HUNO',
-                'ant': 'ANT',
-                'btn': 'BTN',
-                'bhd': 'BHD',
-                'hdb': 'HDB',
-                'sp': 'SP',
-                'rf': 'RF',
-                'otw': 'OTW',
-                'yus': 'YUS',
-                'dp': 'DP',
-                'ptp': 'PTP',
+                "aither": "AITHER",
+                "blu": "BLU",
+                "lst": "LST",
+                "ulcx": "ULCX",
+                "oe": "OE",
+                "huno": "HUNO",
+                "ant": "ANT",
+                "btn": "BTN",
+                "bhd": "BHD",
+                "hdb": "HDB",
+                "sp": "SP",
+                "rf": "RF",
+                "otw": "OTW",
+                "yus": "YUS",
+                "dp": "DP",
+                "ptp": "PTP",
             }
 
             specific_tracker: list[str] = [tracker_keys[key] for key in tracker_keys if meta.get(key) is not None]
@@ -139,8 +139,8 @@ class TrackerDataManager:
                         valid_trackers.append(tracker)
                         continue
                     tracker_config = self.get_tracker_config(tracker)
-                    api_key = tracker_config.get('api_key', '')
-                    announce_url = tracker_config.get('announce_url', '')
+                    api_key = tracker_config.get("api_key", "")
+                    announce_url = tracker_config.get("announce_url", "")
 
                     if not tracker_config:
                         logger.debug(f"[yellow]Tracker {tracker} not found in config, skipping[/yellow]")
@@ -168,7 +168,7 @@ class TrackerDataManager:
                 meta_trackers_raw = meta.trackers
                 meta_trackers: list[str]
                 if isinstance(meta_trackers_raw, str):
-                    meta_trackers = [t.strip().upper() for t in meta_trackers_raw.split(',')]
+                    meta_trackers = [t.strip().upper() for t in meta_trackers_raw.split(",")]
                 elif isinstance(meta_trackers_raw, list):
                     meta_trackers_list = meta_trackers_raw
                     meta_trackers = [t.upper() for t in meta_trackers_list]
@@ -222,7 +222,7 @@ class TrackerDataManager:
                 while not found_match and specific_tracker:
                     meta_trackers_raw = meta.trackers
                     if isinstance(meta_trackers_raw, str):
-                        meta_trackers = [t.strip().upper() for t in meta_trackers_raw.split(',')]
+                        meta_trackers = [t.strip().upper() for t in meta_trackers_raw.split(",")]
                     elif isinstance(meta_trackers_raw, list):
                         meta_trackers_list = cast(list[Any], meta_trackers_raw)
                         meta_trackers = [str(t).upper() for t in meta_trackers_list]
@@ -239,14 +239,10 @@ class TrackerDataManager:
                             waiting_trackers.sort(key=lambda x: x[1])
                             tracker_to_process, wait_time = waiting_trackers[0]
 
-                            cooldown_info = ", ".join(
-                                f"{tracker} ({wait_time:.1f}s)" for tracker, wait_time in waiting_trackers
-                            )
+                            cooldown_info = ", ".join(f"{tracker} ({wait_time:.1f}s)" for tracker, wait_time in waiting_trackers)
                             for remaining in range(int(wait_time), -1, -1):
                                 msg = (
-                                    f"[yellow]All specific trackers in cooldown. "
-                                    f"Waiting {remaining:.1f} seconds for {tracker_to_process}. "
-                                    f"Cooldowns: {cooldown_info}[/yellow]"
+                                    f"[yellow]All specific trackers in cooldown. Waiting {remaining:.1f} seconds for {tracker_to_process}. Cooldowns: {cooldown_info}[/yellow]"
                                 )
                                 logger.info(msg)
                                 await asyncio.sleep(1)
@@ -260,7 +256,7 @@ class TrackerDataManager:
                     if tracker_to_process == "BTN":
                         btn_id_value = meta.btn
                         btn_id = str(btn_id_value) if btn_id_value is not None else ""
-                        btn_api = self.default_config.get('btn_api')
+                        btn_api = self.default_config.get("btn_api")
                         if isinstance(btn_api, str) and len(btn_api) > 25:
                             imdb, tvdb = await BtnIdManager.get_btn_torrents(btn_api, btn_id)
                             if imdb != 0 or tvdb != 0:
@@ -288,7 +284,7 @@ class TrackerDataManager:
                                     meta.matched_tracker = "BTN"
                             await self.save_tracker_timestamp("BTN", base_dir=base_dir)
                     elif tracker_to_process == "ANT":
-                        imdb_tmdb_list = await tracker_class_map['ANT'](config=self.config).get_data_from_files(meta)
+                        imdb_tmdb_list = await tracker_class_map["ANT"](config=self.config).get_data_from_files(meta)
                         if imdb_tmdb_list:
                             logger.info(f"[green]Found ANT IDs: {imdb_tmdb_list}[/green]")
                             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
@@ -331,6 +327,7 @@ class TrackerDataManager:
             else:
                 # Process all trackers with API = true if no specific tracker is set in meta
                 from src.trackersetup import api_trackers
+
                 other_api = sorted(api_trackers - {"BHD"})
                 tracker_order = ["PTP", "HDB", "BHD"] + other_api
 
@@ -369,9 +366,9 @@ class TrackerDataManager:
                 for tracker_name in tracker_order:
                     if not found_match:  # Stop checking once a match is found
                         tracker_config = self.get_tracker_config(tracker_name)
-                        use_search = tracker_config.get('use_for_search')
+                        use_search = tracker_config.get("use_for_search")
                         if use_search is None:
-                            use_search = tracker_config.get('useAPI', 'false')
+                            use_search = tracker_config.get("useAPI", "false")
                         if str(use_search).lower() == "true":
                             meta = await process_tracker(tracker_name, meta, skip_tracker_descriptions)
 
@@ -393,6 +390,7 @@ class TrackerDataManager:
 
         # Prioritize trackers in this order
         from src.trackersetup import api_trackers
+
         prioritized = ["BLU", "AITHER", "ULCX", "LST", "OE"]
         tracker_order = prioritized + sorted(api_trackers - set(prioritized) - {"BHD"})
 
@@ -410,21 +408,19 @@ class TrackerDataManager:
                 # Check each stored comment for matching tracker URL
                 for comment_data in meta.torrent_comments:
                     is_tracker_comment = False
-                    comment = str(comment_data.get('comment', ''))
+                    comment = str(comment_data.get("comment", ""))
                     # Dynamically build tracker hosts
                     tracker_hosts = {}
                     for name in api_trackers:
                         hostname = ""
                         if name in tracker_class_map:
-                            try:
+                            with contextlib.suppress(Exception):
                                 tracker_instance = tracker_class_map[name](self.config)
-                                base_url = getattr(tracker_instance, 'base_url', '')
+                                base_url = getattr(tracker_instance, "base_url", "")
                                 if base_url:
                                     hostname = urlparse(base_url).hostname or ""
-                            except Exception:
-                                pass
                         if not hostname:
-                            announce_url = self.config.get('TRACKERS', {}).get(name, {}).get('announce_url', '')
+                            announce_url = self.config.get("TRACKERS", {}).get(name, {}).get("announce_url", "")
                             if announce_url:
                                 hostname = urlparse(announce_url).hostname or ""
                         if hostname:
@@ -451,7 +447,7 @@ class TrackerDataManager:
                                 break
 
                     if is_tracker_comment:
-                        match = re.search(r'/(\d+)$', comment)
+                        match = re.search(r"/(\d+)$", comment)
                         if match:
                             tracker_id = match.group(1)
                             meta[tracker_key] = tracker_id
@@ -479,4 +475,3 @@ class TrackerDataManager:
 
                     if meta.distributor and not had_distributor and meta.debug:
                         logger.info(f"[green]Found distributor '{meta.distributor}' from {tracker_name}[/green]")
-

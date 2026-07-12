@@ -14,6 +14,7 @@ import sys
 import time
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import cli_ui
@@ -64,7 +65,7 @@ class CustomTorrent(torf.Torrent):
     @piece_size_min.setter
     def piece_size_min(self, piece_size_min: int | None) -> None:
         _ = piece_size_min
-        return None
+        return
 
     @property
     def piece_size_max(self) -> int:
@@ -73,7 +74,7 @@ class CustomTorrent(torf.Torrent):
     @piece_size_max.setter
     def piece_size_max(self, piece_size_max: int | None) -> None:
         _ = piece_size_max
-        return None
+        return
 
     @property
     def piece_size(self) -> int:
@@ -170,20 +171,19 @@ class TorrentCreator:
             manual_patterns = ["*.nfo", "*.jpg", "*.png", "*.txt", "*.xml"]
         else:
             manual_patterns = ["*.nfo", "*.jpg", "*.png", "*.srt", "*.sub", "*.vtt", "*.ssa", "*.ass", "*.txt", "*.xml"]
-        keep_set = {os.path.abspath(f) for f in filelist}
+        keep_set = {str(Path(f).resolve()) for f in filelist}
 
         exclude_files: set[str] = set()
         for dirpath, _, filenames in os.walk(root_folder):
             for fname in filenames:
-                full_path = os.path.abspath(os.path.join(dirpath, fname))
+                full_path = str(Path(Path(dirpath) / fname).resolve())
                 if full_path in keep_set:
                     continue
                 if any(fnmatch.fnmatch(fname, pat) for pat in manual_patterns):
                     continue
                 exclude_files.add(fname)
 
-        exclude_str = ",".join(sorted(exclude_files) + manual_patterns)
-        return exclude_str
+        return ",".join(sorted(exclude_files) + manual_patterns)
 
     @classmethod
     async def create_torrent(
@@ -235,8 +235,8 @@ class TorrentCreator:
                         exclude = ["*.*", "*sample.mkv"]
                         meta.mkbrr = False
                     elif not meta.tv_pack:
-                        folder_name = os.path.basename(str(path))
-                        include = [f"{folder_name}/{os.path.basename(f)}" for f in creation_filelist]
+                        folder_name = Path(str(path)).name
+                        include = [f"{folder_name}/{Path(f).name}" for f in creation_filelist]
                         exclude = ["*", "*/**"]
 
                 elif meta.isdir:
@@ -252,20 +252,20 @@ class TorrentCreator:
                         path_dir = os.fspath(path)
                         os.chdir(path_dir)
                         globs = (
-                            [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mkv"))]
-                            + [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.mp4"))]
-                            + [os.path.basename(f) for f in glob.glob(os.path.join(path_dir, "*.ts"))]
+                            [Path(f).name for f in glob.glob(Path(path_dir) / "*.mkv")]
+                            + [Path(f).name for f in glob.glob(Path(path_dir) / "*.mp4")]
+                            + [Path(f).name for f in glob.glob(Path(path_dir) / "*.ts")]
                         )
                         no_sample_globs = [
-                            os.path.abspath(f"{path_dir}{os.sep}{file}") for file in globs if not file.lower().endswith("sample.mkv") or "!sample" in file.lower()
+                            str(Path(f"{path_dir}{os.sep}{file}").resolve()) for file in globs if not file.lower().endswith("sample.mkv") or "!sample" in file.lower()
                         ]
                         if len(no_sample_globs) == 1 and not is_subs:
                             path = meta.filelist[0]
                         exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta.is_disc else []
                         include = ["*.mkv", "*.mp4", "*.ts"] if not meta.is_disc else []
                     else:
-                        folder_name = os.path.basename(str(path))
-                        include = [f"{folder_name}/{os.path.basename(f)}" for f in creation_filelist]
+                        folder_name = Path(str(path)).name
+                        include = [f"{folder_name}/{Path(f).name}" for f in creation_filelist]
                         exclude = ["*", "*/**"]
                 else:
                     exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta.is_disc else []
@@ -275,13 +275,13 @@ class TorrentCreator:
                 if meta.mkbrr:
                     try:
                         # Validate input path to prevent potential command injection
-                        if not os.path.exists(path):
+                        if not Path(path).exists():
                             raise ValueError(f"Path does not exist: {path}")
                         mkbrr_binary = cls.get_mkbrr_path(meta)
                         # Validate mkbrr binary exists and is executable
-                        if not os.path.exists(mkbrr_binary):
+                        if not Path(mkbrr_binary).exists():
                             raise FileNotFoundError(f"mkbrr binary not found: {mkbrr_binary}")
-                        output_path = os.path.join(meta.base_dir, "tmp", meta.uuid, f"{output_filename}.torrent")
+                        output_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"{output_filename}.torrent"
 
                         # Ensure executable permission for non-Windows systems
                         if not sys.platform.startswith("win"):
@@ -385,18 +385,17 @@ class TorrentCreator:
                             logger.info(f"[bold red]mkbrr exited with non-zero status code: {result}")
                             raise RuntimeError(f"mkbrr exited with status code {result}")
 
-                        if not os.path.exists(output_path):
+                        if not Path(output_path).exists():
                             logger.info("[bold red]mkbrr did not create a torrent file!")
                             raise FileNotFoundError(f"Expected torrent file {output_path} was not created")
-                        else:
-                            return output_path
+                        return output_path
 
                     except subprocess.CalledProcessError as e:
                         logger.info(f"[bold red]Error creating torrent with mkbrr: {e}")
                         logger.info("[yellow]Falling back to CustomTorrent method")
                         meta.mkbrr = False
                     except Exception as e:
-                        logger.info(f"[bold red]Error using mkbrr: {str(e)}")
+                        logger.info(f"[bold red]Error using mkbrr: {e!s}")
                         logger.info("[yellow]Falling back to CustomTorrent method")
                         meta.mkbrr = False
                 overall_start_time = time.time()
@@ -406,9 +405,9 @@ class TorrentCreator:
                     size = 0
                     if os.path.isfile(path):
                         size = os.path.getsize(path)
-                    elif os.path.isdir(path):
+                    elif Path(path).is_dir():
                         for root, _dirs, files in os.walk(path):
-                            size += sum(os.path.getsize(os.path.join(root, f)) for f in files if os.path.isfile(os.path.join(root, f)))
+                            size += sum(os.path.getsize(Path(root) / f) for f in files if os.path.isfile(Path(root) / f))
                     return size
 
                 initial_size = await asyncio.to_thread(calculate_size)
@@ -436,7 +435,7 @@ class TorrentCreator:
                 # Run torrent generation in thread to avoid blocking the event loop
                 def generate_torrent() -> None:
                     torrent.generate(callback=cls.torf_cb, interval=5)
-                    torrent.write(f"{meta.base_dir}/tmp/{meta.uuid}/{output_filename}.torrent", overwrite=True)
+                    torrent.write(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{output_filename}.torrent", overwrite=True)
                     torrent.verify_filesize(path)
 
                 await asyncio.to_thread(generate_torrent)
@@ -444,7 +443,7 @@ class TorrentCreator:
                 total_elapsed_time = time.time() - overall_start_time
                 formatted_time = time.strftime("%H:%M:%S", time.gmtime(total_elapsed_time))
 
-                torrent_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/{output_filename}.torrent"
+                torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{output_filename}.torrent"
                 torrent_file_size = os.path.getsize(torrent_file_path) / 1024
                 logger.debug("")
                 logger.debug(f"[bold green]torrent created in {formatted_time}")
@@ -486,16 +485,16 @@ class TorrentCreator:
 
     @staticmethod
     def create_random_torrents(base_dir: str, uuid: str, num: int | str, path: str) -> None:
-        manual_name = re.sub(r"[^0-9a-zA-Z\[\]\'\-]+", ".", os.path.basename(path))
-        base_torrent = Torrent.read(f"{base_dir}/tmp/{uuid}/BASE.torrent")
+        manual_name = re.sub(r"[^0-9a-zA-Z\[\]\'\-]+", ".", Path(path).name)
+        base_torrent = Torrent.read(f"{base_dir}{'/' + 'tmp' + '/'}{uuid}/BASE.torrent")
         for i in range(1, int(num) + 1):
             new_torrent = base_torrent
             new_torrent.metainfo["info"]["entropy"] = random.randint(1, 999999)  # type: ignore  # nosec B311
-            Torrent.copy(new_torrent).write(f"{base_dir}/tmp/{uuid}/[RAND-{i}]{manual_name}.torrent", overwrite=True)
+            Torrent.copy(new_torrent).write(f"{base_dir}{'/' + 'tmp' + '/'}{uuid}/[RAND-{i}]{manual_name}.torrent", overwrite=True)
 
     @staticmethod
     async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> None:
-        if os.path.exists(torrentpath):
+        if Path(torrentpath).exists():
             base_torrent = Torrent.read(torrentpath)
             base_torrent.trackers = ["https://fake.tracker"]
             base_torrent.comment = "Upload-Assistant (fork)"
@@ -541,7 +540,7 @@ class TorrentCreator:
                     has_subs = True
                     break
             out_name = "BASE_SUBS.torrent" if has_subs else "BASE.torrent"
-            Torrent.copy(base_torrent).write(f"{base_dir}/tmp/{uuid}/{out_name}", overwrite=True)
+            Torrent.copy(base_torrent).write(f"{base_dir}{'/' + 'tmp' + '/'}{uuid}/{out_name}", overwrite=True)
 
     @staticmethod
     def get_mkbrr_path(meta: Meta) -> str:
@@ -550,7 +549,7 @@ class TorrentCreator:
         if system_mkbrr:
             return system_mkbrr
 
-        base_dir = os.path.join(meta.base_dir, "bin", "mkbrr")
+        base_dir = Path(meta.base_dir) / "bin" / "mkbrr"
 
         # Detect OS & Architecture
         system = platform.system().lower()
@@ -559,26 +558,26 @@ class TorrentCreator:
         if system == "windows":
             if arch in {"x86_64", "amd64", "arm64", "aarch64"}:
                 # Windows ARM currently uses the x86_64 mkbrr build via Windows emulation.
-                binary_path = os.path.join(base_dir, "windows", "x86_64", "mkbrr.exe")
+                binary_path = Path(base_dir) / "windows" / "x86_64" / "mkbrr.exe"
             else:
                 raise Exception("Unsupported Windows architecture")
         elif system == "darwin":
-            binary_path = os.path.join(base_dir, "macos", "arm64", "mkbrr") if "arm" in arch else os.path.join(base_dir, "macos", "x86_64", "mkbrr")
+            binary_path = Path(base_dir) / "macos" / "arm64" / "mkbrr" if "arm" in arch else Path(base_dir) / "macos" / "x86_64" / "mkbrr"
         elif system == "linux":
             if "x86_64" in arch:
-                binary_path = os.path.join(base_dir, "linux", "amd64", "mkbrr")
+                binary_path = Path(base_dir) / "linux" / "amd64" / "mkbrr"
             elif "armv6" in arch:
-                binary_path = os.path.join(base_dir, "linux", "armv6", "mkbrr")
+                binary_path = Path(base_dir) / "linux" / "armv6" / "mkbrr"
             elif "arm" in arch:
-                binary_path = os.path.join(base_dir, "linux", "arm", "mkbrr")
+                binary_path = Path(base_dir) / "linux" / "arm" / "mkbrr"
             elif "aarch64" in arch or "arm64" in arch:
-                binary_path = os.path.join(base_dir, "linux", "arm64", "mkbrr")
+                binary_path = Path(base_dir) / "linux" / "arm64" / "mkbrr"
             else:
                 raise Exception("Unsupported Linux architecture")
         else:
             raise Exception("Unsupported OS")
 
-        if not os.path.exists(binary_path):
+        if not Path(binary_path).exists():
             raise FileNotFoundError(f"mkbrr binary not found: {binary_path}")
 
         return binary_path

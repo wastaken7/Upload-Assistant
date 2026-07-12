@@ -5,7 +5,7 @@ import platform
 import re
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import urlparse
 
 import aiofiles
@@ -30,7 +30,7 @@ Config = dict[str, Any]
 
 class BJS:
     tracker = "BJS"
-    banned_groups: list[str] = []
+    banned_groups: tuple[str, ...] = ()
     source_flag = "BJ"
     base_url = "https://bj-share.info"
     auth_token = None
@@ -38,24 +38,81 @@ class BJS:
     torrent_download_url = f"{base_url}/torrents.php?action=download&id="
     requests_url = f"{base_url}/requests.php?"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ['tracker.bj-share.info']
+    tracker_urls = ("tracker.bj-share.info",)
     secret_token: str = ""
     already_has_the_info: bool = False
     database_title: str = ""
-    tmdb_localization_requirements = {
+    tmdb_localization_requirements: ClassVar = {
         "pt-BR": {
             "main": "credits,videos,content_ratings",
             "episode": "",
         }
     }
-    file_extensions = {
-        "mkv", "mp4", "avi", "ts", "m2ts", "wmv", "mov", "flv", "webm", "mpg", "mpeg", "vob", "divx", "xvid",
-        "mp3", "m4b", "flac", "aac", "m4a", "ogg", "wav", "opus", "wma", "ape", "cue", "m3u",
-        "epub", "pdf", "mobi", "azw3", "kfx", "cbz", "cbr", "cbt", "fb2", "ibooks", "djvu", "txt", "html", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-        "zip", "rar", "7z", "tar", "gz", "bz2",
-        "iso", "dmg", "pkg", "exe", "bin", "msi", "apk",
-        "srt", "ass", "vtt", "sub", "idx"
-    }  # fmt: off
+    file_extensions: ClassVar = {
+        "mkv",
+        "mp4",
+        "avi",
+        "ts",
+        "m2ts",
+        "wmv",
+        "mov",
+        "flv",
+        "webm",
+        "mpg",
+        "mpeg",
+        "vob",
+        "divx",
+        "xvid",
+        "mp3",
+        "m4b",
+        "flac",
+        "aac",
+        "m4a",
+        "ogg",
+        "wav",
+        "opus",
+        "wma",
+        "ape",
+        "cue",
+        "m3u",
+        "epub",
+        "pdf",
+        "mobi",
+        "azw3",
+        "kfx",
+        "cbz",
+        "cbr",
+        "cbt",
+        "fb2",
+        "ibooks",
+        "djvu",
+        "txt",
+        "html",
+        "doc",
+        "docx",
+        "xls",
+        "xlsx",
+        "ppt",
+        "pptx",
+        "zip",
+        "rar",
+        "7z",
+        "tar",
+        "gz",
+        "bz2",
+        "iso",
+        "dmg",
+        "pkg",
+        "exe",
+        "bin",
+        "msi",
+        "apk",
+        "srt",
+        "ass",
+        "vtt",
+        "sub",
+        "idx",
+    }
 
     def has_extension(self, name: str) -> bool:
         _, ext = os.path.splitext(name)
@@ -100,10 +157,9 @@ class BJS:
 
         subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
         if not subtitles and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
-            proceed = await self.common.prompt_user_for_confirmation(
+            return await self.common.prompt_user_for_confirmation(
                 f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
             )
-            return proceed
         return subtitles
 
     async def validate_credentials(self, meta: Meta) -> bool:
@@ -248,8 +304,7 @@ class BJS:
 
         if language_name in possible_languages:
             return language_name
-        else:
-            return "Outro"
+        return "Outro"
 
     def get_game_platform(self, meta: Meta) -> str:
         """Map meta.platform to BJS platform ID for the Jogos category."""
@@ -346,9 +401,9 @@ class BJS:
                 platform = available_platforms[0].lower()
                 if "pc" in platform or "windows" in platform:
                     return "Windows"
-                elif "mac" in platform:
+                if "mac" in platform:
                     return "Mac"
-                elif "linux" in platform:
+                if "linux" in platform:
                     return "Linux"
         return ""
 
@@ -368,10 +423,9 @@ class BJS:
         if has_pt_audio:
             if is_original_pt:
                 return "Nacional"
-            elif len(audio_languages) > 1:
+            if len(audio_languages) > 1:
                 return "Dual Áudio"
-            else:
-                return "Dublado"
+            return "Dublado"
 
         return "Legendado"
 
@@ -398,7 +452,7 @@ class BJS:
 
                 width_num = round((16 / 9) * height_num)
                 width = str(width_num)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 pass
 
         else:
@@ -485,8 +539,7 @@ class BJS:
         original_title, brazilian_title = self.get_titles(meta)
         if not brazilian_title:
             return original_title
-        else:
-            return f"{brazilian_title} [{original_title}]"
+        return f"{brazilian_title} [{original_title}]"
 
     def get_titles(self, meta: Meta) -> tuple[str, str]:
         if meta.category == "BOOK":
@@ -523,7 +576,7 @@ class BJS:
         builder = DescriptionBuilder(self.tracker, self.config)
         meta.episode_tmdb_data = self.episode_tmdb_data
 
-        description = await builder.general_description_generator(
+        return await builder.general_description_generator(
             meta,
             audio_spectrogram=True,
             bluray=True,
@@ -545,14 +598,10 @@ class BJS:
             signature=f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/size][/url][/align]",
         )
 
-        return description
-
     def get_trailer(self, meta: Meta) -> str:
         video_results: list[dict[str, Any]] = dict(self.main_tmdb_data.get("videos", {})).get("results", [])
         youtube_code = video_results[-1].get("key", "") if video_results else ""
-        youtube = f"http://www.youtube.com/watch?v={youtube_code}" if youtube_code else meta.youtube or ""
-
-        return youtube
+        return f"http://www.youtube.com/watch?v={youtube_code}" if youtube_code else meta.youtube or ""
 
     def get_rating(self) -> str:
         ratings: list[dict[str, Any]] = dict(self.main_tmdb_data.get("content_ratings", {})).get("results", [])
@@ -853,7 +902,6 @@ class BJS:
 
         return dupes
 
-
     def get_edition(self, meta: Meta) -> str:
         edition_str = meta.edition.lower()
         if not edition_str:
@@ -888,19 +936,18 @@ class BJS:
 
                 try:
                     size_in_gb = meta.bdinfo["size"]
-                except (KeyError, IndexError, TypeError):
+                except KeyError, IndexError, TypeError:
                     size_in_gb = 0
 
                 if size_in_gb > 66:
                     return "BD100"
-                elif size_in_gb > 50:
+                if size_in_gb > 50:
                     return "BD66"
-                elif size_in_gb > 25:
+                if size_in_gb > 25:
                     return "BD50"
-                else:
-                    return "BD25"
+                return "BD25"
 
-            elif is_disc_type == "DVD":
+            if is_disc_type == "DVD":
                 dvd_size = meta.dvd_size
                 if dvd_size in ["DVD9", "DVD5"]:
                     return dvd_size
@@ -998,7 +1045,7 @@ class BJS:
                 response = await self.session.get(cover_tmdb_url, timeout=120)
                 response.raise_for_status()
                 image_bytes = response.content
-                filename = os.path.basename(cover_path)
+                filename = Path(cover_path).name
 
                 return await self.img_host(image_bytes, filename)
             except Exception as e:
@@ -1014,7 +1061,7 @@ class BJS:
             try:
                 async with aiofiles.open(cover_path, "rb") as f:
                     image_bytes = await f.read()
-                filename = os.path.basename(cover_path)
+                filename = Path(cover_path).name
 
                 return await self.img_host(image_bytes, filename)
             except Exception as e:
@@ -1030,14 +1077,14 @@ class BJS:
         async def upload_local_file(path: Path):
             async with aiofiles.open(path, "rb") as f:
                 image_bytes = await f.read()
-            return await self.img_host(image_bytes, os.path.basename(path))
+            return await self.img_host(image_bytes, Path(path).name)
 
         async def upload_remote_file(url: str):
             try:
                 response = await self.session.get(url, timeout=120)
                 response.raise_for_status()
                 image_bytes = response.content
-                filename = os.path.basename(urlparse(url).path) or "screenshot.png"
+                filename = Path(urlparse(url).path).name or "screenshot.png"
                 return await self.img_host(image_bytes, filename)
             except Exception as e:
                 logger.info(f"Failed to process screenshot from URL {url}: {e}", extra={"markup": False})
@@ -1087,9 +1134,7 @@ class BJS:
 
         try:
             date_object = datetime.strptime(raw_date_string, "%Y-%m-%d").replace(tzinfo=UTC)
-            formatted_date = date_object.strftime("%d %b %Y")
-
-            return formatted_date
+            return date_object.strftime("%d %b %Y")
 
         except ValueError:
             return ""
@@ -1111,7 +1156,7 @@ class BJS:
                 bit_depth_str = meta.discs[0]["bdinfo"]["video"][0]["bit_depth"]
                 if "10" in bit_depth_str:
                     is_10_bit = True
-            except (KeyError, IndexError, TypeError):
+            except KeyError, IndexError, TypeError:
                 pass
         else:
             if meta.bit_depth == "10":
@@ -1224,82 +1269,81 @@ class BJS:
             title = self.common.portuguese_title_capitalization(meta.title)
         if not self.config["DEFAULT"].get("search_requests", False) and not meta.search_requests:
             return results
-        else:
-            try:
-                cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
-                if cookie_jar:
-                    self.session.cookies = cookie_jar
-                cat = meta.category
-                if cat == "TV":
-                    cat = 2
-                if cat == "MOVIE":
-                    cat = 1
-                if meta.anime:
-                    cat = 14
+        try:
+            cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+            if cookie_jar:
+                self.session.cookies = cookie_jar
+            cat = meta.category
+            if cat == "TV":
+                cat = 2
+            if cat == "MOVIE":
+                cat = 1
+            if meta.anime:
+                cat = 14
 
-                query = title
+            query = title
 
-                search_url = f"{self.requests_url}submit=true&search={query}&showall=on&filter_cat[{cat}]=1"
+            search_url = f"{self.requests_url}submit=true&search={query}&showall=on&filter_cat[{cat}]=1"
 
-                response = await self.session.get(search_url)
-                response.raise_for_status()
-                response_results_text = response.text
+            response = await self.session.get(search_url)
+            response.raise_for_status()
+            response_results_text = response.text
 
-                soup = BeautifulSoup(response_results_text, "html.parser")
+            soup = BeautifulSoup(response_results_text, "html.parser")
 
-                request_rows = soup.select("#torrent_table tr.torrent")
+            request_rows = soup.select("#torrent_table tr.torrent")
 
-                for row in request_rows:
-                    all_tds = row.find_all("td")
-                    if not all_tds or len(all_tds) < 5:
-                        continue
+            for row in request_rows:
+                all_tds = row.find_all("td")
+                if not all_tds or len(all_tds) < 5:
+                    continue
 
-                    info_cell = all_tds[1]
+                info_cell = all_tds[1]
 
-                    link_element = info_cell.select_one('a[href*="requests.php?action=view"]')
-                    quality_element = info_cell.select_one("b")
+                link_element = info_cell.select_one('a[href*="requests.php?action=view"]')
+                quality_element = info_cell.select_one("b")
 
-                    if not isinstance(link_element, Tag) or not isinstance(quality_element, Tag):
-                        continue
+                if not isinstance(link_element, Tag) or not isinstance(quality_element, Tag):
+                    continue
 
-                    name: str = link_element.text.strip()
-                    quality: str = quality_element.text.strip()
-                    url = link_element.get("href")
-                    if isinstance(url, str):
-                        link: str = url
-                    else:
-                        link = ""
+                name: str = link_element.text.strip()
+                quality: str = quality_element.text.strip()
+                url = link_element.get("href")
+                if isinstance(url, str):
+                    link: str = url
+                else:
+                    link = ""
 
-                    reward_td = all_tds[3]
-                    reward_parts = [td.text.replace("\xa0", " ").strip() for td in reward_td.select("tr > td:first-child")]
-                    reward = " / ".join(reward_parts)
+                reward_td = all_tds[3]
+                reward_parts = [td.text.replace("\xa0", " ").strip() for td in reward_td.select("tr > td:first-child")]
+                reward = " / ".join(reward_parts)
 
-                    results.append(
-                        {
-                            "Name": name,
-                            "Quality": quality,
-                            "Reward": reward,
-                            "Link": link,
-                        }
-                    )
+                results.append(
+                    {
+                        "Name": name,
+                        "Quality": quality,
+                        "Reward": reward,
+                        "Link": link,
+                    }
+                )
 
-                if results:
-                    message = f"\n{self.tracker}: [bold yellow]Seu upload pode atender o(s) seguinte(s) pedido(s), confira:[/bold yellow]\n\n"
-                    for r in results:
-                        message += f"[bold green]Nome:[/bold green] {r['Name']}\n"
-                        message += f"[bold green]Qualidade:[/bold green] {r['Quality']}\n"
-                        message += f"[bold green]Recompensa:[/bold green] {r['Reward']}\n"
-                        message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
-                    logger.info(message)
+            if results:
+                message = f"\n{self.tracker}: [bold yellow]Seu upload pode atender o(s) seguinte(s) pedido(s), confira:[/bold yellow]\n\n"
+                for r in results:
+                    message += f"[bold green]Nome:[/bold green] {r['Name']}\n"
+                    message += f"[bold green]Qualidade:[/bold green] {r['Quality']}\n"
+                    message += f"[bold green]Recompensa:[/bold green] {r['Reward']}\n"
+                    message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
+                logger.info(message)
 
-                return results
+            return results
 
-            except Exception as e:
-                logger.info(f"[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
-                import traceback
+        except Exception as e:
+            logger.info(f"[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
+            import traceback
 
-                logger.info(traceback.format_exc())
-                return results
+            logger.info(traceback.format_exc())
+            return results
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         await self.load_localized_data(meta)  #  keep this line FIRST to ensure localized data is loaded before proceeding
@@ -1320,35 +1364,41 @@ class BJS:
 
         if category == "BOOK":
             b_lang = meta.book_language_iso
-            data.update({
-                "title": original_title,
-                "diretor": meta.author,
-                "idioma": "Português" if b_lang == "por" else "Espanhol" if b_lang == "spa" else "Inglês" if b_lang == "eng" else "Outro",
-                "release_desc": await self.build_description(meta),
-            })
+            data.update(
+                {
+                    "title": original_title,
+                    "diretor": meta.author,
+                    "idioma": "Português" if b_lang == "por" else "Espanhol" if b_lang == "spa" else "Inglês" if b_lang == "eng" else "Outro",
+                    "release_desc": await self.build_description(meta),
+                }
+            )
             if meta.audiobook:
                 audiobook_bitrate = self.get_audiobook_bitrate(meta)
-                data.update({
-                    "bitrateTypes": audiobook_bitrate,
-                    "bitrate": audiobook_bitrate,
-                })
+                data.update(
+                    {
+                        "bitrateTypes": audiobook_bitrate,
+                        "bitrate": audiobook_bitrate,
+                    }
+                )
 
         elif category == "GAME":
             localized_overviews = meta.localized_overviews
             pt_br_overview = localized_overviews.get("brazilian", "") if isinstance(localized_overviews, dict) else ""
             release_desc = pt_br_overview or meta.overview
 
-            data.update({
-                "title": original_title,
-                "plataforma": self.get_game_platform(meta),
-                "idioma": self.get_game_language(meta),
-                "tags": await self.get_tags(meta),
-                "adulto": self.get_adulto(meta),
-                "release_desc": release_desc,
-                "fichatecnica": await self.build_description(meta),
-                "traileryoutube": meta.youtube,
-                "subcategoria": self.get_game_subcategory(meta),
-            })
+            data.update(
+                {
+                    "title": original_title,
+                    "plataforma": self.get_game_platform(meta),
+                    "idioma": self.get_game_language(meta),
+                    "tags": await self.get_tags(meta),
+                    "adulto": self.get_adulto(meta),
+                    "release_desc": release_desc,
+                    "fichatecnica": await self.build_description(meta),
+                    "traileryoutube": meta.youtube,
+                    "subcategoria": self.get_game_subcategory(meta),
+                }
+            )
 
             if meta.platform == "PC":
                 tag = meta.tag
@@ -1382,78 +1432,94 @@ class BJS:
             width, height = self.get_resolution(meta)
             hours, minutes = self.get_runtime(meta)
 
-            data.update({
-                "audio": await self.get_audio(meta),
-                "codecaudio": self.get_audio_codec(meta),
-                "codecvideo": self.get_video_codec(meta),
-                "duracaoHR": str(hours),
-                "duracaoMIN": str(minutes),
-                "duracaotipo": "selectbox",
-                "fichatecnica": await self.build_description(meta),
-                "idioma": self.get_languages(),
-                "imdblink": self.get_imdblink(meta),
-                "qualidade": self.get_bitrate(meta),
-                "release": meta.service_longname,
-                "remaster_title": self.build_remaster_title(meta),
-                "resolucaoh": height,
-                "resolucaow": width,
-                "sinopse": await self.get_overview(),
-                "tags": await self.get_tags(meta),
-                "tipolegenda": await self.get_subtitle(meta),
-                "title": original_title,
-                "titulobrasileiro": brazilian_title,
-                "traileryoutube": self.get_trailer(meta),
-            })
+            data.update(
+                {
+                    "audio": await self.get_audio(meta),
+                    "codecaudio": self.get_audio_codec(meta),
+                    "codecvideo": self.get_video_codec(meta),
+                    "duracaoHR": str(hours),
+                    "duracaoMIN": str(minutes),
+                    "duracaotipo": "selectbox",
+                    "fichatecnica": await self.build_description(meta),
+                    "idioma": self.get_languages(),
+                    "imdblink": self.get_imdblink(meta),
+                    "qualidade": self.get_bitrate(meta),
+                    "release": meta.service_longname,
+                    "remaster_title": self.build_remaster_title(meta),
+                    "resolucaoh": height,
+                    "resolucaow": width,
+                    "sinopse": await self.get_overview(),
+                    "tags": await self.get_tags(meta),
+                    "tipolegenda": await self.get_subtitle(meta),
+                    "title": original_title,
+                    "titulobrasileiro": brazilian_title,
+                    "traileryoutube": self.get_trailer(meta),
+                }
+            )
 
             # These fields are common in movies and TV shows, even if it's anime
             if category == "MOVIE":
-                data.update({
-                    "adulto": self.get_adulto(meta),
-                    "diretor": await self.get_credits(meta, "director"),
-                })
+                data.update(
+                    {
+                        "adulto": self.get_adulto(meta),
+                        "diretor": await self.get_credits(meta, "director"),
+                    }
+                )
 
             if category == "TV":
-                data.update({
-                    "diretor": await self.get_credits(meta, "creator"),
-                    "tipo": "episode" if meta.tv_pack == 0 else "season",
-                    "season": meta.season_int,
-                    "episode": meta.episode_int,
-                })
+                data.update(
+                    {
+                        "diretor": await self.get_credits(meta, "creator"),
+                        "tipo": "episode" if meta.tv_pack == 0 else "season",
+                        "season": meta.season_int,
+                        "episode": meta.episode_int,
+                    }
+                )
 
             # These fields are common in movies and TV shows, if not Anime
             if not meta.anime:
-                data.update({
-                    "validimdb": "yes",
-                    "imdbrating": self.get_imdb_rating(meta),
-                    "elenco": await self.get_credits(meta, "cast"),
-                })
+                data.update(
+                    {
+                        "validimdb": "yes",
+                        "imdbrating": self.get_imdb_rating(meta),
+                        "elenco": await self.get_credits(meta, "cast"),
+                    }
+                )
                 if category == "MOVIE":
-                    data.update({
-                        "datalancamento": self.get_release_date(),
-                    })
+                    data.update(
+                        {
+                            "datalancamento": self.get_release_date(),
+                        }
+                    )
 
                 if category == "TV":
                     # Convert country code to name
                     country_list = [country.name for code in self.main_tmdb_data.get("origin_country", []) if (country := pycountry.countries.get(alpha_2=code))]
-                    data.update({
-                        "network": ", ".join([p.get("name", "") for p in self.main_tmdb_data.get("networks", [])]) or "",  # Optional
-                        "numtemporadas": self.main_tmdb_data.get("number_of_seasons", ""),  # Optional
-                        "datalancamento": self.get_release_date(),
-                        "pais": ", ".join(country_list),  # Optional
-                        "diretorserie": ", ".join(list(dict.fromkeys(meta.tmdb_directors or meta.imdb_info.get("directors", [])))[:1]),  # Optional
-                        "avaliacao": self.get_rating(),  # Optional
-                    })
+                    data.update(
+                        {
+                            "network": ", ".join([p.get("name", "") for p in self.main_tmdb_data.get("networks", [])]) or "",  # Optional
+                            "numtemporadas": self.main_tmdb_data.get("number_of_seasons", ""),  # Optional
+                            "datalancamento": self.get_release_date(),
+                            "pais": ", ".join(country_list),  # Optional
+                            "diretorserie": ", ".join(list(dict.fromkeys(meta.tmdb_directors or meta.imdb_info.get("directors", [])))[:1]),  # Optional
+                            "avaliacao": self.get_rating(),  # Optional
+                        }
+                    )
 
             # Anime-specific data
             if meta.anime:
                 if category == "MOVIE":
-                    data.update({
-                        "tipo": "movie",
-                    })
+                    data.update(
+                        {
+                            "tipo": "movie",
+                        }
+                    )
                 if category == "TV":
-                    data.update({
-                        "adulto": self.get_adulto(meta),
-                    })
+                    data.update(
+                        {
+                            "adulto": self.get_adulto(meta),
+                        }
+                    )
 
         # Anon
         anon = not (meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
@@ -1466,9 +1532,11 @@ class BJS:
         if meta.tag and (
             self.config["TRACKERS"][self.tracker].get("internal", False) is True and meta.tag[1:] in self.config["TRACKERS"][self.tracker].get("internal_groups", [])
         ):
-            data.update({
-                'internalrel': 1,
-            })
+            data.update(
+                {
+                    "internalrel": 1,
+                }
+            )
 
         # Repack
         if meta.repack:
@@ -1476,13 +1544,17 @@ class BJS:
 
         # Only upload images if not debugging
         if not meta.debug:
-            data.update({
-                "image": await self.get_cover(meta),
-            })
+            data.update(
+                {
+                    "image": await self.get_cover(meta),
+                }
+            )
             if not meta.audiobook:
-                data.update({
-                    "screenshots[]": await self.get_screenshots(meta),
-                })
+                data.update(
+                    {
+                        "screenshots[]": await self.get_screenshots(meta),
+                    }
+                )
 
         return data
 
@@ -1604,18 +1676,15 @@ class BJS:
         if issue:
             meta.tracker_status[self.tracker]["status_message"] = f"data error - {issue}"
             return False
-        else:
-            is_uploaded = await self.cookie_auth_uploader.handle_upload(
-                meta=meta,
-                tracker=self.tracker,
-                source_flag=self.source_flag,
-                torrent_url=self.torrent_url,
-                data=data,
-                torrent_field_name="file_input",
-                upload_cookies=self.session.cookies,
-                upload_url=f"{self.base_url}/upload.php",
-                id_pattern=r"torrentid=(\d+)",
-                success_text="action=download&id=",
-            )
-
-        return is_uploaded
+        return await self.cookie_auth_uploader.handle_upload(
+            meta=meta,
+            tracker=self.tracker,
+            source_flag=self.source_flag,
+            torrent_url=self.torrent_url,
+            data=data,
+            torrent_field_name="file_input",
+            upload_cookies=self.session.cookies,
+            upload_url=f"{self.base_url}/upload.php",
+            id_pattern=r"torrentid=(\d+)",
+            success_text="action=download&id=",
+        )

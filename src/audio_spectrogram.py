@@ -1,8 +1,8 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import io
 import json
-import os
 import subprocess
+from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
@@ -20,17 +20,15 @@ WIDTH_INCH = 16
 HEIGHT_INCH = 9
 DPI_VALUE = 240
 
+
 def get_audio_streams(file_path):
     """
     Uses ffprobe to list all audio streams in the MKV file.
     """
-    command = [
-        'ffprobe', '-v', 'error', '-show_entries',
-        'stream=index:stream_tags=language,title',
-        '-select_streams', 'a', '-of', 'json', file_path
-    ]
+    command = ["ffprobe", "-v", "error", "-show_entries", "stream=index:stream_tags=language,title", "-select_streams", "a", "-of", "json", file_path]
     result = subprocess.run(command, capture_output=True, text=True)
-    return json.loads(result.stdout).get('streams', [])
+    return json.loads(result.stdout).get("streams", [])
+
 
 def generate_spectrogram(stream_index, stream_label, stream_lang, file_path, output_dir):
     """
@@ -39,12 +37,7 @@ def generate_spectrogram(stream_index, stream_label, stream_lang, file_path, out
     logger.info(f"--- Processing Stream {stream_index} ({stream_label}) [{stream_lang}] ---")
 
     # FFmpeg command to extract specific audio stream to pipe
-    command = [
-        'ffmpeg', '-y', '-i', file_path,
-        '-map', f'0:{stream_index}',
-        '-t', str(DURATION_LIMIT),
-        '-f', 'wav', '-ac', '1', '-ar', '22050', 'pipe:1'
-    ]
+    command = ["ffmpeg", "-y", "-i", file_path, "-map", f"0:{stream_index}", "-t", str(DURATION_LIMIT), "-f", "wav", "-ac", "1", "-ar", "22050", "pipe:1"]
 
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, _ = process.communicate()
@@ -56,24 +49,24 @@ def generate_spectrogram(stream_index, stream_label, stream_lang, file_path, out
 
     # Plotting
     plt.figure(figsize=(WIDTH_INCH, HEIGHT_INCH), dpi=DPI_VALUE)
-    img = librosa.display.specshow(db_spectrogram, sr=sr, x_axis='time', y_axis='hz', cmap='inferno')
+    img = librosa.display.specshow(db_spectrogram, sr=sr, x_axis="time", y_axis="hz", cmap="inferno")
 
-    plt.colorbar(img, format='%+2.0f dB')
+    plt.colorbar(img, format="%+2.0f dB")
     plt.title(f"Spectrogram - Index: {stream_index} | Lang: {stream_lang} | Label: {stream_label} | First {DURATION_LIMIT}s", fontsize=22, pad=20)
-    plt.xlabel('Time (s)', fontsize=14)
-    plt.ylabel('Frequency (Hz)', fontsize=14)
+    plt.xlabel("Time (s)", fontsize=14)
+    plt.ylabel("Frequency (Hz)", fontsize=14)
 
-    output_name = os.path.join(output_dir, f"spectrogram_stream_{stream_index}.png")
+    output_name = Path(output_dir) / f"spectrogram_stream_{stream_index}.png"
     plt.tight_layout()
-    plt.savefig(output_name, dpi=DPI_VALUE, bbox_inches='tight')
-    plt.close() # Free memory
+    plt.savefig(output_name, dpi=DPI_VALUE, bbox_inches="tight")
+    plt.close()  # Free memory
     logger.info(f"Saved: {output_name}")
     return output_name
 
 
 async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploadscreens_manager: Any = None) -> list[str]:
-    audio_spectrograms_images = f"{meta.base_dir}/tmp/{meta.uuid}/audio_spectrograms_images.json"
-    if os.path.exists(audio_spectrograms_images):
+    audio_spectrograms_images = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/audio_spectrograms_images.json"
+    if Path(audio_spectrograms_images).exists():
         try:
             async with aiofiles.open(audio_spectrograms_images, encoding="utf-8") as spec_file:
                 content = await spec_file.read()
@@ -84,15 +77,15 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
                     logger.debug(f"[cyan]Loaded {len(spectrograms_image_file['spectrograms_images'])} previously saved spectrograms")
 
         except Exception as e:
-            logger.info(f"[yellow]Could not load spectrograms image data: {str(e)}")
+            logger.info(f"[yellow]Could not load spectrograms image data: {e!s}")
 
     if meta.spectrograms_images:
         return []
 
     logger.info("[yellow]Generating Audio Spectrograms...[/yellow]")
 
-    output_dir = os.path.join(meta.base_dir, "tmp", meta.uuid, "spectrograms")
-    os.makedirs(output_dir, exist_ok=True)
+    output_dir = Path(meta.base_dir) / "tmp" / meta.uuid / "spectrograms"
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     disc_final_path = ""
     bdinfo = meta.bdinfo
@@ -100,7 +93,7 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
         disc_path = bdinfo.get("path", "")
         files_list = bdinfo.get("files", [])
         disc_file = files_list[0].get("file", "") if files_list else ""
-        disc_final_path = os.path.join(disc_path, "STREAM", disc_file) if disc_path and disc_file else ""
+        disc_final_path = Path(disc_path) / "STREAM" / disc_file if disc_path and disc_file else ""
         logger.debug(f"disc_final_path: {disc_final_path}")
 
     mkv_path = ""
@@ -112,7 +105,7 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
 
     generated_files = []
 
-    if not audio_path or not os.path.exists(audio_path):
+    if not audio_path or not Path(audio_path).exists():
         logger.info("[red]Could not find a valid audio or video file to process spectrograms from.[/red]")
         return generated_files
 
@@ -136,8 +129,8 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
     else:
         logger.info("\nAvailable Audio Streams:")
         for i, s in enumerate(streams):
-            lang = s.get('tags', {}).get('language', 'und')
-            title = s.get('tags', {}).get('title', 'No Title')
+            lang = s.get("tags", {}).get("language", "und")
+            title = s.get("tags", {}).get("title", "No Title")
             logger.info(f"[{i}] Lang: {lang} | Title: {title}")
 
         unattended = meta.unattended
@@ -191,7 +184,7 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
                             await spec_file.write(json.dumps(spectrograms_image_file_dict, indent=4))
                         logger.debug(f"[cyan]Saved {len(spec_images)} spectrograms to audio_spectrograms_images.json")
                     except Exception as e:
-                        logger.info(f"[yellow]Failed to save spectrograms image data: {str(e)}")
+                        logger.info(f"[yellow]Failed to save spectrograms image data: {e!s}")
             except Exception as e:
                 logger.error(f"[red]Error uploading audio spectrograms: {e}[/red]")
 

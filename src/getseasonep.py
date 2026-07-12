@@ -38,7 +38,7 @@ def _anitopy_parse(value: str) -> dict[str, Any]:
 def _safe_int(value: Any, default: int = 0) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -196,7 +196,7 @@ class SeasonEpisodeManager:
                                             episode_int = int(match.group(1))
                                             episode = f"E{str(episode_int).zfill(2)}"
                                             break
-                                        except (ValueError, IndexError):
+                                        except ValueError, IndexError:
                                             continue
 
                             if episode_int == 1:  # Still using fallback
@@ -240,7 +240,7 @@ class SeasonEpisodeManager:
                             else:
                                 season_int = 1  # Default to 1 if error occurs
                                 season = "S01"
-                                names_url = f"https://thexem.info/map/names?origin=tvdb&id={str(meta.tvdb_id)}"
+                                names_url = f"https://thexem.info/map/names?origin=tvdb&id={meta.tvdb_id!s}"
                                 async with httpx.AsyncClient(timeout=30.0) as client:
                                     names_response = (await client.get(names_url)).json()
                                 logger.debug(f"[cyan]Matching Season Number from TheXEM\n{names_response}")
@@ -349,7 +349,7 @@ class SeasonEpisodeManager:
 
                 logger.info(f"[cyan]Filelist ({len(filelist)} files):")
                 for i, file in enumerate(filelist[:batch_size]):
-                    logger.info(f"[cyan]  {i + 1:2d}. {os.path.basename(file)}")
+                    logger.info(f"[cyan]  {i + 1:2d}. {Path(file).name}")
 
                 files_shown = min(batch_size, len(filelist))
 
@@ -369,13 +369,13 @@ class SeasonEpisodeManager:
                         # Show next batch of files
                         next_batch = filelist[files_shown : files_shown + batch_size]
                         for i, file in enumerate(next_batch):
-                            logger.info(f"[cyan]  {files_shown + i + 1:2d}. {os.path.basename(file)}")
+                            logger.info(f"[cyan]  {files_shown + i + 1:2d}. {Path(file).name}")
                         files_shown += len(next_batch)
                     elif response.lower() == "a":
                         # Show all remaining files
                         remaining_batch = filelist[files_shown:]
                         for i, file in enumerate(remaining_batch):
-                            logger.info(f"[cyan]  {files_shown + i + 1:2d}. {os.path.basename(file)}")
+                            logger.info(f"[cyan]  {files_shown + i + 1:2d}. {Path(file).name}")
                         files_shown = len(filelist)
                     elif response.lower() == "c":
                         just_go = True
@@ -425,11 +425,11 @@ class SeasonEpisodeManager:
         raw_season_int = meta.season_int
         try:
             default_season_num = raw_season_int
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             default_season_num = 1
 
         for file_path in files:
-            filename = os.path.basename(file_path)
+            filename = Path(file_path).name
 
             # Extract group tag from each file
             file_tag = await get_tag(file_path, meta, season_pack_check=True)

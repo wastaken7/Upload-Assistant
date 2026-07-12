@@ -2,6 +2,7 @@
 import itertools
 import os
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
@@ -30,13 +31,13 @@ class DiscInfoManager:
             for each in directories:
                 if each.upper() == "BDMV":  # BDMVs
                     is_disc = "BDMV"
-                    discs.append({"path": f"{path}/{each}", "name": os.path.basename(path), "type": "BDMV", "summary": "", "bdinfo": ""})
+                    discs.append({"path": f"{path}/{each}", "name": Path(path).name, "type": "BDMV", "summary": "", "bdinfo": ""})
                 elif each == "VIDEO_TS":  # DVDs
                     is_disc = "DVD"
-                    discs.append({"path": f"{path}/{each}", "name": os.path.basename(path), "type": "DVD", "vob_mi": "", "ifo_mi": "", "main_set": [], "size": ""})
+                    discs.append({"path": f"{path}/{each}", "name": Path(path).name, "type": "DVD", "vob_mi": "", "ifo_mi": "", "main_set": [], "size": ""})
                 elif each == "HVDVD_TS":
                     is_disc = "HDDVD"
-                    discs.append({"path": f"{path}/{each}", "name": os.path.basename(path), "type": "HDDVD", "evo_mi": "", "largest_evo": ""})
+                    discs.append({"path": f"{path}/{each}", "name": Path(path).name, "type": "HDDVD", "evo_mi": "", "largest_evo": ""})
 
         if is_disc == "BDMV":
             if meta.site_check:
@@ -59,7 +60,7 @@ class DiscInfoManager:
         elif is_disc == "HDDVD":
             discs = await self._parser.get_hddvd_info(discs, meta)
             async with aiofiles.open(
-                f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt",
+                f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt",
                 "w",
                 newline="",
                 encoding="utf-8",

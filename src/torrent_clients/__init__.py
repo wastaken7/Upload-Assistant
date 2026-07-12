@@ -6,8 +6,8 @@ from src.torrent_clients.rtorrent import RtorrentClientMixin
 from src.torrent_clients.transmission import TransmissionClientMixin
 
 __all__ = [
+    "DelugeClientMixin",
     "QbittorrentClientMixin",
     "RtorrentClientMixin",
-    "DelugeClientMixin",
     "TransmissionClientMixin",
 ]

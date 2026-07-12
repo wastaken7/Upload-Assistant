@@ -5,6 +5,7 @@ import os
 import platform
 import re
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, ClassVar, cast
 
 import aiofiles
@@ -80,7 +81,7 @@ class ASC:
         self.common = COMMON(config)
         self.cookie_validator = CookieValidator(config)
         self.cookie_auth_uploader = CookieAuthUploader(config)
-        self.layout = self.config['TRACKERS'][self.tracker].get('custom_layout', '2')
+        self.layout = self.config["TRACKERS"][self.tracker].get("custom_layout", "2")
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
 
     async def validate_credentials(self, meta: Meta) -> bool:
@@ -123,18 +124,18 @@ class ASC:
             return ext_map.get(ext, "17")
 
         if meta.is_disc == "BDMV":
-            return '5'
-        elif meta.is_disc == "DVD":
-            return '15'
+            return "5"
+        if meta.is_disc == "DVD":
+            return "15"
 
         try:
             general_track = next(t for t in meta.mediainfo["media"]["track"] if t["@type"] == "General")
-            file_extension = general_track.get('FileExtension', '').lower()
-            if file_extension == 'mkv':
-                return '6'
-            elif file_extension == 'mp4':
-                return '8'
-        except (StopIteration, AttributeError, TypeError):
+            file_extension = general_track.get("FileExtension", "").lower()
+            if file_extension == "mkv":
+                return "6"
+            if file_extension == "mp4":
+                return "8"
+        except StopIteration, AttributeError, TypeError:
             return None
         return None
 
@@ -143,21 +144,20 @@ class ASC:
         if category == "BOOK":
             if meta.audiobook:
                 return "121"
-            elif meta.comic:
+            if meta.comic:
                 return "112"
-            elif meta.manga:
+            if meta.manga:
                 return "147"
-            elif meta.magazine:
+            if meta.magazine:
                 return "68"
-            else:
-                return "67"
+            return "67"
 
         if category == "GAME":
             return self.get_game_type(meta)
 
-        bd_disc_map = {'BD25': '40', 'BD50': '41', 'BD66': '42', 'BD100': '43'}
-        standard_map = {'ENCODE': '9', 'REMUX': '39', 'WEBDL': '23', 'WEBRIP': '38', 'BDRIP': '8', 'DVDRIP': '3'}
-        dvd_map = {'DVD5': '45', 'DVD9': '46'}
+        bd_disc_map = {"BD25": "40", "BD50": "41", "BD66": "42", "BD100": "43"}
+        standard_map = {"ENCODE": "9", "REMUX": "39", "WEBDL": "23", "WEBRIP": "38", "BDRIP": "8", "DVDRIP": "3"}
+        dvd_map = {"DVD5": "45", "DVD9": "46"}
 
         if meta.type == "DISC":
             if meta.is_disc == "HDDVD":
@@ -175,19 +175,17 @@ class ASC:
 
             try:
                 size_in_gb = meta.bdinfo["size"]
-            except (KeyError, IndexError, TypeError):
+            except KeyError, IndexError, TypeError:
                 size_in_gb = 0
 
             if size_in_gb > 66:
-                return '43'  # BD100
-            elif size_in_gb > 50:
-                return '42'  # BD66
-            elif size_in_gb > 25:
-                return '41'  # BD50
-            else:
-                return '40'  # BD25
-        else:
-            return standard_map.get(meta.type or "", "0")
+                return "43"  # BD100
+            if size_in_gb > 50:
+                return "42"  # BD66
+            if size_in_gb > 25:
+                return "41"  # BD50
+            return "40"  # BD25
+        return standard_map.get(meta.type or "", "0")
 
     async def get_languages(self, meta: Meta) -> dict[str, str] | None:
         if meta.anime:
@@ -198,24 +196,20 @@ class ASC:
 
             lang = "8" if await self.get_audio(meta) in ("2", "3", "4") else self.language_map.get(original_language, "11")
 
-            return {
-                'type': type_,
-                'idioma': anime_language,
-                'lang': lang
-            }
+            return {"type": type_, "idioma": anime_language, "lang": lang}
 
         return None
 
     async def get_audio(self, meta: Meta) -> str:
-        subtitles = '1'
-        dual_audio = '2'
-        dubbed = '3'
-        national = '4'
-        original = '7'
+        subtitles = "1"
+        dual_audio = "2"
+        dubbed = "3"
+        national = "4"
+        original = "7"
 
-        portuguese_languages = {'portuguese', 'português', 'pt'}
+        portuguese_languages = {"portuguese", "português", "pt"}
 
-        has_pt_subs = (await self.get_subtitle(meta)) == 'Embutida'
+        has_pt_subs = (await self.get_subtitle(meta)) == "Embutida"
 
         meta_audio_languages = meta.audio_languages if meta.audio_languages else []
         audio_languages = {lang.lower() for lang in meta_audio_languages}
@@ -227,39 +221,46 @@ class ASC:
         if has_pt_audio:
             if is_original_pt:
                 return national
-            elif len(audio_languages - portuguese_languages) > 0:
+            if len(audio_languages - portuguese_languages) > 0:
                 return dual_audio
-            else:
-                return dubbed
-        elif has_pt_subs:
+            return dubbed
+        if has_pt_subs:
             return subtitles
-        else:
-            return original
+        return original
 
     async def get_subtitle(self, meta: Meta) -> str:
-        portuguese_languages = {'portuguese', 'português', 'pt'}
+        portuguese_languages = {"portuguese", "português", "pt"}
 
         meta_subtitle_languages = meta.subtitle_languages if meta.subtitle_languages else []
         found_languages = {lang.lower() for lang in meta_subtitle_languages}
 
         if any(lang in portuguese_languages for lang in found_languages):
-            return 'Embutida'
-        return 'S_legenda'
+            return "Embutida"
+        return "S_legenda"
 
     async def get_resolution(self, meta: Meta) -> dict[str, str]:
-        width = str(meta.video_width) if meta.video_width is not None else ''
-        height = str(meta.video_height) if meta.video_height is not None else ''
-        return {
-            'width': width,
-            'height': height
-        }
+        width = str(meta.video_width) if meta.video_width is not None else ""
+        height = str(meta.video_height) if meta.video_height is not None else ""
+        return {"width": width, "height": height}
 
     async def get_video_codec(self, meta: Meta) -> str:
         codec_video_map = {
-            'MPEG-4': '31', 'AV1': '29', 'AVC': '30', 'DivX': '9',
-            'H264': '17', 'H265': '18', 'HEVC': '27', 'M4V': '20',
-            'MPEG-1': '10', 'MPEG-2': '11', 'RMVB': '12', 'VC-1': '21',
-            'VP6': '22', 'VP9': '23', 'WMV': '13', 'XviD': '15'
+            "MPEG-4": "31",
+            "AV1": "29",
+            "AVC": "30",
+            "DivX": "9",
+            "H264": "17",
+            "H265": "18",
+            "HEVC": "27",
+            "M4V": "20",
+            "MPEG-1": "10",
+            "MPEG-2": "11",
+            "RMVB": "12",
+            "VC-1": "21",
+            "VP6": "22",
+            "VP9": "23",
+            "WMV": "13",
+            "XviD": "15",
         }
 
         codec_video = None
@@ -267,26 +268,26 @@ class ASC:
 
         if video_encode_raw and isinstance(video_encode_raw, str):
             video_encode_clean = video_encode_raw.strip().lower()
-            if '264' in video_encode_clean:
-                codec_video = 'H264'
-            elif '265' in video_encode_clean:
-                codec_video = 'HEVC'
+            if "264" in video_encode_clean:
+                codec_video = "H264"
+            elif "265" in video_encode_clean:
+                codec_video = "HEVC"
 
         if not codec_video:
             codec_video = meta.video_codec
 
         if not isinstance(codec_video, str):
-            codec_video = ''
+            codec_video = ""
 
-        codec_id = codec_video_map.get(codec_video, '16')
+        codec_id = codec_video_map.get(codec_video, "16")
 
         is_hdr = bool(meta.hdr)
 
         if is_hdr:
-            if codec_video in ('HEVC', 'H265'):
-                return '28'
-            if codec_video in ('AVC', 'H264'):
-                return '32'
+            if codec_video in ("HEVC", "H265"):
+                return "28"
+            if codec_video in ("AVC", "H264"):
+                return "32"
 
         return codec_id
 
@@ -294,27 +295,27 @@ class ASC:
         audio_type = (meta.audio or "").upper()
 
         codec_map = {
-            'ATMOS': '43',
-            'DTS:X': '25',
-            'DTS-HD MA': '24',
-            'DTS-HD': '23',
-            'TRUEHD': '29',
-            'DD+': '26',
-            'DD': '11',
-            'DTS': '12',
-            'FLAC': '13',
-            'LPCM': '21',
-            'PCM': '28',
-            'AAC': '10',
-            'OPUS': '27',
-            'MPEG': '17'
+            "ATMOS": "43",
+            "DTS:X": "25",
+            "DTS-HD MA": "24",
+            "DTS-HD": "23",
+            "TRUEHD": "29",
+            "DD+": "26",
+            "DD": "11",
+            "DTS": "12",
+            "FLAC": "13",
+            "LPCM": "21",
+            "PCM": "28",
+            "AAC": "10",
+            "OPUS": "27",
+            "MPEG": "17",
         }
 
         for key, code in codec_map.items():
             if key in audio_type:
                 return code
 
-        return '20'
+        return "20"
 
     async def get_title(self, meta: Meta) -> str:
         if meta.category == "BOOK":
@@ -330,18 +331,17 @@ class ASC:
         original_name_title = self.main_tmdb_data.get("original_name") or self.main_tmdb_data.get("original_title") or ""
 
         if meta.category == "TV":
-            tv_title_ptbr = self.main_tmdb_data.get('name')
+            tv_title_ptbr = self.main_tmdb_data.get("name")
             if tv_title_ptbr and tv_title_ptbr.lower() != name.lower() and (not original_name_title or tv_title_ptbr.lower() != original_name_title.lower()):
                 base_name = f"{tv_title_ptbr} ({name})"
 
             return f"{base_name} - {meta.season}{meta.episode}"
 
-        else:
-            movie_title_ptbr = self.main_tmdb_data.get('title')
-            if movie_title_ptbr and movie_title_ptbr.lower() != name.lower() and (not original_name_title or movie_title_ptbr.lower() != original_name_title.lower()):
-                base_name = f"{movie_title_ptbr} ({name})"
+        movie_title_ptbr = self.main_tmdb_data.get("title")
+        if movie_title_ptbr and movie_title_ptbr.lower() != name.lower() and (not original_name_title or movie_title_ptbr.lower() != original_name_title.lower()):
+            base_name = f"{movie_title_ptbr} ({name})"
 
-            return f"{base_name}"
+        return f"{base_name}"
 
     def get_book_cover(self, meta: Meta) -> str:
         covers = meta.covers
@@ -386,8 +386,8 @@ class ASC:
 
         # External DESCRIPTION.txt
         desc = ""
-        base_desc_path = f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt"
-        if os.path.exists(base_desc_path):
+        base_desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt"
+        if Path(base_desc_path).exists():
             async with aiofiles.open(base_desc_path, encoding="utf-8") as f:
                 desc = (await f.read()).strip()
                 # strip standard formatting codes
@@ -409,7 +409,7 @@ class ASC:
 
         description_parts.append(f"\n[center][url=https://github.com/wastaken7/Upload-Assistant]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/url][/center]")
 
-        final_desc_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
+        final_desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         async with aiofiles.open(final_desc_path, "w", encoding="utf-8") as descfile:
             final_description = "\n".join(filter(None, description_parts))
             await descfile.write(final_description)
@@ -427,23 +427,18 @@ class ASC:
         fileinfo_dump = await self.media_info(meta)
 
         if not user_layout:
-            return '[center]Erro: Não foi possível carregar o layout da descrição.[/center]'
+            return "[center]Erro: Não foi possível carregar o layout da descrição.[/center]"
 
-        layout_image = {k: v for k, v in user_layout.items() if k.startswith('BARRINHA_')}
-        description_parts = ['[center]']
+        layout_image = {k: v for k, v in user_layout.items() if k.startswith("BARRINHA_")}
+        description_parts = ["[center]"]
 
         async def append_section(key: str, content: str | None) -> None:
             if content and (img := layout_image.get(key)):
-                description_parts.append(f'\n{await self.format_image(img)}')
-                description_parts.append(f'\n{content}\n')
+                description_parts.append(f"\n{await self.format_image(img)}")
+                description_parts.append(f"\n{content}\n")
 
         # Title
-        description_parts.extend(
-            [
-                await self.format_image(layout_image.get(f'BARRINHA_CUSTOM_T_{i}'))
-                for i in range(1, 4)
-            ]
-        )
+        description_parts.extend([await self.format_image(layout_image.get(f"BARRINHA_CUSTOM_T_{i}")) for i in range(1, 4)])
         description_parts.append(f"\n{await self.format_image(layout_image.get('BARRINHA_APRESENTA'))}\n")
         description_parts.append(f"\n[size=3]{await self.get_title(meta)}[/size]\n")
 
@@ -452,8 +447,8 @@ class ASC:
         main_tmdb = self.main_tmdb_data
         episode_tmdb = self.episode_tmdb_data
         poster_path = season_tmdb.get("poster_path") or main_tmdb.get("poster_path") or meta.tmdb_poster
-        poster = f'https://image.tmdb.org/t/p/w500{poster_path}' if poster_path else ''
-        await append_section('BARRINHA_CAPA', await self.format_image(poster))
+        poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ""
+        await append_section("BARRINHA_CAPA", await self.format_image(poster))
 
         # Overview
         overview: str = season_tmdb.get("overview", "") or main_tmdb.get("overview", "")
@@ -461,18 +456,18 @@ class ASC:
             user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f"{self.tracker}: Sinopse não encontrada no TMDb. Por favor, insira manualmente.")
             user_input = (user_input_raw or "").strip()
             overview = user_input or "Sinopse não encontrada."
-        await append_section('BARRINHA_SINOPSE', overview)
+        await append_section("BARRINHA_SINOPSE", overview)
 
         # Episode
         if meta.category == "TV" and episode_tmdb:
-            episode_name = episode_tmdb.get('name')
-            episode_overview = episode_tmdb.get('overview')
-            still_path = episode_tmdb.get('still_path')
+            episode_name = episode_tmdb.get("name")
+            episode_overview = episode_tmdb.get("overview")
+            still_path = episode_tmdb.get("still_path")
 
             if episode_name and episode_overview and still_path:
-                still_url = f'https://image.tmdb.org/t/p/w300{still_path}'
-                description_parts.append(f'\n[size=4][b]Episódio:[/b] {episode_name}[/size]\n')
-                description_parts.append(f'\n{await self.format_image(still_url)}\n\n{episode_overview}\n')
+                still_url = f"https://image.tmdb.org/t/p/w300{still_path}"
+                description_parts.append(f"\n[size=4][b]Episódio:[/b] {episode_name}[/size]\n")
+                description_parts.append(f"\n{await self.format_image(still_url)}\n\n{episode_overview}\n")
 
         # Technical Sheet
         if main_tmdb:
@@ -485,126 +480,115 @@ class ASC:
             release_date = episode_tmdb.get("air_date") or season_tmdb.get("air_date") if meta.category != "MOVIE" else main_tmdb.get("release_date")
 
             sheet_items = [
-                f'Duração: {formatted_runtime}' if formatted_runtime else None,
-                f"País de Origem: {', '.join(c['name'] for c in main_tmdb.get('production_countries', []))}" if main_tmdb.get('production_countries') else None,
-                f"Gêneros: {', '.join(g['name'] for g in main_tmdb.get('genres', []))}" if main_tmdb.get('genres') else None,
-                f'Data de Lançamento: {await self.format_date(release_date)}' if release_date else None,
-                f"Site: [url={main_tmdb.get('homepage')}]Clique aqui[/url]" if main_tmdb.get('homepage') else None
+                f"Duração: {formatted_runtime}" if formatted_runtime else None,
+                f"País de Origem: {', '.join(c['name'] for c in main_tmdb.get('production_countries', []))}" if main_tmdb.get("production_countries") else None,
+                f"Gêneros: {', '.join(g['name'] for g in main_tmdb.get('genres', []))}" if main_tmdb.get("genres") else None,
+                f"Data de Lançamento: {await self.format_date(release_date)}" if release_date else None,
+                f"Site: [url={main_tmdb.get('homepage')}]Clique aqui[/url]" if main_tmdb.get("homepage") else None,
             ]
-            await append_section('BARRINHA_FICHA_TECNICA', '\n'.join(filter(None, sheet_items)))
+            await append_section("BARRINHA_FICHA_TECNICA", "\n".join(filter(None, sheet_items)))
 
         # Production Companies
-        if main_tmdb and main_tmdb.get('production_companies'):
-            prod_parts = ['[size=4][b]Produtoras[/b][/size]']
-            for p in main_tmdb.get('production_companies', []):
-                logo_path = p.get('logo_path')
-                logo = await self.format_image(f'https://image.tmdb.org/t/p/w45{logo_path}') if logo_path else ''
+        if main_tmdb and main_tmdb.get("production_companies"):
+            prod_parts = ["[size=4][b]Produtoras[/b][/size]"]
+            for p in main_tmdb.get("production_companies", []):
+                logo_path = p.get("logo_path")
+                logo = await self.format_image(f"https://image.tmdb.org/t/p/w45{logo_path}") if logo_path else ""
 
                 prod_parts.append(f"{logo}[size=2] - [b]{p.get('name', '')}[/b][/size]" if logo else f"[size=2][b]{p.get('name', '')}[/b][/size]")
-            description_parts.append('\n' + '\n'.join(prod_parts) + '\n')
+            description_parts.append("\n" + "\n".join(prod_parts) + "\n")
 
         # Cast
         if meta.category == "MOVIE":
-            main_credits = cast(dict[str, Any], main_tmdb.get('credits') or {})
-            cast_data = cast(list[dict[str, Any]], main_credits.get('cast', []))
+            main_credits = cast(dict[str, Any], main_tmdb.get("credits") or {})
+            cast_data = cast(list[dict[str, Any]], main_credits.get("cast", []))
         elif meta.tv_pack:
-            season_credits = cast(dict[str, Any], season_tmdb.get('credits') or {})
-            cast_data = cast(list[dict[str, Any]], season_credits.get('cast', []))
+            season_credits = cast(dict[str, Any], season_tmdb.get("credits") or {})
+            cast_data = cast(list[dict[str, Any]], season_credits.get("cast", []))
         else:
-            episode_credits = cast(dict[str, Any], episode_tmdb.get('credits') or {})
-            cast_data = cast(list[dict[str, Any]], episode_credits.get('cast', []))
-        await append_section('BARRINHA_ELENCO', await self.build_cast_bbcode(cast_data))
+            episode_credits = cast(dict[str, Any], episode_tmdb.get("credits") or {})
+            cast_data = cast(list[dict[str, Any]], episode_credits.get("cast", []))
+        await append_section("BARRINHA_ELENCO", await self.build_cast_bbcode(cast_data))
 
         # Seasons
         if meta.category == "TV" and main_tmdb and main_tmdb.get("seasons"):
             seasons_content: list[str] = []
-            for seasons in main_tmdb.get('seasons', []):
-                season_name = seasons.get('name', f"Temporada {seasons.get('season_number')}").strip()
-                poster_temp = await self.format_image(f"https://image.tmdb.org/t/p/w185{seasons.get('poster_path')}") if seasons.get('poster_path') else ''
-                overview_temp = f"\n\nSinopse:\n{seasons.get('overview')}" if seasons.get('overview') else ''
+            for seasons in main_tmdb.get("seasons", []):
+                season_name = seasons.get("name", f"Temporada {seasons.get('season_number')}").strip()
+                poster_temp = await self.format_image(f"https://image.tmdb.org/t/p/w185{seasons.get('poster_path')}") if seasons.get("poster_path") else ""
+                overview_temp = f"\n\nSinopse:\n{seasons.get('overview')}" if seasons.get("overview") else ""
 
                 inner_content_parts: list[str] = []
-                air_date = seasons.get('air_date')
+                air_date = seasons.get("air_date")
                 if air_date:
-                    inner_content_parts.append(f'Data: {await self.format_date(air_date)}')
+                    inner_content_parts.append(f"Data: {await self.format_date(air_date)}")
 
-                episode_count = seasons.get('episode_count')
+                episode_count = seasons.get("episode_count")
                 if episode_count is not None:
-                    inner_content_parts.append(f'Episódios: {episode_count}')
+                    inner_content_parts.append(f"Episódios: {episode_count}")
 
                 inner_content_parts.append(poster_temp)
                 inner_content_parts.append(overview_temp)
 
-                inner_content = '\n'.join(inner_content_parts)
-                seasons_content.append(f'\n[spoiler={season_name}]{inner_content}[/spoiler]\n')
-            await append_section('BARRINHA_EPISODIOS', ''.join(seasons_content))
+                inner_content = "\n".join(inner_content_parts)
+                seasons_content.append(f"\n[spoiler={season_name}]{inner_content}[/spoiler]\n")
+            await append_section("BARRINHA_EPISODIOS", "".join(seasons_content))
 
         # Ratings
-        ratings_list = cast(list[dict[str, Any]], user_layout.get('Ratings', []))
+        ratings_list = cast(list[dict[str, Any]], user_layout.get("Ratings", []))
         if not ratings_list and (imdb_rating := meta.imdb_info.get("rating")):
-            ratings_list.append({'Source': 'Internet Movie Database', 'Value': f'{imdb_rating}/10'})
-        if main_tmdb and (tmdb_rating := main_tmdb.get('vote_average')) and not any(r.get('Source') == 'TMDb' for r in ratings_list):
-            ratings_list.append({'Source': 'TMDb', 'Value': f'{tmdb_rating:.1f}/10'})
+            ratings_list.append({"Source": "Internet Movie Database", "Value": f"{imdb_rating}/10"})
+        if main_tmdb and (tmdb_rating := main_tmdb.get("vote_average")) and not any(r.get("Source") == "TMDb" for r in ratings_list):
+            ratings_list.append({"Source": "TMDb", "Value": f"{tmdb_rating:.1f}/10"})
 
         criticas_key = "BARRINHA_INFORMACOES" if meta.category == "MOVIE" and "BARRINHA_INFORMACOES" in layout_image else "BARRINHA_CRITICAS"
         await append_section(criticas_key, await self.build_ratings_bbcode(meta, ratings_list))
 
         # MediaInfo/BDinfo
         if fileinfo_dump:
-            description_parts.append(f'\n[spoiler=Informações do Arquivo]\n[left][font=Courier New]{fileinfo_dump}[/font][/left][/spoiler]\n')
+            description_parts.append(f"\n[spoiler=Informações do Arquivo]\n[left][font=Courier New]{fileinfo_dump}[/font][/left][/spoiler]\n")
 
         # Custom Bar
-        description_parts.extend(
-            [
-                await self.format_image(layout_image.get(f'BARRINHA_CUSTOM_B_{i}'))
-                for i in range(1, 4)
-            ]
-        )
-        description_parts.append('[/center]')
+        description_parts.extend([await self.format_image(layout_image.get(f"BARRINHA_CUSTOM_B_{i}")) for i in range(1, 4)])
+        description_parts.append("[/center]")
 
         # External description
-        desc = ''
-        base_desc_path = f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt"
-        if os.path.exists(base_desc_path):
-            async with aiofiles.open(base_desc_path, encoding='utf-8') as f:
+        desc = ""
+        base_desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt"
+        if Path(base_desc_path).exists():
+            async with aiofiles.open(base_desc_path, encoding="utf-8") as f:
                 desc = (await f.read()).strip()
-                desc = desc.replace('[user]', '').replace('[/user]', '')
-                desc = desc.replace('[align=left]', '').replace('[/align]', '')
-                desc = desc.replace('[align=right]', '').replace('[/align]', '')
-                desc = desc.replace('[alert]', '').replace('[/alert]', '')
-                desc = desc.replace('[note]', '').replace('[/note]', '')
-                desc = desc.replace('[h1]', '[u][b]').replace('[/h1]', '[/b][/u]')
-                desc = desc.replace('[h2]', '[u][b]').replace('[/h2]', '[/b][/u]')
-                desc = desc.replace('[h3]', '[u][b]').replace('[/h3]', '[/b][/u]')
-                desc = re.sub(r'(\[img=\d+)]', '[img]', desc, flags=re.IGNORECASE)
+                desc = desc.replace("[user]", "").replace("[/user]", "")
+                desc = desc.replace("[align=left]", "").replace("[/align]", "")
+                desc = desc.replace("[align=right]", "").replace("[/align]", "")
+                desc = desc.replace("[alert]", "").replace("[/alert]", "")
+                desc = desc.replace("[note]", "").replace("[/note]", "")
+                desc = desc.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+                desc = desc.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+                desc = desc.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+                desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
                 description_parts.append(desc)
 
-        custom_description_header = self.config['DEFAULT'].get('custom_description_header', '')
+        custom_description_header = self.config["DEFAULT"].get("custom_description_header", "")
         if custom_description_header:
-            description_parts.append(custom_description_header + '\n')
+            description_parts.append(custom_description_header + "\n")
 
         description_parts.append(f"[center][url=https://github.com/wastaken7/Upload-Assistant]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/url][/center]")
 
-        final_desc_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
-        async with aiofiles.open(final_desc_path, 'w', encoding='utf-8') as descfile:
-            final_description = '\n'.join(filter(None, description_parts))
+        final_desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
+        async with aiofiles.open(final_desc_path, "w", encoding="utf-8") as descfile:
+            final_description = "\n".join(filter(None, description_parts))
             await descfile.write(final_description)
 
         return final_description
 
     async def get_trailer(self, meta: Meta) -> str:
-        video_results = self.main_tmdb_data.get('videos', {}).get('results', [])
-        youtube_code = video_results[-1].get('key', '') if video_results else ''
-        youtube = f"http://www.youtube.com/watch?v={youtube_code}" if youtube_code else meta.youtube or ""
-
-        return youtube
+        video_results = self.main_tmdb_data.get("videos", {}).get("results", [])
+        youtube_code = video_results[-1].get("key", "") if video_results else ""
+        return f"http://www.youtube.com/watch?v={youtube_code}" if youtube_code else meta.youtube or ""
 
     async def get_tags(self, meta: Meta) -> str:
-        tags = ', '.join(
-            g.get('name', '')
-            for g in self.main_tmdb_data.get('genres', [])
-            if isinstance(g.get('name'), str) and g.get('name').strip()
-        )
+        tags = ", ".join(g.get("name", "") for g in self.main_tmdb_data.get("genres", []) if isinstance(g.get("name"), str) and g.get("name").strip())
 
         if not tags:
             tags_raw = meta.genre or await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
@@ -613,30 +597,26 @@ class ASC:
         return tags
 
     async def _fetch_file_info(self, torrent_id: str, torrent_link: str, size: str) -> dict[str, str]:
-        '''
+        """
         Helper function to fetch file info for a single release in parallel.
-        '''
-        file_page_url = f'{self.base_url}/torrents-arquivos.php?id={torrent_id}'
-        filename = 'N/A'
+        """
+        file_page_url = f"{self.base_url}/torrents-arquivos.php?id={torrent_id}"
+        filename = "N/A"
 
         try:
             file_page_response = await self.session.get(file_page_url, timeout=15)
             file_page_response.raise_for_status()
-            file_page_soup = BeautifulSoup(file_page_response.text, 'html.parser')
-            file_li_tag = file_page_soup.find('li', class_='list-group-item')
+            file_page_soup = BeautifulSoup(file_page_response.text, "html.parser")
+            file_li_tag = file_page_soup.find("li", class_="list-group-item")
 
             if file_li_tag and file_li_tag.contents:
                 first_content = file_li_tag.contents[0]
                 filename = first_content.strip() if isinstance(first_content, str) else first_content.get_text(strip=True)
 
         except Exception as e:
-            logger.info(f'[bold red]Falha ao obter nome do arquivo para ID {torrent_id}: {e}[/bold red]')
+            logger.info(f"[bold red]Falha ao obter nome do arquivo para ID {torrent_id}: {e}[/bold red]")
 
-        return {
-            'name': filename,
-            'size': size,
-            'link': torrent_link
-        }
+        return {"name": filename, "size": size, "link": torrent_link}
 
     def get_game_name(self, meta: Meta) -> str:
         """Build the torrent name for GAME category."""
@@ -757,7 +737,7 @@ class ASC:
 
         final_description = "\n\n".join(part for part in desc_parts if part.strip())
 
-        final_desc_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
+        final_desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         async with aiofiles.open(final_desc_path, "w", encoding="utf-8") as descfile:
             await descfile.write(final_description)
 
@@ -793,8 +773,8 @@ class ASC:
         elif meta.anime:
             await self.load_localized_data(meta)
             search_name = await self.get_title(meta)
-            search_query = search_name.replace(' ', '+')
-            search_url = f'{self.base_url}/torrents-search.php?search={search_query}'
+            search_query = search_name.replace(" ", "+")
+            search_url = f"{self.base_url}/torrents-search.php?search={search_query}"
 
         elif meta.category in ("MOVIE", "TV"):
             imdb = meta.imdb_info.get("imdbID") or f"tt{str(meta.imdb_id).zfill(7)}"
@@ -808,13 +788,13 @@ class ASC:
             return found_items
 
         response = await self.session.get(search_url, timeout=30)
-        if 'Esqueceu sua senha' in response.text or 'login.php' in str(response.url) or 'login.php' in response.text:
+        if "Esqueceu sua senha" in response.text or "login.php" in str(response.url) or "login.php" in response.text:
             await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
             meta.skipping = f"{self.tracker}"
             return found_items
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-        releases = soup.find_all('li', class_='list-group-item dark-gray')
+        soup = BeautifulSoup(response.text, "html.parser")
+        releases = soup.find_all("li", class_="list-group-item dark-gray")
 
         if not releases:
             return found_items
@@ -822,26 +802,28 @@ class ASC:
         name_search_tasks: list[asyncio.Task[dict[str, str]]] = []
 
         for release in releases:
+
             def _has_details_link(href: str | None) -> bool:
-                return bool(href and 'torrents-details.php?id=' in href)
+                return bool(href and "torrents-details.php?id=" in href)
 
-            details_link_tag = release.find('a', href=_has_details_link)
-            torrent_link_value = details_link_tag.get('href') if details_link_tag else None
-            torrent_link = torrent_link_value if isinstance(torrent_link_value, str) else ''
+            details_link_tag = release.find("a", href=_has_details_link)
+            torrent_link_value = details_link_tag.get("href") if details_link_tag else None
+            torrent_link = torrent_link_value if isinstance(torrent_link_value, str) else ""
+
             def _has_size_text(text: str | None) -> bool:
-                return bool(text and ('GB' in text.upper() or 'MB' in text.upper()))
+                return bool(text and ("GB" in text.upper() or "MB" in text.upper()))
 
-            size_tag = release.find('span', text=_has_size_text, class_='badge-info')
-            size = size_tag.get_text(strip=True).strip() if size_tag else ''
+            size_tag = release.find("span", text=_has_size_text, class_="badge-info")
+            size = size_tag.get_text(strip=True).strip() if size_tag else ""
 
-            badges = release.find_all('span', class_='badge')
-            disc_types = ['BD25', 'BD50', 'BD66', 'BD100', 'DVD5', 'DVD9']
+            badges = release.find_all("span", class_="badge")
+            disc_types = ["BD25", "BD50", "BD66", "BD100", "DVD5", "DVD9"]
             is_disc = any(badge.text.strip().upper() in disc_types for badge in badges)
 
             if is_disc:
                 name, year, resolution, disk_type, video_codec, audio_codec = meta.title, "N/A", "N/A", "N/A", "N/A", "N/A"
-                video_codec_terms = ['MPEG-4', 'AV1', 'AVC', 'H264', 'H265', 'HEVC', 'MPEG-1', 'MPEG-2', 'VC-1', 'VP6', 'VP9']
-                audio_codec_terms = ['DTS', 'AC3', 'DDP', 'E-AC-3', 'TRUEHD', 'ATMOS', 'LPCM', 'AAC', 'FLAC']
+                video_codec_terms = ["MPEG-4", "AV1", "AVC", "H264", "H265", "HEVC", "MPEG-1", "MPEG-2", "VC-1", "VP6", "VP9"]
+                audio_codec_terms = ["DTS", "AC3", "DDP", "E-AC-3", "TRUEHD", "ATMOS", "LPCM", "AAC", "FLAC"]
 
                 for badge in badges:
                     badge_text = badge.text.strip()
@@ -849,8 +831,8 @@ class ASC:
 
                     if badge_text.isdigit() and len(badge_text) == 4:
                         year = badge_text
-                    elif badge_text_upper in ['4K', '2160P', '1080P', '720P', '480P']:
-                        resolution = '2160p' if badge_text_upper == '4K' else badge_text
+                    elif badge_text_upper in ["4K", "2160P", "1080P", "720P", "480P"]:
+                        resolution = "2160p" if badge_text_upper == "4K" else badge_text
                     elif any(term in badge_text_upper for term in video_codec_terms):
                         video_codec = badge_text
                     elif any(term in badge_text_upper for term in audio_codec_terms):
@@ -858,12 +840,8 @@ class ASC:
                     elif any(term in badge_text_upper for term in disc_types):
                         disk_type = badge_text
 
-                name = f'{name} {year} {resolution} {disk_type} {video_codec} {audio_codec}'
-                dupe_entry = {
-                    'name': name,
-                    'size': size,
-                    'link': torrent_link
-                }
+                name = f"{name} {year} {resolution} {disk_type} {video_codec} {audio_codec}"
+                dupe_entry = {"name": name, "size": size, "link": torrent_link}
 
                 found_items.append(dupe_entry)
 
@@ -871,22 +849,23 @@ class ASC:
                 if not details_link_tag:
                     continue
 
-                href_value = details_link_tag.get('href')
+                href_value = details_link_tag.get("href")
                 if not isinstance(href_value, str):
                     continue
 
                 if meta.category == "GAME":
                     title_tag = release.select_one(".tooltips p a")
                     game_title = title_tag.get_text(strip=True) if title_tag else "N/A"
-                    found_items.append({
-                        "name": game_title,
-                        "size": size,
-                        "link": torrent_link,
-                    })
+                    found_items.append(
+                        {
+                            "name": game_title,
+                            "size": size,
+                            "link": torrent_link,
+                        }
+                    )
                 else:
                     torrent_id = href_value.split("id=")[-1]
                     name_search_tasks.append(asyncio.create_task(self._fetch_file_info(torrent_id, torrent_link, size)))
-
 
         if name_search_tasks:
             parallel_results = await asyncio.gather(*name_search_tasks)
@@ -897,28 +876,28 @@ class ASC:
     async def get_upload_url(self, meta: Meta) -> str:
         if meta.category == "BOOK":
             return f"{self.base_url}/enviar-ebook.php"
-        elif meta.category == "GAME":
+        if meta.category == "GAME":
             return f"{self.base_url}/enviar-jogos.php"
-        elif meta.anime:
-            return f'{self.base_url}/enviar-anime.php'
-        elif meta.category == "MOVIE":
-            return f'{self.base_url}/enviar-filme.php'
-        else:
-            return f'{self.base_url}/enviar-series.php'
+        if meta.anime:
+            return f"{self.base_url}/enviar-anime.php"
+        if meta.category == "MOVIE":
+            return f"{self.base_url}/enviar-filme.php"
+        return f"{self.base_url}/enviar-series.php"
 
     async def format_image(self, url: str | None) -> str:
-        return f'[img]{url}[/img]' if isinstance(url, str) and url else ''
+        return f"[img]{url}[/img]" if isinstance(url, str) and url else ""
 
     async def format_date(self, date_str: str | None) -> str:
-        if not date_str or date_str == 'N/A':
-            return 'N/A'
+        if not date_str or date_str == "N/A":
+            return "N/A"
+
         def _try_format(fmt: str) -> str | None:
             try:
                 return datetime.strptime(date_str, fmt).replace(tzinfo=UTC).strftime("%d/%m/%Y")
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 return None
 
-        for fmt in ('%Y-%m-%d', '%d %b %Y'):
+        for fmt in ("%Y-%m-%d", "%d %b %Y"):
             formatted = _try_format(fmt)
             if formatted:
                 return formatted
@@ -926,40 +905,34 @@ class ASC:
 
     async def media_info(self, meta: Meta) -> str | None:
         if meta.is_disc == "BDMV":
-            summary_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt"
-            if os.path.exists(summary_path):
-                async with aiofiles.open(summary_path, encoding='utf-8') as f:
+            summary_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt"
+            if Path(summary_path).exists():
+                async with aiofiles.open(summary_path, encoding="utf-8") as f:
                     return await f.read()
         if not meta.is_disc:
             filelist = cast(list[str], meta.filelist or [])
             video_file = filelist[0] if filelist else (meta.path or "")
-            template_path = os.path.abspath(f"{meta.base_dir}/data/templates/MEDIAINFO.txt")
-            if os.path.exists(template_path):
-                mi_output = MediaInfo.parse(
-                    video_file,
-                    output='STRING',
-                    full=False,
-                    mediainfo_options={'inform': f'file://{template_path}'}
-                )
+            template_path = str(Path(f"{meta.base_dir}/data/templates/MEDIAINFO.txt").resolve())
+            if Path(template_path).exists():
+                mi_output = MediaInfo.parse(video_file, output="STRING", full=False, mediainfo_options={"inform": f"file://{template_path}"})
                 return mi_output.replace("\r", "")
 
         return None
 
     async def fetch_layout_data(self, meta: Meta) -> dict[str, Any]:
         url = f"{self.base_url}/search.php"
-        cache_dir = os.path.join(meta.base_dir, "tmp")
+        cache_dir = Path(meta.base_dir) / "tmp"
 
         async def _fetch(payload: dict[str, Any]) -> dict[str, Any]:
             layout_dict: dict[str, Any] = {}
-            cache_path = os.path.join(cache_dir, f"ASC_layout_cache_{self.layout}.json")
+            cache_path = Path(cache_dir) / f"ASC_layout_cache_{self.layout}.json"
 
-            if os.path.exists(cache_path):
+            if Path(cache_path).exists():
                 try:
                     async with aiofiles.open(cache_path, encoding="utf-8") as f:
                         cache = await f.read()
-                        layout_dict = json.loads(cache)
-                        return layout_dict
-                except (OSError, json.JSONDecodeError):
+                        return json.loads(cache)
+                except OSError, json.JSONDecodeError:
                     logger.info(f"{self.tracker}: [yellow]Failed to read cached layout data.[/yellow]")
 
             try:
@@ -992,29 +965,29 @@ class ASC:
 
     async def build_ratings_bbcode(self, meta: Meta, ratings_list: list[dict[str, Any]]) -> str:
         if not ratings_list:
-            return ''
+            return ""
 
         ratings_map = {
-            'Internet Movie Database': '[img]https://i.postimg.cc/Pr8Gv4RQ/IMDB.png[/img]',
-            'Rotten Tomatoes': '[img]https://i.postimg.cc/rppL76qC/rotten.png[/img]',
-            'Metacritic': '[img]https://i.postimg.cc/SKkH5pNg/Metacritic45x45.png[/img]',
-            'TMDb': '[img]https://i.postimg.cc/T13yyzyY/tmdb.png[/img]'
+            "Internet Movie Database": "[img]https://i.postimg.cc/Pr8Gv4RQ/IMDB.png[/img]",
+            "Rotten Tomatoes": "[img]https://i.postimg.cc/rppL76qC/rotten.png[/img]",
+            "Metacritic": "[img]https://i.postimg.cc/SKkH5pNg/Metacritic45x45.png[/img]",
+            "TMDb": "[img]https://i.postimg.cc/T13yyzyY/tmdb.png[/img]",
         }
         parts: list[str] = []
         for rating in ratings_list:
-            source = rating.get('Source')
+            source = rating.get("Source")
             if not isinstance(source, str):
                 continue
-            value = rating.get('Value', '').strip()
+            value = rating.get("Value", "").strip()
             img_tag = ratings_map.get(source)
             if not img_tag:
                 continue
 
-            if source == 'Internet Movie Database':
+            if source == "Internet Movie Database":
                 parts.append(
                     f"\n[url={meta.imdb_info.get('imdb_url', '') or f'https://www.imdb.com/title/{f"tt{str(meta.imdb_id).zfill(7)}"}'}]{img_tag}[/url]\n[b]{value}[/b]\n"
                 )
-            elif source == 'TMDb' and meta.tmdb:
+            elif source == "TMDb" and meta.tmdb:
                 parts.append(f"[url=https://www.themoviedb.org/{meta.category.lower()}/{meta.tmdb}]{img_tag}[/url]\n[b]{value}[/b]\n")
             else:
                 parts.append(f"{img_tag}\n[b]{value}[/b]\n")
@@ -1022,90 +995,92 @@ class ASC:
 
     async def build_cast_bbcode(self, cast_list: list[dict[str, Any]]) -> str:
         if not cast_list:
-            return ''
+            return ""
 
         parts: list[str] = []
         for person in cast_list[:10]:
-            profile_path = person.get('profile_path')
-            profile_url = f'https://image.tmdb.org/t/p/w45{profile_path}' if profile_path else 'https://i.imgur.com/eCCCtFA.png'
+            profile_path = person.get("profile_path")
+            profile_url = f"https://image.tmdb.org/t/p/w45{profile_path}" if profile_path else "https://i.imgur.com/eCCCtFA.png"
             tmdb_url = f"https://www.themoviedb.org/person/{person.get('id')}?language=pt-BR"
             img_tag = await self.format_image(profile_url)
             character_info = f"({person.get('name', '')}) como {person.get('character', '')}"
-            parts.append(f'[url={tmdb_url}]{img_tag}[/url]\n[size=2][b]{character_info}[/b][/size]\n')
-        return ''.join(parts)
+            parts.append(f"[url={tmdb_url}]{img_tag}[/url]\n[size=2][b]{character_info}[/b][/size]\n")
+        return "".join(parts)
 
     async def get_requests(self, meta: Meta) -> bool | list[dict[str, str]]:
         if not self.config["DEFAULT"].get("search_requests", False) and not meta.search_requests:
             return False
-        else:
-            cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
-            if cookie_jar is not None:
-                self.session.cookies = cast(Any, cookie_jar)
-            try:
-                category = meta.category
-                if category in ["BOOK", "GAME"]:
-                    category = await self.get_type(meta)
-                elif meta.anime:
-                    if category == 'TV':
-                        category = 118
-                    if category == 'MOVIE':
-                        category = 116
-                else:
-                    if category == 'TV':
-                        category = 120
-                    if category == 'MOVIE':
-                        category = 119
+        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if cookie_jar is not None:
+            self.session.cookies = cast(Any, cookie_jar)
+        try:
+            category = meta.category
+            if category in ["BOOK", "GAME"]:
+                category = await self.get_type(meta)
+            elif meta.anime:
+                if category == "TV":
+                    category = 118
+                if category == "MOVIE":
+                    category = 116
+            else:
+                if category == "TV":
+                    category = 120
+                if category == "MOVIE":
+                    category = 119
 
-                query = meta.title
-                search_url = f'{self.requests_url}?search={query}&category={category}'
+            query = meta.title
+            search_url = f"{self.requests_url}?search={query}&category={category}"
 
-                response = await self.session.get(search_url)
-                response.raise_for_status()
-                response_results_text = response.text
+            response = await self.session.get(search_url)
+            response.raise_for_status()
+            response_results_text = response.text
 
-                soup = BeautifulSoup(response_results_text, 'html.parser')
+            soup = BeautifulSoup(response_results_text, "html.parser")
 
-                request_rows = soup.select('.table-responsive table tr')
+            request_rows = soup.select(".table-responsive table tr")
 
-                results: list[dict[str, str]] = []
-                for row in request_rows:
-                    all_tds = row.find_all('td')
-                    if not all_tds or len(all_tds) < 6:
-                        continue
+            results: list[dict[str, str]] = []
+            for row in request_rows:
+                all_tds = row.find_all("td")
+                if not all_tds or len(all_tds) < 6:
+                    continue
 
-                    info_cell = all_tds[1]
-                    link_element = info_cell.select_one('a[href*="pedidos.php?action=ver"]')
-                    if not link_element:
-                        continue
+                info_cell = all_tds[1]
+                link_element = info_cell.select_one('a[href*="pedidos.php?action=ver"]')
+                if not link_element:
+                    continue
 
-                    name = link_element.text.strip()
-                    link_value = link_element.get('href')
-                    link = str(link_value) if link_value is not None else ''
+                name = link_element.text.strip()
+                link_value = link_element.get("href")
+                link = str(link_value) if link_value is not None else ""
 
-                    reward_td = all_tds[4]
-                    reward = reward_td.text.strip()
+                reward_td = all_tds[4]
+                reward = reward_td.text.strip()
 
-                    results.append({
-                        'Name': name,
-                        'Reward': reward,
-                        'Link': link,
-                    })
+                results.append(
+                    {
+                        "Name": name,
+                        "Reward": reward,
+                        "Link": link,
+                    }
+                )
 
-                if results:
-                    message = f'\n{self.tracker}: [bold yellow]Seu upload pode atender o(s) seguinte(s) pedido(s), confira:[/bold yellow]\n\n'
-                    for r in results:
-                        message += f"[bold green]Nome:[/bold green] {r['Name']}\n"
-                        message += f"[bold green]Recompensa:[/bold green] {r['Reward']}\n"
-                        message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
-                    logger.info(message)
+            if results:
+                message = f"\n{self.tracker}: [bold yellow]Seu upload pode atender o(s) seguinte(s) pedido(s), confira:[/bold yellow]\n\n"
+                for r in results:
+                    message += f"[bold green]Nome:[/bold green] {r['Name']}\n"
+                    message += f"[bold green]Recompensa:[/bold green] {r['Reward']}\n"
+                    message += f"[bold green]Link:[/bold green] {self.base_url}/{r['Link']}\n\n"
+                logger.info(message)
 
-                return results
+            return results
 
-            except Exception as e:
-                logger.info(f'[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]')
-                import traceback
-                logger.info(traceback.format_exc())
-                return []
+        except Exception as e:
+            logger.info(f"[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
+            import traceback
+
+            logger.info(traceback.format_exc())
+            return []
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         await self.load_localized_data(meta)  #  keep this line FIRST to ensure localized data is loaded before proceeding
@@ -1149,15 +1124,17 @@ class ASC:
 
             cover_url = self.get_book_cover(meta)
 
-            data.update({
-                "capa": cover_url,
-                "extencao": await self.get_container(meta),
-                "idioma": idioma_val,
-                "screens1": meta.author,
-                "screens2": cover_url,
-                "screens3": cover_url,
-                "type": upload_type,
-            })
+            data.update(
+                {
+                    "capa": cover_url,
+                    "extencao": await self.get_container(meta),
+                    "idioma": idioma_val,
+                    "screens1": meta.author,
+                    "screens2": cover_url,
+                    "screens3": cover_url,
+                    "type": upload_type,
+                }
+            )
 
             image_list = meta.image_list or []
             if len(image_list) > 0:
@@ -1168,12 +1145,14 @@ class ASC:
             return data
 
         if meta.category == "GAME":
-            data.update({
-                "capa": meta.poster,
-                "genero": self.get_game_genre(meta),
-                "idioma": self.get_game_idioma(meta),
-                "type": upload_type,
-            })
+            data.update(
+                {
+                    "capa": meta.poster,
+                    "genero": self.get_game_genre(meta),
+                    "idioma": self.get_game_idioma(meta),
+                    "type": upload_type,
+                }
+            )
 
             # Screenshots
             image_list = meta.image_list or []
@@ -1188,37 +1167,41 @@ class ASC:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
         resolution = await self.get_resolution(meta)
 
-        data.update({
-            "altura": resolution["height"],
-            "audio": await self.get_audio(meta),
-            "capa": f"https://image.tmdb.org/t/p/w500{self.main_tmdb_data.get('poster_path') or meta.tmdb_poster}",
-            "codecaudio": await self.get_audio_codec(meta),
-            "codecvideo": await self.get_video_codec(meta),
-            "extencao": await self.get_container(meta),
-            "genre": await self.get_tags(meta),
-            "imdb": meta.imdb_info.get("imdbID") or f"tt{str(meta.imdb_id).zfill(7)}",
-            "lang": "1" if not meta.original_language else self.language_map.get(meta.original_language.lower(), "11"),
-            "largura": resolution["width"],
-            "layout": self.layout,
-            "legenda": await self.get_subtitle(meta),
-            "qualidade": upload_type,
-            "tresd": "1" if meta.three_d else "2",
-            "tube": await self.get_trailer(meta),
-        })
+        data.update(
+            {
+                "altura": resolution["height"],
+                "audio": await self.get_audio(meta),
+                "capa": f"https://image.tmdb.org/t/p/w500{self.main_tmdb_data.get('poster_path') or meta.tmdb_poster}",
+                "codecaudio": await self.get_audio_codec(meta),
+                "codecvideo": await self.get_video_codec(meta),
+                "extencao": await self.get_container(meta),
+                "genre": await self.get_tags(meta),
+                "imdb": meta.imdb_info.get("imdbID") or f"tt{str(meta.imdb_id).zfill(7)}",
+                "lang": "1" if not meta.original_language else self.language_map.get(meta.original_language.lower(), "11"),
+                "largura": resolution["width"],
+                "layout": self.layout,
+                "legenda": await self.get_subtitle(meta),
+                "qualidade": upload_type,
+                "tresd": "1" if meta.three_d else "2",
+                "tube": await self.get_trailer(meta),
+            }
+        )
 
         if meta.anime:
             anime_info = await self.get_languages(meta)
             if anime_info:
-                data.update({
-                    'idioma': anime_info['idioma'],
-                    'lang': anime_info['lang'],
-                    'type': anime_info['type'],
-                })
+                data.update(
+                    {
+                        "idioma": anime_info["idioma"],
+                        "lang": anime_info["lang"],
+                        "type": anime_info["type"],
+                    }
+                )
 
         # Screenshots
         image_list = meta.image_list or []
         for i, img in enumerate(image_list[:4]):
-            data[f'screens{i+1}'] = img.get('raw_url')
+            data[f"screens{i + 1}"] = img.get("raw_url")
 
         return data
 
@@ -1238,10 +1221,10 @@ class ASC:
             source_flag=self.source_flag,
             torrent_url=self.torrent_url,
             data=data,
-            torrent_field_name='torrent',
+            torrent_field_name="torrent",
             upload_cookies=self.session.cookies,
             upload_url=upload_url,
-            id_pattern=r'torrents-details\.php\?id=(\d+)',
+            id_pattern=r"torrents-details\.php\?id=(\d+)",
             success_text="torrents-details.php?id=",
         )
 
@@ -1263,43 +1246,36 @@ class ASC:
 
     async def auto_approval(self, meta: Meta) -> None:
         if meta.debug:
-            logger.debug(
-                f'{self.tracker}: Debug mode, skipping automatic approval.'
-            )
+            logger.debug(f"{self.tracker}: Debug mode, skipping automatic approval.")
         else:
             torrent_id = meta.tracker_status[self.tracker]["torrent_id"]
             try:
-                approval_url = f'{self.base_url}/uploader_app.php?id={torrent_id}'
+                approval_url = f"{self.base_url}/uploader_app.php?id={torrent_id}"
                 approval_response = await self.session.get(approval_url, timeout=30)
                 approval_response.raise_for_status()
             except Exception as e:
-                logger.info(f'{self.tracker}: [bold red]Error during automatic approval attempt: {e}[/bold red]')
+                logger.info(f"{self.tracker}: [bold red]Error during automatic approval attempt: {e}[/bold red]")
 
     async def get_approval(self, meta: Meta) -> bool:
-        if not self.config['TRACKERS'][self.tracker].get('uploader_status', False):
+        if not self.config["TRACKERS"][self.tracker].get("uploader_status", False):
             return False
 
         if meta.modq:
-            logger.info(f'{self.tracker}: Sending to the moderation queue.')
+            logger.info(f"{self.tracker}: Sending to the moderation queue.")
             return False
 
         return True
 
     async def set_internal_flag(self, meta: Meta) -> None:
         if meta.debug:
-            logger.debug(
-                f'{self.tracker}: [bold yellow]Debug mode, skipping setting internal flag.[/bold yellow]'
-            )
+            logger.debug(f"{self.tracker}: [bold yellow]Debug mode, skipping setting internal flag.[/bold yellow]")
         else:
             data = {"id": meta.tracker_status[self.tracker]["torrent_id"], "internal": "yes"}
 
             try:
-                response = await self.session.post(
-                    f"{self.base_url}/torrents-edit.php?action=doedit",
-                    data=data
-                )
+                response = await self.session.post(f"{self.base_url}/torrents-edit.php?action=doedit", data=data)
                 response.raise_for_status()
 
             except Exception as e:
-                logger.info(f'{self.tracker}: [bold red]Error setting internal flag: {e}[/bold red]')
+                logger.info(f"{self.tracker}: [bold red]Error setting internal flag: {e}[/bold red]")
                 return

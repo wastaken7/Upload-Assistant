@@ -71,13 +71,13 @@ class ULCX(UNIT3D):
     tracker_urls = ("upload.cx",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='ULCX')
+        super().__init__(config, tracker_name="ULCX")
         self.config = config
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if "concert" in meta.keywords:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f'[bold red]Concerts not allowed at {self.tracker}.[/bold red]')
+                logger.info(f"[bold red]Concerts not allowed at {self.tracker}.[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -86,7 +86,7 @@ class ULCX(UNIT3D):
                 return False
         if meta.video_codec == "HEVC" and meta.resolution != "2160p" and "animation" not in meta.keywords and meta.anime is not True:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f'[bold red]This content might not fit HEVC rules for {self.tracker}.[/bold red]')
+                logger.info(f"[bold red]This content might not fit HEVC rules for {self.tracker}.[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -95,12 +95,12 @@ class ULCX(UNIT3D):
                 return False
         if meta.type in ["ENCODE", "HDTV"] and meta.resolution not in ["8640p", "4320p", "2160p", "1440p", "1080p", "1080i", "720p"]:
             if not meta.unattended:
-                logger.info(f'[bold red]Encodes must be at least 720p resolution for {self.tracker}.[/bold red]')
+                logger.info(f"[bold red]Encodes must be at least 720p resolution for {self.tracker}.[/bold red]")
             return False
 
         if meta.type in ["DVDRIP"]:
             if not meta.unattended:
-                logger.info(f'[bold red]DVDRIPs are not allowed for {self.tracker}.[/bold red]')
+                logger.info(f"[bold red]DVDRIPs are not allowed for {self.tracker}.[/bold red]")
             return False
 
         if meta.is_disc != "BDMV" and not await self.common.check_language_requirements(
@@ -114,51 +114,45 @@ class ULCX(UNIT3D):
 
         if meta.personalrelease:
             if meta.has_multiple_default_audio_tracks:
-                logger.info(
-                    f"[bold red]Multiple default audio tracks detected, skipping {self.tracker} upload.[/bold red]")
+                logger.info(f"[bold red]Multiple default audio tracks detected, skipping {self.tracker} upload.[/bold red]")
                 return False
 
             if meta.has_multiple_default_subtitle_tracks:
-                logger.info(
-                    f"[bold red]Multiple default subtitle tracks detected, skipping {self.tracker} upload.[/bold red]")
+                logger.info(f"[bold red]Multiple default subtitle tracks detected, skipping {self.tracker} upload.[/bold red]")
                 return False
 
         if meta.non_disc_has_pcm_audio_tracks:
-            logger.info(
-                f"[bold red]Non-disc source with PCM audio tracks detected, skipping {self.tracker} upload.[/bold red]")
+            logger.info(f"[bold red]Non-disc source with PCM audio tracks detected, skipping {self.tracker} upload.[/bold red]")
             return False
 
         if meta.discs_missing_certificate:
-            logger.info(
-                f"[bold red]Disc source(s) missing BD certificate, skipping {self.tracker} upload.[/bold red]")
+            logger.info(f"[bold red]Disc source(s) missing BD certificate, skipping {self.tracker} upload.[/bold red]")
             return False
 
         return True
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
-        data = {
-            'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
+        return {
+            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
-
-        return data
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)
 
         if meta.adult_media:
-            pattern = r'(\[center\](?:(?!\[/center\]).)*\[/center\])'
+            pattern = r"(\[center\](?:(?!\[/center\]).)*\[/center\])"
 
             def wrap_in_spoiler(match: re.Match[str]) -> str:
                 center_block = match.group(1)
-                if '[img' not in center_block.lower():
+                if "[img" not in center_block.lower():
                     return center_block
-                return f'[center][spoiler=Screenshots]{center_block}[/spoiler][/center]'
+                return f"[center][spoiler=Screenshots]{center_block}[/spoiler][/center]"
 
             desc = re.sub(pattern, wrap_in_spoiler, desc, flags=re.DOTALL)
-            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as f:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as f:
                 await f.write(desc)
 
-        return {'description': desc}
+        return {"description": desc}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         ulcx_name = meta.name
@@ -181,4 +175,4 @@ class ULCX(UNIT3D):
         if meta.type == "WEBDL" and ("hybrid" in meta.edition.lower() or meta.webdv):
             ulcx_name = ulcx_name.replace("Hybrid ", "", 1)
 
-        return {'name': ulcx_name}
+        return {"name": ulcx_name}

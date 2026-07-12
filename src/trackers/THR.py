@@ -3,9 +3,9 @@ import asyncio
 import contextlib
 import glob
 import json
-import os
 import platform
 import re
+from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
@@ -33,7 +33,7 @@ class THR:
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.username = str(config['TRACKERS'][self.tracker].get('username', ''))
+        self.username = str(config["TRACKERS"][self.tracker].get("username", ""))
         self.password = str(config["TRACKERS"][self.tracker].get("password", ""))
 
     async def upload(self, meta: Meta) -> bool | None:
@@ -51,11 +51,10 @@ class THR:
             if thr_confirm is not True:
                 thr_name_manually = cli_ui.ask_string("Please enter a proper name", default="") or ""
                 if thr_name_manually == "":
-                    logger.info('No proper name given')
+                    logger.info("No proper name given")
                     logger.info("Aborting...")
-                    return
-                else:
-                    thr_name = thr_name_manually
+                    return None
+                thr_name = thr_name_manually
         torrent_name = re.sub(r"[^0-9a-zA-Z. '\-\[\]]+", " ", thr_name)
 
         mi_file: bytes = b""
@@ -64,26 +63,24 @@ class THR:
             mi_file = b""
             # bd_file = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", 'r', encoding='utf-8'
         else:
-            mi_file_path = os.path.abspath(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt")
-            async with aiofiles.open(mi_file_path, 'rb') as f:
+            mi_file_path = str(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt").resolve())
+            async with aiofiles.open(mi_file_path, "rb") as f:
                 mi_file = await f.read()
             # bd_file = None
 
         async with aiofiles.open(
-            f"{meta.base_dir}/tmp/{meta.uuid}/[THR]DESCRIPTION.txt",
+            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[THR]DESCRIPTION.txt",
             encoding="utf-8",
         ) as f:
             desc = await f.read()
 
-        torrent_path = os.path.abspath(f"{meta.base_dir}/tmp/{meta.uuid}/[THR].torrent")
-        async with aiofiles.open(torrent_path, 'rb') as f:
+        torrent_path = str(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[THR].torrent").resolve())
+        async with aiofiles.open(torrent_path, "rb") as f:
             tfile = await f.read()
 
         # Upload Form
-        url = 'https://www.torrenthr.org/takeupload.php'
-        files: dict[str, tuple[str, Any]] = {
-            'tfile': (f'{torrent_name}.torrent', tfile)
-        }
+        url = "https://www.torrenthr.org/takeupload.php"
+        files: dict[str, tuple[str, Any]] = {"tfile": (f"{torrent_name}.torrent", tfile)}
         imdb_info = meta.imdb_info
         payload: dict[str, Any] = {
             "name": thr_name,
@@ -97,9 +94,9 @@ class THR:
         }
         # If pronfo fails, put mediainfo into THR parser
         if (meta.is_disc) != "BDMV":
-            files['nfo'] = ("MEDIAINFO.txt", mi_file)
+            files["nfo"] = ("MEDIAINFO.txt", mi_file)
         if subs:
-            payload['subs[]'] = tuple(subs)
+            payload["subs[]"] = tuple(subs)
 
         thr_upload_prompt = True if not meta.debug else cli_ui.ask_yes_no("send to takeupload.php?", default=False)
 
@@ -124,23 +121,22 @@ class THR:
                             tracker_status.setdefault(self.tracker, {})
                             tracker_status[self.tracker]["status_message"] = response.url
                             return True
-                        else:
-                            logger.info(f"[yellow]Upload response didn't contain 'uploaded=1'. URL: {response.url}")
-                            soup = BeautifulSoup(response.text, "html.parser")
-                            error_text = soup.find("h2", string=re.compile(r"Error"))  # type: ignore
+                        logger.info(f"[yellow]Upload response didn't contain 'uploaded=1'. URL: {response.url}")
+                        soup = BeautifulSoup(response.text, "html.parser")
+                        error_text = soup.find("h2", string=re.compile(r"Error"))  # type: ignore
 
-                            if error_text:
-                                error_message = cast(Any, error_text).find_next("p")
-                                if error_message:
-                                    logger.info(f"[red]Upload error: {error_message.text}")
+                        if error_text:
+                            error_message = cast(Any, error_text).find_next("p")
+                            if error_message:
+                                logger.info(f"[red]Upload error: {error_message.text}")
 
-                            return False
+                        return False
                 else:
                     logger.error("[red]Failed to log in to THR for upload")
                     return False
 
             except Exception as e:
-                logger.error(f"[red]Error during upload: {str(e)}")
+                logger.error(f"[red]Error during upload: {e!s}")
                 console.print_exception()
                 if meta.debug and response is not None:
                     with contextlib.suppress(Exception):
@@ -183,7 +179,7 @@ class THR:
         subs: list[int] = []
         sub_langs: list[str] = []
         if (meta.is_disc) != "BDMV":
-            with open(f"{meta.base_dir}/tmp/{meta.uuid}/MediaInfo.json", encoding="utf-8") as f:
+            with Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MediaInfo.json").open(encoding="utf-8") as f:
                 mi = cast(dict[str, Any], json.load(f))
             tracks = cast(list[dict[str, Any]], cast(dict[str, Any], mi.get("media", {})).get("track", []))
             for track in tracks:
@@ -210,7 +206,7 @@ class THR:
         pronfo = False
         bbcode = BBCODE()
         async with aiofiles.open(
-            f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt",
+            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt",
             encoding="utf-8",
         ) as base_file:
             base = await base_file.read()
@@ -233,7 +229,7 @@ class THR:
             desc_parts.append(f"TMDB: https://www.themoviedb.org/{category.lower()}/{meta.tmdb}\n")
         if meta.imdb_id or 0 != 0:
             imdb_info = meta.imdb_info
-            desc_parts.append(f"IMDb: {str(imdb_info.get('imdb_url', ''))}\n")
+            desc_parts.append(f"IMDb: {imdb_info.get('imdb_url', '')!s}\n")
         if meta.tvdb_id or 0 != 0:
             desc_parts.append(f"TVDB: https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series\n")
         if int(meta.tvmaze_id or 0) != 0:
@@ -259,17 +255,17 @@ class THR:
             desc_parts.append("\n\n" + base)
 
         # REHOST IMAGES
-        tmp_dir = os.path.join(meta.base_dir, "tmp", meta.uuid)
+        tmp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
         image_patterns: list[str] = ["*.png", ".[!.]*.png"]
         for pattern in image_patterns:
-            image_glob.extend(glob.glob(os.path.join(tmp_dir, pattern)))
+            image_glob.extend(glob.glob(Path(tmp_dir) / pattern))
 
         unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
         unwanted_files: set[str] = set()
         for pattern in unwanted_patterns:
-            unwanted_files.update(glob.glob(os.path.join(tmp_dir, pattern)))
+            unwanted_files.update(glob.glob(Path(tmp_dir) / pattern))
             hidden_pattern = f".{pattern}"
-            unwanted_files.update(glob.glob(os.path.join(tmp_dir, hidden_pattern)))
+            unwanted_files.update(glob.glob(Path(tmp_dir) / hidden_pattern))
 
         ordered_images: list[str] = []
         seen_images: set[str] = set()
@@ -301,7 +297,7 @@ class THR:
                     response = await image_client.post(
                         url,
                         data=data,
-                        files={"source": (os.path.basename(image), file_bytes)},
+                        files={"source": (Path(image).name, file_bytes)},
                     )
                     response.raise_for_status()
                     response_data = response.json()
@@ -311,29 +307,29 @@ class THR:
                         raise KeyError("image.url")
                     image_list.append(img_url)
             except httpx.RequestError as exc:
-                logger.info(f"[yellow]Failed to upload image {os.path.basename(image)}: {exc}")
+                logger.info(f"[yellow]Failed to upload image {Path(image).name}: {exc}")
             except httpx.HTTPStatusError:
-                logger.info(f"[yellow]Failed to upload image {os.path.basename(image)}")
+                logger.info(f"[yellow]Failed to upload image {Path(image).name}")
                 if response is not None:
                     logger.info(f"[yellow]THR image host returned HTTP {response.status_code}")
                     logger.info(response.text)
             except json.decoder.JSONDecodeError:
-                logger.info(f"[yellow]Failed to parse THR image host response for {os.path.basename(image)}")
+                logger.info(f"[yellow]Failed to parse THR image host response for {Path(image).name}")
                 if response is not None:
                     logger.info(response.text)
             except KeyError:
-                logger.info(f"[yellow]THR image host response was missing an image URL for {os.path.basename(image)}")
+                logger.info(f"[yellow]THR image host response was missing an image URL for {Path(image).name}")
                 logger.info(response_data)
             await asyncio.sleep(1)
 
         desc_parts.append("[align=center]")
         if (meta.is_disc) == "BDMV":
-            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt") as bd_file:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt") as bd_file:
                 desc_parts.append(f"[nfo]{await bd_file.read()}[/nfo]")
         elif self.config["TRACKERS"]["THR"].get("pronfo_api_key"):
             # ProNFO
             pronfo_url = f"https://www.pronfo.com/api/v1/access/upload/{self.config['TRACKERS']['THR'].get('pronfo_api_key', '')}"
-            async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt") as mi_file:
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt") as mi_file:
                 data = {
                     "content": await mi_file.read(),
                     "theme": self.config["TRACKERS"]["THR"].get("pronfo_theme", "gray"),
@@ -361,7 +357,7 @@ class THR:
         #         mi_file.close()
         desc_parts.append(f"\n\n[size=2][url=https://www.torrenthr.org/forums.php?action=viewtopic&topicid=8977]{meta.ua_signature}[/url][/size][/align]")
         async with aiofiles.open(
-            f"{meta.base_dir}/tmp/{meta.uuid}/[THR]DESCRIPTION.txt",
+            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[THR]DESCRIPTION.txt",
             "w",
             encoding="utf-8",
         ) as desc:
@@ -489,7 +485,7 @@ class THR:
 
                         logger.debug(f"[dim]Next page URL: {href}")
 
-                        page_match = re.search(r'page=(\d+)', href)
+                        page_match = re.search(r"page=(\d+)", href)
                         if page_match:
                             next_page_number = int(page_match.group(1))
                             logger.debug(f"[dim]Found next page link: page={next_page_number} (will be displayed as page {next_page_number + 1})")
@@ -502,17 +498,13 @@ class THR:
 
     async def login(self, meta) -> dict[str, Any] | None:
         logger.info("[yellow]Logging in to THR...")
-        url = 'https://www.torrenthr.org/takelogin.php'
+        url = "https://www.torrenthr.org/takelogin.php"
 
         if not self.username or not self.password:
-            logger.info('[red]Missing THR credentials in config.py')
+            logger.info("[red]Missing THR credentials in config.py")
             return None
 
-        payload: dict[str, Any] = {
-            'username': self.username,
-            'password': self.password,
-            'ssl': 'yes'
-        }
+        payload: dict[str, Any] = {"username": self.username, "password": self.password, "ssl": "yes"}
         headers = {
             "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})",
             "Referer": "https://www.torrenthr.org/login.php",
@@ -520,29 +512,28 @@ class THR:
 
         async with httpx.AsyncClient(follow_redirects=True) as session:
             try:
-                login_page = await session.get('https://www.torrenthr.org/login.php')
-                login_soup = BeautifulSoup(login_page.text, 'html.parser')
+                login_page = await session.get("https://www.torrenthr.org/login.php")
+                login_soup = BeautifulSoup(login_page.text, "html.parser")
 
-                for input_tag in login_soup.find_all('input', type='hidden'):
-                    name_raw = input_tag.get('name')
-                    value_raw = input_tag.get('value')
+                for input_tag in login_soup.find_all("input", type="hidden"):
+                    name_raw = input_tag.get("name")
+                    value_raw = input_tag.get("value")
                     if name_raw and value_raw:
-                        name = ' '.join(name_raw) if isinstance(name_raw, AttributeValueList) else name_raw
-                        value = ' '.join(value_raw) if isinstance(value_raw, AttributeValueList) else value_raw
+                        name = " ".join(name_raw) if isinstance(name_raw, AttributeValueList) else name_raw
+                        value = " ".join(value_raw) if isinstance(value_raw, AttributeValueList) else value_raw
                         payload[name] = value
 
                 resp = await session.post(url, headers=headers, data=payload)
 
                 if "index.php" in str(resp.url) or "logout.php" in resp.text:
-                    logger.info('[green]Successfully logged in to THR')
+                    logger.info("[green]Successfully logged in to THR")
                     return dict(session.cookies)
-                else:
-                    logger.error('[red]Failed to log in to THR')
-                    logger.info(f'[red]Login response URL: {resp.url}')
-                    logger.info(f'[red]Login status code: {resp.status_code}')
-                    return None
+                logger.error("[red]Failed to log in to THR")
+                logger.info(f"[red]Login response URL: {resp.url}")
+                logger.info(f"[red]Login status code: {resp.status_code}")
+                return None
 
             except Exception as e:
-                logger.error(f"[red]Error during THR login: {str(e)}")
+                logger.error(f"[red]Error during THR login: {e!s}")
                 console.print_exception()
                 return None

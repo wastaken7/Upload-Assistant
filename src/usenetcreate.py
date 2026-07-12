@@ -8,6 +8,7 @@ import random
 import re
 import secrets
 import shutil
+from pathlib import Path
 from typing import Any
 
 import aiofiles
@@ -48,7 +49,7 @@ def get_path_size(path: str) -> int:
     total_size = 0
     for dirpath, _, filenames in os.walk(path):
         for f in filenames:
-            fp = os.path.join(dirpath, f)
+            fp = Path(dirpath) / f
             if not os.path.islink(fp):
                 with contextlib.suppress(OSError):
                     total_size += os.path.getsize(fp)
@@ -60,12 +61,11 @@ def get_dynamic_volume_size(total_bytes: int) -> str:
     gb = 1024 * 1024 * 1024
     if total_bytes < 2 * gb:
         return "100m"
-    elif total_bytes < 10 * gb:
+    if total_bytes < 10 * gb:
         return "200m"
-    elif total_bytes < 50 * gb:
+    if total_bytes < 50 * gb:
         return "500m"
-    else:
-        return "1g"
+    return "1g"
 
 
 def compute_nyuu_connections(total_connections: int, nyuu_check_enabled: bool, check_connections_cfg: str | int | None) -> tuple[int, int | None]:
@@ -109,15 +109,15 @@ async def check_binary(binary_name: str, config_path: str | None = None, meta: M
                 from bin.get_7z import SevenZipBinaryManager
 
                 return await SevenZipBinaryManager.ensure_7z_binary(base_dir)
-            elif binary_name == "nyuu":
+            if binary_name == "nyuu":
                 from bin.get_nyuu import NyuuBinaryManager
 
                 return await NyuuBinaryManager.ensure_nyuu_binary(base_dir, path_7z=path_7z)
-            elif binary_name == "par2":
+            if binary_name == "par2":
                 from bin.get_par2 import Par2BinaryManager
 
                 return await Par2BinaryManager.ensure_par2_binary(base_dir)
-            elif binary_name == "pesto":
+            if binary_name == "pesto":
                 from bin.get_pesto import PestoBinaryManager
 
                 return await PestoBinaryManager.ensure_pesto_binary(base_dir)
@@ -125,7 +125,6 @@ async def check_binary(binary_name: str, config_path: str | None = None, meta: M
             logger.debug(f"[yellow]Automatic download of '{binary_name}' failed: {e}[/yellow]")
 
     raise FileNotFoundError(f"Binary '{path}' not found in PATH or config. Please install it.")
-
 
 
 async def run_command_with_logging(cmd: list[str], description: str) -> None:
@@ -170,11 +169,11 @@ def parse_volume_size(vol_size: str) -> int:
     try:
         if vol_size.endswith("g"):
             return int(vol_size[:-1]) * 1024 * 1024 * 1024
-        elif vol_size.endswith("m"):
+        if vol_size.endswith("m"):
             return int(vol_size[:-1]) * 1024 * 1024
-        elif vol_size.endswith("k"):
+        if vol_size.endswith("k"):
             return int(vol_size[:-1]) * 1024
-        elif vol_size.isdigit():
+        if vol_size.isdigit():
             return int(vol_size)
     except ValueError:
         pass
@@ -216,7 +215,7 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
 
             async def monitor_progress():
                 while process.returncode is None:
-                    try:
+                    with contextlib.suppress(Exception):
                         files = os.listdir(usenet_dir)
                         parts = []
                         for f in files:
@@ -232,8 +231,6 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
                         if current_part > expected_volumes:
                             expected_volumes = current_part
                         progress.update(task, completed=current_part, total=expected_volumes)
-                    except Exception:
-                        pass
                     await asyncio.sleep(0.5)
 
             monitor_task = asyncio.create_task(monitor_progress())
@@ -576,10 +573,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                         round_num = event.get("round", 0)
                         max_rounds = event.get("max_rounds", 0)
                         missing = event.get("missing", 0)
-                        logger.info(
-                            f"[yellow]Article check: round {round_num}/{max_rounds} — "
-                            f"{missing} article(s) missing, reposting automatically...[/yellow]"
-                        )
+                        logger.info(f"[yellow]Article check: round {round_num}/{max_rounds} — {missing} article(s) missing, reposting automatically...[/yellow]")
                     elif etype == "repost_round_done":
                         round_num = event.get("round", 0)
                         max_rounds = event.get("max_rounds", 0)
@@ -587,10 +581,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                         still_missing = event.get("still_missing", 0)
                         check_missing_count = still_missing
                         if still_missing:
-                            logger.info(
-                                f"[yellow]Article check: round {round_num}/{max_rounds} — "
-                                f"reposted {reposted} article(s), {still_missing} still missing[/yellow]"
-                            )
+                            logger.info(f"[yellow]Article check: round {round_num}/{max_rounds} — reposted {reposted} article(s), {still_missing} still missing[/yellow]")
                 except json.JSONDecodeError:
                     pass
 
@@ -664,7 +655,7 @@ async def verify_nzb_has_password(nzb_path: str) -> bool:
     """Verify that the NZB file contains a password tag inside the head section."""
     if not await aiofiles.ospath.isfile(nzb_path):
         return False
-    try:
+    with contextlib.suppress(Exception):
         # Read the first 4096 bytes (the head section is always at the beginning)
         async with aiofiles.open(nzb_path, encoding="utf-8", errors="ignore") as f:
             header_sample = await f.read(4096)
@@ -674,8 +665,6 @@ async def verify_nzb_has_password(nzb_path: str) -> bool:
             head_content = head_match.group(1)
             if re.search(r'<meta\s+type=["\']password["\']', head_content, re.IGNORECASE):
                 return True
-    except Exception:
-        pass
     return False
 
 
@@ -730,8 +719,8 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     # For directories, fall back to the directory basename only when meta name is absent.
     if safe_name:
         safe_nzb_name = safe_name
-    elif os.path.isdir(input_path):
-        folder_name = os.path.basename(input_path)
+    elif Path(input_path).is_dir():
+        folder_name = Path(input_path).name
         safe_nzb_name = "".join(c for c in folder_name if c.isalnum() or c in "._- ").replace(" ", ".") or safe_name
     else:
         safe_nzb_name = safe_name
@@ -739,38 +728,38 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     # Determine NZB output directory (falls back to default tmp dir if empty)
     nzb_output_dir = usenet_cfg.get("nzb_output_dir")
     if not nzb_output_dir:
-        nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(input_path))
+        nzb_output_dir = Path(base_dir) / "tmp" / Path(input_path).name
 
     try:
-        os.makedirs(nzb_output_dir, exist_ok=True)
+        Path(nzb_output_dir).mkdir(parents=True, exist_ok=True)
     except Exception as e:
         logger.warning(f"[yellow]Warning: Could not create nzb_output_dir '{nzb_output_dir}' ({e}). Falling back to default tmp dir.[/yellow]")
-        nzb_output_dir = os.path.join(base_dir, "tmp", os.path.basename(input_path))
+        nzb_output_dir = Path(base_dir) / "tmp" / Path(input_path).name
         with contextlib.suppress(Exception):
-            os.makedirs(nzb_output_dir, exist_ok=True)
+            Path(nzb_output_dir).mkdir(parents=True, exist_ok=True)
 
     # Determine tmp base directory for staging (falls back to default tmp dir if empty)
     usenet_tmp_dir = usenet_cfg.get("usenet_tmp_dir")
     if usenet_tmp_dir:
         try:
-            os.makedirs(usenet_tmp_dir, exist_ok=True)
+            Path(usenet_tmp_dir).mkdir(parents=True, exist_ok=True)
             tmp_base = usenet_tmp_dir
         except Exception as e:
             logger.warning(f"[yellow]Warning: Could not create usenet_tmp_dir '{usenet_tmp_dir}' ({e}). Falling back to default tmp dir.[/yellow]")
-            tmp_base = os.path.join(base_dir, "tmp", os.path.basename(input_path))
+            tmp_base = Path(base_dir) / "tmp" / Path(input_path).name
     else:
-        tmp_base = os.path.join(base_dir, "tmp", os.path.basename(input_path))
+        tmp_base = Path(base_dir) / "tmp" / Path(input_path).name
 
     # Check if a valid NZB file already exists to skip the upload process
-    final_nzb_path = os.path.join(nzb_output_dir, f"{safe_nzb_name}.nzb")
-    nzb_file = os.path.join(tmp_base, uuid, f"{safe_nzb_name}.nzb")
+    final_nzb_path = Path(nzb_output_dir) / f"{safe_nzb_name}.nzb"
+    nzb_file = Path(tmp_base) / uuid / f"{safe_nzb_name}.nzb"
 
     for path_to_check in [final_nzb_path, nzb_file]:
         if path_to_check and await is_valid_nzb(path_to_check):
             return path_to_check
 
     # Temp Usenet directory
-    usenet_dir = os.path.join(tmp_base, uuid, "usenet")
+    usenet_dir = Path(tmp_base) / uuid / "usenet"
     await aiofiles.os.makedirs(usenet_dir, exist_ok=True)
 
     is_debug = meta.debug
@@ -836,8 +825,8 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         logger.info("[cyan]Skipping archive step; copying files directly for upload...[/cyan]")
         if await aiofiles.ospath.isdir(input_path):
             for entry in await aiofiles.os.listdir(input_path):
-                src = os.path.join(input_path, entry)
-                dst = os.path.join(usenet_dir, entry)
+                src = Path(input_path) / entry
+                dst = Path(usenet_dir) / entry
                 if os.path.isfile(src):
                     if is_debug and not await aiofiles.ospath.exists(src):
                         async with aiofiles.open(dst, "wb") as f:
@@ -845,7 +834,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                     else:
                         await asyncio.to_thread(shutil.copy2, src, dst)
         else:
-            dest_file = os.path.join(usenet_dir, os.path.basename(input_path))
+            dest_file = Path(usenet_dir) / Path(input_path).name
             if is_debug and not await aiofiles.ospath.exists(input_path):
                 async with aiofiles.open(dest_file, "wb") as f:
                     await f.write(b"mock single file content")
@@ -857,7 +846,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             if is_debug:
                 logger.info(f"[cyan]Dynamic volume size chosen based on upload size ({total_size / (1024 * 1024 * 1024):.2f} GB): {volume_size.upper()}[/cyan]")
 
-        archive_out = os.path.join(usenet_dir, f"{archive_name}.7z")
+        archive_out = Path(usenet_dir) / f"{archive_name}.7z"
 
         if await aiofiles.ospath.isdir(input_path) or volume_size or archive_password:
             cmd_7z = [path_7z or "7z", "a", "-mx=0"]
@@ -876,7 +865,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 await run_7z_with_progress(cmd_7z, usenet_dir, archive_name, volume_size, total_size)
         else:
             logger.info("[cyan]Copying single file for upload...[/cyan]")
-            dest_file = os.path.join(usenet_dir, os.path.basename(input_path))
+            dest_file = Path(usenet_dir) / Path(input_path).name
             if is_debug and not await aiofiles.ospath.exists(input_path):
                 logger.info(f"[yellow][DEBUG SIMULATION] Input path '{input_path}' doesn't exist, writing dummy file to '{dest_file}'[/yellow]")
                 async with aiofiles.open(dest_file, "wb") as f:
@@ -890,21 +879,21 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     if not use_pesto:
         target_files = []
         for f in await aiofiles.os.listdir(usenet_dir):
-            file_path = os.path.join(usenet_dir, f)
+            file_path = Path(usenet_dir) / f
             if await aiofiles.ospath.isfile(file_path) and not f.endswith(".par2"):
                 target_files.append(file_path)
 
         if target_files:
             logger.info("[cyan]Generating PAR2 parity files...[/cyan]")
             par2_file = f"{archive_name}.par2"
-            relative_target_files = [os.path.basename(f) for f in target_files]
+            relative_target_files = [Path(f).name for f in target_files]
             # No -n/-u/-l flag: par2cmdline falls back to its default scheme of
             # exponentially-sized recovery volumes, matching standard Usenet posts
             # and letting repair tools fetch only as much recovery data as needed.
             cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", par2_file] + relative_target_files
             if is_debug and not path_par2:
                 logger.info(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_par2)}[/yellow]")
-                mock_par2 = os.path.normpath(os.path.join(usenet_dir, par2_file))
+                mock_par2 = os.path.normpath(Path(usenet_dir) / par2_file)
                 async with aiofiles.open(mock_par2, "wb") as f:
                     await f.write(b"mock par2 content")
             else:
@@ -933,11 +922,11 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         subject = name
 
     # 6. Collect files to upload
-    nzb_file = os.path.join(tmp_base, uuid, f"{safe_nzb_name}.nzb")
+    nzb_file = Path(tmp_base) / uuid / f"{safe_nzb_name}.nzb"
 
     all_upload_files = []
     for f in await aiofiles.os.listdir(usenet_dir):
-        file_path = os.path.join(usenet_dir, f)
+        file_path = Path(usenet_dir) / f
         if await aiofiles.ospath.isfile(file_path):
             all_upload_files.append(f)
 
@@ -959,15 +948,24 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         # 6a. Upload via pesto
         cmd_pesto = [
             path_pesto or "pesto",
-            "-s", usenet_cfg.get("host"),
-            "-P", str(usenet_cfg.get("port", 563)),
-            "-u", usenet_cfg.get("username"),
-            "-p", usenet_cfg.get("password"),
-            "-n", str(usenet_cfg.get("connections", 20)),
-            "-g", usenet_cfg.get("newsgroups"),
-            "--out", nzb_file,
-            "--par2", str(par2_percentage),
-            "--output-format", "json",
+            "-s",
+            usenet_cfg.get("host"),
+            "-P",
+            str(usenet_cfg.get("port", 563)),
+            "-u",
+            usenet_cfg.get("username"),
+            "-p",
+            usenet_cfg.get("password"),
+            "-n",
+            str(usenet_cfg.get("connections", 20)),
+            "-g",
+            usenet_cfg.get("newsgroups"),
+            "--out",
+            nzb_file,
+            "--par2",
+            str(par2_percentage),
+            "--output-format",
+            "json",
             # Upload-Assistant submits to trackers itself with full metadata
             # (title, TMDB id, category, screenshots) right after this call.
             # Any user-configured pesto post-upload hook (~/.config/pesto/hooks/)
@@ -1050,16 +1048,26 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
 
         cmd_nyuu = [
             path_nyuu or "nyuu",
-            "-h", usenet_cfg.get("host"),
-            "-P", str(usenet_cfg.get("port", 563)),
-            "-u", usenet_cfg.get("username"),
-            "-p", usenet_cfg.get("password"),
-            "-n", str(post_connections),
-            "-g", usenet_cfg.get("newsgroups"),
-            "-f", poster,
-            "-s", subject,
-            "-o", nzb_file,
-            "--progress", "log:2s",
+            "-h",
+            usenet_cfg.get("host"),
+            "-P",
+            str(usenet_cfg.get("port", 563)),
+            "-u",
+            usenet_cfg.get("username"),
+            "-p",
+            usenet_cfg.get("password"),
+            "-n",
+            str(post_connections),
+            "-g",
+            usenet_cfg.get("newsgroups"),
+            "-f",
+            poster,
+            "-s",
+            subject,
+            "-o",
+            nzb_file,
+            "--progress",
+            "log:2s",
         ]
 
         if usenet_cfg.get("ssl", True):
@@ -1144,11 +1152,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             final_nzb_path = nzb_file
 
     # Clean up empty parent uuid folder
-    uuid_dir = os.path.join(tmp_base, uuid)
-    try:
+    uuid_dir = Path(tmp_base) / uuid
+    with contextlib.suppress(Exception):
         if not is_debug and await aiofiles.ospath.exists(uuid_dir) and not os.listdir(uuid_dir):
             await asyncio.to_thread(os.rmdir, uuid_dir)
-    except Exception:
-        pass
 
     return final_nzb_path

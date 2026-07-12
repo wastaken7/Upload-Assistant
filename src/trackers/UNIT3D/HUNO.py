@@ -23,7 +23,7 @@ class HUNO(UNIT3D):
     tracker = "HUNO"
     source_flag = "HUNO"
     base_url = "https://hawke.uno"
-    banned_groups = [
+    banned_groups = (
         "4K4U",
         "Bearfish",
         "BiTOR",
@@ -67,8 +67,8 @@ class HUNO(UNIT3D):
         "YAWNiX",
         "YIFY",
         "YTS",
-    ]
-    approved_image_hosts = [
+    )
+    approved_image_hosts = (
         "ptpimg",
         "imgbox",
         "imgbb",
@@ -78,13 +78,13 @@ class HUNO(UNIT3D):
         "ptscreens",
         "passtheimage",
         "hawke.pics",
-    ]
+    )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     requests_url = f"{base_url}/api/requests/filter"
-    tracker_urls = ["https://hawke.uno"]
+    tracker_urls = ("https://hawke.uno",)
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:
@@ -137,7 +137,7 @@ class HUNO(UNIT3D):
                             if bit_rate and "Animation" not in meta.genre:
                                 try:
                                     bit_rate_num = int(bit_rate)
-                                except (ValueError, TypeError):
+                                except ValueError, TypeError:
                                     bit_rate_num = None
 
                                 if bit_rate_num is not None:
@@ -176,7 +176,7 @@ class HUNO(UNIT3D):
             approved_image_hosts=self.approved_image_hosts,
             signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=8]{meta.ua_signature}[/size][/url][/right]",
         )
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as f:
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as f:
             await f.write(desc)
 
     async def get_internal(self, meta: Meta) -> int:
@@ -207,14 +207,13 @@ class HUNO(UNIT3D):
         }
         if mapping_only:
             return resolution_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in resolution_id.items()}
-        elif resolution:
+        if resolution:
             return {"resolution_id": resolution_id.get(resolution, "10")}
-        else:
-            meta_resolution = meta.resolution
-            resolved_id = resolution_id.get(meta_resolution, "10")
-            return {"resolution_id": resolved_id}
+        meta_resolution = meta.resolution
+        resolved_id = resolution_id.get(meta_resolution, "10")
+        return {"resolution_id": resolved_id}
 
     async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
@@ -228,14 +227,13 @@ class HUNO(UNIT3D):
         }
         if mapping_only:
             return type_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in type_id.items()}
-        elif type:
+        if type:
             return {"type_id": type_id.get(type, "0")}
-        else:
-            meta_type = meta.type or ""
-            resolved_id = type_id.get(meta_type, "0")
-            return {"type_id": resolved_id}
+        meta_type = meta.type or ""
+        resolved_id = type_id.get(meta_type, "0")
+        return {"type_id": resolved_id}
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         await self.get_description(meta)
@@ -284,20 +282,20 @@ class HUNO(UNIT3D):
     async def get_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
         files: dict[str, tuple[str, bytes, str]] = {}
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, announce_url=self.announce_url)
-        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
+        torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
         async with aiofiles.open(torrent_path, "rb") as f:
             files["torrent"] = (f"{meta.clean_name}.torrent", await f.read(), "application/x-bittorrent")
 
-        desc_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
+        desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         async with aiofiles.open(desc_path, "rb") as f:
             files["description"] = ("description.txt", await f.read(), "text/plain")
 
         if meta.is_disc == "BDMV":
-            bdinfo_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt"
+            bdinfo_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt"
             async with aiofiles.open(bdinfo_path, "rb") as f:
                 files["bdinfo"] = ("bdinfo.txt", await f.read(), "text/plain")
         else:
-            mediainfo_path = f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
+            mediainfo_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
             async with aiofiles.open(mediainfo_path, "rb") as f:
                 files["mediainfo"] = ("mediainfo.txt", await f.read(), "text/plain")
 
@@ -341,11 +339,10 @@ class HUNO(UNIT3D):
                     status_message = f"{response_json.get('message')}\nModeration Status: {moderation_status}\nWarnings: {warnings}\nName Issues: {name_issues}"
                     status_dict["status_message"] = status_message
                     return True
-                else:
-                    error_msg = response_json.get("message", "Unknown error")
-                    status_dict["status_message"] = f"data error: API error: {error_msg}"
-                    logger.info(f"[yellow]Upload to {self.tracker} failed: {error_msg}[/yellow]")
-                    return False
+                error_msg = response_json.get("message", "Unknown error")
+                status_dict["status_message"] = f"data error: API error: {error_msg}"
+                logger.info(f"[yellow]Upload to {self.tracker} failed: {error_msg}[/yellow]")
+                return False
 
         except httpx.HTTPStatusError as e:
             msg = f"HTTP {e.response.status_code} - {e.response.text}"

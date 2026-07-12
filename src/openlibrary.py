@@ -2,7 +2,6 @@
 import asyncio
 import contextlib
 import json
-import os
 import re
 from pathlib import Path
 from typing import Any
@@ -20,8 +19,8 @@ class OpenLibraryManager:
         author_id = author_key.split("/")[-1]
         author_cache_file = None
         if cache_dir:
-            author_cache_file = os.path.join(cache_dir, f"author_{author_id}.json")
-            if author_cache_file and os.path.exists(author_cache_file):
+            author_cache_file = Path(cache_dir) / f"author_{author_id}.json"
+            if author_cache_file and Path(author_cache_file).exists():
                 try:
                     cache_content = await asyncio.to_thread(Path(author_cache_file).read_text, encoding="utf-8")
                     cached_data = json.loads(cache_content)
@@ -52,11 +51,11 @@ class OpenLibraryManager:
         cache_dir = None
         cache_file = None
         if base_dir:
-            cache_dir = os.path.join(base_dir, "tmp", "openlibrary_cache")
+            cache_dir = Path(base_dir) / "tmp" / "openlibrary_cache"
             try:
-                os.makedirs(cache_dir, exist_ok=True)
-                cache_file = os.path.join(cache_dir, f"{work_id}.json")
-                if os.path.exists(cache_file):
+                Path(cache_dir).mkdir(parents=True, exist_ok=True)
+                cache_file = Path(cache_dir) / f"{work_id}.json"
+                if Path(cache_file).exists():
                     try:
                         cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
                         cached_data = json.loads(cache_content)
@@ -123,11 +122,10 @@ class OpenLibraryManager:
                                 logger.debug(f"[yellow]Warning: Could not write cache for Work ID '{work_id}': {ex}[/yellow]")
 
                         return metadata
-                    else:
-                        logger.info(f"{openlibrary_color_str}: No metadata found for Work ID: {work_id}")
-                        if cache_file:
-                            with contextlib.suppress(Exception):
-                                await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
+                    logger.info(f"{openlibrary_color_str}: No metadata found for Work ID: {work_id}")
+                    if cache_file:
+                        with contextlib.suppress(Exception):
+                            await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
                 else:
                     logger.info(f"{openlibrary_color_str}: API returned error status code {resp.status_code} for Work ID: {work_id}")
                     if resp.status_code == 404 and cache_file:
@@ -147,11 +145,11 @@ class OpenLibraryManager:
         cache_dir = None
         cache_file = None
         if base_dir:
-            cache_dir = os.path.join(base_dir, "tmp", "openlibrary_cache")
+            cache_dir = Path(base_dir) / "tmp" / "openlibrary_cache"
             try:
-                os.makedirs(cache_dir, exist_ok=True)
-                cache_file = os.path.join(cache_dir, f"isbn_{clean_isbn}.json")
-                if os.path.exists(cache_file):
+                Path(cache_dir).mkdir(parents=True, exist_ok=True)
+                cache_file = Path(cache_dir) / f"isbn_{clean_isbn}.json"
+                if Path(cache_file).exists():
                     try:
                         cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
                         cached_data = json.loads(cache_content)
@@ -209,56 +207,52 @@ class OpenLibraryManager:
                                     with contextlib.suppress(Exception):
                                         await asyncio.to_thread(Path(cache_file).write_text, json.dumps(metadata, indent=4), encoding="utf-8")
                                 return metadata
-                            else:
-                                if cache_file:
-                                    with contextlib.suppress(Exception):
-                                        await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
-                                return None
-                        else:
-                            # Parse metadata directly from details if no work key
-                            metadata = {}
-                            title = details.get("title")
-                            if title:
-                                subtitle = details.get("subtitle")
-                                metadata["title"] = f"{title}: {subtitle}" if subtitle else title
+                            if cache_file:
+                                with contextlib.suppress(Exception):
+                                    await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
+                            return None
+                        # Parse metadata directly from details if no work key
+                        metadata = {}
+                        title = details.get("title")
+                        if title:
+                            subtitle = details.get("subtitle")
+                            metadata["title"] = f"{title}: {subtitle}" if subtitle else title
 
-                                authors = details.get("authors", [])
-                                author_names = [a.get("name") for a in authors if a.get("name")]
-                                if author_names:
-                                    metadata["author"] = ", ".join(author_names)
+                            authors = details.get("authors", [])
+                            author_names = [a.get("name") for a in authors if a.get("name")]
+                            if author_names:
+                                metadata["author"] = ", ".join(author_names)
 
-                                publishers = details.get("publishers")
-                                if publishers and isinstance(publishers, list):
-                                    metadata["publisher"] = ", ".join(publishers)
+                            publishers = details.get("publishers")
+                            if publishers and isinstance(publishers, list):
+                                metadata["publisher"] = ", ".join(publishers)
 
-                                publish_date = details.get("publish_date")
-                                if publish_date:
-                                    year_match = re.search(r"\b\d{4}\b", str(publish_date))
-                                    if year_match:
-                                        year_str = year_match.group(0)
-                                        metadata["year"] = year_str
-                                        metadata["search_year"] = int(year_str)
+                            publish_date = details.get("publish_date")
+                            if publish_date:
+                                year_match = re.search(r"\b\d{4}\b", str(publish_date))
+                                if year_match:
+                                    year_str = year_match.group(0)
+                                    metadata["year"] = year_str
+                                    metadata["search_year"] = int(year_str)
 
-                                thumbnail_url = book_data.get("thumbnail_url")
-                                if thumbnail_url:
-                                    metadata["poster"] = thumbnail_url.replace("-S.jpg", "-L.jpg")
+                            thumbnail_url = book_data.get("thumbnail_url")
+                            if thumbnail_url:
+                                metadata["poster"] = thumbnail_url.replace("-S.jpg", "-L.jpg")
 
-                                metadata["isbn"] = clean_isbn
+                            metadata["isbn"] = clean_isbn
 
-                                if metadata and cache_file:
-                                    with contextlib.suppress(Exception):
-                                        await asyncio.to_thread(Path(cache_file).write_text, json.dumps(metadata, indent=4), encoding="utf-8")
-                                return metadata
-                            else:
-                                if cache_file:
-                                    with contextlib.suppress(Exception):
-                                        await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
-                                return None
-                    else:
-                        logger.info(f"{openlibrary_color_str}: No items found for ISBN: {clean_isbn}")
+                            if metadata and cache_file:
+                                with contextlib.suppress(Exception):
+                                    await asyncio.to_thread(Path(cache_file).write_text, json.dumps(metadata, indent=4), encoding="utf-8")
+                            return metadata
                         if cache_file:
                             with contextlib.suppress(Exception):
                                 await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
+                        return None
+                    logger.info(f"{openlibrary_color_str}: No items found for ISBN: {clean_isbn}")
+                    if cache_file:
+                        with contextlib.suppress(Exception):
+                            await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
                 else:
                     logger.info(f"{openlibrary_color_str}: API returned error status code {resp.status_code} for ISBN: {clean_isbn}")
                     if resp.status_code == 404 and cache_file:

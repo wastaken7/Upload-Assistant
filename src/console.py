@@ -4,6 +4,7 @@ import contextvars
 import logging
 import os
 import re
+from pathlib import Path
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -23,28 +24,24 @@ def ansi_to_html(ansi_chunk: str, width: int = 120) -> str:
         # the chunk looks like Rich markup (e.g. contains [bold] tags),
         # parse as markup so styled output is preserved.
         text = Text.from_ansi(ansi_chunk)
-        try:
+        with contextlib.suppress(Exception):
             if (not getattr(text, "spans", None) or len(text.spans) == 0) and "[" in ansi_chunk and "]" in ansi_chunk:
                 # Parse Rich markup into a Text instance
                 with contextlib.suppress(Exception):
                     text = Text.from_markup(ansi_chunk)
-        except Exception:
             # If introspecting spans fails for any reason, proceed with the original text
-            pass
         c.print(text, end="")
         # inline_styles keeps the fragment self-contained
         # export the recorded renderable as HTML with inline styles
         html = c.export_html(inline_styles=True)
         # Rich returns a full HTML document; extract the body contents so the
         # web UI can embed the fragment directly.
-        try:
+        with contextlib.suppress(Exception):
             import re
 
             m = re.search(r"<body[^>]*>(.*?)</body>", html, re.S | re.I)
             if m:
                 return m.group(1).strip()
-        except Exception:
-            pass
         return html
     except Exception:
         # Fallback: escape HTML to avoid breaking the page
@@ -135,11 +132,11 @@ class DynamicFileHandler(logging.Handler):
 
             # Ensure target directory exists
             log_dir = os.path.dirname(log_path)
-            if log_dir and not os.path.exists(log_dir):
-                os.makedirs(log_dir, exist_ok=True)
+            if log_dir and not Path(log_dir).exists():
+                Path(log_dir).mkdir(parents=True, exist_ok=True)
 
             # Append message to file
-            with open(log_path, "a", encoding="utf-8") as f:
+            with Path(log_path).open("a", encoding="utf-8") as f:
                 f.write(msg + "\n")
         except Exception:
             self.handleError(record)

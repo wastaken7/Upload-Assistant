@@ -37,13 +37,11 @@ def get_filename(system: str, arch: str, library_type: str = "cli") -> str:
         if library_type == "cli":
             # MediaInfo CLI uses Lambda (pre-compiled) version for better DVD support
             return f"MediaInfo_CLI_{MEDIAINFO_VERSION}_Lambda_{arch}.zip"
-        elif library_type == "lib":
+        if library_type == "lib":
             # MediaInfo library uses DLL version for better compatibility
             return f"MediaInfo_DLL_{MEDIAINFO_VERSION}_Lambda_{arch}.zip"
-        else:
-            raise ValueError(f"Unknown library_type: {library_type}")
-    else:
-        raise ValueError(f"Unsupported system: {system}")
+        raise ValueError(f"Unknown library_type: {library_type}")
+    raise ValueError(f"Unsupported system: {system}")
 
 
 def get_url(system: str, arch: str, library_type: str = "cli") -> str:
@@ -51,10 +49,9 @@ def get_url(system: str, arch: str, library_type: str = "cli") -> str:
     filename = get_filename(system, arch, library_type)
     if library_type == "cli":
         return f"{MEDIAINFO_CLI_BASE_URL}/{MEDIAINFO_VERSION}/{filename}"
-    elif library_type == "lib":
+    if library_type == "lib":
         return f"{MEDIAINFO_LIB_BASE_URL}/{MEDIAINFO_VERSION}/{filename}"
-    else:
-        raise ValueError(f"Unknown library_type: {library_type}")
+    raise ValueError(f"Unknown library_type: {library_type}")
 
 
 def download_file(url: str, output_path: Path) -> None:
@@ -63,7 +60,7 @@ def download_file(url: str, output_path: Path) -> None:
     response = requests.get(url, stream=True, timeout=60)
     response.raise_for_status()
 
-    with open(output_path, "wb") as f:
+    with Path(output_path).open("wb") as f:
         for chunk in response.iter_content(chunk_size=8192):
             f.write(chunk)
     logger.info(f"Downloaded: {output_path.name}", extra={"markup": False})
@@ -90,7 +87,7 @@ def extract_linux_binaries(cli_archive: Path, lib_archive: Path, output_dir: Pat
                 continue
 
             # Check for absolute paths
-            if os.path.isabs(member):
+            if Path(member).is_absolute():
                 logger.warning(f"Warning: Skipping absolute path: {member}", extra={"markup": False})
                 continue
 
@@ -128,7 +125,7 @@ def extract_linux_binaries(cli_archive: Path, lib_archive: Path, output_dir: Pat
                     continue
 
                 # Check for absolute paths
-                if os.path.isabs(candidate):
+                if Path(candidate).is_absolute():
                     logger.warning(f"Warning: Skipping absolute path: {candidate}", extra={"markup": False})
                     continue
 
@@ -213,7 +210,7 @@ def download_dvd_mediainfo_docker():
         extract_linux_binaries(cli_archive, lib_archive, output_dir)
 
         # Create version marker
-        with open(version_file, "w") as f:
+        with Path(version_file).open("w") as f:
             f.write(f"MediaInfo {MEDIAINFO_VERSION} - DVD Support")
 
         # Make CLI binary executable and verify permissions
@@ -240,8 +237,7 @@ def download_dvd_mediainfo_docker():
     cli_stat = cli_file.stat()
     if not (cli_stat.st_mode & 0o111):
         raise Exception(f"CLI binary is not executable: {cli_file}")
-    else:
-        logger.info(f"✓ CLI binary is executable: {oct(cli_stat.st_mode)}", extra={"markup": False})
+    logger.info(f"✓ CLI binary is executable: {oct(cli_stat.st_mode)}", extra={"markup": False})
 
     logger.info(f"Successfully installed DVD MediaInfo {MEDIAINFO_VERSION}", extra={"markup": False})
     logger.info(f"CLI: {cli_file}", extra={"markup": False})
