@@ -5,7 +5,7 @@ import os
 import platform
 import re
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 import aiofiles
 import cli_ui
@@ -23,9 +23,47 @@ from src.trackers.COMMON import COMMON
 
 
 class ASC:
-    supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
-    tracker_urls = ['amigos-share.club']
-    tmdb_localization_requirements = {
+    tracker = "ASC"
+    source_flag = "ASC"
+    banned_groups: tuple[str, ...] = ()
+    base_url = "https://cliente.amigos-share.club"
+    torrent_url = "https://cliente.amigos-share.club/torrents-details.php?id="
+    requests_url = f"{base_url}/pedidos.php"
+    language_map: ClassVar[dict[str, str]] = {
+        "bg": "15",
+        "da": "12",
+        "de": "3",
+        "en": "1",
+        "es": "6",
+        "fi": "14",
+        "fr": "2",
+        "hi": "23",
+        "it": "4",
+        "ja": "5",
+        "ko": "20",
+        "nl": "17",
+        "no": "16",
+        "pl": "19",
+        "pt": "8",
+        "ru": "7",
+        "sv": "13",
+        "th": "21",
+        "tr": "25",
+        "zh": "10",
+    }
+    anime_language_map: ClassVar[dict[str, str]] = {
+        "de": "3",
+        "en": "4",
+        "es": "1",
+        "ja": "8",
+        "ko": "11",
+        "pt": "5",
+        "ru": "2",
+        "zh": "9",
+    }
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ("amigos-share.club",)
+    tmdb_localization_requirements: ClassVar[dict[str, dict[str, str]]] = {
         "pt-BR": {
             "main": "credits,videos,content_ratings",
             "season": "credits",
@@ -35,41 +73,15 @@ class ASC:
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
+        self.main_tmdb_data: dict[str, Any] = {}
+        self.season_tmdb_data: dict[str, Any] = {}
+        self.episode_tmdb_data: dict[str, Any] = {}
         self.tmdb_manager = TmdbManager(config)
         self.common = COMMON(config)
         self.cookie_validator = CookieValidator(config)
         self.cookie_auth_uploader = CookieAuthUploader(config)
-        self.tracker = 'ASC'
-        self.source_flag = 'ASC'
-        self.banned_groups: list[str] = []
-        self.base_url = 'https://cliente.amigos-share.club'
-        self.torrent_url = 'https://cliente.amigos-share.club/torrents-details.php?id='
-        self.requests_url = f'{self.base_url}/pedidos.php'
         self.layout = self.config['TRACKERS'][self.tracker].get('custom_layout', '2')
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
-
-        self.main_tmdb_data: dict[str, Any] = {}
-        self.season_tmdb_data: dict[str, Any] = {}
-        self.episode_tmdb_data: dict[str, Any] = {}
-
-        self.language_map = {
-            'bg': '15', 'da': '12',
-            'de': '3', 'en': '1',
-            'es': '6', 'fi': '14',
-            'fr': '2', 'hi': '23',
-            'it': '4', 'ja': '5',
-            'ko': '20', 'nl': '17',
-            'no': '16', 'pl': '19',
-            'pt': '8', 'ru': '7',
-            'sv': '13', 'th': '21',
-            'tr': '25', 'zh': '10',
-        }
-        self.anime_language_map = {
-            'de': '3', 'en': '4',
-            'es': '1', 'ja': '8',
-            'ko': '11', 'pt': '5',
-            'ru': '2', 'zh': '9',
-        }
 
     async def validate_credentials(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -91,7 +103,7 @@ class ASC:
     async def get_container(self, meta: Meta) -> str | None:
         if meta.category == "BOOK":
             filelist = meta.filelist or []
-            file_path = filelist[0] if filelist else str(meta.path or "")
+            file_path = filelist[0] if filelist else (meta.path or "")
             ext = os.path.splitext(file_path)[1].lower().strip(".")
             ext_map = {
                 "mp3": "31",
@@ -920,7 +932,7 @@ class ASC:
                     return await f.read()
         if not meta.is_disc:
             filelist = cast(list[str], meta.filelist or [])
-            video_file = filelist[0] if filelist else str(meta.path or "")
+            video_file = filelist[0] if filelist else (meta.path or "")
             template_path = os.path.abspath(f"{meta.base_dir}/data/templates/MEDIAINFO.txt")
             if os.path.exists(template_path):
                 mi_output = MediaInfo.parse(

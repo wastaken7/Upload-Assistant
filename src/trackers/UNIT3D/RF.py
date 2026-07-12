@@ -10,20 +10,21 @@ Config = dict[str, Any]
 
 
 class RF(UNIT3D):
+    tracker = "RF"
+    base_url = "https://reelflix.cc"
+    banned_groups = []
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    requests_url = f"{base_url}/api/requests/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("MOVIE",)
     tracker_urls = ['https://reelflix.xyz', 'https://reelflix.cc']
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='RF')
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'RF'
-        self.base_url = 'https://reelflix.cc'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.requests_url = f'{self.base_url}/api/requests/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = []
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)

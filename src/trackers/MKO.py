@@ -26,11 +26,17 @@ Config = dict[str, Any]
 
 class MKO:
     """
-    MakingOff (makingoff.org).
+    MakingOff (https://makingoff.org).
     Cinema forum with public torrents (DHT).
     Platform: Invision Power Board (IPB).
     """
 
+    tracker = "MKO"
+    source_flag = ""
+    base_url = "https://makingoff.org/forum"
+    banned_groups: list[str] = []
+    index_url = "https://indice.makingoff.org/"
+    torrent_url = ""
     supported_categories = ["MOVIE"]
     tmdb_localization_requirements = {
         "pt-BR": {
@@ -67,12 +73,6 @@ class MKO:
     def __init__(self, config: Config):
         self.config = config
         self.common = COMMON(config)
-        self.tracker = "MKO"
-        self.source_flag = ""
-        self.base_url = "https://makingoff.org/forum"
-        self.index_url = "https://indice.makingoff.org/"
-        self.torrent_url = ""
-        self.banned_groups: list[str] = []
 
         # Cache for the resolved PT-BR display title, keyed by meta.uuid.
         self._display_title_cache: dict[str, str] = {}

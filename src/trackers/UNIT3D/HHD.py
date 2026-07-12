@@ -10,6 +10,64 @@ Config = dict[str, Any]
 
 
 class HHD(UNIT3D):
+    tracker = "HHD"
+    base_url = "https://homiehelpdesk.net"
+    banned_groups = [
+        "aXXo",
+        "BONE",
+        "BRrip",
+        "CM8",
+        "CrEwSaDe",
+        "CTFOH",
+        "d3g",
+        "dAV1nci",
+        "DNL",
+        "EVO",
+        "FaNGDiNG0",
+        "GalaxyTV",
+        "HD2DVD",
+        "HDTime",
+        "iHYTECH",
+        "ION10",
+        "iPlanet",
+        "KiNGDOM",
+        "LAMA",
+        "MeGusta",
+        "mHD",
+        "mSD",
+        "NaNi",
+        "NhaNc3",
+        "nHD",
+        "nikt0",
+        "nSD",
+        "OFT",
+        "PRODJi",
+        "PSA",
+        "RARBG",
+        "Rifftrax",
+        "SANTi",
+        "SasukeducK",
+        "ShAaNiG",
+        "Sicario",
+        "STUTTERSHIT",
+        "TGALAXY",
+        "TORRENTGALAXY",
+        "TSP",
+        "TSPxL",
+        "ViSION",
+        "VXT",
+        "WAF",
+        "WKS",
+        "x0r",
+        "YAWNiX",
+        "YIFY",
+        "YTS",
+    ]
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    requests_url = f"{base_url}/api/requests/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     tracker_urls = ['https://homiehelpdesk.net']
 
@@ -17,21 +75,6 @@ class HHD(UNIT3D):
         super().__init__(config, tracker_name="HHD")
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = "HHD"
-        self.base_url = "https://homiehelpdesk.net"
-        self.id_url = f"{self.base_url}/api/torrents/"
-        self.upload_url = f"{self.base_url}/api/torrents/upload"
-        self.search_url = f"{self.base_url}/api/torrents/filter"
-        self.requests_url = f"{self.base_url}/api/requests/filter"
-        self.torrent_url = f"{self.base_url}/torrents/"
-        self.banned_groups = [
-            'aXXo', 'BONE', 'BRrip', 'CM8', 'CrEwSaDe', 'CTFOH', 'dAV1nci', 'd3g',
-            'DNL', 'FaNGDiNG0', 'GalaxyTV', 'HD2DVD', 'HDTime', 'iHYTECH', 'ION10',
-            'iPlanet', 'KiNGDOM', 'LAMA', 'MeGusta', 'mHD', 'mSD', 'NaNi', 'NhaNc3',
-            'nHD', 'nikt0', 'nSD', 'OFT', 'PRODJi', 'RARBG', 'Rifftrax', 'SANTi',
-            'SasukeducK', 'ShAaNiG', 'Sicario', 'STUTTERSHIT', 'TGALAXY', 'TORRENTGALAXY',
-            'TSP', 'TSPxL', 'ViSION', 'VXT', 'WAF', 'WKS', 'x0r', 'YAWNiX', 'YIFY', 'YTS', 'PSA', ['EVO', 'WEB-DL only']
-        ]  # fmt: off
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

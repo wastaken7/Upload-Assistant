@@ -13,19 +13,20 @@ Config = dict[str, Any]
 
 
 class LCD(UNIT3D):
+    tracker = "LCD"
+    base_url = "https://locadora.cc"
+    banned_groups = []
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['locadora.cc']
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='LCD')
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'LCD'
-        self.base_url = 'https://locadora.cc'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = []
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         name_value = meta.name if meta.is_disc == "BDMV" else meta.basename_no_ext

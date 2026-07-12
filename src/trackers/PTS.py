@@ -16,20 +16,21 @@ Config = dict[str, Any]
 
 
 class PTS:
+    tracker = "PTS"
+    banned_groups = ()
+    source_flag = "[www.ptskit.org] PTSKIT"
+    base_url = "https://www.ptskit.org"
+    auth_token: str | None = None
+    torrent_url = "https://www.ptskit.org/details.php?id="
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://tracker.ptskit.com']
+    tracker_urls = ("tracker.ptskit.com",)
+
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.common = COMMON(config)
         self.cookie_validator = CookieValidator(config)
         self.cookie_auth_uploader = CookieAuthUploader(config)
-        self.tracker = "PTS"
-        self.banned_groups = []
-        self.source_flag = "[www.ptskit.org] PTSKIT"
-        self.base_url = "https://www.ptskit.org"
-        self.torrent_url = "https://www.ptskit.org/details.php?id="
-        self.announce = str(self.config['TRACKERS'][self.tracker]['announce_url'])
-        self.auth_token: str | None = None
+        self.announce = str(self.config["TRACKERS"][self.tracker]["announce_url"])
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"}, timeout=60.0)
 
     async def validate_credentials(self, meta: Meta) -> bool:

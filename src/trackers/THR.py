@@ -25,15 +25,16 @@ Config = dict[str, Any]
 
 
 class THR:
+    tracker = "THR"
+    source_flag = "[https://www.torrenthr.org] TorrentHR.org"
+    banned_groups = ("",)
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['torrenthr']
+    tracker_urls = ("torrenthr",)
+
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.tracker = 'THR'
-        self.source_flag = '[https://www.torrenthr.org] TorrentHR.org'
-        self.username = str(config['TRACKERS']['THR'].get('username', ''))
-        self.password = str(config['TRACKERS']['THR'].get('password', ''))
-        self.banned_groups = [""]
+        self.username = str(config['TRACKERS'][self.tracker].get('username', ''))
+        self.password = str(config["TRACKERS"][self.tracker].get("password", ""))
 
     async def upload(self, meta: Meta) -> bool | None:
         common = COMMON(config=self.config)

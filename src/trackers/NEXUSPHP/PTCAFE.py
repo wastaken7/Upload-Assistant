@@ -9,14 +9,15 @@ Config = dict[str, Any]
 
 
 class PTCAFE(NEXUSPHP):
+    banned_groups = []
+    base_url = "https://ptcafe.club"
+    source_flag = "[ptcafe.club] 咖啡"
+    torrent_url = f"{base_url}/details.php?id="
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://tracker.ptcafe.club']
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, "PTCAFE")
-        self.banned_groups = []
-        self.base_url = "https://ptcafe.club"
-        self.source_flag = "[ptcafe.club] 咖啡"
-        self.torrent_url = f"{self.base_url}/details.php?id="
 
     def get_category(self, meta: Meta) -> int:
         animations = 405

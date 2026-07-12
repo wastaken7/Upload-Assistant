@@ -10,23 +10,51 @@ Config = dict[str, Any]
 
 
 class PHD(AZTrackerBase):
+    tracker = "PHD"
+    source_flag = "PrivateHD"
+    banned_groups = [
+        "4K4U",
+        "C4K",
+        "d3g",
+        "DDR",
+        "EASports",
+        "FaNGDiNG0",
+        "FRDS",
+        "HD2DVD",
+        "HDTime",
+        "iPlanet",
+        "KiNGDOM",
+        "Leffe",
+        "LiGaS",
+        "MeGusta",
+        "NhaNc3",
+        "nikt0",
+        "PRoDJi",
+        "RARBG",
+        "RDN",
+        "SANTi",
+        "STUTTERSHIT",
+        "SWTYBLZ",
+        "TBS",
+        "Tigole",
+        "VisionXpert",
+        "WKS",
+        "x0r",
+        "Xiaomi",
+        "YIFY",
+        "YTS",
+        "Zeus",
+    ]
+    base_url = "https://privatehd.to"
+    torrent_url = f"{base_url}/torrent/"
+    requests_url = f"{base_url}/requests"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['tracker.privatehd']
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='PHD')
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'PHD'
-        self.source_flag = 'PrivateHD'
-        self.banned_groups = [
-            "RARBG", "STUTTERSHIT", "LiGaS", "DDR", "Zeus", "TBS", "SWTYBLZ", "EASports", "C4K", "d3g",
-            "MeGusta", "YTS", "YIFY", "Tigole", "x0r", "nikt0", "NhaNc3", "PRoDJi", "RDN", "SANTi",
-            "FaNGDiNG0", "FRDS", "HD2DVD", "HDTime", "iPlanet", "KiNGDOM", "Leffe", "4K4U", "Xiaomi",
-            "VisionXpert", "WKS"
-        ]
-        self.base_url = 'https://privatehd.to'
-        self.torrent_url = f'{self.base_url}/torrent/'
-        self.requests_url = f'{self.base_url}/requests'
 
     def rules(self, meta: Meta) -> str:
         warnings: list[str] = []

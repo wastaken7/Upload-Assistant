@@ -23,20 +23,20 @@ Config = dict[str, Any]
 
 
 class HDB:
+    tracker = "HDB"
+    source_flag = "HDBits"
+    signature: str | None = None
+    banned_groups: list[str] = [""]
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://tracker.hdbits.org']
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.tracker = 'HDB'
-        self.source_flag = 'HDBits'
         tracker_config = config.get('TRACKERS', {}).get('HDB', {})
         tracker_config_dict = cast(dict[str, Any], tracker_config) if isinstance(tracker_config, dict) else {}
         self.username = str(tracker_config_dict.get('username', '')).strip()
         self.passkey = str(tracker_config_dict.get('passkey', '')).strip()
-        self.rehost_images = bool(tracker_config_dict.get('img_rehost', True))
-        self.signature: str | None = None
-        self.banned_groups: list[str] = [""]
+        self.rehost_images = bool(tracker_config_dict.get("img_rehost", True))
 
     async def get_type_category_id(self, meta: Meta) -> int:
         cat_id = 0

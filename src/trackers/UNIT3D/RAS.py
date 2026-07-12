@@ -9,6 +9,23 @@ Config = dict[str, Any]
 
 
 class RAS(UNIT3D):
+    tracker = "RAS"
+    base_url = "https://rastastugan.org"
+    banned_groups = [
+        "GalaxyRG",
+        "INFINITY",
+        "LAMA",
+        "MeGUSTA",
+        "NAHOM",
+        "RARBG",
+        "YiFY",
+        "YTS",
+    ]
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    requests_url = f"{base_url}/api/requests/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     tracker_urls = ['https://rastastugan.org']
 
@@ -16,14 +33,6 @@ class RAS(UNIT3D):
         super().__init__(config, tracker_name="RAS")
         self.config: Config = config
         self.tmdb_manager = TmdbManager(config)
-        self.tracker = "RAS"
-        self.base_url = "https://rastastugan.org"
-        self.id_url = f"{self.base_url}/api/torrents/"
-        self.upload_url = f"{self.base_url}/api/torrents/upload"
-        self.search_url = f"{self.base_url}/api/torrents/filter"
-        self.requests_url = f"{self.base_url}/api/requests/filter"
-        self.torrent_url = f"{self.base_url}/torrents/"
-        self.banned_groups = ["YTS", "YiFY", "LAMA", "MeGUSTA", "NAHOM", "GalaxyRG", "RARBG", "INFINITY"]
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         nordic_languages = ["danish", "swedish", "norwegian", "icelandic", "finnish", "english"]

@@ -16,44 +16,83 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class HUNO(UNIT3D):
-    tracker_urls = ['https://hawke.uno']
     """
     https://hawke.uno/api-docs
     """
 
+    tracker = "HUNO"
+    source_flag = "HUNO"
+    base_url = "https://hawke.uno"
+    banned_groups = [
+        "4K4U",
+        "Bearfish",
+        "BiTOR",
+        "BONE",
+        "D3FiL3R",
+        "d3g",
+        "DTR",
+        "ELiTE",
+        "EVO",
+        "eztv",
+        "EzzRips",
+        "FGT",
+        "HashMiner",
+        "HETeam",
+        "HEVCBay",
+        "HiQVE",
+        "HR-DR",
+        "iFT",
+        "ION265",
+        "iVy",
+        "JATT",
+        "Joy",
+        "LAMA",
+        "m3th",
+        "MeGusta",
+        "MRN",
+        "Musafirboy",
+        "OEPlus",
+        "Pahe.in",
+        "PHOCiS",
+        "PSA",
+        "RARBG",
+        "RMTeam",
+        "ShieldBearer",
+        "SiQ",
+        "TBD",
+        "Telly",
+        "TSP",
+        "VXT",
+        "WKS",
+        "YAWNiX",
+        "YIFY",
+        "YTS",
+    ]
+    approved_image_hosts = [
+        "ptpimg",
+        "imgbox",
+        "imgbb",
+        "pixhost",
+        "bam",
+        "onlyimage",
+        "ptscreens",
+        "passtheimage",
+        "hawke.pics",
+    ]
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
+    requests_url = f"{base_url}/api/requests/filter"
+    tracker_urls = ["https://hawke.uno"]
     supported_categories = ("TV", "MOVIE")
+
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, "HUNO")
         self.config = config
         self.common = COMMON(config)
         self.rehost_images_manager = RehostImagesManager(config)
-        self.tracker = "HUNO"
-        self.source_flag = "HUNO"
-        self.base_url = "https://hawke.uno"
-        self.id_url = f"{self.base_url}/api/torrents/"
-        self.upload_url = f"{self.base_url}/api/torrents/upload"
-        self.search_url = f"{self.base_url}/api/torrents/filter"
-        self.torrent_url = f"{self.base_url}/torrents/"
-        self.requests_url = f"{self.base_url}/api/requests/filter"
         self.announce_url = str(self.config.get("TRACKERS", {}).get(self.tracker, {}).get("announce_url", "")).strip()
-        self.banned_groups = [
-            '4K4U', 'Bearfish', 'BiTOR', 'BONE', 'D3FiL3R', 'd3g', 'DTR', 'ELiTE',
-            'EVO', 'eztv', 'EzzRips', 'FGT', 'HashMiner', 'HETeam', 'HEVCBay', 'HiQVE',
-            'HR-DR', 'iFT', 'ION265', 'iVy', 'JATT', 'Joy', 'LAMA', 'm3th', 'MeGusta',
-            'MRN', 'Musafirboy', 'OEPlus', 'Pahe.in', 'PHOCiS', 'PSA', 'RARBG', 'RMTeam',
-            'ShieldBearer', 'SiQ', 'TBD', 'Telly', 'TSP', 'VXT', 'WKS', 'YAWNiX', 'YIFY', 'YTS'
-        ]  # fmt: off
-        self.approved_image_hosts = [
-            "ptpimg",
-            "imgbox",
-            "imgbb",
-            "pixhost",
-            "bam",
-            "onlyimage",
-            "ptscreens",
-            "passtheimage",
-            "hawke.pics",
-        ]
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

@@ -13,29 +13,87 @@ Config = dict[str, Any]
 
 
 class OTW(UNIT3D):
+    tracker = "OTW"
+    base_url = "https://oldtoons.world"
+    banned_groups = (
+        "[Oj]",
+        "3LTON",
+        "4f8c4100292",
+        "4yEo",
+        "ADE",
+        "AFG",
+        "AniHLS",
+        "AnimeRG",
+        "AniURL",
+        "AROMA",
+        "aXXo",
+        "Azkars",
+        "CM8",
+        "CrEwSaDe",
+        "DeadFish",
+        "DNL",
+        "ELiTE",
+        "eSc",
+        "FaNGDiNG0",
+        "FGT",
+        "Flights",
+        "FRDS",
+        "FUM",
+        "GalaxyRG",
+        "HAiKU",
+        "HD2DVD",
+        "HDS",
+        "HDTime",
+        "Hi10",
+        "INFINITY",
+        "ION10",
+        "iPlanet",
+        "JIVE",
+        "KiNGDOM",
+        "LAMA",
+        "Leffe",
+        "LOAD",
+        "mHD",
+        "NhaNc3",
+        "nHD",
+        "NOIVTC",
+        "nSD",
+        "PiRaTeS",
+        "PRODJi",
+        "RAPiDCOWS",
+        "RARBG",
+        "RDN",
+        "REsuRRecTioN",
+        "RMTeam",
+        "SANTi",
+        "SicFoI",
+        "SPASM",
+        "STUTTERSHIT",
+        "Sync0rdi",
+        "Telly",
+        "TM",
+        "UPiNSMOKE",
+        "WAF",
+        "xRed",
+        "XS",
+        "YELLO",
+        "YIFY",
+        "YTS",
+        "ZKBL",
+        "ZmN",
+    )
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    requests_url = f"{base_url}/api/requests/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://oldtoons.world']
+    tracker_urls = ("oldtoons.world",)
+
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='OTW')
+        super().__init__(config, tracker_name="OTW")
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'OTW'
-        self.base_url = 'https://oldtoons.world'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.requests_url = f'{self.base_url}/api/requests/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = [
-            '[Oj]', '3LTON', '4yEo', 'ADE', 'AFG', 'AniHLS', 'AnimeRG', 'AniURL',
-            'AROMA', 'aXXo', 'CM8', 'CrEwSaDe', 'DeadFish', 'DNL', 'ELiTE',
-            'eSc', 'FaNGDiNG0', 'FGT', 'Flights', 'FRDS', 'FUM', 'GalaxyRG', 'HAiKU',
-            'HD2DVD', 'HDS', 'HDTime', 'Hi10', 'INFINITY', 'ION10', 'iPlanet', 'JIVE', 'KiNGDOM',
-            'LAMA', 'Leffe', 'LOAD', 'mHD', 'NhaNc3', 'nHD', 'NOIVTC', 'nSD', 'PiRaTeS',
-            'PRODJi', 'RAPiDCOWS', 'RARBG', 'RDN', 'REsuRRecTioN', 'RMTeam', 'SANTi',
-            'SicFoI', 'SPASM', 'STUTTERSHIT', 'Telly', 'TM', 'UPiNSMOKE', 'WAF', 'xRed',
-            'XS', 'YELLO', 'YIFY', 'YTS', 'ZKBL', 'ZmN', '4f8c4100292', 'Azkars', 'Sync0rdi'
-        ]
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         combined_genres_value = meta.combined_genres

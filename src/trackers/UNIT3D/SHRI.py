@@ -24,8 +24,14 @@ _shri_session_data: dict[str, dict[str, str | None]] = {}
 
 
 class SHRI(UNIT3D):
-    """ShareIsland tracker implementation with Italian localization support"""
-
+    tracker = "SHRI"
+    base_url = "https://shareisland.org"
+    banned_groups: list[str] = []
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    requests_url = f"{base_url}/api/requests/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
 
     # Pre-compile regex patterns for performance
@@ -38,14 +44,6 @@ class SHRI(UNIT3D):
         self.config = config
         self.common = COMMON(config)
         self.audio_manager = AudioManager(config)
-        self.tracker = "SHRI"
-        self.base_url = "https://shareisland.org"
-        self.id_url = f"{self.base_url}/api/torrents/"
-        self.upload_url = f"{self.base_url}/api/torrents/upload"
-        self.search_url = f"{self.base_url}/api/torrents/filter"
-        self.requests_url = f"{self.base_url}/api/requests/filter"
-        self.torrent_url = f"{self.base_url}/torrents/"
-        self.banned_groups: list[str] = []
 
     def _get_language_code(self, track_or_string: Any) -> str:
         """Extract and normalize language to ISO alpha-2 code"""

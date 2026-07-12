@@ -13,15 +13,16 @@ Config = dict[str, Any]
 
 
 class SN:
+    tracker = "SN"
+    source_flag = "Swarmazon"
+    banned_groups = ("",)
+    upload_url = "https://swarmazon.club/api/upload.php"
+    forum_link = "https://swarmazon.club/php/forum.php?forum_page=2-swarmazon-rules"
+    search_url = "https://swarmazon.club/api/search.php"
     supported_categories = ("TV", "MOVIE")
+
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.tracker = 'SN'
-        self.source_flag = 'Swarmazon'
-        self.upload_url = 'https://swarmazon.club/api/upload.php'
-        self.forum_link = 'https://swarmazon.club/php/forum.php?forum_page=2-swarmazon-rules'
-        self.search_url = 'https://swarmazon.club/api/search.php'
-        self.banned_groups = [""]
 
     async def get_type_id(self, type: str) -> str:
         type_id = {"BluRay": "3", "Web": "1", "DVD": "2"}.get(type, "0")
@@ -63,7 +64,7 @@ class SN:
 
         mi_dump: str | None
         bd_dump: str | None
-        if meta.bdinfo is not None:
+        if meta.bdinfo:
             mi_dump = None
             async with aiofiles.open(
                 f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt",

@@ -9,14 +9,15 @@ Config = dict[str, Any]
 
 
 class LPT(NEXUSPHP):
+    banned_groups = []
+    base_url = "https://longpt.org"
+    source_flag = "[longpt.org] LongPT"
+    torrent_url = f"{base_url}/details.php?id="
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://longpt.org']
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, "LPT")
-        self.banned_groups = []
-        self.base_url = "https://longpt.org"
-        self.source_flag = "[longpt.org] LongPT"
-        self.torrent_url = f"{self.base_url}/details.php?id="
 
     def get_category(self, meta: Meta) -> int:
         animations = 405

@@ -13,22 +13,17 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class EMUW(UNIT3D):
-    """
-    EMUW tracker handler with Spanish naming conventions
-    Handles torrents with Spanish titles, audio, and subtitle requirements
-    """
-
+    base_url = "https://emuwarez.com"
+    banned_groups = []
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name='EMUW')
         self.tmdb_manager = TmdbManager(config)
-        self.base_url = 'https://emuwarez.com'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = []
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         """

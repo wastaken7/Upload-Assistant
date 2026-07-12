@@ -21,26 +21,93 @@ Config = dict[str, Any]
 
 
 class ANT:
-    supported_categories = ('MOVIE',)
-    tracker_urls = ['tracker.anthelion.me']
+    tracker = "ANT"
+    source_flag = "ANT"
+    banned_groups = (
+        "3LTON",
+        "4yEo",
+        "ADE",
+        "AFG",
+        "AniHLS",
+        "AnimeRG",
+        "AniURL",
+        "AROMA",
+        "aXXo",
+        "Brrip",
+        "CHD",
+        "CM8",
+        "CrEwSaDe",
+        "d3g",
+        "DDR",
+        "DeadFish",
+        "DNL",
+        "ELiTE",
+        "eSc",
+        "EVO",
+        "FaNGDiNG0",
+        "FGT",
+        "FRDS",
+        "FUM",
+        "HAiKU",
+        "HD2DVD",
+        "HDS",
+        "HDTime",
+        "Hi10",
+        "ION10",
+        "iPlanet",
+        "JIVE",
+        "KiNGDOM",
+        "Leffe",
+        "LiGaS",
+        "LOAD",
+        "MeGusta",
+        "mHD",
+        "MkvCage",
+        "mSD",
+        "NhaNc3",
+        "nHD",
+        "NOIVTC",
+        "nSD",
+        "Oj",
+        "Ozlem",
+        "PiRaTeS",
+        "PRoDJi",
+        "RAPiDCOWS",
+        "RARBG",
+        "RDN",
+        "REsuRRecTioN",
+        "RetroPeeps",
+        "RMTeam",
+        "SANTi",
+        "SicFoI",
+        "SM737",
+        "SPASM",
+        "SPDVD",
+        "STUTTERSHIT",
+        "TBS",
+        "Telly",
+        "TM",
+        "UPiNSMOKE",
+        "URANiME",
+        "WAF",
+        "xRed",
+        "XS",
+        "YIFY",
+        "YTS",
+        "Zeus",
+        "ZKBL",
+        "ZmN",
+        "ZMNT",
+    )
+    search_url = "https://anthelion.me/api.php"
+    upload_url = "https://anthelion.me/api.php"
+    supported_categories = ("MOVIE",)
+    tracker_urls = ("tracker.anthelion.me",)
 
     def __init__(self, config: Config):
-        self.tracker = 'ANT'
         self.config = config
         self.common = COMMON(config)
         self.tracker_config = self.config["TRACKERS"].get(self.tracker, {})
-        self.source_flag = 'ANT'
-        self.search_url = 'https://anthelion.me/api.php'
-        self.upload_url = 'https://anthelion.me/api.php'
-        self.banned_groups = [
-            '3LTON', '4yEo', 'ADE', 'AFG', 'AniHLS', 'AnimeRG', 'AniURL', 'AROMA', 'aXXo', 'Brrip', 'CHD', 'CM8',
-            'CrEwSaDe', 'd3g', 'DDR', 'DNL', 'DeadFish', 'ELiTE', 'eSc', 'EVO', 'FaNGDiNG0', 'FGT', 'FRDS', 'FUM',
-            'HAiKU', 'HD2DVD', 'HDS', 'HDTime', 'Hi10', 'ION10', 'iPlanet', 'JIVE', 'KiNGDOM', 'Leffe', 'LiGaS',
-            'LOAD', 'MeGusta', 'MkvCage', 'mHD', 'mSD', 'NhaNc3', 'nHD', 'NOIVTC', 'nSD', 'Oj', 'Ozlem', 'PiRaTeS',
-            'PRoDJi', 'RAPiDCOWS', 'RARBG', 'RetroPeeps', 'RDN', 'REsuRRecTioN', 'RMTeam', 'SANTi', 'SicFoI',
-            'SPASM', 'SM737', 'SPDVD', 'STUTTERSHIT', 'TBS', 'Telly', 'TM', 'UPiNSMOKE', 'URANiME', 'WAF', 'xRed',
-            'XS', 'YIFY', 'YTS', 'Zeus', 'ZKBL', 'ZmN', 'ZMNT'
-        ]
 
     async def get_flags(self, meta: Meta) -> list[str]:
         flags: list[str] = []

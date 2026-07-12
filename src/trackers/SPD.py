@@ -21,18 +21,18 @@ Config = dict[str, Any]
 
 
 class SPD:
-    supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
-    tracker_urls = ['ramjet.speedapp.io', 'ramjet.speedapp.to', 'ramjet.speedappio.org']
+    url = "https://speedapp.io"
+    tracker = "SPD"
+    banned_groups = ()
+    upload_url = "https://speedapp.io/api/upload"
+    torrent_url = "https://speedapp.io/browse/"
+    banned_url = "https://speedapp.io/api/torrent/release-group/blacklist"
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ("ramjet.speedapp.io", "ramjet.speedapp.to", "ramjet.speedappio.org")
 
     def __init__(self, config: Config) -> None:
-        self.url = "https://speedapp.io"
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'SPD'
-        self.upload_url = 'https://speedapp.io/api/upload'
-        self.torrent_url = 'https://speedapp.io/browse/'
-        self.banned_groups = []
-        self.banned_url = 'https://speedapp.io/api/torrent/release-group/blacklist'
         api_key = str(self.config['TRACKERS'][self.tracker]['api_key'])
         self.session = httpx.AsyncClient(
             headers={

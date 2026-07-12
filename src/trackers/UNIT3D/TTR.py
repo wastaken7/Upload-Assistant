@@ -13,6 +13,14 @@ Config = dict[str, Any]
 
 
 class TTR(UNIT3D):
+    tracker = "TTR"
+    base_url = "https://torrenteros.org"
+    banned_groups = []
+    ttr_name = ""  # Initialize instance variable
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://torrenteros.org']
 
@@ -20,14 +28,6 @@ class TTR(UNIT3D):
         super().__init__(config, tracker_name='TTR')
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'TTR'
-        self.base_url = 'https://torrenteros.org'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = []
-        self.ttr_name = ''  # Initialize instance variable
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         name = self.ttr_name or self.build_name(meta)

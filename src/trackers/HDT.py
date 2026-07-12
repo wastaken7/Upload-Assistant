@@ -19,6 +19,10 @@ Config = dict[str, Any]
 
 
 class HDT:
+    tracker = "HDT"
+    source_flag = "hd-torrents.org"
+    auth_token: str | None = None
+    banned_groups = []
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://hdts-announce.ru']
     secret_token: str = ''
@@ -27,9 +31,6 @@ class HDT:
         self.config: Config = config
         self.cookie_validator = CookieValidator(config)
         self.cookie_auth_uploader = CookieAuthUploader(config)
-        self.tracker = 'HDT'
-        self.source_flag = 'hd-torrents.org'
-        self.auth_token: str | None = None
 
         tracker_config = self.config.get('TRACKERS', {}).get(self.tracker, {})
         tracker_config_dict = cast(dict[str, Any], tracker_config) if isinstance(tracker_config, dict) else {}
@@ -39,8 +40,7 @@ class HDT:
         self.base_url = f'https://{self.config_url}'
 
         self.torrent_url = f'{self.base_url}/details.php?id='
-        self.announce_url = str(tracker_config_dict.get('announce_url', ''))
-        self.banned_groups = []
+        self.announce_url = str(tracker_config_dict.get("announce_url", ""))
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
 
     async def validate_credentials(self, meta: Meta) -> bool:

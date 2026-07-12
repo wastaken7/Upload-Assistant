@@ -8,18 +8,19 @@ from src.trackers.COMMON import COMMON
 
 
 class CZ(AZTrackerBase):
+    tracker = "CZ"
+    source_flag = "CinemaZ"
+    banned_groups = [""]
+    base_url = "https://cinemaz.to"
+    torrent_url = f"{base_url}/torrent/"
+    requests_url = f"{base_url}/requests"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['tracker.cinemaz.to']
+
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name='CZ')
         self.config = config
         self.common = COMMON(config)
-        self.tracker = 'CZ'
-        self.source_flag = 'CinemaZ'
-        self.banned_groups = ['']
-        self.base_url = 'https://cinemaz.to'
-        self.torrent_url = f'{self.base_url}/torrent/'
-        self.requests_url = f'{self.base_url}/requests'
 
     def rules(self, meta: Meta) -> str:
         warnings: list[str] = []

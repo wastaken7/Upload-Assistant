@@ -9,6 +9,15 @@ Config = dict[str, Any]
 
 
 class ZNTH(UNIT3D):
+    tracker = "ZNTH"
+    base_url = "https://znth.cx"
+    banned_groups: list[str] = []
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    requests_url = f"{base_url}/api/requests/filter"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
+    banned_url = f"{base_url}/api/bannedReleaseGroups"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     tracker_urls = ['https://znth.cx']
 
@@ -16,15 +25,6 @@ class ZNTH(UNIT3D):
         super().__init__(config, tracker_name="ZNTH")
         self.config = config
         self.common = COMMON(config)
-        self.tracker = "ZNTH"
-        self.base_url = "https://znth.cx"
-        self.id_url = f"{self.base_url}/api/torrents/"
-        self.upload_url = f"{self.base_url}/api/torrents/upload"
-        self.requests_url = f"{self.base_url}/api/requests/filter"
-        self.search_url = f"{self.base_url}/api/torrents/filter"
-        self.torrent_url = f"{self.base_url}/torrents/"
-        self.banned_url = f"{self.base_url}/api/bannedReleaseGroups"
-        self.banned_groups: list[str] = []
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK":

@@ -18,34 +18,23 @@ Config = dict[str, Any]
 
 
 class MTEAM:
-    tracker_urls = ['tracker.m-team.cc', 'tra1.m-team.cc', 'tracker.m-team.io', 'tra1.m-team.io', 'tra99.manfuz.co']
-    """
-    API Docs: https://test2.m-team.cc/api/swagger-ui/index.html
-    API Limits: https://wiki.m-team.cc/zh-tw/api
-    Upload Rules: https://wiki.m-team.cc/zh-tw/upload-rules
-    """
-
+    tracker = "MTEAM"
+    api_base_url = "https://api.m-team.cc/api"
+    banned_groups = ("FGT",)
+    requests_url = f"{api_base_url}/seek/search"
+    tracker_urls = ("tracker.m-team.cc", "tra1.m-team.cc", "tracker.m-team.io", "tra1.m-team.io", "tra99.manfuz.co")
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config):
         self.config = config
         self.common = COMMON(config)
         self.tmdb_manager = TmdbManager(config)
-
-        self.tracker = "MTEAM"
-
         raw_url = self.config["TRACKERS"][self.tracker].get("base_url", "kp.m-team.cc").strip()
         parsed_raw = urlparse(raw_url)
         clean_netloc = parsed_raw.netloc if parsed_raw.netloc else parsed_raw.path
         self.base_url = urlunparse(("https", clean_netloc, "", "", "", ""))
-
-        self.api_base_url = "https://api.m-team.cc/api"
         self.torrent_url = f"{self.base_url}/detail/"
-        self.requests_url = f"{self.api_base_url}/seek/search"
         self.api_key = self.config["TRACKERS"][self.tracker].get("api_key")
-
-        self.banned_groups = ["FGT"]
-
         self.session = httpx.AsyncClient(
             headers={
                 "x-api-key": self.api_key,

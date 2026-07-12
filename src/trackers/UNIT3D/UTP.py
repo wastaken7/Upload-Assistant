@@ -9,18 +9,19 @@ Config = dict[str, Any]
 
 
 class UTP(UNIT3D):
+    tracker = "UTP"
+    base_url = "https://utp.to"
+    banned_groups = []
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='UTP')
         self.config = config
         self.common = COMMON(config)
-        self.tracker = 'UTP'
-        self.base_url = 'https://utp.to'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = []
 
     async def get_category_id(
         self,

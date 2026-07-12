@@ -12,18 +12,19 @@ Config = dict[str, Any]
 
 
 class R4E(UNIT3D):
+    tracker = "R4E"
+    base_url = "https://racing4everyone.eu"
+    banned_groups: tuple[str, ...] = ()
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='R4E')
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'R4E'
-        self.base_url = 'https://racing4everyone.eu'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = []
 
     async def get_category_id(
         self,
@@ -111,7 +112,7 @@ class R4E(UNIT3D):
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
-        url = "https://racing4everyone.eu/api/torrents/filter"
+        url = self.search_url
         params: dict[str, Any] = {
             "api_token": str(self.config["TRACKERS"]["R4E"]["api_key"]).strip(),
             "tmdb": meta.tmdb,

@@ -8,21 +8,22 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class ACM(UNIT3D):
+    tracker = "ACM"
+    source_flag = "AsianCinema"
+    base_url = "https://eiga.moi"
+    banned_groups: list[str] = []
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    requests_url = f"{base_url}/api/requests/filter"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://eiga.moi']
+
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="ACM")
         self.config = config
         self.common = COMMON(config)
-        self.tracker = "ACM"
-        self.source_flag = "AsianCinema"
-        self.base_url = "https://eiga.moi"
-        self.id_url = f"{self.base_url}/api/torrents/"
-        self.upload_url = f"{self.base_url}/api/torrents/upload"
-        self.requests_url = f"{self.base_url}/api/requests/filter"
-        self.search_url = f"{self.base_url}/api/torrents/filter"
-        self.torrent_url = f"{self.base_url}/torrents/"
-        self.banned_groups: list[str] = []
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         asia = [

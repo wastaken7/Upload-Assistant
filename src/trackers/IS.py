@@ -17,6 +17,11 @@ Config = dict[str, Any]
 
 
 class IS:
+    tracker = "IS"
+    source_flag = "https://immortalseed.me"
+    banned_groups = [""]
+    base_url = "https://immortalseed.me"
+    torrent_url = "https://immortalseed.me/details.php?hash="
     supported_categories = ('TV', 'MOVIE', 'BOOK')
     tracker_urls = ['https://immortalseed.me']
 
@@ -24,11 +29,6 @@ class IS:
         self.config: Config = config
         self.cookie_validator = CookieValidator(config)
         self.cookie_auth_uploader = CookieAuthUploader(config)
-        self.tracker = 'IS'
-        self.source_flag = 'https://immortalseed.me'
-        self.banned_groups = ['']
-        self.base_url = 'https://immortalseed.me'
-        self.torrent_url = 'https://immortalseed.me/details.php?hash='
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"}, timeout=30)
 
     async def validate_credentials(self, meta: Meta) -> bool:

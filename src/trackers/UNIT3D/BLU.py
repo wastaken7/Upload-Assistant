@@ -10,29 +10,109 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class BLU(UNIT3D):
+    tracker = "BLU"
+    base_url = "https://blutopia.cc"
+    banned_groups = [
+        "[Oj]",
+        "3LTON",
+        "4yEo",
+        "ADE",
+        "AFG",
+        "AniHLS",
+        "AnimeRG",
+        "AniURL",
+        "AROMA",
+        "aXXo",
+        "B3LLUM",
+        "BHDStudio",
+        "Brrip",
+        "CHD",
+        "CM8",
+        "CrEwSaDe",
+        "d3g",
+        "DeadFish",
+        "DNL",
+        "DTLegacy",
+        "ELiTE",
+        "eSc",
+        "EZTV.RE",
+        "EZTV",
+        "F13",
+        "FaNGDiNG0",
+        "FGT",
+        "Flights",
+        "flower",
+        "FRDS",
+        "FUM",
+        "HAiKU",
+        "hallowed",
+        "HD2DVD",
+        "HDS",
+        "HDTime",
+        "Hi10",
+        "ION10",
+        "iPlanet",
+        "JIVE",
+        "KiNGDOM",
+        "LAMA",
+        "Leffe",
+        "LEGi0N",
+        "LOAD",
+        "MeGusta",
+        "mHD",
+        "mSD",
+        "NhaNc3",
+        "nHD",
+        "nikt0",
+        "NOIVTC",
+        "nSD",
+        "OFT",
+        "PiRaTeS",
+        "playBD",
+        "PlaySD",
+        "playXD",
+        "PRODJi",
+        "RAPiDCOWS",
+        "RARBG",
+        "RDN",
+        "REsuRRecTioN",
+        "RetroPeeps",
+        "RMTeam",
+        "SANTi",
+        "SasukeducK",
+        "SicFoI",
+        "SPASM",
+        "SPDVD",
+        "STUTTERSHIT",
+        "Telly",
+        "TheFarm",
+        "TM",
+        "TRiToN",
+        "UPiNSMOKE",
+        "URANiME",
+        "VN_Foxcore",
+        "WAF",
+        "WKS",
+        "x0r",
+        "xRed",
+        "XS",
+        "YIFY",
+        "ZKBL",
+        "ZmN",
+        "ZMNT",
+    ]
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    requests_url = f"{base_url}/api/requests/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://blutopia.cc']
+    tracker_urls = ["https://blutopia.cc"]
+
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name='BLU')
+        super().__init__(config, tracker_name="BLU")
         self.config = config
         self.common = COMMON(config)
-        self.tracker = 'BLU'
-        self.base_url = 'https://blutopia.cc'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.requests_url = f'{self.base_url}/api/requests/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = [
-            '[Oj]', '3LTON', '4yEo', 'ADE', 'AFG', 'AniHLS', 'AnimeRG', 'AniURL', 'AROMA', 'aXXo', 'B3LLUM',
-            'BHDStudio', 'Brrip', 'CHD', 'CM8', 'CrEwSaDe', 'd3g', 'DeadFish', 'DNL', 'DTLegacy', 'ELiTE',
-            'eSc', 'EZTV', 'EZTV.RE', 'F13', 'FaNGDiNG0', 'FGT', 'Flights', 'flower', 'FRDS', 'FUM', 'HAiKU', 'hallowed',
-            'HD2DVD', 'HDS', 'HDTime', 'Hi10', 'ION10', 'iPlanet', 'JIVE', 'KiNGDOM', 'LAMA', 'Leffe', 'LEGi0N',
-            'LOAD', 'MeGusta', 'mHD', 'mSD', 'NhaNc3', 'nHD', 'nikt0', 'NOIVTC', 'nSD', 'OFT', 'PiRaTeS', 'playBD',
-            'PlaySD', 'playXD', 'PRODJi', 'RAPiDCOWS', 'RARBG', 'RetroPeeps', 'RDN', 'REsuRRecTioN', 'RMTeam', 'SANTi', 'SasukeducK',
-            'SicFoI', 'SPASM', 'SPDVD', 'STUTTERSHIT', 'Telly', 'TheFarm', 'TM', 'TRiToN', 'UPiNSMOKE', 'URANiME', 'VN_Foxcore', 'WAF',
-            'WKS', 'x0r', 'xRed', 'XS', 'YIFY', 'ZKBL', 'ZmN', 'ZMNT',
-        ]
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

@@ -25,45 +25,45 @@ Config = dict[str, Any]
 
 
 class TVC:
+    tracker = "TVC"
+    source_flag = "TVCHAOS"
+    signature = ""
+    banned_groups = []
+    approved_image_hosts = ["imgbb", "ptpimg", "imgbox", "pixhost", "bam", "onlyimage"]
+    upload_url = "https://tvchaosuk.com/api/torrents/upload"
+    search_url = "https://tvchaosuk.com/api/torrents/filter"
+    torrent_url = "https://tvchaosuk.com/torrents/"
+    tv_type_map = {
+        "comedy": "29",
+        "current affairs": "45",
+        "documentary": "5",
+        "drama": "11",
+        "entertainment": "14",
+        "factual": "19",
+        "foreign": "43",
+        "holding bin": "53",
+        "kids": "32",
+        "movies": "44",
+        "news": "54",
+        "reality": "52",
+        "sci-fi": "33",
+        "soaps": "30",
+        "sport": "42",
+    }
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://tvchaosuk.com']
+    tracker_urls = ["https://tvchaosuk.com"]
     # Constants for the class
-    DEFAULT_LOGO_SIZE = '300'
-    SCREENSHOT_THUMB_SIZE = '350'
+    DEFAULT_LOGO_SIZE = "300"
+    SCREENSHOT_THUMB_SIZE = "350"
     COMPARISON_COLLAPSE_THRESHOLD = 1000
     MIN_SCREENSHOTS_REQUIRED = 2
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.rehost_images_manager = RehostImagesManager(config)
-        self.tracker = 'TVC'
-        self.source_flag = 'TVCHAOS'
-        self.upload_url = 'https://tvchaosuk.com/api/torrents/upload'
-        self.search_url = 'https://tvchaosuk.com/api/torrents/filter'
-        self.torrent_url = 'https://tvchaosuk.com/torrents/'
-        self.signature = ""
-        self.banned_groups = []
-        self.approved_image_hosts = ['imgbb', 'ptpimg', 'imgbox', 'pixhost', 'bam', 'onlyimage']
-        tmdb.API_KEY = config['DEFAULT']['tmdb_api']
+        tmdb.API_KEY = config["DEFAULT"]["tmdb_api"]
 
         # TV type mapping as a dict for clarity and maintainability
-        self.tv_type_map = {
-            "comedy": "29",
-            "current affairs": "45",
-            "documentary": "5",
-            "drama": "11",
-            "entertainment": "14",
-            "factual": "19",
-            "foreign": "43",
-            "kids": "32",
-            "movies": "44",
-            "news": "54",
-            "reality": "52",
-            "soaps": "30",
-            "sci-fi": "33",
-            "sport": "42",
-            "holding bin": "53",
-        }
 
     def format_date_ddmmyyyy(self, date_str: str) -> str:
         """
@@ -523,7 +523,7 @@ class TVC:
 
         anon = 0 if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else 1
 
-        if meta.bdinfo is not None:
+        if meta.bdinfo:
             mi_dump = None
             bd_dump = await self.read_file(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt")
         else:

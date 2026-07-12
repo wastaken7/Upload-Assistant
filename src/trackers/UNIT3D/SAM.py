@@ -11,6 +11,14 @@ Config = dict[str, Any]
 
 
 class SAM(UNIT3D):
+    tracker = "SAM"
+    base_url = "https://samaritano.cc"
+    banned_groups = []
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
+    requests_url = f"{base_url}/api/requests/filter"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     tracker_urls = ['https://samaritano.cc']
 
@@ -18,14 +26,6 @@ class SAM(UNIT3D):
         super().__init__(config, tracker_name="SAM")
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = "SAM"
-        self.base_url = "https://samaritano.cc"
-        self.id_url = f"{self.base_url}/api/torrents/"
-        self.upload_url = f"{self.base_url}/api/torrents/upload"
-        self.search_url = f"{self.base_url}/api/torrents/filter"
-        self.torrent_url = f"{self.base_url}/torrents/"
-        self.requests_url = f"{self.base_url}/api/requests/filter"
-        self.banned_groups = []
 
     async def get_resolution_id(self, meta: Meta, resolution: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         resolution_id = {

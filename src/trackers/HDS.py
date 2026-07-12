@@ -18,18 +18,19 @@ Config = dict[str, Any]
 
 
 class HDS:
+    tracker = "HDS"
+    source_flag = "HD-Space"
+    banned_groups = [""]
+    base_url = "https://hd-space.org"
+    torrent_url = f"{base_url}/index.php?page=torrent-details&id="
+    requests_url = f"{base_url}/index.php?page=viewrequests"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['hd-space.pw']
+
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.cookie_validator = CookieValidator(config)
         self.cookie_auth_uploader = CookieAuthUploader(config)
-        self.tracker = 'HDS'
-        self.source_flag = 'HD-Space'
-        self.banned_groups = ['']
-        self.base_url = 'https://hd-space.org'
-        self.torrent_url = f'{self.base_url}/index.php?page=torrent-details&id='
-        self.requests_url = f'{self.base_url}/index.php?page=viewrequests'
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"}, timeout=30)
 
     async def validate_credentials(self, meta: Meta) -> bool:

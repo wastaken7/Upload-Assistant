@@ -8,7 +8,7 @@ import os
 import platform
 import re
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 from urllib.parse import urlparse
 
 import aiofiles
@@ -31,16 +31,94 @@ from src.uploadscreens import UploadScreensManager
 
 
 class PTP:
-    supported_categories = ('MOVIE',)
-    tracker_urls = ['passthepopcorn.me']
+    tracker = "PTP"
+    source_flag = "PTP"
+    banned_groups = (
+        "aXXo",
+        "BMDru",
+        "BRrip",
+        "CM8",
+        "CrEwSaDe",
+        "CTFOH",
+        "d3g",
+        "DNL",
+        "FaNGDiNG0",
+        "HD2DVD",
+        "HDT",
+        "HDTime",
+        "ION10",
+        "iPlanet",
+        "KiNGDOM",
+        "mHD",
+        "mSD",
+        "nHD",
+        "nikt0",
+        "nSD",
+        "NhaNc3",
+        "OFT",
+        "PRODJi",
+        "SANTi",
+        "SPiRiT",
+        "STUTTERSHIT",
+        "ViSION",
+        "VXT",
+        "WAF",
+        "x0r",
+        "YIFY",
+        "LAMA",
+        "WORLD",
+    )
+    approved_image_hosts = ["ptpimg", "pixhost"]
+    sub_lang_map: ClassVar[dict[tuple[str, ...], int]] = {
+        ("Arabic", "ara", "ar"): 22,
+        ("Brazilian Portuguese", "Brazilian", "Portuguese-BR", "pt-br", "pt-BR"): 49,
+        ("Bulgarian", "bul", "bg"): 29,
+        ("Chinese", "chi", "zh", "Chinese (Simplified)", "Chinese (Traditional)", "cmn-Hant", "cmn-Hans", "yue-Hant", "yue-Hans"): 14,
+        ("Croatian", "hrv", "hr", "scr"): 23,
+        ("Czech", "cze", "cz", "cs"): 30,
+        ("Danish", "dan", "da"): 10,
+        ("Dutch", "dut", "nl"): 9,
+        ("English", "eng", "en", "en-US", "en-GB", "English (CC)", "English - SDH"): 3,
+        ("English - Forced", "English (Forced)", "en (Forced)", "en-US (Forced)"): 50,
+        ("English Intertitles", "English (Intertitles)", "English - Intertitles", "en (Intertitles)", "en-US (Intertitles)"): 51,
+        ("Estonian", "est", "et"): 38,
+        ("Finnish", "fin", "fi"): 15,
+        ("French", "fre", "fr", "fr-FR", "fr-CA"): 5,
+        ("German", "ger", "de"): 6,
+        ("Greek", "gre", "el"): 26,
+        ("Hebrew", "heb", "he"): 40,
+        ("Hindi", "hin", "hi"): 41,
+        ("Hungarian", "hun", "hu"): 24,
+        ("Icelandic", "ice", "is"): 28,
+        ("Indonesian", "ind", "id"): 47,
+        ("Italian", "ita", "it"): 16,
+        ("Japanese", "jpn", "ja"): 8,
+        ("Korean", "kor", "ko"): 19,
+        ("Latvian", "lav", "lv"): 37,
+        ("Lithuanian", "lit", "lt"): 39,
+        ("Norwegian", "nor", "no"): 12,
+        ("Polish", "pol", "pl"): 17,
+        ("Portuguese", "por", "pt", "pt-PT"): 21,
+        ("Romanian", "rum", "ro"): 13,
+        ("Russian", "rus", "ru"): 7,
+        ("Serbian", "srp", "sr", "scc"): 31,
+        ("Slovak", "slo", "sk"): 42,
+        ("Slovenian", "slv", "sl"): 43,
+        ("Spanish", "spa", "es", "es-ES", "es-419"): 4,
+        ("Swedish", "swe", "sv"): 11,
+        ("Thai", "tha", "th"): 20,
+        ("Turkish", "tur", "tr"): 18,
+        ("Ukrainian", "ukr", "uk"): 34,
+        ("Vietnamese", "vie", "vi"): 25,
+    }
+    supported_categories = ("MOVIE",)
+    tracker_urls = ("passthepopcorn.me",)
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.rehost_images_manager = RehostImagesManager(config)
         self.takescreens_manager = TakeScreensManager(config)
         self.uploadscreens_manager = UploadScreensManager(config)
-        self.tracker = 'PTP'
-        self.source_flag = 'PTP'
         self.api_user = config['TRACKERS']['PTP'].get('ApiUser', '').strip()
         self.api_key = config["TRACKERS"]["PTP"].get("api_key", "").strip()
         announce_url = config['TRACKERS']['PTP'].get('announce_url', '').strip()
@@ -55,53 +133,7 @@ class PTP:
         self.password = config['TRACKERS']['PTP'].get('password', '').strip()
         self.web_source = self._is_true(config['TRACKERS']['PTP'].get('add_web_source_to_desc', True))
         self.user_agent = f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"
-        self.banned_groups = ['aXXo', 'BMDru', 'BRrip', 'CM8', 'CrEwSaDe', 'CTFOH', 'd3g', 'DNL', 'FaNGDiNG0', 'HD2DVD', 'HDT', 'HDTime', 'ION10', 'iPlanet',
-                              'KiNGDOM', 'mHD', 'mSD', 'nHD', 'nikt0', 'nSD', 'NhaNc3', 'OFT', 'PRODJi', 'SANTi', 'SPiRiT', 'STUTTERSHIT', 'ViSION', 'VXT',
-                              'WAF', 'x0r', 'YIFY', 'LAMA', 'WORLD']
-        self.approved_image_hosts = ['ptpimg', 'pixhost']
 
-        self.sub_lang_map = {
-            ("Arabic", "ara", "ar"): 22,
-            ("Brazilian Portuguese", "Brazilian", "Portuguese-BR", 'pt-br', 'pt-BR'): 49,
-            ("Bulgarian", "bul", "bg"): 29,
-            ("Chinese", "chi", "zh", "Chinese (Simplified)", "Chinese (Traditional)", 'cmn-Hant', 'cmn-Hans', 'yue-Hant', 'yue-Hans'): 14,
-            ("Croatian", "hrv", "hr", "scr"): 23,
-            ("Czech", "cze", "cz", "cs"): 30,
-            ("Danish", "dan", "da"): 10,
-            ("Dutch", "dut", "nl"): 9,
-            ("English", "eng", "en", "en-US", "en-GB", "English (CC)", "English - SDH"): 3,
-            ("English - Forced", "English (Forced)", "en (Forced)", "en-US (Forced)"): 50,
-            ("English Intertitles", "English (Intertitles)", "English - Intertitles", "en (Intertitles)", "en-US (Intertitles)"): 51,
-            ("Estonian", "est", "et"): 38,
-            ("Finnish", "fin", "fi"): 15,
-            ("French", "fre", "fr", "fr-FR", "fr-CA"): 5,
-            ("German", "ger", "de"): 6,
-            ("Greek", "gre", "el"): 26,
-            ("Hebrew", "heb", "he"): 40,
-            ("Hindi" "hin", "hi"): 41,
-            ("Hungarian", "hun", "hu"): 24,
-            ("Icelandic", "ice", "is"): 28,
-            ("Indonesian", "ind", "id"): 47,
-            ("Italian", "ita", "it"): 16,
-            ("Japanese", "jpn", "ja"): 8,
-            ("Korean", "kor", "ko"): 19,
-            ("Latvian", "lav", "lv"): 37,
-            ("Lithuanian", "lit", "lt"): 39,
-            ("Norwegian", "nor", "no"): 12,
-            ("Polish", "pol", "pl"): 17,
-            ("Portuguese", "por", "pt", "pt-PT"): 21,
-            ("Romanian", "rum", "ro"): 13,
-            ("Russian", "rus", "ru"): 7,
-            ("Serbian", "srp", "sr", "scc"): 31,
-            ("Slovak", "slo", "sk"): 42,
-            ("Slovenian", "slv", "sl"): 43,
-            ("Spanish", "spa", "es", "es-ES", "es-419"): 4,
-            ("Swedish", "swe", "sv"): 11,
-            ("Thai", "tha", "th"): 20,
-            ("Turkish", "tur", "tr"): 18,
-            ("Ukrainian", "ukr", "uk"): 34,
-            ("Vietnamese", "vie", "vi"): 25,
-        }
 
         self.cookie_validator = CookieValidator(config)
 
@@ -571,7 +603,7 @@ class PTP:
             tmdb_type = (meta.tmdb_type if meta.tmdb_type is not None else "movie").lower()
             if tmdb_type == "movie":
                 try:
-                    runtime = int(meta.runtime) if meta.runtime is not None else 60
+                    runtime = (meta.runtime) if meta.runtime is not None else 60
                 except (ValueError, TypeError):
                     runtime = 60
                 ptpType = "Feature Film" if runtime >= 45 or runtime == 0 else "Short Film"
@@ -1566,7 +1598,7 @@ class PTP:
             else:
                 imdb_value = meta.imdb or "0"
                 tinfo = await self.get_torrent_info(imdb_value, meta)
-            if meta.youtube is None or "youtube" not in str(meta.youtube):
+            if meta.youtube is None or "youtube" not in meta.youtube:
                 youtube = (
                     ""
                     if meta.unattended
@@ -1604,7 +1636,7 @@ class PTP:
                     logger.info("Valid tags can be found on the PTP upload form")
                     new_data["tags"] = console.input("Please enter at least one tag. Comma separated (action, animation, short):")
             data.update(new_data)
-            imdb_info = cast(dict[str, Any], meta.imdb_info)
+            imdb_info = meta.imdb_info
             directors: list[str] | tuple[str, ...] | None = None
             directors_value = imdb_info.get('directors')
             if isinstance(directors_value, (list, tuple)):

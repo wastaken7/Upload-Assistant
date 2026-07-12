@@ -5,24 +5,17 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class DT(UNIT3D):
-    """
-    DesiTorrents (DT) Tracker Class
-    """
-
+    tracker = "DT"
+    base_url = "https://torrent.desi"
+    banned_groups = ["DusIcTv", "PDHM", "Ranvijay", "BWT", "DDH", "Telly", "YTS", "RARBG", "BonsaiHD", "GalaxyRG", "-=!DrSTAR!=-"]
+    upload_url = f"{base_url}/api/v1/torrents/upload"
+    search_url = f"{base_url}/api/v1/torrents/filter"
     supported_categories = ("TV", "MOVIE")
+
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name='DT')
-        self.tracker = 'DT'
-        self.base_url = 'https://torrent.desi'
-        self.upload_url = f'{self.base_url}/api/v1/torrents/upload'
-        self.search_url = f'{self.base_url}/api/v1/torrents/filter'
+        super().__init__(config, tracker_name="DT")
 
         # Banned Groups
-        self.banned_groups = [
-            "DusIcTv", "PDHM", "Ranvijay",
-            "BWT", "DDH", "Telly", "YTS", "RARBG",
-            "BonsaiHD", "GalaxyRG", "-=!DrSTAR!=-"
-        ]
 
     async def get_category_id(
         self,

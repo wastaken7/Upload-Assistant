@@ -23,22 +23,20 @@ Config = dict[str, Any]
 
 
 class PTER:
+    tracker = "PTER"
+    source_flag = "PTER"
+    ptgen_retry = 3
+    signature: str | None = None
+    banned_groups: list[str] = [""]
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.tracker = 'PTER'
-        self.source_flag = 'PTER'
         self.passkey = str(config['TRACKERS']['PTER'].get('passkey', '')).strip()
         self.username = str(config['TRACKERS']['PTER'].get('username', '')).strip()
         self.password = str(config['TRACKERS']['PTER'].get('password', '')).strip()
         self.rehost_images = bool(config['TRACKERS']['PTER'].get('img_rehost', False))
-        self.ptgen_api = str(config['TRACKERS']['PTER'].get('ptgen_api', '')).strip()
-
-        self.ptgen_retry = 3
-        self.signature: str | None = None
-        self.banned_groups: list[str] = [""]
-
+        self.ptgen_api = str(config["TRACKERS"]["PTER"].get("ptgen_api", "")).strip()
         self.cookie_validator = CookieValidator(config)
 
     def _extract_auth_token(self, text: str, pattern: str) -> str:
@@ -374,7 +372,7 @@ class PTER:
 
         pter_name = await self.edit_name(meta)
 
-        mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo is not None else f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt"
+        mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo else f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt"
         async with aiofiles.open(mi_path, encoding='utf-8') as mi_dump:
             _ = await mi_dump.read()
         async with aiofiles.open(desc_file, encoding='utf-8') as desc_handle:

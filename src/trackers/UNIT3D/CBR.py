@@ -10,31 +10,103 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class CBR(UNIT3D):
+    tracker = "CBR"
+    base_url = "https://capybarabr.com"
+    banned_groups = (
+        "4K4U",
+        "afm72",
+        "Alcaide_Kira",
+        "AROMA",
+        "ASM",
+        "Bandi",
+        "BiTOR",
+        "BLUDV",
+        "Bluespots",
+        "BOLS",
+        "CaNNIBal",
+        "Comando",
+        "d3g",
+        "DepraveD",
+        "EMBER",
+        "FGT",
+        "FreetheFish",
+        "Garshasp",
+        "Ghost",
+        "Grym",
+        "HDS",
+        "Hi10",
+        "HiQVE",
+        "Hiro360",
+        "ImE",
+        "ION10",
+        "iVy",
+        "Judas",
+        "LAMA",
+        "Langbard",
+        "Lapumia",
+        "LION",
+        "MeGusta",
+        "MONOLITH",
+        "MRCS",
+        "NaNi",
+        "Natty",
+        "nikt0",
+        "OEPlus",
+        "OFT",
+        "OsC",
+        "Panda",
+        "PANDEMONiUM",
+        "PHOCiS",
+        "PiRaTeS",
+        "PYC",
+        "QxR",
+        "r00t",
+        "Ralphy",
+        "RARBG",
+        "RetroPeeps",
+        "RZeroX",
+        "S74Ll10n",
+        "SAMPA",
+        "Sicario",
+        "SiCFoI",
+        "Silence",
+        "SkipTT",
+        "SM737",
+        "SPDVD",
+        "STUTTERSHIT",
+        "SWTYBLZ",
+        "t3nzin",
+        "TAoE",
+        "TEKNO3D",
+        "Telly",
+        "TGx",
+        "Tigole",
+        "TSP",
+        "TSPxL",
+        "TWA",
+        "UnKn0wn",
+        "VXT",
+        "Vyndros",
+        "W32",
+        "Will1869",
+        "x0r",
+        "YIFY",
+        "YTS.MX",
+        "YTS",
+    )
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
+    requests_url = f"{base_url}/api/requests/filter"
+    pending_url = f"{base_url}/api/torrents/pending"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ['capybarabr.com']
+    tracker_urls = ("capybarabr.com",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name='CBR')
+        super().__init__(config, tracker_name="CBR")
         self.config = config
         self.common = COMMON(config)
-        self.tracker = 'CBR'
-        self.base_url = 'https://capybarabr.com'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.requests_url = f'{self.base_url}/api/requests/filter'
-        self.pending_url = f"{self.base_url}/api/torrents/pending"
-        self.banned_groups = [
-            "4K4U", "afm72", "Alcaide_Kira", "AROMA", "ASM", "Bandi", "BiTOR", "BLUDV", "Bluespots",
-            "BOLS", "CaNNIBal", "Comando", "d3g", "DepraveD", "EMBER", "FGT", "FreetheFish", "Garshasp",
-            "Ghost", "Grym", "HDS", "Hi10", "HiQVE", "Hiro360", "ImE", "ION10", "iVy", "Judas", "LAMA",
-            "Langbard", "Lapumia", "LION", "MeGusta", "MONOLITH", "MRCS", "NaNi", "Natty", "nikt0",
-            "OEPlus", "OFT", "OsC", "Panda", "PANDEMONiUM", "PHOCiS", "PiRaTeS", "PYC", "QxR", "r00t",
-            "Ralphy", "RARBG", "RetroPeeps", "RZeroX", "S74Ll10n", "SAMPA", "Sicario", "SiCFoI", "Silence",
-            "SkipTT", "SM737", "SPDVD", "STUTTERSHIT", "SWTYBLZ", "t3nzin", "TAoE", "TEKNO3D", "Telly", "TGx",
-            "Tigole", "TSP", "TSPxL", "TWA", "UnKn0wn", "VXT", "Vyndros", "W32", "Will1869", "x0r", "YIFY", "YTS.MX", "YTS"
-        ]
 
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id: dict[str, str] = {"MOVIE": "1", "TV": "2", "ANIMES": "4", "BOOK": "11", "COMIC_MANGA": "10", "GAME": "5"}

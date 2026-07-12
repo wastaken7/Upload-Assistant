@@ -14,25 +14,14 @@ from src.trackers.COMMON import COMMON
 
 
 class BHDTV:
-    """
-    Edit for Tracker:
-        Edit BASE.torrent with announce and source
-        Check for duplicates
-        Set type/category IDs
-        Upload
-    """
-
+    tracker = "BHDTV"
+    source_flag = "BIT-HDTV"
+    banned_groups = []
+    upload_url = "https://www.bit-hdtv.com/takeupload.php"
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.tracker = 'BHDTV'
-        self.source_flag = 'BIT-HDTV'
-        # search not implemented
-        # self.search_url = 'https://api.bit-hdtv.com/torrent/search/advanced'
-        self.upload_url = 'https://www.bit-hdtv.com/takeupload.php'
-        # self.forum_link = 'https://www.bit-hdtv.com/rules.php'
-        self.banned_groups = []
 
     async def upload(self, meta: Meta) -> bool:
         common = COMMON(config=self.config)
@@ -52,7 +41,7 @@ class BHDTV:
         # region_id = await common.unit3d_region_ids(meta.region)
         # distributor_id = await common.unit3d_distributor_ids(meta.distributor)
 
-        if meta.bdinfo is not None:
+        if meta.bdinfo:
             mi_dump = None
             async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as bd_file:
                 bd_dump = await bd_file.read()
@@ -213,6 +202,5 @@ class BHDTV:
         return None
 
     async def search_existing(self, _meta: dict[str, Any]) -> list[str]:
-        logger.info("[red]Dupes must be checked Manually")
-        return ['Dupes must be checked Manually']
-        # hopefully someone else has the time to implement this.
+        logger.info(f"{self.tracker}: [red]Dupes must be checked Manually")
+        return []

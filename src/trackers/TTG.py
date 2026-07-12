@@ -22,21 +22,20 @@ Config = dict[str, Any]
 
 
 class TTG:
+    tracker = "TTG"
+    source_flag = "TTG"
+    signature = None
+    banned_groups = ("",)
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.tracker = 'TTG'
-        self.source_flag = 'TTG'
         self.username = str(config['TRACKERS']['TTG'].get('username', '')).strip()
         self.password = str(config['TRACKERS']['TTG'].get('password', '')).strip()
         self.passid = str(config['TRACKERS']['TTG'].get('login_question', '0')).strip()
         self.passan = str(config['TRACKERS']['TTG'].get('login_answer', '')).strip()
         self.uid = str(config['TRACKERS']['TTG'].get('user_id', '')).strip()
-        self.passkey = str(config['TRACKERS']['TTG'].get('announce_url', '')).strip().split('/')[-1]
-        self.signature = None
-        self.banned_groups = [""]
-
+        self.passkey = str(config["TRACKERS"]["TTG"].get("announce_url", "")).strip().split("/")[-1]
         self.cookie_validator = CookieValidator(config)
 
     async def edit_name(self, meta: Meta) -> str:
@@ -130,7 +129,7 @@ class TTG:
 
         anon = "no" if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else "yes"
 
-        mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo is not None else f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt"
+        mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo else f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt"
 
         async with aiofiles.open(
             f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",

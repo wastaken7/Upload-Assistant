@@ -1,5 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from typing import Any, cast
+from typing import Any
 
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
@@ -9,22 +9,23 @@ Config = dict[str, Any]
 
 
 class PTT(UNIT3D):
+    tracker = "PTT"
+    base_url = "https://polishtorrent.top"
+    banned_groups = ["ViP", "BiRD", "M@RTiNU$", "inTGrity", "CiNEMAET", "MusicET", "TeamET", "R2D2"]
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='PTT')
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'PTT'
-        self.base_url = 'https://polishtorrent.top'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = ['ViP', 'BiRD', 'M@RTiNU$', 'inTGrity', 'CiNEMAET', 'MusicET', 'TeamET', 'R2D2']
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         ptt_name = meta.name
-        imdb_info = cast(dict[str, Any], meta.imdb_info)
+        imdb_info = meta.imdb_info
         if meta.original_language == "pl" and imdb_info:
             ptt_name = ptt_name.replace(meta.aka, "")
             ptt_name = ptt_name.replace(meta.title, str(imdb_info.get("aka", "")))
