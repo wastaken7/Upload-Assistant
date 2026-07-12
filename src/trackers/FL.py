@@ -21,13 +21,15 @@ from src.trackers.COMMON import COMMON
 
 
 class FL:
+    tracker = "FL"
+    source_flag = "FL"
+    signature: str | None = None
+    banned_groups = [""]
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['reactor.filelist', 'reactor.thefl.org']
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config: dict[str, Any] = config
-        self.tracker = 'FL'
-        self.source_flag = 'FL'
         tracker_cfg = config['TRACKERS'][self.tracker]
         self.username: str = str(tracker_cfg.get('username', '')).strip()
         self.password: str = str(tracker_cfg.get('password', '')).strip()
@@ -35,8 +37,6 @@ class FL:
         self.fltools: dict[str, Any] = cast(dict[str, Any], fltools_raw) if isinstance(fltools_raw, dict) else {}
         uploader_name_raw = tracker_cfg.get('uploader_name')
         self.uploader_name: str | None = str(uploader_name_raw) if uploader_name_raw else None
-        self.signature: str | None = None
-        self.banned_groups = [""]
 
         self.cookie_validator = CookieValidator(config)
 
@@ -169,7 +169,7 @@ class FL:
         async with aiofiles.open(desc_path, newline='', encoding='utf-8') as desc_file:
             fl_desc = await desc_file.read()
         torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
-        mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo is not None else f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
+        mi_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo else f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
         async with aiofiles.open(mi_path, encoding='utf-8') as mi_file:
             mi_dump = await mi_file.read()
         async with aiofiles.open(torrent_path, 'rb') as torrent_file:

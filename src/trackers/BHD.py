@@ -16,30 +16,53 @@ from src.trackers.COMMON import COMMON
 
 
 class BHD:
-    tracker_urls = ['https://beyond-hd.me', 'tracker.beyond-hd.me']
-    """
-    Edit for Tracker:
-        Edit BASE.torrent with announce and source
-        Check for duplicates
-        Set type/category IDs
-        Upload
-    """
-
+    tracker = "BHD"
+    source_flag = "BHD"
+    banned_groups = [
+        "4K4U",
+        "AOC",
+        "BiTOR",
+        "C4K",
+        "CRUCiBLE",
+        "d3g",
+        "EASports",
+        "FGT",
+        "Flights",
+        "iFT",
+        "iVy",
+        "MeGusta",
+        "MezRips",
+        "nikt0",
+        "OFT",
+        "ProRes",
+        "QxR",
+        "RARBG",
+        "ReaLHD",
+        "SasukeducK",
+        "Sicario",
+        "SyncUP",
+        "TEKNO3D",
+        "Telly",
+        "TGS",
+        "tigole",
+        "TOMMY",
+        "WKS",
+        "x0r",
+        "YIFY",
+    ]
+    approved_image_hosts = ["ptpimg", "imgbox", "imgbb", "pixhost", "bhd", "bam"]
+    upload_url = "https://beyond-hd.me/api/upload/"
+    torrent_url = "https://beyond-hd.me/details/"
+    tracker_urls = ["https://beyond-hd.me", "tracker.beyond-hd.me"]
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.rehost_images_manager = RehostImagesManager(config)
-        self.tracker = 'BHD'
-        self.source_flag = 'BHD'
-        self.upload_url = 'https://beyond-hd.me/api/upload/'
-        self.torrent_url = 'https://beyond-hd.me/details/'
         trackers_cfg = cast(dict[str, Any], self.config.get('TRACKERS', {}))
         self.tracker_config = cast(dict[str, Any], trackers_cfg.get('BHD', {}))
         api_key = str(self.tracker_config.get('api_key', '')).strip()
         self.requests_url = f"https://beyond-hd.me/api/requests/{api_key}"
-        self.banned_groups = ['Sicario', 'TOMMY', 'x0r', 'nikt0', 'FGT', 'd3g', 'MeGusta', 'YIFY', 'tigole', 'TEKNO3D', 'C4K', 'RARBG', '4K4U', 'EASports', 'ReaLHD', 'Telly', 'AOC', 'WKS', 'SasukeducK', 'CRUCiBLE', 'iFT', 'ProRes', 'MezRips', 'Flights', 'BiTOR', 'iVy', 'QxR', 'SyncUP', 'OFT', 'TGS']
-        self.approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb', 'pixhost', 'bhd', 'bam']
 
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {

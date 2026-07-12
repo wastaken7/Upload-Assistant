@@ -24,6 +24,8 @@ type ParamsList = list[tuple[str, QueryValue]]
 
 class UNIT3D:
     supported_categories: tuple[str, ...] = ('TV', 'MOVIE')
+    tracker: str = ""
+    banned_groups: list[str] = []
 
     def __init__(self, config: dict[str, Any], tracker_name: str):
         self.config = config

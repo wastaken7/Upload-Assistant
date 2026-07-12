@@ -23,6 +23,44 @@ from src.trackers.COMMON import COMMON
 
 
 class ASC:
+    tracker = "ASC"
+    source_flag = "ASC"
+    banned_groups: list[str] = []
+    base_url = "https://cliente.amigos-share.club"
+    torrent_url = "https://cliente.amigos-share.club/torrents-details.php?id="
+    requests_url = f"{base_url}/pedidos.php"
+    language_map = {
+        "bg": "15",
+        "da": "12",
+        "de": "3",
+        "en": "1",
+        "es": "6",
+        "fi": "14",
+        "fr": "2",
+        "hi": "23",
+        "it": "4",
+        "ja": "5",
+        "ko": "20",
+        "nl": "17",
+        "no": "16",
+        "pl": "19",
+        "pt": "8",
+        "ru": "7",
+        "sv": "13",
+        "th": "21",
+        "tr": "25",
+        "zh": "10",
+    }
+    anime_language_map = {
+        "de": "3",
+        "en": "4",
+        "es": "1",
+        "ja": "8",
+        "ko": "11",
+        "pt": "5",
+        "ru": "2",
+        "zh": "9",
+    }
     supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
     tracker_urls = ['amigos-share.club']
     tmdb_localization_requirements = {
@@ -35,41 +73,15 @@ class ASC:
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
+        self.main_tmdb_data: dict[str, Any] = {}
+        self.season_tmdb_data: dict[str, Any] = {}
+        self.episode_tmdb_data: dict[str, Any] = {}
         self.tmdb_manager = TmdbManager(config)
         self.common = COMMON(config)
         self.cookie_validator = CookieValidator(config)
         self.cookie_auth_uploader = CookieAuthUploader(config)
-        self.tracker = 'ASC'
-        self.source_flag = 'ASC'
-        self.banned_groups: list[str] = []
-        self.base_url = 'https://cliente.amigos-share.club'
-        self.torrent_url = 'https://cliente.amigos-share.club/torrents-details.php?id='
-        self.requests_url = f'{self.base_url}/pedidos.php'
         self.layout = self.config['TRACKERS'][self.tracker].get('custom_layout', '2')
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
-
-        self.main_tmdb_data: dict[str, Any] = {}
-        self.season_tmdb_data: dict[str, Any] = {}
-        self.episode_tmdb_data: dict[str, Any] = {}
-
-        self.language_map = {
-            'bg': '15', 'da': '12',
-            'de': '3', 'en': '1',
-            'es': '6', 'fi': '14',
-            'fr': '2', 'hi': '23',
-            'it': '4', 'ja': '5',
-            'ko': '20', 'nl': '17',
-            'no': '16', 'pl': '19',
-            'pt': '8', 'ru': '7',
-            'sv': '13', 'th': '21',
-            'tr': '25', 'zh': '10',
-        }
-        self.anime_language_map = {
-            'de': '3', 'en': '4',
-            'es': '1', 'ja': '8',
-            'ko': '11', 'pt': '5',
-            'ru': '2', 'zh': '9',
-        }
 
     async def validate_credentials(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)

@@ -12,19 +12,20 @@ Config = dict[str, Any]
 
 
 class PT(UNIT3D):
+    tracker = "PT"
+    base_url = "https://portugas.org"
+    banned_groups = []
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://portugas.org']
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='PT')
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'PT'
-        self.base_url = 'https://portugas.org'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = []
 
     async def get_type_id(
         self,

@@ -17,6 +17,9 @@ Config = dict[str, Any]
 
 class NEXUSPHP:
     supported_categories: tuple[str, ...] = ('TV', 'MOVIE')
+    tracker: str = ""
+    source_flag: str = ""
+    banned_groups: list[str] = []
     tmdb_localization_requirements = {
         "zh-cn": {
             "main": "credits",

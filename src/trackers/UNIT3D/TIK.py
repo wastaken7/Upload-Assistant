@@ -19,18 +19,19 @@ Config = dict[str, Any]
 
 
 class TIK(UNIT3D):
+    tracker = "TIK"
+    base_url = "https://cinematik.net"
+    banned_groups = []
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='TIK')
         self.config: Config = config
         self.uploadscreens_manager = UploadScreensManager(config)
-        self.tracker = 'TIK'
-        self.base_url = 'https://cinematik.net'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = []
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if not meta.is_disc:

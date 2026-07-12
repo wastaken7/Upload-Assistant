@@ -29,6 +29,9 @@ Config = dict[str, Any]
 
 class AZTrackerBase:
     supported_categories: tuple[str, ...] = ('TV', 'MOVIE')
+    tracker: str = ""
+    source_flag: str = ""
+    banned_groups: list[str] = []
 
     def __init__(self, config: Config, tracker_name: str):
         self.config = config

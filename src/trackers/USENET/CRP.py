@@ -17,16 +17,16 @@ Config = dict[str, Any]
 
 
 class CRP:
+    tracker = "CRP"
+    banned_groups = []
+    upload_url = "https://curupira.cc/v1/releases"
+    torrent_url = "https://curupira.cc/releases/"
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")
     is_usenet = True
 
     def __init__(self, config: Config) -> None:
         self.config = config
         self.common = COMMON(config)
-        self.tracker = "CRP"
-        self.upload_url = "https://curupira.cc/v1/releases"
-        self.torrent_url = "https://curupira.cc/releases/"
-        self.banned_groups = []
 
     async def search_existing(self, meta: Meta) -> list[Any]:
         release_name = await self.get_name(meta)

@@ -9,14 +9,15 @@ Config = dict[str, Any]
 
 
 class PTGTK(NEXUSPHP):
+    banned_groups = []
+    base_url = "https://pt.gtkpw.xyz"
+    source_flag = "[pt.gtkpw.xyz] PT GTK"
+    torrent_url = f"{base_url}/details.php?id="
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://t.myaltbox.com']
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, "PTGTK")
-        self.banned_groups = []
-        self.base_url = "https://pt.gtkpw.xyz"
-        self.source_flag = "[pt.gtkpw.xyz] PT GTK"
-        self.torrent_url = f"{self.base_url}/details.php?id="
 
     def get_category(self, meta: Meta) -> int:
         animations = 405

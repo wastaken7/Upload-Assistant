@@ -14,6 +14,12 @@ from src.trackers.COMMON import COMMON
 
 Config = dict[str, Any]
 class DC:
+    tracker = "DC"
+    base_url = "https://digitalcore.club"
+    api_base_url = f"{base_url}/api/v1/torrents"
+    banned_groups = [""]
+    approved_image_hosts = ["imgbox", "imgbb", "bhd", "imgur", "postimg", "sharex"]
+    torrent_url = f"{base_url}/torrent/"
     supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
     tracker_urls = ['tracker.digitalcore.club', 'trackerprxy.digitalcore.club']
 
@@ -21,12 +27,6 @@ class DC:
         self.config = config
         self.common = COMMON(config)
         self.rehost_images_manager = RehostImagesManager(config)
-        self.tracker = 'DC'
-        self.base_url = 'https://digitalcore.club'
-        self.api_base_url = f'{self.base_url}/api/v1/torrents'
-        self.torrent_url = f'{self.base_url}/torrent/'
-        self.banned_groups = ['']
-        self.approved_image_hosts = ['imgbox', 'imgbb', 'bhd', 'imgur', 'postimg', 'sharex']
         self.api_key = self.config['TRACKERS'][self.tracker].get('api_key')
         self.session = httpx.AsyncClient(headers={'X-API-KEY': self.api_key}, timeout=30.0)
 

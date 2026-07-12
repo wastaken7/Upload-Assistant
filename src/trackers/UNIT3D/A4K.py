@@ -14,20 +14,21 @@ Config = dict[str, Any]
 
 
 class A4K(UNIT3D):
+    tracker = "A4K"
+    base_url = "https://aura4k.net"
+    approved_image_hosts = ["ptpimg", "onlyimage", "imgbox", "ptscreens", "imgbb", "imgur", "postimg"]
+    banned_groups = ["BiTOR", "DepraveD", "Flights", "SasukeducK", "SPDVD", "TEKNO3D"]
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='A4K')
         self.config = config
         self.common = COMMON(config)
-        self.tracker = 'A4K'
-        self.base_url = 'https://aura4k.net'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
         self.rehost_images_manager = RehostImagesManager(config)
-        self.approved_image_hosts = ['ptpimg', 'onlyimage','imgbox', 'ptscreens', 'imgbb', 'imgur', 'postimg']
-        self.banned_groups = ["BiTOR", "DepraveD", "Flights", "SasukeducK", "SPDVD", "TEKNO3D"]
 
     async def get_type_id(
         self,

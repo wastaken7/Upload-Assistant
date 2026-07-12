@@ -17,19 +17,19 @@ Config = dict[str, Any]
 
 
 class TL:
+    tracker = "TL"
+    source_flag = "TorrentLeech.org"
+    base_url = "https://www.torrentleech.org"
+    banned_groups = []
+    http_upload_url = f"{base_url}/torrents/upload/"
+    api_upload_url = f"{base_url}/torrents/upload/apiupload"
+    torrent_url = f"{base_url}/torrent/"
     supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
     tracker_urls = ['tracker.tleechreload', 'tracker.torrentleech']
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'TL'
-        self.source_flag = 'TorrentLeech.org'
-        self.base_url = 'https://www.torrentleech.org'
-        self.http_upload_url = f'{self.base_url}/torrents/upload/'
-        self.api_upload_url = f'{self.base_url}/torrents/upload/apiupload'
-        self.torrent_url = f'{self.base_url}/torrent/'
-        self.banned_groups = []
         self.session = httpx.AsyncClient(timeout=60.0)
         self.tracker_config: dict[str, Any] = self.config['TRACKERS'][self.tracker]
         self.api_upload: bool = bool(self.tracker_config.get('api_upload', False))

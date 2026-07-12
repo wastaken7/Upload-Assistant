@@ -9,23 +9,24 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class AITHER(UNIT3D):
+    tracker = "AITHER"
+    base_url = "https://aither.cc"
+    banned_groups: list[str] = []
+    banned_url = f"{base_url}/api/blacklists/releasegroups"
+    claims_url = f"{base_url}/api/internals/claim"
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
+    requests_url = f"{base_url}/api/requests/filter"
+    trumping_url = f"{base_url}/api/trumping-reports/filter"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://aither.cc']
+
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name='AITHER')
         self.config = config
         self.common = COMMON(config)
-        self.tracker = 'AITHER'
-        self.base_url = 'https://aither.cc'
-        self.banned_url = f'{self.base_url}/api/blacklists/releasegroups'
-        self.claims_url = f'{self.base_url}/api/internals/claim'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.requests_url = f'{self.base_url}/api/requests/filter'
-        self.trumping_url = f'{self.base_url}/api/trumping-reports/filter'
-        self.banned_groups: list[str] = []
 
     async def get_additional_checks(self, meta: Meta):
         should_continue = True

@@ -10,6 +10,15 @@ Config = dict[str, Any]
 
 
 class LST(UNIT3D):
+    tracker = "LST"
+    base_url = "https://lst.gg"
+    banned_groups = []
+    banned_url = f"{base_url}/api/bannedReleaseGroups"
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
+    trumping_url = f"{base_url}/api/reports/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK")
     tracker_urls = ['https://lst.gg']
 
@@ -17,15 +26,6 @@ class LST(UNIT3D):
         super().__init__(config, tracker_name='LST')
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'LST'
-        self.base_url = 'https://lst.gg'
-        self.banned_url = f'{self.base_url}/api/bannedReleaseGroups'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.trumping_url = f'{self.base_url}/api/reports/torrents/'
-        self.banned_groups = []
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK":

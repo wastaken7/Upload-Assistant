@@ -12,20 +12,21 @@ Config = dict[str, Any]
 
 
 class ITT(UNIT3D):
+    tracker = "ITT"
+    base_url = "https://itatorrents.xyz"
+    banned_groups = []
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    requests_url = f"{base_url}/api/requests/filter"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://itatorrents.xyz']
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='ITT')
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'ITT'
-        self.base_url = 'https://itatorrents.xyz'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.requests_url = f'{self.base_url}/api/requests/filter'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = []
 
     async def get_type_name(self, meta: Meta) -> str | None:
         type_name: str | None = None

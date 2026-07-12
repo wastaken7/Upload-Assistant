@@ -29,6 +29,14 @@ Config = dict[str, Any]
 
 
 class BJS:
+    tracker = "BJS"
+    banned_groups: list[str] = []
+    source_flag = "BJ"
+    base_url = "https://bj-share.info"
+    auth_token = None
+    torrent_url = f"{base_url}/torrents.php?torrentid="
+    torrent_download_url = f"{base_url}/torrents.php?action=download&id="
+    requests_url = f"{base_url}/requests.php?"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     tracker_urls = ['tracker.bj-share.info']
     secret_token: str = ""
@@ -55,21 +63,13 @@ class BJS:
 
     def __init__(self, config: Config):
         self.config = config
+        self.main_tmdb_data: dict[str, Any] = {}
+        self.episode_tmdb_data: dict[str, Any] = {}
         self.tmdb_manager = TmdbManager(config)
         self.common = COMMON(config)
         self.cookie_validator = CookieValidator(config)
         self.cookie_auth_uploader = CookieAuthUploader(config)
-        self.tracker = "BJS"
-        self.banned_groups: list[str] = []
-        self.source_flag = "BJ"
-        self.base_url = "https://bj-share.info"
-        self.torrent_url = f"{self.base_url}/torrents.php?torrentid="
-        self.torrent_download_url = f"{self.base_url}/torrents.php?action=download&id="
-        self.requests_url = f"{self.base_url}/requests.php?"
-        self.auth_token = None
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
-        self.main_tmdb_data: dict[str, Any] = {}
-        self.episode_tmdb_data: dict[str, Any] = {}
         self.semaphore = asyncio.Semaphore(1)
 
     async def get_additional_checks(self, meta: Meta) -> bool:

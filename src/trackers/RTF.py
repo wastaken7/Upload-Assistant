@@ -15,31 +15,18 @@ from src.trackers.COMMON import COMMON
 
 
 class RTF:
-    tracker_urls = ['peer.retroflix']
-    """
-    Edit for Tracker:
-        Edit BASE.torrent with announce and source
-        Check for duplicates
-        Set type/category IDs
-        Upload
-    """
-
+    tracker = "RTF"
+    source_flag = "sunshine"
+    banned_groups: list[str] = []
+    upload_url = "https://retroflix.club/api/upload"
+    search_url = "https://retroflix.club/api/torrent"
+    torrent_url = "https://retroflix.club/browse/t/"
+    forum_link = "https://retroflix.club/forums.php?action=viewtopic&topicid=3619"
+    tracker_urls = ["peer.retroflix"]
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:
-        """Initialize the RTF tracker handler.
-
-        Args:
-            config: Configuration dictionary containing tracker settings and API credentials.
-        """
         self.config = config
-        self.tracker = 'RTF'
-        self.source_flag = 'sunshine'
-        self.upload_url = 'https://retroflix.club/api/upload'
-        self.search_url = 'https://retroflix.club/api/torrent'
-        self.torrent_url = 'https://retroflix.club/browse/t/'
-        self.forum_link = 'https://retroflix.club/forums.php?action=viewtopic&topicid=3619'
-        self.banned_groups: list[str] = []
 
     async def upload(self, meta: Meta) -> bool:
         """Upload a torrent to RetroFlix tracker.
@@ -54,7 +41,7 @@ class RTF:
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, signature=self.forum_link)
-        if meta.bdinfo is not None:
+        if meta.bdinfo:
             mi_dump = None
             async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
                 bd_dump = await f.read()

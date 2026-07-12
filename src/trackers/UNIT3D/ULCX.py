@@ -14,24 +14,65 @@ Config = dict[str, Any]
 
 
 class ULCX(UNIT3D):
+    tracker = "ULCX"
+    base_url = "https://upload.cx"
+    banned_groups = [
+        "4K4U",
+        "Alcaide_Kira",
+        "AROMA",
+        "d3g",
+        "EDGE2020",
+        "EMBER",
+        "FGT",
+        "FnP",
+        "FRDS",
+        "Grym",
+        "HDT",
+        "Hi10",
+        "iAHD",
+        "INFINITY",
+        "ION10",
+        "iVy",
+        "Judas",
+        "LAMA",
+        "MeGusta",
+        "NAHOM",
+        "Niblets",
+        "nikt0",
+        "NuBz",
+        "OFT",
+        "PHOCiS",
+        "QxR",
+        "Ralphy",
+        "RARBG",
+        "seedpool",
+        "Sicario",
+        "SM737",
+        "SPDVD",
+        "SPx",
+        "SWTYBLZ",
+        "TAoE",
+        "TGx",
+        "Tigole",
+        "TSP",
+        "TSPxL",
+        "VXT",
+        "Vyndros",
+        "Will1869",
+        "x0r",
+        "YIFY",
+    ]
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    requests_url = f"{base_url}/api/requests/filter"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://upload.cx']
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='ULCX')
         self.config = config
-        self.tracker = 'ULCX'
-        self.base_url = 'https://upload.cx'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.requests_url = f'{self.base_url}/api/requests/filter'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = [
-            '4K4U', 'AROMA', 'd3g', ['EDGE2020', 'Encodes'], 'EMBER', 'FGT', 'FnP', 'FRDS', 'Grym', 'Hi10', 'iAHD', 'INFINITY',
-            'ION10', 'iVy', 'Judas', 'LAMA', 'MeGusta', 'NAHOM', 'Niblets', 'nikt0', ['NuBz', 'Encodes'], 'OFT', 'QxR',
-            ['Ralphy', 'Encodes'], 'RARBG', 'Sicario', 'SM737', 'SPDVD', 'SWTYBLZ', 'TAoE', 'TGx', 'Tigole', 'TSP',
-            'TSPxL', 'VXT', 'Vyndros', 'Will1869', 'x0r', 'YIFY', 'Alcaide_Kira', 'PHOCiS', 'HDT', 'SPx', 'seedpool'
-        ]
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if "concert" in meta.keywords:

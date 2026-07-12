@@ -26,6 +26,13 @@ from src.trackers.COMMON import COMMON
 
 
 class BT:
+    tracker = "BT"
+    banned_groups: list[str] = []
+    source_flag = "BT"
+    base_url = "https://brasiltracker.org"
+    auth_token: str | None = None
+    torrent_url = f"{base_url}/torrents.php?id="
+    ultimate_lang_map: dict[str, str] = {}
     supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
     tracker_urls = ['t.brasiltracker.org']
     secret_token: str = ''
@@ -38,18 +45,12 @@ class BT:
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config: dict[str, Any] = config
+        self.main_tmdb_data: dict[str, Any] = {}
+        self.episode_tmdb_data: dict[str, Any] = {}
         self.tmdb_manager = TmdbManager(config)
         self.common = COMMON(config)
         self.cookie_validator = CookieValidator(config)
         self.cookie_auth_uploader = CookieAuthUploader(config)
-        self.tracker = 'BT'
-        self.banned_groups: list[str] = []
-        self.source_flag = 'BT'
-        self.base_url = 'https://brasiltracker.org'
-        self.torrent_url = f'{self.base_url}/torrents.php?id='
-        self.auth_token: str | None = None
-        self.main_tmdb_data: dict[str, Any] = {}
-        self.episode_tmdb_data: dict[str, Any] = {}
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
 
         target_site_ids = {
@@ -107,7 +108,6 @@ class BT:
             ('Vietnamese', 'vie', 'vi'): 'vietnamese',
         }
 
-        self.ultimate_lang_map: dict[str, str] = {}
         for aliases_tuple, canonical_name in source_alias_map.items():
             if canonical_name in target_site_ids:
                 correct_id = target_site_ids[canonical_name]

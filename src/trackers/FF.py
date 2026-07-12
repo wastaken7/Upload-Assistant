@@ -17,19 +17,20 @@ from src.meta import Meta
 
 
 class FF:
+    tracker = "FF"
+    banned_groups: list[str] = []
+    source_flag = "FunFile"
+    base_url = "https://www.funfile.org"
+    auth_token = None
+    torrent_url = f"{base_url}/details.php?id="
+    requests_url = f"{base_url}/requests.php"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['tracker.funfile.org']
+
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.cookie_validator = CookieValidator(config)
         self.cookie_auth_uploader = CookieAuthUploader(config)
-        self.tracker = "FF"
-        self.banned_groups: list[str] = []
-        self.source_flag = "FunFile"
-        self.base_url = "https://www.funfile.org"
-        self.torrent_url = f"{self.base_url}/details.php?id="
-        self.requests_url = f"{self.base_url}/requests.php"
-        self.auth_token = None
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"}, timeout=30.0)
 
     async def validate_credentials(self, meta: Meta) -> bool:

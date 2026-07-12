@@ -25,36 +25,69 @@ Config = dict[str, Any]
 
 
 class MTV:
-    tracker_urls = ['tracker.morethantv']
-    """
-    Edit for Tracker:
-        Edit BASE.torrent with announce and source
-        Check for duplicates
-        Set type/category IDs
-        Upload
-    """
-
+    tracker = "MTV"
+    source_flag = "MTV"
+    approved_image_hosts = ["ptpimg", "imgbox", "imgbb"]
+    banned_groups = [
+        "[Oj]",
+        "3LTON",
+        "AFG",
+        "aXXo",
+        "BDP",
+        "BRrip",
+        "CM8",
+        "CMCT",
+        "CrEwSaDe",
+        "DeadFish",
+        "DNL",
+        "ELiTE",
+        "FaNGDiNG0",
+        "FRDS",
+        "FUM",
+        "h65",
+        "HD2DVD",
+        "HDTime",
+        "ION10",
+        "iPlanet",
+        "JIVE",
+        "KiNGDOM",
+        "LAMA",
+        "Leffe",
+        "LOAD",
+        "mHD",
+        "mRS",
+        "mSD",
+        "NhaNc3",
+        "nHD",
+        "nikt0",
+        "nSD",
+        "PandaRG",
+        "PRODJi",
+        "QxR",
+        "RARBG",
+        "RDN",
+        "SANTi",
+        "STUTTERSHIT",
+        "TERMiNAL",
+        "TM",
+        "ViSiON",
+        "WAF",
+        "x0r",
+        "XS",
+        "YIFY",
+        "ZKBL",
+        "ZmN",
+        "ZMNT",
+    ]
+    upload_url = "https://www.morethantv.me/upload.php"
+    forum_link = "https://www.morethantv.me/wiki.php?action=article&id=73"
+    search_url = "https://www.morethantv.me/api/torznab"
+    tracker_urls = ["tracker.morethantv"]
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.rehost_images_manager = RehostImagesManager(config)
-        self.tracker = 'MTV'
-        self.source_flag = 'MTV'
-        self.upload_url = 'https://www.morethantv.me/upload.php'
-        self.forum_link = 'https://www.morethantv.me/wiki.php?action=article&id=73'
-        self.search_url = 'https://www.morethantv.me/api/torznab'
-        self.approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb']
-        self.banned_groups = [
-            '3LTON', '[Oj]', 'aXXo', 'BDP', 'BRrip', 'CM8', 'CrEwSaDe', 'CMCT',
-            'DeadFish', 'DNL', 'ELiTE', 'AFG', 'ZMNT',
-            'FaNGDiNG0', 'FRDS', 'FUM', 'h65', 'HD2DVD', 'HDTime', 'ION10', 'iPlanet', 'JIVE',
-            'KiNGDOM', 'LAMA', 'Leffe', 'LOAD', 'mHD', 'mRS', 'mSD', 'NhaNc3', 'nHD', 'nikt0', 'nSD',
-            'PandaRG', 'PRODJi', 'QxR', 'RARBG', 'RDN', 'SANTi', 'STUTTERSHIT',
-            'TERMiNAL',  # TERMiNAL: low bitrate UHD
-            'TM', 'ViSiON',  # ViSiON: Xvid releases -- re-encoded
-            'WAF', 'x0r', 'XS', 'YIFY', 'ZKBL', 'ZmN'
-        ]
 
     # For loading
     async def async_json_loads(self, data_str: str) -> Any:

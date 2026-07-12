@@ -17,33 +17,87 @@ Config = dict[str, Any]
 
 
 class NBL:
+    tracker = "NBL"
+    source_flag = "NBL"
+    banned_groups = [
+        "[Oj]",
+        "0neshot",
+        "3LTON",
+        "4yEo",
+        "AFG",
+        "AkihitoSubs",
+        "AniHLS",
+        "Anime Time",
+        "AnimeRG",
+        "AniURL",
+        "ASW",
+        "BakedFish",
+        "bonkai77",
+        "Cleo",
+        "DeadFish",
+        "DeeJayAhmed",
+        "ELiTE",
+        "EMBER",
+        "eSc",
+        "EVO",
+        "FGT",
+        "FUM",
+        "GERMini",
+        "HAiKU",
+        "Hi10",
+        "ION10",
+        "JacobSwaggedUp",
+        "JIVE",
+        "Judas",
+        "LOAD",
+        "MeGusta",
+        "Mr.Deadpool",
+        "mSD",
+        "NemDiggers",
+        "neoHEVC",
+        "NhaNc3",
+        "NOIVTC",
+        "PlaySD",
+        "playXD",
+        "project-gxs",
+        "PSA",
+        "QaS",
+        "Ranger",
+        "RAPiDCOWS",
+        "Raze",
+        "Reaktor",
+        "REsuRRecTioN",
+        "RMTeam",
+        "ROBOTS",
+        "SpaceFish",
+        "SPASM",
+        "SSA",
+        "Telly",
+        "Tenrai-Sensei",
+        "TM",
+        "Trix",
+        "URANiME",
+        "VipapkStudios",
+        "ViSiON",
+        "Wardevil",
+        "xRed",
+        "XS",
+        "YakuboEncodes",
+        "YuiSubs",
+        "ZKBL",
+        "ZmN",
+        "ZMNT",
+    ]
+    upload_url = "https://nebulance.io/api.php"
+    search_url = "https://nebulance.io/api.php"
+    torrent_url = "https://nebulance.io/torrents.php?id="
     supported_categories = ('TV',)
     tracker_urls = ['tracker.nebulance']
-
-    """
-    Edit for Tracker:
-        Edit BASE.torrent with announce and source
-        Check for duplicates
-        Set type/category IDs
-        Upload
-    """
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'NBL'
-        self.source_flag = 'NBL'
-        self.upload_url = 'https://nebulance.io/api.php'
-        self.search_url = 'https://nebulance.io/api.php'
-        self.torrent_url = 'https://nebulance.io/torrents.php?id='
-        self.api_key = str(self.config['TRACKERS'][self.tracker]['api_key']).strip()
-        self.banned_groups = ['0neshot', '3LTON', '4yEo', '[Oj]', 'AFG', 'AkihitoSubs', 'AniHLS', 'Anime Time', 'AnimeRG', 'AniURL', 'ASW', 'BakedFish',
-                              'bonkai77', 'Cleo', 'DeadFish', 'DeeJayAhmed', 'ELiTE', 'EMBER', 'eSc', 'EVO', 'FGT', 'FUM', 'GERMini', 'HAiKU', 'Hi10', 'ION10',
-                              'JacobSwaggedUp', 'JIVE', 'Judas', 'LOAD', 'MeGusta', 'Mr.Deadpool', 'mSD', 'NemDiggers', 'neoHEVC', 'NhaNc3', 'NOIVTC',
-                              'PlaySD', 'playXD', 'project-gxs', 'PSA', 'QaS', 'Ranger', 'RAPiDCOWS', 'Raze', 'Reaktor', 'REsuRRecTioN', 'RMTeam', 'ROBOTS',
-                              'SpaceFish', 'SPASM', 'SSA', 'Telly', 'Tenrai-Sensei', 'TM', 'Trix', 'URANiME', 'VipapkStudios', 'ViSiON', 'Wardevil', 'xRed',
-                              'XS', 'YakuboEncodes', 'YuiSubs', 'ZKBL', 'ZmN', 'ZMNT']
-
+        self.api_key = str(self.config["TRACKERS"][self.tracker]["api_key"]).strip()
 
     async def get_cat_id(self, meta: Meta) -> int:
         cat_id = 3 if meta.tv_pack == 1 else 1
@@ -56,7 +110,7 @@ class NBL:
     async def upload(self, meta: Meta) -> bool:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
-        if meta.bdinfo is not None:
+        if meta.bdinfo:
             async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt", encoding="utf-8") as f:
                 mi_dump = await f.read()
         else:

@@ -17,35 +17,157 @@ Config = dict[str, Any]
 
 
 class OE(UNIT3D):
+    tracker = "OE"
+    base_url = "https://onlyencodes.cc"
+    approved_image_hosts = ["ptpimg", "imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage"]
+    banned_groups = [
+        "[Oj]",
+        "$andra",
+        "0neshot",
+        "3LT0N",
+        "4K4U",
+        "4yEo",
+        "AFG",
+        "AkihitoSubs",
+        "Alcaide_Kira",
+        "AniHLS",
+        "Anime Time",
+        "AnimeRG",
+        "AniURL",
+        "AOC",
+        "AR",
+        "AROMA",
+        "ASW",
+        "aXXo",
+        "BakedFish",
+        "BiTOR",
+        "bonkai",
+        "BRrip",
+        "C4K",
+        "Cleo",
+        "CM8",
+        "core",
+        "CrEwSaDe",
+        "d3g",
+        "DDR",
+        "DE3PM",
+        "DeadFish",
+        "DeeJayAhmed",
+        "DNL",
+        "ELiTE",
+        "EMBER",
+        "eSc",
+        "EVO",
+        "EZTV",
+        "FaNGDiNG0",
+        "fenix",
+        "FGT",
+        "FRDS",
+        "FROZEN",
+        "FUM",
+        "GalaxyRG",
+        "GalaxyRG265",
+        "GalaxyTV",
+        "GERMini",
+        "Grym",
+        "GrymLegacy",
+        "HAiKU",
+        "HD2DVD",
+        "HDTime",
+        "Hi10",
+        "HiQVE",
+        "ION10",
+        "iPlanet",
+        "iVy",
+        "JacobSwaggedUp",
+        "JIVE",
+        "Judas",
+        "KiNGDOM",
+        "LAMA",
+        "Leffe",
+        "LiGaS",
+        "LOAD",
+        "LycanHD",
+        "MeGusta",
+        "MezRips",
+        "mHD",
+        "Mr.Deadpool",
+        "mSD",
+        "NemDiggers",
+        "neoHEVC",
+        "NeXus",
+        "NhaNc3",
+        "nHD",
+        "nikt0",
+        "NOIVTC",
+        "nSD",
+        "pahe.in",
+        "PlaySD",
+        "playXD",
+        "PRODJi",
+        "project-gxs",
+        "ProRes",
+        "PSA",
+        "QaS",
+        "Ranger",
+        "RAPiDCOWS",
+        "RARBG",
+        "Raze",
+        "RCDiVX",
+        "RDN",
+        "Reaktor",
+        "REsuRRecTioN",
+        "RMTeam",
+        "ROBOTS",
+        "rubix",
+        "SANTi",
+        "SHUTTERSHIT",
+        "SM737",
+        "SpaceFish",
+        "SPASM",
+        "SSA",
+        "TBS",
+        "Telly",
+        "Tenrai-Sensei",
+        "TERMiNAL",
+        "TGx",
+        "TM",
+        "topaz",
+        "ToVaR",
+        "TSP",
+        "TSPxL",
+        "UnKn0wn",
+        "URANiME",
+        "UTR",
+        "VipapkSudios",
+        "ViSION",
+        "WAF",
+        "Wardevil",
+        "x0r",
+        "xRed",
+        "XS",
+        "YakuboEncodes",
+        "YAWNiX",
+        "YAWNTiC",
+        "YIFY",
+        "YTS",
+        "YuiSubs",
+        "ZKBL",
+        "ZmN",
+        "ZMNT",
+    ]
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://onlyencodes.cc']
+    tracker_urls = ["https://onlyencodes.cc"]
+
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='OE')
+        super().__init__(config, tracker_name="OE")
         self.config: Config = config
         self.common = COMMON(config)
         self.rehost_images_manager = RehostImagesManager(config)
-        self.tracker = 'OE'
-        self.base_url = 'https://onlyencodes.cc'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.approved_image_hosts = ['ptpimg', 'imgbox', 'imgbb', 'onlyimage', 'ptscreens', 'passtheimage']
-        self.banned_groups = [
-            '0neshot', '3LT0N', '4K4U', '4yEo', '$andra', '[Oj]', 'AFG', 'AkihitoSubs', 'Alcaide_Kira', 'AniHLS', 'Anime Time',
-            'AnimeRG', 'AniURL', 'AOC', 'AR', 'AROMA', 'ASW', 'aXXo', 'BakedFish', 'BiTOR', 'BRrip', 'bonkai',
-            'Cleo', 'CM8', 'C4K', 'CrEwSaDe', 'core', 'd3g', 'DDR', 'DE3PM', 'DeadFish', 'DeeJayAhmed', 'DNL', 'ELiTE',
-            'EMBER', 'eSc', 'EVO', 'EZTV', 'FaNGDiNG0', 'FGT', 'fenix', 'FUM', 'FRDS', 'FROZEN', 'GalaxyTV',
-            'GalaxyRG', 'GalaxyRG265', 'GERMini', 'Grym', 'GrymLegacy', 'HAiKU', 'HD2DVD', 'HDTime', 'Hi10',
-            'HiQVE', 'ION10', 'iPlanet', 'iVy', 'JacobSwaggedUp', 'JIVE', 'Judas', 'KiNGDOM', 'LAMA', 'Leffe', 'LiGaS',
-            'LOAD', 'LycanHD', 'MeGusta', 'MezRips', 'mHD', 'Mr.Deadpool', 'mSD', 'NemDiggers', 'neoHEVC', 'NeXus',
-            'nHD', 'nikt0', 'nSD', 'NhaNc3', 'NOIVTC', 'pahe.in', 'PlaySD', 'playXD', 'PRODJi', 'ProRes',
-            'project-gxs', 'PSA', 'QaS', 'Ranger', 'RAPiDCOWS', 'RARBG', 'Raze', 'RCDiVX', 'RDN', 'Reaktor',
-            'REsuRRecTioN', 'RMTeam', 'ROBOTS', 'rubix', 'SANTi', 'SHUTTERSHIT', 'SM737', 'SpaceFish', 'SPASM', 'SSA',
-            'TBS', 'Telly', 'Tenrai-Sensei', 'TERMiNAL', 'TGx', 'TM', 'topaz', 'ToVaR', 'TSP', 'TSPxL', 'UnKn0wn', 'URANiME', 'UTR',
-            'VipapkSudios', 'ViSION', 'WAF', 'Wardevil', 'x0r', 'xRed', 'XS', 'YakuboEncodes', 'YAWNTiC', 'YAWNiX', 'YIFY', 'YTS',
-            'YuiSubs', 'ZKBL', 'ZmN', 'ZMNT'
-        ]
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if not self.common.check_and_confirm_adult_media_upload(meta, self.tracker):

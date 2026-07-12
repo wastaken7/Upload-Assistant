@@ -14,19 +14,20 @@ Config = dict[str, Any]
 
 
 class SP(UNIT3D):
+    tracker = "SP"
+    base_url = "https://seedpool.org"
+    banned_groups = []
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://seedpool.org']
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='SP')
         self.config: Config = config
         self.common = COMMON(config)
-        self.tracker = 'SP'
-        self.base_url = 'https://seedpool.org'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = []
 
     async def get_category_id(
         self,

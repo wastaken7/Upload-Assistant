@@ -11,29 +11,84 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class DP(UNIT3D):
+    tracker = "DP"
+    base_url = "https://darkpeers.org"
+    banned_groups = [
+        "ARCADE",
+        "aXXo",
+        "BANDOLEROS",
+        "BONE",
+        "BRrip",
+        "CM8",
+        "CrEwSaDe",
+        "CTFOH",
+        "dAV1nci",
+        "DNL",
+        "eranger2",
+        "FaNGDiNG0",
+        "FGT",
+        "FiSTER",
+        "flower",
+        "GalaxyTV",
+        "HD2DVD",
+        "HDTime",
+        "HorribleSubs",
+        "iHYTECH",
+        "ION10",
+        "iPlanet",
+        "KiNGDOM",
+        "LAMA",
+        "MeGusta",
+        "mHD",
+        "mSD",
+        "NaNi",
+        "NhaNc3",
+        "nHD",
+        "nikt0",
+        "nSD",
+        "OFT",
+        "PiTBULL",
+        "PRODJi",
+        "PSA",
+        "RARBG",
+        "Rifftrax",
+        "ROCKETRACCOON",
+        "SANTi",
+        "SasukeducK",
+        "SEEDSTER",
+        "ShAaNiG",
+        "Sicario",
+        "STUTTERSHIT",
+        "Subsplease",
+        "SyncUp",
+        "TAoE",
+        "TGALAXY",
+        "TGx",
+        "TORRENTGALAXY",
+        "ToVaR",
+        "Trix",
+        "TSP",
+        "TSPxL",
+        "ViSION",
+        "VXT",
+        "WAF",
+        "WKS",
+        "X0r",
+        "YIFY",
+        "YTS",
+    ]
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    requests_url = f"{base_url}/api/requests/filter"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ['https://darkpeers.org']
+    tracker_urls = ["https://darkpeers.org"]
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name='DP')
+        super().__init__(config, tracker_name="DP")
         self.config = config
         self.tmdb_manager = TmdbManager(config)
-        self.tracker = 'DP'
-        self.base_url = 'https://darkpeers.org'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.requests_url = f'{self.base_url}/api/requests/filter'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = [
-            'ARCADE', 'aXXo', 'BANDOLEROS', 'BONE', 'BRrip', 'CM8', 'CrEwSaDe', 'CTFOH', 'dAV1nci', 'DNL',
-            'eranger2', 'FaNGDiNG0', 'FGT', 'FiSTER', 'flower', 'GalaxyTV', 'HD2DVD', 'HDTime', 'HorribleSubs',
-            'iHYTECH', 'ION10', 'iPlanet', 'KiNGDOM', 'LAMA', 'MeGusta', 'mHD', 'mSD', 'NaNi', 'NhaNc3', 'nHD',
-            'nikt0', 'nSD', 'OFT', 'PiTBULL', 'PRODJi', 'PSA', 'RARBG', 'Rifftrax', 'ROCKETRACCOON',
-            'SANTi', 'SasukeducK', 'SEEDSTER', 'ShAaNiG', 'Sicario', 'STUTTERSHIT', 'Subsplease', 'SyncUp',
-            'TAoE', 'TGALAXY', 'TGx', 'TORRENTGALAXY', 'ToVaR', 'Trix', 'TSP', 'TSPxL', 'ViSION', 'VXT',
-            'WAF', 'WKS', 'X0r', 'YIFY', 'YTS',
-        ]
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

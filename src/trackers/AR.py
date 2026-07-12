@@ -20,25 +20,26 @@ from src.trackers.COMMON import COMMON
 
 
 class AR:
+    tracker = "AR"
+    source_flag = "AlphaRatio"
+    base_url = "https://alpharatio.cc"
+    banned_groups = []
+    login_url = f"{base_url}/login.php"
+    upload_url = f"{base_url}/upload.php"
+    search_url = f"{base_url}/torrents.php"
+    test_url = f"{base_url}/torrents.php"
+    torrent_url = f"{base_url}/torrents.php?id="
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['tracker.alpharatio']
+
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.cookie_validator = CookieValidator(config)
         self.cookie_uploader = CookieAuthUploader(config)
-        self.tracker = 'AR'
-        self.source_flag = 'AlphaRatio'
         trackers_cfg = cast(dict[str, Any], self.config.get('TRACKERS', {}))
         ar_cfg = cast(dict[str, Any], trackers_cfg.get('AR', {}))
         self.username = str(ar_cfg.get('username', '')).strip()
-        self.password = str(ar_cfg.get('password', '')).strip()
-        self.base_url = 'https://alpharatio.cc'
-        self.login_url = f'{self.base_url}/login.php'
-        self.upload_url = f'{self.base_url}/upload.php'
-        self.search_url = f'{self.base_url}/torrents.php'
-        self.test_url = f'{self.base_url}/torrents.php'
-        self.torrent_url = f"{self.base_url}/torrents.php?id="
-        self.banned_groups = []
+        self.password = str(ar_cfg.get("password", "")).strip()
 
     async def get_type(self, meta: Meta) -> str:
         if (meta.type == "DISC" or meta.type == "REMUX") and meta.source == "Blu-ray":

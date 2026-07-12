@@ -10,28 +10,29 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class TOS(UNIT3D):
+    tracker = "TOS"
+    source_flag = "TheOldSchool"
+    base_url = "https://theoldschool.cc"
+    banned_groups = [
+        "FL3ER",
+        "SUNS3T",
+        "WoLFHD",
+        "EXTREME",
+        "Slay3R",
+        "3T3AM",
+        "BARBiE",
+    ]
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://theoldschool.cc']
+    tracker_urls = ["https://theoldschool.cc"]
+
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="TOS")
         self.config = config
         self.common = COMMON(config)
-        self.tracker = "TOS"
-        self.source_flag = "TheOldSchool"
-        self.base_url = "https://theoldschool.cc"
-        self.id_url = f"{self.base_url}/api/torrents/"
-        self.upload_url = f"{self.base_url}/api/torrents/upload"
-        self.search_url = f"{self.base_url}/api/torrents/filter"
-        self.torrent_url = f"{self.base_url}/torrents/"
-        self.banned_groups = [
-            "FL3ER",
-            "SUNS3T",
-            "WoLFHD",
-            "EXTREME",
-            "Slay3R",
-            "3T3AM",
-            "BARBiE",
-        ]
 
     async def get_category_id(
         self,

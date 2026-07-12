@@ -15,21 +15,22 @@ Config = dict[str, Any]
 
 
 class STC(UNIT3D):
+    tracker = "STC"
+    base_url = "https://skipthecommercials.xyz"
+    banned_groups = [""]
+    approved_image_hosts = ["imgbox", "imgbb"]
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://skipthecommercials.xyz']
+
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='STC')
         self.config: Config = config
         self.common = COMMON(config)
         self.rehost_images_manager = RehostImagesManager(config)
-        self.tracker = 'STC'
-        self.base_url = 'https://skipthecommercials.xyz'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = [""]
-        self.approved_image_hosts = ['imgbox', 'imgbb']
 
     async def get_type_id(
         self,

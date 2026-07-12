@@ -10,20 +10,21 @@ from src.trackers.UNIT3D import UNIT3D
 
 
 class LUME(UNIT3D):
+    tracker = "LUME"
+    base_url = "https://luminarr.me"
+    banned_groups: list[str] = []
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    requests_url = f"{base_url}/api/requests/filter"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ['https://luminarr.me']
+
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name="LUME")
         self.config = config
         self.common = COMMON(config)
-        self.tracker = "LUME"
-        self.base_url = "https://luminarr.me"
-        self.id_url = f"{self.base_url}/api/torrents/"
-        self.upload_url = f"{self.base_url}/api/torrents/upload"
-        self.requests_url = f"{self.base_url}/api/requests/filter"
-        self.search_url = f"{self.base_url}/api/torrents/filter"
-        self.torrent_url = f"{self.base_url}/torrents/"
-        self.banned_groups: list[str] = []
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         data = {

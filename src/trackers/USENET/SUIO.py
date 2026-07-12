@@ -21,15 +21,16 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 class SUIO:
-    supported_categories = ("MOVIE", "TV", "XXX", "GAME", "MUSIC", "BOOK")
+    tracker = "SUIO"
+    banned_groups: list[str] = []
+    upload_url: str | None = None
+    torrent_url: str | None = None
+    supported_categories = ("MOVIE", "TV", "GAME", "BOOK")
     is_usenet = True
 
     def __init__(self, config: Config) -> None:
         self.config = config
         self.common = COMMON(config)
-        self.tracker = "SUIO"
-        self.upload_url: str | None = None
-        self.torrent_url: str | None = None
         tracker_cfg = config.get("TRACKERS", {}).get(self.tracker, {})
         base_url = tracker_cfg.get("base_url", "").strip().rstrip("/")
         if base_url:
@@ -54,7 +55,6 @@ class SUIO:
         else:
             self.upload_url = None
             self.torrent_url = None
-        self.banned_groups: list[str] = []
 
     async def search_existing(self, meta: Meta) -> list[Any]:
         release_name = await self.get_name(meta)

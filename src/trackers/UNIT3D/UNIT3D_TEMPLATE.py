@@ -9,20 +9,20 @@ Config = dict[str, Any]
 
 
 class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER NAME
+    tracker = "Abbreviated Tracker Name"
+    base_url = "https://domain.tld"
+    banned_groups = [""]
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    requests_url = f"{base_url}/api/requests/filter"  # If the site supports requests via API, otherwise remove this line
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='UNIT3D_TEMPLATE')  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER NAME
         self.config = config
         self.common = COMMON(config)
-        self.tracker = 'Abbreviated Tracker Name'
-        self.base_url = 'https://domain.tld'
-        self.id_url = f'{self.base_url}/api/torrents/'
-        self.upload_url = f'{self.base_url}/api/torrents/upload'
-        self.requests_url = f'{self.base_url}/api/requests/filter'  # If the site supports requests via API, otherwise remove this line
-        self.search_url = f'{self.base_url}/api/torrents/filter'
-        self.torrent_url = f'{self.base_url}/torrents/'
-        self.banned_groups = [""]
 
     # The section below can be deleted if no changes are needed, as everything else is handled in UNIT3D.py
     # If advanced changes are required, copy the necessary functions from UNIT3D.py here

@@ -21,6 +21,77 @@ from src.trackers.COMMON import COMMON
 
 
 class GPW:
+    tracker = "GPW"
+    source_flag = "GreatPosterWall"
+    base_url = "https://greatposterwall.com"
+    auth_token = None
+    tmdb_data: dict[str, Any] = {}
+    banned_groups = [
+        "ALT",
+        "aXXo",
+        "BATWEB",
+        "BitsTV",
+        "BlackTV",
+        "BMDRu",
+        "BRrip",
+        "CM8",
+        "CrEwSaDe",
+        "CTFOH",
+        "CTRLHD",
+        "DDHDTV",
+        "DNL",
+        "DreamHD",
+        "ENTHD",
+        "FaNGDiNG0",
+        "FGT",
+        "GPTHD",
+        "HD2DVD",
+        "HDT",
+        "HDTime",
+        "Huawei",
+        "ION10",
+        "iPlanet",
+        "KiNGDOM",
+        "Leffe",
+        "mHD",
+        "MiniHD",
+        "MOMOWEB",
+        "Mp4Ba",
+        "mSD",
+        "NhaNc3",
+        "nHD",
+        "nikt0",
+        "NSBC",
+        "nSD",
+        "NukeHD",
+        "OFT",
+        "PRODJi",
+        "RARBG",
+        "RDN",
+        "SANTi",
+        "SeeHD",
+        "SeeWEB",
+        "SM737",
+        "SonyHD",
+        "STUTTERSHIT",
+        "TAGWEB",
+        "ViSION",
+        "VXT",
+        "WAF",
+        "x0r",
+        "Xiaomi",
+        "YIFY",
+    ]
+    approved_image_hosts = ["kshare", "pixhost", "ptpimg", "pterclub", "ilikeshots", "imgbox"]
+    torrent_url = f"{base_url}/torrents.php?torrentid="
+    url_host_mapping = {
+        "kshare.club": "kshare",
+        "pixhost.to": "pixhost",
+        "imgbox.com": "imgbox",
+        "ptpimg.me": "ptpimg",
+        "img.pterclub.com": "pterclub",
+        "yes.ilikeshots.club": "ilikeshots",
+    }
     supported_categories = ("MOVIE",)
     tracker_urls = ['https://tracker.greatposterwall.com']
     group_id: str = ""
@@ -35,31 +106,9 @@ class GPW:
         self.rehost_images_manager = RehostImagesManager(config)
         self.common = COMMON(config)
         self.tmdb_manager = TmdbManager(config)
-        self.tracker = 'GPW'
         self.tracker_config: dict[str, Any] = self.config["TRACKERS"].get(self.tracker, {})
-        self.source_flag = 'GreatPosterWall'
-        self.base_url = 'https://greatposterwall.com'
-        self.torrent_url = f'{self.base_url}/torrents.php?torrentid='
         self.announce = self.tracker_config.get('announce_url', '')
-        self.api_key = self.tracker_config.get('api_key', '')
-        self.auth_token = None
-        self.tmdb_data: dict[str, Any] = {}
-        self.banned_groups = [
-            "ALT", "aXXo", "BATWEB", "BlackTV", "BitsTV", "BMDRu", "BRrip", "CM8", "CrEwSaDe", "CTFOH", "CTRLHD",
-            "DDHDTV", "DNL", "DreamHD", "ENTHD", "FaNGDiNG0", "FGT", "HD2DVD", "HDTime", "HDT", "Huawei", "GPTHD",
-            "ION10", "iPlanet", "KiNGDOM", "Leffe", "Mp4Ba", "mHD", "MiniHD", "mSD", "MOMOWEB", "nHD", "nikt0", "NSBC",
-            "nSD", "NhaNc3", "NukeHD", "OFT", "PRODJi", "RARBG", "RDN", "SANTi", "SeeHD", "SeeWEB", "SM737", "SonyHD",
-            "STUTTERSHIT", "TAGWEB", "ViSION", "VXT", "WAF", "x0r", "Xiaomi", "YIFY",
-        ]
-        self.approved_image_hosts = ['kshare', 'pixhost', 'ptpimg', 'pterclub', 'ilikeshots', 'imgbox']
-        self.url_host_mapping = {
-            'kshare.club': 'kshare',
-            'pixhost.to': 'pixhost',
-            'imgbox.com': 'imgbox',
-            'ptpimg.me': 'ptpimg',
-            'img.pterclub.com': 'pterclub',
-            'yes.ilikeshots.club': 'ilikeshots',
-        }
+        self.api_key = self.tracker_config.get("api_key", "")
 
     async def load_cookies(self, meta: Meta) -> Any:
         cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{self.tracker}.txt")
