@@ -5,6 +5,26 @@
 > [!IMPORTANT]
 > **This is a modified version of the Upload Assistant project and is not affiliated with or endorsed by Audionut.**
 
+## Table of Contents
+
+- [Fork Features & Differences](#fork-features--differences-from-upstream-audionutupload-assistant)
+  - [1. New Media Category Support](#1-new-media-category-support)
+  - [2. Audio Stream Spectrogram Generation](#2-audio-stream-spectrogram-generation)
+  - [3. qBittorrent Bandwidth Control](#3-qbittorrent-bandwidth-control)
+  - [4. Argument-Embedded Text Queue](#4-argument-embedded-text-queue)
+  - [5. Extended Tracker Support](#5-extended-tracker-support)
+  - [6. Usenet & Indexer Posting](#6-usenet--indexer-posting)
+- [Supported Sites](#supported-sites)
+- [Setup Guide](#setup-guide)
+  - [Step 1: Install Required Tools](#step-1-install-required-tools)
+  - [Step 2: Download Upload Assistant](#step-2-download-upload-assistant)
+  - [Step 3: Install Python Packages](#step-3-install-python-packages)
+  - [Step 4: Configure the Assistant](#step-4-configure-the-assistant)
+- [Updating](#updating)
+- [CLI Usage](#cli-usage)
+- [Docker Usage](#docker-usage)
+- [Attributions](#attributions)
+
 ## Fork Features & Differences from Upstream (Audionut/Upload-Assistant)
 
 This branch introduces new media categories and automation features not present in the upstream Audionut repository:
@@ -148,52 +168,149 @@ This branch introduces new media categories and automation features not present 
 
 </details>
 
-## **Setup:**
+## **Setup Guide**
 
-* **REQUIRES AT LEAST PYTHON 3.14 AND PIP3**
-* Also needs MediaInfo and ffmpeg installed on your system
-  * On Windows systems, ffmpeg must be added to PATH (<https://windowsloop.com/install-ffmpeg-windows-10/>)
-  * On linux systems, get it from your favorite package manager
-  * If you have issues with ffmpeg, such as `max workers` errors, see this [wiki](docs/ffmpeg---max-workers-issues.md)
-* Get the source:
-  * Clone the repo to your system `git clone https://github.com/wastaken7/Upload-Assistant.git`
-  * Fetch all of the release tags `git fetch --all --tags`
-  * Check out the specifc release: see [releases](https://github.com/wastaken7/Upload-Assistant/releases)
-  * `git checkout tags/tagname` where `tagname` is the release name, eg `v5.0.0`
-  * or download a zip of the source from the releases page and create/overwrite a local copy.
-* Install necessary python modules `pip3 install --user -U -r requirements.txt`
-  * `sudo apt install pip` if needed
-* If you receive an error about externally managed environment, or otherwise wish to keep UA python separate:
-  * Install virtual python environment `python3 -m venv venv`
-  * Activate the virtual environment `source venv/bin/activate`
-  * Then install the requirements `pip install -r requirements.txt`
-* From the installation directory, run `python3 config-generator.py`
-* OR
-* Copy `data/example_config.py` to `data/config.py`, leaving `data/example_config.py` intact.
-* NOTE: New users who use the webui will have the config file generated automatically.
-* Edit `config.py` to use your information (more detailed information in example config options: [docs/example-config.md](docs/example-config.md))
-  * tmdb_api key can be obtained from <https://www.themoviedb.org/settings/api>
-  * image host api keys can be obtained from their respective sites
+Setting up Upload Assistant is straightforward, even if you are not a developer. Follow these steps to get up and running:
 
-    **Additional Resources are found in the [wiki](docs/Home.md)**
+### Step 1: Install Required Tools
+Upload Assistant needs a few tools installed on your computer to process media and run:
 
-   Feel free to contact me if you need help, I'm not that hard to find.
+1. **Python (version 3.14 or newer)**:
+   * Download and install it from the [official Python website](https://www.python.org/downloads/).
+   * **Important (Windows users):** During installation, make sure to check the box that says **"Add python.exe to PATH"**.
+2. **MediaInfo & FFmpeg**:
+   * These are helper tools used to scan files and generate screenshots/spectrograms.
+   * **Windows:**
+     * Install [MediaInfo](https://mediaarea.net/en/MediaInfo/Download/Windows).
+     * Install [FFmpeg](https://ffmpeg.org/download.html). For a step-by-step guide on how to add FFmpeg to your system's search path, see [this Windows guide](https://windowsloop.com/install-ffmpeg-windows-10/).
+   * **Linux:** Install them using your system's software manager:
+     * Debian/Ubuntu: `sudo apt install mediainfo ffmpeg`
+     * Arch Linux: `sudo pacman -S mediainfo ffmpeg`
+     * RedHat/Fedora: `sudo dnf install mediainfo ffmpeg`
+   * *Having issues with FFmpeg? Check out our [FFmpeg troubleshooting guide](docs/ffmpeg---max-workers-issues.md).*
+
+---
+
+### Step 2: Download Upload Assistant
+Choose **one** of the two options below to get the files onto your computer:
+
+#### Option A: Clone using Git (Recommended)
+Using Git is the recommended method because it makes updating the assistant in the future extremely easy.
+
+1. **Install Git** (if you don't already have it):
+   * **Windows:** Open Command Prompt or PowerShell and run:
+     ```cmd
+     winget install Git.Git
+     ```
+     *(Close and reopen your command prompt/terminal after installation).*
+   * **Linux:** Install via your package manager (e.g., `sudo apt install git` or `sudo pacman -S git`).
+   * **macOS:** Install via Homebrew (`brew install git`) or Xcode Command Line Tools.
+2. **Clone the project**:
+   Open your command prompt or terminal, navigate to the folder where you want to keep the assistant, and run:
+   ```bash
+   git clone https://github.com/wastaken7/Upload-Assistant.git
+   cd Upload-Assistant
+   ```
+
+#### Option B: Download as a ZIP file (Alternative)
+If you do not want to install Git, you can download a copy of the files directly:
+1. Go to the [GitHub Repository Page](https://github.com/wastaken7/Upload-Assistant).
+2. Click the green **Code** button near the top right, and click **Download ZIP**.
+3. Extract the ZIP file to a folder of your choice on your computer.
+
+---
+
+### Step 3: Install Python Packages
+Open your terminal (Command Prompt/PowerShell on Windows, Terminal on Mac/Linux), navigate to the folder where you downloaded Upload Assistant, and run the command for your operating system:
+
+* **Windows:**
+  ```cmd
+  pip install -U -r requirements.txt
+  ```
+* **Linux / macOS:**
+  ```bash
+  pip3 install --user -U -r requirements.txt
+  ```
+
+> [!TIP]
+> **Getting an "externally managed environment" error?**
+> This means your system prefers keeping Python packages separated. You can set up a "Virtual Environment" (a private workspace for this tool) by running:
+>
+> * **Windows:**
+>   ```cmd
+>   python -m venv venv
+>   venv\Scripts\activate
+>   pip install -r requirements.txt
+>   ```
+> * **Linux / macOS:**
+>   ```bash
+>   python3 -m venv venv
+>   source venv/bin/activate
+>   pip install -r requirements.txt
+>   ```
+
+---
+
+### Step 4: Configure the Assistant
+You need to add your API keys (like TMDb) and tracker credentials so the tool knows where to upload.
+
+#### Method A: Use the Web UI (Easiest)
+If you plan to use the Web UI, **your configuration file will be generated automatically** when you launch and configure it for the first time.
+
+#### Method B: Use the Interactive Generator
+In your terminal, run the command for your operating system and follow the on-screen prompts:
+* **Windows:**
+  ```cmd
+  python config-generator.py
+  ```
+* **Linux / macOS:**
+  ```bash
+  python3 config-generator.py
+  ```
+
+#### Method C: Manual Configuration
+1. Go to the `data/` folder inside the project.
+2. Copy `example_config.py` and rename the copy to `config.py` (leave the original `example_config.py` file as-is).
+3. Open `config.py` in a text editor (like Notepad, VS Code, or TextEdit) and fill in your information.
+   * For detailed info on what each setting does, see [Example Config Docs](docs/example-config.md).
+   * Get a free TMDb API key from [TheMovieDB API settings](https://www.themoviedb.org/settings/api).
+
+---
+
+**Additional Resources:**
+* Check out our [Wiki Help Page](docs/Home.md).
+* Feel free to contact me if you need help, I'm not that hard to find.
+
 
 ## **Updating:**
 
-* To update first navigate into the Upload-Assistant directory: `cd Upload-Assistant`
-* `git fetch --all --tags`
-* `git checkout tags/tagname`
-* Or download a fresh zip from the releases page and overwrite existing files
-* Run `python3 -m pip install --user -U -r requirements.txt` to ensure dependencies are up to date
-* Run `python3 config-generator.py` and select to grab new UA config options.
+* To update, navigate into the Upload-Assistant directory and pull the latest changes:
+  ```bash
+  cd Upload-Assistant
+  git pull
+  ```
+* Or, if you downloaded the ZIP file, download a fresh ZIP from GitHub and overwrite your existing files.
+* Run the command to update dependencies:
+  * **Windows:** `pip install -U -r requirements.txt`
+  * **Linux / macOS:** `python3 -m pip install --user -U -r requirements.txt`
+* Run the configuration generator to fetch any new settings:
+  * **Windows:** `python config-generator.py`
+  * **Linux / macOS:** `python3 config-generator.py`
 
 ## **CLI Usage:**
 
-  `python3 upload.py "/path/to/content" --args`
+To run the assistant, use the command for your system:
+* **Windows:**
+  ```cmd
+  python upload.py "/path/to/content" --args
+  ```
+* **Linux / macOS:**
+  ```bash
+  python3 upload.py "/path/to/content" --args
+  ```
 
-  Args are OPTIONAL and ALWAYS follow path, for a list of acceptable args, pass `--help`.
-  Path works best in quotes.
+Args are OPTIONAL and ALWAYS follow the path. For a list of all available arguments, pass `--help`.
+The file/folder path works best enclosed in double quotes.
 
 * CLI arguments: [docs/cli-args.md](docs/cli-args.md)
 * Usenet uploading: [docs/usenet.md](docs/usenet.md)
