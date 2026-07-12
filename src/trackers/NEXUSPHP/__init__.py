@@ -20,6 +20,10 @@ class NEXUSPHP:
     tracker: str = ""
     source_flag: str = ""
     banned_groups: list[str] = []
+    base_url: str = ""
+    search_url: str = ""
+    torrent_url: str = ""
+    upload_url: str = ""
     tmdb_localization_requirements = {
         "zh-cn": {
             "main": "credits",
@@ -38,13 +42,6 @@ class NEXUSPHP:
         # Normalize announce_url: must be a non-empty string after stripping
         raw_announce = self.tracker_config.get("announce_url")
         self.announce_url = raw_announce.strip() if isinstance(raw_announce, str) else ""
-
-        # Default URLs - should be overridden by subclasses
-        self.base_url = ""
-        self.search_url = ""
-        self.source_flag = ""
-        self.torrent_url = ""
-        self.upload_url = ""
 
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
 

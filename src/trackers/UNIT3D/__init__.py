@@ -26,6 +26,10 @@ class UNIT3D:
     supported_categories: tuple[str, ...] = ('TV', 'MOVIE')
     tracker: str = ""
     banned_groups: list[str] = []
+    base_url: str = ""
+    pending_url: str = ""
+    search_url: str = ""
+    upload_url: str = ""
 
     def __init__(self, config: dict[str, Any], tracker_name: str):
         self.config = config
@@ -40,12 +44,6 @@ class UNIT3D:
         # Normalize api_key: must be a non-empty string after stripping
         raw_api_key = self.tracker_config.get("api_key")
         self.api_key = raw_api_key.strip() if isinstance(raw_api_key, str) else ""
-
-        # Default URLs - should be overridden by subclasses
-        self.base_url = ""
-        self.pending_url = ""
-        self.search_url = ""
-        self.upload_url = ""
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         _meta = meta
