@@ -636,6 +636,9 @@ class DescriptionBuilder:
                 table_lines.append("[/table]")
                 final_book_parts.append("\n".join(table_lines))
 
+            if meta.epubmeta_output:
+                final_book_parts.append(f"[spoiler=EPUB Metadata][code]{meta.epubmeta_output}[/code][/spoiler]")
+
             if overview:
                 final_book_parts.append(f"{header}{str_overview if not underline else str_overview}{header_end}\n{overview}")
 
@@ -1773,6 +1776,7 @@ class DescriptionBuilder:
             description = bbcode.remove_img_resize(description)
             description = bbcode.convert_to_align(description)
             description = bbcode.remove_list(description)
+            description = description.replace("[code]", "[pre]").replace("[/code]", "[/pre]")
 
         if tracker == "ANT":
             description = bbcode.convert_to_align(description)
@@ -1781,6 +1785,7 @@ class DescriptionBuilder:
             description = bbcode.remove_sub(description)
             description = bbcode.remove_list(description)
             description = description.replace("•", "-").replace("’", "'").replace("–", "-")
+            description = description.replace("[code]", "[pre]").replace("[/code]", "[/pre]")
 
         if tracker == "DC":
             description = description.replace("[user]", "").replace("[/user]", "")
@@ -1846,6 +1851,7 @@ class DescriptionBuilder:
             description = bbcode.remove_sub(description)
             description = bbcode.convert_to_align(description)
             description = bbcode.remove_list(description)
+            description = description.replace("[code]", "[pre]").replace("[/code]", "[/pre]")
             description = re.sub(r"\[url=[^\]]+\]\[img(?:=[^\]]+)?\]([^\[]+)\[/img\]\[/url\]", r"[img]\1[/img]", description, flags=re.IGNORECASE)
 
         if tracker == "HDS":

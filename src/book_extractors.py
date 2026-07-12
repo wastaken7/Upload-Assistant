@@ -15,6 +15,15 @@ from typing import Any
 from src.console import logger
 
 
+def normalize_series_index(value: str) -> str:
+    """Drop a trailing .0 from a series index ("5.0" -> "5"), keeping "5.5"/"0.5"."""
+    try:
+        idx = float(value)
+    except (TypeError, ValueError):
+        return (value).strip()
+    return str(int(idx)) if idx.is_integer() else str(idx)
+
+
 def extract_epub_metadata(epub_path: str) -> dict[str, Any]:
     """Extract metadata from an EPUB zip container's OPF file."""
     metadata: dict[str, Any] = {}
@@ -58,6 +67,8 @@ def extract_epub_metadata(epub_path: str) -> dict[str, Any]:
             identifier = ""
             description = ""
             publisher = ""
+            series = ""
+            series_index = ""
 
             for elem in root.iter():
                 tag_local = elem.tag.split("}")[-1]
@@ -81,6 +92,12 @@ def extract_epub_metadata(epub_path: str) -> dict[str, Any]:
                     description = (elem.text or "").strip()
                 elif tag_local == "publisher":
                     publisher = (elem.text or "").strip()
+                elif tag_local == "meta":
+                    meta_name = (elem.attrib.get("name") or "").lower()
+                    if meta_name == "calibre:series":
+                        series = (elem.attrib.get("content") or "").strip()
+                    elif meta_name == "calibre:series_index":
+                        series_index = (elem.attrib.get("content") or "").strip()
 
             if title:
                 metadata["title"] = title
@@ -100,11 +117,24 @@ def extract_epub_metadata(epub_path: str) -> dict[str, Any]:
                 metadata["overview"] = description
             if publisher:
                 metadata["publisher"] = publisher
+            if series:
+                metadata["book_series"] = series
+            if series_index:
+                metadata["book_series_index"] = normalize_series_index(series_index)
 
     except Exception as e:
         logger.debug(f"[yellow]Warning: Error parsing EPUB metadata: {e}[/yellow]")
 
     return metadata
+
+
+def extract_series_from_filename(filename: str) -> tuple[str, str]:
+    """Parse (series, index) from a filename like "Author - Series #5 - Title", or ("", "")."""
+    name = os.path.splitext(os.path.basename(filename))[0]
+    match = re.search(r"[-–]\s*([^-–#\[\]]+?)\s*#\s*(\d+(?:\.\d+)?)", name)
+    if not match:
+        return "", ""
+    return match.group(1).strip(), normalize_series_index(match.group(2))
 
 
 def extract_cbr_cbz_metadata(filepath: str) -> dict[str, Any]:
@@ -384,3 +414,369 @@ def extract_isbn_from_pdf(pdf_path: str) -> str | None:
         logger.debug(f"[yellow]Warning: Error extracting ISBN from PDF: {e}[/yellow]")
 
     return None
+
+
+def date_event_from_str(event_str: str | None) -> str | None:
+    if not event_str:
+        return "Epub"
+    val = event_str.strip().lower()
+    if val == "dcterms:available":
+        return "Available"
+    if val in ("dcterms:created", "publication"):
+        return "Created"
+    if val == "dcterms:date":
+        return "Date"
+    if val == "dcterms:dateaccepted":
+        return "DateAccepted"
+    if val == "dcterms:datecopyrighted":
+        return "DateCopyrighted"
+    if val == "dcterms:datesubmitted":
+        return "DateSubmitted"
+    if val in ("dcterms:issued", "original-publication"):
+        return "Issued"
+    if val == "dcterms:modified":
+        return "Modified"
+    if val == "dcterms:valid":
+        return "Valid"
+    return None
+
+
+def get_attr_ignore_ns(elem: ET.Element, attr_name: str) -> str | None:
+    if attr_name in elem.attrib:
+        return elem.attrib[attr_name]
+    for k, v in elem.attrib.items():
+        if k.split("}")[-1] == attr_name:
+            return v
+    return None
+
+
+def get_epubmeta_output(epub_path: str) -> str | None:
+    """Extract and format EPUB metadata to match the output of epubmeta."""
+    if not os.path.isfile(epub_path) or not zipfile.is_zipfile(epub_path):
+        return None
+
+    try:
+        with zipfile.ZipFile(epub_path, "r") as z:
+            rootfile_path = None
+            try:
+                container_data = z.read("META-INF/container.xml")
+                root = ET.fromstring(container_data)
+                for elem in root.iter():
+                    if elem.tag.split("}")[-1] == "rootfile":
+                        rootfile_path = elem.attrib.get("full-path")
+                        if rootfile_path:
+                            break
+            except Exception:
+                pass
+
+            if not rootfile_path:
+                for name in z.namelist():
+                    if name.endswith(".opf"):
+                        rootfile_path = name
+                        break
+
+            if not rootfile_path or rootfile_path not in z.namelist():
+                return None
+
+            opf_data = z.read(rootfile_path)
+            root = ET.fromstring(opf_data)
+
+            # Get package tag attributes
+            version = get_attr_ignore_ns(root, "version") or ""
+            unique_id = get_attr_ignore_ns(root, "unique-identifier") or ""
+
+            metadata_elem = None
+            for elem in root.iter():
+                if elem.tag.split("}")[-1] == "metadata":
+                    metadata_elem = elem
+                    break
+
+            if metadata_elem is None:
+                return None
+
+            # Collect refinements
+            refinements = []
+            for child in metadata_elem:
+                tag = child.tag.split("}")[-1]
+                if tag == "meta":
+                    refines = get_attr_ignore_ns(child, "refines")
+                    if refines:
+                        ref_id = refines.lstrip("#")
+                        prop = get_attr_ignore_ns(child, "property") or ""
+                        scheme = get_attr_ignore_ns(child, "scheme") or ""
+                        text = (child.text or "").strip()
+                        refinements.append({"refId": ref_id, "refProp": prop, "refScheme": scheme, "refText": text})
+
+            def find_refinement(ref_id, prop):
+                for r in refinements:
+                    if r["refId"] == ref_id and r["refProp"] == prop:
+                        return r
+                return None
+
+            identifiers = []
+            titles = []
+            languages = []
+            contributors = []
+            creators = []
+            dates_map = {}
+            sources = []
+            mType = None
+            coverages = []
+            descriptions = []
+            formats = []
+            publishers = []
+            relations = []
+            rights = []
+            subjects = []
+
+            for child in metadata_elem:
+                tag = child.tag.split("}")[-1]
+                text = (child.text or "").strip()
+
+                if tag == "identifier":
+                    id_val = get_attr_ignore_ns(child, "id")
+                    scheme_val = get_attr_ignore_ns(child, "scheme")
+                    id_type = None
+                    if id_val:
+                        ref = find_refinement(id_val, "identifier-type")
+                        if ref:
+                            id_type = ref["refText"]
+                            if not scheme_val:
+                                scheme_val = ref["refScheme"]
+                    identifiers.append({"id": id_val, "identifier_type": id_type, "scheme": scheme_val, "text": text})
+
+                elif tag == "title":
+                    id_val = get_attr_ignore_ns(child, "id")
+                    lang_val = get_attr_ignore_ns(child, "lang")
+                    title_type = None
+                    title_seq = None
+                    if id_val:
+                        ref_type = find_refinement(id_val, "title-type")
+                        if ref_type:
+                            title_type = ref_type["refText"]
+                        ref_seq = find_refinement(id_val, "display-seq")
+                        if ref_seq:
+                            with contextlib.suppress(ValueError):
+                                title_seq = int(ref_seq["refText"])
+                    titles.append({"lang": lang_val, "title_type": title_type, "title_seq": title_seq, "text": text})
+
+                elif tag == "language":
+                    languages.append(text)
+
+                elif tag in ("contributor", "creator"):
+                    id_val = get_attr_ignore_ns(child, "id")
+                    role_val = get_attr_ignore_ns(child, "role")
+                    file_as_val = get_attr_ignore_ns(child, "file-as")
+                    creator_seq = None
+
+                    if id_val:
+                        ref_role = find_refinement(id_val, "role")
+                        if ref_role:
+                            role_val = ref_role["refText"]
+                        ref_file = find_refinement(id_val, "file-as")
+                        if ref_file:
+                            file_as_val = ref_file["refText"]
+                        ref_seq = find_refinement(id_val, "display-seq")
+                        if ref_seq:
+                            with contextlib.suppress(ValueError):
+                                creator_seq = int(ref_seq["refText"])
+
+                    item = {"role": role_val, "file_as": file_as_val, "creator_seq": creator_seq, "text": text}
+                    if tag == "creator":
+                        creators.append(item)
+                    else:
+                        contributors.append(item)
+
+                elif tag == "date":
+                    event_val = get_attr_ignore_ns(child, "event")
+                    event_name = date_event_from_str(event_val)
+                    if event_name:
+                        dates_map[event_name] = text
+
+                elif tag == "meta":
+                    refines = get_attr_ignore_ns(child, "refines")
+                    if not refines:
+                        prop = get_attr_ignore_ns(child, "property")
+                        if prop and prop.startswith("dcterms:"):
+                            event_name = date_event_from_str(prop)
+                            if event_name:
+                                dates_map[event_name] = text
+
+                elif tag == "source":
+                    id_val = get_attr_ignore_ns(child, "id")
+                    id_type = None
+                    scheme_val = None
+                    source_of = None
+                    if id_val:
+                        ref_type = find_refinement(id_val, "identifier-type")
+                        if ref_type:
+                            id_type = ref_type["refText"]
+                            scheme_val = ref_type["refScheme"] or None
+                        ref_sof = find_refinement(id_val, "source-of")
+                        if ref_sof:
+                            source_of = ref_sof["refText"]
+                    sources.append({"id_type": id_type, "scheme": scheme_val, "source_of": source_of, "text": text})
+
+                elif tag == "type" and mType is None:
+                    mType = text
+
+                elif tag == "coverage":
+                    coverages.append(text)
+
+                elif tag == "description":
+                    lang_val = get_attr_ignore_ns(child, "lang")
+                    descriptions.append({"lang": lang_val, "text": text})
+
+                elif tag == "format":
+                    formats.append(text)
+
+                elif tag == "publisher":
+                    publishers.append(text)
+
+                elif tag == "relation":
+                    relations.append(text)
+
+                elif tag == "rights":
+                    rights.append(text)
+
+                elif tag == "subject":
+                    subjects.append(text)
+
+            # Build formatted lines
+            lines = []
+            lines.append("package")
+            lines.append(f"  version: {version}")
+            lines.append(f"  unique-identifier: {unique_id}")
+
+            def format_subline(key, val):
+                if val is None or val == "":
+                    return ""
+                return f"  {key}: {val}"
+
+            # 1. Identifiers
+            for ident in identifiers:
+                lines.append("identifier")
+                if ident.get("id"):
+                    lines.append(format_subline("id", ident["id"]))
+                if ident.get("identifier_type"):
+                    lines.append(format_subline("identifier-type", ident["identifier_type"]))
+                if ident.get("scheme"):
+                    lines.append(format_subline("scheme", ident["scheme"]))
+                lines.append(format_subline("text", ident["text"]))
+
+            # 2. Titles
+            for title in titles:
+                if title.get("lang") is None and title.get("title_type") is None and title.get("title_seq") is None:
+                    lines.append(f"title: {title['text']}")
+                else:
+                    lines.append("title")
+                    lines.append(format_subline("text", title["text"]))
+                    if title.get("lang"):
+                        lines.append(format_subline("lang", title["lang"]))
+                    if title.get("title_type"):
+                        lines.append(format_subline("title-type", title["title_type"]))
+                    if title.get("title_seq") is not None:
+                        lines.append(format_subline("display-seq", str(title["title_seq"])))
+
+            # 3. Languages
+            lines.extend(f"language: {lang}" for lang in languages)
+
+            # 4. Contributors
+            for contributor in contributors:
+                if contributor.get("role") is None and contributor.get("file_as") is None and contributor.get("creator_seq") is None:
+                    lines.append(f"contributor: {contributor['text']}")
+                else:
+                    lines.append("contributor")
+                    lines.append(format_subline("text", contributor["text"]))
+                    if contributor.get("file_as"):
+                        lines.append(format_subline("file-as", contributor["file_as"]))
+                    if contributor.get("role"):
+                        lines.append(format_subline("role", contributor["role"]))
+                    if contributor.get("creator_seq") is not None:
+                        lines.append(format_subline("display-seq", str(contributor["creator_seq"])))
+
+            # 5. Creators
+            for creator in creators:
+                if creator.get("role") is None and creator.get("file_as") is None and creator.get("creator_seq") is None:
+                    lines.append(f"creator: {creator['text']}")
+                else:
+                    lines.append("creator")
+                    lines.append(format_subline("text", creator["text"]))
+                    if creator.get("file_as"):
+                        lines.append(format_subline("file-as", creator["file_as"]))
+                    if creator.get("role"):
+                        lines.append(format_subline("role", creator["role"]))
+                    if creator.get("creator_seq") is not None:
+                        lines.append(format_subline("display-seq", str(creator["creator_seq"])))
+
+            # 6. Dates
+            date_event_order = ["Available", "Created", "Date", "DateAccepted", "DateCopyrighted", "DateSubmitted", "Epub", "Issued", "Modified", "Valid"]
+            date_event_strings = {
+                "Available": "available",
+                "Created": "created",
+                "Date": "date",
+                "DateAccepted": "dateAccepted",
+                "DateCopyrighted": "dateCopyrighted",
+                "DateSubmitted": "dateSubmitted",
+                "Epub": "EPUB created",
+                "Issued": "issued",
+                "Modified": "modified",
+                "Valid": "valid",
+            }
+            for event_name in date_event_order:
+                if event_name in dates_map:
+                    lines.append("date")
+                    lines.append(format_subline("event", date_event_strings[event_name]))
+                    lines.append(format_subline("text", dates_map[event_name]))
+
+            # 7. Sources
+            for source in sources:
+                if source.get("id_type") is None and source.get("scheme") is None and source.get("source_of") is None:
+                    lines.append(f"source: {source['text']}")
+                else:
+                    lines.append("source")
+                    lines.append(format_subline("text", source["text"]))
+                    if source.get("id_type"):
+                        lines.append(format_subline("identifier-type", source["id_type"]))
+                    if source.get("scheme"):
+                        lines.append(format_subline("scheme", source["scheme"]))
+                    if source.get("source_of"):
+                        lines.append(format_subline("source-of", source["source_of"]))
+
+            # 8. Type
+            if mType:
+                lines.append(f"type: {mType}")
+
+            # 9. Coverage
+            lines.extend(f"coverage: {coverage}" for coverage in coverages)
+
+            # 10. Descriptions
+            for desc in descriptions:
+                if desc.get("lang") is None:
+                    lines.append(f"description: {desc['text']}")
+                else:
+                    lines.append("description")
+                    if desc.get("lang"):
+                        lines.append(format_subline("lang", desc["lang"]))
+                    lines.append(format_subline("text", desc["text"]))
+
+            # 11. Formats
+            lines.extend(f"format: {fmt}" for fmt in formats)
+
+            # 12. Publishers
+            lines.extend(f"publisher: {pub}" for pub in publishers)
+
+            # 13. Relations
+            lines.extend(f"relation: {rel}" for rel in relations)
+
+            # 14. Rights
+            lines.extend(f"rights: {right}" for right in rights)
+
+            # 15. Subjects
+            lines.extend(f"subject: {subject}" for subject in subjects)
+
+            return "\n".join(lines) + "\n"
+
+    except Exception as e:
+        logger.debug(f"[yellow]Warning: Error parsing EPUB for epubmeta output: {e}[/yellow]")
+        return None

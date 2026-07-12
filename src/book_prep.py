@@ -32,6 +32,15 @@ from src.book_extractors import (
 from src.book_extractors import (
     extract_mobi_metadata as _extract_mobi_metadata,
 )
+from src.book_extractors import (
+    extract_series_from_filename as _extract_series_from_filename,
+)
+from src.book_extractors import (
+    get_epubmeta_output as _get_epubmeta_output,
+)
+from src.book_extractors import (
+    normalize_series_index as _normalize_series_index,
+)
 from src.console import logger
 from src.exportmi import exportInfo
 from src.meta import Meta
@@ -140,6 +149,19 @@ def sanitize_book_language(meta: Meta) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _mi_extra(general_track: dict[str, Any], name: str) -> str:
+    """Case-insensitive lookup of a freeform tag in a MediaInfo General track's extra dict."""
+    extra = general_track.get("extra")
+    if not isinstance(extra, dict):
+        return ""
+    for key, val in extra.items():
+        if key.lower() == name.lower() and val and not isinstance(val, dict):
+            text = str(val).strip()
+            if text:
+                return text
+    return ""
+
+
 def _unescape_meta_val(val: Any) -> str | None:
     if val is None or isinstance(val, (dict, list)):
         return None
@@ -194,6 +216,7 @@ async def gather_book_prep(
 
     # Extract EPUB metadata directly if the file is an EPUB
     if videopath.lower().endswith(".epub") and os.path.isfile(videopath):
+        meta.epubmeta_output = _get_epubmeta_output(videopath)
         epub_meta = _extract_epub_metadata(videopath)
         if epub_meta:
             logger.debug(f"[cyan]EPUB metadata extracted: {epub_meta}[/cyan]")
@@ -346,6 +369,15 @@ async def gather_book_prep(
                 if asin_val and not meta.asin:
                     meta.asin = asin_val
 
+                # Series from extra.SERIES / extra.SERIESPART
+                if not meta.book_series:
+                    series_val = _mi_extra(general_track, "SERIES")
+                    if series_val:
+                        meta.book_series = series_val
+                        part_val = _mi_extra(general_track, "SERIESPART")
+                        if part_val and not meta.book_series_index:
+                            meta.book_series_index = _normalize_series_index(part_val)
+
                 # 6. Overview/Comment
                 comment = _unescape_meta_val(general_track.get("Comment") or general_track.get("comment"))
                 description = _unescape_meta_val(general_track.get("Description") or general_track.get("description"))
@@ -413,6 +445,14 @@ async def gather_book_prep(
                                     break
         except Exception as ex:
             logger.debug(f"[yellow]Warning: Error extracting embedded book metadata: {ex}[/yellow]")
+
+    # Series fallback from filename (embedded Calibre/MediaInfo tags take precedence)
+    if not meta.book_series:
+        fname_series, fname_index = _extract_series_from_filename(os.path.basename(videopath))
+        if fname_series:
+            meta.book_series = fname_series
+            if fname_index and not meta.book_series_index:
+                meta.book_series_index = fname_index
 
     # MyAnonamouse API search using torrent client comments (online lookup takes precedence)
     if not meta.torrent_comments and not meta.skip_auto_torrent and not meta.edit and config:
@@ -799,7 +839,7 @@ async def get_audiobook_bitrate(filelist: list[str]) -> int | None:
         return None
 
     avg_bps = sum(valid_bitrates) / len(valid_bitrates)
-    return int(avg_bps / 1000) if avg_bps >= 1000 else int(avg_bps)
+    return round(avg_bps / 1000) if avg_bps >= 1000 else round(avg_bps)
 
 
 def sanitize_book_author(meta: Meta) -> None:
