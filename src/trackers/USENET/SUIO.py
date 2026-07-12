@@ -22,7 +22,7 @@ Config = dict[str, Any]
 
 class SUIO:
     tracker = "SUIO"
-    banned_groups: list[str] = []
+    banned_groups: tuple[str, ...] = ()
     upload_url: str | None = None
     torrent_url: str | None = None
     supported_categories = ("MOVIE", "TV", "GAME", "BOOK")

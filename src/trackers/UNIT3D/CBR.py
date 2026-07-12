@@ -12,7 +12,7 @@ from src.trackers.UNIT3D import UNIT3D
 class CBR(UNIT3D):
     tracker = "CBR"
     base_url = "https://capybarabr.com"
-    banned_groups = [
+    banned_groups = (
         "4K4U",
         "afm72",
         "Alcaide_Kira",
@@ -93,7 +93,7 @@ class CBR(UNIT3D):
         "YIFY",
         "YTS.MX",
         "YTS",
-    ]
+    )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
@@ -101,7 +101,7 @@ class CBR(UNIT3D):
     requests_url = f"{base_url}/api/requests/filter"
     pending_url = f"{base_url}/api/torrents/pending"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ["capybarabr.com"]
+    tracker_urls = ("capybarabr.com",)
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="CBR")

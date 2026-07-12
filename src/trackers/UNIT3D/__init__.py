@@ -25,7 +25,7 @@ type ParamsList = list[tuple[str, QueryValue]]
 class UNIT3D:
     supported_categories: tuple[str, ...] = ('TV', 'MOVIE')
     tracker: str = ""
-    banned_groups: list[str] = []
+    banned_groups: tuple[str, ...] = ()
     base_url: str = ""
     pending_url: str = ""
     search_url: str = ""

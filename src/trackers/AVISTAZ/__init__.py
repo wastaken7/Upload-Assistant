@@ -31,7 +31,7 @@ class AZTrackerBase:
     supported_categories: tuple[str, ...] = ('TV', 'MOVIE')
     tracker: str = ""
     source_flag: str = ""
-    banned_groups: list[str] = []
+    banned_groups: tuple[str, ...] = ()
 
     def __init__(self, config: Config, tracker_name: str):
         self.config = config
@@ -41,10 +41,10 @@ class AZTrackerBase:
         self.az_class = getattr(importlib.import_module(f"src.trackers.AVISTAZ.{self.tracker}"), self.tracker)
 
         tracker_config = self.config['TRACKERS'][self.tracker]
-        self.base_url: str = tracker_config.get('base_url') or ''
-        self.requests_url: str = tracker_config.get('requests_url') or ''
-        self.announce_url: str = tracker_config.get('announce_url') or ''
-        self.source_flag: str = tracker_config.get('source_flag') or ''
+        self.base_url: str = tracker_config.get('base_url') or getattr(type(self), 'base_url', '')
+        self.requests_url: str = tracker_config.get('requests_url') or getattr(type(self), 'requests_url', '')
+        self.announce_url: str = tracker_config.get('announce_url') or getattr(type(self), 'announce_url', '')
+        self.source_flag: str = tracker_config.get('source_flag') or getattr(type(self), 'source_flag', '')
         self.torrent_url: str = f'{self.base_url}/torrent/' if self.base_url else ''
 
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"}, timeout=60.0)

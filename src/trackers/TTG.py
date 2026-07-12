@@ -25,7 +25,7 @@ class TTG:
     tracker = "TTG"
     source_flag = "TTG"
     signature = None
-    banned_groups = [""]
+    banned_groups = ("",)
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:

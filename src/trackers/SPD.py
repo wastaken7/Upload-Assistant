@@ -23,12 +23,12 @@ Config = dict[str, Any]
 class SPD:
     url = "https://speedapp.io"
     tracker = "SPD"
-    banned_groups = []
+    banned_groups = ()
     upload_url = "https://speedapp.io/api/upload"
     torrent_url = "https://speedapp.io/browse/"
     banned_url = "https://speedapp.io/api/torrent/release-group/blacklist"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ["ramjet.speedapp.io", "ramjet.speedapp.to", "ramjet.speedappio.org"]
+    tracker_urls = ("ramjet.speedapp.io", "ramjet.speedapp.to", "ramjet.speedappio.org")
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config

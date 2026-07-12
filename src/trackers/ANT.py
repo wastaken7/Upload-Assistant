@@ -23,7 +23,7 @@ Config = dict[str, Any]
 class ANT:
     tracker = "ANT"
     source_flag = "ANT"
-    banned_groups = [
+    banned_groups = (
         "3LTON",
         "4yEo",
         "ADE",
@@ -98,11 +98,11 @@ class ANT:
         "ZKBL",
         "ZmN",
         "ZMNT",
-    ]
+    )
     search_url = "https://anthelion.me/api.php"
     upload_url = "https://anthelion.me/api.php"
     supported_categories = ("MOVIE",)
-    tracker_urls = ["tracker.anthelion.me"]
+    tracker_urls = ("tracker.anthelion.me",)
 
     def __init__(self, config: Config):
         self.config = config

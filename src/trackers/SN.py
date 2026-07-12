@@ -15,7 +15,7 @@ Config = dict[str, Any]
 class SN:
     tracker = "SN"
     source_flag = "Swarmazon"
-    banned_groups = [""]
+    banned_groups = ("",)
     upload_url = "https://swarmazon.club/api/upload.php"
     forum_link = "https://swarmazon.club/php/forum.php?forum_page=2-swarmazon-rules"
     search_url = "https://swarmazon.club/api/search.php"

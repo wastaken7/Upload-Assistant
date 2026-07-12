@@ -17,12 +17,12 @@ from src.trackers.COMMON import COMMON
 class RTF:
     tracker = "RTF"
     source_flag = "sunshine"
-    banned_groups: list[str] = []
+    banned_groups: tuple[str, ...] = ()
     upload_url = "https://retroflix.club/api/upload"
     search_url = "https://retroflix.club/api/torrent"
     torrent_url = "https://retroflix.club/browse/t/"
     forum_link = "https://retroflix.club/forums.php?action=viewtopic&topicid=3619"
-    tracker_urls = ["peer.retroflix"]
+    tracker_urls = ("peer.retroflix",)
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:

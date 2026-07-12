@@ -18,7 +18,7 @@ Config = dict[str, Any]
 
 class CRP:
     tracker = "CRP"
-    banned_groups = []
+    banned_groups = ()
     upload_url = "https://curupira.cc/v1/releases"
     torrent_url = "https://curupira.cc/releases/"
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")

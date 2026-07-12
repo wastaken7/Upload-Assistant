@@ -15,7 +15,7 @@ Config = dict[str, Any]
 class OTW(UNIT3D):
     tracker = "OTW"
     base_url = "https://oldtoons.world"
-    banned_groups = [
+    banned_groups = (
         "[Oj]",
         "3LTON",
         "4f8c4100292",
@@ -81,14 +81,14 @@ class OTW(UNIT3D):
         "YTS",
         "ZKBL",
         "ZmN",
-    ]
+    )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     requests_url = f"{base_url}/api/requests/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ["https://oldtoons.world"]
+    tracker_urls = ("oldtoons.world",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="OTW")

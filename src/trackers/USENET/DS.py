@@ -15,7 +15,7 @@ Config = dict[str, Any]
 
 class DS:
     tracker = "DS"
-    banned_groups = []
+    banned_groups = ()
     torrent_url = "https://drunkenslug.com/search/"
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")
     is_usenet = True

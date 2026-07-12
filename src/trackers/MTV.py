@@ -28,7 +28,7 @@ class MTV:
     tracker = "MTV"
     source_flag = "MTV"
     approved_image_hosts = ["ptpimg", "imgbox", "imgbb"]
-    banned_groups = [
+    banned_groups = (
         "[Oj]",
         "3LTON",
         "AFG",
@@ -78,11 +78,11 @@ class MTV:
         "ZKBL",
         "ZmN",
         "ZMNT",
-    ]
+    )
     upload_url = "https://www.morethantv.me/upload.php"
     forum_link = "https://www.morethantv.me/wiki.php?action=article&id=73"
     search_url = "https://www.morethantv.me/api/torznab"
-    tracker_urls = ["tracker.morethantv"]
+    tracker_urls = ("tracker.morethantv",)
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:

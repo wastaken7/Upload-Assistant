@@ -16,7 +16,7 @@ Config = dict[str, Any]
 class ULCX(UNIT3D):
     tracker = "ULCX"
     base_url = "https://upload.cx"
-    banned_groups = [
+    banned_groups = (
         "4K4U",
         "Alcaide_Kira",
         "AROMA",
@@ -61,14 +61,14 @@ class ULCX(UNIT3D):
         "Will1869",
         "x0r",
         "YIFY",
-    ]
+    )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     requests_url = f"{base_url}/api/requests/filter"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://upload.cx']
+    tracker_urls = ("upload.cx",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name='ULCX')

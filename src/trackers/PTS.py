@@ -17,13 +17,13 @@ Config = dict[str, Any]
 
 class PTS:
     tracker = "PTS"
-    banned_groups = []
+    banned_groups = ()
     source_flag = "[www.ptskit.org] PTSKIT"
     base_url = "https://www.ptskit.org"
     auth_token: str | None = None
     torrent_url = "https://www.ptskit.org/details.php?id="
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['https://tracker.ptskit.com']
+    tracker_urls = ("tracker.ptskit.com",)
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config

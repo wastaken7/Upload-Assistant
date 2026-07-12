@@ -14,7 +14,7 @@ Config = dict[str, Any]
 class R4E(UNIT3D):
     tracker = "R4E"
     base_url = "https://racing4everyone.eu"
-    banned_groups = []
+    banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
@@ -112,7 +112,7 @@ class R4E(UNIT3D):
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
-        url = "https://racing4everyone.eu/api/torrents/filter"
+        url = self.search_url
         params: dict[str, Any] = {
             "api_token": str(self.config["TRACKERS"]["R4E"]["api_key"]).strip(),
             "tmdb": meta.tmdb,

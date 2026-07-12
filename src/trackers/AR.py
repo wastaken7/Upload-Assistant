@@ -23,14 +23,14 @@ class AR:
     tracker = "AR"
     source_flag = "AlphaRatio"
     base_url = "https://alpharatio.cc"
-    banned_groups = []
+    banned_groups = ()
     login_url = f"{base_url}/login.php"
     upload_url = f"{base_url}/upload.php"
     search_url = f"{base_url}/torrents.php"
     test_url = f"{base_url}/torrents.php"
     torrent_url = f"{base_url}/torrents.php?id="
     supported_categories = ("TV", "MOVIE")
-    tracker_urls = ['tracker.alpharatio']
+    tracker_urls = ("tracker.alpharatio",)
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config

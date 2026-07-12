@@ -20,9 +20,9 @@ Config = dict[str, Any]
 class MTEAM:
     tracker = "MTEAM"
     api_base_url = "https://api.m-team.cc/api"
-    banned_groups = ["FGT"]
+    banned_groups = ("FGT",)
     requests_url = f"{api_base_url}/seek/search"
-    tracker_urls = ["tracker.m-team.cc", "tra1.m-team.cc", "tracker.m-team.io", "tra1.m-team.io", "tra99.manfuz.co"]
+    tracker_urls = ("tracker.m-team.cc", "tra1.m-team.cc", "tracker.m-team.io", "tra1.m-team.io", "tra99.manfuz.co")
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config):

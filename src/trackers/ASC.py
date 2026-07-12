@@ -5,7 +5,7 @@ import os
 import platform
 import re
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
 import aiofiles
 import cli_ui
@@ -25,11 +25,11 @@ from src.trackers.COMMON import COMMON
 class ASC:
     tracker = "ASC"
     source_flag = "ASC"
-    banned_groups: list[str] = []
+    banned_groups: tuple[str, ...] = ()
     base_url = "https://cliente.amigos-share.club"
     torrent_url = "https://cliente.amigos-share.club/torrents-details.php?id="
     requests_url = f"{base_url}/pedidos.php"
-    language_map = {
+    language_map: ClassVar[dict[str, str]] = {
         "bg": "15",
         "da": "12",
         "de": "3",
@@ -51,7 +51,7 @@ class ASC:
         "tr": "25",
         "zh": "10",
     }
-    anime_language_map = {
+    anime_language_map: ClassVar[dict[str, str]] = {
         "de": "3",
         "en": "4",
         "es": "1",
@@ -61,9 +61,9 @@ class ASC:
         "ru": "2",
         "zh": "9",
     }
-    supported_categories = ('TV', 'MOVIE', 'BOOK', 'GAME')
-    tracker_urls = ['amigos-share.club']
-    tmdb_localization_requirements = {
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    tracker_urls = ("amigos-share.club",)
+    tmdb_localization_requirements: ClassVar[dict[str, dict[str, str]]] = {
         "pt-BR": {
             "main": "credits,videos,content_ratings",
             "season": "credits",
@@ -103,7 +103,7 @@ class ASC:
     async def get_container(self, meta: Meta) -> str | None:
         if meta.category == "BOOK":
             filelist = meta.filelist or []
-            file_path = filelist[0] if filelist else str(meta.path or "")
+            file_path = filelist[0] if filelist else (meta.path or "")
             ext = os.path.splitext(file_path)[1].lower().strip(".")
             ext_map = {
                 "mp3": "31",
@@ -932,7 +932,7 @@ class ASC:
                     return await f.read()
         if not meta.is_disc:
             filelist = cast(list[str], meta.filelist or [])
-            video_file = filelist[0] if filelist else str(meta.path or "")
+            video_file = filelist[0] if filelist else (meta.path or "")
             template_path = os.path.abspath(f"{meta.base_dir}/data/templates/MEDIAINFO.txt")
             if os.path.exists(template_path):
                 mi_output = MediaInfo.parse(
