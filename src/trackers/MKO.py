@@ -1100,7 +1100,7 @@ class MKO:
         title_orig = title_br if self._is_brazilian(meta) else meta.original_title or title_br
 
         release_name = meta.basename_no_ext or meta.name or meta.uuid
-        release = release_name.replace(" ", ".").rsplit(".", 1)[0]
+        release = release_name.replace(" ", ".")
 
         # Prefer TMDB PT-BR overview already cached by the UA; fall back to
         # translation details from the pre-fetched translations list.
