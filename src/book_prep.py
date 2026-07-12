@@ -22,6 +22,7 @@ from src.book_extractors import (
 )
 from src.book_extractors import (
     extract_epub_metadata as _extract_epub_metadata,
+    get_epubmeta_output as _get_epubmeta_output,
 )
 from src.book_extractors import (
     extract_isbn_from_pdf as _extract_isbn_from_pdf,
@@ -210,6 +211,7 @@ async def gather_book_prep(
 
     # Extract EPUB metadata directly if the file is an EPUB
     if videopath.lower().endswith(".epub") and os.path.isfile(videopath):  # noqa: ASYNC240
+        meta.epubmeta_output = _get_epubmeta_output(videopath)
         epub_meta = _extract_epub_metadata(videopath)
         if epub_meta:
             logger.debug(f"[cyan]EPUB metadata extracted: {epub_meta}[/cyan]")

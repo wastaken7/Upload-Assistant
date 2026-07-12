@@ -1,4 +1,6 @@
 import os
+import re
+import unicodedata
 from typing import Any
 
 import aiofiles
@@ -20,17 +22,34 @@ def _iso_639_2_code(iso3: str) -> str:
 
 def _is_misc(meta: Meta) -> bool:
     """True for comic/manga/magazine/newspaper (ZNTH Misc, not ebook/audiobook)."""
-    return bool(meta.comic or meta.manga or meta.magazine or meta.newspaper)
+    return meta.comic or meta.manga or meta.magazine or meta.newspaper
 
 
 def _book_format(meta: Meta) -> str:
     """Uppercased format token, e.g. 'EPUB', 'M4B'."""
-    return str(meta.type or meta.container or "").strip().upper().lstrip(".")
+    return (meta.type or meta.container or "").strip().upper().lstrip(".")
 
 
 class ZNTH(UNIT3D):
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ['https://znth.cx']
+    tracker_urls = ["https://znth.cx"]
+
+    _banned_authors_raw = [
+        "J.R.R. Tolkien",
+        "Anne Perry",
+        "Simon Scarrow",
+        "Sara Gruen",
+        "Joan Elliott",
+        "Alan Dart",
+        "Chris Mead",
+        "Paul Moore & Gavin Jones",
+        "Noah K Sturdevant",
+        "Benedict Brown",
+        "Erika T Wurth",
+        "Randolph Lalonde",
+        "Andrea Sfiligoi",
+        "Ana-Maria Babanica",
+    ]
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="ZNTH")
@@ -45,6 +64,89 @@ class ZNTH(UNIT3D):
         self.torrent_url = f"{self.base_url}/torrents/"
         self.banned_url = f"{self.base_url}/api/bannedReleaseGroups"
         self.banned_groups: list[str] = []
+
+        self.banned_author_sets: list[set[str]] = []
+        for author in self._banned_authors_raw:
+            parts = re.split(r"\s*(?:\&|\band\b)\s*", author, flags=re.IGNORECASE)
+            for part in parts:
+                norm = self._normalize_author(part)
+                if norm:
+                    self.banned_author_sets.append(norm)
+                # Handle middle initials (e.g. Erika T Wurth)
+                words = part.split()
+                if len(words) > 2:
+                    for idx, w in enumerate(words[1:-1], start=1):
+                        if len(w.strip(".")) == 1:
+                            without_initial = " ".join(words[:idx] + words[idx + 1 :])
+                            norm_without = self._normalize_author(without_initial)
+                            if norm_without:
+                                self.banned_author_sets.append(norm_without)
+
+    @staticmethod
+    def _normalize_author(name: str) -> set[str]:
+        if not name:
+            return set()
+        nfkd_form = unicodedata.normalize("NFKD", name)
+        cleaned = "".join(c for c in nfkd_form if not unicodedata.combining(c))
+        cleaned = re.sub(r"[^a-zA-Z0-9\s]", " ", cleaned)
+        cleaned = cleaned.lower()
+        words = cleaned.split()
+        conjunctions = {"and", "e", "y", "with", "und", "et"}
+        words = [w for w in words if w not in conjunctions]
+        merged_words = []
+        initials_buffer = []
+        for w in words:
+            if len(w) == 1 and w.isalpha():
+                initials_buffer.append(w)
+            else:
+                if initials_buffer:
+                    merged_words.append("".join(initials_buffer))
+                    initials_buffer = []
+                merged_words.append(w)
+        if initials_buffer:
+            merged_words.append("".join(initials_buffer))
+        return set(merged_words)
+
+    @staticmethod
+    def _split_authors(author_str: str) -> list[str]:
+        if not author_str:
+            return []
+        major_pattern = r"\s*(?:;|&|/|\+|\band\b|\be\b|\by\b|\bwith\b|\s+-\s+)\s*"
+        candidates = re.split(major_pattern, author_str, flags=re.IGNORECASE)
+
+        final_authors = []
+        for cand in candidates:
+            cand = cand.strip()
+            if not cand:
+                continue
+            if "," in cand:
+                comma_parts = [p.strip() for p in cand.split(",")]
+                if len(comma_parts) == 2:
+                    p1, p2 = comma_parts
+                    p2_words = p2.split()
+                    is_initials = all(len(w.strip(".")) <= 3 for w in p2_words)
+                    if len(p2_words) == 1 or is_initials:
+                        final_authors.append(cand)
+                    else:
+                        final_authors.extend(comma_parts)
+                else:
+                    final_authors.extend(comma_parts)
+            else:
+                final_authors.append(cand)
+        return final_authors
+
+    def _is_banned_author(self, meta_author: str) -> bool:
+        if not meta_author:
+            return False
+        parts = self._split_authors(meta_author)
+        for part in parts:
+            part_norm = self._normalize_author(part)
+            if not part_norm:
+                continue
+            for banned in self.banned_author_sets:
+                if banned.issubset(part_norm):
+                    return True
+        return False
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK" and not _is_misc(meta):
@@ -61,6 +163,10 @@ class ZNTH(UNIT3D):
                     return False
             elif book_format not in ("EPUB", "PDF", "MOBI", "AZW3", "DJVU"):
                 logger.info(f"{self.tracker}: [bold red]Ebooks must be EPUB, PDF, MOBI, AZW3, or DJVU. Skipping upload...[/bold red]")
+                return False
+
+            if meta.author and self._is_banned_author(meta.author):
+                logger.info(f"{self.tracker}: [bold red]Author '{meta.author}' is banned on {self.tracker}. Skipping upload...[/bold red]")
                 return False
 
         return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)
@@ -94,7 +200,7 @@ class ZNTH(UNIT3D):
                 language = _iso_639_2_code(meta.book_language_iso)
                 edition = str(meta.manual_edition or meta.edition or "").strip()
                 narrator = _primary_name(meta.narrator or "")
-                source = (str(meta.manual_source or "").strip() or str(meta.source or "").strip() or "WEB").upper()
+                source = ((meta.manual_source or "").strip() or (meta.source or "").strip() or "WEB").upper()
 
                 audio_map = {
                     "FLAC": ("", "FLAC"),
@@ -149,8 +255,8 @@ class ZNTH(UNIT3D):
                     elif not any(t in ("edition", "ed") for t in edition_lower.replace(".", " ").split()):
                         edition = f"{edition} Edition"
 
-                source = str(meta.source or "").strip().upper()
-                manual_source = str(meta.manual_source or "").strip().upper()
+                source = (meta.source or "").strip().upper()
+                manual_source = (meta.manual_source or "").strip().upper()
                 if manual_source in ("RETAIL", "SCAN", "HYBRID"):
                     source = manual_source
                 if source not in ("RETAIL", "SCAN", "HYBRID"):
@@ -272,20 +378,19 @@ class ZNTH(UNIT3D):
         data: dict[str, str] = {}
         if meta.category == "BOOK" and not _is_misc(meta):
             if meta.isbn:
-                data["isbn"] = str(meta.isbn)
+                data["isbn"] = meta.isbn
             if meta.asin:
-                data["asin"] = str(meta.asin)
+                data["asin"] = meta.asin
         return data
 
     async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
         files = await super().get_additional_files(meta)
         # audiobook: send the original uncropped cover, real format sniffed; base cover if >5MB
-        if meta.audiobook and meta.cover_path and os.path.exists(meta.cover_path):
-            if os.path.getsize(meta.cover_path) <= 5 * 1024 * 1024:
-                async with aiofiles.open(meta.cover_path, "rb") as f:
-                    raw = await f.read()
-                if raw[:3] == b"\xff\xd8\xff":
-                    files["torrent-cover"] = ("cover.jpg", raw, "image/jpeg")
-                elif raw[:8] == b"\x89PNG\r\n\x1a\n":
-                    files["torrent-cover"] = ("cover.png", raw, "image/png")
+        if meta.audiobook and meta.cover_path and os.path.exists(meta.cover_path) and os.path.getsize(meta.cover_path) <= 5 * 1024 * 1024:
+            async with aiofiles.open(meta.cover_path, "rb") as f:
+                raw = await f.read()
+            if raw[:3] == b"\xff\xd8\xff":
+                files["torrent-cover"] = ("cover.jpg", raw, "image/jpeg")
+            elif raw[:8] == b"\x89PNG\r\n\x1a\n":
+                files["torrent-cover"] = ("cover.png", raw, "image/png")
         return files

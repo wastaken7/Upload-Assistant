@@ -130,6 +130,7 @@ class Meta:
     episode_tmdb_data: dict[str, Any] = field(default_factory=dict)
     episode: str = ""
     episodes: list[dict[str, Any]] | None = None
+    epubmeta_output: str | None = None
     exclusive: bool = False
     ext_torrenthash: str | None = None
     extra_openlibrary_ids: int | None = None
