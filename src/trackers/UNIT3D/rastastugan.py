@@ -3,6 +3,7 @@ from typing import Any
 
 from src.meta import Meta
 from src.tmdb import TmdbManager
+from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -37,6 +38,7 @@ class Rastastugan(UNIT3D):
         super().__init__(config, tracker_name="Rastastugan")
         self.config: Config = config
         self.tmdb_manager = TmdbManager(config)
+        self.common = COMMON(config)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         nordic_languages = ["danish", "swedish", "norwegian", "icelandic", "finnish", "english"]

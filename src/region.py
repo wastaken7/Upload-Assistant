@@ -1,16 +1,16 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import importlib
 import re
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any
 
-import guessit
-
-guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
+_guessit_module = importlib.import_module("guessit")
+_guessit_fn: GuessitFn = _guessit_module.guessit
 
 
 def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
-    return cast(dict[str, Any], guessit_module.guessit(value, options))
+    return _guessit_fn(value, options)
 
 
 async def get_region(bdinfo: dict[str, Any], region: str | None = None) -> str:

@@ -26,11 +26,10 @@ check_dependencies()
 import logging
 
 import aiofiles
-import cli_ui
-import discord
+import cli_ui  # pyright: ignore[reportMissingImports]
+import discord  # pyright: ignore[reportMissingImports]
 import requests
-from packaging import version
-from torf import Torrent
+from torf import Torrent as _Torrent  # pyright: ignore[reportMissingImports,reportUnknownVariableType]
 
 from bin.get_mkbrr import MkbrrBinaryManager
 from cogs.redaction import Redaction
@@ -41,7 +40,8 @@ from src.audio_spectrogram import process_audio_spectrograms
 from src.book_prep import detect_newspaper, is_valid_book_language, resolve_book_language
 from src.cleanup import cleanup_manager
 from src.clients import Clients
-from src.console import current_release_log_path, logger
+from src.console import current_release_log_path, logger  # pyright: ignore[reportUnknownVariableType]
+from src.console import rich_handler as _rich_handler
 from src.disc_menus import process_disc_menus
 from src.dupe_checking import DupeChecker
 from src.get_desc import gen_desc
@@ -54,15 +54,33 @@ from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
 from src.trackers.alpharatio import AlphaRatio
-from src.trackers.common import COMMON
+from src.trackers.COMMON import COMMON
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup, api_trackers, http_trackers, normalize_tracker_name, other_api_trackers, tracker_class_map
 from src.trackerstatus import TrackerStatusManager
 from src.uphelper import UploadHelper
 from src.uploadscreens import UploadScreensManager
 
-cli_ui.setup(color="always", title="Upload Assistant")
 base_dir = str(Path(__file__).resolve().parent)
+CLI_UI: Any = cli_ui
+DISCORD: Any = discord
+TORF_Torrent: Any = cast(Any, _Torrent)
+DISCORD_NOTIFIER: Any = cast(Any, DiscordNotifier)
+RICH_HANDLER: Any = cast(Any, _rich_handler)
+TORRENT_CREATOR: Any = cast(Any, TorrentCreator)
+CLI_UI.setup(color="always", title="Upload Assistant")
+
+
+def _parse_version_tuple(value: str) -> tuple[int, ...]:
+    """Parse a dotted version string into a tuple for comparison."""
+    cleaned = value.strip().lstrip("vV")
+    parts: list[int] = []
+    for part in cleaned.split("."):
+        if not part.isdigit():
+            break
+        parts.append(int(part))
+    return tuple(parts)
+
 
 class WebUIServer(Protocol):
     def run(self) -> None: ...
@@ -239,7 +257,7 @@ if Path(_config_path).exists():
         from data.config import config as _imported_config  # pyright: ignore[reportMissingImports,reportUnknownVariableType]
 
         config = cast(dict[str, Any], _imported_config)
-        parser = Args(config)
+        parser: Any = Args(config)
         client = Clients(config)
         name_manager = NameManager(config)
         tracker_data_manager = TrackerDataManager(config)
@@ -437,7 +455,7 @@ def update_oeimg_to_onlyimage() -> None:
         logger.info("[yellow]No 'oeimg' or 'oeimg_api' found to update in config.py[/yellow]")
 
 
-async def validate_tracker_logins(meta: Meta, trackers: list[str] | None = None) -> None:
+async def validate_tracker_logins(meta: Meta, trackers: list[str] | str | None = None) -> None:
     if "tracker_status" not in meta:
         meta.tracker_status = {}
 
@@ -522,7 +540,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
             prompt_label = "language" if field == "book_language" else field
             if field == "book_language":
                 while True:
-                    value = (cli_ui.ask_string("Enter language (leave blank to skip): ") or "").strip()
+                    value = (CLI_UI.ask_string("Enter language (leave blank to skip): ") or "").strip()
                     if not value:
                         break
 
@@ -535,7 +553,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
                     logger.info("[red]Invalid language. Please try again.[/red]")
             elif field == "year":
                 while True:
-                    value = (cli_ui.ask_string("Enter year (leave blank to skip): ") or "").strip()
+                    value = (CLI_UI.ask_string("Enter year (leave blank to skip): ") or "").strip()
                     if not value:
                         break
                     if value.isdigit() and len(value) == 4 and 1000 <= int(value) <= 3000:
@@ -545,7 +563,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
                         break
                     logger.info("[red]Invalid year (must be a 4-digit number between 1000 and 3000). Please try again.[/red]")
             else:
-                value = (cli_ui.ask_string(f"Enter {prompt_label} (leave blank to skip): ") or "").strip()
+                value = (CLI_UI.ask_string(f"Enter {prompt_label} (leave blank to skip): ") or "").strip()
                 if value:
                     meta[field] = value
                     name_needs_rebuild = True
@@ -592,7 +610,7 @@ async def _prompt_game_meta(meta: Meta) -> None:
             for field in game_missing:
                 if field == "year":
                     while True:
-                        value = (cli_ui.ask_string("Enter year (leave blank to skip): ") or "").strip()
+                        value = (CLI_UI.ask_string("Enter year (leave blank to skip): ") or "").strip()
                         if not value:
                             break
                         if value.isdigit() and len(value) == 4 and 1000 <= int(value) <= 3000:
@@ -603,7 +621,7 @@ async def _prompt_game_meta(meta: Meta) -> None:
                         logger.info("[red]Invalid year (must be a 4-digit number between 1000 and 3000). Please try again.[/red]")
                 elif field == "platform":
                     try:
-                        value = cli_ui.ask_choice(
+                        value = CLI_UI.ask_choice(
                             "Select target platform: (can be manually set with -plat / --platform)",
                             choices=["pc", "mac", "linux", "ps5", "ps4", "ps3", "ps2", "xbox", "x360", "xone", "xsx", "switch", "3ds", "nds", "wiiu", "wii"],
                             sort=False,
@@ -615,7 +633,7 @@ async def _prompt_game_meta(meta: Meta) -> None:
                         meta[field] = value
                         name_needs_rebuild = True
                 elif field == "game_version":
-                    value = (cli_ui.ask_string("Enter game version (e.g., 1.15) (leave blank to skip): ") or "").strip()
+                    value = (CLI_UI.ask_string("Enter game version (e.g., 1.15) (leave blank to skip): ") or "").strip()
                     if value:
                         from src.prep_game import normalize_version
 
@@ -625,12 +643,12 @@ async def _prompt_game_meta(meta: Meta) -> None:
                 elif field == "game_subcategory":
                     subcategory_choices = ["full_game (Full Game)", "full_game_dlc (Full Game + DLC)", "dlc (DLC only)", "update (Update only)"]
                     subcategory_values = {"Full Game": "full_game", "Full Game + DLC": "full_game_dlc", "DLC": "dlc", "Update": "update"}
-                    choice = cli_ui.ask_choice("Select game subcategory (can be manually set with -gsc / --game-subcategory):", choices=subcategory_choices, sort=False)
+                    choice = CLI_UI.ask_choice("Select game subcategory (can be manually set with -gsc / --game-subcategory):", choices=subcategory_choices, sort=False)
                     meta.game_subcategory = subcategory_values.get(choice, "full_game")
                     name_needs_rebuild = True
 
                 else:
-                    value = (cli_ui.ask_string(f"Enter {field} (leave blank to skip): ") or "").strip()
+                    value = (CLI_UI.ask_string(f"Enter {field} (leave blank to skip): ") or "").strip()
                     if value:
                         meta[field] = value
                         name_needs_rebuild = True
@@ -670,7 +688,7 @@ async def _prompt_game_meta(meta: Meta) -> None:
                 if meta.platform.upper() == "PSP":
                     system_choices = ["FREE", "NTSC", "PAL", "Skip"]
                 try:
-                    choice = cli_ui.ask_choice(
+                    choice = CLI_UI.ask_choice(
                         "BJShare: Select game system (TV standard):",
                         choices=system_choices,
                     )
@@ -682,7 +700,7 @@ async def _prompt_game_meta(meta: Meta) -> None:
             if needs_game_region and not meta.game_region:
                 region_choices = ["USA", "EUR", "JPN", "Skip"]
                 try:
-                    choice = cli_ui.ask_choice(
+                    choice = CLI_UI.ask_choice(
                         "BJShare: Select game region:",
                         choices=region_choices,
                     )
@@ -698,7 +716,7 @@ async def _prompt_game_meta(meta: Meta) -> None:
 
                 if meta.container.upper() not in container_choices:
                     try:
-                        choice = cli_ui.ask_choice(
+                        choice = CLI_UI.ask_choice(
                             "BJShare: Select container format ('Destravamento'):",
                             choices=container_choices,
                         )
@@ -735,7 +753,7 @@ def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
 async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
     """Process the metadata for each queued path."""
     if use_discord and bot:
-        await DiscordNotifier.send_discord_notification(config, bot, f"Starting upload process for: {meta.path}", meta=meta)
+        await DISCORD_NOTIFIER.send_discord_notification(config, bot, f"Starting upload process for: {meta.path}", meta=meta)
 
     if not meta.imghost:
         meta.imghost = config["DEFAULT"]["img_host_1"]
@@ -774,8 +792,8 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
         except Exception as e:
             logger.debug(f"[red]Error loading covers.json into meta.covers: {e}")
 
-    parser = Args(config)
-    helper = UploadHelper(config)
+    parser: Any = Args(config)
+    helper: Any = UploadHelper(config)
 
     raw_trackers: list[str] | str = meta.trackers
     if isinstance(raw_trackers, list):
@@ -819,7 +837,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
         sys.exit(1)
     while confirm is False:
         try:
-            editargs_str = cli_ui.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
+            editargs_str = CLI_UI.ask_string("Input args that need correction e.g. (--tag NTb --category tv --tmdb 12345)")
         except EOFError:
             logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
             await cleanup_manager.cleanup()
@@ -868,13 +886,15 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
     if meta.remove_trackers:
         removed: list[str] = []
         remove_trackers_list = [t for t in meta.remove_trackers if t] if isinstance(meta.remove_trackers, list) else [str(meta.remove_trackers)]
+        current_trackers = meta.trackers if isinstance(meta.trackers, list) else [meta.trackers]
         for tracker in remove_trackers_list:
-            if tracker in meta.trackers:
+            if tracker in current_trackers:
                 if meta.debug:
                     logger.debug(f"[DEBUG] Would have removed {tracker} found in client")
                 else:
-                    meta.trackers.remove(tracker)
+                    current_trackers.remove(tracker)
                     removed.append(tracker)
+        meta.trackers = current_trackers
         if removed:
             logger.info(f"[yellow]Removing trackers already in your client: {', '.join(removed)}[/yellow]")
     if not meta.trackers:
@@ -1458,20 +1478,20 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
         if meta.rehash is False and not meta.base_torrent_created and not meta.we_checked_them_all:
             reuse_torrent = await client.find_existing_torrent(meta)
             if reuse_torrent is not None:
-                await TorrentCreator.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid)
+                await TORRENT_CREATOR.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid)
 
         # 2. Re-create base torrents if rehash is True
         if meta.rehash is True and meta.nohash is False:
-            await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
+            await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
             if has_local_subs:
-                await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS")
+                await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS")
 
         # 3. Otherwise generate if missing
         else:
             if not Path(torrent_path).exists() and meta.nohash is False:
-                await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
+                await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
             if has_local_subs and not Path(subs_torrent_path).exists() and meta.nohash is False:
-                await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS")
+                await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS")
 
     if meta.nohash:
         meta.client = "none"
@@ -1484,9 +1504,10 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
         base_piece_mb: int | None = cast(int | None, meta.base_torrent_piece_mb)
         if base_piece_mb is None and any(t in {"HDBits", "MoreThanTV", "PassThePopcorn"} for t in trackers_normalized):
             try:
-                torrent = await asyncio.to_thread(Torrent.read, torrent_path)
+                torrent = await asyncio.to_thread(TORF_Torrent.read, torrent_path)
                 base_piece_mb = torrent.piece_size // (1024 * 1024)
-                meta.base_torrent_piece_mb = base_piece_mb
+                if base_piece_mb is not None:
+                    meta.base_torrent_piece_mb = base_piece_mb
             except Exception as e:
                 logger.debug(f"[yellow]Unable to cache BASE.torrent piece size: {e}")
                 base_piece_mb = None
@@ -1504,7 +1525,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                     return True
 
     if meta.randomized >= 1 and not meta.mkbrr and not is_usenet_only:
-        TorrentCreator.create_random_torrents(meta.base_dir, meta.uuid, meta.randomized, cast(str, meta.path))
+        TORRENT_CREATOR.create_random_torrents(meta.base_dir, meta.uuid, meta.randomized, cast(str, meta.path))
 
     async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
         await f.write(json.dumps(meta.to_dict(), indent=4))
@@ -1560,7 +1581,7 @@ async def save_processed_file(log_file: str, file_path: str) -> None:
         await f.write(json.dumps(processed_files, indent=4))
 
 
-def get_local_version(version_file: str) -> str | None:
+def get_local_version(version_file: str | Path) -> str | None:
     """Extracts the local version from the version.py file."""
     try:
         with Path(version_file).open(encoding="utf-8") as f:
@@ -1629,7 +1650,7 @@ async def update_notification(base_dir: str) -> str:
     if not remote_version:
         return local_version
 
-    if version.parse(remote_version) > version.parse(local_version):
+    if _parse_version_tuple(remote_version) > _parse_version_tuple(local_version):
         logger.info(f"[red][NOTICE] [green]Update available: [/green][yellow]{remote_version}")
         logger.info(f"[red][NOTICE] [green]Current version: [/green][yellow]{local_version}")
         await asyncio.sleep(1)
@@ -1678,7 +1699,7 @@ async def do_the_thing(base_dir: str) -> None:
         if os.name != "nt":
             Path(tmp_dir).chmod(0o700)
 
-    def ensure_secure_tmp_subdir(subdir_path: str) -> None:
+    def ensure_secure_tmp_subdir(subdir_path: str | Path) -> None:
         """Ensure tmp subdirectories are created with secure permissions (0o700)"""
         if not Path(subdir_path).exists():
             if os.name != "nt":
@@ -1726,12 +1747,11 @@ async def do_the_thing(base_dir: str) -> None:
             meta.debug = True
             logger.setLevel(logging.DEBUG)
             # Update RichHandler settings for debug mode
-            from src.console import rich_handler
 
-            rich_handler._log_render.show_time = bool(config["DEFAULT"].get("console_debug_show_time", True))
-            rich_handler._log_render.show_level = bool(config["DEFAULT"].get("console_debug_show_level", True))
-            rich_handler._log_render.show_path = bool(config["DEFAULT"].get("console_debug_show_path", True))
-            rich_handler.markup = bool(config["DEFAULT"].get("console_debug_markup", True))
+            RICH_HANDLER._log_render.show_time = bool(config["DEFAULT"].get("console_debug_show_time", True))
+            RICH_HANDLER._log_render.show_level = bool(config["DEFAULT"].get("console_debug_show_level", True))
+            RICH_HANDLER._log_render.show_path = bool(config["DEFAULT"].get("console_debug_show_path", True))
+            RICH_HANDLER.markup = bool(config["DEFAULT"].get("console_debug_markup", True))
 
         # Start web UI if requested (exclusive mode - doesn't continue with uploads)
         if meta.webui:
@@ -1895,25 +1915,26 @@ async def do_the_thing(base_dir: str) -> None:
                     meta.item_args = [path]
                 elif meta.args_line_queue and isinstance(queue_item, dict) and "args" in queue_item:
                     # Extract path and arguments from custom args queue item
-                    args_list = queue_item["args"]
+                    queue_item_mapping = cast(Mapping[str, Any], queue_item)
+                    args_list = cast(list[str], queue_item_mapping["args"])
                     # We parse the arguments for this specific item using the parser, updating the cloned meta dict.
                     meta, parser_obj, _before_args = cast(tuple[Meta, Any, Any], parser.parse(args_list, meta))
 
                     # Preserve global defaults from base_meta if they were not explicitly overridden in args_list
-                    dest_to_options = {}
+                    dest_to_options: dict[str, list[str]] = {}
                     if parser_obj and hasattr(parser_obj, "_actions"):
                         for action in parser_obj._actions:
                             if action.dest and action.option_strings:
                                 dest_to_options[action.dest] = action.option_strings
 
-                    for key, val in base_meta.items():
+                    for key, val in cast(dict[str, Any], base_meta).items():
                         if val not in (None, False, []):
                             option_strings = dest_to_options.get(key, [])
                             if option_strings and not any(arg == opt or arg.startswith(opt + "=") for opt in option_strings for arg in args_list):
                                 meta[key] = val
 
                     path = meta.path or ""
-                    current_item_path = cast(str, queue_item.get("line") or path or "")
+                    current_item_path = str(queue_item_mapping.get("line") or path or "")
                     meta.item_args = args_list
                 else:
                     # Regular queue processing
@@ -1934,7 +1955,7 @@ async def do_the_thing(base_dir: str) -> None:
 
                 # Ensure tmp subdirectory exists with secure permissions
                 ensure_secure_tmp_subdir(tmp_path)
-                current_release_log_path.set(Path(tmp_path) / f"upload_{int(time.time())}.log")
+                current_release_log_path.set(str(Path(tmp_path) / f"upload_{int(time.time())}.log"))
 
                 if meta.delete_tmp and Path(tmp_path).exists():
                     try:
@@ -1986,9 +2007,9 @@ async def do_the_thing(base_dir: str) -> None:
             ):
                 try:
                     logger.info("[cyan]Starting Discord bot initialization...")
-                    intents = discord.Intents.default()
+                    intents = DISCORD.Intents.default()
                     intents.message_content = True
-                    bot = discord.Client(intents=intents)
+                    bot = DISCORD.Client(intents=intents)
                     token = discord_bot_token
                     await asyncio.wait_for(bot.login(token), timeout=10)
                     connect_task = asyncio.create_task(bot.connect())
@@ -2001,9 +2022,9 @@ async def do_the_thing(base_dir: str) -> None:
                         logger.info("[yellow]Continuing without Discord integration...")
                         if "connect_task" in locals():
                             connect_task.cancel()
-                except discord.LoginFailure:
+                except DISCORD.LoginFailure:
                     logger.info("[bold red]Discord bot token is invalid. Please check your configuration.")
-                except discord.ClientException as e:
+                except DISCORD.ClientException as e:
                     logger.info(f"[bold red]Discord client exception: {e}")
                 except Exception as e:
                     logger.error(f"[bold red]Unexpected error during Discord bot initialization: {e}")
@@ -2106,8 +2127,8 @@ async def do_the_thing(base_dir: str) -> None:
                 else:
                     trackers_upper = [(t).upper() for t in meta.trackers]
                     # Partition trackers into torrent trackers and Usenet indexers
-                    torrent_trackers = []
-                    usenet_trackers = []
+                    torrent_trackers: list[str] = []
+                    usenet_trackers: list[str] = []
                     for tracker in meta.trackers:
                         t_upper = (tracker).upper().strip()
                         if t_upper == "USENET":
@@ -2211,7 +2232,7 @@ async def do_the_thing(base_dir: str) -> None:
                             upload_torrent_flow(meta, torrent_trackers),
                         )
                     if use_discord and bot:
-                        await DiscordNotifier.send_upload_status_notification(config, bot, meta)
+                        await DISCORD_NOTIFIER.send_upload_status_notification(config, bot, meta)
 
                     if config["DEFAULT"].get("cross_seeding", True):
                         await process_cross_seeds(meta)
@@ -2269,11 +2290,11 @@ async def do_the_thing(base_dir: str) -> None:
                         for tracker, status in tracker_status_dict.items():
                             discord_message += build_tracker_status_line(tracker, status)
                         discord_message += "All tracker uploads processed.\n"
-                        await DiscordNotifier.send_discord_notification(config, bot, discord_message, meta=meta)
+                        await DISCORD_NOTIFIER.send_discord_notification(config, bot, discord_message, meta=meta)
                     except Exception as e:
                         logger.error(f"[red]Error in tracker print loop: {e}[/red]")
                 else:
-                    await DiscordNotifier.send_discord_notification(config, bot, f"Finished uploading: {meta.path}\n", meta=meta)
+                    await DISCORD_NOTIFIER.send_discord_notification(config, bot, f"Finished uploading: {meta.path}\n", meta=meta)
 
             for tracker in meta.trumping_trackers:
                 logger.info(f"[yellow]Submitting trumpable report to {tracker}.....")
@@ -2402,7 +2423,7 @@ async def process_cross_seeds(meta: Meta) -> None:
         original_unattended = meta.unattended
         meta.unattended = True
 
-        helper = UploadHelper(config)
+        helper: Any = UploadHelper(config)
         dupe_checker = DupeChecker(config)
 
         async def check_tracker_for_dupes(tracker: str) -> None:

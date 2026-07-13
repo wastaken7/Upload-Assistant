@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
-from src.trackers.common import COMMON
+from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 

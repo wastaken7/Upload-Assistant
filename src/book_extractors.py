@@ -158,6 +158,7 @@ def extract_cbr_cbz_metadata(filepath: str) -> dict[str, Any]:
     elif ext == ".cbr":
         try:
             import rarfile
+
             has_rarfile = True
         except ImportError:
             logger.debug("[yellow]Debug: rarfile library not available for CBR metadata extraction.[/yellow]")

@@ -124,8 +124,7 @@ class Redaction:
             typed_data = cast(dict[str, Any], data)
             return {k: ("[REDACTED]" if any(s.lower() in k.lower() for s in keys) else Redaction.redact_private_info(v, keys)) for k, v in typed_data.items()}
         if isinstance(data, list):
-            typed_list = data
-            return [Redaction.redact_private_info(item, keys) for item in typed_list]
+            return [Redaction.redact_private_info(item, keys) for item in cast(list[Any], data)]
         if isinstance(data, str):
             # Try to parse as JSON first
             try:
@@ -146,7 +145,7 @@ class Redaction:
         # tracker status is not in the saved meta file, but adding the catch here
         # in case the meta file is updated in the future
         tracker_status = meta.tracker_status
-        if isinstance(tracker_status, dict):
+        if tracker_status:
             typed_status = cast(dict[str, dict[str, Any]], tracker_status)
             for tracker in list(typed_status):  # list() to avoid RuntimeError if deleting keys
                 if "status_message" in typed_status[tracker]:

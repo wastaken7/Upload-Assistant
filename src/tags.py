@@ -4,15 +4,14 @@ import json
 import os
 import re
 from collections.abc import Callable
+from importlib import import_module
 from pathlib import Path
 from typing import Any, cast
-
-import guessit
 
 from src.console import logger
 from src.meta import Meta
 
-guessit_module: Any = cast(Any, guessit)
+guessit_module = import_module("guessit")
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 
 

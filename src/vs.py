@@ -35,10 +35,12 @@ def custom_frame_info(clip: Any, _text: str) -> Any:
     return core.std.FrameEval(clip, partial(frame_props, clip=clip), prop_src=clip)
 
 
-def optimize_images(image: str, config: dict[str, Any]) -> None:
+def optimize_images(image: str | Path, config: dict[str, Any]) -> None:
     import platform  # Ensure platform is imported here
 
-    if config.get("optimize_images", True) and Path(image).exists():
+    image_path = Path(image)
+
+    if config.get("optimize_images", True) and image_path.exists():
         oxipng: Any | None
         try:
             pyver = platform.python_version_tuple()
@@ -50,7 +52,7 @@ def optimize_images(image: str, config: dict[str, Any]) -> None:
                 oxipng = None
             if oxipng is None:
                 return
-            if Path(image).stat().st_size >= 16000000:
+            if image_path.stat().st_size >= 16000000:
                 oxipng.optimize(image, level=6)
             else:
                 oxipng.optimize(image, level=3)

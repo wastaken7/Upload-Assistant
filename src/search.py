@@ -39,7 +39,7 @@ class Search:
                     if not name.endswith(".nfo"):
                         l_name = name.lower()
                         if await self.file_search(l_name, words):
-                            files_total_search.append(Path(root) / name)
+                            files_total_search.append(str(Path(root) / name))
             return files_total_search
 
         for each in self._get_search_dirs():
@@ -63,7 +63,7 @@ class Search:
                     l_name = name.lower()
 
                     if await self.file_search(l_name, words):
-                        folders_total_search.append(Path(root) / name)
+                        folders_total_search.append(str(Path(root) / name))
 
             return folders_total_search
 
