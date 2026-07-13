@@ -1,6 +1,5 @@
 import asyncio
 import contextlib
-import glob
 import json
 import os
 import platform
@@ -192,7 +191,7 @@ class DiscMenus:
 
                 # Setup output file patterns
                 sanitized_disc_name = re.sub(r'[<>:"/\\|?*]', "_", disc.get("name", "dvd"))
-                vob_base = os.path.splitext(file)[0]
+                vob_base = Path(file).stem
                 image_pattern = Path(output_dir) / f"{sanitized_disc_name}-{vob_base}-%03d.png"
 
                 # Run ffmpeg
@@ -222,7 +221,7 @@ class DiscMenus:
 
                     # Gather generated screenshots
                     glob_pattern = Path(output_dir) / f"{sanitized_disc_name}-{vob_base}-*.png"
-                    found_images = sorted(glob.glob(glob_pattern))
+                    found_images = sorted(str(p) for p in glob_pattern.parent.glob(glob_pattern.name))
 
                     # Filter out blank/black frames
                     valid_images = []
@@ -232,7 +231,7 @@ class DiscMenus:
                                 extrema = img.convert("L").getextrema()
                                 if extrema and isinstance(extrema[1], (int, float)) and extrema[1] < 10:
                                     logger.debug(f"Skipping {Path(img_path).name} because it is a blank/black frame.")
-                                    os.remove(img_path)
+                                    Path(img_path).unlink()
                                     continue
                             valid_images.append(img_path)
                         except Exception as e:
@@ -269,7 +268,7 @@ class DiscMenus:
                             await process_fallback.communicate()
                             logger.error(f"[red]FFmpeg fallback timed out processing {file}[/red]")
 
-                        found_images = sorted(glob.glob(glob_pattern))
+                        found_images = sorted(str(p) for p in glob_pattern.parent.glob(glob_pattern.name))
                         valid_images = []
                         for img_path in found_images:
                             try:
@@ -277,7 +276,7 @@ class DiscMenus:
                                     extrema = img.convert("L").getextrema()
                                     if extrema and isinstance(extrema[1], (int, float)) and extrema[1] < 10:
                                         logger.debug(f"Skipping fallback frame {Path(img_path).name} because it is a blank/black frame.")
-                                        os.remove(img_path)
+                                        Path(img_path).unlink()
                                         continue
                                 valid_images.append(img_path)
                             except Exception as e:
@@ -299,7 +298,7 @@ class DiscMenus:
                             await process_retry.communicate()
                             logger.error(f"[red]FFmpeg retry timed out processing {file}[/red]")
 
-                        found_images = sorted(glob.glob(glob_pattern))
+                        found_images = sorted(str(p) for p in glob_pattern.parent.glob(glob_pattern.name))
                         valid_images = []
                         for img_path in found_images:
                             try:
@@ -307,7 +306,7 @@ class DiscMenus:
                                     extrema = img.convert("L").getextrema()
                                     if extrema and isinstance(extrema[1], (int, float)) and extrema[1] < 10:
                                         logger.debug(f"Skipping retry frame {Path(img_path).name} because it is a blank/black frame.")
-                                        os.remove(img_path)
+                                        Path(img_path).unlink()
                                         continue
                                 valid_images.append(img_path)
                             except Exception as e:
@@ -331,7 +330,7 @@ class DiscMenus:
             for img in captured_images:
                 if img not in keep_set:
                     with contextlib.suppress(Exception):
-                        os.remove(img)
+                        Path(img).unlink()
             captured_images = keep_images
 
         if not captured_images:

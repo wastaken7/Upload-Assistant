@@ -9,8 +9,12 @@ from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 
-class TOS(UNIT3D):
-    tracker = "TOS"
+class TheOldSchool(UNIT3D):
+    """
+    The Old School (TOS) is a FRENCH Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
+    tracker = "TheOldSchool"
     source_flag = "TheOldSchool"
     base_url = "https://theoldschool.cc"
     banned_groups = (
@@ -30,7 +34,7 @@ class TOS(UNIT3D):
     tracker_urls = ("https://theoldschool.cc",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="TOS")
+        super().__init__(config, tracker_name="TheOldSchool")
         self.config = config
         self.common = COMMON(config)
 
@@ -118,11 +122,11 @@ class TOS(UNIT3D):
             logger.info(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
 
-        # Check if it's a Scene release without NFO - TOS requires NFO for Scene releases
+        # Check if it's a Scene release without NFO - TheOldSchool requires NFO for Scene releases
         is_scene = meta.scene
         has_nfo = meta.nfo or meta.auto_nfo
 
         if is_scene and not has_nfo:
-            logger.info(f"[red]{self.tracker}: Scene release detected but no NFO file found. TOS requires NFO files for Scene releases.[/red]")
+            logger.info(f"[red]{self.tracker}: Scene release detected but no NFO file found. TheOldSchool requires NFO files for Scene releases.[/red]")
             return False
         return True

@@ -15,12 +15,12 @@ from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 
-class HUNO(UNIT3D):
+class HawkeUno(UNIT3D):
     """
-    https://hawke.uno/api-docs
+    hawke-uno (HUNO) is a Private Torrent Tracker for HD MOVIES / TV
     """
 
-    tracker = "HUNO"
+    tracker = "HawkeUno"
     source_flag = "HUNO"
     base_url = "https://hawke.uno"
     banned_groups = (
@@ -88,7 +88,7 @@ class HUNO(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, "HUNO")
+        super().__init__(config, "HawkeUno")
         self.config = config
         self.common = COMMON(config)
         self.rehost_images_manager = RehostImagesManager(config)
@@ -129,7 +129,7 @@ class HUNO(UNIT3D):
                             crf_value = float(crf_match.group(1))
                             if crf_value > 22:
                                 if not meta.unattended:
-                                    logger.info(f"CRF value too high: {crf_value} for HUNO")
+                                    logger.info(f"CRF value too high: {crf_value} for HawkeUno")
                                 return False
                         else:
                             logger.debug("No CRF value found in encoding settings.")
@@ -145,7 +145,7 @@ class HUNO(UNIT3D):
 
                                     if bit_rate_kbps < 3000:
                                         if not meta.unattended:
-                                            logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for HUNO")
+                                            logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for HawkeUno")
                                         return False
 
         return should_continue

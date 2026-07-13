@@ -3,7 +3,6 @@ import asyncio
 import base64
 import contextlib
 import gc
-import glob
 import json
 import os
 import re
@@ -678,17 +677,17 @@ async def _upload_screens(
         image_patterns = ["*.png", ".[!.]*.png"]
         image_glob: list[str] = []
         for pattern in image_patterns:
-            glob_results = await asyncio.to_thread(glob.glob, pattern)
+            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
             image_glob.extend(glob_results)
 
         unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
         unwanted_files: set[str] = set()
         for pattern in unwanted_patterns:
-            glob_results = await asyncio.to_thread(glob.glob, pattern)
+            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
             unwanted_files.update(glob_results)
             if pattern.startswith("FILE") or pattern.startswith("PLAYLIST") or pattern.startswith("POSTER"):
                 hidden_pattern = "." + pattern
-                hidden_glob_results = await asyncio.to_thread(glob.glob, hidden_pattern)
+                hidden_glob_results = await asyncio.to_thread(lambda hp=hidden_pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(hp)])
                 unwanted_files.update(hidden_glob_results)
 
         image_glob = [file for file in image_glob if file not in unwanted_files]

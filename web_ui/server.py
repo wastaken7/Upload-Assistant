@@ -2763,7 +2763,7 @@ def browse_path():
 
                     # Skip files based on filter type
                     if not is_dir:
-                        _, ext = os.path.splitext(item.lower())
+                        ext = Path(item.lower()).suffix
                         if file_filter == "desc":
                             if ext not in SUPPORTED_DESC_EXTS:
                                 continue
@@ -2888,7 +2888,7 @@ def browse_search():
                             continue
                         if not name_matches(filename):
                             continue
-                        _, ext = os.path.splitext(filename.lower())
+                        ext = Path(filename.lower()).suffix
                         if ext not in allowed_exts:
                             continue
                         full_path = Path(dirpath) / filename

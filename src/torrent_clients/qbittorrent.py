@@ -128,7 +128,7 @@ class QbittorrentClientMixin:
         if not meta.uuid:
             meta.uuid = folder_id
 
-        extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid)
         Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
         for torrent in torrents:
@@ -193,7 +193,7 @@ class QbittorrentClientMixin:
                                 valid, _ = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, "qbit", client)
                                 if not valid:
                                     logger.debug(f"[bold red]Validation failed for {torrent_file_path}")
-                                    os.remove(torrent_file_path)  # Remove invalid file
+                                    torrent_file_path.unlink()  # Remove invalid file
                                 else:
                                     await TorrentCreator.create_base_from_existing_torrent(torrent_file_path, meta.base_dir, meta.uuid)
                             except TimeoutError:
@@ -309,13 +309,13 @@ class QbittorrentClientMixin:
         proxy_url: str | None = None,
     ) -> str | None:
         trackers_config = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-        mtv_config_value = trackers_config.get("MTV", {})
+        mtv_config_value = trackers_config.get("MoreThanTV", {})
         mtv_config = cast(dict[str, Any], mtv_config_value) if isinstance(mtv_config_value, dict) else {}
         prefer_small_pieces = bool(mtv_config.get("prefer_mtv_torrent", False))
         logger.debug("[green]Searching qBittorrent for an existing .torrent")
 
         torrent_storage_dir = client.get("torrent_storage_dir")
-        extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid)
 
         if not extracted_torrent_dir or extracted_torrent_dir.strip() == "tmp/":
             logger.info("[bold red]Invalid extracted torrent directory path. Check `meta.base_dir` and `meta.uuid`.")
@@ -531,7 +531,7 @@ class QbittorrentClientMixin:
                         return torrent_hash
                 else:
                     logger.debug(f"[bold red]{torrent_hash} failed validation")
-                    os.remove(torrent_file_path)
+                    torrent_file_path.unlink()
 
             # **Return the best match if `prefer_small_pieces` is enabled**
             if best_match:
@@ -982,14 +982,14 @@ class QbittorrentClientMixin:
         logger.debug(f"[yellow]Searching for torrents in qBittorrent for path: {content_path}[/yellow]")
         try:
             trackers_config = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-            mtv_config_value = trackers_config.get("MTV", {})
+            mtv_config_value = trackers_config.get("MoreThanTV", {})
             mtv_config = cast(dict[str, Any], mtv_config_value) if isinstance(mtv_config_value, dict) else {}
             piece_limit = bool(self.config["DEFAULT"].get("prefer_max_16_torrent", False))
             mtv_torrent = bool(mtv_config.get("prefer_mtv_torrent", False))
             piece_size_constraints_enabled: str | bool
-            # MTV preference takes priority as it's more restrictive (8 MiB vs 16 MiB)
+            # MoreThanTV preference takes priority as it's more restrictive (8 MiB vs 16 MiB)
             if mtv_torrent:
-                piece_size_constraints_enabled = "MTV"
+                piece_size_constraints_enabled = "MoreThanTV"
             elif piece_limit:
                 piece_size_constraints_enabled = "16MiB"
             else:
@@ -1048,7 +1048,7 @@ class QbittorrentClientMixin:
                     stop_due_to_constraints = (
                         not constraints_enabled
                         or found_piece_size == "no_constraints"
-                        or found_piece_size == "MTV"
+                        or found_piece_size == "MoreThanTV"
                         or (found_piece_size == "16MiB" and constraints_enabled == "16MiB")
                     )
                     should_stop = stop_due_to_constraints
@@ -1208,7 +1208,7 @@ class QbittorrentClientMixin:
         from src.trackersetup import tracker_class_map
 
         tracker_patterns = {}
-        for name in set(tracker_class_map.keys()) | {"PTP", "BHD", "BTN", "HDB"}:
+        for name in set(tracker_class_map.keys()) | {"PassThePopcorn", "BeyondHD", "BTN", "HDBits"}:
             # Determine URL
             url = ""
             if name in tracker_class_map:
@@ -1220,31 +1220,31 @@ class QbittorrentClientMixin:
             if not url:
                 # Hardcoded fallback
                 hardcoded_urls = {
-                    "PTP": "passthepopcorn.me",
-                    "AITHER": "https://aither.cc",
+                    "PassThePopcorn": "passthepopcorn.me",
+                    "Aither": "https://aither.cc",
                     "LST": "https://lst.gg",
-                    "OE": "https://onlyencodes.cc",
-                    "BLU": "https://blutopia.cc",
-                    "ULCX": "https://upload.cx",
-                    "HDB": "https://hdbits.org",
+                    "OnlyEncodes": "https://onlyencodes.cc",
+                    "Blutopia": "https://blutopia.cc",
+                    "UploadCx": "https://upload.cx",
+                    "HDBits": "https://hdbits.org",
                     "BTN": "https://broadcasthe.net",
-                    "BHD": "https://beyond-hd.me",
-                    "HUNO": "https://hawke.uno",
-                    "RF": "https://reelflix.xyz",
-                    "OTW": "https://oldtoons.world",
-                    "YUS": "https://yu-scene.net",
-                    "DP": "https://darkpeers.org",
-                    "SP": "https://seedpool.org",
+                    "BeyondHD": "https://beyond-hd.me",
+                    "HawkeUno": "https://hawke.uno",
+                    "ReelFlix": "https://reelflix.xyz",
+                    "OldToonsWorld": "https://oldtoons.world",
+                    "Yuscene": "https://yu-scene.net",
+                    "DarkPeers": "https://darkpeers.org",
+                    "Seedpool": "https://seedpool.org",
                 }
                 url = hardcoded_urls.get(name, "")
 
             if url:
                 # Determine pattern
-                if name == "PTP":
+                if name == "PassThePopcorn":
                     pattern = r"torrentid=(\d+)"
-                elif name in ("HDB", "BTN"):
+                elif name in ("HDBits", "BTN"):
                     pattern = r"id=(\d+)"
-                elif name == "BHD":
+                elif name == "BeyondHD":
                     pattern = r"details/(\d+)"
                 else:
                     pattern = r"/(\d+)$"
@@ -1493,7 +1493,7 @@ class QbittorrentClientMixin:
             else:
                 logger.info(f"[bold red]Failed to export {prefix}.torrent for {torrent_hash} after retries")
 
-        return torrent_file_path
+        return str(torrent_file_path) if torrent_file_path else None
 
     async def _process_base_torrent_creation(
         self,
@@ -1508,15 +1508,15 @@ class QbittorrentClientMixin:
         if not meta.base_torrent_created:
             torrent_storage_dir = client_config.get("torrent_storage_dir")
 
-            extracted_torrent_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+            extracted_torrent_dir = str(Path(meta.base_dir) / "tmp" / meta.uuid)
             Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
             # Set up piece size preference logic
-            mtv_config = self.config.get("TRACKERS", {}).get("MTV", {})
+            mtv_config = self.config.get("TRACKERS", {}).get("MoreThanTV", {})
             prefer_small_pieces = mtv_config.get("prefer_mtv_torrent", False)
             piece_limit = self.config["DEFAULT"].get("prefer_max_16_torrent", False)
 
-            # Use piece preference if MTV preference is true, otherwise use general piece limit
+            # Use piece preference if MoreThanTV preference is true, otherwise use general piece limit
             use_piece_preference = prefer_small_pieces or piece_limit
             piece_size_best_match: dict[str, Any] | None = None  # Track the best match for fallback if piece preference is enabled
             found_valid_torrent = False
@@ -1541,7 +1541,7 @@ class QbittorrentClientMixin:
                             # For piece_limit: prefer torrents with piece size <= 16 MiB (16777216 bytes)
                             is_better_match = False
                             if prefer_small_pieces:
-                                # MTV preference: always prefer smaller pieces
+                                # MoreThanTV preference: always prefer smaller pieces
                                 is_better_match = True if piece_size_best_match is None else piece_size < piece_size_best_match["piece_size"]
                             elif piece_limit and piece_size <= 16777216:
                                 # General preference: prefer <= 16 MiB pieces, then smaller within that range
@@ -1556,7 +1556,7 @@ class QbittorrentClientMixin:
                         except Exception as e:
                             logger.info(f"[bold red]Error reading torrent data for {torrent_hash}: {e}")
                             if Path(torrent_file_path).exists() and torrent_file_path.startswith(extracted_torrent_dir):
-                                os.remove(torrent_file_path)
+                                Path(torrent_file_path).unlink()
                     else:
                         # If piece preference is disabled, return first valid torrent
                         try:
@@ -1570,7 +1570,7 @@ class QbittorrentClientMixin:
                 else:
                     logger.debug(f"[bold red]{torrent_hash} failed validation")
                     if Path(torrent_file_path).exists() and torrent_file_path.startswith(extracted_torrent_dir):
-                        os.remove(torrent_file_path)
+                        Path(torrent_file_path).unlink()
 
                     # If first torrent fails validation, continue to try other matches
                     if not found_valid_torrent and meta.debug:
@@ -1599,7 +1599,7 @@ class QbittorrentClientMixin:
                                     # For piece_limit: prefer torrents with piece size <= 16 MiB (16777216 bytes)
                                     is_better_match = False
                                     if prefer_small_pieces:
-                                        # MTV preference: always prefer smaller pieces
+                                        # MoreThanTV preference: always prefer smaller pieces
                                         is_better_match = True if piece_size_best_match is None else piece_size < piece_size_best_match["piece_size"]
                                     elif piece_limit and piece_size <= 16777216:
                                         # General preference: prefer <= 16 MiB pieces, then smaller within that range
@@ -1632,7 +1632,7 @@ class QbittorrentClientMixin:
                         else:
                             logger.debug(f"[bold red]{alt_torrent_hash} failed validation")
                             if Path(alt_torrent_file_path).exists() and alt_torrent_file_path.startswith(extracted_torrent_dir):
-                                os.remove(alt_torrent_file_path)
+                                Path(alt_torrent_file_path).unlink()
 
                 if not found_valid_torrent:
                     logger.debug("[bold red]No valid torrents found after checking all matches, falling back to a best match if preference is set")
@@ -1641,7 +1641,7 @@ class QbittorrentClientMixin:
             # **Return the best match if piece preference is enabled**
             if use_piece_preference and piece_size_best_match and not found_valid_torrent:
                 try:
-                    preference_type = "MTV preference" if prefer_small_pieces else "16 MiB piece limit"
+                    preference_type = "MoreThanTV preference" if prefer_small_pieces else "16 MiB piece limit"
                     logger.info(f"[green]Using best match torrent ({preference_type}) with hash: {piece_size_best_match['hash']}")
                     await TorrentCreator.create_base_from_existing_torrent(piece_size_best_match["torrent_path"], meta.base_dir, meta.uuid)
                     if meta.debug:
@@ -1655,7 +1655,7 @@ class QbittorrentClientMixin:
                     # Check if the best match actually meets the piece size constraint
                     piece_size = piece_size_best_match["piece_size"]
                     if prefer_small_pieces and piece_size <= 8388608:  # 8 MiB
-                        meta.found_preferred_piece_size = "MTV"
+                        meta.found_preferred_piece_size = "MoreThanTV"
                     elif piece_limit and piece_size <= 16777216:  # 16 MiB
                         meta.found_preferred_piece_size = "16MiB"
                     else:
@@ -1766,10 +1766,10 @@ async def match_tracker_url(tracker_urls: list[str], meta: Meta) -> None:
                 if pattern in tracker:
                     found_ids.add(tracker_id.upper())
                     logger.debug(f"[bold cyan]Matched {tracker_id.upper()} in tracker URL: {Redaction.redact_private_info(tracker)}")
-                    if tracker_id.upper() == "PTP" and "passthepopcorn.me" in tracker and tracker.startswith("http://"):
-                        logger.info("[red]Found PTP announce URL using plaintext HTTP.\n")
+                    if tracker_id.upper() == "PassThePopcorn" and "passthepopcorn.me" in tracker and tracker.startswith("http://"):
+                        logger.info("[red]Found PassThePopcorn announce URL using plaintext HTTP.\n")
                         logger.info(
-                            "[red]PTP is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PTP/forums.php?page=1&action=viewthread&threadid=46663"
+                            "[red]PassThePopcorn is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PassThePopcorn/forums.php?page=1&action=viewthread&threadid=46663"
                         )
 
     if "remove_trackers" not in meta or not isinstance(meta.remove_trackers, list):

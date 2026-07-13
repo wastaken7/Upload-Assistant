@@ -172,7 +172,7 @@ async def disc_screenshots(
     keyframe = "nokey" if "VC-1" in bdinfo["video"][0]["codec"] or bdinfo["video"][0]["hdr_dv"] != "" else "none"
     logger.debug(f"File: {file_path}, Length: {length}, Frame Rate: {frame_rate}", extra={"markup": False})
     os.chdir(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}")
-    existing_screens = glob.glob(f"{sanitized_filename}-*.png")
+    existing_screens = [p.name for p in Path.cwd().glob(f"{glob.escape(sanitized_filename)}-*.png")]
     existing_screens = [f for f in existing_screens if re.match(r"^-\d+\.png$", Path(f).name[len(sanitized_filename) :])]
     total_existing = len(existing_screens) + len(existing_images)
     num_screens = max(0, screens - total_existing) if not force_screenshots else num_screens
@@ -262,7 +262,7 @@ async def disc_screenshots(
             try:
                 smallest: str = min(capture_results, key=os.path.getsize)
                 logger.debug(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)")
-                os.remove(smallest)
+                Path(smallest).unlink()
                 capture_results.remove(smallest)
             except Exception as e:
                 logger.error(f"[red]Error removing smallest image: {e!s}")
@@ -309,7 +309,7 @@ async def disc_screenshots(
                     try:
                         index = int(image_path.rsplit("-", 1)[-1].split(".")[0])
                         if Path(image_path).exists():
-                            os.remove(image_path)
+                            Path(image_path).unlink()
 
                         random_time = random.uniform(0, length)  # nosec B311 - Random screenshot timing, not cryptographic
                         screenshot_response = await capture_disc_task(index, file_path, str(random_time), image_path, keyframe, loglevel, hdr_tonemap, meta)
@@ -465,7 +465,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
         return
 
     sanitized_disc_name = await sanitize_filename(meta.discs[disc_num]["name"])
-    existing_screens = glob.glob(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{sanitized_disc_name}-*.png")
+    existing_screens = [str(p) for p in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(sanitized_disc_name)}-*.png")]
     normal_screens = [f for f in existing_screens if re.match(r"^-\d+\.png$", Path(f).name[len(sanitized_disc_name) :])]
     if len(normal_screens) >= num_screens:
         i = num_screens
@@ -606,7 +606,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
     if capture_results and len(capture_results) > num_screens:
         smallest = None
         smallest_size = float("inf")
-        matching_files = glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/") / f"{sanitized_disc_name}-*")
+        matching_files = [str(p) for p in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(sanitized_disc_name)}-*")]
         normal_screens = [Path(f).name for f in matching_files if re.match(r"^-\d+\.png$", Path(f).name[len(sanitized_disc_name) :])]
         for screens in normal_screens:
             screen_path = Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/") / screens
@@ -621,7 +621,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
 
         if smallest:
             logger.debug(f"[yellow]Removing smallest image: {smallest} ({smallest_size} bytes)[/yellow]")
-            os.remove(smallest)
+            Path(smallest).unlink()
             capture_results.remove(smallest)
 
     valid_results: list[str] = []
@@ -649,7 +649,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
 
                 if Path(image).exists():  # Prevent unnecessary deletion error
                     try:
-                        os.remove(image)
+                        Path(image).unlink()
                     except Exception as e:
                         logger.error(f"[red]Failed to delete {image}: {e}[/red]")
                         break
@@ -827,7 +827,7 @@ async def extract_embedded_cover_from_audiobook(meta: Meta, dest_path: str, conf
         audio_extensions = {".mp3", ".m4b", ".flac", ".aac", ".m4a", ".ogg", ".wav"}
 
         for audio_path in filelist:
-            ext = os.path.splitext(audio_path)[1].lower()
+            ext = Path(audio_path).suffix.lower()
             if ext not in audio_extensions:
                 continue
             if not Path(audio_path).exists():
@@ -1138,7 +1138,7 @@ async def generate_ebook_screenshots(
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     sanitized_filename = await sanitize_filename(filename)
 
-    extension = os.path.splitext(path)[1].lower().lstrip(".")
+    extension = Path(path).suffix.lower().lstrip(".")
     screenshots = []
 
     cover_path = Path(output_dir) / "POSTER.png"
@@ -1604,7 +1604,7 @@ async def screenshots(
                         )
                         try:
                             if Path(image_path).exists():
-                                os.remove(image_path)
+                                Path(image_path).unlink()
 
                             screenshot_response = await capture_screenshot(
                                 (original_index, path, adjusted_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta)
@@ -1650,7 +1650,7 @@ async def screenshots(
                 logger.info(f"[yellow]Retaking screenshot for: {image_path} (Attempt {attempt}/{retry_attempts}) at random time {random_time:.2f}s[/yellow]")
                 try:
                     if Path(image_path).exists():
-                        os.remove(image_path)
+                        Path(image_path).unlink()
 
                     screenshot_response = await capture_screenshot((original_index, path, random_time, image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta))
 
@@ -2171,7 +2171,7 @@ async def check_libplacebo_compatibility(
             logger.debug("[green]libplacebo compatibility test succeeded[/green]")
             with contextlib.suppress(Exception):
                 if Path(test_image_path).exists():
-                    os.remove(test_image_path)
+                    Path(test_image_path).unlink()
             return True, True
         can_hdr = await run_check(w_sar, h_sar, width, height, path, ss_time, image_path, loglevel, meta, try_libplacebo=False, test_image_path=test_image_path)
         if can_hdr:
@@ -2179,7 +2179,7 @@ async def check_libplacebo_compatibility(
             # Clean up the test image regardless of success/failure
             with contextlib.suppress(Exception):
                 if Path(test_image_path).exists():
-                    os.remove(test_image_path)
+                    Path(test_image_path).unlink()
             return False, True
     return False, False
 

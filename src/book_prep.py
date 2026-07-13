@@ -72,7 +72,7 @@ def resolve_book_filelist(
     if Path(videoloc).is_dir():
         for root, _, files in os.walk(videoloc):
             for file in files:
-                ext = os.path.splitext(file)[1].lower()
+                ext = Path(file).suffix.lower()
                 if ext in allowed_extensions:
                     filelist.append(str(Path(Path(root) / file).resolve()))
         filelist = sorted(filelist)
@@ -87,7 +87,7 @@ def resolve_book_filelist(
     meta.filelist = filelist
     meta.imdb_id = 0
 
-    primary_ext = os.path.splitext(videopath)[1].lower()
+    primary_ext = Path(videopath).suffix.lower()
     meta.audiobook = primary_ext in audiobook_extensions
 
     search_term = Path(filelist[0]).name if filelist else ""
@@ -198,7 +198,7 @@ async def gather_book_prep(
         logger.warning("[bold red]Warning: Google Books API key is not configured. Book metadata searches will be limited and incomplete.[/bold red]")
 
     # Check if the file format is CBR or CBZ and automatically set comic to True
-    file_ext = os.path.splitext(videopath)[1].lstrip(".").upper()
+    file_ext = Path(videopath).suffix.lstrip(".").upper()
     if file_ext in ("CBR", "CBZ"):
         meta.comic = True
 

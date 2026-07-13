@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import os
 import random
 import re
 from pathlib import Path
@@ -24,8 +23,12 @@ from src.trackers.UNIT3D import UNIT3D
 _shri_session_data: dict[str, dict[str, str | None]] = {}
 
 
-class SHRI(UNIT3D):
-    tracker = "SHRI"
+class Shareisland(UNIT3D):
+    """
+    Shareisland is a ITALIAN Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
+    tracker = "Shareisland"
     base_url = "https://shareisland.org"
     banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"
@@ -41,7 +44,7 @@ class SHRI(UNIT3D):
     MARKER_PATTERN = re.compile(r"\b(UNTOUCHED|VU1080|VU720|VU)\b", re.IGNORECASE)
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name="SHRI")
+        super().__init__(config, tracker_name="Shareisland")
         self.config = config
         self.common = COMMON(config)
         self.audio_manager = AudioManager(config)
@@ -285,7 +288,7 @@ class SHRI(UNIT3D):
             # Prompt for region if not in meta
             if not region_name and (not meta.unattended or meta.unattended_confirm):
                 while True:
-                    region_name = cli_ui.ask_string("SHRI: Region code not found for disc. Please enter it manually (mandatory): ")
+                    region_name = cli_ui.ask_string("Shareisland: Region code not found for disc. Please enter it manually (mandatory): ")
                     region_name = region_name.strip().upper() if region_name else None
                     if region_name:
                         break
@@ -293,20 +296,20 @@ class SHRI(UNIT3D):
 
             # Validate region name was provided
             if not region_name:
-                cli_ui.error("Region required; skipping SHRI.")
+                cli_ui.error("Region required; skipping Shareisland.")
                 raise ValueError("Region required for disc upload")
 
             # Validate region code with API
             region_id = await self.common.unit3d_region_ids(region_name)
             if not region_id:
-                cli_ui.error(f"Invalid region code '{region_name}'; skipping SHRI.")
+                cli_ui.error(f"Invalid region code '{region_name}'; skipping Shareisland.")
                 raise ValueError(f"Invalid region code: {region_name}")
 
             # Handle optional distributor
             distributor_name = meta.distributor
             distributor_id = None
             if not distributor_name and not meta.unattended:
-                distributor_name = cli_ui.ask_string("SHRI: Distributor (optional, Enter to skip): ")
+                distributor_name = cli_ui.ask_string("Shareisland: Distributor (optional, Enter to skip): ")
                 distributor_name = distributor_name.strip().upper() if distributor_name else None
 
             if distributor_name:
@@ -356,7 +359,7 @@ class SHRI(UNIT3D):
         return self._analyze_encode_type(meta)
 
     def _has_remux_marker(self, meta: Meta) -> bool:
-        name_no_ext = os.path.splitext(self.get_basename(meta))[0].lower()
+        name_no_ext = Path(self.get_basename(meta)).stem.lower()
         if "remux" in name_no_ext:
             return True
         if self.MARKER_PATTERN.search(name_no_ext):

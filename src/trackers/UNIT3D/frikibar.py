@@ -5,8 +5,12 @@ from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 
-class FRIKI(UNIT3D):
-    tracker = "FRIKI"
+class FrikiBar(UNIT3D):
+    """
+    FRIKI Private Torrent Tracker
+    """
+
+    tracker = "FrikiBar"
     base_url = "https://frikibar.com"
     banned_groups = ("",)
     id_url = f"{base_url}/api/torrents/"
@@ -16,6 +20,6 @@ class FRIKI(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name="FRIKI")
+        super().__init__(config, tracker_name="FrikiBar")
         self.config = config
         self.common = COMMON(config)

@@ -1,10 +1,8 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import contextlib
-import glob
 import hashlib
 import io
-import os
 import re
 import unicodedata
 from pathlib import Path
@@ -23,9 +21,13 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class SUIO:
+class Suio:
+    """
+    SUIO Private Torrent Tracker
+    """
+
     auth_type = "other_api"
-    tracker = "SUIO"
+    tracker = "Suio"
     banned_groups: tuple[str, ...] = ()
     upload_url: str | None = None
     torrent_url: str | None = None
@@ -230,12 +232,12 @@ class SUIO:
         nfo_content = None
         nfo_filename = None
         if meta.scene:
-            nfo_files = glob.glob(Path(nfo_dir) / "*.nfo")
+            nfo_files = list(nfo_dir.glob("*.nfo"))
             nfo_path = nfo_files[0] if nfo_files else None
-            if nfo_path and Path(nfo_path).exists():
+            if nfo_path and nfo_path.exists():
                 async with aiofiles.open(nfo_path, "rb") as f:
                     nfo_content = await f.read()
-                nfo_filename = Path(nfo_path).name
+                nfo_filename = nfo_path.name
         else:
             if meta.is_disc == "BDMV":
                 bdinfo_path = Path(nfo_dir) / "BD_SUMMARY_00.txt"
@@ -250,12 +252,12 @@ class SUIO:
                         nfo_content = await f.read()
                     nfo_filename = "MediaInfo.nfo"
             if not nfo_content:
-                nfo_files = glob.glob(Path(nfo_dir) / "*.nfo")
+                nfo_files = list(nfo_dir.glob("*.nfo"))
                 nfo_path = nfo_files[0] if nfo_files else None
-                if nfo_path and Path(nfo_path).exists():
+                if nfo_path and nfo_path.exists():
                     async with aiofiles.open(nfo_path, "rb") as f:
                         nfo_content = await f.read()
-                    nfo_filename = Path(nfo_path).name
+                    nfo_filename = nfo_path.name
         if nfo_content and nfo_filename:
             files["nfo"] = (nfo_filename, nfo_content, "application/octet-stream")
         # Cover image file (optional)
@@ -288,7 +290,7 @@ class SUIO:
                             return buf.getvalue()
 
                     cover_content = await asyncio.to_thread(_convert_to_jpg, cover_path)
-                    filename = os.path.splitext(Path(cover_path).name)[0] + ".jpg"
+                    filename = Path(cover_path).stem + ".jpg"
                 files["cover"] = (filename, cover_content, "image/jpeg")
         return files
 

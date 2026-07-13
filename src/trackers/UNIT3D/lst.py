@@ -10,6 +10,10 @@ Config = dict[str, Any]
 
 
 class LST(UNIT3D):
+    """
+    LST is an ENGLISH Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
     tracker = "LST"
     base_url = "https://lst.gg"
     banned_groups = ()

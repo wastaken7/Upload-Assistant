@@ -86,8 +86,8 @@ async def gen_desc(
 
     base_dir = meta.base_dir
     uuid = meta.uuid
-    specified_dir_path = Path(glob.escape(base_dir)) / "tmp" / uuid / "*.nfo"
-    source_dir_path = Path(glob.escape(meta.path or "")) / "*.nfo"
+    specified_dir = Path(base_dir) / "tmp" / uuid
+    source_dir = Path(meta.path or "")
 
     if meta.description_template:
         try:
@@ -107,13 +107,13 @@ async def gen_desc(
         logger.debug(f"specified_dir_path: {specified_dir_path}")
         logger.debug(f"sourcedir_path: {source_dir_path}")
         if "auto_nfo" in meta and meta.auto_nfo is True:
-            nfo_files = glob.glob(specified_dir_path)
+            nfo_files = sorted(str(p) for p in specified_dir.glob("*.nfo"))
             scene_nfo = True
         elif "bhd_nfo" in meta and meta.bhd_nfo is True:
-            nfo_files = glob.glob(specified_dir_path)
+            nfo_files = sorted(str(p) for p in specified_dir.glob("*.nfo"))
             bhd_nfo = True
         else:
-            nfo_files = glob.glob(source_dir_path)
+            nfo_files = sorted(str(p) for p in source_dir.glob("*.nfo"))
         if not nfo_files:
             logger.info("NFO was set but no nfo file was found")
             if not content_written:
@@ -289,7 +289,7 @@ class DescriptionBuilder:
             if not self._get_bool_config("add_logo", False):
                 return logo, logo_size
 
-            if self.tracker in ("BJS", "ANT", "GPW", "BT", "FF", "HDS", "HDT", "SPD"):
+            if self.tracker in ("BJShare", "Anthelion", "GreatPosterWall", "BrasilTracker", "FunFile", "HDSpace", "HDTorrents", "SpeedApp"):
                 logo_resize_url = meta.tmdb_logo
                 if logo_resize_url:
                     if logo_resize_url.endswith(".svg"):
@@ -315,7 +315,7 @@ class DescriptionBuilder:
             if not self._get_bool_config("episode_overview", False) or meta.category != "TV":
                 return title, overview
 
-            if self.tracker in ("CBR", "BJS", "BT", "LCD", "SAM"):
+            if self.tracker in ("CapybaraBR", "BJShare", "BrasilTracker", "Locadora", "Samaritano"):
                 episode_tmdb_data = meta.episode_tmdb_data
                 title = episode_tmdb_data.get("name", "")
                 overview = episode_tmdb_data.get("overview", "")
@@ -502,9 +502,9 @@ class DescriptionBuilder:
                     web_url = img_data.get("web_url", "")
                     raw_url = img_data.get("raw_url", "")
 
-                    if self.tracker == "TL":
+                    if self.tracker == "TorrentLeech":
                         cover_list.append(f"""<a href="{web_url}"><img src="{raw_url}" style="max-width: {cover_size}px;"></a>  """)
-                    elif self.tracker == "HDT":
+                    elif self.tracker == "HDTorrents":
                         cover_list.append(f"<a href='{raw_url}'><img src='{web_url}' height=137></a> ")
                     else:
                         cover_list.append(f"[url={web_url}][img={cover_size}]{raw_url}[/img][/url]")
@@ -549,13 +549,13 @@ class DescriptionBuilder:
 
     def _build_book_desc_section(self, meta: Meta, header_size: int = 0, table: bool = True, underline: bool = False, bullet: str = "") -> str:
         """Build the BBCode table or list for BOOK-category uploads."""
-        if self.tracker == "TL":
+        if self.tracker == "TorrentLeech":
             table = False
             header_size = -1
-        elif self.tracker in ("BJS", "BT", "ASC"):
+        elif self.tracker in ("BJShare", "BrasilTracker", "AmigosShare"):
             if not header_size:
                 header_size = 3
-            if self.tracker == "ASC":
+            if self.tracker == "AmigosShare":
                 table = False
 
         header = "[h2]" if not header_size else f"[size={header_size}][b]"
@@ -571,7 +571,7 @@ class DescriptionBuilder:
         publisher = meta.publisher
         year = str(meta.year) if meta.year is not None else ""
 
-        use_pt_br = self.tracker in ("ASC", "BT", "CBR", "SAM", "BJS")
+        use_pt_br = self.tracker in ("AmigosShare", "BrasilTracker", "CapybaraBR", "Samaritano", "BJShare")
 
         str_asin = "ASIN"
         str_author = "Author" if not use_pt_br else "Autor"
@@ -674,15 +674,15 @@ class DescriptionBuilder:
 
         game_parts: list[str] = []
 
-        if self.tracker == "TL" and not header_size:
+        if self.tracker == "TorrentLeech" and not header_size:
             header_size = 1
-        elif self.tracker in ("BJS", "BT") and not header_size:
+        elif self.tracker in ("BJShare", "BrasilTracker") and not header_size:
             header_size = 3
 
         header = "[h2]" if not header_size else f"[size={header_size}][b]"
         header_end = "[/h2]" if not header_size else "[/b][/size]\n"
 
-        use_pt_br = self.tracker in ("ASC", "BT", "CBR", "SAM", "BJS")
+        use_pt_br = self.tracker in ("AmigosShare", "BrasilTracker", "CapybaraBR", "Samaritano", "BJShare")
         str_technical_details = "Technical Details" if not use_pt_br else "Detalhes Técnicos"
         str_overview = "Overview" if not use_pt_br else "Visão Geral"
         str_platform = "Platform" if not use_pt_br else "Plataforma"
@@ -886,40 +886,40 @@ class DescriptionBuilder:
             if logo_url and logo_size:
                 desc_parts.append(f"[center][img={logo_size}]{logo_url}[/img][/center]\n")
 
-        # Mediainfo / BDInfo section for trackers like BJS
+        # Mediainfo / BDInfo section for trackers like BJShare
         if mediainfo:
-            if self.tracker == "BJS":
+            if self.tracker == "BJShare":
                 if meta.is_disc == "DVD":
                     desc_parts.append(f"[hide=DVD MediaInfo][pre]{await self.get_mediainfo_section(meta)}[/pre][/hide]")
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(f"[hide=BDInfo][pre]{bd_info}[/pre][/hide]")
-            elif self.tracker == "DC":
+            elif self.tracker == "DigitalCore":
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(bd_info)
-            elif self.tracker in ("FF", "HDS", "IPT", "IS"):
+            elif self.tracker in ("FunFile", "HDSpace", "IPTorrents", "ImmortalSeed"):
                 mediainfo_sec = await self.get_mediainfo_section(meta)
                 if mediainfo_sec:
                     desc_parts.append(f"[pre]{mediainfo_sec}[/pre]")
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(f"[pre]{bd_info}[/pre]")
-            elif self.tracker == "PTS":
+            elif self.tracker == "Ptskit":
                 mediainfo_sec = await self.get_mediainfo_section(meta)
                 if mediainfo_sec:
                     desc_parts.append(mediainfo_sec)
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(bd_info)
-            elif self.tracker == "HDT":
+            elif self.tracker == "HDTorrents":
                 mediainfo_sec = await self.get_mediainfo_section(meta)
                 if mediainfo_sec:
                     desc_parts.append(f"[left][font=consolas]{mediainfo_sec}[/font][/left]")
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(f"[left][font=consolas]{bd_info}[/font][/left]")
-            elif self.tracker == "MTV":
+            elif self.tracker == "MoreThanTV":
                 mediainfo_sec = await self.get_mediainfo_section(meta)
                 if mediainfo_sec:
                     desc_parts.append(f"[mediainfo]{mediainfo_sec}[/mediainfo]\n\n")
@@ -928,7 +928,7 @@ class DescriptionBuilder:
                     desc_parts.append(f"[mediainfo]{bd_info}[/mediainfo]\n\n")
                 if meta.is_disc == "DVD" and isinstance(meta.discs, list) and len(meta.discs) > 0 and "vob_mi" in meta.discs[0]:
                     desc_parts.append(f"[mediainfo]{meta.discs[0]['vob_mi']}[/mediainfo]\n\n")
-            elif self.tracker == "TL":
+            elif self.tracker == "TorrentLeech":
                 mediainfo_sec = await self.get_mediainfo_section(meta)
                 if mediainfo_sec:
                     desc_parts.append(mediainfo_sec)
@@ -966,10 +966,10 @@ class DescriptionBuilder:
             if game_section:
                 desc_parts.append(game_section)
 
-        if self.tracker == "MTEAM" and meta.mteam_description:
+        if self.tracker == "MTeam" and meta.mteam_description:
             desc_parts.append(meta.mteam_description)
 
-        if self.tracker in {"LAJIDUI", "LPT", "PTCAFE", "PTFANS", "PTGTK", "RPT", "NEXUSPHP"} and meta.nexusphp_description:
+        if self.tracker in {"Lajidui", "LongPT", "PTCafe", "PTFans", "PTGTK", "RailgunPT", "NEXUSPHP"} and meta.nexusphp_description:
             desc_parts.append(meta.nexusphp_description)
 
         # Description that may come from API requests
@@ -982,7 +982,7 @@ class DescriptionBuilder:
             else:
                 meta_description = str(meta_description_value)
             # Add FraMeSToR NFO to Aither
-            if self.tracker == "AITHER" and "framestor" in meta and meta.framestor:
+            if self.tracker == "Aither" and "framestor" in meta and meta.framestor:
                 nfo_content = meta.description_nfo_content
                 if nfo_content:
                     aither_framestor_nfo = f"[code]{nfo_content}[/code]"
@@ -1003,7 +1003,7 @@ class DescriptionBuilder:
                     if meta_description:
                         desc_parts.append(meta_description)
             elif meta_description:
-                if self.tracker == "MTV":
+                if self.tracker == "MoreThanTV":
                     meta_description = re.sub(r"\[/?quote\]", "", meta_description, flags=re.IGNORECASE).strip()
                     if meta_description:
                         desc_parts.append(f"[spoiler=Notes]{meta_description}[/spoiler]")
@@ -1014,9 +1014,9 @@ class DescriptionBuilder:
         if nfo:
             nfo_content = meta.description_nfo_content
             if isinstance(nfo_content, str) and nfo_content:
-                if self.tracker == "DC":
+                if self.tracker == "DigitalCore":
                     desc_parts.append(f"[nfo]{nfo_content}[/nfo]")
-                elif self.tracker == "TL":
+                elif self.tracker == "TorrentLeech":
                     desc_parts.append(f"<div style='display: flex; justify-content: center;'><div style='background-color: #000000; color: #ffffff;'>{nfo_content}</div></div>")
                 else:
                     desc_parts.append(f"[pre]{nfo_content}[/pre]")
@@ -1263,7 +1263,7 @@ class DescriptionBuilder:
                             desc_parts.append("[/center]\n\n")
                             meta.retry_count += 1
                             meta[new_images_key] = []
-                            new_screens = [Path(f).name for f in glob.glob(Path(glob.escape(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")) / f"PLAYLIST_{i}-*.png")]
+                            new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"PLAYLIST_{i}-*.png")]
                             if not new_screens:
                                 use_vs = meta.vapoursynth
                                 try:
@@ -1281,7 +1281,7 @@ class DescriptionBuilder:
                                     )
                                 except Exception as e:
                                     logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
-                                new_screens = [Path(f).name for f in glob.glob(Path(glob.escape(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")) / f"PLAYLIST_{i}-*.png")]
+                                new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"PLAYLIST_{i}-*.png")]
                             if new_screens and not meta.skip_imghost_upload:
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
                                     meta,
@@ -1411,12 +1411,9 @@ class DescriptionBuilder:
                             # Check if new screenshots already exist before running prep.screenshots
                             new_screens: list[str] = []
                             if each["type"] == "BDMV":
-                                new_screens = [Path(f).name for f in glob.glob(Path(glob.escape(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")) / f"FILE_{i}-*.png")]
+                                new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
                             elif each["type"] == "DVD":
-                                new_screens = [
-                                    Path(f).name
-                                    for f in glob.glob(Path(glob.escape(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")) / f"{glob.escape(meta.discs[i]['name'])}-*.png")
-                                ]
+                                new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
                             if not new_screens:
                                 logger.debug(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
                                 # Run prep.screenshots if no screenshots are present
@@ -1437,16 +1434,13 @@ class DescriptionBuilder:
                                         )
                                     except Exception as e:
                                         logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
-                                    new_screens = [Path(f).name for f in glob.glob(Path(glob.escape(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")) / f"FILE_{i}-*.png")]
+                                    new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
                                 if each["type"] == "DVD":
                                     try:
                                         await self.takescreens_manager.dvd_screenshots(meta, i, multi_screens, True)
                                     except Exception as e:
                                         logger.info(f"Error during DVD screenshot capture: {e}", extra={"markup": False})
-                                    new_screens = [
-                                        Path(f).name
-                                        for f in glob.glob(Path(glob.escape(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")) / f"{glob.escape(meta.discs[i]['name'])}-*.png")
-                                    ]
+                                    new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
 
                             if new_screens and not meta.skip_imghost_upload:
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
@@ -1571,7 +1565,7 @@ class DescriptionBuilder:
                     if new_images_key not in meta or not meta[new_images_key]:
                         meta[new_images_key] = []
                         # Proceed with image generation if not already present
-                        new_screens = [Path(f).name for f in glob.glob(Path(glob.escape(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")) / f"FILE_{i}-*.png")]
+                        new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
 
                         # If no screenshots exist, create them
                         if not new_screens and meta.debug:
@@ -1590,7 +1584,7 @@ class DescriptionBuilder:
                         except Exception as e:
                             logger.info(f"Error during generic screenshot capture: {e}", extra={"markup": False})
 
-                        new_screens = [Path(f).name for f in glob.glob(Path(glob.escape(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")) / f"FILE_{i}-*.png")]
+                        new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
 
                         # Upload generated screenshots
                         if new_screens and not meta.skip_imghost_upload:
@@ -1631,7 +1625,7 @@ class DescriptionBuilder:
                 if i >= process_limit:
                     continue
                 # Extract filename directly from the file path
-                filename = os.path.splitext(Path(file.strip()).name)[0].replace("[", "").replace("]", "")
+                filename = Path(file.strip()).stem.replace("[", "").replace("]", "")
 
                 # If we are beyond the file limit, add all further files in a spoiler
                 if multi_screens != 0 and i >= file_limit and not other_files_spoiler_open:
@@ -1702,7 +1696,7 @@ class DescriptionBuilder:
         try:
             # If screens_per_row is set, use that to determine how many screenshots should be on each row. Otherwise, use 2 as default
             screens_per_row = self._get_int_config("screens_per_row", 2)
-            if self.tracker == "HUNO":
+            if self.tracker == "HawkeUno":
                 width = self._get_int_config("thumbnail_size", 350)
                 # Adjust screens_per_row to keep total width below 1100
                 while screens_per_row * width > 1100 and screens_per_row > 1:
@@ -1745,32 +1739,32 @@ class DescriptionBuilder:
         if not thumb_size:
             thumb_size = self._get_int_config("thumbnail_size", 350)
 
-        nexusphp_trackers = {"LAJIDUI", "LPT", "PTCAFE", "PTFANS", "PTGTK", "RPT", "NEXUSPHP"}
+        nexusphp_trackers = {"Lajidui", "LongPT", "PTCafe", "PTFans", "PTGTK", "RailgunPT", "NEXUSPHP"}
         if self.tracker in nexusphp_trackers:
             return f"[img]{raw_url}[/img]"
-        if self.tracker == "HDT":
+        if self.tracker == "HDTorrents":
             return f"<a href='{raw_url}'><img src='{img_url}' height=137></a> "
-        if self.tracker == "TL":
+        if self.tracker == "TorrentLeech":
             return f'<a href="{web_url}"><img src="{img_url}" style="max-width: {thumb_size}px;"></a>  '
-        if self.tracker == "FF":
+        if self.tracker == "FunFile":
             return f'<a href="{web_url}" target="_blank"><img src="{img_url}" width="{thumb_size}"></a> '
-        if self.tracker == "GPW":
+        if self.tracker == "GreatPosterWall":
             return f"[img]{raw_url}[/img] "
-        if self.tracker in ("HDS", "IPT"):
+        if self.tracker in ("HDSpace", "IPTorrents"):
             if "imgbox" not in web_url:
                 return f"[url={web_url}][img]{img_url}[/img][/url]\n"
             return f"[url={web_url}][img]{img_url}[/img][/url] "
-        if self.tracker == "MTV":
+        if self.tracker == "MoreThanTV":
             return f"[url={raw_url}][img={thumb_size}]{img_url}[/img][/url] "
         return f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url] "
 
     def tracker_specific_formats(self, tracker: str, description: str) -> str:
         bbcode = BBCODE()
-        if tracker == "BT":
+        if tracker == "BrasilTracker":
             description = bbcode.remove_img_resize(description)
             description = bbcode.remove_list(description)
 
-        if tracker == "BJS":
+        if tracker == "BJShare":
             description = bbcode.convert_named_spoiler_to_named_hide(description)
             description = bbcode.convert_spoiler_to_hide(description)
             description = bbcode.remove_img_resize(description)
@@ -1778,7 +1772,7 @@ class DescriptionBuilder:
             description = bbcode.remove_list(description)
             description = description.replace("[code]", "[pre]").replace("[/code]", "[/pre]")
 
-        if tracker == "ANT":
+        if tracker == "Anthelion":
             description = bbcode.convert_to_align(description)
             description = bbcode.remove_img_resize(description)
             description = bbcode.remove_sup(description)
@@ -1787,7 +1781,7 @@ class DescriptionBuilder:
             description = description.replace("•", "-").replace("’", "'").replace("–", "-")
             description = description.replace("[code]", "[pre]").replace("[/code]", "[/pre]")
 
-        if tracker == "DC":
+        if tracker == "DigitalCore":
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[align=left]", "").replace("[/align]", "")
             description = description.replace("[right]", "").replace("[/right]", "")
@@ -1807,7 +1801,7 @@ class DescriptionBuilder:
             description = bbcode.remove_list(description)
             description = description.strip()
 
-        if tracker == "FF":
+        if tracker == "FunFile":
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[align=left]", "").replace("[/align]", "")
             description = description.replace("[right]", "").replace("[/right]", "")
@@ -1846,7 +1840,7 @@ class DescriptionBuilder:
             # [img=200]...[/img] (no [url])
             description = re.sub(r"\[img=(?P<width>\d+)\](?P<src>[^\[]+)\[/img\]", r'<img src="\g<src>" width="\g<width>">', description, flags=re.IGNORECASE)
 
-        if tracker == "GPW":
+        if tracker == "GreatPosterWall":
             description = bbcode.remove_sup(description)
             description = bbcode.remove_sub(description)
             description = bbcode.convert_to_align(description)
@@ -1854,7 +1848,7 @@ class DescriptionBuilder:
             description = description.replace("[code]", "[pre]").replace("[/code]", "[/pre]")
             description = re.sub(r"\[url=[^\]]+\]\[img(?:=[^\]]+)?\]([^\[]+)\[/img\]\[/url\]", r"[img]\1[/img]", description, flags=re.IGNORECASE)
 
-        if tracker == "HDS":
+        if tracker == "HDSpace":
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[align=left]", "").replace("[/align]", "")
             description = description.replace("[right]", "").replace("[/right]", "")
@@ -1875,7 +1869,7 @@ class DescriptionBuilder:
             description = bbcode.remove_spoiler(description)
             description = bbcode.remove_color(description)
 
-            # Apply custom image line breaks for HDS: if "imgbox" is not in the web_url, place only one image per line.
+            # Apply custom image line breaks for HDSpace: if "imgbox" is not in the web_url, place only one image per line.
             def hds_image_formatter(match) -> str:
                 web_url = match.group(1)
                 raw_url = match.group(2)
@@ -1886,7 +1880,7 @@ class DescriptionBuilder:
             pattern = r"\[url=([^\]]+)\]\[img(?:=[^\]]*)?\]([^\[]+)\[/img\]\[/url\]\s*"
             description = re.sub(pattern, hds_image_formatter, description)
 
-        if tracker == "IPT":
+        if tracker == "IPTorrents":
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[align=left]", "").replace("[/align]", "")
             description = description.replace("[right]", "").replace("[/right]", "")
@@ -1906,7 +1900,7 @@ class DescriptionBuilder:
             description = bbcode.convert_comparison_to_centered(description, 1000)
             description = bbcode.remove_spoiler(description)
 
-        if tracker == "HDT":
+        if tracker == "HDTorrents":
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[align=left]", "").replace("[/align]", "")
             description = description.replace("[align=right]", "").replace("[/align]", "")
@@ -1926,7 +1920,7 @@ class DescriptionBuilder:
             description = bbcode.remove_spoiler(description)
             description = bbcode.remove_list(description)
 
-        if tracker == "PTS":
+        if tracker == "Ptskit":
             description = description.replace("[user]", "").replace("[/user]", "")
             description = description.replace("[align=left]", "").replace("[/align]", "")
             description = description.replace("[right]", "").replace("[/right]", "")
@@ -1947,14 +1941,14 @@ class DescriptionBuilder:
             description = bbcode.remove_spoiler(description)
             description = re.sub(r"\n{3,}", "\n\n", description)
 
-        if tracker == "SPD":
+        if tracker == "SpeedApp":
             description = bbcode.remove_img_resize(description)
             description = bbcode.convert_named_spoiler_to_normal_spoiler(description)
             description = description.replace("[note]", "Note: ").replace("[/note]", "").replace("[code]", "").replace("[/code]", "").replace("[*]", "• ")
             description = bbcode.remove_spoiler(description)
             description = bbcode.remove_list(description)
 
-        if tracker == "TL":
+        if tracker == "TorrentLeech":
             description = description.replace("[center]", "<center>").replace("[/center]", "</center>")
             description = re.sub(r"\[\*\]", "\n[*]", description, flags=re.IGNORECASE)
             description = re.sub(r"\[c\](.*?)\[/c\]", r"[code]\1[/code]", description, flags=re.IGNORECASE | re.DOTALL)

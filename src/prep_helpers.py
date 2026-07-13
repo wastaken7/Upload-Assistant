@@ -136,7 +136,7 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     if meta.isdir:
         meta.basename_no_ext = folder_id
     else:
-        meta.basename_no_ext = os.path.splitext(folder_id)[0]
+        meta.basename_no_ext = Path(folder_id).stem
     if not Path(f"{base_dir}{'/' + 'tmp' + '/'}{meta.uuid}").exists():
         Path(f"{base_dir}{'/' + 'tmp' + '/'}{meta.uuid}").mkdir(parents=True, mode=0o700, exist_ok=True)
 
@@ -167,7 +167,7 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                 has_video = False
                 for _root, _, files in os.walk(path_to_check):
                     for file in files:
-                        ext = os.path.splitext(file)[1].lower()
+                        ext = Path(file).suffix.lower()
                         if ext in book_extensions:
                             has_books = True
                         elif ext in audiobook_extensions:
@@ -178,7 +178,7 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                 if (has_books or has_audio) and not has_video:
                     is_book = True
             else:
-                ext = os.path.splitext(path_to_check)[1].lower()
+                ext = Path(path_to_check).suffix.lower()
                 if ext in book_extensions or ext in audiobook_extensions:
                     is_book = True
 
@@ -241,7 +241,7 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                 for root, _, files in os.walk(path_to_check):
                     for file in files:
                         file_lower = file.lower()
-                        ext = os.path.splitext(file_lower)[1]
+                        ext = Path(file_lower).suffix
                         if ext in game_extensions:
                             has_game_ext = True
                         elif ext in video_extensions:
@@ -260,7 +260,7 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                                         if _nfo_has_store_link(nfo_content):
                                             has_steam_link = True
             else:
-                ext = os.path.splitext(base_name_lower)[1]
+                ext = Path(base_name_lower).suffix
                 if ext in game_extensions:
                     has_game_ext = True
 
@@ -419,23 +419,23 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                     if any(x in root.upper() for x in ["BDMV", "VIDEO_TS", "HVDVD_TS"]):
                         continue
                     for file in files:
-                        ext = os.path.splitext(file)[1].lower()
+                        ext = Path(file).suffix.lower()
                         if ext in subtitle_exts:
                             meta.subtitle_files.append(str(Path(Path(root) / file).resolve()))
             else:
                 parent_dir = str(Path(meta_path).parent)
                 if parent_dir and Path(parent_dir).exists():
-                    base_name = os.path.splitext(Path(meta_path).name)[0]
+                    base_name = Path(meta_path).stem
                     for file in os.listdir(parent_dir):
                         if os.path.isfile(Path(parent_dir) / file):
-                            ext = os.path.splitext(file)[1].lower()
+                            ext = Path(file).suffix.lower()
                             if ext in subtitle_exts and file.lower().startswith(base_name.lower()):
                                 meta.subtitle_files.append(str(Path(Path(parent_dir) / file).resolve()))
             meta.subtitle_files = sorted(set(meta.subtitle_files))
 
         video, meta.scene, meta.imdb_id = await prep_instance.scene_manager.is_scene(videopath, meta, meta.imdb_id)
         if meta.category == "BOOK" or (meta.manual_category or "").upper() == "BOOK":
-            orig_ext = os.path.splitext(videopath)[1]
+            orig_ext = Path(videopath).suffix
             if video.endswith(".mkv") and not videopath.endswith(".mkv"):
                 video = video[:-4] + orig_ext
 
@@ -577,7 +577,7 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
                     for file in os.listdir(tmp_dir):
                         file_path = Path(tmp_dir) / file
                         if os.path.isfile(file_path) and file.endswith((".txt", ".json")):
-                            os.remove(file_path)
+                            file_path.unlink()
                             logger.debug(f"[yellow]Removed temporary metadata file: {file_path}[/yellow]")
                 except Exception as e:
                     logger.error(f"[red]Error cleaning up temporary metadata files: {e}[/red]", extra={"highlighter": None})
@@ -872,8 +872,8 @@ async def search_metadata(
         meta.original_language = manual_language.lower()
 
     if meta.category == "BOOK":
-        meta.type = os.path.splitext(videopath)[1].lstrip(".").upper()
-        if meta.type in ("CBR", "CBZ"):
+        meta.type = Path(videopath).suffix.lstrip(".").upper()
+        if meta.type in ("CapybaraBR", "CBZ"):
             meta.comic = True
     elif meta.category == "GAME":
         meta.type = "GAME"
@@ -1507,15 +1507,15 @@ async def finalize_metadata(
     meta.tvmaze = meta.tvmaze_id
 
     if meta.category == "BOOK":
-        meta.container = os.path.splitext(videopath)[1].lstrip(".").lower()
+        meta.container = Path(videopath).suffix.lstrip(".").lower()
         meta.audio = ""
         meta.channels = ""
         meta.has_commentary = False
         meta.three_d = ""
         meta.source = "WEB"
         if not meta.type:
-            meta.type = os.path.splitext(videopath)[1].lstrip(".").upper()
-        if meta.type.upper() in ("CBR", "CBZ"):
+            meta.type = Path(videopath).suffix.lstrip(".").upper()
+        if meta.type.upper() in ("CapybaraBR", "CBZ"):
             meta.comic = True
         meta.uhd = ""
         meta.hdr = ""
@@ -1539,7 +1539,7 @@ async def finalize_metadata(
         if not meta.genres:
             meta.genres = []
     elif meta.category == "GAME":
-        meta.container = os.path.splitext(videopath)[1].lstrip(".").lower()
+        meta.container = Path(videopath).suffix.lstrip(".").lower()
         meta.audio = ""
         meta.channels = ""
         meta.has_commentary = False
@@ -1587,7 +1587,7 @@ async def finalize_metadata(
                         if (
                             (data_type == "season" and meta.category != "TV")
                             or (data_type == "episode" and (meta.category != "TV" or meta.tv_pack))
-                            or (data_type == "episode" and tracker_name in ("BJS", "BT") and not prep_instance.config["DEFAULT"].get("episode_overview", False))
+                            or (data_type == "episode" and tracker_name in ("BJShare", "BrasilTracker") and not prep_instance.config["DEFAULT"].get("episode_overview", False))
                             or (data_type == "main" and meta.category not in ("TV", "MOVIE"))
                         ):
                             continue

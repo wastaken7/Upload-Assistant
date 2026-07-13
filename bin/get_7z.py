@@ -78,9 +78,9 @@ class SevenZipBinaryManager:
 
         # Cleanup old files
         if binary_path.exists():
-            os.remove(binary_path)
+            binary_path.unlink()
         if version_path.exists():
-            os.remove(version_path)
+            version_path.unlink()
 
         download_url = f"https://github.com/ip7z/7zip/releases/download/{version}/{file_pattern}"
         logger.debug(f"[blue]7-Zip Download URL: {download_url}[/blue]")

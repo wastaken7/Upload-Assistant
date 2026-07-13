@@ -76,6 +76,8 @@ class Args:
         self.config = config
 
     def parse(self, argv: Sequence[str], meta: Meta) -> tuple[Meta, CustomArgumentParser, list[str]]:
+        from src.trackersetup import normalize_tracker_name
+
         input = list(argv)
         parser = CustomArgumentParser(
             usage="upload.py [path...] [options]",
@@ -315,33 +317,33 @@ class Args:
             required=False,
             help="Use the largest video file for processing instead of the first video file found",
         )
-        parser.add_argument("-ptp", "--ptp", nargs=1, required=False, help="PTP torrent id/permalink", type=str)
-        parser.add_argument("-blu", "--blu", nargs=1, required=False, help="BLU torrent id/link", type=str)
+        parser.add_argument("-ptp", "--ptp", nargs=1, required=False, help="PassThePopcorn torrent id/permalink", type=str)
+        parser.add_argument("-blu", "--blu", nargs=1, required=False, help="Blutopia torrent id/link", type=str)
         parser.add_argument("-aither", "--aither", nargs=1, required=False, help="Aither torrent id/link", type=str)
         parser.add_argument("-lst", "--lst", nargs=1, required=False, help="LST torrent id/link", type=str)
-        parser.add_argument("-oe", "--oe", nargs=1, required=False, help="OE torrent id/link", type=str)
-        parser.add_argument("-hdb", "--hdb", nargs=1, required=False, help="HDB torrent id/link", type=str)
+        parser.add_argument("-oe", "--oe", nargs=1, required=False, help="OnlyEncodes torrent id/link", type=str)
+        parser.add_argument("-hdb", "--hdb", nargs=1, required=False, help="HDBits torrent id/link", type=str)
         parser.add_argument("-btn", "--btn", nargs=1, required=False, help="BTN torrent id/link", type=str)
-        parser.add_argument("-bhd", "--bhd", nargs=1, required=False, help="BHD torrent_id/link", type=str)
-        parser.add_argument("-huno", "--huno", nargs=1, required=False, help="HUNO torrent id/link", type=str)
-        parser.add_argument("-ulcx", "--ulcx", nargs=1, required=False, help="ULCX torrent id/link", type=str)
+        parser.add_argument("-bhd", "--bhd", nargs=1, required=False, help="BeyondHD torrent_id/link", type=str)
+        parser.add_argument("-huno", "--huno", nargs=1, required=False, help="HawkeUno torrent id/link", type=str)
+        parser.add_argument("-ulcx", "--ulcx", nargs=1, required=False, help="UploadCx torrent id/link", type=str)
         parser.add_argument("-req", "--search_requests", action="store_true", required=False, help="Search for matching requests on supported trackers", default=None)
         parser.add_argument("-sat", "--skip_auto_torrent", action="store_true", required=False, help="Skip automated qbittorrent client torrent searching", default=None)
         parser.add_argument(
             "-onlyID", "--onlyID", action="store_true", required=False, help="Only grab meta ids (tmdb/imdb/etc) from tracker, not description/image links.", default=None
         )
-        parser.add_argument("--foreign", dest="foreign", action="store_true", required=False, help="Set for TIK Foreign category")
-        parser.add_argument("--opera", dest="opera", action="store_true", required=False, help="Set for TIK Opera & Musical category")
-        parser.add_argument("--asian", dest="asian", action="store_true", required=False, help="Set for TIK Asian category")
+        parser.add_argument("--foreign", dest="foreign", action="store_true", required=False, help="Set for Cinematik Foreign category")
+        parser.add_argument("--opera", dest="opera", action="store_true", required=False, help="Set for Cinematik Opera & Musical category")
+        parser.add_argument("--asian", dest="asian", action="store_true", required=False, help="Set for Cinematik Asian category")
         parser.add_argument(
             "-disctype",
             "--disctype",
             nargs=1,
             required=False,
-            help="Type of disc for TIK (BD100, BD66, BD50, BD25, NTSC DVD9, NTSC DVD5, PAL DVD9, PAL DVD5, Custom, 3D)",
+            help="Type of disc for Cinematik (BD100, BD66, BD50, BD25, NTSC DVD9, NTSC DVD5, PAL DVD9, PAL DVD5, Custom, 3D)",
             type=str,
         )
-        parser.add_argument("--untouched", dest="untouched", action="store_true", required=False, help="Set when a completely untouched disc at TIK")
+        parser.add_argument("--untouched", dest="untouched", action="store_true", required=False, help="Set when a completely untouched disc at Cinematik")
         parser.add_argument(
             "-manual_dvds",
             "--manual_dvds",
@@ -460,7 +462,7 @@ class Args:
             help="(qBitTorrent only with auto torrent searching) Force recheck torrent in client before uploading",
             dest="force_recheck",
         )
-        parser.add_argument("-dr", "--draft", action="store_true", required=False, help="Send to drafts (BHD, LST)")
+        parser.add_argument("-dr", "--draft", action="store_true", required=False, help="Send to drafts (BeyondHD, LST)")
         parser.add_argument("-mq", "--modq", action="store_true", required=False, help="Send to modQ")
         parser.add_argument("-client", "--client", nargs=1, required=False, help="Use this torrent client instead of default")
         parser.add_argument("-qbt", "--qbit-tag", dest="qbit_tag", nargs=1, required=False, help="Add to qbit with this tag")
@@ -537,7 +539,7 @@ class Args:
             "--channel",
             nargs=1,
             required=False,
-            help="SPD only: Channel ID number or tag to upload to (preferably the ID), without '@'. Example: '-ch spd' when using a tag, or '-ch 1' when using an ID.",
+            help="SpeedApp only: Channel ID number or tag to upload to (preferably the ID), without '@'. Example: '-ch spd' when using a tag, or '-ch 1' when using an ID.",
             type=str,
             dest="spd_channel",
             default="",
@@ -737,7 +739,7 @@ class Args:
                                 else:
                                     meta.bhd = bhdpath.split("/")[-1]
 
-                                logger.info(f"[green]Parsed BHD torrent ID: {meta.bhd}")
+                                logger.info(f"[green]Parsed BeyondHD torrent ID: {meta.bhd}")
                             except Exception as e:
                                 logger.info(f"[red]Unable to parse id from url: {e}")
                                 logger.info("[red]Continuing without --bhd")
@@ -781,13 +783,13 @@ class Args:
                 if isinstance(value, list):
                     value_list = [str(item) for item in value]
                     if len(value_list) == 1:
-                        meta[key] = value_list[0].upper()  # Extract the tracker acronym and uppercase it
+                        meta[key] = normalize_tracker_name(value_list[0])  # Extract the tracker acronym and normalize it
                     elif value_list:
-                        meta[key] = str(value_list).upper()
+                        meta[key] = normalize_tracker_name(str(value_list))
                     else:
                         meta[key] = None
                 elif value is not None:
-                    meta[key] = str(value).upper()
+                    meta[key] = normalize_tracker_name(str(value))
                 else:
                     meta[key] = None
             if key == "manual_year":
@@ -870,21 +872,21 @@ class Args:
 
                         # Split by comma if present
                         if "," in tracker_value:
-                            meta[key] = [t.strip().upper() for t in tracker_value.split(",")]
+                            meta[key] = [normalize_tracker_name(t) for t in tracker_value.split(",")]
                         else:
-                            meta[key] = [tracker_value.strip().upper()]
+                            meta[key] = [normalize_tracker_name(tracker_value)]
                     elif isinstance(tracker_value, list):
                         # Handle list of strings
                         expanded: list[str] = []
                         for t in tracker_value:
                             t_str = str(t)
                             if "," in t_str:
-                                expanded.extend([x.strip().upper() for x in t_str.split(",")])
+                                expanded.extend([normalize_tracker_name(x) for x in t_str.split(",")])
                             else:
-                                expanded.append(t_str.strip().upper())
+                                expanded.append(normalize_tracker_name(t_str))
                         meta[key] = expanded
                     else:
-                        meta[key] = [str(tracker_value).upper()]
+                        meta[key] = [normalize_tracker_name(str(tracker_value))]
                 else:
                     meta[key] = []
             else:
@@ -905,7 +907,7 @@ class Args:
             meta.manual_frames = None
 
         # Apply book metadata overrides: --author and --book-title map to meta keys
-        # used by trackers like CBR when constructing the torrent name for BOOK category.
+        # used by trackers like CapybaraBR when constructing the torrent name for BOOK category.
         self._apply_book_meta_overrides(meta)
 
         # Apply game metadata overrides: --platform maps to platforms key
@@ -918,7 +920,7 @@ class Args:
         """Normalise CLI book arguments (--author, --book-title, --blang, --isbn) into *meta*.
 
         Maps ``book_author`` / ``book_title`` to the ``author`` / ``title`` keys
-        expected by trackers like CBR.  Maps ``book_isbn`` to ``isbn``.
+        expected by trackers like CapybaraBR.  Maps ``book_isbn`` to ``isbn``.
         Resolves the ``book_language`` value via
         *langcodes* so both a human-readable name and the ISO 639-3 code are stored.
         Falls back gracefully when *langcodes* is unavailable or the code is unknown.

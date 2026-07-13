@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import contextlib
-import glob
 import json
 import os
 import re
@@ -287,11 +286,12 @@ class QueueManager:
         queue: list[str] = []
         allowed_extensions_tuple = tuple(allowed_extensions) if allowed_extensions else None
         if Path(path).parent.exists() and len(paths) <= 1:
-            escaped_path = path.replace("[", "[[]")
+            parent_dir = Path(path).parent
+            pattern = Path(path).name.replace("[", "[[]")
             queue = [
-                file
-                for file in glob.glob(escaped_path)
-                if Path(file).is_dir() or (os.path.isfile(file) and (allowed_extensions_tuple is None or file.lower().endswith(allowed_extensions_tuple)))
+                str(p)
+                for p in parent_dir.glob(pattern)
+                if p.is_dir() or (p.is_file() and (allowed_extensions_tuple is None or str(p).lower().endswith(allowed_extensions_tuple)))
             ]
             if queue:
                 await QueueManager.display_queue(queue, save_to_log=False)
@@ -406,7 +406,7 @@ class QueueManager:
         if path.endswith(".txt") and not meta.unit3d:
             logger.info(f"[bold yellow]Detected a text file for queue input: {path}[/bold yellow]")
             if Path(path).exists():
-                queue_name = os.path.splitext(Path(path).name)[0]
+                queue_name = Path(path).stem
                 meta.queue = queue_name
                 meta.args_line_queue = True
 
@@ -642,8 +642,9 @@ class QueueManager:
         else:
             # Search glob if dirname exists
             if Path(path).parent.exists() and len(paths) <= 1:
-                escaped_path = path.replace("[", "[[]")
-                globs = glob.glob(escaped_path)
+                parent_dir = Path(path).parent
+                pattern = Path(path).name.replace("[", "[[]")
+                globs = [str(p) for p in parent_dir.glob(pattern)]
                 queue = globs
                 if queue:
                     md_text = "\n - ".join(queue)

@@ -8,8 +8,12 @@ from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 
-class AITHER(UNIT3D):
-    tracker = "AITHER"
+class Aither(UNIT3D):
+    """
+    Aither is a Private Torrent Tracker for HD MOVIES / TV
+    """
+
+    tracker = "Aither"
     base_url = "https://aither.cc"
     banned_groups: tuple[str, ...] = ()
     banned_url = f"{base_url}/api/blacklists/releasegroups"
@@ -24,7 +28,7 @@ class AITHER(UNIT3D):
     tracker_urls = ("https://aither.cc",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="AITHER")
+        super().__init__(config, tracker_name="Aither")
         self.config = config
         self.common = COMMON(config)
 

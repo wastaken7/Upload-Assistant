@@ -7,8 +7,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class YOINK(UNIT3D):
-    tracker = "YOINK"
+class Yoinked(UNIT3D):
+    """
+    YOINK Private Torrent Tracker
+    """
+
+    tracker = "Yoinked"
     base_url = "https://yoinked.org"
     banned_groups = ("YTS", "YiFY", "LAMA", "MeGUSTA", "NAHOM", "GalaxyRG", "RARBG", "INFINITY")
     id_url = f"{base_url}/api/torrents/"
@@ -20,6 +24,6 @@ class YOINK(UNIT3D):
     tracker_urls = ("yoinked.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="YOINK")
+        super().__init__(config, tracker_name="Yoinked")
         self.config = config
         self.common = COMMON(config)

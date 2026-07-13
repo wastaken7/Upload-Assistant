@@ -15,9 +15,13 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class PTS:
+class Ptskit:
+    """
+    PTSKIT is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
     auth_type = "cookies"
-    tracker = "PTS"
+    tracker = "Ptskit"
     banned_groups = ()
     source_flag = "[www.ptskit.org] PTSKIT"
     base_url = "https://www.ptskit.org"

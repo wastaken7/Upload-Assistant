@@ -7,8 +7,12 @@ from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 
-class ACM(UNIT3D):
-    tracker = "ACM"
+class AsianCinema(UNIT3D):
+    """
+    AsianCinema is a Private Tracker for ASIAN MOVIES / TV / MUSIC
+    """
+
+    tracker = "AsianCinema"
     source_flag = "AsianCinema"
     base_url = "https://eiga.moi"
     banned_groups: tuple[str, ...] = ()
@@ -21,7 +25,7 @@ class ACM(UNIT3D):
     tracker_urls = ("https://eiga.moi",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="ACM")
+        super().__init__(config, tracker_name="AsianCinema")
         self.config = config
         self.common = COMMON(config)
 

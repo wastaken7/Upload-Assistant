@@ -130,7 +130,7 @@ def extract_epub_metadata(epub_path: str) -> dict[str, Any]:
 
 def extract_series_from_filename(filename: str) -> tuple[str, str]:
     """Parse (series, index) from a filename like "Author - Series #5 - Title", or ("", "")."""
-    name = os.path.splitext(os.path.basename(filename))[0]
+    name = Path(filename).stem
     match = re.search(r"[-–]\s*([^-–#\[\]]+?)\s*#\s*(\d+(?:\.\d+)?)", name)
     if not match:
         return "", ""
@@ -143,7 +143,7 @@ def extract_cbr_cbz_metadata(filepath: str) -> dict[str, Any]:
     if not os.path.isfile(filepath):
         return metadata
 
-    ext = os.path.splitext(filepath)[1].lower()
+    ext = Path(filepath).suffix.lower()
     xml_data: bytes | None = None
 
     if ext == ".cbz" or zipfile.is_zipfile(filepath):

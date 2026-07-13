@@ -1,6 +1,5 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import contextlib
-import glob
 import json
 from pathlib import Path
 from typing import Any
@@ -17,9 +16,13 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class CRP:
+class Curupira:
+    """
+    CRP Private Torrent Tracker
+    """
+
     auth_type = "other_api"
-    tracker = "CRP"
+    tracker = "Curupira"
     banned_groups = ()
     upload_url = "https://curupira.cc/v1/releases"
     torrent_url = "https://curupira.cc/releases/"
@@ -121,12 +124,12 @@ class CRP:
 
         # NFO file (optional)
         nfo_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-        nfo_files = glob.glob(Path(nfo_dir) / "*.nfo")
+        nfo_files = list(nfo_dir.glob("*.nfo"))
         nfo_path = nfo_files[0] if nfo_files else None
-        if nfo_path and Path(nfo_path).exists():
+        if nfo_path and nfo_path.exists():
             async with aiofiles.open(nfo_path, "rb") as f:
                 nfo_content = await f.read()
-            files["nfo_file"] = (Path(nfo_path).name, nfo_content, "application/octet-stream")
+            files["nfo_file"] = (nfo_path.name, nfo_content, "application/octet-stream")
 
         return files
 
@@ -274,7 +277,7 @@ class CRP:
         data = await self._prepare_data(meta, tracker_cfg)
 
         if meta.debug:
-            logger.debug("[cyan]CRP Upload (DEBUG MODE):[/cyan]")
+            logger.debug("[cyan]Curupira Upload (DEBUG MODE):[/cyan]")
             logger.debug(f"URL: {self.upload_url}")
             logger.debug(f"Category ID: {self.get_category_id(meta)}")
             logger.debug("Fields:")

@@ -144,7 +144,7 @@ class VideoManager:
             video_exts = {".mkv", ".mp4", ".ts"}
             for file in entries:
                 fname_lower = file.lower()
-                ext = os.path.splitext(file)[1].lower()
+                ext = Path(file).suffix.lower()
                 if ext not in video_exts:
                     continue
 
@@ -393,7 +393,7 @@ class VideoManager:
             logger.error(f"[red]Error getting container for file: {e}[/red]")
             return ""
 
-        extension = os.path.splitext(str(largest_file_path))[1]
+        extension = Path(str(largest_file_path)).suffix
         return extension.lstrip(".").lower() if extension else ""
 
 

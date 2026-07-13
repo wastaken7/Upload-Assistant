@@ -9,8 +9,12 @@ from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 
-class BLU(UNIT3D):
-    tracker = "BLU"
+class Blutopia(UNIT3D):
+    """
+    Blutopia (BLU) is a Private Torrent Tracker for HD MOVIES / TV
+    """
+
+    tracker = "Blutopia"
     base_url = "https://blutopia.cc"
     banned_groups = (
         "[Oj]",
@@ -110,7 +114,7 @@ class BLU(UNIT3D):
     tracker_urls = ("https://blutopia.cc",)
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name="BLU")
+        super().__init__(config, tracker_name="Blutopia")
         self.config = config
         self.common = COMMON(config)
 

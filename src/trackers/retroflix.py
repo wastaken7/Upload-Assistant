@@ -14,9 +14,13 @@ from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
 
-class RTF:
+class RetroFlix:
+    """
+    RTF Private Torrent Tracker
+    """
+
     auth_type = "other_api"
-    tracker = "RTF"
+    tracker = "RetroFlix"
     source_flag = "sunshine"
     banned_groups: tuple[str, ...] = ()
     upload_url = "https://retroflix.club/api/upload"
@@ -154,7 +158,7 @@ class RTF:
                         return False
 
             except httpx.TimeoutException:
-                meta.tracker_status[self.tracker]["status_message"] = "data error: RTF request timed out while uploading."
+                meta.tracker_status[self.tracker]["status_message"] = "data error: RetroFlix request timed out while uploading."
                 return False
             except httpx.RequestError as e:
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: An error occurred while making the request: {e}"
@@ -164,7 +168,7 @@ class RTF:
                 return False
 
         else:
-            logger.info("[cyan]RTF Request Data:")
+            logger.info("[cyan]RetroFlix Request Data:")
             debug_data = json_data.copy()
             if debug_data.get("file"):
                 debug_data["file"] = f"{str(debug_data['file'])[:10]}..."
@@ -233,7 +237,7 @@ class RTF:
                 ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365 * 10 + 3)  # add leeway
                 if release_date > ten_years_ago:
                     if not meta.unattended:
-                        logger.info("[red]Content must be older than 10 Years to upload at RTF")
+                        logger.info("[red]Content must be older than 10 Years to upload at RetroFlix")
                     return False
             except ValueError, AttributeError:
                 # If date parsing fails, fall back to year comparison
@@ -242,7 +246,7 @@ class RTF:
                     year = int(release_year)
                     if datetime.datetime.now(datetime.UTC).date().year - year <= 9:
                         if not meta.unattended:
-                            logger.info("[red]Content must be older than 10 Years to upload at RTF")
+                            logger.info("[red]Content must be older than 10 Years to upload at RetroFlix")
                         return False
 
         elif meta.category == "TV" and most_recent_aired_date:
@@ -250,13 +254,13 @@ class RTF:
             ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365 * 10 + 3)  # add leeway
             if most_recent_aired_date > ten_years_ago:
                 if not meta.unattended:
-                    logger.info("[red]Content must be older than 10 Years to upload at RTF")
+                    logger.info("[red]Content must be older than 10 Years to upload at RetroFlix")
                 return False
 
         else:
             if year is not None and datetime.datetime.now(datetime.UTC).date().year - year <= 9:
                 if not meta.unattended:
-                    logger.info("[red]Content must be older than 10 Years to upload at RTF")
+                    logger.info("[red]Content must be older than 10 Years to upload at RetroFlix")
                 return False
         return True
 
@@ -392,8 +396,8 @@ class RTF:
                         async with aiofiles.open(config_path, encoding="utf-8") as file:
                             config_data = await file.read()
 
-                        # Find the RTF tracker and replace the api_key value (supports single/double quotes and multiline blocks)
-                        pattern = r"(['\"]RTF['\"]\s*:\s*{.*?['\"]api_key['\"]\s*:\s*)(['\"])[^'\"]*(['\"])"
+                        # Find the RetroFlix tracker and replace the api_key value (supports single/double quotes and multiline blocks)
+                        pattern = r"(['\"]RetroFlix['\"]\s*:\s*{.*?['\"]api_key['\"]\s*:\s*)(['\"])[^'\"]*(['\"])"
                         new_config_data, replacements = re.subn(
                             pattern,
                             rf"\1\2{token}\3",
@@ -402,7 +406,7 @@ class RTF:
                             flags=re.DOTALL,
                         )
                         if replacements == 0:
-                            logger.info("[bold red]Failed to update RTF api_key in config file.")
+                            logger.info("[bold red]Failed to update RetroFlix api_key in config file.")
                             return None
 
                         # Write the updated config back to the file

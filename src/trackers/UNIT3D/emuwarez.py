@@ -12,7 +12,11 @@ from src.tmdb import TmdbManager
 from src.trackers.UNIT3D import UNIT3D
 
 
-class EMUW(UNIT3D):
+class Emuwarez(UNIT3D):
+    """
+    eMuwarez is a SPANISH Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
     base_url = "https://emuwarez.com"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -22,12 +26,12 @@ class EMUW(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="EMUW")
+        super().__init__(config, tracker_name="Emuwarez")
         self.tmdb_manager = TmdbManager(config)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         """
-        Generate EMUW-compliant torrent name format
+        Generate Emuwarez-compliant torrent name format
         Format: [Spanish Title] [Season] [Year] [Resolution] [Format] [Codec] [Audio] [SUBS] - [Group]
 
         Examples:
@@ -116,7 +120,7 @@ class EMUW(UNIT3D):
         return meta.title
 
     def _map_resolution(self, resolution: str) -> str:
-        """Map resolution to EMUW nomenclature"""
+        """Map resolution to Emuwarez nomenclature"""
         resolution_map = {
             "4320p": "4320p FUHD",
             "2160p": "2160p UHD",
@@ -129,7 +133,7 @@ class EMUW(UNIT3D):
         return resolution_map.get(resolution, resolution)
 
     def _map_format(self, meta: Meta) -> str:
-        """Map source format to EMUW nomenclature"""
+        """Map source format to Emuwarez nomenclature"""
         source = str(meta.source)
         type_name = str(meta.type)
 
@@ -157,7 +161,7 @@ class EMUW(UNIT3D):
         return ""
 
     def _map_codec(self, meta: Meta) -> str:
-        """Map video codec to EMUW nomenclature with HDR/DV prefix"""
+        """Map video codec to Emuwarez nomenclature with HDR/DV prefix"""
         codec_map = {
             "H.264": "AVC",
             "H.265": "HEVC",
@@ -219,7 +223,7 @@ class EMUW(UNIT3D):
 
     async def _build_audio_string(self, meta: Meta) -> str:
         """
-        Build audio string in EMUW format with proper priority order
+        Build audio string in Emuwarez format with proper priority order
 
         Priority Order:
         1. DUAL: Exactly 2 audio tracks, same codec
@@ -330,7 +334,7 @@ class EMUW(UNIT3D):
         return audio_langs
 
     def _map_language(self, lang: str) -> str:
-        """Map language codes and names to EMUW nomenclature"""
+        """Map language codes and names to Emuwarez nomenclature"""
         if not lang:
             return ""
 
@@ -413,7 +417,7 @@ class EMUW(UNIT3D):
         return lang.upper()[:3] if len(lang) >= 3 else lang.upper()
 
     def _map_audio_codec(self, audio_track: dict[str, Any]) -> str:
-        """Map audio codec to EMUW nomenclature"""
+        """Map audio codec to Emuwarez nomenclature"""
         codec = str(audio_track.get("Format", "")).upper()
 
         if "atmos" in str(audio_track.get("Format_AdditionalFeatures", "")).lower():
@@ -634,7 +638,7 @@ class EMUW(UNIT3D):
         return dupes
 
     async def get_upload_data(self, meta: Meta) -> dict[str, Any]:
-        """Get upload data with EMUW-specific options"""
+        """Get upload data with Emuwarez-specific options"""
         upload_data = await super().get_data(meta)
 
         if meta.anon:

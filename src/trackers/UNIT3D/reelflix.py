@@ -9,8 +9,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class RF(UNIT3D):
-    tracker = "RF"
+class ReelFlix(UNIT3D):
+    """
+    ReelFLiX (HD4Free, LegacyHD) is a Private Torrent Tracker for HD MOVIES
+    """
+
+    tracker = "ReelFlix"
     base_url = "https://reelflix.cc"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -22,7 +26,7 @@ class RF(UNIT3D):
     tracker_urls = ("https://reelflix.xyz", "https://reelflix.cc")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="RF")
+        super().__init__(config, tracker_name="ReelFlix")
         self.config: Config = config
         self.common = COMMON(config)
 

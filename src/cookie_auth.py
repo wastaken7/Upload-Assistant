@@ -28,13 +28,157 @@ def _attr_to_string(value: str | AttributeValueList | None) -> str:
     return ""
 
 
+def get_tracker_domain(tracker: str, config: dict[str, Any] | None = None) -> str:
+    """Extract or map a tracker name to its primary domain name."""
+    try:
+        from src.trackersetup import tracker_class_map
+
+        cls = tracker_class_map.get(tracker.upper())
+        if cls and hasattr(cls, "base_url") and isinstance(cls.base_url, str):
+            from urllib.parse import urlparse
+
+            netloc = urlparse(cls.base_url).netloc
+            if netloc:
+                domain = netloc.lower().lstrip(".")
+                if domain.startswith("www."):
+                    domain = domain[4:]
+                return domain
+    except Exception:
+        pass
+
+    if config:
+        tracker_cfg = config.get("TRACKERS", {}).get(tracker, {})
+        announce_url = tracker_cfg.get("announce_url", "")
+        if announce_url:
+            try:
+                from urllib.parse import urlparse
+
+                netloc = urlparse(announce_url).netloc
+                if netloc:
+                    domain = netloc.lower().lstrip(".")
+                    if domain.startswith("www."):
+                        domain = domain[4:]
+                    return domain
+            except Exception:
+                pass
+
+    # Fallback/Hardcoded domains
+    fallback_domains = {
+        "amigosshare": "amigos-share.club",
+        "avistaz": "avistaz.to",
+        "bjshare": "bj-share.info",
+        "brasiltracker": "brasiltracker.org",
+        "cinemaz": "cinemaz.to",
+        "greatposterwall": "greatposterwall.com",
+        "hdbits": "hdbits.org",
+        "hdspace": "hd-space.org",
+        "hdtorrents": "hd-torrents.org",
+        "iptorrents": "iptorrents.com",
+        "immortalseed": "immortalseed.me",
+        "lajidui": "lajidui.top",
+        "longpt": "longpt.org",
+        "privatehd": "privatehd.to",
+        "ptcafe": "ptcafe.club",
+        "ptfans": "ptfans.cc",
+        "ptgtk": "gtkpw.xyz",
+        "ptskit": "ptskit.org",
+        "railgunpt": "bilibili.download",
+        "torrentleech": "torrentleech.org",
+        "filelist": "filelist.io",
+        "morethantv": "morethan.tv",
+        "passthepopcorn": "passthepopcorn.me",
+        "pterclub": "pterclub.com",
+    }
+
+    t_lower = tracker.lower()
+    if t_lower in fallback_domains:
+        return fallback_domains[t_lower]
+
+    return t_lower
+
+
+def find_cookie_file(base_dir: str, tracker: str, config: dict[str, Any] | None = None) -> str:
+    """
+    Find the cookie file for a tracker.
+    First checks if the tracker's config has a custom 'cookie_file' path.
+    Then scans data/cookies/ for files:
+    - First looks for files whose names contain the tracker name (case insensitive).
+    - If not found, looks for text/json files whose contents contain the tracker's domain.
+    - If still not found, falls back to the default 'data/cookies/{tracker}.txt' (or json/etc).
+    """
+    cookies_dir = Path(base_dir) / "data" / "cookies"
+    if not cookies_dir.exists():
+        cookies_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Check if tracker config has 'cookie_file' or 'cookies'
+    tracker_config = config.get("TRACKERS", {}).get(tracker, {}) if config else {}
+    custom_cookie_file = tracker_config.get("cookie_file", "").strip() or tracker_config.get("cookies", "").strip()
+    if custom_cookie_file:
+        custom_path = Path(custom_cookie_file)
+        if custom_path.is_absolute():
+            return str(custom_path.resolve())
+        if len(custom_path.parts) > 1 and custom_path.parts[0] == "data":
+            return str((Path(base_dir) / custom_cookie_file).resolve())
+        return str((cookies_dir / custom_cookie_file).resolve())
+
+    matching_files = []
+
+    # 2. Try to find by filename match in data/cookies/
+    if cookies_dir.exists():
+        files = sorted(cookies_dir.glob("*"), key=lambda p: p.name)
+
+        # Check for exact name match (with any extension)
+        for file_path in files:
+            if file_path.is_file() and file_path.stem.lower() == tracker.lower():
+                matching_files.append(file_path)
+
+        # Check for partial name match (e.g. "my_avistaz_cookies.txt")
+        if not matching_files:
+            for file_path in files:
+                if file_path.is_file() and tracker.lower() in file_path.name.lower():
+                    matching_files.append(file_path)
+
+        # 3. Try to find by content/domain match
+        if not matching_files:
+            domain = get_tracker_domain(tracker, config)
+            if domain:
+                for file_path in files:
+                    if not file_path.is_file():
+                        continue
+                    # Only search text/json files
+                    if file_path.suffix.lower() in [".txt", ".json"]:
+                        try:
+                            with file_path.open("r", encoding="utf-8", errors="ignore") as f:
+                                head = f.read(10240)
+                                if domain in head.lower():
+                                    matching_files.append(file_path)
+                        except Exception:
+                            pass
+
+    if matching_files:
+        if len(matching_files) > 1:
+            file_names = ", ".join(f.name for f in matching_files)
+            logger.warning(f"[yellow]{tracker}: Found multiple cookie files ({file_names}). Using the first one by default: {matching_files[0].name}[/yellow]")
+        return str(matching_files[0].resolve())
+
+    # 4. Fallback to default
+    if tracker == "FileList":
+        return str((cookies_dir / "FileList.json").resolve())
+    if tracker in ["MoreThanTV", "PassThePopcorn"]:
+        return str((cookies_dir / f"{tracker}.json").resolve())
+    if tracker == "Pterimg":
+        return str((cookies_dir / "Pterimg.json").resolve())
+
+    return str((cookies_dir / f"{tracker}.txt").resolve())
+
+
 class CookieValidator:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.common = COMMON(config)
 
     async def load_session_cookies(self, meta: Meta, tracker: str) -> http.cookiejar.MozillaCookieJar | None:
-        cookie_file = str(Path(f"{meta.base_dir}/data/cookies/{tracker}.txt").resolve())
+        cookie_file = find_cookie_file(meta.base_dir, tracker, self.config)
         cookie_jar = http.cookiejar.MozillaCookieJar(cookie_file)
 
         try:
@@ -44,8 +188,8 @@ class CookieValidator:
             logger.info(f"{tracker}: Please ensure the cookie file is in the correct format (Netscape).")
             return None
         except FileNotFoundError:
-            # Attempt automatic login for AR tracker
-            if tracker == "AR":
+            # Attempt automatic login for AlphaRatio tracker
+            if tracker == "AlphaRatio":
                 logger.info(f"{tracker}: [yellow]Cookie file not found. Attempting automatic login...[/yellow]")
                 if await self.ar_login(meta, tracker, cookie_file):
                     # Try loading the newly created cookie file
@@ -80,8 +224,8 @@ class CookieValidator:
             logger.info(f"{tracker}: Failed to update the cookie file: {e}")
 
     async def get_ar_auth_key(self, meta: Meta, tracker: str) -> str | None:
-        """Retrieve the saved auth key for AR tracker."""
-        cookie_file = str(Path(f"{meta.base_dir}/data/cookies/{tracker}.txt").resolve())
+        """Retrieve the saved auth key for AlphaRatio tracker."""
+        cookie_file = find_cookie_file(meta.base_dir, tracker, self.config)
         auth_file = cookie_file.replace(".txt", "_auth.txt")
 
         if Path(auth_file).exists():
@@ -97,7 +241,7 @@ class CookieValidator:
         return None
 
     async def ar_login(self, meta: Meta, tracker: str, cookie_file: str) -> bool:
-        """Perform automatic login to AR and save cookies in Netscape format."""
+        """Perform automatic login to AlphaRatio and save cookies in Netscape format."""
         username = self.config["TRACKERS"][tracker].get("username", "").strip()
         password = self.config["TRACKERS"][tracker].get("password", "").strip()
 
@@ -262,6 +406,7 @@ class CookieValidator:
                         return False
                     # Dynamically set a class attribute to store the token
                     from src.trackersetup import tracker_class_map
+
                     cls = tracker_class_map.get(tracker.upper())
                     if cls:
                         cls.secret_token = str(match.group(1))
@@ -380,14 +525,14 @@ class CookieValidator:
                             json.load(f)  # Just verify it can be loaded
 
                         # Migration verified successful - delete the old pickle file
-                        os.remove(potential_pickle)
+                        Path(potential_pickle).unlink()
                         logger.info(f"[green]Successfully migrated cookies to JSON format and removed legacy file {potential_pickle}[/green]")
 
                     except (OSError, json.JSONDecodeError) as verify_error:
                         logger.info(f"[red]Migration verification failed: {verify_error}. Keeping original file {potential_pickle}[/red]")
                         # Remove the potentially corrupted JSON file
                         if Path(cookiefile).exists():
-                            os.remove(cookiefile)
+                            Path(cookiefile).unlink()
                         raise
 
                     break
@@ -398,7 +543,7 @@ class CookieValidator:
                     continue
 
             elif Path(potential_pickle).exists() and Path(cookiefile).exists():
-                os.remove(potential_pickle)
+                Path(potential_pickle).unlink()
                 logger.info(f"[yellow]Removed legacy cookie file {potential_pickle}. Using JSON file.[/yellow]")
 
         # Load cookies from JSON file

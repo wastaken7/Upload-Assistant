@@ -15,88 +15,88 @@ from data.example_config import config as example_config
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
-from src.trackers.alpharatio import AR
-from src.trackers.amigosshare import ASC
-from src.trackers.anthelion import ANT
-from src.trackers.AVISTAZ.avistaz import AZ
-from src.trackers.AVISTAZ.cinemaz import CZ
-from src.trackers.AVISTAZ.privatehd import PHD
-from src.trackers.beyondhd import BHD
-from src.trackers.bithdtv import BHDTV
-from src.trackers.bjshare import BJS
-from src.trackers.brasiltracker import BT
+from src.trackers.alpharatio import AlphaRatio
+from src.trackers.amigosshare import AmigosShare
+from src.trackers.anthelion import Anthelion
+from src.trackers.AVISTAZ.avistaz import AvistaZ
+from src.trackers.AVISTAZ.cinemaz import CinemaZ
+from src.trackers.AVISTAZ.privatehd import PrivateHD
+from src.trackers.beyondhd import BeyondHD
+from src.trackers.bithdtv import BitHDTV
+from src.trackers.bjshare import BJShare
+from src.trackers.brasiltracker import BrasilTracker
 from src.trackers.COMMON import COMMON
-from src.trackers.digitalcore import DC
-from src.trackers.filelist import FL
-from src.trackers.funfile import FF
-from src.trackers.greatposterwall import GPW
-from src.trackers.hdbits import HDB
-from src.trackers.hdspace import HDS
-from src.trackers.hdtorrents import HDT
-from src.trackers.immortalseed import IS
-from src.trackers.iptorrents import IPT
-from src.trackers.makingoff import MKO
-from src.trackers.morethantv import MTV
-from src.trackers.mteam import MTEAM
-from src.trackers.nebulance import NBL
-from src.trackers.NEXUSPHP.lajidui import LAJIDUI
-from src.trackers.NEXUSPHP.longpt import LPT
-from src.trackers.NEXUSPHP.ptcafe import PTCAFE
-from src.trackers.NEXUSPHP.ptfans import PTFANS
+from src.trackers.digitalcore import DigitalCore
+from src.trackers.filelist import FileList
+from src.trackers.funfile import FunFile
+from src.trackers.greatposterwall import GreatPosterWall
+from src.trackers.hdbits import HDBits
+from src.trackers.hdspace import HDSpace
+from src.trackers.hdtorrents import HDTorrents
+from src.trackers.immortalseed import ImmortalSeed
+from src.trackers.iptorrents import IPTorrents
+from src.trackers.makingoff import MakingOff
+from src.trackers.morethantv import MoreThanTV
+from src.trackers.mteam import MTeam
+from src.trackers.nebulance import Nebulance
+from src.trackers.NEXUSPHP.lajidui import Lajidui
+from src.trackers.NEXUSPHP.longpt import LongPT
+from src.trackers.NEXUSPHP.ptcafe import PTCafe
+from src.trackers.NEXUSPHP.ptfans import PTFans
 from src.trackers.NEXUSPHP.ptgtk import PTGTK
-from src.trackers.NEXUSPHP.railgunpt import RPT
-from src.trackers.passthepopcorn import PTP
-from src.trackers.pterclub import PTER
-from src.trackers.ptskit import PTS
-from src.trackers.retroflix import RTF
-from src.trackers.speedapp import SPD
-from src.trackers.swarmazon import SN
-from src.trackers.torrentgui import TTG
-from src.trackers.torrenthr import THR
-from src.trackers.torrentleech import TL
-from src.trackers.tvchaosuk import TVC
-from src.trackers.UNIT3D.aither import AITHER
-from src.trackers.UNIT3D.asiancinema import ACM
-from src.trackers.UNIT3D.aura4k import A4K
-from src.trackers.UNIT3D.blutopia import BLU
-from src.trackers.UNIT3D.capybarabr import CBR
-from src.trackers.UNIT3D.cinematik import TIK
-from src.trackers.UNIT3D.darkpeers import DP
-from src.trackers.UNIT3D.emuwarez import EMUW
-from src.trackers.UNIT3D.frikibar import FRIKI
-from src.trackers.UNIT3D.hawkeuno import HUNO
-from src.trackers.UNIT3D.homiehelpdesk import HHD
-from src.trackers.UNIT3D.infinityhd import IHD
-from src.trackers.UNIT3D.itatorrents import ITT
-from src.trackers.UNIT3D.latteam import LT
-from src.trackers.UNIT3D.locadora import LCD
+from src.trackers.NEXUSPHP.railgunpt import RailgunPT
+from src.trackers.passthepopcorn import PassThePopcorn
+from src.trackers.pterclub import PTerClub
+from src.trackers.ptskit import Ptskit
+from src.trackers.retroflix import RetroFlix
+from src.trackers.speedapp import SpeedApp
+from src.trackers.swarmazon import Swarmazon
+from src.trackers.torrentgui import TorrentGUI
+from src.trackers.torrenthr import TorrentHR
+from src.trackers.torrentleech import TorrentLeech
+from src.trackers.tvchaosuk import TVChaosUK
+from src.trackers.UNIT3D.aither import Aither
+from src.trackers.UNIT3D.asiancinema import AsianCinema
+from src.trackers.UNIT3D.aura4k import Aura4K
+from src.trackers.UNIT3D.blutopia import Blutopia
+from src.trackers.UNIT3D.capybarabr import CapybaraBR
+from src.trackers.UNIT3D.cinematik import Cinematik
+from src.trackers.UNIT3D.darkpeers import DarkPeers
+from src.trackers.UNIT3D.emuwarez import Emuwarez
+from src.trackers.UNIT3D.frikibar import FrikiBar
+from src.trackers.UNIT3D.hawkeuno import HawkeUno
+from src.trackers.UNIT3D.homiehelpdesk import HomieHelpDesk
+from src.trackers.UNIT3D.infinityhd import InfinityHD
+from src.trackers.UNIT3D.itatorrents import ItaTorrents
+from src.trackers.UNIT3D.latteam import LatTeam
+from src.trackers.UNIT3D.locadora import Locadora
 from src.trackers.UNIT3D.lst import LST
-from src.trackers.UNIT3D.luminarr import LUME
-from src.trackers.UNIT3D.midnightscene import MS
-from src.trackers.UNIT3D.oldtoonsworld import OTW
-from src.trackers.UNIT3D.onlyencodes import OE
-from src.trackers.UNIT3D.polishtorrent import PTT
-from src.trackers.UNIT3D.portugas import PT
-from src.trackers.UNIT3D.racing4everyone import R4E
-from src.trackers.UNIT3D.rastastugan import RAS
-from src.trackers.UNIT3D.reelflix import RF
-from src.trackers.UNIT3D.samaritano import SAM
-from src.trackers.UNIT3D.seedpool import SP
-from src.trackers.UNIT3D.shareisland import SHRI
-from src.trackers.UNIT3D.skipthecommercials import STC
-from src.trackers.UNIT3D.theldu import LDU
-from src.trackers.UNIT3D.theoldschool import TOS
-from src.trackers.UNIT3D.tlzdigital import TLZ
-from src.trackers.UNIT3D.torrentdesi import DT
-from src.trackers.UNIT3D.torrenteros import TTR
-from src.trackers.UNIT3D.uploadcx import ULCX
-from src.trackers.UNIT3D.utp import UTP
-from src.trackers.UNIT3D.yoinked import YOINK
-from src.trackers.UNIT3D.yuscene import YUS
-from src.trackers.UNIT3D.znth import ZNTH
-from src.trackers.USENET.crp import CRP
-from src.trackers.USENET.ds import DS
-from src.trackers.USENET.suio import SUIO
+from src.trackers.UNIT3D.luminarr import Luminarr
+from src.trackers.UNIT3D.midnightscene import MidnightScene
+from src.trackers.UNIT3D.oldtoonsworld import OldToonsWorld
+from src.trackers.UNIT3D.onlyencodes import OnlyEncodes
+from src.trackers.UNIT3D.polishtorrent import PolishTorrent
+from src.trackers.UNIT3D.portugas import Portugas
+from src.trackers.UNIT3D.racing4everyone import Racing4Everyone
+from src.trackers.UNIT3D.rastastugan import Rastastugan
+from src.trackers.UNIT3D.reelflix import ReelFlix
+from src.trackers.UNIT3D.samaritano import Samaritano
+from src.trackers.UNIT3D.seedpool import Seedpool
+from src.trackers.UNIT3D.shareisland import Shareisland
+from src.trackers.UNIT3D.skipthecommercials import SkipTheCommercials
+from src.trackers.UNIT3D.theldu import LastDigitalUnderground
+from src.trackers.UNIT3D.theoldschool import TheOldSchool
+from src.trackers.UNIT3D.tlzdigital import TheLeachZone
+from src.trackers.UNIT3D.torrentdesi import DesiTorrents
+from src.trackers.UNIT3D.torrenteros import Torrenteros
+from src.trackers.UNIT3D.uploadcx import UploadCx
+from src.trackers.UNIT3D.utp import Utopia
+from src.trackers.UNIT3D.yoinked import Yoinked
+from src.trackers.UNIT3D.yuscene import Yuscene
+from src.trackers.UNIT3D.znth import Zenith
+from src.trackers.USENET.crp import Curupira
+from src.trackers.USENET.ds import DrunkenSlug
+from src.trackers.USENET.suio import Suio
 
 JsonDict = dict[str, Any]
 example_config: dict[str, Any]
@@ -191,8 +191,8 @@ class TRACKER_SETUP:
         tracker_instance = self._create_tracker_instance(tracker)
         if tracker_instance is None:
             return None
-        if tracker.upper() == "LUME":
-            # LUME doesn't expose a banned_url; sync TRaSH groups and use the file if present
+        if tracker.upper() == "Luminarr":
+            # Luminarr doesn't expose a banned_url; sync TRaSH groups and use the file if present
             await self.sync_trash_groups(file_path)
             if Path(file_path).exists():
                 return file_path
@@ -382,7 +382,7 @@ class TRACKER_SETUP:
         if "taoe" in group_tags:
             group_tags = "taoe"
 
-        if tracker.upper() in ("AITHER", "LST", "LUME", "SPD", "ZNTH"):
+        if tracker.upper() in ("Aither", "LST", "Luminarr", "SpeedApp", "Zenith"):
             file_path = await self.get_banned_groups(meta, tracker)
             if file_path == "empty":
                 logger.info(f"[bold red]No banned groups found for '{tracker}'.")
@@ -614,7 +614,7 @@ class TRACKER_SETUP:
         headers = {"Authorization": f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}", "Accept": "application/json"}
         if meta.tmdb is None:
             return requests
-        params = {"tmdbId": meta.tmdb} if tracker == "HUNO" else {"tmdb": meta.tmdb}
+        params = {"tmdbId": meta.tmdb} if tracker == "HawkeUno" else {"tmdb": meta.tmdb}
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url=url, headers=headers, params=params)
@@ -635,9 +635,9 @@ class TRACKER_SETUP:
 
                     try:
                         for each in results_list:
-                            attributes = each.get("attributes", each) if tracker == "HUNO" else cast(JsonDict, each)
+                            attributes = each.get("attributes", each) if tracker == "HawkeUno" else cast(JsonDict, each)
                             result: JsonDict = {
-                                "id": each.get("id") if tracker == "HUNO" else attributes.get("id"),
+                                "id": each.get("id") if tracker == "HawkeUno" else attributes.get("id"),
                                 "name": attributes.get("name"),
                                 "description": attributes.get("description"),
                                 "category": attributes.get("category_id"),
@@ -665,8 +665,8 @@ class TRACKER_SETUP:
         return requests
 
     async def bhd_request_check(self, meta: Meta, tracker: str, url: str) -> list[JsonDict]:
-        if "BHD" not in self.config["TRACKERS"] or not self.config["TRACKERS"]["BHD"].get("api_key"):
-            logger.info("[red]BHD API key not configured. Skipping BHD request check.[/red]")
+        if "BeyondHD" not in self.config["TRACKERS"] or not self.config["TRACKERS"]["BeyondHD"].get("api_key"):
+            logger.info("[red]BeyondHD API key not configured. Skipping BeyondHD request check.[/red]")
             return []
         logger.debug(f"[bold green]Searching for existing requests on {tracker}[/bold green]")
         requests: list[dict[str, Any]] = []
@@ -720,7 +720,7 @@ class TRACKER_SETUP:
             logger.info(f"[bold red]Unable to search for existing torrents: {e}")
         except Exception as e:
             logger.error(f"[bold red]Unexpected error: {e}")
-        # console.print(f"Debug: BHD requests found: {requests}")
+        # console.print(f"Debug: BeyondHD requests found: {requests}")
         return requests
 
     async def tracker_request(self, meta: Meta, tracker: str | list[str]) -> bool:
@@ -740,15 +740,15 @@ class TRACKER_SETUP:
             try:
                 url = tracker_instance.requests_url
             except AttributeError:
-                if tracker_name.upper() not in ("ASC", "BJS", "FF", "HDS", "AZ", "CZ", "PHD"):
+                if tracker_name.upper() not in ("AmigosShare", "BJShare", "FunFile", "HDSpace", "AvistaZ", "CinemaZ", "PrivateHD"):
                     # tracker without requests url not supported
                     return False
 
-            if tracker_name.upper() == "BHD":
+            if tracker_name.upper() == "BeyondHD":
                 if not url:
                     return False
                 requests = await self.bhd_request_check(meta, tracker_name, url)
-            elif tracker_name.upper() in ("ASC", "BJS", "FF", "HDS", "AZ", "CZ", "PHD", "MTEAM"):
+            elif tracker_name.upper() in ("AmigosShare", "BJShare", "FunFile", "HDSpace", "AvistaZ", "CinemaZ", "PrivateHD", "MTeam"):
                 # These trackers have custom request handling
                 requests = cast(list[JsonDict], await tracker_instance.get_requests(meta))
                 return False
@@ -811,7 +811,7 @@ class TRACKER_SETUP:
                 api_resolution = each.get("resolution")
                 api_resolution_str = str(api_resolution or "")
                 api_resolution_lower = api_resolution_str.lower()
-                if "BHD" not in tracker_name:
+                if "BeyondHD" not in tracker_name:
                     if str(api_type) in [str(tid) for tid in type_ids]:
                         type_name = True
                     elif api_type is None:
@@ -1322,90 +1322,140 @@ class TRACKER_SETUP:
             return True
 
 
-tracker_class_map: dict[str, type[Any]] = {
-    "A4K": A4K,
-    "ACM": ACM,
-    "AITHER": AITHER,
-    "ANT": ANT,
-    "AR": AR,
-    "ASC": ASC,
-    "AZ": AZ,
-    "BHD": BHD,
-    "BHDTV": BHDTV,
-    "BJS": BJS,
-    "BLU": BLU,
-    "BT": BT,
-    "CBR": CBR,
-    "CRP": CRP,
-    "CZ": CZ,
-    "DC": DC,
-    "DP": DP,
-    "DS": DS,
-    "DT": DT,
-    "EMUW": EMUW,
-    "FF": FF,
-    "FL": FL,
-    "FRIKI": FRIKI,
-    "GPW": GPW,
-    "HDB": HDB,
-    "HDS": HDS,
-    "HDT": HDT,
-    "HHD": HHD,
-    "HUNO": HUNO,
-    "IHD": IHD,
-    "IPT": IPT,
-    "IS": IS,
-    "ITT": ITT,
-    "LAJIDUI": LAJIDUI,
-    "LCD": LCD,
-    "LDU": LDU,
-    "LPT": LPT,
-    "LST": LST,
-    "LT": LT,
-    "LUME": LUME,
-    "MKO": MKO,
-    "MS": MS,
-    "MTEAM": MTEAM,
-    "MTV": MTV,
-    "NBL": NBL,
-    "OE": OE,
-    "OTW": OTW,
-    "PHD": PHD,
-    "PT": PT,
-    "PTCAFE": PTCAFE,
-    "PTER": PTER,
-    "PTFANS": PTFANS,
-    "PTGTK": PTGTK,
-    "PTP": PTP,
-    "PTS": PTS,
-    "PTT": PTT,
-    "R4E": R4E,
-    "RAS": RAS,
-    "RF": RF,
-    "RPT": RPT,
-    "RTF": RTF,
-    "SAM": SAM,
-    "SHRI": SHRI,
-    "SN": SN,
-    "SP": SP,
-    "SPD": SPD,
-    "STC": STC,
-    "SUIO": SUIO,
-    "THR": THR,
-    "TIK": TIK,
-    "TL": TL,
-    "TLZ": TLZ,
-    "TOS": TOS,
-    "TTG": TTG,
-    "TTR": TTR,
-    "TVC": TVC,
-    "ULCX": ULCX,
-    "UTP": UTP,
-    "YOINK": YOINK,
-    "YUS": YUS,
-    "ZNTH": ZNTH,
-}
+class CaseInsensitiveDict(dict[str, Any]):
+    def __getitem__(self, key: str) -> Any:
+        if not isinstance(key, str):
+            return super().__getitem__(key)
+        if super().__contains__(key):
+            return super().__getitem__(key)
+        key_lower = key.lower()
+        for k in self:
+            if k.lower() == key_lower:
+                return super().__getitem__(k)
+        raise KeyError(key)
 
-api_trackers = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "unit3d_api"}
-other_api_trackers = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "other_api"}
-http_trackers = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "cookies"}
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __contains__(self, key: object) -> bool:
+        if not isinstance(key, str):
+            return False
+        if super().__contains__(key):
+            return True
+        key_lower = key.lower()
+        return any(k.lower() == key_lower for k in self)
+
+
+class CaseInsensitiveSet(set[str]):
+    def __contains__(self, item: object) -> bool:
+        if not isinstance(item, str):
+            return False
+        if super().__contains__(item):
+            return True
+        item_lower = item.lower()
+        return any(x.lower() == item_lower for x in self)
+
+
+tracker_class_map: dict[str, type[Any]] = CaseInsensitiveDict(
+    {
+        "Aura4K": Aura4K,
+        "AsianCinema": AsianCinema,
+        "Aither": Aither,
+        "Anthelion": Anthelion,
+        "AlphaRatio": AlphaRatio,
+        "AmigosShare": AmigosShare,
+        "AvistaZ": AvistaZ,
+        "BeyondHD": BeyondHD,
+        "BitHDTV": BitHDTV,
+        "BJShare": BJShare,
+        "Blutopia": Blutopia,
+        "BrasilTracker": BrasilTracker,
+        "CapybaraBR": CapybaraBR,
+        "Curupira": Curupira,
+        "CinemaZ": CinemaZ,
+        "DigitalCore": DigitalCore,
+        "DarkPeers": DarkPeers,
+        "DrunkenSlug": DrunkenSlug,
+        "DesiTorrents": DesiTorrents,
+        "Emuwarez": Emuwarez,
+        "FunFile": FunFile,
+        "FileList": FileList,
+        "FrikiBar": FrikiBar,
+        "GreatPosterWall": GreatPosterWall,
+        "HDBits": HDBits,
+        "HDSpace": HDSpace,
+        "HDTorrents": HDTorrents,
+        "HomieHelpDesk": HomieHelpDesk,
+        "HawkeUno": HawkeUno,
+        "InfinityHD": InfinityHD,
+        "IPTorrents": IPTorrents,
+        "ImmortalSeed": ImmortalSeed,
+        "ItaTorrents": ItaTorrents,
+        "Lajidui": Lajidui,
+        "Locadora": Locadora,
+        "LastDigitalUnderground": LastDigitalUnderground,
+        "LongPT": LongPT,
+        "LST": LST,
+        "LatTeam": LatTeam,
+        "Luminarr": Luminarr,
+        "MakingOff": MakingOff,
+        "MidnightScene": MidnightScene,
+        "MTeam": MTeam,
+        "MoreThanTV": MoreThanTV,
+        "Nebulance": Nebulance,
+        "OnlyEncodes": OnlyEncodes,
+        "OldToonsWorld": OldToonsWorld,
+        "PrivateHD": PrivateHD,
+        "Portugas": Portugas,
+        "PTCafe": PTCafe,
+        "PTerClub": PTerClub,
+        "PTFans": PTFans,
+        "PTGTK": PTGTK,
+        "PassThePopcorn": PassThePopcorn,
+        "Ptskit": Ptskit,
+        "PolishTorrent": PolishTorrent,
+        "Racing4Everyone": Racing4Everyone,
+        "Rastastugan": Rastastugan,
+        "ReelFlix": ReelFlix,
+        "RailgunPT": RailgunPT,
+        "RetroFlix": RetroFlix,
+        "Samaritano": Samaritano,
+        "Shareisland": Shareisland,
+        "Swarmazon": Swarmazon,
+        "Seedpool": Seedpool,
+        "SpeedApp": SpeedApp,
+        "SkipTheCommercials": SkipTheCommercials,
+        "Suio": Suio,
+        "TorrentHR": TorrentHR,
+        "Cinematik": Cinematik,
+        "TorrentLeech": TorrentLeech,
+        "TheLeachZone": TheLeachZone,
+        "TheOldSchool": TheOldSchool,
+        "TorrentGUI": TorrentGUI,
+        "Torrenteros": Torrenteros,
+        "TVChaosUK": TVChaosUK,
+        "UploadCx": UploadCx,
+        "Utopia": Utopia,
+        "Yoinked": Yoinked,
+        "Yuscene": Yuscene,
+        "Zenith": Zenith,
+    }
+)
+
+api_trackers: set[str] = CaseInsensitiveSet(name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "unit3d_api")
+other_api_trackers: set[str] = CaseInsensitiveSet(name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "other_api")
+http_trackers: set[str] = CaseInsensitiveSet(name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "cookies")
+
+
+def normalize_tracker_name(name: str) -> str:
+    if not isinstance(name, str):
+        return name
+    name_stripped = name.strip()
+    name_lower = name_stripped.lower()
+    for key in tracker_class_map:
+        if key.lower() == name_lower:
+            return key
+    return name_stripped.upper()

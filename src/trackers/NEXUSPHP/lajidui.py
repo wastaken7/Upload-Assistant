@@ -8,7 +8,11 @@ from src.trackers.NEXUSPHP import NEXUSPHP
 Config = dict[str, Any]
 
 
-class LAJIDUI(NEXUSPHP):
+class Lajidui(NEXUSPHP):
+    """
+    lajidui is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
     banned_groups = ()
     base_url = "https://pt.lajidui.top"
     source_flag = "[pt.lajidui.top] lajidui"
@@ -17,7 +21,7 @@ class LAJIDUI(NEXUSPHP):
     tracker_urls = ("https://pt.lajidui.top",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, "LAJIDUI")
+        super().__init__(config, "Lajidui")
 
     def get_category(self, meta: Meta) -> int:
         animations = 405

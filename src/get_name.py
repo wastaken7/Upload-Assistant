@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import re
 import sys
 from collections.abc import Callable, Sequence
@@ -24,9 +23,9 @@ def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, A
 
 
 TRACKER_DISC_REQUIREMENTS = {
-    "ULCX": {"region": "mandatory", "distributor": "mandatory"},
-    "SHRI": {"region": "mandatory", "distributor": "optional"},
-    "OTW": {"region": "mandatory", "distributor": "optional"},
+    "UploadCx": {"region": "mandatory", "distributor": "mandatory"},
+    "Shareisland": {"region": "mandatory", "distributor": "optional"},
+    "OldToonsWorld": {"region": "mandatory", "distributor": "optional"},
 }
 
 
@@ -360,8 +359,7 @@ class NameManager:
         return name
 
     async def extract_title_and_year(self, meta: Meta, filename: str) -> tuple[str | None, str | None, str | None]:
-        basename = Path(filename).name
-        basename = os.path.splitext(basename)[0]
+        basename = Path(filename).stem
 
         secondary_title: str | None = None
         year: str | None = None

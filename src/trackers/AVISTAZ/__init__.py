@@ -59,7 +59,7 @@ class AZTrackerBase:
     def get_video_quality(self, meta: Meta) -> str:
         resolution: str = meta.resolution
 
-        if self.tracker != "PHD":
+        if self.tracker != "PrivateHD":
             resolution_int = int(resolution.lower().replace("p", "").replace("i", ""))
             if resolution_int < 720 or meta.sd:
                 return "1"
@@ -203,7 +203,7 @@ class AZTrackerBase:
                 else:
                     return False
 
-        if meta.type not in ["WEBDL"] and self.tracker == "PHD" and meta.tag in ["FGT", "EVO"]:
+        if meta.type not in ["WEBDL"] and self.tracker == "PrivateHD" and meta.tag in ["FGT", "EVO"]:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 logger.info(f"[bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
                 if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
@@ -338,7 +338,7 @@ class AZTrackerBase:
         info_file_path = ""
         file_info = ""
         if meta.is_disc == "BDMV":
-            summary_file = "BD_SUMMARY_EXT_00" if self.tracker == "CZ" else "BD_SUMMARY_00"
+            summary_file = "BD_SUMMARY_EXT_00" if self.tracker == "CinemaZ" else "BD_SUMMARY_00"
             info_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{summary_file}.txt"
         else:
             info_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
@@ -622,19 +622,19 @@ class AZTrackerBase:
         tags = [str(tag_id) for tag_id in tag_ids_results if tag_id]
 
         if meta.personalrelease:
-            if self.tracker == "AZ":
+            if self.tracker == "AvistaZ":
                 tags.insert(0, "3773")
-            elif self.tracker == "CZ":
+            elif self.tracker == "CinemaZ":
                 tags.insert(0, "1594")
-            elif self.tracker == "PHD":
+            elif self.tracker == "PrivateHD":
                 tags.insert(0, "1448")
 
         if self.config["TRACKERS"][self.tracker].get("internal", False):
-            if self.tracker == "AZ":
+            if self.tracker == "AvistaZ":
                 tags.insert(0, "943")
-            elif self.tracker == "CZ":
+            elif self.tracker == "CinemaZ":
                 tags.insert(0, "938")
-            elif self.tracker == "PHD":
+            elif self.tracker == "PrivateHD":
                 tags.insert(0, "415")
 
         return tags
@@ -693,11 +693,11 @@ class AZTrackerBase:
         }
 
         default_announce = ""
-        if self.tracker == "AZ":
+        if self.tracker == "AvistaZ":
             default_announce = "https://tracker.avistaz.to/announce"
-        elif self.tracker == "CZ":
+        elif self.tracker == "CinemaZ":
             default_announce = "https://tracker.cinemaz.to/announce"
-        elif self.tracker == "PHD":
+        elif self.tracker == "PrivateHD":
             default_announce = "https://tracker.privatehd.to/announce"
 
         if not meta.debug:
@@ -758,7 +758,7 @@ class AZTrackerBase:
         daily_episode_title = meta.daily_episode_title or ""
         upload_name: str = meta.name.replace(aka_name, "").replace("Dubbed", "").replace("Dual-Audio", "").replace(manual_episode_title, "").replace(daily_episode_title, "")
 
-        if self.tracker == "PHD":
+        if self.tracker == "PrivateHD":
             forbidden_terms = [r"\bLIMITED\b", r"\bCriterion Collection\b", r"\b\d{1,3}(?:st|nd|rd|th)\s+Anniversary Edition\b"]
             for term in forbidden_terms:
                 upload_name = re.sub(term, "", upload_name, flags=re.IGNORECASE).strip()
@@ -778,9 +778,9 @@ class AZTrackerBase:
             for invalid_tag in invalid_tags:
                 upload_name = re.sub(f"-{invalid_tag}", "", upload_name, flags=re.IGNORECASE)
 
-            if self.tracker == "CZ":
+            if self.tracker == "CinemaZ":
                 upload_name = f"{upload_name}-NoGroup"
-            if self.tracker == "PHD":
+            if self.tracker == "PrivateHD":
                 upload_name = f"{upload_name}-NOGROUP"
 
         if meta.category == "TV":
@@ -803,10 +803,10 @@ class AZTrackerBase:
                 if year_to_use:
                     upload_name = upload_name.replace(meta.title, f"{meta.title} {year_to_use}", 1)
 
-            if self.tracker == "PHD" and year_to_use:
+            if self.tracker == "PrivateHD" and year_to_use:
                 upload_name = upload_name.replace(str(year_to_use), "")
 
-            if self.tracker == "AZ" and meta.tv_pack and year_to_use:
+            if self.tracker == "AvistaZ" and meta.tv_pack and year_to_use:
                 upload_name = upload_name.replace(f"{meta.title} {year_to_use} {meta.season}", f"{meta.title} {meta.season} {year_to_use}")
 
         source = meta.source
@@ -1210,7 +1210,7 @@ class AZTrackerBase:
             ("Zulu", "zul", "zu"): "186",
         }
 
-        if self.tracker == "PHD":
+        if self.tracker == "PrivateHD":
             all_lang_map.update(
                 {
                     ("Portuguese (BR)", "por", "pt-br"): "187",
@@ -1219,7 +1219,7 @@ class AZTrackerBase:
                 }
             )
 
-        if self.tracker == "AZ":
+        if self.tracker == "AvistaZ":
             all_lang_map.update(
                 {
                     ("Portuguese (BR)", "por", "pt-br"): "189",
@@ -1228,7 +1228,7 @@ class AZTrackerBase:
                 }
             )
 
-        if self.tracker == "CZ":
+        if self.tracker == "CinemaZ":
             all_lang_map.update(
                 {
                     ("Portuguese (BR)", "por", "pt-br"): "187",
@@ -1240,19 +1240,19 @@ class AZTrackerBase:
             )
 
         if meta.is_disc:
-            if self.tracker == "CZ":
+            if self.tracker == "CinemaZ":
                 all_lang_map.update(
                     {
                         ("Portuguese", "por", "pt-br"): "187",
                     }
                 )
-            elif self.tracker == "AZ":
+            elif self.tracker == "AvistaZ":
                 all_lang_map.update(
                     {
                         ("Portuguese", "por", "pt-br"): "189",
                     }
                 )
-            elif self.tracker == "PHD":
+            elif self.tracker == "PrivateHD":
                 all_lang_map.update(
                     {
                         ("Portuguese", "por", "pt-br"): "187",
@@ -1260,19 +1260,19 @@ class AZTrackerBase:
                 )
 
         if meta.is_disc:
-            if self.tracker == "CZ":
+            if self.tracker == "CinemaZ":
                 all_lang_map.update(
                     {
                         ("Portuguese", "por", "pt-br"): "187",
                     }
                 )
-            elif self.tracker == "AZ":
+            elif self.tracker == "AvistaZ":
                 all_lang_map.update(
                     {
                         ("Portuguese", "por", "pt-br"): "189",
                     }
                 )
-            elif self.tracker == "PHD":
+            elif self.tracker == "PrivateHD":
                 all_lang_map.update(
                     {
                         ("Portuguese", "por", "pt-br"): "187",

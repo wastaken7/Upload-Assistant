@@ -21,7 +21,7 @@ def _iso_639_2_code(iso3: str) -> str:
 
 
 def _is_misc(meta: Meta) -> bool:
-    """True for comic/manga/magazine/newspaper (ZNTH Misc, not ebook/audiobook)."""
+    """True for comic/manga/magazine/newspaper (Zenith Misc, not ebook/audiobook)."""
     return meta.comic or meta.manga or meta.magazine or meta.newspaper
 
 
@@ -30,8 +30,12 @@ def _book_format(meta: Meta) -> str:
     return (meta.type or meta.container or "").strip().upper().lstrip(".")
 
 
-class ZNTH(UNIT3D):
-    tracker = "ZNTH"
+class Zenith(UNIT3D):
+    """
+    Zenith is an Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
+    tracker = "Zenith"
     base_url = "https://znth.cx"
     banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"
@@ -61,7 +65,7 @@ class ZNTH(UNIT3D):
     ]
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="ZNTH")
+        super().__init__(config, tracker_name="Zenith")
         self.config = config
         self.common = COMMON(config)
 

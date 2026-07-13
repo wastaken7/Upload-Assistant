@@ -24,9 +24,13 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class TVC:
+class TVChaosUK:
+    """
+    TVC Private Torrent Tracker
+    """
+
     auth_type = "other_api"
-    tracker = "TVC"
+    tracker = "TVChaosUK"
     source_flag = "TVCHAOS"
     signature = ""
     banned_groups = ()
@@ -98,9 +102,9 @@ class TVC:
         """
         Build disc information section.
 
-        Note: TVC does not currently accept BDMV/Blu-ray disc releases (only HDTV and WEB-DL).
+        Note: TVChaosUK does not currently accept BDMV/Blu-ray disc releases (only HDTV and WEB-DL).
         This method exists for code compatibility/future use and will not be called during
-        normal TVC uploads due to the disc blocking in search_existing().
+        normal TVChaosUK uploads due to the disc blocking in search_existing().
         """
         parts = []
 
@@ -314,7 +318,7 @@ class TVC:
         return desc
 
     def _normalize_tvc_formatting(self, desc: str) -> str:
-        """Normalize whitespace for TVC (multi-block style)."""
+        """Normalize whitespace for TVChaosUK (multi-block style)."""
         # Collapse any run of 3+ newlines into exactly 2 (preserve spacing between blocks)
         return re.sub(r"\n{3,}", "\n\n", desc)
 
@@ -332,7 +336,7 @@ class TVC:
 
     async def get_cat_id(self, genres: list[str]) -> str:
         """
-        Determine TVC category ID based on genre list.
+        Determine TVChaosUK category ID based on genre list.
 
         Args:
             genres (list[str]): List of genre names (e.g. ["Drama", "Comedy"]).
@@ -525,7 +529,7 @@ class TVC:
                     tvc_name = f"{meta.title}{year_str} {meta.season}{meta.episode} [{meta.resolution} {type} {str(meta.video[-3:]).upper()}]"
         else:
             # Defensive guard for unsupported categories
-            raise ValueError(f"Unsupported category for TVC: {meta.category}")
+            raise ValueError(f"Unsupported category for TVChaosUK: {meta.category}")
 
         # Add original language title if foreign
         if cat_id == self.tv_type_map["foreign"] and meta.original_title and meta.original_title != meta.title:
@@ -606,19 +610,19 @@ class TVC:
                     else:
                         meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
                     return None
-                # TVC returns "application/x-bittorrent\n{json}" so strip the prefix
+                # TVChaosUK returns "application/x-bittorrent\n{json}" so strip the prefix
                 json_data = json.loads(response.text.split("\n", 1)[-1])
                 meta.tracker_status[self.tracker]["status_message"] = json_data
 
                 # Extract torrent ID robustly from returned URL
                 data_str = json_data.get("data")
                 if not isinstance(data_str, str):
-                    raise ValueError(f"Invalid TVC response: 'data' missing or not a string: {data_str}")
+                    raise ValueError(f"Invalid TVChaosUK response: 'data' missing or not a string: {data_str}")
 
                 parsed = urlparse(data_str)
                 segments = [seg for seg in parsed.path.split("/") if seg]
                 if not segments:
-                    raise ValueError(f"Invalid TVC response format: no path segments in {data_str}")
+                    raise ValueError(f"Invalid TVChaosUK response format: no path segments in {data_str}")
 
                 # Use last segment as torrent ID
                 t_id = segments[-1]
@@ -642,7 +646,7 @@ class TVC:
                 return False
 
         else:
-            logger.info("[cyan]TVC Request Data:")
+            logger.info("[cyan]TVChaosUK Request Data:")
             logger.info(Redaction.redact_private_info(data))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
@@ -704,7 +708,7 @@ class TVC:
             return {}
 
         if meta.category == "TV":
-            # TVC-specific extras
+            # TVChaosUK-specific extras
             if isinstance(meta.networks, list) and len(meta.networks) != 0 and "name" in meta.networks[0]:
                 meta.networks = meta.networks[0]["name"]
 
@@ -775,14 +779,14 @@ class TVC:
                 meta.setdefault("first_air_date", f"{year_str}-N/A-N/A")
 
         else:
-            raise ValueError(f"Unsupported category for TVC: {meta.category}")
+            raise ValueError(f"Unsupported category for TVChaosUK: {meta.category}")
 
         return {}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        # UHD, Discs, remux and non-1080p HEVC are not allowed on TVC.
+        # UHD, Discs, remux and non-1080p HEVC are not allowed on TVChaosUK.
         if meta.resolution == "2160p" or (meta.is_disc or "REMUX" in str(meta.type)) or (meta.video_codec == "HEVC" and meta.resolution != "1080p"):
-            logger.info("[bold red]No UHD, Discs, Remuxes or non-1080p HEVC allowed at TVC[/bold red]")
+            logger.info("[bold red]No UHD, Discs, Remuxes or non-1080p HEVC allowed at TVChaosUK[/bold red]")
             return False
         return True
 
@@ -790,7 +794,7 @@ class TVC:
         # Search on TVCUK has been DISABLED due to issues, but we can still skip uploads based on criteria
         dupes: list[dict[str, Any]] = []
 
-        logger.info("[red]Cannot search for dupes on TVC at this time.[/red]")
+        logger.info("[red]Cannot search for dupes on TVChaosUK at this time.[/red]")
         logger.info("[red]Please make sure you are not uploading duplicates.")
         await asyncio.sleep(2)
 
@@ -809,7 +813,7 @@ class TVC:
 
         Constructs BBCode-formatted description text for discs, TV packs,
         episodes, or movies using multiple separate [center] blocks.
-        Always writes a non-empty description file to tmp/<uuid>/[TVC]DESCRIPTION.txt.
+        Always writes a non-empty description file to tmp/<uuid>/[TVChaosUK]DESCRIPTION.txt.
         """
         # Read base description file
         base = await self._read_base_description(meta)

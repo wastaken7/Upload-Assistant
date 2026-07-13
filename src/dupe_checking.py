@@ -7,7 +7,7 @@ from typing import Any, TypedDict, cast
 from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
-from src.trackers.UNIT3D.hawkeuno import HUNO
+from src.trackers.UNIT3D.hawkeuno import HawkeUno
 
 
 class DupeEntry(TypedDict, total=False):
@@ -489,8 +489,8 @@ class DupeChecker:
                             format_match = True
 
                     if not format_match:
-                        if tracker_name == "CBR":
-                            logger.debug("[debug] CBR allows only one ebook format per book, so different formats are considered duplicates.")
+                        if tracker_name == "CapybaraBR":
+                            logger.debug("[debug] CapybaraBR allows only one ebook format per book, so different formats are considered duplicates.")
                         else:
                             await log_exclusion(f"book format type mismatch (expected {target_type})", each)
                             return True
@@ -515,14 +515,14 @@ class DupeChecker:
                 return False
 
             # Aither-specific trumping logic - no internal checking, if it's marked trumpable, it's trumpable
-            if tracker_name in ["AITHER", "LST"] and entry.get("trumpable", False) and res_id and target_resolution == res_id:
+            if tracker_name in ["Aither", "LST"] and entry.get("trumpable", False) and res_id and target_resolution == res_id:
                 meta.trumpable_id = entry.get("id")
                 remember_match("trumpable_id")
 
             if not meta.is_disc:
                 for file in filenames:
-                    if tracker_name in ["MTV", "AR", "RTF"]:
-                        # MTV: check if any dupe file is a substring of our file (ignoring extension)
+                    if tracker_name in ["MoreThanTV", "AlphaRatio", "RetroFlix"]:
+                        # MoreThanTV: check if any dupe file is a substring of our file (ignoring extension)
                         if any(f.lower() in file.lower() for f in files):
                             meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
                             remember_match("filename")
@@ -551,8 +551,8 @@ class DupeChecker:
                                 logger.debug(f"[debug] File count match found: {meta.file_count_match}")
                                 remember_match("file_count")
                                 return False
-                if tracker_name in ["BHD"]:
-                    # BHD: compare sizes
+                if tracker_name in ["BeyondHD"]:
+                    # BeyondHD: compare sizes
                     entry_size = coerce_int(entry.get("size"))
                     source_size = coerce_int(meta.source_size)
                     if entry_size is not None and source_size is not None:
@@ -584,7 +584,7 @@ class DupeChecker:
                 await log_exclusion("repack release", each)
                 return True
 
-            if tracker_name == "MTV":
+            if tracker_name == "MoreThanTV":
                 target_name = meta.name.replace(" ", ".").replace("DD+", "DDP")
                 dupe_name = entry.get("name", "")
 
@@ -600,14 +600,14 @@ class DupeChecker:
                     meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
                     return False
 
-            if tracker_name == "BHD":
+            if tracker_name == "BeyondHD":
                 target_name = meta.name.replace("DD+", "DDP")
                 if str(entry.get("name")) == target_name:
                     meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
                     return False
 
-            if tracker_name == "HUNO":
-                huno = HUNO(config=self.config)
+            if tracker_name == "HawkeUno":
+                huno = HawkeUno(config=self.config)
                 huno_name_result: Any = await huno.get_name(meta)
                 huno_name_map = cast(dict[str, Any], huno_name_result)
                 huno_name = str(huno_name_map.get("name", huno_name_result)) if isinstance(huno_name_result, dict) else str(huno_name_result)
@@ -615,7 +615,7 @@ class DupeChecker:
                     meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
                     return False
 
-            if tracker_name in ["BHD", "MTV", "RTF", "AR"] and (
+            if tracker_name in ["BeyondHD", "MoreThanTV", "RetroFlix", "AlphaRatio"] and (
                 ("2160p" in target_resolution and "2160p" in each) and ("framestor" in each.lower() or "framestor" in meta.uuid.lower())
             ):
                 return False
@@ -627,14 +627,14 @@ class DupeChecker:
                 await log_exclusion("file extension mismatch (is_disc=True)", each)
                 return True
 
-            if is_sd == 1 and tracker_name in {"BHD", "AITHER"} and any(str(res) in each for res in [1080, 720, 2160]) and not has_is_disc:
+            if is_sd == 1 and tracker_name in {"BeyondHD", "Aither"} and any(str(res) in each for res in [1080, 720, 2160]) and not has_is_disc:
                 return False
 
             if target_hdr and "1080p" in target_resolution and "2160p" in each:
                 await log_exclusion("No 1080p HDR when 4K exists", each)
                 return False
 
-            if tracker_name in ["AITHER", "LST"] and is_dvd:
+            if tracker_name in ["Aither", "LST"] and is_dvd:
                 if len(each) >= 1 and tag == "":
                     return False
                 return not (tag.strip() and tag.strip() in normalized)
@@ -654,7 +654,7 @@ class DupeChecker:
 
             skip_resolution_check = is_dvd or "DVD" in target_source or is_dvdrip
 
-            if tracker_name == "OTW" and not is_tv_pack and meta.category == "TV" and target_episode and target_resolution:
+            if tracker_name == "OldToonsWorld" and not is_tv_pack and meta.category == "TV" and target_episode and target_resolution:
                 dupe_season_match = re.search(r"[sS](\d+)", each)
                 dupe_has_episode = bool(re.search(r"[eE]\d{2}", each))
                 same_season_episode_dupe = (
@@ -662,7 +662,7 @@ class DupeChecker:
                 )
 
                 if same_season_episode_dupe and (target_resolution.lower() not in each.lower()):
-                    await log_exclusion(f"OTW same-season episode resolution mismatch: expected '{target_resolution}'", each)
+                    await log_exclusion(f"OldToonsWorld same-season episode resolution mismatch: expected '{target_resolution}'", each)
                     return False
 
             if not skip_resolution_check:
@@ -673,7 +673,7 @@ class DupeChecker:
                     await log_exclusion(f"HDR mismatch: Expected {target_hdr}, got {file_hdr}", each)
                     return True
 
-            if is_dvd and tracker_name != "BHD" and any(str(res) in each for res in [1080, 720, 2160]):
+            if is_dvd and tracker_name != "BeyondHD" and any(str(res) in each for res in [1080, 720, 2160]):
                 await log_exclusion(f"resolution '{target_resolution}' mismatch", each)
                 return False
 
@@ -702,7 +702,7 @@ class DupeChecker:
                 logger.debug(f"[debug] Season/Episode match result: {season_episode_match}")
                 logger.debug(f"[debug] is_season: {is_season}")
                 # Aither episode trumping logic
-                if is_season and tracker_name in ["AITHER", "LST"]:
+                if is_season and tracker_name in ["Aither", "LST"]:
                     # Null-safe normalization for comparisons
                     target_source_lower = (target_source or "").lower()
                     type_id_lower = (type_id or "").lower()
@@ -719,7 +719,7 @@ class DupeChecker:
                             is_internal = False
                             if entry.get("internal", 0) == 1:
                                 trackers_section: dict[str, Any] = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-                                aither_settings: dict[str, Any] = trackers_section.get("AITHER", {})
+                                aither_settings: dict[str, Any] = trackers_section.get("Aither", {})
                                 if aither_settings.get("internal") is True:
                                     internal_groups = aither_settings.get("internal_groups", [])
                                     if isinstance(internal_groups, list):
@@ -789,7 +789,7 @@ class DupeChecker:
             if (
                 len(dupes) == 1
                 and meta.is_disc != "BDMV"
-                and tracker_name in ["AITHER", "BHD", "HUNO", "OE", "ULCX"]
+                and tracker_name in ["Aither", "BeyondHD", "HawkeUno", "OnlyEncodes", "UploadCx"]
                 and file_size is not None
                 and "1080" in target_resolution
                 and "x264" in video_encode_lower
@@ -803,7 +803,7 @@ class DupeChecker:
                     if size_difference >= 0.20:
                         await log_exclusion(f"Your file is significantly larger ({size_difference * 100:.2f}%)", each)
                         return True
-            if len(dupes) == 1 and meta.is_disc != "BDMV" and tracker_name == "RF":
+            if len(dupes) == 1 and meta.is_disc != "BDMV" and tracker_name == "ReelFlix":
                 if tag.strip() and tag.strip() in normalized:
                     return False
                 if tag.strip() and tag.strip() not in normalized:
@@ -933,7 +933,7 @@ class DupeChecker:
                 meta_type = str(meta.type).lower()
                 if "web" not in meta_type:
                     simplified.add("HDR")
-                if tracker_name == "ANT":
+                if tracker_name == "Anthelion":
                     simplified.add("HDR")
             return simplified
 

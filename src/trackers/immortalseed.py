@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import glob
 import platform
 import re
 from pathlib import Path
@@ -16,9 +15,13 @@ from src.meta import Meta
 Config = dict[str, Any]
 
 
-class IS:
+class ImmortalSeed:
+    """
+    IS Private Torrent Tracker
+    """
+
     auth_type = "cookies"
-    tracker = "IS"
+    tracker = "ImmortalSeed"
     source_flag = "https://immortalseed.me"
     banned_groups = ("",)
     base_url = "https://immortalseed.me"
@@ -225,13 +228,13 @@ class IS:
 
     async def get_nfo(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
         nfo_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-        nfo_files = glob.glob(Path(nfo_dir) / "*.nfo")
+        nfo_files = list(nfo_dir.glob("*.nfo"))
 
         if nfo_files:
             nfo_path = nfo_files[0]
             async with aiofiles.open(nfo_path, "rb") as nfo_file:
                 nfo_bytes = await nfo_file.read()
-            return {"nfofile": (Path(nfo_path).name, nfo_bytes, "application/octet-stream")}
+            return {"nfofile": (nfo_path.name, nfo_bytes, "application/octet-stream")}
         nfo_content = await self.generate_description(meta)
         nfo_bytes = nfo_content.encode("utf-8")
         nfo_filename = f"{(meta.scene_name if meta.scene_name is not None else meta.basename_no_ext)}.nfo"

@@ -20,9 +20,13 @@ from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 
 
-class GPW:
+class GreatPosterWall:
+    """
+    GPW Private Torrent Tracker
+    """
+
     auth_type = "other_api"
-    tracker = "GPW"
+    tracker = "GreatPosterWall"
     source_flag = "GreatPosterWall"
     base_url = "https://greatposterwall.com"
     auth_token = None
@@ -112,7 +116,9 @@ class GPW:
         self.api_key = self.tracker_config.get("api_key", "")
 
     async def load_cookies(self, meta: Meta) -> Any:
-        cookie_file = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.txt").resolve())
+        from src.cookie_auth import find_cookie_file
+
+        cookie_file = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if not Path(cookie_file).exists():
             return False
 
@@ -395,7 +401,7 @@ class GPW:
                 found_items.append(dupe_entry)
 
             if found_items:
-                await self.get_slots(meta, client, GPW.group_id)
+                await self.get_slots(meta, client, GreatPosterWall.group_id)
 
             return found_items
 
@@ -610,7 +616,7 @@ class GPW:
         return " / ".join(found_tags)
 
     async def get_groupid(self, meta: Meta) -> bool:
-        GPW.group_id = ""
+        GreatPosterWall.group_id = ""
         search_url = f"{self.base_url}/api.php?api_key={self.api_key}&action=torrent&req=group&imdbID={meta.imdb_info.get('imdbID')}"
 
         try:
@@ -632,7 +638,7 @@ class GPW:
             return False
 
         if data.get("status") == 200 and "response" in data and "ID" in data["response"]:
-            GPW.group_id = str(data["response"]["ID"])
+            GreatPosterWall.group_id = str(data["response"]["ID"])
             return True
         return False
 
@@ -715,7 +721,7 @@ class GPW:
         if tmdb_identifier:
             data["tmdb"] = tmdb_identifier
 
-        # GPW API still requires explicit main-artist fields for new group creation.
+        # GreatPosterWall API still requires explicit main-artist fields for new group creation.
         data.update(await self._get_artist_data(meta))
         data["main_artist_number"] = "1"
 
@@ -1035,7 +1041,7 @@ class GPW:
 
         data: dict[str, Any] = {}
 
-        if not GPW.group_id:
+        if not GreatPosterWall.group_id:
             logger.info(f"{self.tracker}: This movie is not registered in the database, please enter additional information.")
             data.update(await self.get_additional_data(meta))
 
@@ -1063,8 +1069,8 @@ class GPW:
                 "subtitles[]": await self.get_subtitle(meta),
             }
         )
-        if GPW.group_id:
-            data["groupid"] = GPW.group_id
+        if GreatPosterWall.group_id:
+            data["groupid"] = GreatPosterWall.group_id
 
         if await self.get_ch_dubs(meta):
             data.update({"chinese_dubbed": "on"})
@@ -1145,7 +1151,7 @@ class GPW:
                     error_message = str(response_data.get("error") or response_data.get("message") or "Upload failed")
                     duplicate_phrase = "the exact same torrent file already exists on the site"
                     if duplicate_phrase in error_message.lower():
-                        meta.tracker_status[self.tracker]["status_message"] = "data error: Torrent already exists on GPW (duplicate file)."
+                        meta.tracker_status[self.tracker]["status_message"] = "data error: Torrent already exists on GreatPosterWall (duplicate file)."
                         return False
 
                     meta.tracker_status[self.tracker]["status_message"] = f"data error: {error_message}."
@@ -1162,7 +1168,7 @@ class GPW:
                 return False
 
         else:
-            logger.info("[cyan]GPW Request Data:")
+            logger.info("[cyan]GreatPosterWall Request Data:")
             logger.info(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")

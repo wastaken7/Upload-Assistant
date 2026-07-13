@@ -12,8 +12,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class LCD(UNIT3D):
-    tracker = "LCD"
+class Locadora(UNIT3D):
+    """
+    Locadora is a BRAZILIAN Private Torrent Tracker for MOVIES / TV / ANIME
+    """
+
+    tracker = "Locadora"
     base_url = "https://locadora.cc"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -24,7 +28,7 @@ class LCD(UNIT3D):
     tracker_urls = ("locadora.cc",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="LCD")
+        super().__init__(config, tracker_name="Locadora")
         self.config: Config = config
         self.common = COMMON(config)
 

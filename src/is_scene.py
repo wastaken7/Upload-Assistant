@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
-import os
 import re
 import time
 import urllib.parse
@@ -132,7 +131,7 @@ class SceneManager:
                                 try:
                                     for file in release_details_dict.get("files", []):
                                         if file["name"].endswith(".nfo"):
-                                            release_lower = os.path.splitext(file["name"])[0]
+                                            release_lower = Path(file["name"]).stem
                                 except KeyError, ValueError:
                                     pass
 

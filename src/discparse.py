@@ -7,7 +7,6 @@ import re
 import shutil
 import traceback
 from collections import OrderedDict, defaultdict
-from glob import escape, glob
 from pathlib import Path
 from typing import Any, cast
 
@@ -556,7 +555,7 @@ class DiscParse:
             if not isinstance(path, str) or not path:
                 continue
             os.chdir(path)
-            files = glob("VTS_*.VOB")
+            files = [p.name for p in Path.cwd().glob("VTS_*.VOB")]
             files.sort()
             filesdict: OrderedDict[str, list[str]] = OrderedDict()
             main_set: list[str] = []
@@ -701,7 +700,7 @@ class DiscParse:
             try:
                 # Define the playlist path
                 playlist_path = Path(path) / "ADV_OBJ"
-                xpl_files = glob(f"{escape(playlist_path)}/*.xpl")
+                xpl_files = [str(p) for p in playlist_path.glob("*.xpl")]
                 logger.debug(f"Found {xpl_files} in {playlist_path}")
 
                 if not xpl_files:
@@ -923,7 +922,7 @@ class DiscParse:
                 logger.info(f"Playlist processing failed: {e}. Falling back to largest EVO file detection.")
 
                 # Fallback to largest .EVO file
-                files = glob("*.EVO")
+                files = [p.name for p in Path.cwd().glob("*.EVO")]
                 if not files:
                     logger.info("No EVO files found in the directory.")
                     continue

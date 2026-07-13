@@ -8,7 +8,11 @@ from src.trackers.NEXUSPHP import NEXUSPHP
 Config = dict[str, Any]
 
 
-class LPT(NEXUSPHP):
+class LongPT(NEXUSPHP):
+    """
+    LongPT is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
     banned_groups = ()
     base_url = "https://longpt.org"
     source_flag = "[longpt.org] LongPT"
@@ -17,7 +21,7 @@ class LPT(NEXUSPHP):
     tracker_urls = ("https://longpt.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, "LPT")
+        super().__init__(config, "LongPT")
 
     def get_category(self, meta: Meta) -> int:
         animations = 405

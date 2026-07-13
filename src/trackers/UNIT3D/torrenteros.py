@@ -12,8 +12,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class TTR(UNIT3D):
-    tracker = "TTR"
+class Torrenteros(UNIT3D):
+    """
+    Torrenteros (TTR) is a SPANISH Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
+    tracker = "Torrenteros"
     base_url = "https://torrenteros.org"
     banned_groups = ()
     ttr_name = ""  # Initialize instance variable
@@ -25,7 +29,7 @@ class TTR(UNIT3D):
     tracker_urls = ("https://torrenteros.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="TTR")
+        super().__init__(config, tracker_name="Torrenteros")
         self.config: Config = config
         self.common = COMMON(config)
 
@@ -129,7 +133,7 @@ class TTR(UNIT3D):
 
         if "Spanish" not in (meta.audio_languages or []):
             if "Spanish" not in (meta.subtitle_languages or []):
-                logger.info("[bold red]TTR requires at least one Spanish audio or subtitle track.")
+                logger.info("[bold red]Torrenteros requires at least one Spanish audio or subtitle track.")
                 return False
             if meta.unattended:
                 if not meta.unattended_confirm:

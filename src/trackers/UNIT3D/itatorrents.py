@@ -11,8 +11,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class ITT(UNIT3D):
-    tracker = "ITT"
+class ItaTorrents(UNIT3D):
+    """
+    ItaTorrents is an ITALIAN Private tracker for MOVIES / TV / GENERAL
+    """
+
+    tracker = "ItaTorrents"
     base_url = "https://itatorrents.xyz"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -24,7 +28,7 @@ class ITT(UNIT3D):
     tracker_urls = ("https://itatorrents.xyz",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="ITT")
+        super().__init__(config, tracker_name="ItaTorrents")
         self.config: Config = config
         self.common = COMMON(config)
 

@@ -2,7 +2,6 @@
 import asyncio
 import contextlib
 import fnmatch
-import glob
 import math
 import os
 import platform
@@ -152,7 +151,7 @@ class TorrentCreator:
         else:
             piece_size = 128 * 1024 * 1024  # 128 MiB
 
-        if any(tracker in meta.trackers for tracker in ["HDB", "PTP"]) and piece_size > 16 * 1024 * 1024:
+        if any(tracker in meta.trackers for tracker in ["HDBits", "PassThePopcorn"]) and piece_size > 16 * 1024 * 1024:
             piece_size = 16 * 1024 * 1024
 
         # Enforce minimum and maximum limits
@@ -251,11 +250,8 @@ class TorrentCreator:
                     elif not meta.tv_pack:
                         path_dir = os.fspath(path)
                         os.chdir(path_dir)
-                        globs = (
-                            [Path(f).name for f in glob.glob(Path(path_dir) / "*.mkv")]
-                            + [Path(f).name for f in glob.glob(Path(path_dir) / "*.mp4")]
-                            + [Path(f).name for f in glob.glob(Path(path_dir) / "*.ts")]
-                        )
+                        path_dir_path = Path(path_dir)
+                        globs = [f.name for f in path_dir_path.glob("*.mkv")] + [f.name for f in path_dir_path.glob("*.mp4")] + [f.name for f in path_dir_path.glob("*.ts")]
                         no_sample_globs = [
                             str(Path(f"{path_dir}{os.sep}{file}").resolve()) for file in globs if not file.lower().endswith("sample.mkv") or "!sample" in file.lower()
                         ]
@@ -309,7 +305,7 @@ class TorrentCreator:
                             except ValueError, TypeError:
                                 logger.warning("[yellow]Warning: Invalid max_piece_size value, using default piece length")
 
-                        if not piece_size and not tracker_url and not any(tracker in meta.trackers for tracker in ["HDB", "PTP", "MTV"]):
+                        if not piece_size and not tracker_url and not any(tracker in meta.trackers for tracker in ["HDBits", "PassThePopcorn", "MoreThanTV"]):
                             cmd.extend(["-m", "27"])
 
                         if meta.mkbrr_threads != "0":
@@ -535,7 +531,7 @@ class TorrentCreator:
             base_torrent.private = True
             has_subs = False
             for f in base_torrent.files:
-                ext = os.path.splitext(str(f))[1].lower()
+                ext = Path(str(f)).suffix.lower()
                 if ext in {".srt", ".sub", ".vtt", ".ssa", ".ass", ".idx"}:
                     has_subs = True
                     break

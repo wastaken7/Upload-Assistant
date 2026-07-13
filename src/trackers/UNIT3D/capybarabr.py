@@ -9,8 +9,12 @@ from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 
-class CBR(UNIT3D):
-    tracker = "CBR"
+class CapybaraBR(UNIT3D):
+    """
+    CapybaraBR is a BRAZILIAN Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
+    tracker = "CapybaraBR"
     base_url = "https://capybarabr.com"
     banned_groups = (
         "4K4U",
@@ -104,7 +108,7 @@ class CBR(UNIT3D):
     tracker_urls = ("capybarabr.com",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="CBR")
+        super().__init__(config, tracker_name="CapybaraBR")
         self.config = config
         self.common = COMMON(config)
 
@@ -120,7 +124,7 @@ class CBR(UNIT3D):
         if meta.anime is True and resolved_category == "TV":
             resolved_category = "ANIMES"
 
-        if resolved_category == "BOOK" and (str(meta.type).upper() in ("CBR", "CBZ") or meta.manga or meta.comic):
+        if resolved_category == "BOOK" and (str(meta.type).upper() in ("CapybaraBR", "CBZ") or meta.manga or meta.comic):
             resolved_category = "COMIC_MANGA"
 
         if resolved_category:
@@ -139,7 +143,7 @@ class CBR(UNIT3D):
             "WEBRIP": "5",
             "HDTV": "6",
             "AZW3": "13",
-            "CBR": "14",
+            "CapybaraBR": "14",
             "CBZ": "15",
             "MOBI": "16",
             "PDF": "17",

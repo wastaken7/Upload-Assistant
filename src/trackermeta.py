@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import io
-import os
 import sys
 from collections.abc import Mapping, Sequence
 from io import BytesIO
@@ -328,7 +327,7 @@ async def update_metadata_from_tracker(
     manual_key = f"{tracker_key}_manual"
     found_match = False
 
-    if tracker_name == "PTP":
+    if tracker_name == "PassThePopcorn":
         imdb_id: int = 0
         ptp_imagelist: list[ImageDict] = []
         if meta.ptp is None:
@@ -339,7 +338,7 @@ async def update_metadata_from_tracker(
                     logger.info(f"[green]{tracker_name} IMDb ID found: tt{str(imdb_id).zfill(7)}[/green]")
 
                 if not meta.unattended:
-                    if await prompt_user_for_confirmation("Do you want to use this ID data from PTP?"):
+                    if await prompt_user_for_confirmation("Do you want to use this ID data from PassThePopcorn?"):
                         meta.imdb_id = imdb_id
                         found_match = True
                         meta.ptp = ptp_torrent_id
@@ -375,7 +374,7 @@ async def update_metadata_from_tracker(
                         if valid_images:
                             meta.image_list = valid_images
             else:
-                logger.debug("[yellow]Skipping PTP as no match found[/yellow]")
+                logger.debug("[yellow]Skipping PassThePopcorn as no match found[/yellow]")
                 found_match = False
 
         else:
@@ -396,14 +395,14 @@ async def update_metadata_from_tracker(
                     valid_images = await check_images_concurrently(ptp_imagelist, meta)
                     if valid_images:
                         meta.image_list = valid_images
-                        logger.info("[green]PTP images added to metadata.[/green]")
+                        logger.info("[green]PassThePopcorn images added to metadata.[/green]")
             else:
-                logger.info(f"[yellow]Could not find IMDb ID using PTP ID: {ptp_torrent_id}[/yellow]")
+                logger.info(f"[yellow]Could not find IMDb ID using PassThePopcorn ID: {ptp_torrent_id}[/yellow]")
                 found_match = False
 
-    elif tracker_name == "BHD":
+    elif tracker_name == "BeyondHD":
         trackers_cfg = cast(Mapping[str, Any], config.get("TRACKERS", {}))
-        tracker_cfg = cast(dict[str, Any], trackers_cfg.get("BHD", {}))
+        tracker_cfg = cast(dict[str, Any], trackers_cfg.get("BeyondHD", {}))
         bhd_api = tracker_cfg.get("api_key")
         bhd_api = bhd_api if isinstance(bhd_api, str) else None
         if bhd_api and len(bhd_api) < 25:
@@ -415,7 +414,7 @@ async def update_metadata_from_tracker(
             bhd_rss_key = None
 
         if not bhd_api or not bhd_rss_key:
-            logger.info("[red]BHD API or RSS key not found. Please check your configuration.[/red]")
+            logger.info("[red]BeyondHD API or RSS key not found. Please check your configuration.[/red]")
             return meta, False
         use_foldername = bool(meta.is_disc) or meta.keep_folder is True or meta.isdir is True
 
@@ -451,7 +450,7 @@ async def update_metadata_from_tracker(
                     description_value = meta.description
                     if isinstance(description_value, str) and description_value:
                         description = description_value
-                        logger.info("[bold green]Successfully grabbed description from BHD")
+                        logger.info("[bold green]Successfully grabbed description from BeyondHD")
                         logger.info(f"Description after cleaning:\n{description[:1000]}...", extra={"markup": False})
 
                         if not meta.skipit:
@@ -498,7 +497,7 @@ async def update_metadata_from_tracker(
                                         gc.collect()  # Force garbage collection to close any lingering handles
                                         for attempt in range(3):
                                             try:
-                                                os.remove(nfo_file_path)
+                                                nfo_file_path.unlink()
                                                 logger.info("[yellow]NFO file successfully deleted.[/yellow]")
                                                 break
                                             except Exception as e:
@@ -506,7 +505,7 @@ async def update_metadata_from_tracker(
                                                     logger.info(f"[yellow]Attempt {attempt + 1}: Could not delete file, retrying in 1 second...[/yellow]")
                                                     await asyncio.sleep(1)
                                                 else:
-                                                    logger.error(f"[red]Failed to delete BHD NFO file after 3 attempts: {e}[/red]")
+                                                    logger.error(f"[red]Failed to delete BeyondHD NFO file after 3 attempts: {e}[/red]")
                                     except Exception as e:
                                         logger.error(f"[red]Error during file cleanup: {e}[/red]")
                                     meta.nfo = False
@@ -539,9 +538,9 @@ async def update_metadata_from_tracker(
                     nfo_file_path = Path(save_path) / "bhd.nfo"
                     if Path(nfo_file_path).exists():
                         try:
-                            os.remove(nfo_file_path)
+                            nfo_file_path.unlink()
                         except Exception as e:
-                            logger.error(f"[red]Failed to delete BHD NFO file: {e}[/red]")
+                            logger.error(f"[red]Failed to delete BeyondHD NFO file: {e}[/red]")
                     found_match = False
             else:
                 # Only treat as match if we actually got valid IDs
@@ -600,7 +599,7 @@ async def update_metadata_from_tracker(
             logger.debug(f"[yellow]No valid data found on {tracker_name}[/yellow]")
             found_match = False
 
-    elif tracker_name == "HDB":
+    elif tracker_name == "HDBits":
         bbcode = BBCODE()
         if meta.hdb is not None:
             meta[manual_key] = meta[tracker_key]
@@ -628,7 +627,7 @@ async def update_metadata_from_tracker(
                     meta.description = description
                     meta.saved_description = True
                 else:
-                    logger.info("[yellow]HDB description empty[/yellow]")
+                    logger.info("[yellow]HDBits description empty[/yellow]")
                 if image_list and meta.keep_images:
                     valid_images = await check_images_concurrently(image_list, meta)
                     if valid_images:
@@ -637,12 +636,12 @@ async def update_metadata_from_tracker(
                 else:
                     meta.image_list = []
 
-                logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDB Name: {meta.hdb_name}[/green]")
+                logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDBits Name: {meta.hdb_name}[/green]")
             else:
                 logger.info(f"[yellow]{tracker_name} data not found for ID: {meta[tracker_key]}[/yellow]")
                 found_match = False
         else:
-            logger.debug("[yellow]No ID found in meta for HDB, searching by file name[/yellow]")
+            logger.debug("[yellow]No ID found in meta for HDBits, searching by file name[/yellow]")
 
             # Use search_filename function if ID is not found in meta
             hdb_search = await tracker_instance.search_filename(search_term, search_file_folder, meta)
@@ -656,7 +655,7 @@ async def update_metadata_from_tracker(
 
             if imdb or tvdb_id or meta.hdb_description:
                 if not meta.unattended:
-                    logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDB Name: {meta.hdb_name}[/green]")
+                    logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDBits Name: {meta.hdb_name}[/green]")
                     if await prompt_user_for_confirmation(f"Do you want to use the ID's found on {tracker_name}?"):
                         logger.info(f"[green]{tracker_name} data retained.[/green]")
                         meta.imdb_id = imdb if imdb else meta.imdb_id
@@ -668,8 +667,8 @@ async def update_metadata_from_tracker(
                             bbcode.clean_hdb_description(description_source),
                         )
                         if description and len(description) > 0 and not skip_tracker_descriptions:
-                            logger.info("[bold green]Successfully grabbed description from HDB")
-                            logger.info(f"HDB Description content:\n{description[:1000]}.....", extra={"markup": False})
+                            logger.info("[bold green]Successfully grabbed description from HDBits")
+                            logger.info(f"HDBits Description content:\n{description[:1000]}.....", extra={"markup": False})
                             logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                             edit_choice_raw = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
                             edit_choice = (edit_choice_raw or "").strip().lower()
@@ -690,7 +689,7 @@ async def update_metadata_from_tracker(
                                 meta.description = description
                                 meta.saved_description = True
                         else:
-                            logger.info("[yellow]HDB description empty[/yellow]")
+                            logger.info("[yellow]HDBits description empty[/yellow]")
                         if image_list and meta.keep_images:
                             valid_images = await check_images_concurrently(image_list, meta)
                             if valid_images:
@@ -713,7 +712,7 @@ async def update_metadata_from_tracker(
                         bbcode.clean_hdb_description(description_source),
                     )
                     if description and len(description) > 0 and not skip_tracker_descriptions:
-                        logger.info(f"HDB Description content:\n{description[:500]}.....", extra={"markup": False})
+                        logger.info(f"HDBits Description content:\n{description[:500]}.....", extra={"markup": False})
                         meta.description = description
                         meta.saved_description = True
                     if image_list and meta.keep_images:
@@ -721,7 +720,7 @@ async def update_metadata_from_tracker(
                         if valid_images:
                             meta.image_list = valid_images
                             await handle_image_list(meta, tracker_name, valid_images)
-                    logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDB Name: {hdb_name}[/green]")
+                    logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDBits Name: {hdb_name}[/green]")
                     found_match = True
             else:
                 meta.hdb_name = None
@@ -748,11 +747,9 @@ async def handle_image_list(meta: Meta, tracker_name: str, valid_images: Sequenc
                 meta.image_sizes = {}
                 save_path = Path(meta.base_dir) / "tmp" / meta.uuid
                 try:
-                    import glob
-
-                    png_files = glob.glob(Path(save_path) / "*.png")
+                    png_files = list(Path(save_path).glob("*.png"))
                     for png_file in png_files:
-                        os.remove(png_file)
+                        png_file.unlink()
 
                     if png_files:
                         logger.info(f"[yellow]Successfully deleted {len(png_files)} image files.[/yellow]")

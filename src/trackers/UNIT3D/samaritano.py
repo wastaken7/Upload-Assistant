@@ -5,13 +5,17 @@ from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
-from src.trackers.UNIT3D.capybarabr import CBR
+from src.trackers.UNIT3D.capybarabr import CapybaraBR
 
 Config = dict[str, Any]
 
 
-class SAM(UNIT3D):
-    tracker = "SAM"
+class Samaritano(UNIT3D):
+    """
+    SAMARITANO is a BRAZILIAN Private tracker for MOVIES / TV / GENERAL
+    """
+
+    tracker = "Samaritano"
     base_url = "https://samaritano.cc"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -23,7 +27,7 @@ class SAM(UNIT3D):
     tracker_urls = ("https://samaritano.cc",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="SAM")
+        super().__init__(config, tracker_name="Samaritano")
         self.config: Config = config
         self.common = COMMON(config)
 
@@ -46,7 +50,7 @@ class SAM(UNIT3D):
         return {"resolution_id": resolved_id}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        cbr = CBR(self.config)
+        cbr = CapybaraBR(self.config)
         cbr.tracker = self.tracker
         return await cbr.get_name(meta)
 

@@ -122,7 +122,7 @@ def compare_bdinfo(meta: Meta, entry: dict[str, Any], tracker_name: str) -> tupl
         logger.info(f"[{style}][{symbol}] {label.ljust(10)}: {content}[/{style}]")
 
     warning_message = generate_warning(release_name, duplicate_content, has_detected_changes)
-    if has_detected_changes and tracker_name in ["LST", "AITHER"]:
+    if has_detected_changes and tracker_name in ["LST", "Aither"]:
         logger.info(f"[green]{tracker_name} allows uploads for different BD discs.[/green]")
 
     add_val = f"+{stats['+ ']}".ljust(3)

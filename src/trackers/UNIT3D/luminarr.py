@@ -9,8 +9,12 @@ from src.trackers.COMMON import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 
-class LUME(UNIT3D):
-    tracker = "LUME"
+class Luminarr(UNIT3D):
+    """
+    Luminarr is a Private Torrent Tracker for MOVIES / TV
+    """
+
+    tracker = "Luminarr"
     base_url = "https://luminarr.me"
     banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"
@@ -22,7 +26,7 @@ class LUME(UNIT3D):
     tracker_urls = ("https://luminarr.me",)
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name="LUME")
+        super().__init__(config, tracker_name="Luminarr")
         self.config = config
         self.common = COMMON(config)
 

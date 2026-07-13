@@ -26,7 +26,7 @@ def _as_str(value: Any) -> str | None:
 def _safe_remove(path: str) -> bool:
     try:
         if Path(path).exists():
-            os.remove(path)
+            Path(path).unlink()
             return True
     except Exception as e:
         logger.info(f"[yellow]Failed to delete file {path}: {e!s}[/yellow]")
@@ -360,11 +360,11 @@ async def _handle_image_upload(
             logger.debug(f"[yellow]Searching for screenshots with pattern: {filename_pattern}")
 
             if meta.is_disc == "DVD":
-                existing_screens: list[str] = await asyncio.to_thread(
-                    glob.glob, f"{glob.escape(f'{meta.base_dir}{"/" + "tmp" + "/"}{meta.uuid}')}/{glob.escape(meta.discs[0]['name'])}-*.png"
+                existing_screens = await asyncio.to_thread(
+                    lambda: [str(p) for p in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[0]['name'])}-*.png")]
                 )
             else:
-                existing_screens = await asyncio.to_thread(glob.glob, Path(glob.escape(screenshots_dir)) / filename_pattern)
+                existing_screens = await asyncio.to_thread(lambda: [str(p) for p in Path(screenshots_dir).glob(filename_pattern)])
 
             # Add any new screenshots to our list
             for screen in existing_screens:
@@ -377,18 +377,18 @@ async def _handle_image_upload(
         image_patterns = ["*.png", ".[!.]*.png"]
         image_glob: list[str] = []
         for pattern in image_patterns:
-            glob_results = await asyncio.to_thread(glob.glob, pattern)
+            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
             image_glob.extend(glob_results)
             logger.debug(f"[cyan]Found {len(image_glob)} files matching pattern: {pattern}")
 
         unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
         unwanted_files: set[str] = set()
         for pattern in unwanted_patterns:
-            glob_results = await asyncio.to_thread(glob.glob, pattern)
+            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
             unwanted_files.update(glob_results)
             if pattern.startswith("FILE") or pattern.startswith("PLAYLIST") or pattern.startswith("POSTER"):
                 hidden_pattern = "." + pattern
-                hidden_glob_results = await asyncio.to_thread(glob.glob, hidden_pattern)
+                hidden_glob_results = await asyncio.to_thread(lambda hp=hidden_pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(hp)])
                 unwanted_files.update(hidden_glob_results)
 
         # Remove unwanted files
@@ -409,7 +409,7 @@ async def _handle_image_upload(
 
     if tracker == "covers":
         all_screenshots = []
-        existing_screens = await asyncio.to_thread(glob.glob, f"{glob.escape(f'{meta.base_dir}{"/" + "tmp" + "/"}{meta.uuid}')}/cover_*.jpg")
+        existing_screens = await asyncio.to_thread(lambda: [str(p) for p in (Path(meta.base_dir) / "tmp" / meta.uuid).glob("cover_*.jpg")])
         for screen in existing_screens:
             if screen not in all_screenshots:
                 all_screenshots.append(screen)
@@ -448,10 +448,10 @@ async def _handle_image_upload(
                     logger.info("[red]No valid path available for screenshot generation.[/red]")
 
             if meta.is_disc == "DVD":
-                new_screens = await asyncio.to_thread(glob.glob, f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{meta.discs[0]['name']}-*.png")
+                new_screens = await asyncio.to_thread(lambda: [str(p) for p in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[0]['name'])}-*.png")])
             else:
                 # Use a more generic pattern to find any PNG files that aren't already in all_screenshots
-                new_screens = await asyncio.to_thread(glob.glob, Path(screenshots_dir) / "*.png")
+                new_screens = await asyncio.to_thread(lambda: [str(p) for p in Path(screenshots_dir).glob("*.png")])
                 indexed_pattern = re.compile(r".*-\d+\.png$")
                 new_screens = [s for s in new_screens if indexed_pattern.match(Path(s).name)]
 

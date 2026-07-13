@@ -309,7 +309,7 @@ def validate_config(config: Any, active_trackers: list[str] | None = None, activ
                 is_usenet_tracker_active = True
                 break
     except ImportError:
-        if any(ut in trackers_upper for ut in ("CRP", "SUIO", "DS")):
+        if any(ut in trackers_upper for ut in ("Curupira", "Suio", "DrunkenSlug")):
             is_usenet_tracker_active = True
 
     if "USENET" in config_dict:
@@ -542,8 +542,8 @@ def _validate_trackers_section(trackers: dict[str, Any], active_trackers: list[s
     if "default_trackers" not in trackers:
         warnings.append(ConfigValidationWarning("No 'default_trackers' defined - you'll need to specify trackers via command line", key="default_trackers", section="TRACKERS"))
 
-    if "DS" in active_set and "DS" not in [t.upper() for t in trackers]:
-        errors.append("Missing config section for active tracker: 'DS' under 'TRACKERS'")
+    if "DrunkenSlug" in active_set and "DrunkenSlug" not in [t.upper() for t in trackers]:
+        errors.append("Missing config section for active tracker: 'DrunkenSlug' under 'TRACKERS'")
 
     # Validate individual tracker configs
     for tracker_name, tracker_config in trackers.items():
@@ -570,11 +570,11 @@ def _validate_trackers_section(trackers: dict[str, Any], active_trackers: list[s
                 # This is an error for active trackers, not just a warning
                 errors.append(f"[TRACKERS][{tracker_name}] announce_url contains placeholder (e.g., <PASSKEY>) - replace with actual value")
 
-        # Check DS specific config
-        if tracker_name.upper() == "DS" and is_active:
+        # Check DrunkenSlug specific config
+        if tracker_name.upper() == "DrunkenSlug" and is_active:
             upload_url = tracker_config_dict.get("upload_url", "")
             if not upload_url or (isinstance(upload_url, str) and not upload_url.strip()):
-                errors.append("[TRACKERS][DS] upload_url is required when DS is active")
+                errors.append("[TRACKERS][DrunkenSlug] upload_url is required when DrunkenSlug is active")
 
         # Check boolean fields are actually booleans (must be real bool, not string)
         bool_fields = ["anon", "useAPI", "use_for_search", "modq", "draft", "draft_default", "img_rehost", "allow_ext_subtitles", "resolve_language"]
@@ -685,7 +685,7 @@ def group_warnings(warnings: list[ConfigValidationWarning]) -> list[str]:
     Group warnings with the same section and message, combining keys.
 
     For example, multiple trackers with the same warning become:
-    [TRACKERS][BLU, HDB] api_key is whitespace-only
+    [TRACKERS][Blutopia, HDBits] api_key is whitespace-only
     """
     from collections import defaultdict
 

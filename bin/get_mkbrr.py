@@ -85,13 +85,13 @@ class MkbrrBinaryManager:
             if system != "windows":
                 # Set secure permissions before removal
                 os.chmod(binary_path, 0o600)
-            os.remove(binary_path)
+            binary_path.unlink()
             logger.debug(f"[blue]Removed existing binary at: {binary_path}[/blue]")
 
         if wrong_version and version_path.exists():
             if system != "windows":
                 os.chmod(version_path, 0o644)
-            os.remove(version_path)
+            version_path.unlink()
             logger.debug(f"[blue]Removed existing version file at: {version_path}[/blue]")
 
         download_url = f"https://github.com/autobrr/mkbrr/releases/download/{version}/mkbrr_{version[1:]}_{file_pattern}"

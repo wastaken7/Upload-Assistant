@@ -29,7 +29,7 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
     # Try specialized regex patterns first
     if meta.anime:
         # Anime pattern: [Group] at the beginning
-        basename_stripped = os.path.splitext(basename)[0]
+        basename_stripped = Path(video).stem
         anime_match = re.search(r"^\s*\[(.+?)\]", basename_stripped)
         if anime_match:
             matched_anime = True
@@ -45,7 +45,7 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
         else:
             # If video is a file, use the filename without extension
             basename_no_path = Path(video).name
-            name, ext = os.path.splitext(basename_no_path)
+            name, ext = Path(basename_no_path).stem, Path(basename_no_path).suffix
             # If the extension contains a hyphen, it's not a real extension
             basename_stripped = basename_no_path if ext and "-" in ext else name
         # Strip common file extensions if present (e.g. from directories or custom uuid paths)
@@ -73,7 +73,7 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
             ".tar",
             ".7z",
         }
-        name, ext = os.path.splitext(basename_stripped)
+        name, ext = Path(basename_stripped).stem, Path(basename_stripped).suffix
         if ext.lower() in known_extensions:
             basename_stripped = name
 

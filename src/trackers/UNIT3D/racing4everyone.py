@@ -11,8 +11,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class R4E(UNIT3D):
-    tracker = "R4E"
+class Racing4Everyone(UNIT3D):
+    """
+    Racing4Everyone (R4E) is a Private Torrent Tracker for RACING
+    """
+
+    tracker = "Racing4Everyone"
     base_url = "https://racing4everyone.eu"
     banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"
@@ -22,7 +26,7 @@ class R4E(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="R4E")
+        super().__init__(config, tracker_name="Racing4Everyone")
         self.config: Config = config
         self.common = COMMON(config)
 
@@ -96,7 +100,7 @@ class R4E(UNIT3D):
         dupes: list[dict[str, Any]] = []
         url = self.search_url
         params: dict[str, Any] = {
-            "api_token": str(self.config["TRACKERS"]["R4E"]["api_key"]).strip(),
+            "api_token": str(self.config["TRACKERS"]["Racing4Everyone"]["api_key"]).strip(),
             "tmdb": meta.tmdb,
             "categories[]": (await self.get_category_id(meta))["category_id"],
             "types[]": (await self.get_type_id(meta))["type_id"],

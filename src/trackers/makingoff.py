@@ -25,15 +25,13 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class MKO:
+class MakingOff:
     """
-    MakingOff (https://makingoff.org).
-    Cinema forum with public torrents (DHT).
-    Platform: Invision Power Board (IPB).
+    Making Off is a BRAZILIAN Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
     auth_type = "cookies"
-    tracker = "MKO"
+    tracker = "MakingOff"
     source_flag = ""
     base_url = "https://makingoff.org/forum"
     banned_groups: tuple[str, ...] = ()
@@ -79,7 +77,7 @@ class MKO:
         # Cache for the resolved PT-BR display title, keyed by meta.uuid.
         self._display_title_cache: dict[str, str] = {}
 
-        tracker_config = dict(dict(config.get("TRACKERS", {})).get("MKO", {}))
+        tracker_config = dict(dict(config.get("TRACKERS", {})).get("MakingOff", {}))
         public_trackers_raw = tracker_config.get("trackers", [])
         if isinstance(public_trackers_raw, str):
             self._public_trackers: list[str] = [t.strip() for t in public_trackers_raw.splitlines() if t.strip()]

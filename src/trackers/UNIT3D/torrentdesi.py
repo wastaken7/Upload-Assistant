@@ -4,8 +4,12 @@ from src.meta import Meta
 from src.trackers.UNIT3D import UNIT3D
 
 
-class DT(UNIT3D):
-    tracker = "DT"
+class DesiTorrents(UNIT3D):
+    """
+    DesiTorrents is an INDIAN Private Torrent Tracker for MOVIES / TV
+    """
+
+    tracker = "DesiTorrents"
     base_url = "https://torrent.desi"
     banned_groups = ("DusIcTv", "PDHM", "Ranvijay", "BWT", "DDH", "Telly", "YTS", "RARBG", "BonsaiHD", "GalaxyRG", "-=!DrSTAR!=-")
     upload_url = f"{base_url}/api/v1/torrents/upload"
@@ -13,7 +17,7 @@ class DT(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name="DT")
+        super().__init__(config, tracker_name="DesiTorrents")
 
         # Banned Groups
 
@@ -28,7 +32,7 @@ class DT(UNIT3D):
         Returns the category ID for the release.
         """
 
-        # DT Category Map: Movie=1, TV=2, Music=3, Game=4
+        # DesiTorrents Category Map: Movie=1, TV=2, Music=3, Game=4
         category_id = {"MOVIE": "1", "TV": "2", "MUSIC": "3", "GAME": "4"}
 
         if mapping_only:
@@ -69,7 +73,7 @@ class DT(UNIT3D):
             return {v: k for k, v in type_id_map.items()}
         if type:
             return {"type_id": type_id_map.get(type, "0")}
-        # Dynamic Logic for DT specific IDs (UHD vs 1080p)
+        # Dynamic Logic for DesiTorrents specific IDs (UHD vs 1080p)
         meta_type = meta.type
         is_uhd = meta.uhd
 
@@ -105,7 +109,7 @@ class DT(UNIT3D):
         Returns the resolution ID for the release.
         """
 
-        # DT Specific Resolutions
+        # DesiTorrents Specific Resolutions
         resolution_id = {
             "4320p": "9",  # 8k
             "2160p": "8",

@@ -4,7 +4,6 @@ import asyncio
 import contextlib
 import filecmp
 import gc
-import glob
 import json
 import os
 import platform
@@ -54,10 +53,10 @@ from src.queuemanage import QueueManager
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
-from src.trackers.alpharatio import AR
+from src.trackers.alpharatio import AlphaRatio
 from src.trackers.COMMON import COMMON
-from src.trackers.passthepopcorn import PTP
-from src.trackersetup import TRACKER_SETUP, api_trackers, http_trackers, other_api_trackers, tracker_class_map
+from src.trackers.passthepopcorn import PassThePopcorn
+from src.trackersetup import TRACKER_SETUP, api_trackers, http_trackers, normalize_tracker_name, other_api_trackers, tracker_class_map
 from src.trackerstatus import TrackerStatusManager
 from src.uphelper import UploadHelper
 from src.uploadscreens import UploadScreensManager
@@ -442,11 +441,11 @@ async def validate_tracker_logins(meta: Meta, trackers: list[str] | None = None)
 
     # Filter trackers that are in both the list and tracker_class_map
     valid_trackers = [tracker for tracker in trackers if tracker in tracker_class_map and tracker in http_trackers]
-    # RTF/PTP are not HTTP trackers but need validation
-    if "RTF" in trackers:
-        valid_trackers.append("RTF")
-    if "PTP" in trackers:
-        valid_trackers.append("PTP")
+    # RetroFlix/PassThePopcorn are not HTTP trackers but need validation
+    if "RetroFlix" in trackers:
+        valid_trackers.append("RetroFlix")
+    if "PassThePopcorn" in trackers:
+        valid_trackers.append("PassThePopcorn")
 
     if valid_trackers:
 
@@ -459,9 +458,9 @@ async def validate_tracker_logins(meta: Meta, trackers: list[str] | None = None)
 
                 tracker_class = tracker_class_map[tracker_name](config=config)
                 logger.debug(f"[cyan]Validating {tracker_name} credentials...[/cyan]")
-                if tracker_name == "RTF":
+                if tracker_name == "RetroFlix":
                     login = await tracker_class.api_test(meta)
-                elif tracker_name == "PTP":
+                elif tracker_name == "PassThePopcorn":
                     login = await tracker_class.get_AntiCsrfToken(meta)
                 else:
                     login = await tracker_class.validate_credentials(meta)
@@ -488,7 +487,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
     uploads reflect the new values.
     """
     book_required_fields = ["title", "author", "year", "book_language"]
-    if meta.audiobook and ("CBR" in meta.trackers or "ZNTH" in meta.trackers):
+    if meta.audiobook and ("CapybaraBR" in meta.trackers or "Zenith" in meta.trackers):
         book_required_fields.append("narrator")
     book_missing = []
     for f in book_required_fields:
@@ -638,9 +637,9 @@ async def _prompt_game_meta(meta: Meta) -> None:
         if name_needs_rebuild:
             meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
 
-    # BJS-specific game metadata prompts
+    # BJShare-specific game metadata prompts
     trackers = [t.upper() for t in meta.trackers]
-    if "BJS" not in trackers or meta.unattended:
+    if "BJShare" not in trackers or meta.unattended:
         return
 
     try:
@@ -667,7 +666,7 @@ async def _prompt_game_meta(meta: Meta) -> None:
                     system_choices = ["FREE", "NTSC", "PAL", "Skip"]
                 try:
                     choice = cli_ui.ask_choice(
-                        "BJS: Select game system (TV standard):",
+                        "BJShare: Select game system (TV standard):",
                         choices=system_choices,
                     )
                     if choice != "Skip":
@@ -679,7 +678,7 @@ async def _prompt_game_meta(meta: Meta) -> None:
                 region_choices = ["USA", "EUR", "JPN", "Skip"]
                 try:
                     choice = cli_ui.ask_choice(
-                        "BJS: Select game region:",
+                        "BJShare: Select game region:",
                         choices=region_choices,
                     )
                     if choice != "Skip":
@@ -690,12 +689,12 @@ async def _prompt_game_meta(meta: Meta) -> None:
             if needs_container:
                 container_choices = ["NSP", "XCI", "NSZ", "XCZ", "Skip"]
                 if meta.game_system == "X360":
-                    container_choices = ["LT", "JTAG/RGH", "Skip"]
+                    container_choices = ["LatTeam", "JTAG/RGH", "Skip"]
 
                 if meta.container.upper() not in container_choices:
                     try:
                         choice = cli_ui.ask_choice(
-                            "BJS: Select container format ('Destravamento'):",
+                            "BJShare: Select container format ('Destravamento'):",
                             choices=container_choices,
                         )
                         if choice != "Skip":
@@ -721,8 +720,8 @@ def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
         requires more images than actually exist.
     """
     tmp_dir = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}"
-    img_files = glob.glob(glob.escape(tmp_dir) + "/*.png")
-    screenshot_files = [f for f in img_files if not Path(f).name.startswith("POSTER")]
+    img_files = Path(tmp_dir).glob("*.png")
+    screenshot_files = [f for f in img_files if not f.name.startswith("POSTER")]
     actual_screens = len(screenshot_files)
     capped_min = min(min_successful_uploads, actual_screens)
     return actual_screens, capped_min
@@ -780,7 +779,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
         trackers = [t for t in raw_trackers_list if isinstance(t, str)]
     elif isinstance(raw_trackers, str):
         if raw_trackers != "":
-            trackers = [t.strip().upper() for t in raw_trackers.split(",") if t.strip()]  # type: ignore
+            trackers = [normalize_tracker_name(t) for t in raw_trackers.split(",") if t.strip()]  # type: ignore
             meta.trackers = trackers
         else:
             trackers = []
@@ -788,7 +787,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
         trackers = []
 
     if isinstance(meta.trackers_remove, str) and meta.trackers_remove:
-        remove_list = [t.strip().upper() for t in meta.trackers_remove.split(",")]
+        remove_list = [normalize_tracker_name(t) for t in meta.trackers_remove.split(",")]
         for tracker in remove_list:
             if tracker in meta.trackers:
                 meta.trackers.remove(tracker)
@@ -799,7 +798,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
     async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
         await f.write(json.dumps(meta.to_dict(), indent=4))
 
-    # For BOOK category, certain trackers (e.g. CBR) require title, author, year and language.
+    # For BOOK category, certain trackers (e.g. CapybaraBR) require title, author, year and language.
     # Prompt here - on the shared meta - so the data flows into every tracker's upload
     # and into get_name (which runs again below if any field was filled in).
     if meta.category == "BOOK":
@@ -850,11 +849,11 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
             meta.trackers = previous_trackers
         if isinstance(meta.trackers, str):
             if "," in meta.trackers:
-                meta.trackers = [t.strip().upper() for t in meta.trackers.split(",")]
+                meta.trackers = [normalize_tracker_name(t) for t in meta.trackers.split(",")]
             else:
-                meta.trackers = [meta.trackers.strip().upper()]
+                meta.trackers = [normalize_tracker_name(meta.trackers)]
         elif isinstance(meta.trackers, list):
-            meta.trackers = [t.strip().upper() for t in meta.trackers if isinstance(t, str)]
+            meta.trackers = [normalize_tracker_name(t) for t in meta.trackers if isinstance(t, str)]
         logger.debug(f"Trackers list during edit process: {meta.trackers}")
         meta.edit = True
         meta = await prep.gather_prep(meta=meta, mode="cli")
@@ -892,35 +891,35 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
 
         audio_prompted = False
         for tracker in [
-            "ACM",
-            "AITHER",
-            "ASC",
-            "BJS",
-            "BT",
-            "CBR",
-            "CRP",
-            "DP",
-            "FF",
-            "GPW",
-            "HUNO",
-            "IHD",
-            "LAJIDUI",
-            "LDU",
-            "LPT",
-            "LT",
-            "MKO",
-            "OE",
-            "PTCAFE",
+            "AsianCinema",
+            "Aither",
+            "AmigosShare",
+            "BJShare",
+            "BrasilTracker",
+            "CapybaraBR",
+            "Curupira",
+            "DarkPeers",
+            "FunFile",
+            "GreatPosterWall",
+            "HawkeUno",
+            "InfinityHD",
+            "Lajidui",
+            "LastDigitalUnderground",
+            "LongPT",
+            "LatTeam",
+            "MakingOff",
+            "OnlyEncodes",
+            "PTCafe",
             "PTGTK",
-            "PTS",
-            "RPT",
-            "SAM",
-            "SHRI",
-            "SPD",
-            "SUIO",
-            "TTR",
-            "TVC",
-            "ULCX",
+            "Ptskit",
+            "RailgunPT",
+            "Samaritano",
+            "Shareisland",
+            "SpeedApp",
+            "Suio",
+            "Torrenteros",
+            "TVChaosUK",
+            "UploadCx",
         ]:
             if tracker in trackers:
                 if not audio_prompted:
@@ -971,7 +970,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
         for tracker in meta.trackers:
             upload_status = tracker_status.get(tracker, {}).get("upload", False)
             if not upload_status:
-                if tracker == "AITHER" and meta.aither_trumpable and len(meta.aither_trumpable) > 0:
+                if tracker == "Aither" and meta.aither_trumpable and len(meta.aither_trumpable) > 0:
                     pass
                 else:
                     continue
@@ -1004,7 +1003,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                     "mal_id": meta.mal_id,
                     "tvmaze_id": meta.tvmaze_id,
                 }
-                if tracker == "AITHER":
+                if tracker == "Aither":
                     search_entry["trumpable"] = meta.aither_trumpable
                 search_data.append(search_entry)
 
@@ -1026,14 +1025,14 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
 
     meta.frame_overlay = config["DEFAULT"].get("frame_overlay", False)
     tracker_status_map = cast(dict[str, dict[str, Any]], meta.tracker_status)
-    for tracker in ["AZ", "CZ", "PHD"]:
+    for tracker in ["AvistaZ", "CinemaZ", "PrivateHD"]:
         upload_status = tracker_status_map.get(tracker, {}).get("upload", False)
         if tracker in meta.trackers and meta.frame_overlay and upload_status is True:
             meta.frame_overlay = False
-            logger.info("[yellow]AZ, CZ, and PHD do not allow frame overlays. Frame overlay will be disabled for this upload.[/yellow]")
+            logger.info("[yellow]AvistaZ, CinemaZ, and PrivateHD do not allow frame overlays. Frame overlay will be disabled for this upload.[/yellow]")
 
     bdmv_mi_created = False
-    for tracker in ["ANT", "DC", "HUNO", "LCD"]:
+    for tracker in ["Anthelion", "DigitalCore", "HawkeUno", "Locadora"]:
         upload_status = tracker_status_map.get(tracker, {}).get("upload", False)
         if tracker in trackers and upload_status is True and not bdmv_mi_created:
             await common.get_bdmv_mediainfo(meta)
@@ -1197,7 +1196,18 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
             cutoff = meta.cutoff
             if len(meta.image_list) < cutoff and meta.skip_imghost_upload is False and meta.category != "GAME":
                 # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
-                trackers_with_image_host_requirements = {"A4K", "BHD", "DC", "GPW", "HUNO", "MTV", "OE", "PTP", "STC", "TVC"}
+                trackers_with_image_host_requirements = {
+                    "Aura4K",
+                    "BeyondHD",
+                    "DigitalCore",
+                    "GreatPosterWall",
+                    "HawkeUno",
+                    "MoreThanTV",
+                    "OnlyEncodes",
+                    "PassThePopcorn",
+                    "SkipTheCommercials",
+                    "TVChaosUK",
+                }
 
                 relevant_trackers = [t for t in cast(list[Any], meta.trackers) if isinstance(t, str) and t in trackers_with_image_host_requirements and t in tracker_class_map]
 
@@ -1441,9 +1451,9 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
     # 1. Reuse existing torrent from client if possible
     reuse_torrent = None
     if isinstance(meta.trackers, str):
-        trackers_list = [t.strip().upper() for t in meta.trackers.split(",") if t.strip()]
+        trackers_list = [normalize_tracker_name(t) for t in meta.trackers.split(",") if t.strip()]
     elif isinstance(meta.trackers, list):
-        trackers_list = [(t).strip().upper() for t in meta.trackers if (t).strip()]
+        trackers_list = [normalize_tracker_name(t) for t in meta.trackers if (t).strip()]
     else:
         trackers_list = []
 
@@ -1478,10 +1488,10 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
             trackers_list = [(t) for t in raw_trackers if t.strip()]
         else:
             trackers_list = []
-        trackers_upper = [str(t).strip().upper() for t in trackers_list if str(t).strip()]
+        trackers_normalized = [normalize_tracker_name(t) for t in trackers_list if str(t).strip()]
 
         base_piece_mb: int | None = cast(int | None, meta.base_torrent_piece_mb)
-        if base_piece_mb is None and any(t in {"HDB", "MTV", "PTP"} for t in trackers_upper):
+        if base_piece_mb is None and any(t in {"HDBits", "MoreThanTV", "PassThePopcorn"} for t in trackers_normalized):
             try:
                 torrent = await asyncio.to_thread(Torrent.read, torrent_path)
                 base_piece_mb = torrent.piece_size // (1024 * 1024)
@@ -1490,15 +1500,15 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                 logger.debug(f"[yellow]Unable to cache BASE.torrent piece size: {e}")
                 base_piece_mb = None
 
-        if "MTV" in trackers_upper:
-            mtv_cfg = config.get("TRACKERS", {}).get("MTV", {})
+        if "MoreThanTV" in trackers_normalized:
+            mtv_cfg = config.get("TRACKERS", {}).get("MoreThanTV", {})
             if str(mtv_cfg.get("skip_if_rehash", "false")).lower() == "true" and base_piece_mb and base_piece_mb > 8:
-                meta.trackers = [t for t in trackers_list if str(t).strip().upper() != "MTV"]
+                meta.trackers = [t for t in trackers_list if normalize_tracker_name(t) != "MoreThanTV"]
                 trackers_list = [str(t) for t in cast(list[Any], meta.trackers or []) if str(t).strip()]
-                trackers_upper = [t.strip().upper() for t in trackers_list if t.strip()]
-                logger.debug("[yellow]Removed MTV from trackers due to skip_if_rehash config and 8 MiB limit.[/yellow]")
+                trackers_normalized = [normalize_tracker_name(t) for t in trackers_list if t.strip()]
+                logger.debug("[yellow]Removed MoreThanTV from trackers due to skip_if_rehash config and 8 MiB limit.[/yellow]")
                 if not meta.trackers:
-                    logger.info("[red]No trackers remain after removing MTV for skip_if_rehash.[/red]")
+                    logger.info("[red]No trackers remain after removing MoreThanTV for skip_if_rehash.[/red]")
                     meta.we_are_uploading = False
                     return True
 
@@ -1518,7 +1528,7 @@ async def cleanup_screenshot_temp_files(meta: Meta) -> None:
             for file in os.listdir(tmp_dir):
                 file_path = Path(tmp_dir) / file
                 if os.path.isfile(file_path) and file.endswith((".png", ".jpg")):
-                    os.remove(file_path)
+                    file_path.unlink()
                     logger.debug(f"[yellow]Removed temporary screenshot file: {file_path}[/yellow]")
         except Exception as e:
             logger.error(f"[red]Error cleaning up temporary screenshot files: {e}[/red]", extra={"highlighter": None})
@@ -1797,10 +1807,10 @@ async def do_the_thing(base_dir: str) -> None:
         active_trackers: list[str] | None = None
         if meta.trackers:
             if isinstance(meta.trackers, str):
-                active_trackers = [t.strip().upper() for t in meta.trackers.split(",") if t.strip()]
+                active_trackers = [normalize_tracker_name(t) for t in meta.trackers.split(",") if t.strip()]
             elif isinstance(meta.trackers, list):
                 trackers_list = meta.trackers
-                active_trackers = [(t).strip().upper() for t in trackers_list if (t).strip()]
+                active_trackers = [normalize_tracker_name(t) for t in trackers_list if (t).strip()]
 
         # Get active imghost from meta (parsed from command line)
         active_imghost: str | None = None
@@ -1941,7 +1951,7 @@ async def do_the_thing(base_dir: str) -> None:
                 if not keep_meta or meta.delete_meta:
                     if Path(meta_file).exists():
                         try:
-                            os.remove(meta_file)
+                            meta_file.unlink()
                             logger.debug(f"[bold yellow]Found and deleted existing metadata file: {meta_file}")
                         except Exception as e:
                             logger.info(f"[bold red]Failed to delete metadata file {meta_file}: {e!s}")
@@ -2225,7 +2235,7 @@ async def do_the_thing(base_dir: str) -> None:
                     status_dict = cast(dict[str, Any], status)
                     status_message = status_dict.get("status_message")
 
-                    if tracker == "MTV" and status_message is not None and "data error" not in str(status_message):
+                    if tracker == "MoreThanTV" and status_message is not None and "data error" not in str(status_message):
                         return f"{status_message!s}\n"
 
                     if "torrent_id" in status_dict:
@@ -2233,7 +2243,7 @@ async def do_the_thing(base_dir: str) -> None:
                         torrent_url = tracker_class.torrent_url
                         return f"{tracker}: {torrent_url}{status_dict['torrent_id']}\n"
 
-                    if status_message is not None and "data error" not in str(status_message) and tracker != "MTV":
+                    if status_message is not None and "data error" not in str(status_message) and tracker != "MoreThanTV":
                         return f"{tracker}: {Redaction.redact_private_info(status_message)}\n"
 
                     if status_message is not None and "data error" in str(status_message):
@@ -2335,9 +2345,9 @@ async def process_cross_seeds(meta: Meta) -> None:
     remove_list: list[str] = []
     if meta.remove_trackers:
         if isinstance(meta.remove_trackers, str):
-            remove_list = [t.strip().upper() for t in meta.remove_trackers.split(",")]
+            remove_list = [normalize_tracker_name(t) for t in meta.remove_trackers.split(",")]
         elif isinstance(meta.remove_trackers, list):
-            remove_list = [t.strip().upper() for t in meta.remove_trackers if isinstance(t, str)]
+            remove_list = [normalize_tracker_name(t) for t in meta.remove_trackers if isinstance(t, str)]
 
     # Check for trackers that haven't been dupe-checked yet
     dupe_checked_trackers = [t for t in meta.dupe_checked_trackers if isinstance(t, str)]
@@ -2396,7 +2406,7 @@ async def process_cross_seeds(meta: Meta) -> None:
                 tracker_class = tracker_class_map[tracker](config=config)
 
                 # Search for existing torrents
-                if tracker != "PTP":
+                if tracker != "PassThePopcorn":
                     if hasattr(tracker_class, "get_additional_checks"):
                         import inspect
 
@@ -2409,7 +2419,7 @@ async def process_cross_seeds(meta: Meta) -> None:
                             return
                     dupes = await tracker_class.search_existing(meta)
                 else:
-                    ptp = PTP(config=config)
+                    ptp = PassThePopcorn(config=config)
                     if hasattr(ptp, "get_additional_checks"):
                         import inspect
 
@@ -2479,19 +2489,19 @@ async def process_cross_seeds(meta: Meta) -> None:
             return
 
         headers = None
-        if tracker == "RTF":
+        if tracker == "RetroFlix":
             headers = {
                 "accept": "application/json",
                 "Authorization": config["TRACKERS"][tracker]["api_key"].strip(),
             }
 
-        if tracker == "AR" and download_url:
+        if tracker == "AlphaRatio" and download_url:
             try:
-                ar = AR(config=config)
+                ar = AlphaRatio(config=config)
                 auth_key = await ar.get_auth_key(meta)
 
                 # Extract torrent_pass from announce_url
-                announce_url = config["TRACKERS"]["AR"].get("announce_url", "")
+                announce_url = config["TRACKERS"]["AlphaRatio"].get("announce_url", "")
                 # Pattern: http://tracker.alpharatio.cc:2710/PASSKEY/announce
                 match = re.search(r":\d+/([^/]+)/announce", announce_url)
                 torrent_pass = match.group(1) if match else None
@@ -2500,9 +2510,9 @@ async def process_cross_seeds(meta: Meta) -> None:
                     # Append auth_key and torrent_pass to download_url
                     separator = "&" if "?" in download_url else "?"
                     download_url += f"{separator}authkey={auth_key}&torrent_pass={torrent_pass}"
-                    logger.debug("[cyan]Added AR auth_key and torrent_pass to download URL[/cyan]")
+                    logger.debug("[cyan]Added AlphaRatio auth_key and torrent_pass to download URL[/cyan]")
             except Exception as e:
-                logger.debug(f"[yellow]Error getting AR auth credentials: {e}[/yellow]")
+                logger.debug(f"[yellow]Error getting AlphaRatio auth credentials: {e}[/yellow]")
 
         async with semaphore:
             await common.download_tracker_torrent(meta, tracker, headers=headers, params=None, downurl=download_url, hash_is_id=False, cross=True)

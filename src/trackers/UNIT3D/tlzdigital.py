@@ -8,8 +8,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class TLZ(UNIT3D):
-    tracker = "TLZ"
+class TheLeachZone(UNIT3D):
+    """
+    The Leach Zone (TLZ) is a Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
+    tracker = "TheLeachZone"
     base_url = "https://tlzdigital.com"
     banned_groups = ("",)
     id_url = f"{base_url}/api/torrents/"
@@ -20,7 +24,7 @@ class TLZ(UNIT3D):
     tracker_urls = ("https://tlzdigital.com/",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="TLZ")
+        super().__init__(config, tracker_name="TheLeachZone")
         self.config: Config = config
         self.common = COMMON(config)
 

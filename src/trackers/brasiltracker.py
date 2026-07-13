@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import contextlib
-import os
 import platform
 import re
 import zipfile
@@ -27,9 +26,13 @@ from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 
 
-class BT:
+class BrasilTracker:
+    """
+    BT Private Torrent Tracker
+    """
+
     auth_type = "cookies"
-    tracker = "BT"
+    tracker = "BrasilTracker"
     banned_groups: tuple[str, ...] = ()
     source_flag = "BT"
     base_url = "https://brasiltracker.org"
@@ -258,7 +261,7 @@ class BT:
         return category_map.get(category) if isinstance(category, str) else None
 
     def get_game_language(self, meta: Meta) -> str:
-        """Map game languages from IGDB to BT idioma_ori field (same logic as BJS)."""
+        """Map game languages from IGDB to BrasilTracker idioma_ori field (same logic as BJS)."""
         language_map: dict[str, str] = {
             "german": "Alemão",
             "spanish": "Espanhol",
@@ -340,7 +343,7 @@ class BT:
         return ""
 
     def get_game_platform_bt(self, meta: Meta) -> str:
-        """Map meta.platform to BT plataforma_jogo dropdown value."""
+        """Map meta.platform to BrasilTracker plataforma_jogo dropdown value."""
         nin_term = (bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()).capitalize()
         platform_map: dict[str, str] = {
             "PC": "PC",
@@ -366,7 +369,7 @@ class BT:
         return platform_map.get(platform, "")
 
     def get_game_os(self, meta: Meta) -> str:
-        """Map meta.platform to BT sys_jogo dropdown value."""
+        """Map meta.platform to BrasilTracker sys_jogo dropdown value."""
         platform = meta.platform.upper().strip()
         if platform == "PC":
             return "Windows"
@@ -381,7 +384,7 @@ class BT:
         return ""
 
     def get_game_format(self, meta: Meta) -> str:
-        """Map game container/type to BT formato_jogo dropdown value."""
+        """Map game container/type to BrasilTracker formato_jogo dropdown value."""
         platform = meta.platform.upper().strip()
         container = meta.container.lower()
 
@@ -710,7 +713,7 @@ class BT:
         # Extract auth token if present
         auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", response.text)
         if auth_match:
-            BT.secret_token = auth_match.group(1)
+            BrasilTracker.secret_token = auth_match.group(1)
         else:
             logger.info(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
             meta.skipping = f"{self.tracker}"
@@ -966,7 +969,7 @@ class BT:
 
         data: dict[str, Any] = {
             "submit": "true",
-            "auth": BT.secret_token,
+            "auth": BrasilTracker.secret_token,
             "year": str(meta.year) if meta.year is not None else "",
             "title": original_title,
             "type": await self.get_type(meta),
@@ -1242,7 +1245,7 @@ class BT:
         if not file_path or not Path(file_path).exists():
             return ""
 
-        ext = os.path.splitext(file_path)[1].lower()
+        ext = Path(file_path).suffix.lower()
         if ext == ".pdf":
             with contextlib.suppress(Exception):
                 doc = fitz.open(file_path)

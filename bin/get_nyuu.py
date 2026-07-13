@@ -76,9 +76,9 @@ class NyuuBinaryManager:
 
         # Cleanup old files
         if binary_path.exists():
-            os.remove(binary_path)
+            binary_path.unlink()
         if version_path.exists():
-            os.remove(version_path)
+            version_path.unlink()
 
         download_url = f"https://github.com/animetosho/Nyuu/releases/download/{version}/{file_pattern}"
         logger.debug(f"[blue]Nyuu Download URL: {download_url}[/blue]")

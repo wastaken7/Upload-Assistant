@@ -293,7 +293,7 @@ class RtorrentClientMixin:
         if modified_fr:
             logger.debug(f"[cyan]Removing modified fast resume file: {fr_file}")
             try:
-                os.remove(f"{path_dir}/fr.torrent")
+                Path(f"{path_dir}/fr.torrent").unlink()
             except OSError as e:
                 logger.debug(f"[yellow]Warning: Could not remove modified fast resume file: {e}[/yellow]")
         logger.debug(f"[cyan]Path: {path}")
@@ -392,7 +392,7 @@ class RtorrentClientMixin:
                 for filename in os.listdir(torrent_storage_dir):
                     filename_str = filename
                     if filename_str.lower().endswith(".torrent"):
-                        file_hash = os.path.splitext(filename_str)[0]  # Remove .torrent extension
+                        file_hash = Path(filename_str).stem  # Remove .torrent extension
                         if file_hash.upper() == info_hash_v1:
                             torrent_path = Path(torrent_storage_dir) / filename_str
                             found = True

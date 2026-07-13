@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import base64
-import glob
 import re
 import unicodedata
 from pathlib import Path
@@ -20,10 +19,14 @@ from .COMMON import COMMON
 Config = dict[str, Any]
 
 
-class SPD:
+class SpeedApp:
+    """
+    SPD Private Torrent Tracker
+    """
+
     auth_type = "other_api"
     url = "https://speedapp.io"
-    tracker = "SPD"
+    tracker = "SpeedApp"
     banned_groups = ()
     upload_url = "https://speedapp.io/api/upload"
     torrent_url = "https://speedapp.io/browse/"
@@ -246,10 +249,10 @@ class SPD:
 
     async def get_nfo(self, meta: Meta) -> str | None:
         nfo_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-        nfo_files = glob.glob(Path(nfo_dir) / "*.nfo")
+        nfo_files = list(nfo_dir.glob("*.nfo"))
 
         if nfo_files:
-            return await self.encode_to_base64(nfo_files[0])
+            return await self.encode_to_base64(str(nfo_files[0]))
 
         return None
 
@@ -358,7 +361,7 @@ class SPD:
                 return False
 
         else:
-            logger.info("[cyan]SPD Request Data:")
+            logger.info("[cyan]SpeedApp Request Data:")
             logger.info(Redaction.redact_private_info(data))
             tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")

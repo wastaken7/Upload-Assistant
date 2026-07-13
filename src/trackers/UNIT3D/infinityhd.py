@@ -12,8 +12,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class IHD(UNIT3D):
-    tracker = "IHD"
+class InfinityHD(UNIT3D):
+    """
+    InfinityHD is a Private Torrent Tracker for MOVIES / TV / ANIME
+    """
+
+    tracker = "InfinityHD"
     base_url = "https://infinityhd.net"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -25,7 +29,7 @@ class IHD(UNIT3D):
     tracker_urls = ("https://infinityhd.net",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="IHD")
+        super().__init__(config, tracker_name="InfinityHD")
         self.config: Config = config
         self.common = COMMON(config)
 

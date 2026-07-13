@@ -12,8 +12,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class YUS(UNIT3D):
-    tracker = "YUS"
+class Yuscene(UNIT3D):
+    """
+    YUSCENE is a Private Tracker for MOVIES / TV
+    """
+
+    tracker = "Yuscene"
     base_url = "https://yu-scene.net"
     banned_groups = (
         "ADDICTION",
@@ -71,7 +75,7 @@ class YUS(UNIT3D):
     tracker_urls = ("https://yu-scene.net",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="YUS")
+        super().__init__(config, tracker_name="Yuscene")
         self.config = config
         self.common = COMMON(config)
 
@@ -80,7 +84,7 @@ class YUS(UNIT3D):
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai", "adult animation", "softcore"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info("[bold red]Porn/xxx is not allowed at YUS.")
+                logger.info("[bold red]Porn/xxx is not allowed at Yuscene.")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:

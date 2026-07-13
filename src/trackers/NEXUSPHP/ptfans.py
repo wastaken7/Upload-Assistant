@@ -8,7 +8,11 @@ from src.trackers.NEXUSPHP import NEXUSPHP
 Config = dict[str, Any]
 
 
-class PTFANS(NEXUSPHP):
+class PTFans(NEXUSPHP):
+    """
+    PTFans is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
     banned_groups = ()
     base_url = "https://ptfans.cc"
     source_flag = "[ptfans.cc] PTFans"
@@ -17,7 +21,7 @@ class PTFANS(NEXUSPHP):
     tracker_urls = ("https://ptfans.cc",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, "PTFANS")
+        super().__init__(config, "PTFans")
 
     def get_category(self, meta: Meta) -> int:
         animations = 414

@@ -228,7 +228,7 @@ async def detect_platform_from_files(
     if any(b.endswith(three_ds_exts) for b in basenames_lower):
         return "3DS"
 
-    # DS (NDS)
+    # DrunkenSlug (NDS)
     nds_exts = (".nds", ".srl")
     if any(b.endswith(nds_exts) for b in basenames_lower):
         return "NDS"
@@ -478,7 +478,7 @@ async def gather_game_prep(
     # Use title in meta (cleaned folder/file name) or extract from videopath
     title_query = meta.title or meta.filename
     if not title_query and videopath:
-        title_query = os.path.splitext(Path(videopath).name)[0]
+        title_query = Path(videopath).stem
 
     # Clean game release suffixes to get a clean search term for IGDB
     if title_query:
@@ -820,7 +820,7 @@ async def gather_game_prep(
         url = "https://store.steampowered.com/api/appdetails"
         params = {"appids": steam_id}
         trackers = [t.upper() for t in meta.trackers]
-        target_trackers = {"ASC", "BT", "BJS", "CBR", "SAM"}
+        target_trackers = {"AmigosShare", "BrasilTracker", "BJShare", "CapybaraBR", "Samaritano"}
         if any(t in target_trackers for t in trackers):
             params["l"] = "brazilian"
 

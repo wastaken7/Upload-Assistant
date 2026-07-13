@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import glob
 import platform
 import re
 from pathlib import Path
@@ -17,9 +16,13 @@ from src.meta import Meta
 Config = dict[str, Any]
 
 
-class HDS:
+class HDSpace:
+    """
+    HD-Space (HDS) is a Private Torrent Tracker for HD MOVIES / TV
+    """
+
     auth_type = "cookies"
-    tracker = "HDS"
+    tracker = "HDSpace"
     source_flag = "HD-Space"
     banned_groups = ("",)
     base_url = "https://hd-space.org"
@@ -271,13 +274,13 @@ class HDS:
 
     async def get_nfo(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
         nfo_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-        nfo_files = glob.glob(Path(nfo_dir) / "*.nfo")
+        nfo_files = list(nfo_dir.glob("*.nfo"))
 
         if nfo_files:
             nfo_path = nfo_files[0]
             async with aiofiles.open(nfo_path, "rb") as nfo_file:
                 nfo_bytes = await nfo_file.read()
-            return {"nfo": (Path(nfo_path).name, nfo_bytes, "application/octet-stream")}
+            return {"nfo": (nfo_path.name, nfo_bytes, "application/octet-stream")}
         return {}
 
     async def upload(self, meta: Meta) -> bool:

@@ -540,37 +540,37 @@ def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_origi
         audio_languages = [audio_languages]
 
     bloat_is_allowed = [
-        "ASC",
-        "BJS",
-        "BT",
-        "CBR",
-        "DC",
-        "FF",
-        "LAJIDUI",
-        "LCD",
-        "LPT",
-        "MKO",
-        "PTCAFE",
-        "PTFANS",
+        "AmigosShare",
+        "BJShare",
+        "BrasilTracker",
+        "CapybaraBR",
+        "DigitalCore",
+        "FunFile",
+        "Lajidui",
+        "Locadora",
+        "LongPT",
+        "MakingOff",
+        "PTCafe",
+        "PTFans",
         "PTGTK",
-        "RPT",
-        "SAM",
-        "SHRI",
-        "SP",
-        "TL",
-        "TOS",
+        "RailgunPT",
+        "Samaritano",
+        "Shareisland",
+        "Seedpool",
+        "TorrentLeech",
+        "TheOldSchool",
     ]
     # Trackers that allow specific languages (list of allowed language codes per tracker)
     tracker_allowed_bloat_languages = {
-        "AITHER": ["en"],
-        "ANT": ["en"],
-        "BLU": ["en"],
-        "ITT": ["it"],
-        "LT": ["es"],
-        "PT": ["pt"],
-        "SPD": ["ro"],
-        "TTR": ["es"],
-        "UTP": ["uk", "en"],
+        "Aither": ["en"],
+        "Anthelion": ["en"],
+        "Blutopia": ["en"],
+        "ItaTorrents": ["it"],
+        "LatTeam": ["es"],
+        "Portugas": ["pt"],
+        "SpeedApp": ["ro"],
+        "Torrenteros": ["es"],
+        "Utopia": ["uk", "en"],
     }
 
     # Track whether we've already printed messages
@@ -612,8 +612,8 @@ def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_origi
         warning_trackers = []
 
         if is_eng_original_with_non_eng:
-            not_allowed_trackers = [t for t in trackers_to_warn if t in ["ANT", "BHD", "ULCX", "MTV"]]
-            warning_trackers = [t for t in trackers_to_warn if t not in ["ANT", "BHD", "ULCX", "MTV"]]
+            not_allowed_trackers = [t for t in trackers_to_warn if t in ["Anthelion", "BeyondHD", "UploadCx", "MoreThanTV"]]
+            warning_trackers = [t for t in trackers_to_warn if t not in ["Anthelion", "BeyondHD", "UploadCx", "MoreThanTV"]]
         else:
             warning_trackers = trackers_to_warn
 

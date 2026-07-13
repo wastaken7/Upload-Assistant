@@ -16,8 +16,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class OE(UNIT3D):
-    tracker = "OE"
+class OnlyEncodes(UNIT3D):
+    """
+    OnlyEncodes+ is a Private Tracker for MOVIES / TV
+    """
+
+    tracker = "OnlyEncodes"
     base_url = "https://onlyencodes.cc"
     approved_image_hosts = ("ptpimg", "imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage")
     banned_groups = (
@@ -164,7 +168,7 @@ class OE(UNIT3D):
     tracker_urls = ("https://onlyencodes.cc",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="OE")
+        super().__init__(config, tracker_name="OnlyEncodes")
         self.config: Config = config
         self.common = COMMON(config)
         self.rehost_images_manager = RehostImagesManager(config)

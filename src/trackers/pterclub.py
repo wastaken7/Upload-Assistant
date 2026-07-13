@@ -21,9 +21,13 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class PTER:
+class PTerClub:
+    """
+    PTerClub (PT之友俱乐部) is a CHINESE Private Torrent Tracker for HD MUSIC VIDEOS / MOVIES / TV / ANIME
+    """
+
     auth_type = "cookies"
-    tracker = "PTER"
+    tracker = "PTerClub"
     source_flag = "PTER"
     ptgen_retry = 3
     signature: str | None = None
@@ -32,11 +36,11 @@ class PTER:
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.passkey = str(config["TRACKERS"]["PTER"].get("passkey", "")).strip()
-        self.username = str(config["TRACKERS"]["PTER"].get("username", "")).strip()
-        self.password = str(config["TRACKERS"]["PTER"].get("password", "")).strip()
-        self.rehost_images = bool(config["TRACKERS"]["PTER"].get("img_rehost", False))
-        self.ptgen_api = str(config["TRACKERS"]["PTER"].get("ptgen_api", "")).strip()
+        self.passkey = str(config["TRACKERS"]["PTerClub"].get("passkey", "")).strip()
+        self.username = str(config["TRACKERS"]["PTerClub"].get("username", "")).strip()
+        self.password = str(config["TRACKERS"]["PTerClub"].get("password", "")).strip()
+        self.rehost_images = bool(config["TRACKERS"]["PTerClub"].get("img_rehost", False))
+        self.ptgen_api = str(config["TRACKERS"]["PTerClub"].get("ptgen_api", "")).strip()
         self.cookie_validator = CookieValidator(config)
 
     def _extract_auth_token(self, text: str, pattern: str) -> str:
@@ -55,7 +59,9 @@ class PTER:
     async def validate_cookies(self, meta: Meta) -> bool:
         common = COMMON(config=self.config)
         url = "https://pterclub.com"
-        cookiefile = f"{meta.base_dir}/data/cookies/PTER.txt"
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if Path(cookiefile).exists():
             cookies = await common.parseCookieFile(cookiefile)
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
@@ -63,15 +69,17 @@ class PTER:
 
                 return resp.text.find("""<a href="#" data-url="logout.php" id="logout-confirm">""") != -1
         else:
-            logger.info("[bold red]Missing Cookie File. (data/cookies/PTER.txt)")
+            logger.info("[bold red]Missing Cookie File. (data/cookies/PTerClub.txt)")
             return False
 
     async def search_existing(self, meta: Meta) -> list[str] | bool:
         dupes: list[str] = []
         common = COMMON(config=self.config)
-        cookiefile = f"{meta.base_dir}/data/cookies/PTER.txt"
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if not Path(cookiefile).exists():
-            logger.info("[bold red]Missing Cookie File. (data/cookies/PTER.txt)")
+            logger.info("[bold red]Missing Cookie File. (data/cookies/PTerClub.txt)")
             return False
         cookies = await common.parseCookieFile(cookiefile)
         imdb_id = meta.imdb_id or 0
@@ -246,7 +254,9 @@ class PTER:
     async def get_auth_token(self, meta: Meta) -> str:
         if not Path(f"{meta.base_dir}/data/cookies").exists():
             Path(f"{meta.base_dir}/data/cookies").mkdir(parents=True, exist_ok=True)
-        cookiefile = f"{meta.base_dir}/data/cookies/Pterimg.json"
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, "Pterimg", self.config)
         logged_in = False
         response: httpx.Response | None = None
         cookies: dict[str, str] = {}
@@ -277,11 +287,13 @@ class PTER:
         return response.text.find("""<a href="https://s3.pterclub.com/logout/?""") != -1
 
     async def pterimg_upload(self, meta: Meta) -> list[dict[str, str]]:
-        images = glob.glob(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{meta.filename}-*.png")
+        images = [str(p) for p in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.filename)}-*.png")]
         url = "https://s3.pterclub.com"
         image_list: list[dict[str, str]] = []
         data: dict[str, Any] = {"type": "file", "action": "upload", "nsfw": 0, "auth_token": await self.get_auth_token(meta)}
-        cookiefile = f"{meta.base_dir}/data/cookies/Pterimg.json"
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, "Pterimg", self.config)
         if Path(cookiefile).exists():
             raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # pyright: ignore[reportPrivateUsage]
             cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
@@ -427,7 +439,9 @@ class PTER:
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
-        cookiefile = f"{meta.base_dir}/data/cookies/PTER.txt"
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if Path(cookiefile).exists():
             cookies = await common.parseCookieFile(cookiefile)
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:

@@ -1,7 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import glob
-import os
 import platform
 from pathlib import Path
 from typing import Any
@@ -17,9 +15,13 @@ from src.languages import languages_manager
 from src.meta import Meta
 
 
-class FF:
+class FunFile:
+    """
+    FF Private Torrent Tracker
+    """
+
     auth_type = "cookies"
-    tracker = "FF"
+    tracker = "FunFile"
     banned_groups: tuple[str, ...] = ()
     source_flag = "FunFile"
     base_url = "https://www.funfile.org"
@@ -36,7 +38,9 @@ class FF:
         self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"}, timeout=30.0)
 
     async def validate_credentials(self, meta: Meta) -> bool:
-        cookie_file = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.txt").resolve())
+        from src.cookie_auth import find_cookie_file
+
+        cookie_file = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if not Path(cookie_file).exists():
             await self.login(meta)
 
@@ -56,7 +60,9 @@ class FF:
 
     async def login(self, meta: Meta) -> None:
         login_url = "https://www.funfile.org/takelogin.php"
-        cookie_file = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.txt").resolve())
+        from src.cookie_auth import find_cookie_file
+
+        cookie_file = find_cookie_file(meta.base_dir, self.tracker, self.config)
 
         payload = {
             "returnto": "/index.php",
@@ -428,7 +434,7 @@ class FF:
             async with httpx.AsyncClient() as client:
                 response = await client.get(poster_url)
                 if response.status_code == 200:
-                    poster_ext = os.path.splitext(poster_url)[1] or ".jpg"
+                    poster_ext = Path(poster_url).suffix or ".jpg"
                     poster_filename = f"{meta.name}{poster_ext}"
                     return (poster_filename, response.content, "image/jpeg")
 
@@ -436,12 +442,12 @@ class FF:
 
     def get_nfo(self, meta: Meta) -> dict[str, tuple[str, Any, str]]:
         nfo_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-        nfo_files = glob.glob(Path(nfo_dir) / "*.nfo")
+        nfo_files = list(nfo_dir.glob("*.nfo"))
 
         if nfo_files:
             nfo_path = nfo_files[0]
 
-            return {"nfo": (Path(nfo_path).name, Path(nfo_path).open("rb"), "application/octet-stream")}
+            return {"nfo": (nfo_path.name, nfo_path.open("rb"), "application/octet-stream")}
         return {}
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:

@@ -9,8 +9,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class HHD(UNIT3D):
-    tracker = "HHD"
+class HomieHelpDesk(UNIT3D):
+    """
+    HHD is a Private Torrent Tracker for MOVIES / TV / GAMES
+    """
+
+    tracker = "HomieHelpDesk"
     base_url = "https://homiehelpdesk.net"
     banned_groups = (
         "aXXo",
@@ -72,14 +76,14 @@ class HHD(UNIT3D):
     tracker_urls = ("https://homiehelpdesk.net",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="HHD")
+        super().__init__(config, tracker_name="HomieHelpDesk")
         self.config: Config = config
         self.common = COMMON(config)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
         if meta.type == "DVDRIP":
-            logger.info("[bold red]DVDRIP uploads are not allowed on HHD.[/bold red]")
+            logger.info("[bold red]DVDRIP uploads are not allowed on HomieHelpDesk.[/bold red]")
             return False
 
         return should_continue

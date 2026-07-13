@@ -8,7 +8,7 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER NAME
+class Unit3dTemplate(UNIT3D):  # EDIT 'Unit3dTemplate' AS ABBREVIATED TRACKER NAME
     tracker = "Abbreviated Tracker Name"
     base_url = "https://domain.tld"
     banned_groups = ("",)
@@ -20,7 +20,7 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="UNIT3D_TEMPLATE")  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER NAME
+        super().__init__(config, tracker_name="Unit3dTemplate")  # EDIT 'Unit3dTemplate' AS ABBREVIATED TRACKER NAME
         self.config = config
         self.common = COMMON(config)
 

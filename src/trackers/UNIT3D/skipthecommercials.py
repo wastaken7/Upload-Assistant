@@ -14,8 +14,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class STC(UNIT3D):
-    tracker = "STC"
+class SkipTheCommercials(UNIT3D):
+    """
+    SkipTheCommercials (STC) is a Private Torrent Tracker for TV
+    """
+
+    tracker = "SkipTheCommercials"
     base_url = "https://skipthecommercials.xyz"
     banned_groups = ("",)
     approved_image_hosts = ("imgbox", "imgbb")
@@ -27,7 +31,7 @@ class STC(UNIT3D):
     tracker_urls = ("https://skipthecommercials.xyz",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="STC")
+        super().__init__(config, tracker_name="SkipTheCommercials")
         self.config: Config = config
         self.common = COMMON(config)
         self.rehost_images_manager = RehostImagesManager(config)

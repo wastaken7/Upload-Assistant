@@ -2,7 +2,6 @@
 import asyncio
 import contextlib
 import json
-import os
 import re
 import urllib.parse
 from pathlib import Path
@@ -21,9 +20,13 @@ from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
 
-class AR:
+class AlphaRatio:
+    """
+    AR Private Torrent Tracker
+    """
+
     auth_type = "cookies"
-    tracker = "AR"
+    tracker = __name__
     source_flag = "AlphaRatio"
     base_url = "https://alpharatio.cc"
     banned_groups = ()
@@ -40,7 +43,7 @@ class AR:
         self.cookie_validator = CookieValidator(config)
         self.cookie_uploader = CookieAuthUploader(config)
         trackers_cfg = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-        ar_cfg = cast(dict[str, Any], trackers_cfg.get("AR", {}))
+        ar_cfg = cast(dict[str, Any], trackers_cfg.get("AlphaRatio", {}))
         self.username = str(ar_cfg.get("username", "")).strip()
         self.password = str(ar_cfg.get("password", "")).strip()
 
@@ -166,7 +169,7 @@ class AR:
             elif meta.is_disc == "BDMV":
                 description += f"[hide][code]{discs[0]['summary']}[/code][/hide]\n\n"
         else:
-            # Beautify MediaInfo for AR using custom template
+            # Beautify MediaInfo for AlphaRatio using custom template
             filelist = cast(list[str], meta.filelist or [])
             video = filelist[0] if filelist else str(meta.path or "")
             # using custom mediainfo template.
@@ -323,7 +326,9 @@ class AR:
                     if match:
                         auth_key = match.group(1)
                         # Save it for next time
-                        cookie_file = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.txt").resolve())
+                        from src.cookie_auth import find_cookie_file
+
+                        cookie_file = find_cookie_file(meta.base_dir, self.tracker, self.config)
                         auth_file = cookie_file.replace(".txt", "_auth.txt")
                         with contextlib.suppress(Exception):
                             async with aiofiles.open(auth_file, "w", encoding="utf-8") as f:
@@ -336,7 +341,7 @@ class AR:
         return None
 
     async def upload(self, meta: Meta) -> bool:
-        """Upload torrent to AR using centralized cookie_upload."""
+        """Upload torrent to AlphaRatio using centralized cookie_upload."""
         # Prepare the data for the upload
         common = COMMON(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
@@ -393,7 +398,8 @@ class AR:
             ar_name = meta.scene_name or ""
         else:
             ar_name = meta.uuid
-            base, ext = os.path.splitext(ar_name)
+            p = Path(ar_name)
+            base, ext = p.stem, p.suffix
             if ext.lower() in known_extensions:
                 ar_name = base
             ar_name = (

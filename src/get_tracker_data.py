@@ -81,7 +81,7 @@ class TrackerDataManager:
         waiting: list[tuple[str, float]] = []
 
         for tracker in specific_trackers:
-            cooldown_seconds = 60 if tracker == "PTP" else 15
+            cooldown_seconds = 60 if tracker == "PassThePopcorn" else 15
             last_processed = timestamps.get(tracker, 0)
             time_since_last = current_time - last_processed
 
@@ -111,22 +111,22 @@ class TrackerDataManager:
             tracker_keys = {
                 # preference some unit3d based trackers first
                 # since they can return tmdb/imdb/tvdb ids
-                "aither": "AITHER",
-                "blu": "BLU",
+                "aither": "Aither",
+                "blu": "Blutopia",
                 "lst": "LST",
-                "ulcx": "ULCX",
-                "oe": "OE",
-                "huno": "HUNO",
-                "ant": "ANT",
+                "ulcx": "UploadCx",
+                "oe": "OnlyEncodes",
+                "huno": "HawkeUno",
+                "ant": "Anthelion",
                 "btn": "BTN",
-                "bhd": "BHD",
-                "hdb": "HDB",
-                "sp": "SP",
-                "rf": "RF",
-                "otw": "OTW",
-                "yus": "YUS",
-                "dp": "DP",
-                "ptp": "PTP",
+                "bhd": "BeyondHD",
+                "hdb": "HDBits",
+                "sp": "Seedpool",
+                "rf": "ReelFlix",
+                "otw": "OldToonsWorld",
+                "yus": "Yuscene",
+                "dp": "DarkPeers",
+                "ptp": "PassThePopcorn",
             }
 
             specific_tracker: list[str] = [tracker_keys[key] for key in tracker_keys if meta.get(key) is not None]
@@ -160,8 +160,8 @@ class TrackerDataManager:
             logger.debug(f"[blue]Specific trackers to check: {specific_tracker}[/blue]")
 
             if specific_tracker:
-                if meta.is_disc and "ANT" in specific_tracker:
-                    specific_tracker.remove("ANT")
+                if meta.is_disc and "Anthelion" in specific_tracker:
+                    specific_tracker.remove("Anthelion")
                 if meta.category == "MOVIE" and "BTN" in specific_tracker:
                     specific_tracker.remove("BTN")
 
@@ -283,17 +283,17 @@ class TrackerDataManager:
                                     found_match = True
                                     meta.matched_tracker = "BTN"
                             await self.save_tracker_timestamp("BTN", base_dir=base_dir)
-                    elif tracker_to_process == "ANT":
-                        imdb_tmdb_list = await tracker_class_map["ANT"](config=self.config).get_data_from_files(meta)
+                    elif tracker_to_process == "Anthelion":
+                        imdb_tmdb_list = await tracker_class_map["Anthelion"](config=self.config).get_data_from_files(meta)
                         if imdb_tmdb_list:
-                            logger.info(f"[green]Found ANT IDs: {imdb_tmdb_list}[/green]")
+                            logger.info(f"[green]Found Anthelion IDs: {imdb_tmdb_list}[/green]")
                             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                                 try:
                                     if cli_ui.ask_yes_no("Do you want to use these ids?", default=True):
                                         for d in imdb_tmdb_list:
                                             meta.update(d)
                                         found_match = True
-                                        meta.matched_tracker = "ANT"
+                                        meta.matched_tracker = "Anthelion"
                                 except EOFError:
                                     logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                                     await cleanup_manager.cleanup()
@@ -303,8 +303,8 @@ class TrackerDataManager:
                                 for d in imdb_tmdb_list:
                                     meta.update(d)
                                 found_match = True
-                                meta.matched_tracker = "ANT"
-                        await self.save_tracker_timestamp("ANT", base_dir=base_dir)
+                                meta.matched_tracker = "Anthelion"
+                        await self.save_tracker_timestamp("Anthelion", base_dir=base_dir)
                     else:
                         meta = await process_tracker(tracker_to_process, meta, skip_tracker_descriptions)
 
@@ -328,12 +328,12 @@ class TrackerDataManager:
                 # Process all trackers with API = true if no specific tracker is set in meta
                 from src.trackersetup import api_trackers
 
-                other_api = sorted(api_trackers - {"BHD"})
-                tracker_order = ["PTP", "HDB", "BHD", *other_api]
+                other_api = sorted(api_trackers - {"BeyondHD"})
+                tracker_order = ["PassThePopcorn", "HDBits", "BeyondHD", *other_api]
 
                 if cat == "TV" or meta.category == "TV":
-                    logger.debug("[yellow]Detected TV content, skipping PTP tracker check")
-                    tracker_order = [tracker for tracker in tracker_order if tracker != "PTP"]
+                    logger.debug("[yellow]Detected TV content, skipping PassThePopcorn tracker check")
+                    tracker_order = [tracker for tracker in tracker_order if tracker != "PassThePopcorn"]
 
                 async def process_tracker(tracker_name: str, meta: Meta, skip_tracker_descriptions: bool) -> Meta:
                     nonlocal found_match
@@ -391,8 +391,8 @@ class TrackerDataManager:
         # Prioritize trackers in this order
         from src.trackersetup import api_trackers
 
-        prioritized = ["BLU", "AITHER", "ULCX", "LST", "OE"]
-        tracker_order = prioritized + sorted(api_trackers - set(prioritized) - {"BHD"})
+        prioritized = ["Blutopia", "Aither", "UploadCx", "LST", "OnlyEncodes"]
+        tracker_order = prioritized + sorted(api_trackers - set(prioritized) - {"BeyondHD"})
 
         # Check if we have stored torrent comments
         if meta.torrent_comments:
@@ -428,11 +428,11 @@ class TrackerDataManager:
 
                     # Fallbacks for safety
                     for k, v in {
-                        "BLU": "blutopia.cc",
-                        "AITHER": "aither.cc",
+                        "Blutopia": "blutopia.cc",
+                        "Aither": "aither.cc",
                         "LST": "lst.gg",
-                        "OE": "onlyencodes.cc",
-                        "ULCX": "upload.cx",
+                        "OnlyEncodes": "onlyencodes.cc",
+                        "UploadCx": "upload.cx",
                     }.items():
                         if k not in tracker_hosts:
                             tracker_hosts[k] = v

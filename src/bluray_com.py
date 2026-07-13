@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
-import os
 import random
 import re
 from collections.abc import Mapping, MutableMapping, Sequence
@@ -710,12 +709,12 @@ async def download_cover_images(meta: Meta) -> bool:
             if not matching_release:
                 logger.debug(f"[yellow]Existing covers.json found but none match current release URL: {meta.release_url}[/yellow]")
                 logger.debug("[yellow]Deleting outdated covers.json file[/yellow]")
-                os.remove(reuploaded_images_path)
+                Path(reuploaded_images_path).unlink()
 
         except Exception as e:
             logger.error(f"[red]Error reading covers.json: {e!s}[/red]")
             try:
-                os.remove(reuploaded_images_path)
+                Path(reuploaded_images_path).unlink()
                 logger.debug("[yellow]Deleted potentially corrupted covers.json file[/yellow]")
             except Exception as delete_error:
                 logger.error(f"[red]Failed to delete corrupted covers.json: {delete_error!s}[/red]")
@@ -726,7 +725,7 @@ async def download_cover_images(meta: Meta) -> bool:
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
         cover_images = cast(Mapping[str, str], meta.cover_images)
         for img_type, url in cover_images.items():
-            file_ext = os.path.splitext(url)[1]
+            file_ext = Path(url).suffix
             local_filename = f"{temp_dir}/cover_{img_type}{file_ext}"
 
             try:
@@ -1759,7 +1758,7 @@ def map_country_to_region_code(country_name: str) -> str | None:
         "Russia": "RUS",
         "Rwanda": "RWA",
         "Saint Lucia": "LCA",
-        "Samoa": "SAM",
+        "Samoa": "Samaritano",
         "San Marino": "SMR",
         "Saudi Arabia": "KSA",
         "Senegal": "SEN",

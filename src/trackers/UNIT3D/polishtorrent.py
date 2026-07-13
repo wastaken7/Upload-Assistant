@@ -8,8 +8,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class PTT(UNIT3D):
-    tracker = "PTT"
+class PolishTorrent(UNIT3D):
+    """
+    Polish Torrent (PTT) is a POLISH Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
+    tracker = "PolishTorrent"
     base_url = "https://polishtorrent.top"
     banned_groups = ("ViP", "BiRD", "M@RTiNU$", "inTGrity", "CiNEMAET", "MusicET", "TeamET", "R2D2")
     id_url = f"{base_url}/api/torrents/"
@@ -19,7 +23,7 @@ class PTT(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="PTT")
+        super().__init__(config, tracker_name="PolishTorrent")
         self.config: Config = config
         self.common = COMMON(config)
 

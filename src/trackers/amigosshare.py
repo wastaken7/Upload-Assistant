@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
-import os
 import platform
 import re
 from datetime import UTC, datetime
@@ -23,9 +22,13 @@ from src.tmdb import TmdbManager
 from src.trackers.COMMON import COMMON
 
 
-class ASC:
+class AmigosShare:
+    """
+    Amigos Share Club (ASC) is a BRAZILIAN Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
     auth_type = "cookies"
-    tracker = "ASC"
+    tracker = "AmigosShare"
     source_flag = "ASC"
     banned_groups: tuple[str, ...] = ()
     base_url = "https://cliente.amigos-share.club"
@@ -106,7 +109,7 @@ class ASC:
         if meta.category == "BOOK":
             filelist = meta.filelist or []
             file_path = filelist[0] if filelist else (meta.path or "")
-            ext = os.path.splitext(file_path)[1].lower().strip(".")
+            ext = Path(file_path).suffix.lower().strip(".")
             ext_map = {
                 "mp3": "31",
                 "png": "36",
@@ -629,7 +632,7 @@ class ASC:
         return re.sub(r"\s{2,}", " ", name).strip()
 
     def get_game_type(self, meta: Meta) -> str:
-        """Map meta.platform to ASC game category (type field) value."""
+        """Map meta.platform to AmigosShare game category (type field) value."""
         platform_map: dict[str, str] = {
             "ANDROID": "57",
             "DREAMCAST": "52",
@@ -653,7 +656,7 @@ class ASC:
         return platform_map.get(platform, "47")  # Default to PC
 
     def get_game_genre(self, meta: Meta) -> str:
-        """Map IGDB genres to ASC genero field value."""
+        """Map IGDB genres to AmigosShare genero field value."""
         genre_map: dict[str, str] = {
             "action": "1",
             "hack and slash": "1",
@@ -696,7 +699,7 @@ class ASC:
         return "0"
 
     def get_game_idioma(self, meta: Meta) -> str:
-        """Map game languages to ASC idioma field value."""
+        """Map game languages to AmigosShare idioma field value."""
         language_map: dict[str, str] = {
             "german": "3",
             "chinese": "9",
@@ -940,7 +943,7 @@ class ASC:
                 response = await self.session.post(url, data=payload, timeout=20)
                 response.raise_for_status()
                 response_json = cast(dict[str, Any], response.json())
-                layout_dict = response_json.get("ASC", {})
+                layout_dict = response_json.get("AmigosShare", {})
 
                 if layout_dict:
                     try:

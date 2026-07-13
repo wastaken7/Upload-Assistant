@@ -9,8 +9,12 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class PHD(AZTrackerBase):
-    tracker = "PHD"
+class PrivateHD(AZTrackerBase):
+    """
+    PHD Private Torrent Tracker
+    """
+
+    tracker = "PrivateHD"
     source_flag = "PrivateHD"
     banned_groups = (
         "4K4U",
@@ -52,7 +56,7 @@ class PHD(AZTrackerBase):
     tracker_urls = ("tracker.privatehd",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="PHD")
+        super().__init__(config, tracker_name="PrivateHD")
         self.config: Config = config
         self.common = COMMON(config)
 

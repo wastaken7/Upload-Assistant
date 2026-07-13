@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import os
 import platform
 import re
 from datetime import UTC, datetime
@@ -28,9 +27,13 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class BJS:
+class BJShare:
+    """
+    BJ-Share is a BRAZILIAN Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
     auth_type = "cookies"
-    tracker = "BJS"
+    tracker = "BJShare"
     banned_groups: tuple[str, ...] = ()
     source_flag = "BJ"
     base_url = "https://bj-share.info"
@@ -116,7 +119,7 @@ class BJS:
     }
 
     def has_extension(self, name: str) -> bool:
-        _, ext = os.path.splitext(name)
+        ext = Path(name).suffix
         return ext.lower().lstrip(".") in self.file_extensions
 
     def __init__(self, config: Config):
@@ -308,7 +311,7 @@ class BJS:
         return "Outro"
 
     def get_game_platform(self, meta: Meta) -> str:
-        """Map meta.platform to BJS platform ID for the Jogos category."""
+        """Map meta.platform to BJShare platform ID for the Jogos category."""
         platform_map: dict[str, str] = {
             "3DS": "13",
             "MOBILE": "2",
@@ -338,12 +341,12 @@ class BJS:
         return platform_map.get(platform, "3")  # Default to PC
 
     def get_game_language(self, meta: Meta) -> str:
-        """Map game languages from IGDB/Steam to BJS idioma field.
+        """Map game languages from IGDB/Steam to BJShare idioma field.
 
         Logic (similar to CBR.py get_name):
         - If Portuguese is present AND there are other languages → "Multilinguagem"
-        - If only one language → map to BJS name
-        - If multiple languages without Portuguese → use the first match from BJS list
+        - If only one language → map to BJShare name
+        - If multiple languages without Portuguese → use the first match from BJShare list
         - Fallback → "Outro"
         """
         language_map: dict[str, str] = {
@@ -378,7 +381,7 @@ class BJS:
                     return bjs_value
             return "Outro"
 
-        # Multiple languages, no Portuguese → try to find first matching BJS language
+        # Multiple languages, no Portuguese → try to find first matching BJShare language
         for ln in lang_names_lower:
             for key, bjs_value in language_map.items():
                 if key in ln:
@@ -387,7 +390,7 @@ class BJS:
         return "Outro"
 
     def get_game_subcategory(self, meta: Meta) -> str:
-        """Get the game subcategory for BJS."""
+        """Get the game subcategory for BJShare."""
         subcategory = meta.game_subcategory
         subcategory_values = {"full_game": "1", "full_game_dlc": "2", "dlc": "3", "update": "4"}
         return subcategory_values.get(subcategory, "1")
@@ -553,8 +556,8 @@ class BJS:
             original_title = meta.imdb_info.get("title") or meta.title
             brazilian_title = ""
 
-            if BJS.database_title:
-                original_title = BJS.database_title
+            if BJShare.database_title:
+                original_title = BJShare.database_title
 
             main_tmdb_data = meta.tmdb_localized_data.get("pt-BR", {}).get("main") or {}
             tmdb_title = main_tmdb_data.get("name") or main_tmdb_data.get("title")
@@ -629,7 +632,7 @@ class BJS:
 
     async def get_tags(self, meta: Meta) -> str:
         """Map genres from meta.genres or TMDB to Portuguese tags."""
-        if BJS.already_has_the_info:
+        if BJShare.already_has_the_info:
             return ""
 
         matched_tags: list[str] = []
@@ -664,8 +667,8 @@ class BJS:
 
     def get_database_title(self, soup: BeautifulSoup) -> str:
         """
-        Extracts the original title to ensure consistency with the BJS database.
-        Since BJS treats different titles as unique entries regardless of IMDb parity,
+        Extracts the original title to ensure consistency with the BJShare database.
+        Since BJShare treats different titles as unique entries regardless of IMDb parity,
         this value is used to match existing records.
         """
         original_title = ""
@@ -734,8 +737,8 @@ class BJS:
         if cookie_jar:
             self.session.cookies = cookie_jar
 
-        BJS.already_has_the_info = False
-        BJS.database_title = ""
+        BJShare.already_has_the_info = False
+        BJShare.database_title = ""
 
         response = await self.session.get(search_url, params=params, follow_redirects=True)
         if "login.php" in str(response.url) or "login.php" in response.text:
@@ -746,7 +749,7 @@ class BJS:
         # Extract auth token if present
         auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", response.text)
         if auth_match:
-            BJS.secret_token = auth_match.group(1)
+            BJShare.secret_token = auth_match.group(1)
         else:
             logger.info(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
             meta.skipping = f"{self.tracker}"
@@ -760,8 +763,8 @@ class BJS:
         torrent_search_table: Tag | None = soup.find("table", id="torrent_table")
 
         if torrent_details_table:
-            BJS.already_has_the_info = True
-            BJS.database_title = self.get_database_title(soup)
+            BJShare.already_has_the_info = True
+            BJShare.database_title = self.get_database_title(soup)
 
             for row in torrent_details_table.find_all("tr"):
                 row_id = row.get("id")
@@ -800,8 +803,8 @@ class BJS:
                     names: list[Any] = []
                     if name:
                         names.append(name)
-                    if category in ("BOOK", "GAME") and BJS.database_title:
-                        names.append(BJS.database_title.strip())
+                    if category in ("BOOK", "GAME") and BJShare.database_title:
+                        names.append(BJShare.database_title.strip())
 
                     for n in names:
                         dupe_entry = {
@@ -1039,7 +1042,7 @@ class BJS:
                 return None
 
             cover_tmdb_url = f"https://image.tmdb.org/t/p/w500{cover_path}"
-            if BJS.already_has_the_info:
+            if BJShare.already_has_the_info:
                 return cover_tmdb_url
 
             try:
@@ -1211,7 +1214,7 @@ class BJS:
         return " / ".join(ordered_tags)
 
     async def get_credits(self, meta: Meta, role: str) -> str:
-        if BJS.already_has_the_info:
+        if BJShare.already_has_the_info:
             return "N/A"
 
         role_map = {
@@ -1358,7 +1361,7 @@ class BJS:
         # These fields are common across all upload types
         data: dict[str, Any] = {
             "submit": "true",
-            "auth": BJS.secret_token,
+            "auth": BJShare.secret_token,
             "formato": self.get_container(meta),
             "type": str(self.get_type(meta)),
             "year": self.get_year(meta),
@@ -1634,7 +1637,7 @@ class BJS:
         return ""
 
     async def get_overview(self) -> str:
-        if BJS.already_has_the_info:
+        if BJShare.already_has_the_info:
             return ""
 
         overview = self.main_tmdb_data.get("overview", "")

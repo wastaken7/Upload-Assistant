@@ -90,11 +90,139 @@ def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
             console.print("[!] Warning: Example config is not a dict", markup=False)
             return None, comments
 
-        console.print("[✓] Successfully loaded example config template", markup=False)
+        console.print("[OK] Successfully loaded example config template", markup=False)
         return cast(ConfigDict, example_config), comments
     except Exception as e:
         console.print(f"[!] Error parsing example config: {e!s}", markup=False)
         return None, comments
+
+
+def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
+    """Migrate old tracker names/acronyms to new display names in the config dictionary."""
+    if not config_dict:
+        return config_dict
+
+    manual_mapping = {
+        "AR": "AlphaRatio",
+        "ASC": "AmigosShare",
+        "ANT": "Anthelion",
+        "AZ": "AvistaZ",
+        "BHD": "BeyondHD",
+        "CZ": "CinemaZ",
+        "BHDTV": "BitHDTV",
+        "BJS": "BJShare",
+        "PHD": "PrivateHD",
+        "BT": "BrasilTracker",
+        "DC": "DigitalCore",
+        "FL": "FileList",
+        "FF": "FunFile",
+        "GPW": "GreatPosterWall",
+        "HDB": "HDBits",
+        "HDS": "HDSpace",
+        "HDT": "HDTorrents",
+        "IS": "ImmortalSeed",
+        "IPT": "IPTorrents",
+        "MKO": "MakingOff",
+        "MTV": "MoreThanTV",
+        "MTEAM": "MTeam",
+        "NBL": "Nebulance",
+        "LAJIDUI": "Lajidui",
+        "PTP": "PassThePopcorn",
+        "LPT": "LongPT",
+        "PTER": "PTerClub",
+        "PTCAFE": "PTCafe",
+        "PTFANS": "PTFans",
+        "PTS": "Ptskit",
+        "PTGTK": "PTGTK",
+        "RPT": "RailgunPT",
+        "RTF": "RetroFlix",
+        "SPD": "SpeedApp",
+        "SN": "Swarmazon",
+        "TTG": "TorrentGUI",
+        "THR": "TorrentHR",
+        "TL": "TorrentLeech",
+        "TVC": "TVChaosUK",
+        "AITHER": "Aither",
+        "ACM": "AsianCinema",
+        "A4K": "Aura4K",
+        "CRP": "Curupira",
+        "DS": "DrunkenSlug",
+        "BLU": "Blutopia",
+        "CBR": "CapybaraBR",
+        "TIK": "Cinematik",
+        "DP": "DarkPeers",
+        "EMUW": "Emuwarez",
+        "HUNO": "HawkeUno",
+        "HHD": "HomieHelpDesk",
+        "IHD": "InfinityHD",
+        "ITT": "ItaTorrents",
+        "LT": "LatTeam",
+        "LCD": "Locadora",
+        "LST": "LST",
+        "LUME": "Luminarr",
+        "MS": "MidnightScene",
+        "OTW": "OldToonsWorld",
+        "OE": "OnlyEncodes",
+        "PTT": "PolishTorrent",
+        "PT": "Portugas",
+        "R4E": "Racing4Everyone",
+        "RAS": "Rastastugan",
+        "RF": "ReelFlix",
+        "SAM": "Samaritano",
+        "SP": "Seedpool",
+        "SHRI": "Shareisland",
+        "STC": "SkipTheCommercials",
+        "LDU": "LastDigitalUnderground",
+        "TOS": "TheOldSchool",
+        "TLZ": "TheLeachZone",
+        "DT": "DesiTorrents",
+        "TTR": "Torrenteros",
+        "ULCX": "UploadCx",
+        "UTP": "Utopia",
+        "YUS": "Yuscene",
+        "ZNTH": "Zenith",
+        "FRIKI": "FrikiBar",
+        "YOINK": "Yoinked",
+        "SUIO": "Suio",
+        "UNIT3D_TEMPLATE": "Unit3dTemplate",
+    }
+
+    migrated = False
+
+    # Migrate DEFAULT -> default_trackers
+    if "DEFAULT" in config_dict and "default_trackers" in config_dict["DEFAULT"]:
+        val = config_dict["DEFAULT"]["default_trackers"]
+        if isinstance(val, str):
+            trackers_list = [t.strip() for t in val.split(",") if t.strip()]
+            new_list = []
+            for t in trackers_list:
+                t_upper = t.upper()
+                if t_upper in manual_mapping:
+                    new_list.append(manual_mapping[t_upper])
+                    migrated = True
+                else:
+                    new_list.append(t)
+            config_dict["DEFAULT"]["default_trackers"] = ",".join(new_list)
+
+    # Migrate TRACKERS section keys
+    if "TRACKERS" in config_dict:
+        trackers_section = config_dict["TRACKERS"]
+        if isinstance(trackers_section, dict):
+            new_trackers_section = {}
+            for k, v in trackers_section.items():
+                k_upper = k.upper()
+                if k_upper in manual_mapping:
+                    new_key = manual_mapping[k_upper]
+                    new_trackers_section[new_key] = v
+                    migrated = True
+                else:
+                    new_trackers_section[k] = v
+            config_dict["TRACKERS"] = new_trackers_section
+
+    if migrated:
+        console.print("\n[OK] Migrated old tracker names/acronyms to new display names in your configuration.", markup=False)
+
+    return config_dict
 
 
 def load_existing_config() -> tuple[ConfigDict | None, Path | None]:
@@ -116,8 +244,8 @@ def load_existing_config() -> tuple[ConfigDict | None, Path | None]:
                     if not isinstance(config_dict, dict):
                         console.print(f"\n[!] Error loading config from {path}: config is not a dict", markup=False)
                         continue
-                    console.print(f"\n[✓] Found existing config at {path}", markup=False)
-                    return cast(ConfigDict, config_dict), path
+                    console.print(f"\n[OK] Found existing config at {path}", markup=False)
+                    return migrate_old_config(cast(ConfigDict, config_dict)), path
             except Exception as e:
                 console.print(f"\n[!] Error loading config from {path}: {e}", markup=False)
 
@@ -563,7 +691,7 @@ def configure_trackers(
     existing_tracker_list = [t.strip() for t in existing_tracker_list if t.strip()]
     existing_trackers_str = ", ".join(existing_tracker_list)
 
-    trackers_input = get_user_input("\nEnter tracker acronyms separated by commas (e.g. BHD, PTP, AITHER)", existing_value=existing_trackers_str).upper()
+    trackers_input = get_user_input("\nEnter tracker acronyms separated by commas (e.g. BeyondHD, PassThePopcorn, Aither)", existing_value=existing_trackers_str).upper()
     trackers_list = [t.strip().upper() for t in trackers_input.split(",") if t.strip()]
 
     trackers_config: dict[str, Any] = {"default_trackers": ", ".join(trackers_list)}
@@ -597,7 +725,7 @@ def configure_trackers(
         if example_tracker:
             for key, default_value in example_tracker.items():
                 # Skip keys that should not be prompted
-                if tracker == "HDT" and key == "announce_url":
+                if tracker == "HDTorrents" and key == "announce_url":
                     tracker_config[key] = example_tracker[key]
                     continue
 
@@ -642,7 +770,7 @@ def configure_trackers(
             additional_tracker_config: dict[str, Any] = {}
             if example_tracker:
                 for key, default_value in example_tracker.items():
-                    if tracker == "HDT" and key == "announce_url":
+                    if tracker == "HDTorrents" and key == "announce_url":
                         additional_tracker_config[key] = example_tracker[key]
                         continue
                     comment_key = f"TRACKERS.{tracker}.{key}"

@@ -13,9 +13,13 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class DS:
+class DrunkenSlug:
+    """
+    DS Private Torrent Tracker
+    """
+
     auth_type = "other_api"
-    tracker = "DS"
+    tracker = "DrunkenSlug"
     banned_groups = ()
     torrent_url = "https://drunkenslug.com/search/"
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")
@@ -46,7 +50,7 @@ class DS:
         status_dict = status_map[self.tracker]
 
         if not self.upload_url:
-            status_dict["status_message"] = "data error: DS upload_url is not configured in config.py under TRACKERS -> DS -> upload_url"
+            status_dict["status_message"] = "data error: DrunkenSlug upload_url is not configured in config.py under TRACKERS -> DrunkenSlug -> upload_url"
             return False
 
         nzb_path = meta.nzb_path

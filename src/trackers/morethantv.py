@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
-import os
 import re
 import traceback
 from pathlib import Path
@@ -25,9 +24,13 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class MTV:
+class MoreThanTV:
+    """
+    MTV Private Torrent Tracker
+    """
+
     auth_type = "cookies"
-    tracker = "MTV"
+    tracker = "MoreThanTV"
     source_flag = "MTV"
     approved_image_hosts = ("ptpimg", "imgbox", "imgbb")
     banned_groups = (
@@ -119,14 +122,16 @@ class MTV:
 
     async def upload(self, meta: Meta) -> bool | None:
         common = COMMON(config=self.config)
-        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/MTV.json").resolve())
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         base_piece_mb = meta.base_torrent_piece_mb or 0
         torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
 
         if base_piece_mb > 8 and not meta.nohash:
             tracker_config = self.config["TRACKERS"].get(self.tracker, {})
             if str(tracker_config.get("skip_if_rehash", "false")).lower() == "false":
-                logger.info("[red]Piece size is OVER 8M and does not work on MTV. Generating a new .torrent")
+                logger.info("[red]Piece size is OVER 8M and does not work on MoreThanTV. Generating a new .torrent")
                 piece_size = 8
                 tracker_url = str(tracker_config.get("announce_url", "https://fake.tracker")).strip()
                 torrent_create = f"[{self.tracker}]"
@@ -197,7 +202,7 @@ class MTV:
                 async with httpx.AsyncClient(cookies=cookies, timeout=10.0, follow_redirects=True, headers=headers) as client:
                     response = await client.post(url=self.upload_url, data=data, files=files)
 
-                    # This is not a header or cookie size issue, but MTV returns this status.
+                    # This is not a header or cookie size issue, but MoreThanTV returns this status.
                     if response.status_code == 400 and ("Request Header" in response.text or "Cookie Too Large" in response.text or "Header Too Large" in response.text):
                         meta.tracker_status[self.tracker]["status_message"] = "data error: Request Header or Cookie Too Large error from server"
                         return False
@@ -236,7 +241,7 @@ class MTV:
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: {e}"
                 return False
         else:
-            logger.info("[cyan]MTV Request Data:")
+            logger.info("[cyan]MoreThanTV Request Data:")
             debug_data = data.copy()
             if "auth" in debug_data:
                 auth_value = str(debug_data.get("auth", ""))
@@ -332,7 +337,7 @@ class MTV:
             and mtv_name.split(".")[-1].isalpha()
             and len(mtv_name.split(".")[-1]) <= 4
         ):
-            mtv_name = os.path.splitext(mtv_name)[0]
+            mtv_name = Path(mtv_name).stem
 
         tag_value = meta.tag
         tag_lower = "" if not tag_value else tag_value.lower()
@@ -408,7 +413,7 @@ class MTV:
     async def get_tags(self, meta: Meta) -> str:
         tags: list[str] = []
         # Genres
-        # MTV takes issue with some of the pulled TMDB tags, and I'm not hand checking and attempting
+        # MoreThanTV takes issue with some of the pulled TMDB tags, and I'm not hand checking and attempting
         # to regex however many tags need changing, so they're just getting skipped
         # tags.extend([x.strip(', ').lower().replace(' ', '.') for x in meta.genres.split(',')])
         # Resolution
@@ -490,14 +495,16 @@ class MTV:
         return " ".join(tag for tag in tags if tag)
 
     async def validate_credentials(self, meta: Meta) -> bool:
-        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/MTV.json").resolve())
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if not await aiofiles.os.path.exists(cookiefile):
             await self.login(cookiefile)
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
             logger.error("[red]Failed to validate cookies. Please confirm that the site is up and your username and password is valid.")
             if "mtv_timeout" in meta and meta.mtv_timeout:
-                meta.skipping = "MTV"
+                meta.skipping = "MoreThanTV"
                 return False
             recreate = cli_ui.ask_yes_no("Log in again and create new session?") if not meta.unattended or (meta.unattended and meta.unattended_confirm) else True
             if recreate is True:
@@ -520,7 +527,7 @@ class MTV:
                 async with httpx.AsyncClient(cookies=cookies_dict, timeout=10) as client:
                     try:
                         resp = await client.get(url=url)
-                        logger.debug("[cyan]Validating MTV Cookies:")
+                        logger.debug("[cyan]Validating MoreThanTV Cookies:")
 
                         if "Logout" in resp.text:
                             return True
@@ -536,7 +543,7 @@ class MTV:
                         meta.mtv_timeout = True
                         return False
                     except Exception as e:
-                        logger.error(f"[red]Error connecting to MTV: {e!s}")
+                        logger.error(f"[red]Error connecting to MoreThanTV: {e!s}")
                         return False
             except Exception as e:
                 logger.error(f"[red]Error loading cookies: {e!s}")
@@ -602,9 +609,9 @@ class MTV:
                                 otp = pyotp.parse_uri(otp_uri)
                                 mfa_code = pyotp.TOTP(otp.secret).now()
                             except ValueError, TypeError:
-                                mfa_code = console.input("[yellow]MTV 2FA Code: ")
+                                mfa_code = console.input("[yellow]MoreThanTV 2FA Code: ")
                         else:
-                            mfa_code = console.input("[yellow]MTV 2FA Code: ")
+                            mfa_code = console.input("[yellow]MoreThanTV 2FA Code: ")
 
                         two_factor_token = resp.text.rsplit('name="token" value="', 1)[1][:48]
                         two_factor_payload = {"token": two_factor_token, "code": mfa_code, "submit": "login"}
@@ -612,25 +619,25 @@ class MTV:
 
                     await asyncio.sleep(1)
                     if "authkey=" in resp.text:
-                        logger.info("[green]Successfully logged in to MTV")
+                        logger.info("[green]Successfully logged in to MoreThanTV")
                         cookies_dict = dict(client.cookies)
                         cookies_data = await self.async_json_dumps(cookies_dict)
                         async with aiofiles.open(cookiefile, "w", encoding="utf-8") as cf:
                             await cf.write(cookies_data)
                         logger.info(f"[green]Cookies saved to {cookiefile}")
                         return True
-                    logger.info("[bold red]Something went wrong while trying to log into MTV")
+                    logger.info("[bold red]Something went wrong while trying to log into MoreThanTV")
                     logger.info(f"[red]Final URL: {resp.url}")
                     return False
 
                 except httpx.TimeoutException:
-                    logger.info("[red]Connection to MTV timed out. The site may be down or unreachable.")
+                    logger.info("[red]Connection to MoreThanTV timed out. The site may be down or unreachable.")
                     return False
                 except httpx.ConnectError:
-                    logger.error("[red]Failed to connect to MTV. The site may be down or your connection is blocked.")
+                    logger.error("[red]Failed to connect to MoreThanTV. The site may be down or your connection is blocked.")
                     return False
                 except Exception as e:
-                    logger.error(f"[red]Error during MTV login: {e!s}")
+                    logger.error(f"[red]Error during MoreThanTV login: {e!s}")
                     logger.info(f"[dim red]{traceback.format_exc()}[/dim red]")
                     return False
         except Exception as e:
@@ -762,7 +769,7 @@ class MTV:
                         result = {"name": title, "files": title, "file_count": int(files_text), "size": int(size_text), "link": guid, "download": link}
                         dupes.append(result)
                 except ET.ParseError:
-                    logger.error("[red]Failed to parse XML response from MTV API")
+                    logger.error("[red]Failed to parse XML response from MoreThanTV API")
             else:
                 # Handle potential error messages
                 if response.status_code != 200:

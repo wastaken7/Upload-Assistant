@@ -88,7 +88,7 @@ class UNIT3D:
             if meta.tmdb is not None:
                 params_dict["tmdbId"] = str(meta.tmdb)
 
-            if self.tracker not in ["OTW"]:
+            if self.tracker not in ["OldToonsWorld"]:
                 resolutions = await self.get_resolution_id(meta)
                 resolution_id = resolutions["resolution_id"]
                 if resolution_id in ["3", "4"]:
@@ -99,7 +99,7 @@ class UNIT3D:
                 else:
                     params_dict["resolutions[]"] = resolution_id
 
-            if self.tracker not in ["SP", "STC"]:
+            if self.tracker not in ["Seedpool", "SkipTheCommercials"]:
                 type_id = (await self.get_type_id(meta))["type_id"]
                 if params_list is not None:
                     params_list.append(("types[]", type_id))
@@ -420,11 +420,11 @@ class UNIT3D:
         files: dict[str, tuple[str, bytes, str]] = {}
         base_dir = meta.base_dir
         uuid = meta.uuid
-        specified_dir_path = Path(base_dir) / "tmp" / uuid / "*.nfo"
-        nfo_files = glob.glob(specified_dir_path)
+        specified_dir = Path(base_dir) / "tmp" / uuid
+        nfo_files = [str(p) for p in specified_dir.glob("*.nfo")]
         if not nfo_files and meta.keep_nfo and (meta.keep_folder or meta.isdir):
-            search_dir = str(Path(str(meta.path)).parent)
-            nfo_files = glob.glob(Path(search_dir) / "*.nfo")
+            search_dir = Path(str(meta.path)).parent
+            nfo_files = [str(p) for p in search_dir.glob("*.nfo")]
 
         if nfo_files:
             async with aiofiles.open(nfo_files[0], "rb") as f:

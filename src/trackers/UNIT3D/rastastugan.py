@@ -8,8 +8,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class RAS(UNIT3D):
-    tracker = "RAS"
+class Rastastugan(UNIT3D):
+    """
+    Rastastugan is a NORDIC Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
+    tracker = "Rastastugan"
     base_url = "https://rastastugan.org"
     banned_groups = (
         "GalaxyRG",
@@ -30,7 +34,7 @@ class RAS(UNIT3D):
     tracker_urls = ("https://rastastugan.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="RAS")
+        super().__init__(config, tracker_name="Rastastugan")
         self.config: Config = config
         self.tmdb_manager = TmdbManager(config)
 

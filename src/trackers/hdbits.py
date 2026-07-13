@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import glob
 import json
 import os
 import re
@@ -23,9 +22,13 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class HDB:
+class HDBits:
+    """
+    HDB Private Torrent Tracker
+    """
+
     auth_type = "cookies"
-    tracker = "HDB"
+    tracker = "HDBits"
     source_flag = "HDBits"
     signature: str | None = None
     banned_groups: tuple[str, ...] = ("",)
@@ -34,7 +37,7 @@ class HDB:
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        tracker_config = config.get("TRACKERS", {}).get("HDB", {})
+        tracker_config = config.get("TRACKERS", {}).get("HDBits", {})
         tracker_config_dict = cast(dict[str, Any], tracker_config) if isinstance(tracker_config, dict) else {}
         self.username = str(tracker_config_dict.get("username", "")).strip()
         self.passkey = str(tracker_config_dict.get("passkey", "")).strip()
@@ -238,7 +241,7 @@ class HDB:
 
         for each in (cat_id, codec_id, medium_id):
             if each == 0:
-                logger.info("[bold red]Something didn't map correctly, or this content is not allowed on HDB")
+                logger.info("[bold red]Something didn't map correctly, or this content is not allowed on HDBits")
                 return None
         if "Dual-Audio" in meta.audio and not (meta.anime or not meta.is_disc):
             logger.info("[bold red]Dual-Audio Encodes are not allowed for non-anime and non-disc content")
@@ -252,8 +255,8 @@ class HDB:
 
         # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
         if base_piece_mb > 16 and not meta.nohash:
-            logger.info("[red]Piece size is OVER 16M and does not work on HDB. Generating a new .torrent")
-            hdb_config = self.config.get("TRACKERS", {}).get("HDB", {})
+            logger.info("[red]Piece size is OVER 16M and does not work on HDBits. Generating a new .torrent")
+            hdb_config = self.config.get("TRACKERS", {}).get("HDBits", {})
             hdb_config_dict = cast(dict[str, Any], hdb_config) if isinstance(hdb_config, dict) else {}
             tracker_url = str(hdb_config_dict.get("announce_url", "https://fake.tracker")).strip()
             piece_size = 16
@@ -316,7 +319,9 @@ class HDB:
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
-        cookiefile = f"{meta.base_dir}/data/cookies/HDB.txt"
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         cookies = await common.parseCookieFile(cookiefile)
         async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
             up = await client.post(url=url, data=data, files=files)
@@ -332,7 +337,7 @@ class HDB:
         logger.info(data)
         logger.info("\n\n")
         logger.info(up.text)
-        raise UploadException(f"Upload to HDB Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa F405
+        raise UploadException(f"Upload to HDBits Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa F405
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
@@ -391,7 +396,7 @@ class HDB:
 
         # Otherwise, search for each term
         for search_term in search_terms:
-            logger.info(f"[yellow]Searching HDB for: {search_term}")
+            logger.info(f"[yellow]Searching HDBits for: {search_term}")
             data["search"] = search_term
 
             async with httpx.AsyncClient(timeout=5.0) as client:
@@ -425,17 +430,19 @@ class HDB:
     async def validate_cookies(self, meta: Meta) -> bool:
         common = COMMON(config=self.config)
         url = "https://hdbits.org"
-        cookiefile = f"{meta.base_dir}/data/cookies/HDB.txt"
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if Path(cookiefile).exists():
             cookies = await common.parseCookieFile(cookiefile)
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0) as client:
                 resp = await client.get(url=url)
             return resp.text.find("""<a href="/logout.php">Logout</a>""") != -1
-        logger.info("[bold red]Missing Cookie File. (data/cookies/HDB.txt)")
+        logger.info("[bold red]Missing Cookie File. (data/cookies/HDBits.txt)")
         return False
 
     async def download_new_torrent(self, id: str, torrent_path: str) -> None:
-        # Get HDB .torrent filename
+        # Get HDBits .torrent filename
         api_url = "https://hdbits.org/api/torrents"
         data = {"username": self.username, "passkey": self.passkey, "id": id}
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -587,7 +594,7 @@ class HDB:
                 logger.info(f"[red]Comparison path not found: {comparison_path}")
                 return None
 
-            logger.info(f"[green]Uploading comparison images from {comparison_path} to HDB Image Host")
+            logger.info(f"[green]Uploading comparison images from {comparison_path} to HDBits Image Host")
 
             group_images: dict[str, list[str]] = {}
             max_images_per_group = 0
@@ -662,18 +669,15 @@ class HDB:
             image_patterns = ["*.png", ".[!.]*.png"]
             image_glob: list[str] = []
             for image_pattern in image_patterns:
-                full_pattern = Path(glob.escape(screenshot_dir)) / image_pattern
-                glob_results: list[str] = await asyncio.to_thread(glob.glob, full_pattern)
+                glob_results = await asyncio.to_thread(lambda pat=image_pattern: [str(p) for p in Path(screenshot_dir).glob(pat)])
                 image_glob.extend(glob_results)
             unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
             unwanted_files: set[str] = set()
             for unwanted_pattern in unwanted_patterns:
-                unwanted_full_pattern = Path(glob.escape(screenshot_dir)) / unwanted_pattern
-                glob_results = await asyncio.to_thread(glob.glob, unwanted_full_pattern)
+                glob_results = await asyncio.to_thread(lambda pat=unwanted_pattern: [str(p) for p in Path(screenshot_dir).glob(pat)])
                 unwanted_files.update(glob_results)
-                hidden_pattern = Path(glob.escape(screenshot_dir)) / "." + unwanted_pattern
-                hidden_glob_results = await asyncio.to_thread(glob.glob, hidden_pattern)
-                unwanted_files.update(hidden_glob_results)  # finished with hidden_glob_results
+                hidden_glob_results = await asyncio.to_thread(lambda pat=unwanted_pattern: [str(p) for p in Path(screenshot_dir).glob(f".{pat}")])
+                unwanted_files.update(hidden_glob_results)
             image_glob = [file for file in image_glob if file not in unwanted_files]
             all_image_files = list(set(image_glob))
 
@@ -693,7 +697,7 @@ class HDB:
             upload_count = 3 if meta.category == "TV" and meta.tv_pack == 0 else 6
             upload_count = min(len(all_image_files), upload_count)
 
-        logger.debug(f"[cyan]Uploading {upload_count} images to HDB Image Host")
+        logger.debug(f"[cyan]Uploading {upload_count} images to HDBits Image Host")
 
         upload_files: dict[str, tuple[str, bytes, str]] = {}
         for i in range(upload_count):
@@ -713,7 +717,7 @@ class HDB:
                 logger.info("[red]No files to upload")
                 return None
 
-            logger.debug(f"[green]Uploading {len(upload_files)} images to HDB...")
+            logger.debug(f"[green]Uploading {len(upload_files)} images to HDBits...")
 
             upload_success = True
             if meta.comparison:
@@ -859,7 +863,7 @@ class HDB:
                         "limit": 100,
                         "search": bd_summary,  # Using the Disc Title for search with uuid fallback
                     }
-                    logger.info(f"[green]Searching HDB for title: [bold yellow]{bd_summary}[/bold yellow]")
+                    logger.info(f"[green]Searching HDBits for title: [bold yellow]{bd_summary}[/bold yellow]")
                     # console.print(f"[yellow]Using this data: {data}")
                 else:
                     return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
@@ -870,7 +874,7 @@ class HDB:
 
         else:  # Handling non-disc case
             data = {"username": self.username, "passkey": self.passkey, "limit": 100, "file_in_torrent": Path(search_term).name}
-            logger.info(f"[green]Searching HDB for file: [bold yellow]{Path(search_term).name}[/bold yellow]")
+            logger.info(f"[green]Searching HDBits for file: [bold yellow]{Path(search_term).name}[/bold yellow]")
             # console.print(f"[yellow]Using this data: {data}")
 
         try:
@@ -879,10 +883,10 @@ class HDB:
             if response.is_success:
                 try:
                     response_json = response.json()
-                    # console.print(f"[green]HDB API response: {response_json}[/green]")
+                    # console.print(f"[green]HDBits API response: {response_json}[/green]")
 
                     if "data" not in response_json:
-                        logger.error(f"[red]Error: 'data' key not found or empty in HDB API response. Full response: {response_json}[/red]")
+                        logger.error(f"[red]Error: 'data' key not found or empty in HDBits API response. Full response: {response_json}[/red]")
                         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
 
                     for each in response_json["data"]:
@@ -893,20 +897,20 @@ class HDB:
                         hdb_id = each.get("id", None)
                         hdb_description = each.get("descr")
 
-                        logger.info(f"[bold green]Matched release with HDB ID: [yellow]https://hdbits.org/details.php?id={hdb_id}[/yellow][/bold green]")
+                        logger.info(f"[bold green]Matched release with HDBits ID: [yellow]https://hdbits.org/details.php?id={hdb_id}[/yellow][/bold green]")
 
                         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 
-                    logger.info("[yellow]No data found in the HDB API response[/yellow]")
+                    logger.info("[yellow]No data found in the HDBits API response[/yellow]")
 
                 except (ValueError, KeyError, TypeError) as e:
                     console.print_exception()
-                    logger.error(f"[red]Failed to parse HDB API response. Error: {e!s}[/red]")
+                    logger.error(f"[red]Failed to parse HDBits API response. Error: {e!s}[/red]")
             else:
-                logger.error(f"[red]Failed to get info from HDB. Status code: {response.status_code}, Reason: {response.reason_phrase}[/red]")
+                logger.error(f"[red]Failed to get info from HDBits. Status code: {response.status_code}, Reason: {response.reason_phrase}[/red]")
 
         except httpx.RequestError as e:
             logger.info(f"[red]Request error: {e!s}[/red]")
 
-        logger.info("[yellow]Could not find a matching release on HDB[/yellow]")
+        logger.info("[yellow]Could not find a matching release on HDBits[/yellow]")
         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id

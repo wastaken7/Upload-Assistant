@@ -18,8 +18,12 @@ from src.uploadscreens import UploadScreensManager
 Config = dict[str, Any]
 
 
-class TIK(UNIT3D):
-    tracker = "TIK"
+class Cinematik(UNIT3D):
+    """
+    Cinematik is a Private tracker for full BD and DVD discs of non-mainstream movies, niche cinema and arthouse.
+    """
+
+    tracker = "Cinematik"
     base_url = "https://cinematik.net"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -29,13 +33,13 @@ class TIK(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="TIK")
+        super().__init__(config, tracker_name="Cinematik")
         self.config: Config = config
         self.uploadscreens_manager = UploadScreensManager(config)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if not meta.is_disc:
-            logger.info("[red]Only disc-based content allowed at TIK")
+            logger.info("[red]Only disc-based content allowed at Cinematik")
             return False
 
         return True
@@ -136,7 +140,7 @@ class TIK(UNIT3D):
         if not disctype:
             logger.info("[red]You must specify a --disctype")
             # Raise an exception since we can't proceed without disctype
-            raise ValueError("disctype is required for TIK tracker but was not provided")
+            raise ValueError("disctype is required for Cinematik tracker but was not provided")
 
         disctype_value = str(cast(Any, disctype[0])) if isinstance(disctype, list) and disctype else str(cast(Any, disctype))
         type_id = type_id_map.get(disctype_value, "1")  # '1' is the default fallback

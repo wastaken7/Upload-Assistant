@@ -98,13 +98,13 @@ class BDInfoBinaryManager:
         if binary_path.exists() and binary_path.is_file():
             if system != "windows":
                 os.chmod(binary_path, 0o600)
-            os.remove(binary_path)
+            binary_path.unlink()
             logger.debug(f"[blue]Removed existing binary at: {binary_path}[/blue]")
 
         if version_path.exists():
             if system != "windows":
                 os.chmod(version_path, 0o644)
-            os.remove(version_path)
+            version_path.unlink()
             logger.debug(f"[blue]Removed existing version file at: {version_path}[/blue]")
 
         cleanup_old_version_files()

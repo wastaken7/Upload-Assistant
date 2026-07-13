@@ -12,9 +12,13 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class SN:
+class Swarmazon:
+    """
+    Swarmazon is a Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
     auth_type = "other_api"
-    tracker = "SN"
+    tracker = "Swarmazon"
     source_flag = "Swarmazon"
     banned_groups = ("",)
     upload_url = "https://swarmazon.club/api/upload.php"
@@ -133,7 +137,7 @@ class SN:
                 console.print_exception()
                 return False
         else:
-            logger.info("[cyan]SN Request Data:")
+            logger.info("[cyan]Swarmazon Request Data:")
             logger.info(Redaction.redact_private_info(data))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})

@@ -9,6 +9,10 @@ Config = dict[str, Any]
 
 
 class PTGTK(NEXUSPHP):
+    """
+    PT GTK is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
     banned_groups = ()
     base_url = "https://pt.gtkpw.xyz"
     source_flag = "[pt.gtkpw.xyz] PT GTK"

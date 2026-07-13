@@ -18,9 +18,13 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class MTEAM:
+class MTeam:
+    """
+    MTEAM Private Torrent Tracker
+    """
+
     auth_type = "other_api"
-    tracker = "MTEAM"
+    tracker = "MTeam"
     api_base_url = "https://api.m-team.cc/api"
     banned_groups = ("FGT",)
     requests_url = f"{api_base_url}/seek/search"

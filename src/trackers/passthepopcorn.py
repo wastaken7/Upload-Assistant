@@ -30,8 +30,12 @@ from src.trackers.COMMON import COMMON
 from src.uploadscreens import UploadScreensManager
 
 
-class PTP:
-    tracker = "PTP"
+class PassThePopcorn:
+    """
+    PTP Private Torrent Tracker
+    """
+
+    tracker = "PassThePopcorn"
     source_flag = "PTP"
     banned_groups = (
         "aXXo",
@@ -119,21 +123,21 @@ class PTP:
         self.rehost_images_manager = RehostImagesManager(config)
         self.takescreens_manager = TakeScreensManager(config)
         self.uploadscreens_manager = UploadScreensManager(config)
-        self.api_user = config["TRACKERS"]["PTP"].get("ApiUser", "").strip()
-        self.api_key = config["TRACKERS"]["PTP"].get("api_key", "").strip()
-        announce_url = config["TRACKERS"]["PTP"].get("announce_url", "").strip()
+        self.api_user = config["TRACKERS"]["PassThePopcorn"].get("ApiUser", "").strip()
+        self.api_key = config["TRACKERS"]["PassThePopcorn"].get("api_key", "").strip()
+        announce_url = config["TRACKERS"]["PassThePopcorn"].get("announce_url", "").strip()
         if announce_url and announce_url.startswith("http://"):
-            logger.info("[red]PTP announce URL is using plaintext HTTP.\n")
+            logger.info("[red]PassThePopcorn announce URL is using plaintext HTTP.\n")
             logger.info(
-                "[red]PTP is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PTP/forums.php?page=1&action=viewthread&threadid=46663"
+                "[red]PassThePopcorn is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PassThePopcorn/forums.php?page=1&action=viewthread&threadid=46663"
             )
             logger.info("[yellow]Modifying the url to use HTTPS. Update your config file to avoid this message in the future.")
             self.announce_url = announce_url.replace("http://", "https://").replace(":2710", "")
         else:
             self.announce_url = announce_url
-        self.username = config["TRACKERS"]["PTP"].get("username", "").strip()
-        self.password = config["TRACKERS"]["PTP"].get("password", "").strip()
-        self.web_source = self._is_true(config["TRACKERS"]["PTP"].get("add_web_source_to_desc", True))
+        self.username = config["TRACKERS"]["PassThePopcorn"].get("username", "").strip()
+        self.password = config["TRACKERS"]["PassThePopcorn"].get("password", "").strip()
+        self.web_source = self._is_true(config["TRACKERS"]["PassThePopcorn"].get("add_web_source_to_desc", True))
         self.user_agent = f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"
 
         self.cookie_validator = CookieValidator(config)
@@ -159,7 +163,7 @@ class PTP:
 
         passkey_match = re.match(r"https?://please\.passthepopcorn\.me:?\d*/(.+)/announce", self.announce_url)
         if not passkey_match:
-            logger.info(f"[red]{self.tracker}: Failed to extract passkey from PTP announce URL. Skipping upload.[/red]")
+            logger.info(f"[red]{self.tracker}: Failed to extract passkey from PassThePopcorn announce URL. Skipping upload.[/red]")
             return False
 
         return True
@@ -211,14 +215,14 @@ class PTP:
                     if imdb_value:
                         return int(imdb_value or 0), ptp_torrent_id, ptp_torrent_hash
 
-                logger.info(f"[yellow]Could not find any release matching [bold yellow]{search_value}[/bold yellow] on PTP")
+                logger.info(f"[yellow]Could not find any release matching [bold yellow]{search_value}[/bold yellow] on PassThePopcorn")
                 return None, None, None
 
             if response.status_code in [400, 401, 403]:
-                logger.info("[bold red]PTP Error: 400/401/403 - Invalid request or authentication failed[/bold red]")
+                logger.info("[bold red]PassThePopcorn Error: 400/401/403 - Invalid request or authentication failed[/bold red]")
                 return None, None, None
             if response.status_code == 503:
-                logger.info("[bold yellow]PTP Unavailable (503)")
+                logger.info("[bold yellow]PassThePopcorn Unavailable (503)")
                 return None, None, None
             return None, None, None
         except Exception as e:
@@ -245,7 +249,7 @@ class PTP:
                 logger.info(response.text)
                 return None, None
             if response.status_code == 503:
-                logger.info("[bold yellow]PTP Unavailable (503)")
+                logger.info("[bold yellow]PassThePopcorn Unavailable (503)")
                 return None, None
             return None, None
         except Exception:
@@ -268,7 +272,7 @@ class PTP:
         desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
 
         if not meta.skip_tracker_descriptions:
-            logger.info("[bold green]Successfully grabbed description from PTP")
+            logger.info("[bold green]Successfully grabbed description from PassThePopcorn")
             logger.info(f"Description after cleaning:\n{desc[:1000]}...", extra={"markup": False})  # Show first 1000 characters for brevity
 
             if not meta.skipit and not meta.unattended:
@@ -306,7 +310,7 @@ class PTP:
         await asyncio.sleep(1)
         try:
             if response.status_code != 200:
-                logger.info(f"[red]PTP group lookup failed with HTTP {response.status_code}[/red]")
+                logger.info(f"[red]PassThePopcorn group lookup failed with HTTP {response.status_code}[/red]")
                 if response.text:
                     logger.info(f"[red]Response body (truncated): {response.text[:200]}[/red]")
                 return None
@@ -315,7 +319,7 @@ class PTP:
                 response_data = response.json()
             except json.JSONDecodeError:
                 content_type = response.headers.get("content-type", "unknown")
-                logger.info(f"[red]PTP group lookup returned non-JSON content (content-type: {content_type})[/red]")
+                logger.info(f"[red]PassThePopcorn group lookup returned non-JSON content (content-type: {content_type})[/red]")
                 if response.text:
                     logger.info(f"[red]Response body (truncated): {response.text[:200]}[/red]")
                 return None
@@ -590,7 +594,7 @@ class PTP:
                 if isinstance(uploaded_url, str) and uploaded_url:
                     return uploaded_url
         except Exception as e:
-            logger.info(f"[red]PTP poster rehost to {selected_host} failed: {e}")
+            logger.info(f"[red]PassThePopcorn poster rehost to {selected_host} failed: {e}")
 
         return image_url
 
@@ -679,7 +683,7 @@ class PTP:
         elif meta.is_disc == "DVD":
             container = "VOB IFO"
         else:
-            ext = os.path.splitext(meta.filelist[0])[1]
+            ext = Path(meta.filelist[0]).suffix
             containermap = {".mkv": "MKV", ".mp4": "MP4"}
             container = containermap.get(ext, "Other")
         return container
@@ -870,7 +874,7 @@ class PTP:
         multi_screens = int(self.config["DEFAULT"].get("multiScreens", 2))
         if multi_screens < 2:
             multi_screens = 2
-            logger.info("[yellow]PTP requires at least 2 screenshots for multi disc/file content, overriding config")
+            logger.info("[yellow]PassThePopcorn requires at least 2 screenshots for multi disc/file content, overriding config")
 
         image_list_value: Any = (meta.PTP_images_key if "PTP_images_key" in meta else meta.image_list) if not meta.skip_imghost_upload else []
         image_list = cast(list[dict[str, Any]], image_list_value) if isinstance(image_list_value, list) else []
@@ -1017,7 +1021,7 @@ class PTP:
                         desc.write(f"[mediainfo]{summary}[/mediainfo]\n\n")
                         meta.retry_count += 1
                         meta[new_images_key] = []
-                        new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"PLAYLIST_{i}-*.png")]
+                        new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"PLAYLIST_{i}-*.png")]
                         if not new_screens:
                             use_vs = meta.vapoursynth
                             try:
@@ -1026,7 +1030,7 @@ class PTP:
                                 )
                             except Exception as e:
                                 logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
-                            new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"PLAYLIST_{i}-*.png")]
+                            new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"PLAYLIST_{i}-*.png")]
                         uploaded_images: list[dict[str, Any]] = []
                         if new_screens and not meta.skip_imghost_upload:
                             uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
@@ -1097,7 +1101,7 @@ class PTP:
                         else:
                             meta.retry_count += 1
                             meta[new_images_key] = []
-                            new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"FILE_{i}-*.png")]
+                            new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
                             if not new_screens:
                                 try:
                                     await self.takescreens_manager.disc_screenshots(
@@ -1105,7 +1109,7 @@ class PTP:
                                     )
                                 except Exception as e:
                                     logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
-                            new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"FILE_{i}-*.png")]
+                            new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
                             uploaded_images: list[dict[str, Any]] = []
                             if new_screens and not meta.skip_imghost_upload:
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
@@ -1163,13 +1167,13 @@ class PTP:
                         else:
                             meta.retry_count += 1
                             meta[new_images_key] = []
-                            new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"{meta.discs[i]['name']}-*.png")]
+                            new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
                             if not new_screens:
                                 try:
                                     await self.takescreens_manager.dvd_screenshots(meta, i, multi_screens, True)
                                 except Exception as e:
                                     logger.info(f"Error during DVD screenshot capture: {e}", extra={"markup": False})
-                            new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"{meta.discs[i]['name']}-*.png")]
+                            new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
                             uploaded_images: list[dict[str, Any]] = []
                             if new_screens and not meta.skip_imghost_upload:
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
@@ -1189,7 +1193,7 @@ class PTP:
 
         # Handle single file case
         elif len(filelist) == 1:
-            if meta.type == "WEBDL" and meta.service_longname != "" and meta.description is None and self.web_source is True:
+            if meta.type == "WEBDL" and meta.service_longname != "" and not meta.description and self.web_source is True:
                 desc.write(f"[quote][align=center]This release is sourced from {meta.service_longname}[/align][/quote]")
             async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as mi_file:
                 mi_dump = await mi_file.read()
@@ -1286,13 +1290,13 @@ class PTP:
                     else:
                         meta.retry_count = meta.retry_count + 1
                         meta[new_images_key] = []
-                        new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"FILE_{i}-*.png")]
+                        new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
                         if not new_screens:
                             try:
                                 await self.takescreens_manager.screenshots(file, f"FILE_{i}", meta.uuid, meta.base_dir, meta, multi_screens, True, "")
                             except Exception as e:
                                 logger.info(f"Error during generic screenshot capture: {e}", extra={"markup": False})
-                        new_screens = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"FILE_{i}-*.png")]
+                        new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
                         if new_screens and not meta.skip_imghost_upload:
                             uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
                                 meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts
@@ -1380,7 +1384,9 @@ class PTP:
     async def get_AntiCsrfToken(self, meta: Meta) -> str:
         if not Path(f"{meta.base_dir}/data/cookies").exists():
             Path(f"{meta.base_dir}/data/cookies").mkdir(parents=True, exist_ok=True)
-        cookiefile = f"{meta.base_dir}/data/cookies/PTP.json"
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         logged_in = False
         uploadresponse: httpx.Response | None = None
         cookies: dict[str, str] = {}
@@ -1395,16 +1401,16 @@ class PTP:
                     if token_match:
                         return token_match.group(1)
             # Cookies are expired/invalid — discard them so the login POST is clean
-            logger.info("[yellow]PTP session expired. Clearing cookies and re-authenticating.")
+            logger.info("[yellow]PassThePopcorn session expired. Clearing cookies and re-authenticating.")
             cookies = {}
             with contextlib.suppress(OSError):
-                os.remove(cookiefile)
+                Path(cookiefile).unlink()
         else:
-            logger.info("[yellow]PTP Cookies not found. Creating new session.")
+            logger.info("[yellow]PassThePopcorn Cookies not found. Creating new session.")
 
         passkey_match = re.match(r"https?://please\.passthepopcorn\.me:?\d*/(.+)/announce", self.announce_url)
         if not passkey_match:
-            raise LoginException("Failed to extract passkey from PTP announce URL.")  # noqa F405
+            raise LoginException("Failed to extract passkey from PassThePopcorn announce URL.")  # noqa F405
         pass_key = passkey_match.group(1)
         data = {
             "username": self.username,
@@ -1420,13 +1426,13 @@ class PTP:
                 resp = loginresponse.json()
                 if resp["Result"] == "TfaRequired":
                     data["TfaType"] = "normal"
-                    data["TfaCode"] = cli_ui.ask_string("2FA Required: Please enter PTP 2FA code")
+                    data["TfaCode"] = cli_ui.ask_string("2FA Required: Please enter PassThePopcorn 2FA code")
                     loginresponse = await client.post("https://passthepopcorn.me/ajax.php?action=login", data=data, headers=headers)
                     await asyncio.sleep(2)
                     resp = loginresponse.json()
                 try:
                     if resp["Result"] != "Ok":
-                        raise LoginException("Failed to login to PTP. Probably due to the bad user name, password, announce url, or 2FA code.")  # noqa F405
+                        raise LoginException("Failed to login to PassThePopcorn. Probably due to the bad user name, password, announce url, or 2FA code.")  # noqa F405
                     anti_csrf_token = resp["AntiCsrfToken"]
                     self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # pyright: ignore[reportPrivateUsage]
                 except Exception:
@@ -1436,7 +1442,7 @@ class PTP:
                         redacted_text = json.dumps(redacted)
                     except json.JSONDecodeError:
                         redacted_text = Redaction.redact_private_info(loginresponse.text)
-                    raise LoginException(f"Got exception while loading JSON login response from PTP. Response: {redacted_text}")  # noqa F405
+                    raise LoginException(f"Got exception while loading JSON login response from PassThePopcorn. Response: {redacted_text}")  # noqa F405
             except Exception:
                 try:
                     parsed = json.loads(loginresponse.text)
@@ -1444,15 +1450,15 @@ class PTP:
                     redacted_text = json.dumps(redacted)
                 except json.JSONDecodeError:
                     redacted_text = Redaction.redact_private_info(loginresponse.text)
-                raise LoginException(f"Got exception while loading JSON login response from PTP. Response: {redacted_text}")  # noqa F405
+                raise LoginException(f"Got exception while loading JSON login response from PassThePopcorn. Response: {redacted_text}")  # noqa F405
         return anti_csrf_token
 
     async def validate_login(self, response: httpx.Response) -> bool:
         logged_in = False
         if response.text.find("""<a href="login.php?act=recover">""") != -1:
-            logger.info("Looks like you are not logged in to PTP. Probably due to the bad user name, password, or expired session.")
+            logger.info("Looks like you are not logged in to PassThePopcorn. Probably due to the bad user name, password, or expired session.")
         elif "Your popcorn quota has been reached, come back later!" in response.text:
-            raise LoginException("Your PTP request/popcorn quota has been reached, try again later")  # noqa F405
+            raise LoginException("Your PassThePopcorn request/popcorn quota has been reached, try again later")  # noqa F405
         else:
             logged_in = True
         return logged_in
@@ -1604,7 +1610,7 @@ class PTP:
             while new_data["tags"] == "":
                 if (meta.mode if meta.mode is not None else "discord") == "cli":
                     logger.info("[yellow]Unable to match any tags")
-                    logger.info("Valid tags can be found on the PTP upload form")
+                    logger.info("Valid tags can be found on the PassThePopcorn upload form")
                     new_data["tags"] = console.input("Please enter at least one tag. Comma separated (action, animation, short):")
             data.update(new_data)
             imdb_info = meta.imdb_info
@@ -1629,7 +1635,7 @@ class PTP:
 
         # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
         if base_piece_mb > 16 and not meta.nohash:
-            logger.info("[red]Piece size is OVER 16M and does not work on PTP. Generating a new .torrent")
+            logger.info("[red]Piece size is OVER 16M and does not work on PassThePopcorn. Generating a new .torrent")
             tracker_url = self.announce_url.strip() if self.announce_url else "https://fake.tracker"
             piece_size = 16
             torrent_create = f"[{self.tracker}]"
@@ -1665,7 +1671,9 @@ class PTP:
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
         failure_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]PTP_upload_failure.html"
-        cookiefile = f"{meta.base_dir}/data/cookies/PTP.json"
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # pyright: ignore[reportPrivateUsage]
         cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
         async with httpx.AsyncClient(cookies=cookies, timeout=60.0, follow_redirects=True) as client:

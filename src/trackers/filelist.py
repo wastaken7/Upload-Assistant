@@ -1,8 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import glob
-import os
-import pickle  # nosec B403 - legacy cookie migration
 import re
 from pathlib import Path
 from typing import Any, cast
@@ -21,9 +19,13 @@ from src.meta import Meta
 from src.trackers.COMMON import COMMON
 
 
-class FL:
+class FileList:
+    """
+    FL Private Torrent Tracker
+    """
+
     auth_type = "cookies"
-    tracker = "FL"
+    tracker = "FileList"
     source_flag = "FL"
     signature: str | None = None
     banned_groups = ("",)
@@ -124,21 +126,58 @@ class FL:
     def _is_true(self, value: Any) -> bool:
         return str(value).strip().lower() in {"true", "1", "yes"}
 
-    def _load_cookie_dict(self, cookiefile_json: str, cookiefile_pkl: str) -> dict[str, str]:
-        if Path(cookiefile_json).exists():
-            raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile_json)  # pyright: ignore[reportPrivateUsage]
-            return {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
+    def _load_cookie_dict(self, cookiefile: str) -> dict[str, str]:
+        path = Path(cookiefile)
+        if not path.exists():
+            return {}
 
-        if Path(cookiefile_pkl).exists():
+        # If it's a Netscape cookies file (ends with .txt)
+        if path.suffix.lower() == ".txt":
+            cookies: dict[str, str] = {}
             try:
-                with Path(cookiefile_pkl).open("rb") as f:
-                    session_cookies = pickle.load(f)  # nosec B301 - legacy migration only
-                self.cookie_validator._save_cookies_secure(session_cookies, cookiefile_json)  # pyright: ignore[reportPrivateUsage]
+                with path.open("r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        if line.strip() and not line.startswith(("# ", "#")):
+                            line_fields = re.split(r"\s+", line.strip())
+                            if len(line_fields) >= 7:
+                                cookies[line_fields[5]] = line_fields[6]
+            except Exception as e:
+                logger.error(f"[red]Error parsing FileList Netscape cookie file: {e}[/red]")
+            return cookies
+
+        # If it's a pickle file (ends with .pkl or .pickle)
+        if path.suffix.lower() in [".pkl", ".pickle"]:
+            try:
+                import pickle
+
+                with path.open("rb") as f:
+                    session_cookies = pickle.load(f)  # nosec B301
+                # Save it as JSON with same name but .json extension (standard migration)
+                json_path = path.with_suffix(".json")
+                self.cookie_validator._save_cookies_secure(session_cookies, str(json_path))  # pyright: ignore[reportPrivateUsage]
                 return {cookie.name: cookie.value for cookie in session_cookies}
             except Exception as e:
-                logger.error(f"[red]Failed to migrate legacy cookies: {e}[/red]")
+                logger.error(f"[red]Failed to migrate legacy cookies from pickle: {e}[/red]")
+                return {}
 
-        return {}
+        # Default to loading as JSON
+        try:
+            raw_cookies = self.cookie_validator._load_cookies_dict_secure(str(path))  # pyright: ignore[reportPrivateUsage]
+            return {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
+        except Exception:
+            # Maybe it's a raw JSON dict of {name: value} or {name: {"value": val}}?
+            try:
+                with path.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    if data:
+                        first_val = next(iter(data.values()))
+                        if isinstance(first_val, dict) and "value" in first_val:
+                            return {name: str(item.get("value", "")) for name, item in data.items()}
+                    return {name: str(val) for name, val in data.items()}
+            except Exception:
+                pass
+            return {}
 
     async def upload(self, meta: Meta) -> bool:
         common = COMMON(config=self.config)
@@ -148,7 +187,7 @@ class FL:
         cat_id = await self.get_category_id(meta)
         has_ro_audio, _has_ro_sub = await self.get_ro_tracks(meta)
 
-        # Confirm the correct naming order for FL
+        # Confirm the correct naming order for FileList
         cli_ui.info(f"Filelist name: {fl_name}")
         if meta.unattended is False:
             fl_confirm = cli_ui.ask_yes_no("Correct?", default=False)
@@ -205,9 +244,10 @@ class FL:
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
-        cookiefile_json = str(Path(f"{meta.base_dir}/data/cookies/FL.json").resolve())
-        cookiefile_pkl = str(Path(f"{meta.base_dir}/data/cookies/FL.pkl").resolve())
-        cookies = self._load_cookie_dict(cookiefile_json, cookiefile_pkl)
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
+        cookies = self._load_cookie_dict(cookiefile)
         async with httpx.AsyncClient(cookies=cookies, timeout=60.0, follow_redirects=True) as client:
             up = await client.post(url=url, data=data, files=files)
 
@@ -221,13 +261,14 @@ class FL:
         logger.info(data)
         logger.info("\n\n")
         logger.info(up.text)
-        raise UploadException(f"Upload to FL Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa F405
+        raise UploadException(f"Upload to FileList Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa F405
 
     async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
-        cookiefile_json = str(Path(f"{meta.base_dir}/data/cookies/FL.json").resolve())
-        cookiefile_pkl = str(Path(f"{meta.base_dir}/data/cookies/FL.pkl").resolve())
-        cookies = self._load_cookie_dict(cookiefile_json, cookiefile_pkl)
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
+        cookies = self._load_cookie_dict(cookiefile)
 
         search_url = "https://filelist.io/browse.php"
 
@@ -254,15 +295,9 @@ class FL:
         return dupes
 
     async def validate_credentials(self, meta: Meta) -> bool:
-        cookiefile_json = str(Path(f"{meta.base_dir}/data/cookies/FL.json").resolve())
-        cookiefile_pkl = str(Path(f"{meta.base_dir}/data/cookies/FL.pkl").resolve())
+        from src.cookie_auth import find_cookie_file
 
-        if Path(cookiefile_json).exists():
-            cookiefile = cookiefile_json
-        elif Path(cookiefile_pkl).exists():
-            cookiefile = cookiefile_pkl
-        else:
-            cookiefile = cookiefile_json  # Default to JSON for new saves
+        cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
 
         if not Path(cookiefile).exists():
             await self.login(cookiefile)
@@ -272,7 +307,7 @@ class FL:
             recreate = cli_ui.ask_yes_no("Log in again and create new session?")
             if recreate is True:
                 if Path(cookiefile).exists():
-                    os.remove(cookiefile)
+                    Path(cookiefile).unlink()
                 await self.login(cookiefile)
                 return await self.validate_cookies(meta, cookiefile)
             return False
@@ -280,9 +315,10 @@ class FL:
 
     async def validate_cookies(self, meta: Meta, _cookiefile: str) -> bool:
         url = "https://filelist.io/index.php"
-        cookiefile_json = str(Path(f"{meta.base_dir}/data/cookies/FL.json").resolve())
-        cookiefile_pkl = str(Path(f"{meta.base_dir}/data/cookies/FL.pkl").resolve())
-        cookies = self._load_cookie_dict(cookiefile_json, cookiefile_pkl)
+        from src.cookie_auth import find_cookie_file
+
+        cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
+        cookies = self._load_cookie_dict(cookiefile)
         if cookies:
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0) as client:
                 resp = await client.get(url=url)
@@ -297,10 +333,10 @@ class FL:
             soup = BeautifulSoup(r.text, "html.parser")
             validator_input = soup.find("input", {"name": "validator"})
             if validator_input is None:
-                raise LoginException("Unable to locate validator input on FL login page.")  # noqa: F405
+                raise LoginException("Unable to locate validator input on FileList login page.")  # noqa: F405
             validator_value = validator_input.get("value")
             if not isinstance(validator_value, str):
-                raise LoginException("Validator input missing value attribute on FL login page.")  # noqa: F405
+                raise LoginException("Validator input missing value attribute on FileList login page.")  # noqa: F405
             validator = validator_value
             data = {
                 "validator": validator,
@@ -312,10 +348,10 @@ class FL:
             index = "https://filelist.io/index.php"
             response = await client.get(index)
             if response.text.find("Logout") != -1:
-                logger.info("[green]Successfully logged into FL")
+                logger.info("[green]Successfully logged into FileList")
                 self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # pyright: ignore[reportPrivateUsage]
             else:
-                logger.info("[bold red]Something went wrong while trying to log into FL")
+                logger.info("[bold red]Something went wrong while trying to log into FileList")
                 logger.info(response.url)
         return
 
@@ -327,7 +363,7 @@ class FL:
             async with aiofiles.open(torrent_path, "wb") as tor:
                 await tor.write(r.content)
         else:
-            logger.info("[red]There was an issue downloading the new .torrent from FL")
+            logger.info("[red]There was an issue downloading the new .torrent from FileList")
             logger.info(r.text)
         return
 
@@ -355,7 +391,7 @@ class FL:
                     }
                 if meta.imdb_id:
                     data["imdbURL"] = f"tt{meta.imdb_id}"
-                screen_glob = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"{meta.filename}-*.png")]
+                screen_glob = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.filename)}-*.png")]
                 files: list[tuple[str, tuple[str, bytes, str]]] = []
                 for screen in screen_glob:
                     screen_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{screen}"
@@ -382,7 +418,7 @@ class FL:
                     final_desc += "[/pre][/quote]\n"  # Closed bbcode tags
                     # Upload screens and append to the end of the description
                     url = "https://up.img4k.net/api/description"
-                    screen_glob = [Path(f).name for f in glob.glob(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}") / f"{meta.filename}-*.png")]
+                    screen_glob = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.filename)}-*.png")]
                     files: list[tuple[str, tuple[str, bytes, str]]] = []
                     for screen in screen_glob:
                         screen_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{screen}"

@@ -7,8 +7,12 @@ from src.trackers.AVISTAZ import AZTrackerBase
 from src.trackers.COMMON import COMMON
 
 
-class CZ(AZTrackerBase):
-    tracker = "CZ"
+class CinemaZ(AZTrackerBase):
+    """
+    CZ Private Torrent Tracker
+    """
+
+    tracker = "CinemaZ"
     source_flag = "CinemaZ"
     banned_groups = ("",)
     base_url = "https://cinemaz.to"
@@ -18,7 +22,7 @@ class CZ(AZTrackerBase):
     tracker_urls = ("tracker.cinemaz.to",)
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name="CZ")
+        super().__init__(config, tracker_name="CinemaZ")
         self.config = config
         self.common = COMMON(config)
 
@@ -167,7 +171,7 @@ class CZ(AZTrackerBase):
             "BG",
             "BY",
             "CH",
-            "CZ",
+            "CinemaZ",
             "DE",
             "DK",
             "EE",
@@ -283,7 +287,7 @@ class CZ(AZTrackerBase):
         elif any(code in az_countries for code in origin_countries_codes):
             warnings.append("DO NOT upload Asian content. Upload this to our sister site AvistaZ.to instead.")
 
-        # Case 3: The content is from one of the normally allowed CZ regions
+        # Case 3: The content is from one of the normally allowed CinemaZ regions
         elif any(code in cz_allowed_countries for code in origin_countries_codes):
             # It's from a valid region, so it's ALLOWED on CinemaZ
             pass

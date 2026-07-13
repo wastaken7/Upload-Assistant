@@ -47,7 +47,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         from src.trackersetup import tracker_class_map
 
         tracker_hosts: dict[str, str] = {}
-        for tracker_name in set(tracker_class_map.keys()) | {"PTP", "BHD", "BTN", "HDB"}:
+        for tracker_name in set(tracker_class_map.keys()) | {"PassThePopcorn", "BeyondHD", "BTN", "HDBits"}:
             # Check base_url from class
             hostname = ""
             if tracker_name in tracker_class_map:
@@ -64,16 +64,16 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             # Hardcoded fallbacks if config/class is not loaded yet or not configured
             if not hostname:
                 hardcoded_hosts = {
-                    "PTP": "passthepopcorn.me",
-                    "AITHER": "aither.cc",
+                    "PassThePopcorn": "passthepopcorn.me",
+                    "Aither": "aither.cc",
                     "LST": "lst.gg",
-                    "OE": "onlyencodes.cc",
-                    "BLU": "blutopia.cc",
-                    "ULCX": "upload.cx",
-                    "HDB": "hdbits.org",
+                    "OnlyEncodes": "onlyencodes.cc",
+                    "Blutopia": "blutopia.cc",
+                    "UploadCx": "upload.cx",
+                    "HDBits": "hdbits.org",
                     "BTN": "broadcasthe.net",
-                    "BHD": "beyond-hd.me",
-                    "HUNO": "hawke.uno",
+                    "BeyondHD": "beyond-hd.me",
+                    "HawkeUno": "hawke.uno",
                 }
                 hostname = hardcoded_hosts.get(tracker_name, "")
             if hostname:
@@ -97,11 +97,11 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
             tracker_key = matched_tracker.lower()
 
-            if matched_tracker == "PTP":
+            if matched_tracker == "PassThePopcorn":
                 ptp_id = _query_id(parsed.query, "torrentid")
                 if ptp_id:
                     tracker_ids[tracker_key] = ptp_id
-            elif matched_tracker == "HDB":
+            elif matched_tracker == "HDBits":
                 hdb_id = _query_id(parsed.query, "id")
                 if hdb_id:
                     tracker_ids[tracker_key] = hdb_id
@@ -109,7 +109,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 btn_id = _query_id(parsed.query, "id")
                 if btn_id:
                     tracker_ids[tracker_key] = btn_id
-            elif matched_tracker == "BHD":
+            elif matched_tracker == "BeyondHD":
                 match = re.search(r"/details/(\d+)", path)
                 if match:
                     tracker_ids[tracker_key] = match.group(1)
@@ -258,7 +258,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         # Determine piece size preferences
         trackers_config = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-        mtv_config = trackers_config.get("MTV", {})
+        mtv_config = trackers_config.get("MoreThanTV", {})
         piece_limit = bool(self.config["DEFAULT"].get("prefer_max_16_torrent", False))
         mtv_torrent = False
         if isinstance(mtv_config, dict):
@@ -528,6 +528,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         return best_match
 
     async def is_valid_torrent(self, meta: Meta, torrent_path: str, torrenthash: str, torrent_client: str, client: dict[str, Any]) -> tuple[bool, str]:
+        torrent_path = str(torrent_path)
         valid = False
         wrong_file = False
         filelist = cast(list[str], meta.filelist)

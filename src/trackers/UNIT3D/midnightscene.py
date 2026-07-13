@@ -9,8 +9,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class MS(UNIT3D):
-    tracker = "MS"
+class MidnightScene(UNIT3D):
+    """
+    MidnightScene is a Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
+    tracker = "MidnightScene"
     base_url = "https://midnightscene.cc"
     banned_groups = (
         "4K4U",
@@ -87,7 +91,7 @@ class MS(UNIT3D):
     tracker_urls = ("midnightscene.cc",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="MS")
+        super().__init__(config, tracker_name="MidnightScene")
         self.config: Config = config
         self.common = COMMON(config)
 

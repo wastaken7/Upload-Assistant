@@ -11,8 +11,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class PT(UNIT3D):
-    tracker = "PT"
+class Portugas(UNIT3D):
+    """
+    Portugas is a PORTUGUESE Private Torrent Tracker for 0DAY / GENERAL
+    """
+
+    tracker = "Portugas"
     base_url = "https://portugas.org"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -23,7 +27,7 @@ class PT(UNIT3D):
     tracker_urls = ("https://portugas.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="PT")
+        super().__init__(config, tracker_name="Portugas")
         self.config: Config = config
         self.common = COMMON(config)
 

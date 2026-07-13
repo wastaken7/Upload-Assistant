@@ -13,8 +13,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class LDU(UNIT3D):
-    tracker = "LDU"
+class LastDigitalUnderground(UNIT3D):
+    """
+    Last Digital Underground (LDU) is a Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
+    tracker = "LastDigitalUnderground"
     base_url = "https://theldu.to"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -25,7 +29,7 @@ class LDU(UNIT3D):
     tracker_urls = ("theldu.to",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="LDU")
+        super().__init__(config, tracker_name="LastDigitalUnderground")
         self.config: Config = config
         self.common = COMMON(config)
 

@@ -6,8 +6,12 @@ from src.trackers.AVISTAZ import AZTrackerBase
 from src.trackers.COMMON import COMMON
 
 
-class AZ(AZTrackerBase):
-    tracker = "AZ"
+class AvistaZ(AZTrackerBase):
+    """
+    AZ Private Torrent Tracker
+    """
+
+    tracker = "AvistaZ"
     source_flag = "AvistaZ"
     banned_groups = ("",)
     base_url = "https://avistaz.to"
@@ -17,7 +21,7 @@ class AZ(AZTrackerBase):
     tracker_urls = ("tracker.avistaz.to",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="AZ")
+        super().__init__(config, tracker_name="AvistaZ")
         self.config = config
         self.common = COMMON(config)
 
@@ -178,7 +182,7 @@ class AZ(AZTrackerBase):
             "AE",
             "AF",
             "AM",
-            "AZ",
+            "AvistaZ",
             "BD",
             "BH",
             "BN",

@@ -16,9 +16,13 @@ from src.trackers.COMMON import COMMON
 Config = dict[str, Any]
 
 
-class TL:
+class TorrentLeech:
+    """
+    TorrentLeech (TL) is a Private Torrent Tracker for 0DAY / GENERAL. not here _ not scene
+    """
+
     auth_type = "other_api"
-    tracker = "TL"
+    tracker = "TorrentLeech"
     source_flag = "TorrentLeech.org"
     base_url = "https://www.torrentleech.org"
     banned_groups = ()
@@ -45,7 +49,7 @@ class TL:
         if self.api_upload and not force:
             return True
 
-        cookies_file = str(Path(f"{meta.base_dir}/data/cookies/TL.txt").resolve())
+        cookies_file = str(Path(f"{meta.base_dir}/data/cookies/TorrentLeech.txt").resolve())
 
         cookie_path = str(Path(cookies_file).resolve())
         if not Path(cookie_path).exists():
@@ -224,7 +228,7 @@ class TL:
 
         login = await self.login(meta, force=True)
         if not login:
-            meta.skipping = "TL"
+            meta.skipping = "TorrentLeech"
             logger.debug(f"[bold red]Skipping upload to '{self.tracker}' as login failed.[/bold red]")
             return []
         cat_id = self.get_category(meta)
@@ -358,7 +362,7 @@ class TL:
                 return True
 
         else:
-            logger.info("[cyan]TL Request Data:")
+            logger.info("[cyan]TorrentLeech Request Data:")
             logger.info(Redaction.redact_private_info(data))
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
@@ -405,7 +409,7 @@ class TL:
         data = await self.get_cookie_upload_data(meta)
 
         if meta.debug:
-            logger.debug("[cyan]TL Request Data:")
+            logger.debug("[cyan]TorrentLeech Request Data:")
             logger.debug(Redaction.redact_private_info(data))
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success

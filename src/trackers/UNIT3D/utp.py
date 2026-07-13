@@ -8,8 +8,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class UTP(UNIT3D):
-    tracker = "UTP"
+class Utopia(UNIT3D):
+    """
+    UTOPIA is a UKRAINIAN Private Tracker for HD MOVIES and TV
+    """
+
+    tracker = "Utopia"
     base_url = "https://utp.to"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -19,7 +23,7 @@ class UTP(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="UTP")
+        super().__init__(config, tracker_name="Utopia")
         self.config = config
         self.common = COMMON(config)
 

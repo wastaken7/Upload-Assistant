@@ -1,8 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import glob
 import json
-import os
 import re
 import shutil
 import urllib.parse
@@ -78,11 +76,11 @@ class ManualPackageManager:
                     await generic.write(f"{each['img_url']}\n")
         title = re.sub(r"[^0-9a-zA-Z\[\\]]+", "", meta.title)
         archive = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{title}"
-        torrent_files = [Path(f).name for f in glob.glob(Path(glob.escape(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")) / "*.torrent")]
+        torrent_files = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob("*.torrent")]
         if len(torrent_files) > 1:
             for each in torrent_files:
                 if not each.startswith(("BASE", "[RAND")):
-                    os.remove(str(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{each}").resolve()))
+                    Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{each}").resolve().unlink()
         try:
             if Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BASE.torrent").exists():
                 base_torrent = Torrent.read(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BASE.torrent")

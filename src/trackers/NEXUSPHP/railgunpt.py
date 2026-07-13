@@ -8,7 +8,11 @@ from src.trackers.NEXUSPHP import NEXUSPHP
 Config = dict[str, Any]
 
 
-class RPT(NEXUSPHP):
+class RailgunPT(NEXUSPHP):
+    """
+    RailgunPT is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
     banned_groups = ()
     base_url = "https://bilibili.download"
     source_flag = "[bilibili.download] RailgunPT"
@@ -17,7 +21,7 @@ class RPT(NEXUSPHP):
     tracker_urls = ("https://bilibili.download",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, "RPT")
+        super().__init__(config, "RailgunPT")
 
     def get_category(self, meta: Meta) -> int:
         animations = 405

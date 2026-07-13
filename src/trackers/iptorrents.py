@@ -16,9 +16,13 @@ from src.meta import Meta
 Config = dict[str, Any]
 
 
-class IPT:
+class IPTorrents:
+    """
+    IPT Private Torrent Tracker
+    """
+
     auth_type = "cookies"
-    tracker = "IPT"
+    tracker = "IPTorrents"
     source_flag = "IPTorrents"
     base_url = "https://iptorrents.com"
     banned_groups = (

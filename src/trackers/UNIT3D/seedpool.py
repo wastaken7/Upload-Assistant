@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import re
+from pathlib import Path
 from typing import Any, cast
 
 import cli_ui
@@ -13,8 +13,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class SP(UNIT3D):
-    tracker = "SP"
+class Seedpool(UNIT3D):
+    """
+    seedpool is a Private Torrent Tracker for 0-DAY MOVIES / TV / GENERAL
+    """
+
+    tracker = "Seedpool"
     base_url = "https://seedpool.org"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -25,7 +29,7 @@ class SP(UNIT3D):
     tracker_urls = ("https://seedpool.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="SP")
+        super().__init__(config, tracker_name="Seedpool")
         self.config: Config = config
         self.common = COMMON(config)
 
@@ -96,7 +100,8 @@ class SP(UNIT3D):
             base_name = meta.name.replace(" ", ".")
             uuid_name = meta.basename_no_ext.replace(" ", ".")
             name = base_name if meta.mal_id or 0 != 0 else uuid_name
-        base, ext = os.path.splitext(name)
+        p = Path(name)
+        base, ext = p.stem, p.suffix
         if ext.lower() in known_extensions:
             name = base.replace(" ", ".")
 

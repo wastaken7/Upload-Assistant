@@ -13,8 +13,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class A4K(UNIT3D):
-    tracker = "A4K"
+class Aura4K(UNIT3D):
+    """
+    AURA4K is a Private Torrent Tracker for MOVIES / TV
+    """
+
+    tracker = "Aura4K"
     base_url = "https://aura4k.net"
     approved_image_hosts = ("ptpimg", "onlyimage", "imgbox", "ptscreens", "imgbb", "imgur", "postimg")
     banned_groups = ("BiTOR", "DepraveD", "Flights", "SasukeducK", "SPDVD", "TEKNO3D")
@@ -25,7 +29,7 @@ class A4K(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="A4K")
+        super().__init__(config, tracker_name="Aura4K")
         self.config = config
         self.common = COMMON(config)
         self.rehost_images_manager = RehostImagesManager(config)
@@ -72,7 +76,7 @@ class A4K(UNIT3D):
         ):
             return False
 
-        # check bitrate requirements for A4K uploads, but only if it's not a disc upload since discs can have variable bitrates and A4K doesn't specify bitrate requirements for disc uploads
+        # check bitrate requirements for Aura4K uploads, but only if it's not a disc upload since discs can have variable bitrates and Aura4K doesn't specify bitrate requirements for disc uploads
         if not meta.is_disc and meta.type in ["ENCODE", "WEBDL"]:
             tracks = meta.mediainfo.get("media", {}).get("track", [])
             for track in tracks:
@@ -91,11 +95,11 @@ class A4K(UNIT3D):
                                 bit_rate_kbps = bit_rate_num / 1000
                                 if meta.category == "MOVIE" and bit_rate_kbps < 15000:
                                     if not meta.unattended:
-                                        logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K movie uploads.")
+                                        logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for Aura4K movie uploads.")
                                     return False
                                 if meta.category == "TV" and bit_rate_kbps < 10000:
                                     if not meta.unattended:
-                                        logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for A4K TV uploads.")
+                                        logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for Aura4K TV uploads.")
                                     return False
                             else:
                                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):

@@ -10,8 +10,12 @@ from src.tmdb import TmdbManager
 from src.trackers.UNIT3D import UNIT3D
 
 
-class DP(UNIT3D):
-    tracker = "DP"
+class DarkPeers(UNIT3D):
+    """
+    Darkpeers is a Private Torrent Tracker for MOVIES / TV / GENERAL
+    """
+
+    tracker = "DarkPeers"
     base_url = "https://darkpeers.org"
     banned_groups = (
         "ARCADE",
@@ -86,7 +90,7 @@ class DP(UNIT3D):
     tracker_urls = ("https://darkpeers.org",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="DP")
+        super().__init__(config, tracker_name="DarkPeers")
         self.config = config
         self.tmdb_manager = TmdbManager(config)
 

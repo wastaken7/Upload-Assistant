@@ -210,7 +210,7 @@ class BBCODE:
         return description, imagelist
 
     def clean_ptp_description(self, desc: str, is_disc: str) -> tuple[str, list[dict[str, Any]]]:
-        # console.print("[yellow]Cleaning PTP description...")
+        # console.print("[yellow]Cleaning PassThePopcorn description...")
 
         # Convert Bullet Points to -
         desc = desc.replace("&bull;", "-")
@@ -219,7 +219,7 @@ class BBCODE:
         desc = html.unescape(desc)
         desc = desc.replace("\r\n", "\n")
 
-        # Remove url tags with PTP/HDB links
+        # Remove url tags with PassThePopcorn/HDBits links
         url_tags: list[str] = re.findall(
             r"(?:\[url(?:=|\])[^\]]*https?:\/\/passthepopcorn\.m[^\]]*\]|\bhttps?:\/\/passthepopcorn\.m[^\s]+)",
             desc,
@@ -240,9 +240,9 @@ class BBCODE:
                 url_tag_removed = url_tag_removed.replace("[/url]", "")
                 desc = desc.replace(url_tag, url_tag_removed)
 
-        # Remove links to PTP/HDB
-        desc = desc.replace("http://passthepopcorn.me", "PTP").replace("https://passthepopcorn.me", "PTP")
-        desc = desc.replace("http://hdbits.org", "HDB").replace("https://hdbits.org", "HDB")
+        # Remove links to PassThePopcorn/HDBits
+        desc = desc.replace("http://passthepopcorn.me", "PassThePopcorn").replace("https://passthepopcorn.me", "PassThePopcorn")
+        desc = desc.replace("http://hdbits.org", "HDBits").replace("https://hdbits.org", "HDBits")
 
         # Catch Stray Images and Prepare Image List
         imagelist: list[dict[str, Any]] = []
