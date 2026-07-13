@@ -23,7 +23,7 @@ from torf import Torrent
 
 from src.bbcode import BBCODE
 from src.console import console, logger
-from src.exportmi import exportInfo
+from src.exportmi import export_info
 from src.languages import languages_manager
 from src.meta import Meta
 from src.usenetcreate import verify_nzb_has_password
@@ -2669,7 +2669,7 @@ class COMMON:
             logger.info(f"[yellow]Invalid Response from {tracker} API. Error: {e!s}[/yellow]")
             return None, None, None, None, None, None, None, [], None
 
-    async def parseCookieFile(self, cookiefile: str) -> dict[str, str]:
+    async def parse_cookie_file(self, cookiefile: str) -> dict[str, str]:
         """Parse a cookies.txt file and return a dictionary of key value pairs
         compatible with requests."""
 
@@ -3039,15 +3039,15 @@ class COMMON:
 
         if meta.is_disc == "BDMV":
             # 1. Generate/Load initial MediaInfo (Playlist) if not exists
-            if not os.path.isfile(mi_path):
+            if not Path(mi_path).is_file():
                 logger.debug("[blue]Generating MediaInfo for BDMV...[/blue]")
 
                 path = meta.discs[0]["playlists"][0]["path"]
-                await exportInfo(path, False, meta.uuid, meta.base_dir, is_dvd=False)
+                await export_info(path, False, meta.uuid, meta.base_dir, is_dvd=False)
 
             # Helper to read and filter lines from the export file
             async def read_and_clean() -> str:
-                if not os.path.isfile(mi_path):
+                if not Path(mi_path).is_file():
                     return ""
 
                 async with aiofiles.open(mi_path, encoding="utf-8") as f:
@@ -3073,7 +3073,7 @@ class COMMON:
                     if largest_m2ts:
                         logger.debug(f"[blue]Selected largest M2TS from meta: {Path(largest_m2ts).name}[/blue]")
 
-                        await exportInfo(largest_m2ts, False, meta.uuid, meta.base_dir, is_dvd=False)
+                        await export_info(largest_m2ts, False, meta.uuid, meta.base_dir, is_dvd=False)
 
                         mediainfo = await read_and_clean()
 

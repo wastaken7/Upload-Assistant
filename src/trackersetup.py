@@ -25,7 +25,7 @@ from src.trackers.beyondhd import BeyondHD
 from src.trackers.bithdtv import BitHDTV
 from src.trackers.bjshare import BJShare
 from src.trackers.brasiltracker import BrasilTracker
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 from src.trackers.digitalcore import DigitalCore
 from src.trackers.filelist import FileList
 from src.trackers.funfile import FunFile
@@ -102,7 +102,7 @@ JsonDict = dict[str, Any]
 example_config: dict[str, Any]
 
 
-class TRACKER_SETUP:
+class TrackerSetup:
     def __init__(self, config: dict[str, Any]):
         self.config: dict[str, Any] = config
 

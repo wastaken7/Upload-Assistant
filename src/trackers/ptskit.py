@@ -10,7 +10,7 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 Config = dict[str, Any]
 

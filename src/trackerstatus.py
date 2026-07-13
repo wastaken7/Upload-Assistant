@@ -18,7 +18,7 @@ from src.meta import Meta
 from src.metadata_searching import get_douban_id
 from src.torrentcreate import TorrentCreator
 from src.trackers.passthepopcorn import PassThePopcorn
-from src.trackersetup import TRACKER_SETUP, tracker_class_map
+from src.trackersetup import TrackerSetup, tracker_class_map
 from src.uphelper import UploadHelper
 
 
@@ -31,7 +31,7 @@ class TrackerStatusManager:
         tracker_status: dict[str, dict[str, bool]] = {}
         successful_trackers = 0
         client: Any = Clients(config=self.config)
-        tracker_setup: Any = TRACKER_SETUP(config=self.config)
+        tracker_setup: Any = TrackerSetup(config=self.config)
         tracker_setup.filter_unsupported_trackers(meta)
         helper: Any = UploadHelper(self.config)
         dupe_checker = DupeChecker(self.config)
@@ -194,7 +194,7 @@ class TrackerStatusManager:
                             try:
                                 group_id = await ptp.get_group_by_imdb(local_meta["imdb"])
                                 async with meta_lock:
-                                    meta.ptp_groupID = group_id
+                                    meta.ptp_groupid = group_id
                                 dupes = cast(list[Any], await ptp.search_existing(group_id or "", cast(dict[str, Any], local_meta)))
                             except Exception as e:
                                 logger.info(f"[bold red]Error searching for duplicates on {tracker_name}: {e}[/bold red]")

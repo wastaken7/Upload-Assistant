@@ -16,7 +16,7 @@ from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa E403
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 Config = dict[str, Any]
 
@@ -46,7 +46,7 @@ class PTerClub:
     def _extract_auth_token(self, text: str, pattern: str) -> str:
         match = re.search(pattern, text)
         if match is None:
-            raise LoginException("Unable to locate auth token for Pterimg.")  # noqa: F405
+            raise LoginError("Unable to locate auth token for Pterimg.")  # noqa: F405
         return match.group(1)
 
     async def validate_credentials(self, meta: Meta) -> bool:
@@ -63,7 +63,7 @@ class PTerClub:
 
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if Path(cookiefile).exists():
-            cookies = await common.parseCookieFile(cookiefile)
+            cookies = await common.parse_cookie_file(cookiefile)
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
                 resp = await client.get(url=url)
 
@@ -81,7 +81,7 @@ class PTerClub:
         if not Path(cookiefile).exists():
             logger.info("[bold red]Missing Cookie File. (data/cookies/PTerClub.txt)")
             return False
-        cookies = await common.parseCookieFile(cookiefile)
+        cookies = await common.parse_cookie_file(cookiefile)
         imdb_id = meta.imdb_id or 0
         imdb = f"tt{meta.imdb}" if imdb_id != 0 else ""
         source = await self.get_type_medium_id(meta)
@@ -189,7 +189,7 @@ class PTerClub:
             base = await base_file.read()
 
         from src.bbcode import BBCODE
-        from src.trackers.COMMON import COMMON
+        from src.trackers.common import COMMON
 
         common = COMMON(config=self.config)
 
@@ -277,7 +277,7 @@ class PTerClub:
             data["auth_token"] = self._extract_auth_token(response.text, r'auth_token.*?"(\w+)"')
             loginresponse = await client.post(url="https://s3.pterclub.com/login", data=data)
             if not loginresponse.is_success:
-                raise LoginException("Failed to login to Pterimg. ")  # noqa #F405
+                raise LoginError("Failed to login to Pterimg. ")  # noqa #F405
             auth_token = self._extract_auth_token(loginresponse.text, r'auth_token = *?"(\w+)"')
             self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # pyright: ignore[reportPrivateUsage]
 
@@ -443,7 +443,7 @@ class PTerClub:
 
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if Path(cookiefile).exists():
-            cookies = await common.parseCookieFile(cookiefile)
+            cookies = await common.parse_cookie_file(cookiefile)
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
                 up = await client.post(url=url, data=data, files=files)
 
@@ -451,7 +451,7 @@ class PTerClub:
                     logger.info(f"[green]Uploaded to: [yellow]{str(up.url).replace('&uploaded=1', '')}[/yellow][/green]")
                     id_match = re.search(r"(id=)(\d+)", urlparse(str(up.url)).query)
                     if id_match is None:
-                        raise UploadException("Upload succeeded but torrent id was not present in the redirect URL.", "red")  # noqa: F405
+                        raise UploadError("Upload succeeded but torrent id was not present in the redirect URL.", "red")  # noqa: F405
                     torrent_id = id_match.group(2)
                     await self.download_new_torrent(torrent_id, torrent_path)
                     meta.tracker_status[self.tracker]["status_message"] = str(up.url).replace("&uploaded=1", "")
@@ -459,7 +459,7 @@ class PTerClub:
                     return True
                 logger.info(data)
                 logger.info("\n\n")
-                raise UploadException(f"Upload to Pter Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa #F405
+                raise UploadError(f"Upload to Pter Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa #F405
         return False
 
     async def download_new_torrent(self, id: str, torrent_path: str) -> None:

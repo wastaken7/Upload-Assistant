@@ -443,7 +443,7 @@ async def gather_game_prep(
                 search_dir = path_to_check if Path(path_to_check).is_dir() else str(Path(path_to_check).parent)
                 if Path(search_dir).is_dir():
                     with contextlib.suppress(Exception):
-                        for f in os.listdir(search_dir):
+                        for f in (p.name for p in Path(search_dir).iterdir()):
                             if f.lower().endswith(".nfo"):
                                 abs_f = str(Path(Path(search_dir) / f).resolve())
                                 if abs_f not in nfo_files:
@@ -537,7 +537,7 @@ async def gather_game_prep(
             search_dir = path_to_check if Path(path_to_check).is_dir() else str(Path(path_to_check).parent)
             if Path(search_dir).is_dir():
                 with contextlib.suppress(Exception):
-                    for f in os.listdir(search_dir):
+                    for f in (p.name for p in Path(search_dir).iterdir()):
                         if f.lower().endswith(".nfo"):
                             abs_f = str(Path(Path(search_dir) / f).resolve())
                             if abs_f not in nfo_files:

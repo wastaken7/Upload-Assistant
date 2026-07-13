@@ -1,6 +1,6 @@
-import os
 import re
 import unicodedata
+from pathlib import Path
 from typing import Any
 
 import aiofiles
@@ -8,7 +8,7 @@ import aiofiles
 from src.book_prep import extract_first_author as _primary_name
 from src.console import logger
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 from src.trackers.UNIT3D import UNIT3D, ParamsList
 
 Config = dict[str, Any]
@@ -45,9 +45,9 @@ class Zenith(UNIT3D):
     torrent_url = f"{base_url}/torrents/"
     banned_url = f"{base_url}/api/bannedReleaseGroups"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ["https://znth.cx"]
+    tracker_urls = ("https://znth.cx",)
 
-    _banned_authors_raw = [
+    _banned_authors_raw = (
         "J.R.R. Tolkien",
         "Anne Perry",
         "Simon Scarrow",
@@ -62,7 +62,7 @@ class Zenith(UNIT3D):
         "Randolph Lalonde",
         "Andrea Sfiligoi",
         "Ana-Maria Babanica",
-    ]
+    )
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="Zenith")
@@ -387,7 +387,7 @@ class Zenith(UNIT3D):
     async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
         files = await super().get_additional_files(meta)
         # audiobook: send the original uncropped cover, real format sniffed; base cover if >5MB
-        if meta.audiobook and meta.cover_path and os.path.exists(meta.cover_path) and os.path.getsize(meta.cover_path) <= 5 * 1024 * 1024:
+        if meta.audiobook and meta.cover_path and Path(meta.cover_path).exists() and Path(meta.cover_path).stat().st_size <= 5 * 1024 * 1024:
             async with aiofiles.open(meta.cover_path, "rb") as f:
                 raw = await f.read()
             if raw[:3] == b"\xff\xd8\xff":

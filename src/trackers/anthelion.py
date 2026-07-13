@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
-import os
 import platform
 from pathlib import Path
 from typing import Any
@@ -15,7 +14,7 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.torrentcreate import TorrentCreator
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 Config = dict[str, Any]
 
@@ -245,7 +244,7 @@ class Anthelion:
     async def upload(self, meta: Meta) -> bool:
         torrent_filename = "BASE"
         torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BASE.torrent"
-        torrent_file_size_kib = os.path.getsize(torrent_path) / 1024
+        torrent_file_size_kib = Path(torrent_path).stat().st_size / 1024
         tracker_url: str = ""
         if meta.mkbrr:
             tracker_url = self.tracker_config.get("announce_url", "https://fake.tracker").strip()

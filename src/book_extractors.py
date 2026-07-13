@@ -27,7 +27,7 @@ def normalize_series_index(value: str) -> str:
 def extract_epub_metadata(epub_path: str) -> dict[str, Any]:
     """Extract metadata from an EPUB zip container's OPF file."""
     metadata: dict[str, Any] = {}
-    if not os.path.isfile(epub_path) or not zipfile.is_zipfile(epub_path):
+    if not Path(epub_path).is_file() or not zipfile.is_zipfile(epub_path):
         return metadata
 
     try:
@@ -131,7 +131,7 @@ def extract_epub_metadata(epub_path: str) -> dict[str, Any]:
 def extract_series_from_filename(filename: str) -> tuple[str, str]:
     """Parse (series, index) from a filename like "Author - Series #5 - Title", or ("", "")."""
     name = Path(filename).stem
-    match = re.search(r"[-–]\s*([^-–#\[\]]+?)\s*#\s*(\d+(?:\.\d+)?)", name)
+    match = re.search(r"[-–]\s*([^-–#\[\]]+?)\s*#\s*(\d+(?:\.\d+)?)", name)  # noqa: RUF001
     if not match:
         return "", ""
     return match.group(1).strip(), normalize_series_index(match.group(2))
@@ -140,7 +140,7 @@ def extract_series_from_filename(filename: str) -> tuple[str, str]:
 def extract_cbr_cbz_metadata(filepath: str) -> dict[str, Any]:
     """Extract metadata from a CBR (RAR) or CBZ (ZIP) container's ComicInfo.xml file."""
     metadata: dict[str, Any] = {}
-    if not os.path.isfile(filepath):
+    if not Path(filepath).is_file():
         return metadata
 
     ext = Path(filepath).suffix.lower()
@@ -157,14 +157,15 @@ def extract_cbr_cbz_metadata(filepath: str) -> dict[str, Any]:
             logger.debug(f"[yellow]Debug: Error reading CBZ zip archive: {e}[/yellow]")
     elif ext == ".cbr":
         try:
-            from rarfile import RarFile as rar_file_cls
+            import rarfile
+            has_rarfile = True
         except ImportError:
             logger.debug("[yellow]Debug: rarfile library not available for CBR metadata extraction.[/yellow]")
-            rar_file_cls = None
+            has_rarfile = False
 
-        if rar_file_cls:
+        if has_rarfile:
             try:
-                with rar_file_cls(filepath, "r") as r:
+                with rarfile.RarFile(filepath, "r") as r:
                     xml_name = next((name for name in r.namelist() if name.lower().endswith("comicinfo.xml")), None)
                     if xml_name:
                         xml_data = r.read(xml_name)
@@ -244,7 +245,7 @@ def extract_cbr_cbz_metadata(filepath: str) -> dict[str, Any]:
 def extract_mobi_metadata(mobi_path: str) -> dict[str, Any]:
     """Extract metadata from a MOBI file using the mobi library and parsing the extracted OPF."""
     metadata: dict[str, Any] = {}
-    if not os.path.isfile(mobi_path):
+    if not Path(mobi_path).is_file():
         return metadata
 
     try:
@@ -267,7 +268,7 @@ def extract_mobi_metadata(mobi_path: str) -> dict[str, Any]:
             if opf_path:
                 break
 
-        if opf_path and os.path.isfile(opf_path):
+        if opf_path and Path(opf_path).is_file():
             with Path(opf_path).open("rb") as f:
                 opf_data = f.read()
 
@@ -371,7 +372,7 @@ def extract_isbn_from_pdf(pdf_path: str) -> str | None:
         logger.debug("[yellow]Debug: PyMuPDF (fitz) is not installed. Skipping PDF ISBN extraction.[/yellow]")
         return None
 
-    if not os.path.isfile(pdf_path):
+    if not Path(pdf_path).is_file():
         return None
 
     try:
@@ -451,8 +452,8 @@ def get_attr_ignore_ns(elem: ET.Element, attr_name: str) -> str | None:
 
 
 def get_epubmeta_output(epub_path: str) -> str | None:
-    """Extract and format EPUB metadata to match the output of epubmeta."""
-    if not os.path.isfile(epub_path) or not zipfile.is_zipfile(epub_path):
+    """Extract format EPUB metadata to match the output of epubmeta."""
+    if not Path(epub_path).is_file() or not zipfile.is_zipfile(epub_path):
         return None
 
     try:
@@ -466,8 +467,8 @@ def get_epubmeta_output(epub_path: str) -> str | None:
                         rootfile_path = elem.attrib.get("full-path")
                         if rootfile_path:
                             break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"[yellow]Warning: Error parsing EPUB metadata: {e}[/yellow]")
 
             if not rootfile_path:
                 for name in z.namelist():

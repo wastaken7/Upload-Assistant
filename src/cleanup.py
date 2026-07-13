@@ -208,14 +208,14 @@ class CleanupManager:
 
             if hasattr(sys.stdin, "isatty") and sys.stdin.isatty() and not sys.stdin.closed:
                 try:
-                    subprocess.run(["stty", "sane"], check=False)
+                    subprocess.run(["stty", "sane"], check=False)  # noqa: S607
                     if erase_key is not None:
-                        subprocess.run(["stty", "erase", erase_key], check=False)  # explicitly restore backspace character to original value
+                        subprocess.run(["stty", "erase", erase_key], check=False)  # noqa: S603, S607
                     if termios is not None and hasattr(termios, "tcflush"):
                         tciflush = getattr(termios, "TCIOFLUSH", None)
                         if tciflush is not None:
                             termios.tcflush(sys.stdin.fileno(), tciflush)
-                    subprocess.run(["stty", "-ixon"], check=False)
+                    subprocess.run(["stty", "-ixon"], check=False)  # noqa: S607
                 except OSError:
                     pass
 
@@ -231,9 +231,9 @@ class CleanupManager:
             # Kill background jobs
             with contextlib.suppress(Exception):
                 if IS_MACOS:
-                    subprocess.run(["sh", "-c", "jobs -p | xargs kill 2>/dev/null"], check=False)
+                    subprocess.run(["sh", "-c", "jobs -p | xargs kill 2>/dev/null"], check=False)  # noqa: S607
                 else:
-                    subprocess.run(["sh", "-c", "jobs -p | xargs -r kill 2>/dev/null"], check=False)
+                    subprocess.run(["sh", "-c", "jobs -p | xargs -r kill 2>/dev/null"], check=False)  # noqa: S607
 
             if not sys.stderr.closed:
                 sys.stderr.flush()
@@ -248,7 +248,7 @@ class CleanupManager:
 # Wrapped "erase key check and save" in tty check so that Python won't complain if UA is called by a script
 if hasattr(sys.stdin, "isatty") and sys.stdin.isatty() and not sys.stdin.closed:
     try:
-        output = subprocess.check_output(["stty", "-a"]).decode()
+        output = subprocess.check_output(["stty", "-a"]).decode()  # noqa: S607
         match = re.search(r" erase = (\S+);", output)
         if match:
             erase_key = match.group(1)

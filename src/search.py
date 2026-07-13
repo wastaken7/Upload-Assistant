@@ -23,7 +23,7 @@ class Search:
             return [str(entry) for entry in config_list]
         return []
 
-    async def searchFile(self, filename: str) -> list[str] | None:
+    async def search_file(self, filename: str) -> list[str] | None:
         filename = filename.lower()
         files_total: list[str] = []
         if filename == "":
@@ -47,7 +47,7 @@ class Search:
             files_total.extend(files)
         return files_total
 
-    async def searchFolder(self, foldername: str) -> list[str] | None:
+    async def search_folder(self, foldername: str) -> list[str] | None:
         foldername = foldername.lower()
         folders_total: list[str] = []
         if foldername == "":

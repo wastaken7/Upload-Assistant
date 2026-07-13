@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import re
 from pathlib import Path
 from typing import Any, cast
@@ -13,7 +12,7 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.tmdb import TmdbManager
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 Config = dict[str, Any]
 
@@ -104,7 +103,7 @@ class MTeam:
 
         if meta.is_disc == "BDMV":
             disc_folder = Path(meta.base_dir) / "tmp" / meta.uuid
-            for filename in os.listdir(disc_folder):
+            for filename in (p.name for p in Path(disc_folder).iterdir()):
                 if filename.endswith("_FULL.txt"):
                     mi_path = Path(disc_folder) / filename
         else:

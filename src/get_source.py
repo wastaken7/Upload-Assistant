@@ -9,7 +9,7 @@ from typing import Any, cast
 import guessit
 
 from src.console import logger
-from src.exceptions import WeirdSystem
+from src.exceptions import WeirdSystemError
 from src.meta import Meta
 
 guessit_module: Any = cast(Any, guessit)
@@ -53,7 +53,7 @@ async def get_source(type: str, video: str, path: str, is_disc: str, meta: Meta,
                     if track["@type"] == "Video":
                         system = str(track.get("Standard", ""))
                 if system not in ("PAL", "NTSC"):
-                    raise WeirdSystem
+                    raise WeirdSystemError
             except Exception:
                 try:
                     other = cast(list[str], guessit_fn(video).get("other", []))

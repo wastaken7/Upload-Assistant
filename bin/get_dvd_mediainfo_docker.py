@@ -6,7 +6,6 @@ This script downloads specialized MediaInfo CLI and library binaries that
 support DVD IFO/VOB file parsing with language information.
 """
 
-import os
 import platform
 import shutil
 import stat
@@ -139,7 +138,7 @@ def extract_linux_binaries(cli_archive: Path, lib_archive: Path, output_dir: Pat
                 # Move to final location
                 shutil.move(str(extracted_path), str(lib_file))
                 # Set appropriate permissions for library file (readable by all)
-                os.chmod(lib_file, 0o644)
+                Path(lib_file).chmod(0o644)
                 logger.info(f"Extracted library: {lib_file}", extra={"markup": False})
                 break
         else:
@@ -216,7 +215,7 @@ def download_dvd_mediainfo_docker():
         # Make CLI binary executable and verify permissions
         if cli_file.exists():
             # Set secure executable permissions (owner only)
-            os.chmod(cli_file, 0o700)
+            Path(cli_file).chmod(0o700)
             # Verify permissions were set correctly
             file_stat = cli_file.stat()
             is_executable = bool(file_stat.st_mode & 0o100)  # Check if owner execute bit is set

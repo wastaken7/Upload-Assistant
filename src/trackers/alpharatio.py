@@ -17,7 +17,7 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 
 class AlphaRatio:

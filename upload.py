@@ -54,9 +54,9 @@ from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
 from src.trackers.alpharatio import AlphaRatio
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 from src.trackers.passthepopcorn import PassThePopcorn
-from src.trackersetup import TRACKER_SETUP, api_trackers, http_trackers, normalize_tracker_name, other_api_trackers, tracker_class_map
+from src.trackersetup import TrackerSetup, api_trackers, http_trackers, normalize_tracker_name, other_api_trackers, tracker_class_map
 from src.trackerstatus import TrackerStatusManager
 from src.uphelper import UploadHelper
 from src.uploadscreens import UploadScreensManager
@@ -461,7 +461,7 @@ async def validate_tracker_logins(meta: Meta, trackers: list[str] | None = None)
                 if tracker_name == "RetroFlix":
                     login = await tracker_class.api_test(meta)
                 elif tracker_name == "PassThePopcorn":
-                    login = await tracker_class.get_AntiCsrfToken(meta)
+                    login = await tracker_class.get_anti_csrf_token(meta)
                 else:
                     login = await tracker_class.validate_credentials(meta)
 
@@ -1386,7 +1386,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                             parsed_url = urllib.parse.urlparse(poster_url)
                             if parsed_url.scheme in ("http", "https"):
                                 Path(poster_jpg_path).parent.mkdir(parents=True, exist_ok=True)
-                                urllib.request.urlretrieve(poster_url, poster_jpg_path)
+                                urllib.request.urlretrieve(poster_url, poster_jpg_path)  # noqa: S310
                                 cover_path = poster_jpg_path
                                 meta.cover_path = cover_path
                         except Exception as e:
@@ -1525,9 +1525,9 @@ async def cleanup_screenshot_temp_files(meta: Meta) -> None:
     tmp_dir = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}"
     if Path(tmp_dir).exists():
         try:
-            for file in os.listdir(tmp_dir):
+            for file in (p.name for p in Path(tmp_dir).iterdir()):
                 file_path = Path(tmp_dir) / file
-                if os.path.isfile(file_path) and file.endswith((".png", ".jpg")):
+                if file_path.is_file() and file.endswith((".png", ".jpg")):
                     file_path.unlink()
                     logger.debug(f"[yellow]Removed temporary screenshot file: {file_path}[/yellow]")
         except Exception as e:
@@ -1628,11 +1628,11 @@ async def update_notification(base_dir: str) -> str:
     if version.parse(remote_version) > version.parse(local_version):
         logger.info(f"[red][NOTICE] [green]Update available: [/green][yellow]{remote_version}")
         logger.info(f"[red][NOTICE] [green]Current version: [/green][yellow]{local_version}")
-        asyncio.create_task(asyncio.sleep(1))
+        await asyncio.sleep(1)
         if verbose and remote_content:
             changelog = extract_changelog(remote_content, remote_version)
             if changelog:
-                asyncio.create_task(asyncio.sleep(1))
+                await asyncio.sleep(1)
                 logger.info(f"{changelog}")
             else:
                 logger.info("[yellow]Changelog not found between versions.[/yellow]")
@@ -1672,7 +1672,7 @@ async def do_the_thing(base_dir: str) -> None:
     else:
         # Ensure existing directory has secure permissions
         if os.name != "nt":
-            os.chmod(tmp_dir, 0o700)
+            Path(tmp_dir).chmod(0o700)
 
     def ensure_secure_tmp_subdir(subdir_path: str) -> None:
         """Ensure tmp subdirectories are created with secure permissions (0o700)"""
@@ -1683,7 +1683,7 @@ async def do_the_thing(base_dir: str) -> None:
                 Path(subdir_path).mkdir(parents=True, exist_ok=True)
         else:
             if os.name != "nt":
-                os.chmod(subdir_path, 0o700)
+                Path(subdir_path).chmod(0o700)
 
     bot: Any = None
     connect_task: asyncio.Task[None] | None = None
@@ -1768,7 +1768,7 @@ async def do_the_thing(base_dir: str) -> None:
                 _webui_server = create_server(app, host=host, port=port)
 
                 # Build clickable URL (use localhost for 0.0.0.0 display)
-                display_host = "localhost" if host == "0.0.0.0" else host  # nosec B104
+                display_host = "localhost" if host == "0.0.0.0" else host  # noqa: S104
                 url = f"http://{display_host}:{port}"
 
                 logger.info("")
@@ -2024,7 +2024,7 @@ async def do_the_thing(base_dir: str) -> None:
                 cleanup_manager.reset_terminal()
                 continue
 
-            tracker_setup = TRACKER_SETUP(config=config)
+            tracker_setup = TrackerSetup(config=config)
             if "we_are_uploading" not in meta or not meta.we_are_uploading:
                 if config["DEFAULT"].get("cross_seeding", True):
                     await process_cross_seeds(meta)
@@ -2430,10 +2430,10 @@ async def process_cross_seeds(meta: Meta) -> None:
                         if not should_continue:
                             meta.skipping = tracker
                             return
-                    group_id = meta.ptp_groupID
+                    group_id = meta.ptp_groupid
                     if not group_id and meta.imdb:
                         group_id = await ptp.get_group_by_imdb(meta.imdb)
-                        meta.ptp_groupID = group_id
+                        meta.ptp_groupid = group_id
                     if group_id is None:
                         return
                     dupes = await ptp.search_existing(group_id, meta)

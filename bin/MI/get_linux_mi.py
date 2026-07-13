@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import platform
 import shutil
 import zipfile
@@ -140,7 +139,7 @@ def download_dvd_mediainfo(base_dir: str) -> str | None:
 
         # Make CLI binary executable
         if cli_file.exists():
-            os.chmod(cli_file, 0o700)  # rwx------ (owner only)
+            Path(cli_file).chmod(0o700)  # rwx------ (owner only)
 
     if not cli_file.exists():
         raise Exception(f"Failed to extract CLI binary to {cli_file}")

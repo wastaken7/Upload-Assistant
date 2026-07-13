@@ -261,7 +261,7 @@ async def disc_screenshots(
         if capture_results and len(capture_results) > num_screens:
             try:
                 smallest: str = min(capture_results, key=os.path.getsize)
-                logger.debug(f"[yellow]Removing smallest image: {smallest} ({os.path.getsize(smallest)} bytes)")
+                logger.debug(f"[yellow]Removing smallest image: {smallest} ({Path(smallest).stat().st_size} bytes)")
                 Path(smallest).unlink()
                 capture_results.remove(smallest)
             except Exception as e:
@@ -278,7 +278,7 @@ async def disc_screenshots(
                 continue
 
             retake = False
-            image_size = os.path.getsize(image_path)
+            image_size = Path(image_path).stat().st_size
             logger.debug(f"[yellow]Checking image {image_path} (size: {image_size} bytes) for image host: {img_host}[/yellow]")
             if image_size <= 75000:
                 logger.info(f"[yellow]Image {image_path} is incredibly small, retaking.")
@@ -311,9 +311,9 @@ async def disc_screenshots(
                         if Path(image_path).exists():
                             Path(image_path).unlink()
 
-                        random_time = random.uniform(0, length)  # nosec B311 - Random screenshot timing, not cryptographic
+                        random_time = random.uniform(0, length)  # nosec B311 - Random screenshot timing, not cryptographic  # noqa: S311
                         screenshot_response = await capture_disc_task(index, file_path, str(random_time), image_path, keyframe, loglevel, hdr_tonemap, meta)
-                        new_size = os.path.getsize(image_path)
+                        new_size = Path(image_path).stat().st_size
                         valid_image = False
 
                         if img_host and "imgbb" in img_host:
@@ -611,7 +611,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
         for screens in normal_screens:
             screen_path = Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/") / screens
             try:
-                screen_size = os.path.getsize(screen_path)
+                screen_size = Path(screen_path).stat().st_size
                 if screen_size < smallest_size:
                     smallest_size = screen_size
                     smallest = screen_path
@@ -633,7 +633,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
             continue
 
         retake = False
-        image_size = os.path.getsize(image)
+        image_size = Path(image).stat().st_size
         if image_size <= 120000:
             logger.info(f"[yellow]Image {image} is incredibly small, retaking.")
             retake = True
@@ -645,7 +645,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
 
                 index = int(image.rsplit("-", 1)[-1].split(".")[0])
                 input_file = f"{meta.discs[disc_num]['path']}/VTS_{main_set[index % len(main_set)]}"
-                adjusted_time = random.uniform(0, voblength)  # nosec B311 - Random screenshot timing, not cryptographic
+                adjusted_time = random.uniform(0, voblength)  # nosec B311 - Random screenshot timing, not cryptographic  # noqa: S311
 
                 if Path(image).exists():  # Prevent unnecessary deletion error
                     try:
@@ -663,7 +663,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
                         logger.error(f"[red]Failed to capture screenshot for {image}. Retrying...[/red]")
                         continue
 
-                    retaken_size = os.path.getsize(screenshot_result)
+                    retaken_size = Path(screenshot_result).stat().st_size
                     if retaken_size > 75000:
                         logger.info(f"[green]Successfully retaken screenshot for: {screenshot_result} ({retaken_size} bytes)[/green]")
                         valid_results.append(screenshot_result)
@@ -798,7 +798,7 @@ async def load_local_cover_if_exists(path: str, dest_path: str) -> bool:
         search_dir = path if Path(path).is_dir() else str(Path(path).parent)
         valid_names = {"cover.png", "cover.jpg", "cover.jpeg", "folder.png", "folder.jpg", "folder.jpeg", "poster.png", "poster.jpg", "poster.jpeg"}
         if Path(search_dir).exists():
-            for f in os.listdir(search_dir):
+            for f in (p.name for p in Path(search_dir).iterdir()):
                 if f.lower() in valid_names:
                     local_file = Path(search_dir) / f
                     shutil.copy2(local_file, dest_path)
@@ -819,7 +819,7 @@ async def extract_embedded_cover_from_audiobook(meta: Meta, dest_path: str, conf
         filelist = meta.filelist
         if not filelist:
             p = meta.path
-            if p and os.path.isfile(p):
+            if p and Path(p).is_file():
                 filelist = [p]
             else:
                 return False
@@ -902,7 +902,7 @@ async def download_poster_from_meta(meta: Meta, cover_path: str) -> bool:
     min_size = 20480
     if poster_url.startswith("http://books.google.com/") or poster_url.startswith("https://covers.openlibrary.org/b/id/"):
         min_size = 10240
-    if Path(cover_path).exists() and os.path.getsize(cover_path) >= min_size:
+    if Path(cover_path).exists() and Path(cover_path).stat().st_size >= min_size:
         meta.cover_path = cover_path
         return True
     try:
@@ -942,7 +942,7 @@ async def download_poster_from_meta(meta: Meta, cover_path: str) -> bool:
 
 async def extract_epub_cover(epub_path: str, dest_path: str, confirmed_only: bool = False) -> bool:
     def _extract():
-        if not os.path.isfile(epub_path) or not zipfile.is_zipfile(epub_path):
+        if not Path(epub_path).is_file() or not zipfile.is_zipfile(epub_path):
             return False
         with contextlib.suppress(Exception), zipfile.ZipFile(epub_path, "r") as z:
             rootfile_path = None
@@ -1144,8 +1144,8 @@ async def generate_ebook_screenshots(
     cover_path = Path(output_dir) / "POSTER.png"
     banner_path = Path(output_dir) / "POSTER_BANNER.png"
 
-    cover_cached = Path(cover_path).exists() and os.path.getsize(cover_path) >= 20480 and not meta.retake
-    banner_cached = Path(banner_path).exists() and os.path.getsize(banner_path) > 0 and not meta.retake
+    cover_cached = Path(cover_path).exists() and Path(cover_path).stat().st_size >= 20480 and not meta.retake
+    banner_cached = Path(banner_path).exists() and Path(banner_path).stat().st_size > 0 and not meta.retake
 
     if cover_cached:
         meta.cover_path = cover_path
@@ -1319,7 +1319,7 @@ async def screenshots(
             output_dir = str(Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}").resolve())
             Path(output_dir).mkdir(parents=True, exist_ok=True)
             cover_path = Path(output_dir) / "POSTER.png"
-            if Path(cover_path).exists() and os.path.getsize(cover_path) >= 20480 and not meta.retake:
+            if Path(cover_path).exists() and Path(cover_path).stat().st_size >= 20480 and not meta.retake:
                 meta.cover_path = cover_path
                 return []
             local_found = await load_local_cover_if_exists(path, cover_path)
@@ -1563,7 +1563,7 @@ async def screenshots(
     remaining_retakes: list[str] = []
     for image_path in capture_results:
         retake = False
-        image_size = os.path.getsize(image_path)
+        image_size = Path(image_path).stat().st_size
         logger.debug(f"[yellow]Checking image {image_path} (size: {image_size} bytes) for image host: {img_host}[/yellow]")
         if not manual_frames:
             if image_size <= 75000:
@@ -1618,7 +1618,7 @@ async def screenshots(
                             if not screenshot_path or not Path(screenshot_path).exists():
                                 continue
 
-                            new_size = os.path.getsize(screenshot_path)
+                            new_size = Path(screenshot_path).stat().st_size
                             valid_image = False
 
                             if img_host and "imgbb" in img_host:
@@ -1646,7 +1646,7 @@ async def screenshots(
                         continue
                     break
                 # Fallback: use random time if original_time is not available
-                random_time = random.uniform(0, length)  # nosec B311 - Random screenshot timing, not cryptographic
+                random_time = random.uniform(0, length)  # nosec B311 - Random screenshot timing, not cryptographic  # noqa: S311
                 logger.info(f"[yellow]Retaking screenshot for: {image_path} (Attempt {attempt}/{retry_attempts}) at random time {random_time:.2f}s[/yellow]")
                 try:
                     if Path(image_path).exists():
@@ -1662,7 +1662,7 @@ async def screenshots(
                     if not screenshot_path or not Path(screenshot_path).exists():
                         continue
 
-                    new_size = os.path.getsize(screenshot_path)
+                    new_size = Path(screenshot_path).stat().st_size
                     valid_image = False
 
                     if img_host and "imgbb" in img_host:

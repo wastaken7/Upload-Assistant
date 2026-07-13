@@ -85,7 +85,7 @@ class BDInfoBinaryManager:
                     continue
                 if candidate.name.startswith("v"):
                     if system != "windows":
-                        os.chmod(candidate, 0o644)
+                        Path(candidate).chmod(0o644)
                     candidate.unlink()
                     logger.debug(f"[blue]Removed old version file at: {candidate}[/blue]")
 
@@ -97,13 +97,13 @@ class BDInfoBinaryManager:
         # Remove any old binary/version markers
         if binary_path.exists() and binary_path.is_file():
             if system != "windows":
-                os.chmod(binary_path, 0o600)
+                Path(binary_path).chmod(0o600)
             binary_path.unlink()
             logger.debug(f"[blue]Removed existing binary at: {binary_path}[/blue]")
 
         if version_path.exists():
             if system != "windows":
-                os.chmod(version_path, 0o644)
+                Path(version_path).chmod(0o644)
             version_path.unlink()
             logger.debug(f"[blue]Removed existing version file at: {version_path}[/blue]")
 

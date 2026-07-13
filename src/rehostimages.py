@@ -364,7 +364,7 @@ async def _handle_image_upload(
                     lambda: [str(p) for p in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[0]['name'])}-*.png")]
                 )
             else:
-                existing_screens = await asyncio.to_thread(lambda: [str(p) for p in Path(screenshots_dir).glob(filename_pattern)])
+                existing_screens = await asyncio.to_thread(lambda fp=filename_pattern: [str(p) for p in Path(screenshots_dir).glob(fp)])
 
             # Add any new screenshots to our list
             for screen in existing_screens:

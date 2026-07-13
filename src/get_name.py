@@ -12,7 +12,7 @@ import guessit
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]

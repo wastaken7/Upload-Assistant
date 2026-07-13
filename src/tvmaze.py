@@ -14,38 +14,38 @@ class TvmazeManager:
         self,
         filename: str,
         year: str,
-        imdbID: int | str | None,
-        tvdbID: int | str | None,
+        imdb_id: int | str | None,
+        tvdb_id: int | str | None,
         manual_date: str | None = None,
         tvmaze_manual: int | str | None = None,
         return_full_tuple: bool = False,
     ) -> int | tuple[int, int, int]:
         """Searches TVMaze for a show using TVDB ID, IMDb ID, or a title query.
 
-        - If `return_full_tuple=True`, returns `(tvmaze_id, imdbID, tvdbID)`.
+        - If `return_full_tuple=True`, returns `(tvmaze_id, imdb_id, tvdb_id)`.
         - Otherwise, only returns `tvmaze_id`.
         """
-        logger.debug(f"[cyan]Searching TVMaze for TVDB {tvdbID} or IMDB {imdbID} or {filename} ({year}) and returning {return_full_tuple}.[/cyan]")
+        logger.debug(f"[cyan]Searching TVMaze for TVDB {tvdb_id} or IMDB {imdb_id} or {filename} ({year}) and returning {return_full_tuple}.[/cyan]")
         # Convert TVDB ID to integer
-        if isinstance(tvdbID, (int, str)) and tvdbID not in ("", "0"):
+        if isinstance(tvdb_id, (int, str)) and tvdb_id not in ("", "0"):
             try:
-                tvdb_id = int(tvdbID)
+                tvdb_id = int(tvdb_id)
             except ValueError, TypeError:
-                logger.error(f"[red]Error: tvdbID is not a valid integer. Received: {tvdbID}[/red]")
+                logger.error(f"[red]Error: tvdb_id is not a valid integer. Received: {tvdb_id}[/red]")
                 tvdb_id = 0
         else:
             tvdb_id = 0
 
         # Handle IMDb ID - ensure it's an integer without tt prefix
         try:
-            if isinstance(imdbID, str) and imdbID.startswith("tt"):
-                imdb_id = int(imdbID[2:])
-            elif isinstance(imdbID, (int, str)) and imdbID not in ("", "0"):
-                imdb_id = int(imdbID)
+            if isinstance(imdb_id, str) and imdb_id.startswith("tt"):
+                imdb_id = int(imdb_id[2:])
+            elif isinstance(imdb_id, (int, str)) and imdb_id not in ("", "0"):
+                imdb_id = int(imdb_id)
             else:
                 imdb_id = 0
         except ValueError, TypeError:
-            logger.error(f"[red]Error: imdbID is not a valid integer. Received: {imdbID}[/red]")
+            logger.error(f"[red]Error: imdb_id is not a valid integer. Received: {imdb_id}[/red]")
             imdb_id = 0
 
         # If manual selection has been provided, return it directly

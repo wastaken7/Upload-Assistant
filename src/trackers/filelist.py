@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import glob
+import json
 import re
 from pathlib import Path
 from typing import Any, cast
@@ -16,7 +17,7 @@ from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 
 class FileList:
@@ -151,7 +152,7 @@ class FileList:
                 import pickle
 
                 with path.open("rb") as f:
-                    session_cookies = pickle.load(f)  # nosec B301
+                    session_cookies = pickle.load(f)  # noqa: S301
                 # Save it as JSON with same name but .json extension (standard migration)
                 json_path = path.with_suffix(".json")
                 self.cookie_validator._save_cookies_secure(session_cookies, str(json_path))  # pyright: ignore[reportPrivateUsage]
@@ -175,8 +176,8 @@ class FileList:
                         if isinstance(first_val, dict) and "value" in first_val:
                             return {name: str(item.get("value", "")) for name, item in data.items()}
                     return {name: str(val) for name, val in data.items()}
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"[yellow]Warning: Error parsing cookie file: {e}[/yellow]")
             return {}
 
     async def upload(self, meta: Meta) -> bool:
@@ -261,7 +262,7 @@ class FileList:
         logger.info(data)
         logger.info("\n\n")
         logger.info(up.text)
-        raise UploadException(f"Upload to FileList Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa F405
+        raise UploadError(f"Upload to FileList Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa F405
 
     async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
@@ -333,10 +334,10 @@ class FileList:
             soup = BeautifulSoup(r.text, "html.parser")
             validator_input = soup.find("input", {"name": "validator"})
             if validator_input is None:
-                raise LoginException("Unable to locate validator input on FileList login page.")  # noqa: F405
+                raise LoginError("Unable to locate validator input on FileList login page.")  # noqa: F405
             validator_value = validator_input.get("value")
             if not isinstance(validator_value, str):
-                raise LoginException("Validator input missing value attribute on FileList login page.")  # noqa: F405
+                raise LoginError("Validator input missing value attribute on FileList login page.")  # noqa: F405
             validator = validator_value
             data = {
                 "validator": validator,

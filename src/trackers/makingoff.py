@@ -20,7 +20,7 @@ from src.console import logger
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.languages import languages_manager
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 Config = dict[str, Any]
 
@@ -460,7 +460,7 @@ class MakingOff:
         first_post = soup.find("div", attrs={"itemprop": "commentText"})
         if first_post:
             text = first_post.get_text(" ", strip=True)
-            m = re.search(r"Resolu[^\s:]*[:\s]+(\d{3,4})\s*[xX×]\s*(\d{3,4})", text)
+            m = re.search(r"Resolu[^\s:]*[:\s]+(\d{3,4})\s*[xX×]\s*(\d{3,4})", text)  # noqa: RUF001
             if m:
                 resolution = f"{m.group(1)}x{m.group(2)}"
 

@@ -11,7 +11,7 @@ from cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 Config = dict[str, Any]
 
@@ -56,7 +56,7 @@ class TorrentLeech:
             logger.info(f"[bold red]'{self.tracker}' Cookies not found at: {cookie_path}[/bold red]")
             return False
 
-        self.session.cookies.update(await self.common.parseCookieFile(cookies_file))
+        self.session.cookies.update(await self.common.parse_cookie_file(cookies_file))
 
         try:
             if force:

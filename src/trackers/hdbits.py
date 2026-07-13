@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
-import os
 import re
 from pathlib import Path
 from typing import Any, cast
@@ -17,7 +16,7 @@ from src.console import console, logger
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
 from src.torrentcreate import TorrentCreator
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 Config = dict[str, Any]
 
@@ -322,7 +321,7 @@ class HDBits:
         from src.cookie_auth import find_cookie_file
 
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
-        cookies = await common.parseCookieFile(cookiefile)
+        cookies = await common.parse_cookie_file(cookiefile)
         async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
             up = await client.post(url=url, data=data, files=files)
 
@@ -337,7 +336,7 @@ class HDBits:
         logger.info(data)
         logger.info("\n\n")
         logger.info(up.text)
-        raise UploadException(f"Upload to HDBits Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa F405
+        raise UploadError(f"Upload to HDBits Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa F405
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
@@ -434,7 +433,7 @@ class HDBits:
 
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if Path(cookiefile).exists():
-            cookies = await common.parseCookieFile(cookiefile)
+            cookies = await common.parse_cookie_file(cookiefile)
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0) as client:
                 resp = await client.get(url=url)
             return resp.text.find("""<a href="/logout.php">Logout</a>""") != -1
@@ -626,7 +625,7 @@ class HDBits:
 
                     max_images_per_group = max(max_images_per_group, len(group_images[group_idx]))
             else:
-                comparison_files: list[str] = [f for f in os.listdir(comparison_path) if f.lower().endswith(".png")]
+                comparison_files: list[str] = [p.name for p in Path(comparison_path).iterdir() if p.name.lower().endswith(".png")]
                 filename_pattern = re.compile(r"(\d+)-(\d+)-(.+)\.png", re.IGNORECASE)
                 unsorted_groups: dict[str, list[tuple[int, str]]] = {}
 
@@ -732,7 +731,7 @@ class HDBits:
                 files_list = list(upload_files.items())
                 for i in range(0, len(files_list), num_groups):
                     row_items = files_list[i : i + num_groups]
-                    row_size = sum(os.path.getsize(all_image_files[i + j]) for j in range(len(row_items)))
+                    row_size = sum(Path(all_image_files[i + j]).stat().st_size for j in range(len(row_items)))
 
                     # If adding this row would exceed chunk size and we already have items, start new chunk
                     if current_chunk and current_chunk_size + row_size > max_chunk_size:
@@ -755,7 +754,7 @@ class HDBits:
                         file_list[f"images_files[{j}]"] = value
 
                     if meta.debug:
-                        chunk_size_mb = sum(os.path.getsize(all_image_files[int(key.split("[")[1].split("]")[0])]) for key, _ in chunk) / (1024 * 1024)
+                        chunk_size_mb = sum(Path(all_image_files[int(key.split("[")[1].split("]")[0])]).stat().st_size for key, _ in chunk) / (1024 * 1024)
                         logger.debug(f"[cyan]Uploading chunk {chunk_idx + 1}/{len(chunks)} ({len(file_list)} images, {chunk_size_mb:.2f} MiB)")
 
                     async with httpx.AsyncClient(timeout=30.0) as client:

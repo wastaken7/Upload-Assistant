@@ -61,7 +61,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
 
         if img_host == "imgbox":
             try:
-                image_list = await imgbox_upload(os.getcwd(), [image], return_dict={})
+                image_list = await imgbox_upload(Path.cwd(), [image], return_dict={})
                 if image_list and all("img_url" in img and "raw_url" in img and "web_url" in img for img in image_list):
                     img_url = image_list[0]["img_url"]
                     raw_url = image_list[0]["raw_url"]
@@ -849,7 +849,7 @@ async def _upload_screens(
                 image_list.append(new_image)
                 local_file_path = upload.get("local_file_path")
                 if local_file_path:
-                    image_size = os.path.getsize(local_file_path)
+                    image_size = Path(local_file_path).stat().st_size
                     meta.image_sizes[raw_url] = image_size
 
         if len(new_images) and len(new_images) > 0:

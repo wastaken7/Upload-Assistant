@@ -102,9 +102,7 @@ class Wait:
                 if self.proxy_url:
                     if self.qbt_session is None:
                         raise RuntimeError("qbt_session is not initialized")
-                    response = await self.qbt_session.get(
-                        f"{self.qbt_proxy_url}/api/v2/torrents/info" if hasattr(self, "self") else f"{self.qbt_proxy_url}/api/v2/torrents/info", params={"hashes": infohash}
-                    )
+                    response = await self.qbt_session.get(f"{self.qbt_proxy_url}/api/v2/torrents/info", params={"hashes": infohash})
                     if response.status_code == 200:
                         torrents_data = cast(list[dict[str, Any]], response.json())
                         target_torrent = torrents_data[0] if torrents_data else None

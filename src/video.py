@@ -137,7 +137,7 @@ class VideoManager:
         if Path(videoloc).is_dir():
             logger.debug("[blue]Scanning directory for video files...[/blue]")
             try:
-                entries = [e for e in os.listdir(videoloc) if os.path.isfile(Path(videoloc) / e)]
+                entries = [p.name for p in Path(videoloc).iterdir() if p.is_file()]
             except Exception:
                 entries = []
 
@@ -298,10 +298,10 @@ class VideoManager:
         resolution = await mi_resolution(res, guess, width, scan)
         return resolution, hfr
 
-    def closest(self, lst: list[int], K: int) -> int:
+    def closest(self, lst: list[int], k: int) -> int:
         # Get closest, but not over
         lst = sorted(lst)
-        mi_input = K
+        mi_input = k
         res = 0
         for each in lst:
             if mi_input > each:

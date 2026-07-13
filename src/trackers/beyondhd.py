@@ -12,7 +12,7 @@ from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 
 class BeyondHD:

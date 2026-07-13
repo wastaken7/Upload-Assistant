@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
-import os
 import re
 from collections import defaultdict
 from collections.abc import Mapping
@@ -100,7 +99,7 @@ class ComparisonManager:
             except Exception as e:
                 logger.info(f"[yellow]Error loading saved comparison data: {e}")
 
-        files: list[str] = [f for f in os.listdir(comparison_path) if f.lower().endswith(".png")]
+        files: list[str] = [p.name for p in Path(comparison_path).iterdir() if p.name.lower().endswith(".png")]
         pattern = re.compile(r"(\d+)-(\d+)-(.+)\.png", re.IGNORECASE)
 
         groups: defaultdict[str, list[tuple[int, str]]] = defaultdict(list)

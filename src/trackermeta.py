@@ -17,7 +17,7 @@ from src.bbcode import BBCODE
 from src.btnid import BtnIdManager
 from src.console import logger
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 from src.trackersetup import api_trackers
 from src.type_utils import to_int
 
@@ -239,7 +239,7 @@ async def check_image_link(url: str, timeout: httpx.Timeout | None = None) -> bo
         timeout = httpx.Timeout(20.0, connect=10.0)
 
     try:
-        async with httpx.AsyncClient(timeout=timeout, verify=False) as session:
+        async with httpx.AsyncClient(timeout=timeout, verify=False) as session:  # noqa: S501
             try:
                 response = await session.get(url)
                 if response.status_code == 200:

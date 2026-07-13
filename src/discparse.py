@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import cli_ui
-import defusedxml.ElementTree as ET
+import defusedxml.ElementTree as ElementTree
 from langcodes import Language
 from pymediainfo import MediaInfo
 
@@ -101,7 +101,7 @@ class DiscParse:
         use_largest = int(self.config["DEFAULT"].get("use_largest_playlist", False))
         save_dir = f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}"
         if not Path(save_dir).exists():
-            os.mkdir(save_dir)
+            Path(save_dir).mkdir()
 
         for i in range(len(discs)):
             bdinfo_text = None
@@ -110,7 +110,7 @@ class DiscParse:
                 parent_path = str(Path(path).parent)
                 if not Path(Path(parent_path) / "CERTIFICATE").exists():
                     meta.setdefault("discs_missing_certificate", []).append(discs[i]["path"])
-            for file in os.listdir(save_dir):
+            for file in (p.name for p in Path(save_dir).iterdir()):
                 if file == f"BD_SUMMARY_{str(i).zfill(2)}.txt":
                     bdinfo_text = save_dir + "/" + file
             if bdinfo_text is None or meta_discs == []:
@@ -133,7 +133,7 @@ class DiscParse:
 
                 # Parse playlists
                 valid_playlists: list[PlaylistInfo] = []
-                for file_name in os.listdir(playlists_path):
+                for file_name in (p.name for p in Path(playlists_path).iterdir()):
                     if not file_name.endswith(".mpls"):
                         continue
 
@@ -170,7 +170,7 @@ class DiscParse:
                                     continue
                                 m2ts_file = Path(stream_directory) / clip_name + ".m2ts"
                                 if Path(m2ts_file).exists():
-                                    size = os.path.getsize(m2ts_file)
+                                    size = Path(m2ts_file).stat().st_size
                                     file_counts[m2ts_file] += 1
                                     file_sizes[m2ts_file] = size
                                     total_play_items += 1
@@ -307,7 +307,7 @@ class DiscParse:
                                     continue
 
                                 # Rename the output to playlist_report_path
-                                for file in os.listdir(save_dir):
+                                for file in (p.name for p in Path(save_dir).iterdir()):
                                     if file.startswith("BDINFO") and file.endswith(".txt"):
                                         bdinfo_text = Path(save_dir) / file
                                         shutil.move(bdinfo_text, playlist_report_path)
@@ -428,7 +428,7 @@ class DiscParse:
                 # Handle cases where the file name has additional markers like "(1)"
                 if parts[1].startswith("(") and ")" in parts[1]:
                     file_name = f"{parts[0]} {parts[1]}"  # Combine file name and marker
-                    parts = [file_name] + parts[2:]  # Rebuild parts with corrected file name
+                    parts = [file_name, *parts[2:]]  # Rebuild parts with corrected file name
                 else:
                     file_name = parts[0]
 
@@ -681,7 +681,7 @@ class DiscParse:
                 each["vob_mi_full"] = vob_mi_output
                 each["ifo_mi_full"] = ifo_mi_output
 
-            size = sum(os.path.getsize(f) for f in os.listdir(".") if os.path.isfile(f)) / float(1 << 30)
+            size = sum(f.stat().st_size for f in Path().iterdir() if f.is_file()) / float(1 << 30)
             each["disc_size"] = round(size, 2)
             dvd_size = "DVD9"
             if size <= 4.37:
@@ -716,7 +716,7 @@ class DiscParse:
                     playlist_dict = playlist
                     primary_clips = cast(list[dict[str, Any]], playlist_dict.get("primaryClips", []))
                     evo_files = [str(Path(f"{path}/{Path(str(clip.get('src', '')).replace('.MAP', '.EVO')).name}").resolve()) for clip in primary_clips]
-                    total_size = sum(os.path.getsize(evo) for evo in evo_files if Path(evo).exists())
+                    total_size = sum(Path(evo).stat().st_size for evo in evo_files if Path(evo).exists())
                     if total_size > 0:
                         playlist_dict["totalSize"] = total_size
                         playlist_dict["evoFiles"] = evo_files
@@ -776,7 +776,7 @@ class DiscParse:
                         raise ValueError(f"Expected EVO files for playlist {playlist['id']} do not exist.")
 
                     # Calculate the total size for the selected playlist
-                    playlist["totalSize"] = sum(os.path.getsize(evo) for evo in expected_evo_files if Path(evo).exists())
+                    playlist["totalSize"] = sum(Path(evo).stat().st_size for evo in expected_evo_files if Path(evo).exists())
 
                     # Assign the valid EVO files
                     playlist["evoFiles"] = expected_evo_files
@@ -918,7 +918,7 @@ class DiscParse:
                 # Save playlist information in meta under HDDVD_PLAYLIST
                 meta.HDDVD_PLAYLIST = selected_playlist
 
-            except (FileNotFoundError, ValueError, ET.ParseError) as e:
+            except (FileNotFoundError, ValueError, ElementTree.ParseError) as e:
                 logger.info(f"Playlist processing failed: {e}. Falling back to largest EVO file detection.")
 
                 # Fallback to largest .EVO file
@@ -932,7 +932,7 @@ class DiscParse:
 
                 # Get largest file from files
                 for file in files:
-                    file_size = os.path.getsize(file)
+                    file_size = Path(file).stat().st_size
                     if file_size > size:
                         largest = file
                         size = file_size
@@ -960,7 +960,7 @@ class DiscParse:
         titles: list[dict[str, Any]] = []
         try:
             # Parse the XML structure
-            tree = ET.parse(file_path)
+            tree = ElementTree.parse(file_path)
             root = tree.getroot()
             if root is None:
                 return titles
@@ -1096,7 +1096,7 @@ class DiscParse:
                 # Add the fully extracted title data to the list
                 titles.append(title_data)
 
-        except ET.ParseError as e:
+        except ElementTree.ParseError as e:
             logger.info(f"Error parsing XPL file: {e}", extra={"markup": False})
         return titles
 

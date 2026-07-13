@@ -11,7 +11,7 @@ from src.console import logger
 from src.imdb import imdb_manager
 from src.meta import Meta
 from src.tmdb import TmdbManager
-from src.tvdb import tvdb_data
+from src.tvdb import TvdbData
 from src.tvmaze import tvmaze_manager
 
 
@@ -40,7 +40,7 @@ def _apply_tvdb_series_metadata(meta: Meta, episodes_data: Any, series_name: Any
 
 class MetadataSearchingManager:
     def __init__(self, config: dict[str, Any]) -> None:
-        self.tvdb_handler = tvdb_data(config)
+        self.tvdb_handler = TvdbData(config)
         self.tmdb_manager = TmdbManager(config)
 
     async def all_ids(self, meta: Meta) -> Meta:

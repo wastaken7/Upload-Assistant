@@ -176,7 +176,7 @@ class QueueManager:
                 logger.error(f"[red]Error scanning directory {normalized_path}: {e}[/red]")
                 return []
 
-        elif os.path.isfile(normalized_path):
+        elif Path(normalized_path).is_file():
             if allowed_extensions_tuple is None or normalized_path.lower().endswith(allowed_extensions_tuple):
                 queue.append(normalized_path)
         else:
@@ -210,7 +210,7 @@ class QueueManager:
                 alt_path = Path(normalized_path) / entry.name
                 if Path(alt_path).exists() and (
                     (Path(alt_path).is_dir() and await QueueManager.should_include_directory(alt_path, allowed_extensions))
-                    or (os.path.isfile(alt_path) and (allowed_extensions_tuple is None or alt_path.lower().endswith(allowed_extensions_tuple)))
+                    or (alt_path.is_file() and (allowed_extensions_tuple is None or alt_path.name.lower().endswith(allowed_extensions_tuple)))
                 ):
                     entry_paths.append(alt_path)
 
@@ -299,14 +299,14 @@ class QueueManager:
             queue = [
                 file
                 for file in paths
-                if Path(file).is_dir() or (os.path.isfile(file) and (allowed_extensions_tuple is None or file.lower().endswith(allowed_extensions_tuple)))
+                if Path(file).is_dir() or (Path(file).is_file() and (allowed_extensions_tuple is None or file.lower().endswith(allowed_extensions_tuple)))
             ]
             await QueueManager.display_queue(queue, save_to_log=False)
         elif not Path(path).parent.exists():
             queue = [
                 file
                 for file in await QueueManager._resolve_split_path(path)
-                if Path(file).is_dir() or (os.path.isfile(file) and (allowed_extensions_tuple is None or file.lower().endswith(allowed_extensions_tuple)))
+                if Path(file).is_dir() or (Path(file).is_file() and (allowed_extensions_tuple is None or file.lower().endswith(allowed_extensions_tuple)))
             ]
             await QueueManager.display_queue(queue, save_to_log=False)
         return queue
@@ -366,10 +366,10 @@ class QueueManager:
                 Path(tmp_dir).mkdir(parents=True, mode=0o700, exist_ok=True)
                 # Enforce 0700 regardless of process umask (POSIX only).
                 if os.name != "nt":
-                    os.chmod(tmp_dir, 0o700)
+                    Path(tmp_dir).chmod(0o700)
             else:
                 if os.name != "nt":
-                    os.chmod(tmp_dir, 0o700)
+                    Path(tmp_dir).chmod(0o700)
             log_file = Path(tmp_dir) / f"{queue_name}_queue.log"
 
             try:

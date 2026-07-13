@@ -51,7 +51,7 @@ class RtorrentClientMixin:
         tracker_dir: str | None = None
         dst = path
         filelist = self._coerce_str_list(meta.filelist)
-        src = filelist[0] if len(filelist) == 1 and os.path.isfile(filelist[0]) and not meta.keep_folder else meta.path
+        src = filelist[0] if len(filelist) == 1 and Path(filelist[0]).is_file() and not meta.keep_folder else meta.path
 
         if not src:
             error_msg = "[red]No source path found in meta."
@@ -133,13 +133,13 @@ class RtorrentClientMixin:
                 dst = Path(tracker_dir) / src_name  # Destination inside linked folder
 
                 # path magic
-                if Path(dst).exists() or os.path.islink(dst):
+                if Path(dst).exists() or Path(dst).is_symlink():
                     logger.debug(f"[yellow]Skipping linking, path already exists: {dst}")
                 else:
                     if use_hardlink:
                         try:
                             # Check if we're linking a file or directory
-                            if os.path.isfile(src):
+                            if Path(src).is_file():
                                 # For a single file, create a hardlink directly
                                 try:
                                     os.link(src, dst)
@@ -192,9 +192,9 @@ class RtorrentClientMixin:
                     elif use_symlink:
                         try:
                             if platform.system() == "Windows":
-                                os.symlink(src, dst, target_is_directory=Path(src).is_dir())
+                                Path(dst).symlink_to(src, target_is_directory=Path(src).is_dir())
                             else:
-                                os.symlink(src, dst)
+                                Path(dst).symlink_to(src)
 
                             logger.debug(f"[green]Symbolic link created: {dst} -> {src}")
 
@@ -333,17 +333,17 @@ class RtorrentClientMixin:
             # Check file size
             file_length_value = fileinfo["length"]
             file_length = int(file_length_value) if isinstance(file_length_value, (int, float, str)) else 0
-            if os.path.getsize(filepath) != file_length:
+            if Path(filepath).stat().st_size != file_length:
                 raise OSError(
                     errno.EINVAL,
-                    f"File size mismatch for {filepath!r} [is {os.path.getsize(filepath)}, expected {file_length}]",
+                    f"File size mismatch for {filepath!r} [is {Path(filepath).stat().st_size}, expected {file_length}]",
                 )
 
             # Add resume data for this file
             resume["files"].append(
                 {
                     "priority": 1,
-                    "mtime": int(os.path.getmtime(filepath)),
+                    "mtime": int(Path(filepath).stat().st_mtime),
                     "completed": ((offset + file_length + piece_length - 1) // piece_length - offset // piece_length),
                 }
             )
@@ -389,7 +389,7 @@ class RtorrentClientMixin:
             logger.info(f"[yellow]Searching for torrent file with hash {info_hash_v1} in {torrent_storage_dir}")
 
             if Path(torrent_storage_dir).exists():
-                for filename in os.listdir(torrent_storage_dir):
+                for filename in (p.name for p in Path(torrent_storage_dir).iterdir()):
                     filename_str = filename
                     if filename_str.lower().endswith(".torrent"):
                         file_hash = Path(filename_str).stem  # Remove .torrent extension

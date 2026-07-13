@@ -16,7 +16,7 @@ from src.console import console, logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa #F405
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 Config = dict[str, Any]
 
@@ -183,7 +183,7 @@ class TorrentGUI:
             tracker_status[self.tracker]["status_message"] = str(up.url)
             id_match = re.search(r"(id=)(\d+)", urlparse(str(up.url)).query)
             if not id_match:
-                raise UploadException(  # noqa #F405
+                raise UploadError(  # noqa #F405
                     f"Upload to TorrentGUI succeeded but torrent id missing from URL {up.url}",
                     "red",
                 )
@@ -192,7 +192,7 @@ class TorrentGUI:
             return True
         logger.info(data)
         logger.info("\n\n")
-        raise UploadException(f"Upload to TorrentGUI Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa #F405
+        raise UploadError(f"Upload to TorrentGUI Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa #F405
 
     async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
@@ -270,7 +270,7 @@ class TorrentGUI:
                 token_input = soup.find("input", {"name": "authenticity_token"})
                 auth_token = token_input.get("value") if token_input else None
                 if not auth_token:
-                    raise UploadException("Missing authenticity token during TorrentGUI login", "red")  # noqa #F405
+                    raise UploadError("Missing authenticity token during TorrentGUI login", "red")  # noqa #F405
                 two_factor_data = {"otp": console.input("[yellow]TorrentGUI 2FA Code: "), "authenticity_token": auth_token, "uid": self.uid}
                 two_factor_url = "https://totheglory.im/take2fa.php"
                 response = await client.post(two_factor_url, data=two_factor_data)
@@ -293,7 +293,7 @@ class TorrentGUI:
             base = await base_file.read()
 
         from src.bbcode import BBCODE
-        from src.trackers.COMMON import COMMON
+        from src.trackers.common import COMMON
 
         common = COMMON(config=self.config)
 
@@ -304,9 +304,9 @@ class TorrentGUI:
                 parts.append(ptgen)
 
         # Add This line for all web-dls
-        if meta.type == "WEBDL" and meta.service_longname != "" and meta.description is None:
+        if meta.type == "WEBDL" and meta.service_longname != "" and not meta.description:
             parts.append(
-                f"[center][b][color=#ff00ff][size=3]{meta.service_longname}的无损REMUX片源，没有转码/This release is sourced from {meta.service_longname} and is not transcoded, just remuxed from the direct {meta.service_longname} stream[/size][/color][/b][/center]"
+                f"[center][b][color=#ff00ff][size=3]{meta.service_longname}的无损REMUX片源，没有转码/This release is sourced from {meta.service_longname} and is not transcoded, just remuxed from the direct {meta.service_longname} stream[/size][/color][/b][/center]"  # noqa: RUF001
             )
         bbcode = BBCODE()
         if meta.discs != []:

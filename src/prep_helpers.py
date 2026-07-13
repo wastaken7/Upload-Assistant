@@ -20,7 +20,7 @@ from src.clients import Clients
 from src.console import logger
 from src.edition import get_edition
 from src.exceptions import NoAudioMediaError
-from src.exportmi import exportInfo, get_conformance_error, mi_resolution, validate_mediainfo
+from src.exportmi import export_info, get_conformance_error, mi_resolution, validate_mediainfo
 from src.get_source import get_source
 from src.imdb import imdb_manager
 from src.languages import languages_manager
@@ -111,7 +111,7 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     use_radarr = prep_instance.config["DEFAULT"].get("use_radarr", False)
     meta.print_tracker_messages = prep_instance.config["DEFAULT"].get("print_tracker_messages", False)
     meta.print_tracker_links = prep_instance.config["DEFAULT"].get("print_tracker_links", True)
-    only_id_val = meta.onlyID
+    only_id_val = meta.only_id
     skip_tracker_descriptions = bool(prep_instance.config["DEFAULT"].get("skip_tracker_descriptions", False) if only_id_val is None else only_id_val)
     meta.skip_tracker_descriptions = skip_tracker_descriptions
     meta.keep_images = bool(prep_instance.config["DEFAULT"].get("keep_images", True) if not meta.keep_images else True)
@@ -361,7 +361,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
         except Exception:
             meta.search_year = ""
         if not meta.edit:
-            mi = await exportInfo(
+            mi = await export_info(
                 f"{meta.discs[0]['path']}/VTS_{meta.discs[0]['main_set'][0][:2]}_0.IFO",
                 False,
                 meta.uuid,
@@ -390,7 +390,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
         except Exception:
             meta.search_year = ""
         if not meta.edit:
-            mi = await exportInfo(meta.discs[0]["largest_evo"], False, meta.uuid, meta.base_dir)
+            mi = await export_info(meta.discs[0]["largest_evo"], False, meta.uuid, meta.base_dir)
             meta.mediainfo = mi
         else:
             mi = meta.mediainfo
@@ -426,8 +426,8 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                 parent_dir = str(Path(meta_path).parent)
                 if parent_dir and Path(parent_dir).exists():
                     base_name = Path(meta_path).stem
-                    for file in os.listdir(parent_dir):
-                        if os.path.isfile(Path(parent_dir) / file):
+                    for file in (p.name for p in Path(parent_dir).iterdir()):
+                        if (Path(parent_dir) / file).is_file():
                             ext = Path(file).suffix.lower()
                             if ext in subtitle_exts and file.lower().startswith(base_name.lower()):
                                 meta.subtitle_files.append(str(Path(Path(parent_dir) / file).resolve()))
@@ -496,7 +496,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                     meta.search_year = ""
 
                 if not meta.edit:
-                    mi = await exportInfo(videopath, (meta.isdir), meta.uuid, base_dir, is_dvd=(meta.is_disc == "DVD"))
+                    mi = await export_info(videopath, (meta.isdir), meta.uuid, base_dir, is_dvd=(meta.is_disc == "DVD"))
                     meta.mediainfo = mi
                 else:
                     mi = meta.mediainfo
@@ -526,11 +526,11 @@ def calculate_source_size(_prep_instance: Any, meta: Meta, videopath: str) -> No
         filelist = cast(list[str], meta.filelist or [])
         files_to_measure = filelist if filelist else ([videopath] if videopath else [])
         for file_path in files_to_measure:
-            if not os.path.isfile(file_path):
+            if not Path(file_path).is_file():
                 logger.debug(f"[yellow]Skipping size check for missing file: {file_path}")
                 continue
             try:
-                source_size += os.path.getsize(file_path)
+                source_size += Path(file_path).stat().st_size
             except OSError as exc:
                 logger.debug(f"[yellow]Unable to stat {file_path}: {exc}")
 
@@ -543,7 +543,7 @@ def calculate_source_size(_prep_instance: Any, meta: Meta, videopath: str) -> No
                 for name in files:
                     file_path = Path(root) / name
                     try:
-                        source_size += os.path.getsize(file_path)
+                        source_size += Path(file_path).stat().st_size
                     except OSError as exc:
                         logger.debug(f"[yellow]Unable to stat {file_path}: {exc}")
                         continue
@@ -574,9 +574,9 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
             # Cleanup meta so we don't reuse it later
             if Path(tmp_dir).exists():
                 try:
-                    for file in os.listdir(tmp_dir):
+                    for file in (p.name for p in Path(tmp_dir).iterdir()):
                         file_path = Path(tmp_dir) / file
-                        if os.path.isfile(file_path) and file.endswith((".txt", ".json")):
+                        if file_path.is_file() and file.endswith((".txt", ".json")):
                             file_path.unlink()
                             logger.debug(f"[yellow]Removed temporary metadata file: {file_path}[/yellow]")
                 except Exception as e:

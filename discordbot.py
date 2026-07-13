@@ -42,7 +42,7 @@ class Bot(commands.Bot):
 
     async def setup_hook(self) -> None:
         # Called before the bot connects to Discord
-        asyncio.create_task(self.track_start())
+        self._track_task = asyncio.create_task(self.track_start())
         await self.load_all_extensions()
 
     async def track_start(self) -> None:

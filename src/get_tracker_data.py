@@ -384,7 +384,7 @@ class TrackerDataManager:
     async def ping_unit3d(self, meta: Meta) -> None:
         import re
 
-        from src.trackers.COMMON import COMMON
+        from src.trackers.common import COMMON
 
         common = COMMON(self.config)
 

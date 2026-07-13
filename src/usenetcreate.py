@@ -25,34 +25,34 @@ def generate_random_poster() -> str:
     letters = "abcdefghijklmnopqrstuvwxyz"
     digits = "0123456789"
 
-    first_len = random.randint(5, 10)
-    last_len = random.randint(5, 10)
-    user_len = random.randint(6, 12)
-    domain_len = random.randint(5, 10)
+    first_len = random.randint(5, 10)  # noqa: S311
+    last_len = random.randint(5, 10)  # noqa: S311
+    user_len = random.randint(6, 12)  # noqa: S311
+    domain_len = random.randint(5, 10)  # noqa: S311
 
-    first = "".join(random.choice(letters) for _ in range(first_len))
-    last = "".join(random.choice(letters) for _ in range(last_len))
-    email_user = "".join(random.choice(letters + digits) for _ in range(user_len))
-    domain = "".join(random.choice(letters) for _ in range(domain_len))
-    tld = random.choice(["com", "net", "org", "info", "biz", "xyz", "io"])
+    first = "".join(random.choice(letters) for _ in range(first_len))  # noqa: S311
+    last = "".join(random.choice(letters) for _ in range(last_len))  # noqa: S311
+    email_user = "".join(random.choice(letters + digits) for _ in range(user_len))  # noqa: S311
+    domain = "".join(random.choice(letters) for _ in range(domain_len))  # noqa: S311
+    tld = random.choice(["com", "net", "org", "info", "biz", "xyz", "io"])  # noqa: S311
 
     return f"{first.capitalize()} {last.capitalize()} <{email_user}@{domain}.{tld}>"
 
 
 def get_path_size(path: str) -> int:
     """Calculate the total size of a file or directory in bytes."""
-    if os.path.isfile(path):
+    if Path(path).is_file():
         try:
-            return os.path.getsize(path)
+            return Path(path).stat().st_size
         except OSError:
             return 0
     total_size = 0
     for dirpath, _, filenames in os.walk(path):
         for f in filenames:
             fp = Path(dirpath) / f
-            if not os.path.islink(fp):
+            if not Path(fp).is_symlink():
                 with contextlib.suppress(OSError):
-                    total_size += os.path.getsize(fp)
+                    total_size += Path(fp).stat().st_size
     return total_size
 
 
@@ -216,7 +216,7 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
             async def monitor_progress():
                 while process.returncode is None:
                     with contextlib.suppress(Exception):
-                        files = os.listdir(usenet_dir)
+                        files = [p.name for p in Path(usenet_dir).iterdir()]
                         parts = []
                         for f in files:
                             if f.startswith(safe_name):
@@ -470,7 +470,8 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
 
         async def drain_stderr():
             while True:
-                assert process.stderr is not None
+                if process.stderr is None:
+                    break
                 line = await process.stderr.readline()
                 if not line:
                     break
@@ -827,7 +828,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             for entry in await aiofiles.os.listdir(input_path):
                 src = Path(input_path) / entry
                 dst = Path(usenet_dir) / entry
-                if os.path.isfile(src):
+                if src.is_file():
                     if is_debug and not await aiofiles.ospath.exists(src):
                         async with aiofiles.open(dst, "wb") as f:
                             await f.write(b"mock file content")
@@ -1154,7 +1155,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     # Clean up empty parent uuid folder
     uuid_dir = Path(tmp_base) / uuid
     with contextlib.suppress(Exception):
-        if not is_debug and await aiofiles.ospath.exists(uuid_dir) and not os.listdir(uuid_dir):
+        if not is_debug and await aiofiles.ospath.exists(uuid_dir) and not [p.name for p in Path(uuid_dir).iterdir()]:
             await asyncio.to_thread(os.rmdir, uuid_dir)
 
     return final_nzb_path

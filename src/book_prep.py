@@ -42,7 +42,7 @@ from src.book_extractors import (
     normalize_series_index as _normalize_series_index,
 )
 from src.console import logger
-from src.exportmi import exportInfo
+from src.exportmi import export_info
 from src.meta import Meta
 
 # ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ async def gather_book_prep(
     }
 
     # Extract EPUB metadata directly if the file is an EPUB
-    if videopath.lower().endswith(".epub") and os.path.isfile(videopath):
+    if videopath.lower().endswith(".epub") and Path(videopath).is_file():
         meta.epubmeta_output = _get_epubmeta_output(videopath)
         epub_meta = _extract_epub_metadata(videopath)
         if epub_meta:
@@ -236,7 +236,7 @@ async def gather_book_prep(
                             meta.search_year = int(val)
 
     # Extract CBR/CBZ metadata directly if the file is a CBR/CBZ
-    if videopath.lower().endswith((".cbr", ".cbz")) and os.path.isfile(videopath):
+    if videopath.lower().endswith((".cbr", ".cbz")) and Path(videopath).is_file():
         cbr_cbz_meta = _extract_cbr_cbz_metadata(videopath)
         if cbr_cbz_meta:
             logger.debug(f"[cyan]CBR/CBZ metadata extracted: {cbr_cbz_meta}[/cyan]")
@@ -256,7 +256,7 @@ async def gather_book_prep(
                             meta.search_year = int(val)
 
     # Extract MOBI metadata directly if the file is a MOBI
-    if videopath.lower().endswith(".mobi") and os.path.isfile(videopath):
+    if videopath.lower().endswith(".mobi") and Path(videopath).is_file():
         mobi_meta = _extract_mobi_metadata(videopath)
         if mobi_meta:
             logger.debug(f"[cyan]MOBI metadata extracted: {mobi_meta}[/cyan]")
@@ -276,7 +276,7 @@ async def gather_book_prep(
                             meta.search_year = int(val)
 
     # Extract ISBN from PDF directly if the file is a PDF
-    if videopath.lower().endswith(".pdf") and os.path.isfile(videopath):
+    if videopath.lower().endswith(".pdf") and Path(videopath).is_file():
         pdf_isbn = _extract_isbn_from_pdf(videopath)
         if pdf_isbn and not meta.isbn:
             meta.isbn = pdf_isbn
@@ -284,7 +284,7 @@ async def gather_book_prep(
 
     if not meta.edit:
         try:
-            mi = await exportInfo(
+            mi = await export_info(
                 videopath,
                 meta.isdir,
                 meta.uuid,
@@ -448,7 +448,7 @@ async def gather_book_prep(
 
     # Series fallback from filename (embedded Calibre/MediaInfo tags take precedence)
     if not meta.book_series:
-        fname_series, fname_index = _extract_series_from_filename(os.path.basename(videopath))
+        fname_series, fname_index = _extract_series_from_filename(Path(videopath).name)
         if fname_series:
             meta.book_series = fname_series
             if fname_index and not meta.book_series_index:
@@ -770,7 +770,7 @@ async def get_audiobook_duration(filelist: list[str]) -> tuple[float, str]:
 
     def _get_file_duration(file_path: str) -> float:
         with contextlib.suppress(Exception):
-            if not os.path.isfile(file_path):
+            if not Path(file_path).is_file():
                 return 0.0
             media_info = MediaInfo.parse(file_path)
             for track in media_info.tracks:
@@ -809,7 +809,7 @@ async def get_audiobook_bitrate(filelist: list[str]) -> int | None:
 
     def _get_file_bitrate(file_path: str) -> int | None:
         with contextlib.suppress(Exception):
-            if not os.path.isfile(file_path):
+            if not Path(file_path).is_file():
                 return None
             media_info = MediaInfo.parse(file_path)
             for track in media_info.tracks:

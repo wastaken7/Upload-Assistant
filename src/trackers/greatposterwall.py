@@ -17,7 +17,7 @@ from src.languages import languages_manager
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 
 class GreatPosterWall:
@@ -122,7 +122,7 @@ class GreatPosterWall:
         if not Path(cookie_file).exists():
             return False
 
-        return await self.common.parseCookieFile(cookie_file)
+        return await self.common.parse_cookie_file(cookie_file)
 
     async def load_localized_data(self, meta: Meta) -> None:
         data = meta.tmdb_localized_data
@@ -936,7 +936,8 @@ class GreatPosterWall:
                             best_score = score
                         if score >= 10:
                             return response_data
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Failed to process response payload on GreatPosterWall: {e}", exc_info=True)
                 continue
 
         return best_response

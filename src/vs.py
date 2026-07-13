@@ -24,15 +24,15 @@ zresize: Any = awsmfunc.zresize
 # core.std.LoadPlugin(path="/usr/local/lib/vapoursynth/libimwri.so")
 
 
-def CustomFrameInfo(clip: Any, _text: str) -> Any:
-    def FrameProps(n: int, f: Any, clip: Any) -> Any:
+def custom_frame_info(clip: Any, _text: str) -> Any:
+    def frame_props(n: int, f: Any, clip: Any) -> Any:
         # Modify the frame properties extraction here to avoid the decode issue
         info = f"Frame {n} of {clip.num_frames}\nPicture type: {f.props['_PictType']}"
         # Adding the frame information as text to the clip
         return core.text.Text(clip, info)
 
-    # Apply FrameProps to each frame
-    return core.std.FrameEval(clip, partial(FrameProps, clip=clip), prop_src=clip)
+    # Apply frame_props to each frame
+    return core.std.FrameEval(clip, partial(frame_props, clip=clip), prop_src=clip)
 
 
 def optimize_images(image: str, config: dict[str, Any]) -> None:
@@ -50,7 +50,7 @@ def optimize_images(image: str, config: dict[str, Any]) -> None:
                 oxipng = None
             if oxipng is None:
                 return
-            if os.path.getsize(image) >= 16000000:
+            if Path(image).stat().st_size >= 16000000:
                 oxipng.optimize(image, level=6)
             else:
                 oxipng.optimize(image, level=3)
@@ -110,7 +110,7 @@ def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str =
     # Generate random frame numbers for screenshots if not using existing ones
     if not frames:
         for _ in range(num):
-            frames.append(random.randint(start, end))  # nosec B311
+            frames.append(random.randint(start, end))  # nosec B311  # noqa: S311
         frames = sorted(frames)
         frame_lines = [f"{x}\n" for x in frames]
 
@@ -145,12 +145,12 @@ def vs_screengn(source: str, encode: str | None = None, num: int = 5, dir: str =
 
     # Use the custom FrameInfo function
     if tonemapped:
-        src = CustomFrameInfo(src, "Tonemapped")
+        src = custom_frame_info(src, "Tonemapped")
 
     # Generate screenshots
     ScreenGen(src, dir, "a")
     if encode and enc is not None:
-        enc = CustomFrameInfo(enc, "Encode (Tonemapped)")
+        enc = custom_frame_info(enc, "Encode (Tonemapped)")
         ScreenGen(enc, dir, "b")
 
     # Optimize images

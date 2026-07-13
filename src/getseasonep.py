@@ -229,7 +229,7 @@ class SeasonEpisodeManager:
                                 async with httpx.AsyncClient(timeout=30.0) as client:
                                     response = (await client.post(url, params=params)).json()
                                 if response["result"] == "failure":
-                                    raise XEMNotFound  # noqa: F405
+                                    raise XEMNotFoundError  # noqa: F405
                                 logger.debug(f"[cyan]TheXEM Absolute -> Standard[/cyan]\n{response}")
                                 season_int = int(response["data"]["scene"]["season"])  # Convert to integer
                                 season = f"S{str(season_int).zfill(2)}"
@@ -266,7 +266,7 @@ class SeasonEpisodeManager:
                                                         season = f"S{str(season_int).zfill(2)}"
                                                         difference = diff
                                 else:
-                                    raise XEMNotFound  # noqa: F405
+                                    raise XEMNotFoundError  # noqa: F405
                         except Exception:
                             if meta.debug:
                                 console.print_exception()

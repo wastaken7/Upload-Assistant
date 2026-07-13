@@ -568,7 +568,7 @@ class QbittorrentClientMixin:
                 path = str(Path(path).parent)
 
         # Get the appropriate source path
-        src = meta.filelist[0] if len(meta.filelist) == 1 and os.path.isfile(meta.filelist[0]) and not meta.keep_folder else meta.path
+        src = meta.filelist[0] if len(meta.filelist) == 1 and Path(meta.filelist[0]).is_file() and not meta.keep_folder else meta.path
 
         if not src:
             error_msg = "[red]No source path found in meta."
@@ -1863,7 +1863,7 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
         if abs_candidate in seen:
             continue
         seen.add(abs_candidate)
-        if not os.path.isfile(abs_candidate):
+        if not Path(abs_candidate).is_file():
             continue
         if tracker_abs:
             try:
@@ -1872,7 +1872,7 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
             except ValueError:
                 pass
         try:
-            size = os.path.getsize(abs_candidate)
+            size = Path(abs_candidate).stat().st_size
         except OSError:
             size = None
         unique_candidates.append({"path": abs_candidate, "name": Path(abs_candidate).name.lower(), "size": size, "used": False})

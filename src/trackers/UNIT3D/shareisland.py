@@ -17,10 +17,11 @@ from src.audio import AudioManager
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 _shri_session_data: dict[str, dict[str, str | None]] = {}
+ITALIAN_LANGS = {"it", "ita", "italian"}
 
 
 class Shareisland(UNIT3D):
@@ -992,7 +993,7 @@ class Shareisland(UNIT3D):
             "unknown",
             "unk",
         ]:
-            shoutouts = f"SHOUTOUTS : {random.choice(pirate_shouts)}"  # nosec B311
+            shoutouts = f"SHOUTOUTS : {random.choice(pirate_shouts)}"  # nosec B311  # noqa: S311
         else:
             shoutouts = f"SHOUTOUTS : {release_group}"
         logo_section = f"[center][img=250]{logo_url}[/img][/center]\n" if logo_url else ""

@@ -282,7 +282,7 @@ class TorrentCreator:
                         # Ensure executable permission for non-Windows systems
                         if not sys.platform.startswith("win"):
                             with contextlib.suppress(Exception):
-                                os.chmod(mkbrr_binary, 0o700)
+                                Path(mkbrr_binary).chmod(0o700)
 
                         cmd = [mkbrr_binary, "create", os.fspath(path)]
 
@@ -320,7 +320,7 @@ class TorrentCreator:
 
                         # Run mkbrr subprocess in thread to avoid blocking
                         def run_mkbrr() -> int:
-                            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+                            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)  # noqa: S603
 
                             if process.stdout is None:
                                 return process.wait()
@@ -399,11 +399,11 @@ class TorrentCreator:
                 # Calculate initial size
                 def calculate_size() -> int:
                     size = 0
-                    if os.path.isfile(path):
-                        size = os.path.getsize(path)
+                    if Path(path).is_file():
+                        size = Path(path).stat().st_size
                     elif Path(path).is_dir():
                         for root, _dirs, files in os.walk(path):
-                            size += sum(os.path.getsize(Path(root) / f) for f in files if os.path.isfile(Path(root) / f))
+                            size += sum((Path(root) / f).stat().st_size for f in files if (Path(root) / f).is_file())
                     return size
 
                 initial_size = await asyncio.to_thread(calculate_size)
@@ -440,7 +440,7 @@ class TorrentCreator:
                 formatted_time = time.strftime("%H:%M:%S", time.gmtime(total_elapsed_time))
 
                 torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{output_filename}.torrent"
-                torrent_file_size = os.path.getsize(torrent_file_path) / 1024
+                torrent_file_size = Path(torrent_file_path).stat().st_size / 1024
                 logger.debug("")
                 logger.debug(f"[bold green]torrent created in {formatted_time}")
                 logger.debug(f"[green]Torrent file size: {torrent_file_size:.2f} KB")
@@ -485,7 +485,7 @@ class TorrentCreator:
         base_torrent = Torrent.read(f"{base_dir}{'/' + 'tmp' + '/'}{uuid}/BASE.torrent")
         for i in range(1, int(num) + 1):
             new_torrent = base_torrent
-            new_torrent.metainfo["info"]["entropy"] = random.randint(1, 999999)  # type: ignore  # nosec B311
+            new_torrent.metainfo["info"]["entropy"] = random.randint(1, 999999)  # type: ignore  # nosec B311  # noqa: S311
             Torrent.copy(new_torrent).write(f"{base_dir}{'/' + 'tmp' + '/'}{uuid}/[RAND-{i}]{manual_name}.torrent", overwrite=True)
 
     @staticmethod

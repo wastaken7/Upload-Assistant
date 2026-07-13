@@ -84,13 +84,13 @@ class MkbrrBinaryManager:
         if binary_path.exists() and binary_path.is_file():
             if system != "windows":
                 # Set secure permissions before removal
-                os.chmod(binary_path, 0o600)
+                Path(binary_path).chmod(0o600)
             binary_path.unlink()
             logger.debug(f"[blue]Removed existing binary at: {binary_path}[/blue]")
 
         if wrong_version and version_path.exists():
             if system != "windows":
-                os.chmod(version_path, 0o644)
+                Path(version_path).chmod(0o644)
             version_path.unlink()
             logger.debug(f"[blue]Removed existing version file at: {version_path}[/blue]")
 
@@ -279,7 +279,7 @@ class MkbrrBinaryManager:
                             logger.warning(f"Warning: Skipping absolute path: {member.name}", extra={"markup": False})
                             continue
 
-                        if ".." in member.name.split(os.sep):
+                        if ".." in Path(member.name).parts:
                             logger.warning(f"Warning: Skipping path with '..': {member.name}", extra={"markup": False})
                             continue
 
@@ -328,7 +328,7 @@ class MkbrrBinaryManager:
             temp_archive.unlink()
 
             if binary_path.exists():
-                os.chmod(binary_path, 0o700)
+                Path(binary_path).chmod(0o700)
                 logger.info(f"mkbrr binary ready at: {binary_path}", extra={"markup": False})
 
                 with Path(version_path).open("w", encoding="utf-8") as version_file:

@@ -232,17 +232,16 @@ class TmdbManager:
         tmdb_id: int,
         category: str,
         logo_languages: list[str] | str | None = None,
-        TMDB_API_KEY: str | None = None,
-        TMDB_BASE_URL: str | None = None,
+        tmdb_api_key: str | None = None,
+        tmdb_base_url: str | None = None,
         logo_json: dict[str, Any] | None = None,
     ) -> str:
-        _ = TMDB_API_KEY
         return await get_logo(
             tmdb_id=tmdb_id,
             category=category,
             logo_languages=logo_languages,
-            TMDB_API_KEY=tmdb_api_key,
-            TMDB_BASE_URL=TMDB_BASE_URL,
+            tmdb_api_key=tmdb_api_key,
+            tmdb_base_url=tmdb_base_url,
             logo_json=logo_json,
         )
 
@@ -1233,7 +1232,7 @@ async def tmdb_other_meta(
         if default_config.get("add_logo", False) and logo_data and not isinstance(logo_data, Exception):
             try:
                 logo_json = typing_cast(dict[str, Any], logo_data.json())  # type: ignore
-                logo_path = await get_logo(tmdb_id, category or "MOVIE", TMDB_API_KEY=tmdb_api_key, TMDB_BASE_URL=TMDB_BASE_URL, logo_json=logo_json)
+                logo_path = await get_logo(tmdb_id, category or "MOVIE", tmdb_api_key=tmdb_api_key, tmdb_base_url=TMDB_BASE_URL, logo_json=logo_json)
                 tmdb_logo = logo_path.split("/")[-1]
             except Exception:
                 logger.info("[yellow]Failed to process logo[/yellow]")
@@ -1535,7 +1534,7 @@ async def get_romaji(tmdb_name: str, mal: int | None, meta: Meta) -> tuple[str, 
             for title in anime_title.values():
                 if title is not None:
                     title_clean = re.sub(
-                        "[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]+ (?=[A-Za-z ]+–)",
+                        "[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]+ (?=[A-Za-z ]+–)",  # noqa: RUF001
                         "",
                         str(title).lower().replace(" ", ""),
                         flags=re.U,
@@ -1817,8 +1816,8 @@ async def get_logo(
     tmdb_id: int,
     category: str,
     logo_languages: list[str] | str | None = None,
-    TMDB_API_KEY: str | None = None,
-    TMDB_BASE_URL: str | None = None,
+    tmdb_api_key: str | None = None,
+    tmdb_base_url: str | None = None,
     logo_json: dict[str, Any] | None = None,
 ) -> str:
     logo_path = ""
@@ -1847,7 +1846,7 @@ async def get_logo(
             # Make HTTP request only if logo_json is not provided
             async with httpx.AsyncClient() as client:
                 endpoint = "tv" if category == "TV" else "movie"
-                image_response = await client.get(f"{TMDB_BASE_URL}/{endpoint}/{tmdb_id}/images", params={"api_key": TMDB_API_KEY})
+                image_response = await client.get(f"{tmdb_base_url}/{endpoint}/{tmdb_id}/images", params={"api_key": tmdb_api_key})
                 try:
                     image_response.raise_for_status()
                     image_data = image_response.json()

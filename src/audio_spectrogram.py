@@ -25,8 +25,8 @@ def get_audio_streams(file_path):
     """
     Uses ffprobe to list all audio streams in the MKV file.
     """
-    command = ["ffprobe", "-v", "error", "-show_entries", "stream=index:stream_tags=language,title", "-select_streams", "a", "-of", "json", file_path]
-    result = subprocess.run(command, capture_output=True, text=True)
+    command: list[str] = ["ffprobe", "-v", "error", "-show_entries", "stream=index:stream_tags=language,title", "-select_streams", "a", "-of", "json", file_path]
+    result = subprocess.run(command, capture_output=True, text=True)  # noqa: S603
     return json.loads(result.stdout).get("streams", [])
 
 
@@ -39,7 +39,7 @@ def generate_spectrogram(stream_index, stream_label, stream_lang, file_path, out
     # FFmpeg command to extract specific audio stream to pipe
     command = ["ffmpeg", "-y", "-i", file_path, "-map", f"0:{stream_index}", "-t", str(DURATION_LIMIT), "-f", "wav", "-ac", "1", "-ar", "22050", "pipe:1"]
 
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # noqa: S603  # noqa: S603
     stdout, _ = process.communicate()
 
     # Load into librosa

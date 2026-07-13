@@ -11,7 +11,7 @@ import aiofiles.os
 import cli_ui
 import httpx
 import pyotp
-from defusedxml import ElementTree as ET
+from defusedxml import ElementTree
 
 from cogs.redaction import Redaction
 from src.console import console, logger
@@ -19,7 +19,7 @@ from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.torrentcreate import TorrentCreator
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 Config = dict[str, Any]
 
@@ -747,7 +747,7 @@ class MoreThanTV:
         elif meta.tvdb_id != 0:
             params["tvdbid"] = str(meta.tvdb_id)
         else:
-            params["q"] = meta.title.replace(": ", " ").replace("’", "").replace("'", "")
+            params["q"] = meta.title.replace(": ", " ").replace("’", "").replace("'", "")  # noqa: RUF001
 
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(url=self.search_url, params=params)
@@ -756,7 +756,7 @@ class MoreThanTV:
                 # Parse XML response
                 try:
                     loop = asyncio.get_running_loop()
-                    response_xml = await loop.run_in_executor(None, lambda: ET.fromstring(response.text))
+                    response_xml = await loop.run_in_executor(None, lambda: ElementTree.fromstring(response.text))
                     channel = cast(Any | None, response_xml.find("channel"))
                     if channel is None:
                         return dupes
@@ -768,7 +768,7 @@ class MoreThanTV:
                         link = str(each.findtext("link") or "")
                         result = {"name": title, "files": title, "file_count": int(files_text), "size": int(size_text), "link": guid, "download": link}
                         dupes.append(result)
-                except ET.ParseError:
+                except ElementTree.ParseError:
                     logger.error("[red]Failed to parse XML response from MoreThanTV API")
             else:
                 # Handle potential error messages

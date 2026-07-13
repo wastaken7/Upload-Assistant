@@ -614,7 +614,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     piece_size = reuse_torrent.piece_size
                     piece_in_mib = piece_size / 1024 / 1024
                     torrent_storage_dir_valid = torrent_path
-                    torrent_file_size_kib = round(os.path.getsize(torrent_storage_dir_valid) / 1024, 2)
+                    torrent_file_size_kib = round(Path(torrent_storage_dir_valid).stat().st_size / 1024, 2)
                     logger.debug(
                         f"Checking piece size, count and size: pieces={reuse_torrent.pieces}, piece_size={piece_in_mib} MiB, .torrent size={torrent_file_size_kib} KiB"
                     )

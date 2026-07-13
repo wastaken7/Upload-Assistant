@@ -83,7 +83,7 @@ async def search_bluray(meta: Meta) -> str | None:
 
     while retry_count <= max_retries:
         try:
-            delay = random.uniform(1, 3)  # nosec B311 - Rate limiting delay, not cryptographic
+            delay = random.uniform(1, 3)  # nosec B311 - Rate limiting delay, not cryptographic  # noqa: S311
             logger.debug(f"[dim]Waiting {delay:.2f} seconds before request (attempt {retry_count + 1}/{max_retries + 1})...[/dim]")
             await asyncio.sleep(delay)
 
@@ -363,7 +363,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
             logger.info(f"[yellow]Error reading cached file: {e!s}[/yellow]")
 
         # If we're here, we need to make a request
-        delay = random.uniform(2, 4)  # nosec B311 - Rate limiting delay, not cryptographic
+        delay = random.uniform(2, 4)  # nosec B311 - Rate limiting delay, not cryptographic  # noqa: S311
         logger.debug(f"[dim]Waiting {delay:.2f} seconds before request...[/dim]")
         await asyncio.sleep(delay)
 
@@ -856,7 +856,7 @@ async def fetch_release_details(release: Release, meta: Meta) -> Release:
         logger.info(f"[yellow]Error reading cached file: {e!s}[/yellow]")
 
     # If we're here, we need to make a request
-    delay = random.uniform(2, 4)  # nosec B311 - Rate limiting delay, not cryptographic
+    delay = random.uniform(2, 4)  # nosec B311 - Rate limiting delay, not cryptographic  # noqa: S311
     logger.debug(f"[dim]Waiting {delay:.2f} seconds before request...[/dim]")
     await asyncio.sleep(delay)
 

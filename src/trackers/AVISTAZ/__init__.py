@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
-import os
 import platform
 import re
 import uuid
@@ -22,7 +21,7 @@ from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 Config = dict[str, Any]
 
@@ -188,7 +187,7 @@ class AZTrackerBase:
                 tracker=self.tracker,
                 test_url=f"{self.base_url}/torrents",
                 error_text="Page not found",
-                token_pattern=r'name="_token" content="([^"]+)"',  # nosec B106
+                token_pattern=r'name="_token" content="([^"]+)"',  # noqa: S106
             )
         return False
 
@@ -763,7 +762,7 @@ class AZTrackerBase:
             for term in forbidden_terms:
                 upload_name = re.sub(term, "", upload_name, flags=re.IGNORECASE).strip()
 
-            upload_name = re.sub(r"\bDirector[’\'`]s\s+Cut\b", "DC", upload_name, flags=re.IGNORECASE)
+            upload_name = re.sub(r"\bDirector[’\'`]s\s+Cut\b", "DC", upload_name, flags=re.IGNORECASE)  # noqa: RUF001
             upload_name = re.sub(r"\bExtended\s+Cut\b", "Extended", upload_name, flags=re.IGNORECASE)
             upload_name = re.sub(r"\bTheatrical\s+Cut\b", "Theatrical", upload_name, flags=re.IGNORECASE)
             upload_name = re.sub(r"\s{2,}", " ", upload_name).strip()

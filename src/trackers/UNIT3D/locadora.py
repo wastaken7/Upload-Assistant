@@ -6,7 +6,7 @@ import aiofiles
 
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]

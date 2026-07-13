@@ -4,7 +4,6 @@ import contextlib
 import glob
 import io
 import json
-import os
 import platform
 import re
 from pathlib import Path
@@ -26,7 +25,7 @@ from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 from src.uploadscreens import UploadScreensManager
 
 
@@ -472,7 +471,7 @@ class PassThePopcorn:
 
         return tags
 
-    async def search_existing(self, groupID: int | str, meta: Meta) -> list[str]:
+    async def search_existing(self, group_id: int | str, meta: Meta) -> list[str]:
         # Map resolutions to SD / HD / UHD
         quality = None
         if meta.sd == 1:  # 1 is SD
@@ -484,7 +483,7 @@ class PassThePopcorn:
 
         # Prepare request parameters and headers
         params = {
-            "id": groupID,
+            "id": group_id,
         }
         headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
         url = "https://passthepopcorn.me/torrents.php"
@@ -1243,7 +1242,7 @@ class PassThePopcorn:
         elif len(filelist) > 1:
             for i, file in enumerate(filelist):
                 if i == 0:
-                    if meta.type == "WEBDL" and meta.service_longname != "" and meta.description is None and self.web_source is True:
+                    if meta.type == "WEBDL" and meta.service_longname != "" and not meta.description and self.web_source is True:
                         desc.write(f"[quote][align=center]This release is sourced from {meta.service_longname}[/align][/quote]")
                     base2ptp = self.convert_bbcode(base)
                     if base2ptp.strip() != "":
@@ -1381,7 +1380,7 @@ class PassThePopcorn:
             logger.info(f"[bold red]Error saving image links: {e}[/bold red]")
             return None
 
-    async def get_AntiCsrfToken(self, meta: Meta) -> str:
+    async def get_anti_csrf_token(self, meta: Meta) -> str:
         if not Path(f"{meta.base_dir}/data/cookies").exists():
             Path(f"{meta.base_dir}/data/cookies").mkdir(parents=True, exist_ok=True)
         from src.cookie_auth import find_cookie_file
@@ -1410,7 +1409,7 @@ class PassThePopcorn:
 
         passkey_match = re.match(r"https?://please\.passthepopcorn\.me:?\d*/(.+)/announce", self.announce_url)
         if not passkey_match:
-            raise LoginException("Failed to extract passkey from PassThePopcorn announce URL.")  # noqa F405
+            raise LoginError("Failed to extract passkey from PassThePopcorn announce URL.")  # noqa F405
         pass_key = passkey_match.group(1)
         data = {
             "username": self.username,
@@ -1432,7 +1431,7 @@ class PassThePopcorn:
                     resp = loginresponse.json()
                 try:
                     if resp["Result"] != "Ok":
-                        raise LoginException("Failed to login to PassThePopcorn. Probably due to the bad user name, password, announce url, or 2FA code.")  # noqa F405
+                        raise LoginError("Failed to login to PassThePopcorn. Probably due to the bad user name, password, announce url, or 2FA code.")  # noqa F405
                     anti_csrf_token = resp["AntiCsrfToken"]
                     self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # pyright: ignore[reportPrivateUsage]
                 except Exception:
@@ -1442,7 +1441,7 @@ class PassThePopcorn:
                         redacted_text = json.dumps(redacted)
                     except json.JSONDecodeError:
                         redacted_text = Redaction.redact_private_info(loginresponse.text)
-                    raise LoginException(f"Got exception while loading JSON login response from PassThePopcorn. Response: {redacted_text}")  # noqa F405
+                    raise LoginError(f"Got exception while loading JSON login response from PassThePopcorn. Response: {redacted_text}")  # noqa F405
             except Exception:
                 try:
                     parsed = json.loads(loginresponse.text)
@@ -1450,7 +1449,7 @@ class PassThePopcorn:
                     redacted_text = json.dumps(redacted)
                 except json.JSONDecodeError:
                     redacted_text = Redaction.redact_private_info(loginresponse.text)
-                raise LoginException(f"Got exception while loading JSON login response from PassThePopcorn. Response: {redacted_text}")  # noqa F405
+                raise LoginError(f"Got exception while loading JSON login response from PassThePopcorn. Response: {redacted_text}")  # noqa F405
         return anti_csrf_token
 
     async def validate_login(self, response: httpx.Response) -> bool:
@@ -1458,18 +1457,18 @@ class PassThePopcorn:
         if response.text.find("""<a href="login.php?act=recover">""") != -1:
             logger.info("Looks like you are not logged in to PassThePopcorn. Probably due to the bad user name, password, or expired session.")
         elif "Your popcorn quota has been reached, come back later!" in response.text:
-            raise LoginException("Your PassThePopcorn request/popcorn quota has been reached, try again later")  # noqa F405
+            raise LoginError("Your PassThePopcorn request/popcorn quota has been reached, try again later")  # noqa F405
         else:
             logged_in = True
         return logged_in
 
-    async def fill_upload_form(self, groupID: int | str | None, meta: Meta) -> tuple[str, dict[str, Any]]:
+    async def fill_upload_form(self, group_id: int | str | None, meta: Meta) -> tuple[str, dict[str, Any]]:
         resolution, other_resolution = self.get_resolution(meta)
         await self.edit_desc(meta)
         file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         desc = ""
         try:
-            os.stat(file_path)  # Ensures the file is accessible
+            Path(file_path).stat()  # Ensures the file is accessible
             async with aiofiles.open(file_path, encoding="utf-8") as f:
                 desc = await f.read()
         except OSError as e:
@@ -1550,7 +1549,7 @@ class PassThePopcorn:
             "nfo_text": "",
             "subtitles[]": ptp_subtitles,
             "trumpable[]": ptp_trumpable,
-            "AntiCsrfToken": await self.get_AntiCsrfToken(meta),
+            "AntiCsrfToken": await self.get_anti_csrf_token(meta),
         }
         if data["remaster_year"] != "" or data["remaster_title"] != "":
             data["remaster"] = "on"
@@ -1568,7 +1567,7 @@ class PassThePopcorn:
             data["imdb"] = "0"
         else:
             data["imdb"] = str(imdb_id_int).zfill(7)
-        if groupID is None:  # If need to make new group
+        if group_id is None:  # If need to make new group
             url = "https://passthepopcorn.me/upload.php"
             if data["imdb"] == "0":
                 tinfo = await self.get_torrent_info_tmdb(meta)
@@ -1623,8 +1622,8 @@ class PassThePopcorn:
                 data["artist[]"] = directors
                 data["importance[]"] = "1"
         else:  # Upload on existing group
-            url = f"https://passthepopcorn.me/upload.php?groupid={groupID}"
-            data["groupid"] = groupID
+            url = f"https://passthepopcorn.me/upload.php?groupid={group_id}"
+            data["groupid"] = group_id
 
         return url, data
 

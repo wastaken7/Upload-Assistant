@@ -20,7 +20,7 @@ from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.takescreens import TakeScreensManager
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 from src.uploadscreens import UploadScreensManager
 
 
@@ -104,8 +104,8 @@ async def gen_desc(
         except FileNotFoundError:
             logger.info(f"[ERROR] Template '{meta.description_template}' not found.")
     if meta.nfo:
-        logger.debug(f"specified_dir_path: {specified_dir_path}")
-        logger.debug(f"sourcedir_path: {source_dir_path}")
+        logger.debug(f"specified_dir_path: {specified_dir}")
+        logger.debug(f"sourcedir_path: {source_dir}")
         if "auto_nfo" in meta and meta.auto_nfo is True:
             nfo_files = sorted(str(p) for p in specified_dir.glob("*.nfo"))
             scene_nfo = True
@@ -166,7 +166,7 @@ async def gen_desc(
             logger.info(f"[ERROR] Failed to fetch description from link: {e}")
             raise e
 
-    if description_file and os.path.isfile(description_file):
+    if description_file and Path(description_file).is_file():
         async with aiofiles.open(description_file, encoding="utf-8") as f:
             file_content = await f.read()
         cleaned_content = clean_text(file_content)
@@ -366,7 +366,7 @@ class DescriptionBuilder:
         cache_file_path = Path(cache_file_dir) / "MEDIAINFO_SHORT.txt"
 
         file_exists = Path(cache_file_path).exists()
-        file_size = os.path.getsize(cache_file_path) if file_exists else 0
+        file_size = Path(cache_file_path).stat().st_size if file_exists else 0
 
         if file_exists and file_size > 0:
             with contextlib.suppress(Exception):
@@ -629,7 +629,7 @@ class DescriptionBuilder:
                 header_end = "[/b]\n"
 
             if fields:
-                final_book_parts.append(f"{header}{str_technical_details if not underline else str_technical_details}{header_end}")
+                final_book_parts.append(f"{header}{str_technical_details}{header_end}")
                 table_lines = ["[table]"]
                 for label, val in fields:
                     table_lines.append(f"[tr][td][b]{label}[/b][/td][td]{val}[/td][/tr]")
@@ -640,7 +640,7 @@ class DescriptionBuilder:
                 final_book_parts.append(f"[spoiler=EPUB Metadata][code]{meta.epubmeta_output}[/code][/spoiler]")
 
             if overview:
-                final_book_parts.append(f"{header}{str_overview if not underline else str_overview}{header_end}\n{overview}")
+                final_book_parts.append(f"{header}{str_overview}{header_end}\n{overview}")
 
             return "\n\n".join(part for part in final_book_parts if part.strip())
         book_parts = []
@@ -660,10 +660,10 @@ class DescriptionBuilder:
             header_end = "[/h2]" if not header_size else "[/b][/size]\n"
 
         if book_parts:
-            final_book_parts.append(f"{header}{str_technical_details if not underline else str_technical_details}{header_end}" + "\n".join(book_parts))
+            final_book_parts.append(f"{header}{str_technical_details}{header_end}" + "\n".join(book_parts))
 
         if overview:
-            final_book_parts.append(f"{header}{str_overview if not underline else str_overview}{header_end}{overview}")
+            final_book_parts.append(f"{header}{str_overview}{header_end}{overview}")
 
         return "\n\n".join(final_book_parts)
 
@@ -1778,7 +1778,7 @@ class DescriptionBuilder:
             description = bbcode.remove_sup(description)
             description = bbcode.remove_sub(description)
             description = bbcode.remove_list(description)
-            description = description.replace("•", "-").replace("’", "'").replace("–", "-")
+            description = description.replace("•", "-").replace("’", "'").replace("–", "-")  # noqa: RUF001
             description = description.replace("[code]", "[pre]").replace("[/code]", "[/pre]")
 
         if tracker == "DigitalCore":

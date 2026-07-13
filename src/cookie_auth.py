@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import http.cookiejar
 import json
-import os
 import pickle  # nosec B403 - Only used for legacy cookie migration
 import re
 import stat
@@ -16,7 +15,7 @@ from bs4.element import AttributeValueList
 
 from src.console import logger
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 
 def _attr_to_string(value: str | AttributeValueList | None) -> str:
@@ -43,8 +42,8 @@ def get_tracker_domain(tracker: str, config: dict[str, Any] | None = None) -> st
                 if domain.startswith("www."):
                     domain = domain[4:]
                 return domain
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"[yellow]Warning: Error getting tracker domain: {e}[/yellow]")
 
     if config:
         tracker_cfg = config.get("TRACKERS", {}).get(tracker, {})
@@ -59,8 +58,8 @@ def get_tracker_domain(tracker: str, config: dict[str, Any] | None = None) -> st
                     if domain.startswith("www."):
                         domain = domain[4:]
                     return domain
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"[yellow]Warning: Error getting tracker domain: {e}[/yellow]")
 
     # Fallback/Hardcoded domains
     fallback_domains = {
@@ -128,15 +127,11 @@ def find_cookie_file(base_dir: str, tracker: str, config: dict[str, Any] | None 
         files = sorted(cookies_dir.glob("*"), key=lambda p: p.name)
 
         # Check for exact name match (with any extension)
-        for file_path in files:
-            if file_path.is_file() and file_path.stem.lower() == tracker.lower():
-                matching_files.append(file_path)
+        matching_files.extend(file_path for file_path in files if file_path.is_file() and file_path.stem.lower() == tracker.lower())
 
         # Check for partial name match (e.g. "my_avistaz_cookies.txt")
         if not matching_files:
-            for file_path in files:
-                if file_path.is_file() and tracker.lower() in file_path.name.lower():
-                    matching_files.append(file_path)
+            matching_files.extend(file_path for file_path in files if file_path.is_file() and tracker.lower() in file_path.name.lower())
 
         # 3. Try to find by content/domain match
         if not matching_files:
@@ -152,8 +147,8 @@ def find_cookie_file(base_dir: str, tracker: str, config: dict[str, Any] | None 
                                 head = f.read(10240)
                                 if domain in head.lower():
                                     matching_files.append(file_path)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.error(f"[yellow]Warning: Error reading cookie file: {e}[/yellow]")
 
     if matching_files:
         if len(matching_files) > 1:
@@ -475,7 +470,7 @@ class CookieValidator:
                 json.dump(cookie_dict, f, indent=2)
 
             # Set restrictive permissions (0o600) to protect cookie secrets
-            os.chmod(cookiefile, stat.S_IRUSR | stat.S_IWUSR)
+            Path(cookiefile).chmod(stat.S_IRUSR | stat.S_IWUSR)
 
         except OSError as e:
             logger.error(f"[red]Error with cookie file operations: {e}[/red]")
@@ -499,7 +494,7 @@ class CookieValidator:
 
                     # Load the pickle file
                     with Path(potential_pickle).open("rb") as f:
-                        session_cookies = pickle.load(f)  # nosec B301 - Legacy migration only
+                        session_cookies = pickle.load(f)  # noqa: S301 - Legacy migration only
 
                     # Convert to JSON format
                     cookie_dict = {}
@@ -517,7 +512,7 @@ class CookieValidator:
                         json.dump(cookie_dict, f, indent=2)
 
                     # Set restrictive permissions
-                    os.chmod(cookiefile, stat.S_IRUSR | stat.S_IWUSR)
+                    Path(cookiefile).chmod(stat.S_IRUSR | stat.S_IWUSR)
 
                     # Verify the migration was successful by loading the JSON
                     try:

@@ -3,7 +3,7 @@ from typing import Any
 
 from src.meta import Meta
 from src.trackers.AVISTAZ import AZTrackerBase
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 
 class AvistaZ(AZTrackerBase):

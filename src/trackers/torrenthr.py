@@ -18,7 +18,7 @@ from cogs.redaction import Redaction
 from src.bbcode import BBCODE
 from src.console import console, logger
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 Config = dict[str, Any]
 

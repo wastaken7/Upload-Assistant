@@ -2,7 +2,7 @@
 from typing import Any
 
 
-class LoginException(Exception):
+class LoginError(Exception):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         default_message = "An error occurred while logging in"
         # if any arguments are passed...
@@ -16,7 +16,7 @@ class LoginException(Exception):
             super().__init__(default_message, **kwargs)
 
 
-class UploadException(Exception):
+class UploadError(Exception):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         default_message = "An error occurred while uploading"
         # if any arguments are passed...
@@ -30,15 +30,15 @@ class UploadException(Exception):
             super().__init__(default_message, **kwargs)
 
 
-class XEMNotFound(Exception):
+class XEMNotFoundError(Exception):
     pass
 
 
-class WeirdSystem(Exception):
+class WeirdSystemError(Exception):
     pass
 
 
-class ManualDateException(Exception):
+class ManualDateError(Exception):
     pass
 
 

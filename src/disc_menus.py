@@ -1,7 +1,6 @@
 import asyncio
 import contextlib
 import json
-import os
 import platform
 import re
 from collections.abc import MutableMapping, Sequence
@@ -121,13 +120,13 @@ class DiscMenus:
             # List and filter menu files
             menu_files = []
             try:
-                for file in os.listdir(disc_path):
+                for file in (p.name for p in Path(disc_path).iterdir()):
                     file_lower = file.lower()
                     if disc_type == "DVD" and file_lower.endswith(".vob"):
                         file_name = file.upper()
                         if file_name == "VIDEO_TS.VOB" or re.match(r"^VTS_\d{2}_0\.VOB$", file_name):
                             file_path = Path(disc_path) / file
-                            if os.path.isfile(file_path) and os.path.getsize(file_path) > 50000:
+                            if file_path.is_file() and Path(file_path).stat().st_size > 50000:
                                 menu_files.append((file, file_path))
             except Exception as e:
                 logger.error(f"[red]Error scanning directory {disc_path} for menus: {e}[/red]")
@@ -212,7 +211,7 @@ class DiscMenus:
                 try:
                     process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
                     try:
-                        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30.0)
+                        _stdout, _stderr = await asyncio.wait_for(process.communicate(), timeout=30.0)
                     except TimeoutError:
                         with contextlib.suppress(Exception):
                             process.kill()
@@ -350,9 +349,7 @@ class DiscMenus:
         """
         Uploads disc menu images from a local directory.
         """
-        image_paths = [
-            Path(self.path_to_menu_screenshots) / file for file in os.listdir(self.path_to_menu_screenshots) if file.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
-        ]
+        image_paths = [p for p in Path(self.path_to_menu_screenshots).iterdir() if p.name.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))]
 
         if not image_paths:
             logger.info("[yellow]No local menu images found to upload.[/yellow]")

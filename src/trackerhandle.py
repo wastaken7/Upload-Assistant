@@ -18,7 +18,7 @@ from src.meta import Meta
 from src.qbitwait import Wait
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackers.torrenthr import TorrentHR
-from src.trackersetup import TRACKER_SETUP
+from src.trackersetup import TrackerSetup
 
 type StatusDict = dict[str, Any]
 
@@ -65,7 +65,7 @@ async def process_trackers(
     http_trackers: Sequence[str],
     other_api_trackers: Sequence[str],
 ) -> None:
-    tracker_setup = TRACKER_SETUP(config=config)
+    tracker_setup = TrackerSetup(config=config)
     tracker_setup_any = cast(Any, tracker_setup)
     enabled_trackers = list(cast(Sequence[str], tracker_setup_any.trackers_enabled(meta)))
     manual_packager = ManualPackageManager(config)
@@ -153,7 +153,7 @@ async def process_trackers(
                                 new_dupes = cast(list[Any], await t_class.search_existing(meta))
                             else:
                                 ptp = PassThePopcorn(config=config)
-                                group_id = meta.ptp_groupID
+                                group_id = meta.ptp_groupid
                                 new_dupes = cast(list[Any], await ptp.search_existing(group_id or "", meta))
                         except Exception as e:
                             logger.info(f"[bold red]{tracker_name}: Error redoing duplicate check after bandwidth wait: {e}[/bold red]")
@@ -361,7 +361,7 @@ async def process_trackers(
             if upload_status:
                 try:
                     ptp = PassThePopcorn(config=config)
-                    group_id = meta.ptp_groupID
+                    group_id = meta.ptp_groupid
                     ptp_url, ptp_data = await ptp.fill_upload_form(group_id, meta)
                     is_uploaded = False
                     try:

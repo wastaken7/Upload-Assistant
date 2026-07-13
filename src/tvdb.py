@@ -160,7 +160,7 @@ def _get_tvdb_or_warn(config: dict[str, Any] | None = None) -> TVDB | None:
     return None
 
 
-class tvdb_data:
+class TvdbData:
     def __init__(self, config: Any) -> None:
         self.config = config
 
@@ -427,7 +427,7 @@ class tvdb_data:
                     if os.name == "posix":
                         cache_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
                         with contextlib.suppress(Exception):
-                            os.chmod(cache_path.parent, 0o700)
+                            Path(cache_path.parent).chmod(0o700)
                     else:
                         cache_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -436,7 +436,7 @@ class tvdb_data:
 
                     if os.name == "posix":
                         with contextlib.suppress(Exception):
-                            os.chmod(cache_path, 0o644)
+                            Path(cache_path).chmod(0o644)
                     logger.debug(f"[green]Cached TVDB episodes to {cache_path}[/green]")
                 except Exception as cache_write_error:
                     logger.debug(f"[yellow]Failed to write TVDB cache for {series_id}: {cache_write_error}[/yellow]")

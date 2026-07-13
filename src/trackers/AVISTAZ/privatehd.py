@@ -4,7 +4,7 @@ from typing import Any, cast
 
 from src.meta import Meta
 from src.trackers.AVISTAZ import AZTrackerBase
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 Config = dict[str, Any]
 

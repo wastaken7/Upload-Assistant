@@ -184,7 +184,7 @@ def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
         "FRIKI": "FrikiBar",
         "YOINK": "Yoinked",
         "SUIO": "Suio",
-        "UNIT3D_TEMPLATE": "Unit3dTemplate",
+        "unit3d_template": "Unit3dTemplate",
     }
 
     migrated = False

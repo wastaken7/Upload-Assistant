@@ -32,8 +32,8 @@ class EncryptionError(Exception):
 # Defaults and env var names
 # These are environment variable *names* and not actual secrets — suppress
 # Bandit's hardcoded-password detection for these constants (B105).
-ENV_SESSION_SECRET = "SESSION_SECRET"  # nosec B105
-ENV_SESSION_SECRET_FILE = "SESSION_SECRET_FILE"  # nosec B105
+ENV_SESSION_SECRET = "SESSION_SECRET"  # noqa: S105
+ENV_SESSION_SECRET_FILE = "SESSION_SECRET_FILE"  # noqa: S105
 
 
 def get_config_dir() -> Path:
@@ -165,7 +165,7 @@ def _resolve_session_secret() -> bytes:
                     b = token_bytes(64)
                     p.write_text(b.hex(), encoding="utf-8")
                     with suppress(Exception):
-                        os.chmod(p, 0o600)
+                        Path(p).chmod(0o600)
                     log.info("Auto-generated session secret at %s", p)
                     return b
                 except Exception as e:
@@ -220,7 +220,7 @@ def _resolve_session_secret() -> bytes:
             fobj.write(b.hex())
         with suppress(Exception):
             # Tighten permissions when possible
-            os.chmod(secret_file, 0o600)
+            Path(secret_file).chmod(0o600)
         return b
     except Exception as e:
         log.error("failed to persist session secret: %s", e)
@@ -389,7 +389,7 @@ def create_user(username: str, password: str) -> None:
     data = {"username_enc": username_enc, "password_hash": hash_password(password), "extras_enc": extras_enc}
     path.write_text(json.dumps(data), encoding="utf-8")
     with suppress(Exception):
-        os.chmod(path, 0o600)
+        Path(path).chmod(0o600)
 
 
 def load_user() -> dict | None:
@@ -475,7 +475,7 @@ def set_totp_secret(secret: str | None) -> None:
     raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
     path.write_text(json.dumps(raw), encoding="utf-8")
     with suppress(Exception):
-        os.chmod(path, 0o600)
+        Path(path).chmod(0o600)
 
 
 def get_recovery_hashes() -> list[str]:
@@ -518,7 +518,7 @@ def set_recovery_hashes(hashes: list[str]) -> None:
     raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
     path.write_text(json.dumps(raw), encoding="utf-8")
     with suppress(Exception):
-        os.chmod(path, 0o600)
+        Path(path).chmod(0o600)
 
 
 def get_api_tokens() -> dict:
@@ -560,7 +560,7 @@ def set_api_tokens(store: dict) -> None:
     raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
     path.write_text(json.dumps(raw), encoding="utf-8")
     with suppress(Exception):
-        os.chmod(path, 0o600)
+        Path(path).chmod(0o600)
 
 
 def verify_user(username: str, password: str) -> bool:

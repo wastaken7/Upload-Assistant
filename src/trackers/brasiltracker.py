@@ -23,7 +23,7 @@ from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 from src.meta import Meta
 from src.tmdb import TmdbManager
-from src.trackers.COMMON import COMMON
+from src.trackers.common import COMMON
 
 
 class BrasilTracker:

@@ -388,20 +388,20 @@ def _is_ip_allowed(ip: str) -> bool:
 def _handle_failed_auth(ip: str) -> None:
     """Handle failed authentication attempt. Track failures and blacklist if too many."""
     # Configuration: threshold and window (seconds)
-    FAILURE_THRESHOLD = 5
-    FAILURE_WINDOW = 300  # 5 minutes
+    failure_threshold = 5
+    failure_window = 300  # 5 minutes
 
     failures = _get_ip_failures()
     now = int(time.time())
     pts = failures.get(ip, [])
     # Prune old entries outside the window and append current timestamp
-    pts = [t for t in pts if t >= now - FAILURE_WINDOW]
+    pts = [t for t in pts if t >= now - failure_window]
     pts.append(now)
     failures[ip] = pts
     _set_ip_failures(failures)
 
     # Blacklist if threshold exceeded within window
-    if len(pts) >= FAILURE_THRESHOLD:
+    if len(pts) >= failure_threshold:
         blacklist = _get_ip_blacklist()
         if ip not in blacklist:
             blacklist.append(ip)
@@ -1655,7 +1655,7 @@ def _resolve_user_path(
         if "\x00" in user_path or "\n" in user_path or "\r" in user_path:
             raise ValueError("Invalid characters in path")
 
-        expanded = os.path.expandvars(os.path.expanduser(user_path))
+        expanded = os.path.expandvars(Path(user_path).expanduser())
 
     # Build a normalized path and validate it against allowlisted roots.
     # Use werkzeug.security.safe_join as the primary path sanitizer, with a
@@ -2745,7 +2745,7 @@ def browse_path():
                 return jsonify({"error": "Invalid path specified", "success": False}), 400
 
             # codeql[py/path-injection]
-            for item in sorted(os.listdir(safe_path)):
+            for item in sorted([p.name for p in Path(safe_path).iterdir()]):
                 # Skip hidden files
                 if item.startswith("."):
                     continue
@@ -3478,7 +3478,7 @@ def execute_command():
                         return
 
                     # codeql[py/command-line-injection]
-                    process = subprocess.Popen(  # lgtm[py/command-line-injection]
+                    process = subprocess.Popen(  # lgtm[py/command-line-injection]  # noqa: S603
                         command,
                         stdin=subprocess.PIPE,
                         stdout=subprocess.PIPE,

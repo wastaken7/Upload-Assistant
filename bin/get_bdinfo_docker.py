@@ -44,7 +44,7 @@ def secure_extract_tar(tar_path: Path, extract_to: Path) -> None:
             if member.issym() or member.islnk():
                 logger.warning(f"Warning: Skipping link: {member.name}", extra={"markup": False})
                 continue
-            if Path(member.name).is_absolute() or ".." in member.name.split(os.sep):
+            if Path(member.name).is_absolute() or ".." in Path(member.name).parts:
                 logger.warning(f"Warning: Skipping dangerous path: {member.name}", extra={"markup": False})
                 continue
             try:
@@ -135,7 +135,7 @@ def download_bdinfo_for_docker(base_dir: Path = Path("/Upload-Assistant"), versi
     if not binary_path.exists():
         raise Exception(f"Failed to extract bdinfo binary to {binary_path}")
 
-    os.chmod(binary_path, 0o700)
+    Path(binary_path).chmod(0o700)
 
     with Path(version_path).open("w", encoding="utf-8") as vf:
         vf.write(f"BDInfoCLI-ng version {version} installed successfully.")

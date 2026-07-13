@@ -36,17 +36,17 @@ class ImdbManager:
 
     async def get_imdb_info_api(
         self,
-        imdbID: int | str | None,
+        imdb_id: int | str | None,
         manual_language: str | dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         imdb_info: dict[str, Any] = {}
 
-        if not imdbID or imdbID == 0:
+        if not imdb_id or imdb_id == 0:
             imdb_info["type"] = None
             return imdb_info
 
         try:
-            imdb_id_str = f"tt{imdbID:07d}" if not str(imdbID).startswith("tt") else str(imdbID)
+            imdb_id_str = f"tt{imdb_id:07d}" if not str(imdb_id).startswith("tt") else str(imdb_id)
         except Exception as e:
             logger.error(f"[red]Error:[/red] {e}")
             return imdb_info

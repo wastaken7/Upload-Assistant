@@ -23,7 +23,6 @@ def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, A
 async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> str:
     # Using regex from cross-seed (https://github.com/cross-seed/cross-seed/tree/master?tab=Apache-2.0-1-ov-file)
     release_group = None
-    basename = Path(video).name
     matched_anime = False
 
     # Try specialized regex patterns first

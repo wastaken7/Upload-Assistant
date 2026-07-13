@@ -155,7 +155,7 @@ async def mi_resolution(
     return resolution
 
 
-async def exportInfo(
+async def export_info(
     video: str,
     isdir: bool,
     folder_id: str,
