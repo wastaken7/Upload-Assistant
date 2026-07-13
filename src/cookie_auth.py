@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import http.cookiejar
-import importlib
 import json
 import os
 import pickle  # nosec B403 - Only used for legacy cookie migration
@@ -262,20 +261,10 @@ class CookieValidator:
                         await self.handle_validation_failure(meta, tracker, text)
                         return False
                     # Dynamically set a class attribute to store the token
-                    module_name = f"src.trackers.{tracker}"
-                    for sub in ["", "UNIT3D", "AVISTAZ", "NEXUSPHP"]:
-                        sub_path = f"{sub}." if sub else ""
-                        try:
-                            target = f"src.trackers.{sub_path}{tracker}"
-                            importlib.import_module(target)
-                            module_name = target
-                            break
-                        except ModuleNotFoundError as e:
-                            if e.name == f"src.trackers.{sub_path}{tracker}":
-                                continue
-                            raise
-                    cls = getattr(importlib.import_module(module_name), tracker)
-                    cls.secret_token = str(match.group(1))
+                    from src.trackersetup import tracker_class_map
+                    cls = tracker_class_map.get(tracker.upper())
+                    if cls:
+                        cls.secret_token = str(match.group(1))
 
                 # Save cookies only after a confirmed valid login
                 await self.save_session_cookies(tracker, cookie_jar)

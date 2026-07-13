@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import importlib
 import json
 import os
 import platform
@@ -29,6 +28,7 @@ Config = dict[str, Any]
 
 
 class AZTrackerBase:
+    auth_type = "cookies"
     supported_categories: tuple[str, ...] = ("TV", "MOVIE")
     tracker: str = ""
     source_flag: str = ""
@@ -39,7 +39,7 @@ class AZTrackerBase:
         self.tracker = tracker_name
         self.common = COMMON(config)
         self.cookie_validator = CookieValidator(config)
-        self.az_class = getattr(importlib.import_module(f"src.trackers.AVISTAZ.{self.tracker}"), self.tracker)
+        self.az_class = type(self)
 
         tracker_config = self.config["TRACKERS"][self.tracker]
         self.base_url: str = tracker_config.get("base_url") or getattr(type(self), "base_url", "")

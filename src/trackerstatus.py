@@ -17,7 +17,7 @@ from src.imdb import imdb_manager
 from src.meta import Meta
 from src.metadata_searching import get_douban_id
 from src.torrentcreate import TorrentCreator
-from src.trackers.PTP import PTP
+from src.trackers.passthepopcorn import PTP
 from src.trackersetup import TRACKER_SETUP, tracker_class_map
 from src.uphelper import UploadHelper
 

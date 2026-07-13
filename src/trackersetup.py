@@ -15,88 +15,88 @@ from data.example_config import config as example_config
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
-from src.trackers.ANT import ANT
-from src.trackers.AR import AR
-from src.trackers.ASC import ASC
-from src.trackers.AVISTAZ.AZ import AZ
-from src.trackers.AVISTAZ.CZ import CZ
-from src.trackers.AVISTAZ.PHD import PHD
-from src.trackers.BHD import BHD
-from src.trackers.BHDTV import BHDTV
-from src.trackers.BJS import BJS
-from src.trackers.BT import BT
+from src.trackers.alpharatio import AR
+from src.trackers.amigosshare import ASC
+from src.trackers.anthelion import ANT
+from src.trackers.AVISTAZ.avistaz import AZ
+from src.trackers.AVISTAZ.cinemaz import CZ
+from src.trackers.AVISTAZ.privatehd import PHD
+from src.trackers.beyondhd import BHD
+from src.trackers.bithdtv import BHDTV
+from src.trackers.bjshare import BJS
+from src.trackers.brasiltracker import BT
 from src.trackers.COMMON import COMMON
-from src.trackers.DC import DC
-from src.trackers.FF import FF
-from src.trackers.FL import FL
-from src.trackers.GPW import GPW
-from src.trackers.HDB import HDB
-from src.trackers.HDS import HDS
-from src.trackers.HDT import HDT
-from src.trackers.IPT import IPT
-from src.trackers.IS import IS
-from src.trackers.MKO import MKO
-from src.trackers.MTEAM import MTEAM
-from src.trackers.MTV import MTV
-from src.trackers.NBL import NBL
-from src.trackers.NEXUSPHP.LAJIDUI import LAJIDUI
-from src.trackers.NEXUSPHP.LPT import LPT
-from src.trackers.NEXUSPHP.PTCAFE import PTCAFE
-from src.trackers.NEXUSPHP.PTFANS import PTFANS
-from src.trackers.NEXUSPHP.PTGTK import PTGTK
-from src.trackers.NEXUSPHP.RPT import RPT
-from src.trackers.PTER import PTER
-from src.trackers.PTP import PTP
-from src.trackers.PTS import PTS
-from src.trackers.RTF import RTF
-from src.trackers.SN import SN
-from src.trackers.SPD import SPD
-from src.trackers.THR import THR
-from src.trackers.TL import TL
-from src.trackers.TTG import TTG
-from src.trackers.TVC import TVC
-from src.trackers.UNIT3D.A4K import A4K
-from src.trackers.UNIT3D.ACM import ACM
-from src.trackers.UNIT3D.AITHER import AITHER
-from src.trackers.UNIT3D.BLU import BLU
-from src.trackers.UNIT3D.CBR import CBR
-from src.trackers.UNIT3D.DP import DP
-from src.trackers.UNIT3D.DT import DT
-from src.trackers.UNIT3D.EMUW import EMUW
-from src.trackers.UNIT3D.FRIKI import FRIKI
-from src.trackers.UNIT3D.HHD import HHD
-from src.trackers.UNIT3D.HUNO import HUNO
-from src.trackers.UNIT3D.IHD import IHD
-from src.trackers.UNIT3D.ITT import ITT
-from src.trackers.UNIT3D.LCD import LCD
-from src.trackers.UNIT3D.LDU import LDU
-from src.trackers.UNIT3D.LST import LST
-from src.trackers.UNIT3D.LT import LT
-from src.trackers.UNIT3D.LUME import LUME
-from src.trackers.UNIT3D.MS import MS
-from src.trackers.UNIT3D.OE import OE
-from src.trackers.UNIT3D.OTW import OTW
-from src.trackers.UNIT3D.PT import PT
-from src.trackers.UNIT3D.PTT import PTT
-from src.trackers.UNIT3D.R4E import R4E
-from src.trackers.UNIT3D.RAS import RAS
-from src.trackers.UNIT3D.RF import RF
-from src.trackers.UNIT3D.SAM import SAM
-from src.trackers.UNIT3D.SHRI import SHRI
-from src.trackers.UNIT3D.SP import SP
-from src.trackers.UNIT3D.STC import STC
-from src.trackers.UNIT3D.TIK import TIK
-from src.trackers.UNIT3D.TLZ import TLZ
-from src.trackers.UNIT3D.TOS import TOS
-from src.trackers.UNIT3D.TTR import TTR
-from src.trackers.UNIT3D.ULCX import ULCX
-from src.trackers.UNIT3D.UTP import UTP
-from src.trackers.UNIT3D.YOINK import YOINK
-from src.trackers.UNIT3D.YUS import YUS
-from src.trackers.UNIT3D.ZNTH import ZNTH
-from src.trackers.USENET.CRP import CRP
-from src.trackers.USENET.DS import DS
-from src.trackers.USENET.SUIO import SUIO
+from src.trackers.digitalcore import DC
+from src.trackers.filelist import FL
+from src.trackers.funfile import FF
+from src.trackers.greatposterwall import GPW
+from src.trackers.hdbits import HDB
+from src.trackers.hdspace import HDS
+from src.trackers.hdtorrents import HDT
+from src.trackers.immortalseed import IS
+from src.trackers.iptorrents import IPT
+from src.trackers.makingoff import MKO
+from src.trackers.morethantv import MTV
+from src.trackers.mteam import MTEAM
+from src.trackers.nebulance import NBL
+from src.trackers.NEXUSPHP.lajidui import LAJIDUI
+from src.trackers.NEXUSPHP.longpt import LPT
+from src.trackers.NEXUSPHP.ptcafe import PTCAFE
+from src.trackers.NEXUSPHP.ptfans import PTFANS
+from src.trackers.NEXUSPHP.ptgtk import PTGTK
+from src.trackers.NEXUSPHP.railgunpt import RPT
+from src.trackers.passthepopcorn import PTP
+from src.trackers.pterclub import PTER
+from src.trackers.ptskit import PTS
+from src.trackers.retroflix import RTF
+from src.trackers.speedapp import SPD
+from src.trackers.swarmazon import SN
+from src.trackers.torrentgui import TTG
+from src.trackers.torrenthr import THR
+from src.trackers.torrentleech import TL
+from src.trackers.tvchaosuk import TVC
+from src.trackers.UNIT3D.aither import AITHER
+from src.trackers.UNIT3D.asiancinema import ACM
+from src.trackers.UNIT3D.aura4k import A4K
+from src.trackers.UNIT3D.blutopia import BLU
+from src.trackers.UNIT3D.capybarabr import CBR
+from src.trackers.UNIT3D.cinematik import TIK
+from src.trackers.UNIT3D.darkpeers import DP
+from src.trackers.UNIT3D.emuwarez import EMUW
+from src.trackers.UNIT3D.frikibar import FRIKI
+from src.trackers.UNIT3D.hawkeuno import HUNO
+from src.trackers.UNIT3D.homiehelpdesk import HHD
+from src.trackers.UNIT3D.infinityhd import IHD
+from src.trackers.UNIT3D.itatorrents import ITT
+from src.trackers.UNIT3D.latteam import LT
+from src.trackers.UNIT3D.locadora import LCD
+from src.trackers.UNIT3D.lst import LST
+from src.trackers.UNIT3D.luminarr import LUME
+from src.trackers.UNIT3D.midnightscene import MS
+from src.trackers.UNIT3D.oldtoonsworld import OTW
+from src.trackers.UNIT3D.onlyencodes import OE
+from src.trackers.UNIT3D.polishtorrent import PTT
+from src.trackers.UNIT3D.portugas import PT
+from src.trackers.UNIT3D.racing4everyone import R4E
+from src.trackers.UNIT3D.rastastugan import RAS
+from src.trackers.UNIT3D.reelflix import RF
+from src.trackers.UNIT3D.samaritano import SAM
+from src.trackers.UNIT3D.seedpool import SP
+from src.trackers.UNIT3D.shareisland import SHRI
+from src.trackers.UNIT3D.skipthecommercials import STC
+from src.trackers.UNIT3D.theldu import LDU
+from src.trackers.UNIT3D.theoldschool import TOS
+from src.trackers.UNIT3D.tlzdigital import TLZ
+from src.trackers.UNIT3D.torrentdesi import DT
+from src.trackers.UNIT3D.torrenteros import TTR
+from src.trackers.UNIT3D.uploadcx import ULCX
+from src.trackers.UNIT3D.utp import UTP
+from src.trackers.UNIT3D.yoinked import YOINK
+from src.trackers.UNIT3D.yuscene import YUS
+from src.trackers.UNIT3D.znth import ZNTH
+from src.trackers.USENET.crp import CRP
+from src.trackers.USENET.ds import DS
+from src.trackers.USENET.suio import SUIO
 
 JsonDict = dict[str, Any]
 example_config: dict[str, Any]
@@ -1406,90 +1406,6 @@ tracker_class_map: dict[str, type[Any]] = {
     "ZNTH": ZNTH,
 }
 
-api_trackers = {
-    "A4K",
-    "ACM",
-    "AITHER",
-    "BHD",
-    "BLU",
-    "CBR",
-    "DP",
-    "DT",
-    "EMUW",
-    "FRIKI",
-    "HHD",
-    "HUNO",
-    "IHD",
-    "ITT",
-    "LCD",
-    "LDU",
-    "LST",
-    "LT",
-    "LUME",
-    "MS",
-    "OE",
-    "OTW",
-    "PT",
-    "PTT",
-    "R4E",
-    "RAS",
-    "RF",
-    "SAM",
-    "SHRI",
-    "SP",
-    "STC",
-    "TIK",
-    "TLZ",
-    "TOS",
-    "TTR",
-    "ULCX",
-    "UTP",
-    "YOINK",
-    "YUS",
-    "ZNTH",
-}
-
-other_api_trackers = {
-    "ANT",
-    "BHDTV",
-    "CRP",
-    "DC",
-    "DS",
-    "GPW",
-    "MTEAM",
-    "NBL",
-    "RTF",
-    "SN",
-    "SPD",
-    "SUIO",
-    "TL",
-    "TVC",
-}
-
-http_trackers = {
-    "AR",
-    "ASC",
-    "AZ",
-    "BJS",
-    "BT",
-    "CZ",
-    "FF",
-    "FL",
-    "HDB",
-    "HDS",
-    "HDT",
-    "IPT",
-    "IS",
-    "LAJIDUI",
-    "LPT",
-    "MKO",
-    "MTV",
-    "PHD",
-    "PTCAFE",
-    "PTER",
-    "PTFANS",
-    "PTGTK",
-    "PTS",
-    "RPT",
-    "TTG",
-}
+api_trackers = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "unit3d_api"}
+other_api_trackers = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "other_api"}
+http_trackers = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "cookies"}

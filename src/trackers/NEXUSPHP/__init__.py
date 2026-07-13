@@ -16,6 +16,7 @@ Config = dict[str, Any]
 
 
 class NEXUSPHP:
+    auth_type = "cookies"
     supported_categories: tuple[str, ...] = ("TV", "MOVIE")
     tracker: str = ""
     source_flag: str = ""

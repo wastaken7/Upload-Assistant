@@ -24,6 +24,7 @@ type ParamsList = list[tuple[str, QueryValue]]
 
 
 class UNIT3D:
+    auth_type = "unit3d_api"
     supported_categories: tuple[str, ...] = ("TV", "MOVIE")
     tracker: str = ""
     banned_groups: tuple[str, ...] = ()

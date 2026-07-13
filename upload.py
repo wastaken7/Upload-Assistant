@@ -54,9 +54,9 @@ from src.queuemanage import QueueManager
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
-from src.trackers.AR import AR
+from src.trackers.alpharatio import AR
 from src.trackers.COMMON import COMMON
-from src.trackers.PTP import PTP
+from src.trackers.passthepopcorn import PTP
 from src.trackersetup import TRACKER_SETUP, api_trackers, http_trackers, other_api_trackers, tracker_class_map
 from src.trackerstatus import TrackerStatusManager
 from src.uphelper import UploadHelper

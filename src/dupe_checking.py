@@ -7,7 +7,7 @@ from typing import Any, TypedDict, cast
 from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
-from src.trackers.UNIT3D.HUNO import HUNO
+from src.trackers.UNIT3D.hawkeuno import HUNO
 
 
 class DupeEntry(TypedDict, total=False):

@@ -16,8 +16,8 @@ from src.get_desc import DescriptionBuilder
 from src.manualpackage import ManualPackageManager
 from src.meta import Meta
 from src.qbitwait import Wait
-from src.trackers.PTP import PTP
-from src.trackers.THR import THR
+from src.trackers.passthepopcorn import PTP
+from src.trackers.torrenthr import THR
 from src.trackersetup import TRACKER_SETUP
 
 type StatusDict = dict[str, Any]
