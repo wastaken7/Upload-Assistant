@@ -66,7 +66,7 @@ def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
             elif ":" in stripped and not stripped.startswith("{"):
                 key = stripped.split(":", 1)[0].strip().strip("\"'")
                 # Build fully qualified key path
-                fq_key = ".".join(key_stack + [key]) if key_stack else key
+                fq_key = ".".join([*key_stack, key]) if key_stack else key
 
                 if current_comments:
                     comments[key] = list(current_comments)
@@ -903,7 +903,7 @@ def generate_config_file(
                 key_stack = []
             indent = "    " * indent_level
             for key, value in d.items():
-                fq_key = ".".join(key_stack + [key]) if key_stack else key
+                fq_key = ".".join([*key_stack, key]) if key_stack else key
                 if comments and fq_key in comments:
                     for comment in comments[fq_key]:
                         file.write(f"{indent}{comment}\n")
@@ -912,7 +912,7 @@ def generate_config_file(
 
                 if isinstance(value, dict):
                     file.write("{\n")
-                    write_dict(cast(ConfigDict, value), indent_level + 1, key_stack + [key])
+                    write_dict(cast(ConfigDict, value), indent_level + 1, [*key_stack, key])
                     file.write(f"{indent}}},\n")
                 elif isinstance(value, bool):
                     # Ensure booleans are capitalized

@@ -141,7 +141,7 @@ class ApplyOverrides:
 
             # Create a new Args instance and process the arguments
             arg_processor = Args(self.config)
-            full_args = ["upload.py"] + args
+            full_args = ["upload.py", *args]
             updated_meta, _, _ = arg_processor.parse(full_args, meta.copy())
             updated_meta["path"] = meta.path
             modified_keys: list[str] = []

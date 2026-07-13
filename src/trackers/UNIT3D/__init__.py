@@ -422,7 +422,7 @@ class UNIT3D:
         specified_dir_path = Path(base_dir) / "tmp" / uuid / "*.nfo"
         nfo_files = glob.glob(specified_dir_path)
         if not nfo_files and meta.keep_nfo and (meta.keep_folder or meta.isdir):
-            search_dir = os.path.dirname(str(meta.path))
+            search_dir = str(Path(str(meta.path)).parent)
             nfo_files = glob.glob(Path(search_dir) / "*.nfo")
 
         if nfo_files:

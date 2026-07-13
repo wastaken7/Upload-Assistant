@@ -45,10 +45,7 @@ class Wait:
             self.qbt_proxy_url = self.proxy_url.rstrip("/")
             return None  # No traditional client needed for proxy
         # Use traditional qbittorrent API client
-        if client.get("qbit_api_key"):
-            required_keys = ["qbit_url", "qbit_port", "qbit_api_key"]
-        else:
-            required_keys = ["qbit_url", "qbit_port", "qbit_user", "qbit_pass"]
+        required_keys = ["qbit_url", "qbit_port", "qbit_api_key"] if client.get("qbit_api_key") else ["qbit_url", "qbit_port", "qbit_user", "qbit_pass"]
 
         missing_keys = [key for key in required_keys if key not in client]
         if missing_keys:

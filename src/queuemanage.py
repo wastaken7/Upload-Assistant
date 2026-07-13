@@ -119,7 +119,7 @@ class QueueManager:
 
         # Save back to file
         try:
-            Path(os.path.dirname(processed_files_log)).mkdir(parents=True, exist_ok=True)
+            Path(processed_files_log).parent.mkdir(parents=True, exist_ok=True)
             await _write_json_file(processed_files_log, list(processed_paths), indent=4)
         except OSError as e:
             logger.error(f"[red]Error saving processed path: {e}[/red]")
@@ -286,7 +286,7 @@ class QueueManager:
         """
         queue: list[str] = []
         allowed_extensions_tuple = tuple(allowed_extensions) if allowed_extensions else None
-        if Path(os.path.dirname(path)).exists() and len(paths) <= 1:
+        if Path(path).parent.exists() and len(paths) <= 1:
             escaped_path = path.replace("[", "[[]")
             queue = [
                 file
@@ -295,14 +295,14 @@ class QueueManager:
             ]
             if queue:
                 await QueueManager.display_queue(queue, save_to_log=False)
-        elif Path(os.path.dirname(path)).exists() and len(paths) > 1:
+        elif Path(path).parent.exists() and len(paths) > 1:
             queue = [
                 file
                 for file in paths
                 if Path(file).is_dir() or (os.path.isfile(file) and (allowed_extensions_tuple is None or file.lower().endswith(allowed_extensions_tuple)))
             ]
             await QueueManager.display_queue(queue, save_to_log=False)
-        elif not Path(os.path.dirname(path)).exists():
+        elif not Path(path).parent.exists():
             queue = [
                 file
                 for file in await QueueManager._resolve_split_path(path)
@@ -641,7 +641,7 @@ class QueueManager:
 
         else:
             # Search glob if dirname exists
-            if Path(os.path.dirname(path)).exists() and len(paths) <= 1:
+            if Path(path).parent.exists() and len(paths) <= 1:
                 escaped_path = path.replace("[", "[[]")
                 globs = glob.glob(escaped_path)
                 queue = globs
@@ -653,13 +653,13 @@ class QueueManager:
                 else:
                     logger.info(f"[red]Path: [bold red]{path}[/bold red] does not exist")
 
-            elif Path(os.path.dirname(path)).exists() and len(paths) != 1:
+            elif Path(path).parent.exists() and len(paths) != 1:
                 queue = list(paths)
                 md_text = "\n - ".join(queue)
                 logger.info("\n[bold green]Queuing these files:[/bold green]")
                 logger.info(f"- {md_text.rstrip()}\n\n")
                 logger.info("\n\n")
-            elif not Path(os.path.dirname(path)).exists():
+            elif not Path(path).parent.exists():
                 queue = await QueueManager._resolve_split_path(path)
                 if queue:
                     md_text = "\n - ".join(queue)

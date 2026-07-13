@@ -29,34 +29,34 @@ class TvmazeManager:
         # Convert TVDB ID to integer
         if isinstance(tvdbID, (int, str)) and tvdbID not in ("", "0"):
             try:
-                tvdbID = int(tvdbID)
+                tvdb_id = int(tvdbID)
             except ValueError, TypeError:
                 logger.error(f"[red]Error: tvdbID is not a valid integer. Received: {tvdbID}[/red]")
-                tvdbID = 0
+                tvdb_id = 0
         else:
-            tvdbID = 0
+            tvdb_id = 0
 
         # Handle IMDb ID - ensure it's an integer without tt prefix
         try:
             if isinstance(imdbID, str) and imdbID.startswith("tt"):
-                imdbID = int(imdbID[2:])
+                imdb_id = int(imdbID[2:])
             elif isinstance(imdbID, (int, str)) and imdbID not in ("", "0"):
-                imdbID = int(imdbID)
+                imdb_id = int(imdbID)
             else:
-                imdbID = 0
+                imdb_id = 0
         except ValueError, TypeError:
             logger.error(f"[red]Error: imdbID is not a valid integer. Received: {imdbID}[/red]")
-            imdbID = 0
+            imdb_id = 0
 
         # If manual selection has been provided, return it directly
         if tvmaze_manual:
             try:
                 tvmaze_id = int(tvmaze_manual)
-                return (tvmaze_id, imdbID, tvdbID) if return_full_tuple else tvmaze_id
+                return (tvmaze_id, imdb_id, tvdb_id) if return_full_tuple else tvmaze_id
             except ValueError, TypeError:
                 logger.error(f"[red]Error: tvmaze_manual is not a valid integer. Received: {tvmaze_manual}[/red]")
                 tvmaze_id = 0
-                return (tvmaze_id, imdbID, tvdbID) if return_full_tuple else tvmaze_id
+                return (tvmaze_id, imdb_id, tvdb_id) if return_full_tuple else tvmaze_id
 
         tvmaze_id = 0
         results: list[dict[str, Any]] = []
@@ -68,11 +68,11 @@ class TvmazeManager:
                 return [response] if isinstance(response, dict) else response
             return []
 
-        if tvdbID:
-            results.extend(await fetch_tvmaze_data("https://api.tvmaze.com/lookup/shows", {"thetvdb": tvdbID}))
+        if tvdb_id:
+            results.extend(await fetch_tvmaze_data("https://api.tvmaze.com/lookup/shows", {"thetvdb": tvdb_id}))
 
-        if not results and imdbID:
-            results.extend(await fetch_tvmaze_data("https://api.tvmaze.com/lookup/shows", {"imdb": f"tt{imdbID:07d}"}))
+        if not results and imdb_id:
+            results.extend(await fetch_tvmaze_data("https://api.tvmaze.com/lookup/shows", {"imdb": f"tt{imdb_id:07d}"}))
 
         if not results:
             search_resp = await fetch_tvmaze_data("https://api.tvmaze.com/search/shows", {"q": filename})
@@ -95,7 +95,7 @@ class TvmazeManager:
 
         if not unique_results:
             logger.debug("[yellow]No TVMaze results found.[/yellow]")
-            return (tvmaze_id, imdbID, tvdbID) if return_full_tuple else tvmaze_id
+            return (tvmaze_id, imdb_id, tvdb_id) if return_full_tuple else tvmaze_id
 
         # Manual selection process
         if manual_date is not None:
@@ -120,8 +120,8 @@ class TvmazeManager:
                         if "externals" in selected_show and "thetvdb" in selected_show["externals"]:
                             new_tvdb_id = selected_show["externals"]["thetvdb"]
                             if new_tvdb_id:
-                                tvdbID = int(new_tvdb_id)
-                                logger.info(f"[green]Updated TVDb ID to: {tvdbID}[/green]")
+                                tvdb_id = int(new_tvdb_id)
+                                logger.info(f"[green]Updated TVDb ID to: {tvdb_id}[/green]")
                         logger.info(f"Selected show: {selected_show.get('name')} (TVmaze ID: {tvmaze_id})")
                         break
                     logger.info(f"Invalid choice. Please choose a number between 1 and {len(unique_results)}, or 0 to skip.")
@@ -134,11 +134,11 @@ class TvmazeManager:
 
         if return_full_tuple:
             logger.debug(
-                f"[cyan]Returning TVmaze ID: {tvmaze_id} (type: {type(tvmaze_id).__name__}), IMDb ID: {imdbID} (type: {type(imdbID).__name__}), TVDB ID: {tvdbID} (type: {type(tvdbID).__name__})[/cyan]"
+                f"[cyan]Returning TVmaze ID: {tvmaze_id} (type: {type(tvmaze_id).__name__}), IMDb ID: {imdb_id} (type: {type(imdb_id).__name__}), TVDB ID: {tvdb_id} (type: {type(tvdb_id).__name__})[/cyan]"
             )
         else:
             logger.debug(f"[cyan]Returning TVmaze ID: {tvmaze_id} (type: {type(tvmaze_id).__name__})[/cyan]")
-        return (tvmaze_id, imdbID, tvdbID) if return_full_tuple else tvmaze_id
+        return (tvmaze_id, imdb_id, tvdb_id) if return_full_tuple else tvmaze_id
 
     async def _make_tvmaze_request(
         self,

@@ -2678,10 +2678,10 @@ class COMMON:
             content = await fp.read()
             for line in content.splitlines():
                 if line.strip() and not line.startswith(("# ", "#")):
-                    lineFields = re.split(" |\t", line.strip())
-                    lineFields = [x for x in lineFields if x != ""]
-                    if len(lineFields) >= 7:
-                        cookies[lineFields[5]] = lineFields[6]
+                    line_fields = re.split(" |\t", line.strip())
+                    line_fields = [x for x in line_fields if x != ""]
+                    if len(line_fields) >= 7:
+                        cookies[line_fields[5]] = line_fields[6]
         return cookies
 
     async def ptgen(self, meta: Meta, ptgen_site: str = "", ptgen_retry: int = 3) -> str:
@@ -3238,7 +3238,7 @@ class COMMON:
         :rtype: str
         """
         html_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{tracker}]{file_name}.html"
-        Path(os.path.dirname(html_path)).mkdir(parents=True, exist_ok=True)
+        Path(html_path).parent.mkdir(parents=True, exist_ok=True)
         async with aiofiles.open(html_path, "w", encoding="utf-8") as f:
             await f.write(text)
         return html_path

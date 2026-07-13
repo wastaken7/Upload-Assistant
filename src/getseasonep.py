@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import os
 import re
 import sys
 from collections.abc import Callable, Mapping
@@ -140,7 +139,7 @@ class SeasonEpisodeManager:
                 # if the mal id is set, then we've already run get_romaji in tmdb.py
                 if meta.mal_id == 0 and meta.category == "TV":
                     parsed = _anitopy_parse(Path(video).name)
-                    romaji, mal_id, eng_title, seasonYear, anilist_episodes, meta.demographic = await self.tmdb_manager.get_romaji(
+                    romaji, mal_id, eng_title, season_year, anilist_episodes, meta.demographic = await self.tmdb_manager.get_romaji(
                         str(parsed.get("anime_title", "")),
                         _safe_int(meta.mal_id, 0),
                         meta,
@@ -150,7 +149,7 @@ class SeasonEpisodeManager:
                         meta.mal_id = mal_id_value
                     anilist_episodes = _safe_int(anilist_episodes, 0)
                     if meta.tmdb_id == 0:
-                        year = str(parsed.get("anime_year", seasonYear))
+                        year = str(parsed.get("anime_year", season_year))
                         guess_title = _guessit_data(str(parsed.get("anime_title", "")), {"excludes": ["country", "language"]}).get("title", "")
                         tmdb_id_value, category_value = await self.tmdb_manager.get_tmdb_id(str(guess_title), year, meta.category, meta.filename)
                         meta.tmdb_id = tmdb_id_value
@@ -315,7 +314,7 @@ class SeasonEpisodeManager:
             # Guess the part of the episode (if available)
             meta.part = ""
             if meta.tv_pack == 1:
-                part = _guessit_data(os.path.dirname(video)).get("part")
+                part = _guessit_data(str(Path(video).parent)).get("part")
                 meta.part = f"Part {part}" if part else ""  # pyrefly: ignore [bad-assignment]
 
         return meta

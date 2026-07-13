@@ -161,7 +161,7 @@ class FL:
 
         # Torrent File Naming
         # Note: Don't Edit .torrent filename after creation, SubsPlease anime releases (because of their weird naming) are an exception
-        torrentFileName = str(fl_name) if meta.anime is True and meta.tag == "-SubsPlease" else meta.basename_no_ext
+        torrent_file_name = str(fl_name) if meta.anime is True and meta.tag == "-SubsPlease" else meta.basename_no_ext
 
         # Download new .torrent from site
         desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
@@ -175,8 +175,8 @@ class FL:
             mi_dump = await mi_file.read()
         async with aiofiles.open(torrent_path, "rb") as torrent_file:
             torrent_bytes = await torrent_file.read()
-        torrentFileName = unidecode(torrentFileName)
-        files = {"file": (f"{torrentFileName}.torrent", torrent_bytes, "application/x-bittorent")}
+        torrent_file_name = unidecode(torrent_file_name)
+        files = {"file": (f"{torrent_file_name}.torrent", torrent_bytes, "application/x-bittorent")}
         data = {"name": fl_name, "type": cat_id, "descr": fl_desc.strip(), "nfo": mi_dump}
 
         imdb_id_value = str(meta.imdb_id if meta.imdb_id is not None else "0")

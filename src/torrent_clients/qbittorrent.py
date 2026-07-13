@@ -246,6 +246,7 @@ class QbittorrentClientMixin:
                 else:
                     logger.info(f"[bold red]{operation_name} failed after {max_retries + 1} attempts (final timeout: {timeout}s)")
                     raise  # Re-raise the TimeoutError so caller can handle it
+        return None
 
     async def init_qbittorrent_client(self, client: dict[str, Any]) -> qbittorrentapi.Client | None:
         # Creates and logs into a qbittorrent client, with caching to avoid redundant logins
@@ -560,11 +561,11 @@ class QbittorrentClientMixin:
     ) -> None:
         qbt_proxy_url = ""
         if meta.keep_folder:
-            path = os.path.dirname(path)
+            path = str(Path(path).parent)
         else:
             isdir = Path(path).is_dir()
             if len(filelist) != 1 or not isdir:
-                path = os.path.dirname(path)
+                path = str(Path(path).parent)
 
         # Get the appropriate source path
         src = meta.filelist[0] if len(meta.filelist) == 1 and os.path.isfile(meta.filelist[0]) and not meta.keep_folder else meta.path
@@ -1135,7 +1136,7 @@ class QbittorrentClientMixin:
         if is_disc in ("", None) and len(meta.filelist) == 1:
             file_path = meta.filelist[0]
             file_name = Path(file_path).name
-            parent_dir = Path(os.path.dirname(file_path)).name
+            parent_dir = Path(file_path).parent.name
             return torrent_name.lower() == file_name.lower() or torrent_name.lower() == meta.uuid.lower() or (parent_dir and torrent_name.lower() == parent_dir.lower())
         return torrent_name.lower() == meta.uuid.lower()
 
@@ -1845,9 +1846,9 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
             filelist = []
         if filelist:
             candidate_paths.extend(filelist)
-            parent_guess = os.path.dirname(filelist[0])
+            parent_guess = str(Path(filelist[0]).parent)
         else:
-            parent_guess = os.path.dirname(release_root or "")
+            parent_guess = str(Path(release_root or "").parent)
         if parent_guess and Path(parent_guess).is_dir():
             for root, _, files in os.walk(parent_guess):
                 candidate_paths.extend([Path(root) / file for file in files])
@@ -1935,7 +1936,7 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
         if match_reason == "fallback":
             logger.debug(f"[yellow]Cross-seed mapping fallback used for: {relative_path}")
 
-        dest_parent = os.path.dirname(dest_file_path)
+        dest_parent = str(Path(dest_file_path).parent)
         if dest_parent:
             await asyncio.to_thread(os.makedirs, dest_parent, exist_ok=True)
         if await asyncio.to_thread(os.path.exists, dest_file_path):
@@ -1954,7 +1955,7 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
 async def async_link_directory(src: str, dst: str, use_hardlink: bool = True) -> bool:
     try:
         # Create destination directory
-        await asyncio.to_thread(os.makedirs, os.path.dirname(dst), exist_ok=True)
+        await asyncio.to_thread(os.makedirs, str(Path(dst).parent), exist_ok=True)
 
         # Check if destination already exists
         if await asyncio.to_thread(os.path.exists, dst):
@@ -2005,7 +2006,7 @@ async def async_link_directory(src: str, dst: str, use_hardlink: bool = True) ->
                 # Create subdirectories first (to avoid race conditions)
                 subdirs: set[str] = set()
                 for _, dst_path, _ in all_items:
-                    subdir = os.path.dirname(dst_path)
+                    subdir = str(Path(dst_path).parent)
                     if subdir and subdir not in subdirs:
                         subdirs.add(subdir)
                         await asyncio.to_thread(os.makedirs, subdir, exist_ok=True)

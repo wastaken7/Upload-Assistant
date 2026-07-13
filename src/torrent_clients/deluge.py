@@ -21,7 +21,7 @@ class DelugeClientMixin:
                 path = path.replace(local_path, remote_path)
                 path = path.replace(os.sep, "/")
 
-            path = os.path.dirname(path)
+            path = str(Path(path).parent)
 
             deluge_client.call("core.add_torrent_file", torrent_path, base64.b64encode(torrent.dump()), {"download_location": path, "seed_mode": True})
             logger.debug(f"[cyan]Path: {path}")

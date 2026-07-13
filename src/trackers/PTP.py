@@ -328,12 +328,12 @@ class PTP:
                 if total_results == 1:
                     # Single result - use it
                     movie = response_data.get("Movies", [{}])[0]
-                    groupID: str | None = str(movie.get("GroupId")) if movie.get("GroupId") is not None else None
+                    group_id: str | None = str(movie.get("GroupId")) if movie.get("GroupId") is not None else None
                     title = movie.get("Title", "Unknown")
                     year = movie.get("Year", "Unknown")
-                    logger.info(f"[green]Found single match for IMDb: [yellow]tt{imdb}[/yellow] -> Group ID: [yellow]{groupID}[/yellow][/green]")
+                    logger.info(f"[green]Found single match for IMDb: [yellow]tt{imdb}[/yellow] -> Group ID: [yellow]{group_id}[/yellow][/green]")
                     logger.info(f"[green]Title: [yellow]{title}[/yellow] ([yellow]{year}[/yellow])")
-                    return groupID
+                    return group_id
                 # Multiple results - let user choose
                 logger.info(f"[yellow]Found {total_results} matches for IMDb: tt{imdb}[/yellow]")
                 movies = cast(list[dict[str, Any]], response_data.get("Movies", []))
@@ -354,17 +354,17 @@ class PTP:
                         return None
 
                     # Match selection directly to movie data to avoid index issues from cli_ui sorting
-                    groupID = None
+                    group_id = None
                     for movie in movies:
                         title = movie.get("Title", "Unknown")
                         year = movie.get("Year", "Unknown")
                         group_id = movie.get("GroupId", "Unknown")
                         if f"{title} ({year}) - Group ID: {group_id}" == selected:
-                            groupID = str(group_id)
+                            group_id = str(group_id)
                             break
 
-                    logger.info(f"[green]User selected: Group ID [yellow]{groupID}[/yellow][/green]")
-                    return groupID
+                    logger.info(f"[green]User selected: Group ID [yellow]{group_id}[/yellow][/green]")
+                    return group_id
 
                 except KeyboardInterrupt:
                     logger.info("[yellow]Selection cancelled by user[/yellow]")
@@ -372,10 +372,10 @@ class PTP:
             elif response_data.get("Page") == "Browse":  # No Releases on Site with ID
                 return None
             elif response_data.get("Page") == "Details":  # Group Found
-                groupID = response_data.get("GroupId")
-                logger.info(f"[green]Matched IMDb: [yellow]tt{imdb}[/yellow] to Group ID: [yellow]{groupID}[/yellow][/green]")
+                group_id = response_data.get("GroupId")
+                logger.info(f"[green]Matched IMDb: [yellow]tt{imdb}[/yellow] to Group ID: [yellow]{group_id}[/yellow][/green]")
                 logger.info(f"[green]Title: [yellow]{response_data.get('Name')}[/yellow] ([yellow]{response_data.get('Year')}[/yellow])")
-                return str(groupID) if groupID is not None else None
+                return str(group_id) if group_id is not None else None
         except Exception:
             logger.info("[red]An error has occurred trying to find a group ID")
             logger.info("[red]Please check that the site is online and your ApiUser/api_key values are correct")
@@ -595,19 +595,19 @@ class PTP:
         return image_url
 
     def get_type(self, imdb_info: dict[str, Any], meta: Meta) -> str | None:
-        ptpType = None
+        ptp_type = None
         if imdb_info["type"] is not None:
-            imdbType = imdb_info.get("type", "movie").lower()
-            if imdbType in ("movie", "tv movie", "tvmovie"):
-                ptpType = "Feature Film" if int(imdb_info.get("runtime", "60")) >= 45 or int(imdb_info.get("runtime", "60")) == 0 else "Short Film"
-            if imdbType == "short":
-                ptpType = "Short Film"
-            elif imdbType == "tv mini series":
-                ptpType = "Miniseries"
-            elif imdbType == "comedy":
-                ptpType = "Stand-up Comedy"
-            elif imdbType == "concert":
-                ptpType = "Live Performance"
+            imdb_type = imdb_info.get("type", "movie").lower()
+            if imdb_type in ("movie", "tv movie", "tvmovie"):
+                ptp_type = "Feature Film" if int(imdb_info.get("runtime", "60")) >= 45 or int(imdb_info.get("runtime", "60")) == 0 else "Short Film"
+            if imdb_type == "short":
+                ptp_type = "Short Film"
+            elif imdb_type == "tv mini series":
+                ptp_type = "Miniseries"
+            elif imdb_type == "comedy":
+                ptp_type = "Stand-up Comedy"
+            elif imdb_type == "concert":
+                ptp_type = "Live Performance"
         else:
             keywords = [k.lower() for k in meta.keywords]
             tmdb_type = (meta.tmdb_type if meta.tmdb_type is not None else "movie").lower()
@@ -616,21 +616,21 @@ class PTP:
                     runtime = (meta.runtime) if meta.runtime is not None else 60
                 except ValueError, TypeError:
                     runtime = 60
-                ptpType = "Feature Film" if runtime >= 45 or runtime == 0 else "Short Film"
+                ptp_type = "Feature Film" if runtime >= 45 or runtime == 0 else "Short Film"
             if tmdb_type == "miniseries" or "miniseries" in keywords:
-                ptpType = "Miniseries"
+                ptp_type = "Miniseries"
             if "short" in keywords or "short film" in keywords:
-                ptpType = "Short Film"
+                ptp_type = "Short Film"
             elif "stand-up comedy" in keywords:
-                ptpType = "Stand-up Comedy"
+                ptp_type = "Stand-up Comedy"
             elif "concert" in keywords:
-                ptpType = "Live Performance"
-        if ptpType is None and (meta.mode if meta.mode is not None else "discord") == "cli":
-            ptpTypeList = ["Feature Film", "Short Film", "Miniseries", "Stand-up Comedy", "Concert", "Movie Collection"]
-            ptpType = cli_ui.ask_choice("Select the proper type", choices=ptpTypeList)
-            if ptpType == "Concert":
-                ptpType = "Live Performance"
-        return ptpType
+                ptp_type = "Live Performance"
+        if ptp_type is None and (meta.mode if meta.mode is not None else "discord") == "cli":
+            ptp_type_list = ["Feature Film", "Short Film", "Miniseries", "Stand-up Comedy", "Concert", "Movie Collection"]
+            ptp_type = cli_ui.ask_choice("Select the proper type", choices=ptp_type_list)
+            if ptp_type == "Concert":
+                ptp_type = "Live Performance"
+        return ptp_type
 
     def get_codec(self, meta: Meta) -> str:
         codec = ""
@@ -705,14 +705,14 @@ class PTP:
                         title = track.get("Title", "")
                         if isinstance(title, str) and "intertitles" in title.lower():
                             language = "en (Intertitles)"
-                    for lang, subID in sub_lang_map.items():
-                        if language in lang and subID not in sub_langs:
-                            sub_langs.append(subID)
+                    for lang, sub_id in sub_lang_map.items():
+                        if language in lang and sub_id not in sub_langs:
+                            sub_langs.append(sub_id)
         else:
             for language in meta.bdinfo["subtitles"]:
-                for lang, subID in sub_lang_map.items():
-                    if language in lang and subID not in sub_langs:
-                        sub_langs.append(subID)
+                for lang, sub_id in sub_lang_map.items():
+                    if language in lang and sub_id not in sub_langs:
+                        sub_langs.append(sub_id)
 
         if sub_langs == []:
             sub_langs = [44]  # No Subtitle
@@ -750,9 +750,9 @@ class PTP:
                 trumpable_list.append(15)
                 hc_sub_langs = (cli_ui.ask_string("Enter language code for HC Subtitle languages") or "").strip()
                 if hc_sub_langs:
-                    for lang, subID in self.sub_lang_map.items():
-                        if any(hc_sub_langs == x for x in list(lang)) and subID not in sub_langs:
-                            sub_langs.append(subID)
+                    for lang, sub_id in self.sub_lang_map.items():
+                        if any(hc_sub_langs == x for x in list(lang)) and sub_id not in sub_langs:
+                            sub_langs.append(sub_id)
         sub_langs_result = list({*sub_langs})
         trumpable_unique = list({*trumpable_list})
         trumpable_result: list[int] | None = trumpable_unique if trumpable_unique else None
@@ -1381,7 +1381,7 @@ class PTP:
         if not Path(f"{meta.base_dir}/data/cookies").exists():
             Path(f"{meta.base_dir}/data/cookies").mkdir(parents=True, exist_ok=True)
         cookiefile = f"{meta.base_dir}/data/cookies/PTP.json"
-        loggedIn = False
+        logged_in = False
         uploadresponse: httpx.Response | None = None
         cookies: dict[str, str] = {}
         if Path(cookiefile).exists():
@@ -1389,8 +1389,8 @@ class PTP:
             cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
                 uploadresponse = await client.get("https://passthepopcorn.me/upload.php")
-                loggedIn = await self.validate_login(uploadresponse)
-                if loggedIn is True:
+                logged_in = await self.validate_login(uploadresponse)
+                if logged_in is True:
                     token_match = re.search(r'data-AntiCsrfToken="(.*)"', uploadresponse.text)
                     if token_match:
                         return token_match.group(1)
@@ -1405,11 +1405,11 @@ class PTP:
         passkey_match = re.match(r"https?://please\.passthepopcorn\.me:?\d*/(.+)/announce", self.announce_url)
         if not passkey_match:
             raise LoginException("Failed to extract passkey from PTP announce URL.")  # noqa F405
-        passKey = passkey_match.group(1)
+        pass_key = passkey_match.group(1)
         data = {
             "username": self.username,
             "password": self.password,
-            "passkey": passKey,
+            "passkey": pass_key,
             "keeplogged": "1",
         }
         headers = {"User-Agent": self.user_agent}
@@ -1427,7 +1427,7 @@ class PTP:
                 try:
                     if resp["Result"] != "Ok":
                         raise LoginException("Failed to login to PTP. Probably due to the bad user name, password, announce url, or 2FA code.")  # noqa F405
-                    AntiCsrfToken = resp["AntiCsrfToken"]
+                    anti_csrf_token = resp["AntiCsrfToken"]
                     self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # pyright: ignore[reportPrivateUsage]
                 except Exception:
                     try:
@@ -1445,17 +1445,17 @@ class PTP:
                 except json.JSONDecodeError:
                     redacted_text = Redaction.redact_private_info(loginresponse.text)
                 raise LoginException(f"Got exception while loading JSON login response from PTP. Response: {redacted_text}")  # noqa F405
-        return AntiCsrfToken
+        return anti_csrf_token
 
     async def validate_login(self, response: httpx.Response) -> bool:
-        loggedIn = False
+        logged_in = False
         if response.text.find("""<a href="login.php?act=recover">""") != -1:
             logger.info("Looks like you are not logged in to PTP. Probably due to the bad user name, password, or expired session.")
         elif "Your popcorn quota has been reached, come back later!" in response.text:
             raise LoginException("Your PTP request/popcorn quota has been reached, try again later")  # noqa F405
         else:
-            loggedIn = True
-        return loggedIn
+            logged_in = True
+        return logged_in
 
     async def fill_upload_form(self, groupID: int | str | None, meta: Meta) -> tuple[str, dict[str, Any]]:
         resolution, other_resolution = self.get_resolution(meta)
@@ -1646,8 +1646,8 @@ class PTP:
             await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         # Proceed with the upload process
-        async with aiofiles.open(torrent_file_path, "rb") as torrentFile:
-            torrent_bytes = await torrentFile.read()
+        async with aiofiles.open(torrent_file_path, "rb") as torrent_file_handle:
+            torrent_bytes = await torrent_file_handle.read()
         files = {"file_input": ("placeholder.torrent", torrent_bytes, "application/x-bittorent")}
         headers = {
             # 'ApiUser' : self.api_user,
@@ -1675,14 +1675,14 @@ class PTP:
         # If the response contains our announce URL, then we are on the upload page and the upload wasn't successful.
         if responsetext.find(self.announce_url) != -1:
             # Get the error message.
-            errorMessage = ""
+            error_message = ""
             match = re.search(r"""<div class="alert alert--error.*?>(.+?)</div>""", responsetext)
             if match is not None:
-                errorMessage = match.group(1)
+                error_message = match.group(1)
 
             async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
                 await f.write(responsetext)
-            meta.tracker_status[self.tracker]["status_message"] = f"data error: see {failure_path} | {errorMessage}"
+            meta.tracker_status[self.tracker]["status_message"] = f"data error: see {failure_path} | {error_message}"
 
         # URL format in case of successful upload: https://passthepopcorn.me/torrents.php?id=9329&torrentid=91868
         match = re.match(r".*?passthepopcorn\.me/torrents\.php\?id=(\d+)&torrentid=(\d+)", str(response.url))

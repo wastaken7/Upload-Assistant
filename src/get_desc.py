@@ -70,7 +70,7 @@ async def gen_desc(
         return text.replace("\r\n", "\n").strip()
 
     async def write_description_file(description_path: str, lines: list[str]) -> None:
-        Path(os.path.dirname(description_path)).mkdir(parents=True, exist_ok=True)
+        Path(description_path).parent.mkdir(parents=True, exist_ok=True)
         content = "\n".join(lines)
         async with aiofiles.open(description_path, "w", newline="", encoding="utf8") as description:
             await description.write(content)
@@ -531,7 +531,7 @@ class DescriptionBuilder:
             audio_spectrogram_header = self._get_str_config("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]")
             desc_parts: list[str] = [audio_spectrogram_header] if audio_spectrogram_header is not None else []
             desc_parts.append("\n[center]")
-            screensPerRow = await self.get_screens_per_row()
+            screens_per_row = await self.get_screens_per_row()
             for img_index, spec_img in enumerate(spectrograms_images):
                 if isinstance(spec_img, dict):
                     web_url = spec_img.get("web_url")
@@ -539,7 +539,7 @@ class DescriptionBuilder:
                     img_url = spec_img.get("img_url", raw_url) or ""
                     if web_url and raw_url:
                         desc_parts.append(self.format_screenshot(web_url, raw_url, img_url))
-                        if screensPerRow and (img_index + 1) % screensPerRow == 0:
+                        if screens_per_row and (img_index + 1) % screens_per_row == 0:
                             desc_parts.append("\n")
             desc_parts.append("[/center]\n")
             return "".join(desc_parts)
@@ -1178,7 +1178,7 @@ class DescriptionBuilder:
         thumb_size = self._get_int_config("pack_thumb_size", 300)
         process_limit = self._get_int_config("processLimit", 10)
 
-        screensPerRow = await self.get_screens_per_row()
+        screens_per_row = await self.get_screens_per_row()
 
         desc_parts: list[str] = []
 
@@ -1190,7 +1190,7 @@ class DescriptionBuilder:
                 web_url = images[img_index]["web_url"]
                 raw_url = images[img_index]["raw_url"]
                 desc_parts.append(self.format_screenshot(web_url, raw_url))
-                if screensPerRow and (img_index + 1) % screensPerRow == 0:
+                if screens_per_row and (img_index + 1) % screens_per_row == 0:
                     desc_parts.append("\n")
             desc_parts.append("[/center]")
             return "".join(desc_parts)
@@ -1210,7 +1210,7 @@ class DescriptionBuilder:
                 raw_url = images[img_index]["raw_url"]
                 img_url = images[img_index].get("img_url", raw_url)
                 desc_parts.append(self.format_screenshot(web_url, raw_url, img_url))
-                if screensPerRow and (img_index + 1) % screensPerRow == 0:
+                if screens_per_row and (img_index + 1) % screens_per_row == 0:
                     desc_parts.append("\n")
             desc_parts.append("[/center]")
             if each["type"] == "BDMV":
@@ -1351,7 +1351,7 @@ class DescriptionBuilder:
                         raw_url = images[img_index]["raw_url"]
                         img_url = images[img_index].get("img_url", raw_url)
                         desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
-                        if screensPerRow and (img_index + 1) % screensPerRow == 0:
+                        if screens_per_row and (img_index + 1) % screens_per_row == 0:
                             desc_parts.append("\n")
                     desc_parts.append("[/center]\n\n")
                 else:
@@ -1526,7 +1526,7 @@ class DescriptionBuilder:
                 raw_url = images[img_index]["raw_url"]
                 img_url = images[img_index].get("img_url", raw_url)
                 desc_parts.append(self.format_screenshot(web_url, raw_url, img_url))
-                if screensPerRow and (img_index + 1) % screensPerRow == 0:
+                if screens_per_row and (img_index + 1) % screens_per_row == 0:
                     desc_parts.append("\n")
             desc_parts.append("[/center]")
 
@@ -1670,7 +1670,7 @@ class DescriptionBuilder:
                             image_str = self.format_screenshot(web_url, raw_url, img_url, thumb_size)
                             desc_parts.append(image_str)
                             char_count += len(image_str)
-                            if screensPerRow and (img_index + 1) % screensPerRow == 0:
+                            if screens_per_row and (img_index + 1) % screens_per_row == 0:
                                 desc_parts.append("\n")
                         desc_parts.append("[/center]\n\n")
                         char_count += len("[/center]\n\n")
@@ -1700,22 +1700,22 @@ class DescriptionBuilder:
 
     async def get_screens_per_row(self) -> int:
         try:
-            # If screensPerRow is set, use that to determine how many screenshots should be on each row. Otherwise, use 2 as default
-            screensPerRow = self._get_int_config("screens_per_row", 2)
+            # If screens_per_row is set, use that to determine how many screenshots should be on each row. Otherwise, use 2 as default
+            screens_per_row = self._get_int_config("screens_per_row", 2)
             if self.tracker == "HUNO":
                 width = self._get_int_config("thumbnail_size", 350)
-                # Adjust screensPerRow to keep total width below 1100
-                while screensPerRow * width > 1100 and screensPerRow > 1:
-                    screensPerRow -= 1
+                # Adjust screens_per_row to keep total width below 1100
+                while screens_per_row * width > 1100 and screens_per_row > 1:
+                    screens_per_row -= 1
         except Exception:
-            screensPerRow = 2
-        return screensPerRow
+            screens_per_row = 2
+        return screens_per_row
 
     async def menu_section(self, meta: Meta) -> str:
         menu_image_section = ""
         try:
             disc_menu_header = await self.menu_screenshot_header(meta)
-            screensPerRow = await self.get_screens_per_row()
+            screens_per_row = await self.get_screens_per_row()
             if meta.is_disc:
                 menu_parts: list[str] = []
                 menu_images = meta.menu_images
@@ -1730,7 +1730,7 @@ class DescriptionBuilder:
                         if not web_url or not raw_url:
                             continue
                         menu_parts.append(self.format_screenshot(web_url, raw_url, img_url))
-                        if screensPerRow and (img_index + 1) % screensPerRow == 0:
+                        if screens_per_row and (img_index + 1) % screens_per_row == 0:
                             menu_parts.append("\n")
                     menu_parts.append("[/center]\n\n")
                     menu_image_section = "".join(menu_parts)

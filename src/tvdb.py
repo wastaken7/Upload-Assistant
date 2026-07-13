@@ -526,7 +526,7 @@ class tvdb_data:
                                 logger.debug(f"[blue]TVDB movie ID from IMDB (tv_movie): {movie_id}[/blue]")
                                 return _coerce_int(movie_id), movie_name
 
-                    result_types = [list(result.keys())[0] for result in results if result]
+                    result_types = [next(iter(result.keys())) for result in results if result]
                     logger.debug(f"[yellow]IMDB search returned results but no {'series or movie' if tv_movie else 'series'} found (got: {result_types})[/yellow]")
                 else:
                     logger.debug("[yellow]No TVDB series found for IMDB ID[/yellow]")
@@ -571,7 +571,7 @@ class tvdb_data:
                                 logger.debug(f"[blue]TVDB movie ID from TMDB (tv_movie): {movie_id}[/blue]")
                                 return _coerce_int(movie_id), movie_name
 
-                    result_types = [list(result.keys())[0] for result in results if result]
+                    result_types = [next(iter(result.keys())) for result in results if result]
                     logger.debug(f"[yellow]TMDB search returned results but no {'series or movie' if tv_movie else 'series'} found (got: {result_types})[/yellow]")
                 else:
                     logger.debug("[yellow]No TVDB series found for TMDB ID[/yellow]")

@@ -63,7 +63,7 @@ from src.uphelper import UploadHelper
 from src.uploadscreens import UploadScreensManager
 
 cli_ui.setup(color="always", title="Upload Assistant")
-base_dir = str(Path(os.path.dirname(__file__)).resolve())
+base_dir = str(Path(__file__).resolve().parent)
 
 # Global state for shutdown handling (reset via _reset_shutdown_state() for in-process runs)
 _shutdown_requested = False
@@ -980,7 +980,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
 
             log_path = f"{base_dir}{'/' + 'tmp' + '/'}{tracker}_search_results.json"
             if not await common.path_exists(log_path):
-                await common.makedirs(os.path.dirname(log_path))
+                await common.makedirs(str(Path(log_path).parent))
 
             search_data: list[dict[str, Any]] = []
             if Path(log_path).exists():
@@ -1375,7 +1375,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
 
                             parsed_url = urllib.parse.urlparse(poster_url)
                             if parsed_url.scheme in ("http", "https"):
-                                Path(os.path.dirname(poster_jpg_path)).mkdir(parents=True, exist_ok=True)
+                                Path(poster_jpg_path).parent.mkdir(parents=True, exist_ok=True)
                                 urllib.request.urlretrieve(poster_url, poster_jpg_path)
                                 cover_path = poster_jpg_path
                                 meta.cover_path = cover_path
@@ -1401,7 +1401,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                         try:
                             uploaded_cover, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [cover_path], {})
                             if uploaded_cover and len(uploaded_cover) > 0:
-                                Path(os.path.dirname(covers_file)).mkdir(parents=True, exist_ok=True)
+                                Path(covers_file).parent.mkdir(parents=True, exist_ok=True)
                                 async with aiofiles.open(covers_file, "w", encoding="utf-8") as f:
                                     await f.write(json.dumps(uploaded_cover, indent=4))
                                 meta.covers = uploaded_cover
@@ -1701,7 +1701,7 @@ async def do_the_thing(base_dir: str) -> None:
     try:
         # If cleanup is the only operation, use a dummy path to satisfy the parser
         if cleanup_only:
-            args_list = sys.argv[1:] + ["dummy_path"]
+            args_list = [*sys.argv[1:], "dummy_path"]
             meta, _help, _before_args = cast(tuple[Meta, Any, Any], parser.parse(args_list, meta))
             meta.path = None  # Clear the dummy path after parsing
         else:
@@ -2518,7 +2518,7 @@ async def process_cross_seeds(meta: Meta) -> None:
 
 async def get_mkbrr_path(base_dir: str | None = None) -> str | None:
     try:
-        resolved_base_dir = base_dir or str(Path(os.path.dirname(__file__)).resolve())
+        resolved_base_dir = base_dir or str(Path(__file__).resolve().parent)
         mkbrr_path = await MkbrrBinaryManager.ensure_mkbrr_binary(resolved_base_dir, version="v1.18.0")
         return mkbrr_path if mkbrr_path else None
     except Exception as e:

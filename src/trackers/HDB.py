@@ -272,8 +272,8 @@ class HDB:
         # Proceed with the upload process
         async with aiofiles.open(torrent_file_path, "rb") as torrent_file:
             torrent_bytes = await torrent_file.read()
-        torrentFileName = unidecode(Path(meta.video).name.replace(" ", ".")) if len(meta.filelist) == 1 else unidecode(Path(str(meta.path)).name.replace(" ", "."))
-        files = {"file": (f"{torrentFileName}.torrent", torrent_bytes, "application/x-bittorrent")}
+        torrent_file_name = unidecode(Path(meta.video).name.replace(" ", ".")) if len(meta.filelist) == 1 else unidecode(Path(str(meta.path)).name.replace(" ", "."))
+        files = {"file": (f"{torrent_file_name}.torrent", torrent_bytes, "application/x-bittorrent")}
         data: dict[str, Any] = {
             "name": hdb_name,
             "category": cat_id,
@@ -578,7 +578,7 @@ class HDB:
     async def hdbimg_upload(self, meta: Meta) -> str | None:
         bbcode = ""
         response: httpx.Response | None = None
-        uploadSuccess = False
+        upload_success = False
         sorted_group_indices: list[str] = []
         if meta.comparison:
             comparison_path = meta.comparison
@@ -714,7 +714,7 @@ class HDB:
 
             logger.debug(f"[green]Uploading {len(upload_files)} images to HDB...")
 
-            uploadSuccess = True
+            upload_success = True
             if meta.comparison:
                 num_groups = len(sorted_group_indices) if sorted_group_indices else 3
                 max_chunk_size = 100 * 1024 * 1024  # 100 MiB in bytes
@@ -745,22 +745,22 @@ class HDB:
 
                 # Upload each chunk
                 for chunk_idx, chunk in enumerate(chunks):
-                    fileList: dict[str, tuple[str, bytes, str]] = {}
+                    file_list: dict[str, tuple[str, bytes, str]] = {}
                     for j, (_key, value) in enumerate(chunk):
-                        fileList[f"images_files[{j}]"] = value
+                        file_list[f"images_files[{j}]"] = value
 
                     if meta.debug:
                         chunk_size_mb = sum(os.path.getsize(all_image_files[int(key.split("[")[1].split("]")[0])]) for key, _ in chunk) / (1024 * 1024)
-                        logger.debug(f"[cyan]Uploading chunk {chunk_idx + 1}/{len(chunks)} ({len(fileList)} images, {chunk_size_mb:.2f} MiB)")
+                        logger.debug(f"[cyan]Uploading chunk {chunk_idx + 1}/{len(chunks)} ({len(file_list)} images, {chunk_size_mb:.2f} MiB)")
 
                     async with httpx.AsyncClient(timeout=30.0) as client:
-                        response = await client.post(url, data=data, files=fileList)
+                        response = await client.post(url, data=data, files=file_list)
                     if response.status_code == 200:
                         logger.info(f"[green]Chunk {chunk_idx + 1}/{len(chunks)} upload successful!")
                         bbcode += response.text
                     else:
                         logger.info(f"[red]Chunk {chunk_idx + 1}/{len(chunks)} upload failed with status code {response.status_code}")
-                        uploadSuccess = False
+                        upload_success = False
                         break
             else:
                 async with httpx.AsyncClient(timeout=30.0) as client:
@@ -769,9 +769,9 @@ class HDB:
                     logger.info("[green]Upload successful!")
                     bbcode = response.text
                 else:
-                    uploadSuccess = False
+                    upload_success = False
 
-            if uploadSuccess is True:
+            if upload_success is True:
                 if meta.comparison:
                     matches = re.findall(r"\[url=.*?\]\[img\].*?\[/img\]\[/url\]", bbcode)
                     formatted_bbcode = ""

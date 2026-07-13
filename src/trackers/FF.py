@@ -423,7 +423,6 @@ class FF:
     async def get_poster(self, meta: Meta) -> tuple[str, bytes, str] | None:
         poster_url = meta.poster
 
-        poster_file = None
         if poster_url:
             async with httpx.AsyncClient() as client:
                 response = await client.get(poster_url)
@@ -464,12 +463,12 @@ class FF:
                     "anime_v_res": meta.resolution,
                     "anime_v_dar": self.anime_v_dar(meta),
                     "anime_v_codec": self.anime_v_codec(meta),
-                    "anime_a_codec[]": ["0"] + languages.get("anime_a_codec", []),
-                    "anime_a_ch[]": ["0"] + languages.get("anime_a_ch", []),
-                    "anime_a_lang[]": ["0"] + languages.get("anime_a_lang", []),
-                    "anime_s_format[]": ["0"] + languages.get("anime_s_format", []),
-                    "anime_s_type[]": ["0"] + languages.get("anime_s_type", []),
-                    "anime_s_lang[]": ["0"] + languages.get("anime_s_lang", []),
+                    "anime_a_codec[]": ["0", *languages.get("anime_a_codec", [])],
+                    "anime_a_ch[]": ["0", *languages.get("anime_a_ch", [])],
+                    "anime_a_lang[]": ["0", *languages.get("anime_a_lang", [])],
+                    "anime_s_format[]": ["0", *languages.get("anime_s_format", [])],
+                    "anime_s_type[]": ["0", *languages.get("anime_s_type", [])],
+                    "anime_s_lang[]": ["0", *languages.get("anime_s_lang", [])],
                 }
             )
 

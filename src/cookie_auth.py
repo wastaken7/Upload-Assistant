@@ -152,7 +152,7 @@ class CookieValidator:
                             logger.info(f"{tracker}: [green]Auth key extracted successfully[/green]")
 
                     # Save cookies in Netscape format
-                    Path(os.path.dirname(cookie_file)).mkdir(parents=True, exist_ok=True)
+                    Path(cookie_file).parent.mkdir(parents=True, exist_ok=True)
                     cookie_jar = http.cookiejar.MozillaCookieJar(cookie_file)
 
                     # Convert httpx cookies to MozillaCookieJar format
@@ -355,7 +355,7 @@ class CookieValidator:
 
         # Check for legacy pickle file and migrate if needed
         pickle_file = cookiefile.replace(".json", ".pickle")
-        legacy_pickle_file = f"{os.path.dirname(cookiefile)}/{tracker}"  # Legacy filename without extension
+        legacy_pickle_file = f"{Path(cookiefile).parent}/{tracker}"  # Legacy filename without extension
 
         # Try to migrate from pickle files
         for potential_pickle in [pickle_file, legacy_pickle_file]:

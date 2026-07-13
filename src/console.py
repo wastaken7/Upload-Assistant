@@ -2,7 +2,6 @@
 import contextlib
 import contextvars
 import logging
-import os
 import re
 from pathlib import Path
 
@@ -131,9 +130,9 @@ class DynamicFileHandler(logging.Handler):
             msg = self.format(record)
 
             # Ensure target directory exists
-            log_dir = os.path.dirname(log_path)
-            if log_dir and not Path(log_dir).exists():
-                Path(log_dir).mkdir(parents=True, exist_ok=True)
+            log_dir = Path(log_path).parent
+            if str(log_dir) and not log_dir.exists():
+                log_dir.mkdir(parents=True, exist_ok=True)
 
             # Append message to file
             with Path(log_path).open("a", encoding="utf-8") as f:

@@ -58,7 +58,7 @@ class DupeChecker:
                         limited_files = cast(list[str], limited_dupe.get("files", []))
                         if len(limited_files) > 10:
                             dupe_files = cast(list[str], dupe.get("files", []))
-                            limited_dupe["files"] = limited_files[:10] + [f"... and {len(dupe_files) - 10} more files"]
+                            limited_dupe["files"] = [*limited_files[:10], f"... and {len(dupe_files) - 10} more files"]
                         dupes_to_print.append(limited_dupe)
                     else:
                         dupes_to_print.append(Redaction.redact_private_info(dupe))
@@ -828,7 +828,7 @@ class DupeChecker:
                 limited_files = limited_dupe.get("files", [])
                 if len(limited_files) > 10:
                     dupe_files = dupe.get("files", [])
-                    limited_dupe["files"] = limited_files[:10] + [f"... and {len(dupe_files) - 10} more files"]
+                    limited_dupe["files"] = [*limited_files[:10], f"... and {len(dupe_files) - 10} more files"]
 
                 if isinstance(limited_dupe.get("description"), str) and len(limited_dupe["description"]) > 200:
                     limited_dupe["description"] = limited_dupe["description"][:200] + "..."

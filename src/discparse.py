@@ -108,7 +108,7 @@ class DiscParse:
             bdinfo_text = None
             path = str(Path(discs[i]["path"]).resolve())
             if discs[i]["type"] == "BDMV":
-                parent_path = os.path.dirname(path)
+                parent_path = str(Path(path).parent)
                 if not Path(Path(parent_path) / "CERTIFICATE").exists():
                     meta.setdefault("discs_missing_certificate", []).append(discs[i]["path"])
             for file in os.listdir(save_dir):

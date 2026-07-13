@@ -266,15 +266,15 @@ class RtorrentClientMixin:
         modified_fr = False
         path_dir = ""
         if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():
-            path_dir = os.path.dirname(path)
+            path_dir = str(Path(path).parent)
             path = path.replace(local_path, remote_path)
             path = path.replace(os.sep, "/")
             shutil.copy(fr_file, f"{path_dir}/fr.torrent")
-            fr_file = f"{os.path.dirname(path)}/fr.torrent"
+            fr_file = f"{Path(path).parent}/fr.torrent"
             modified_fr = True
             logger.debug(f"[cyan]Modified fast resume file path because path mapping: {fr_file}")
         if (meta.category in ("BOOK", "GAME") and len(filelist) > 1 and isdir) or isdir is False:
-            path = os.path.dirname(path)
+            path = str(Path(path).parent)
         logger.debug(f"[cyan]Final path for rTorrent: {path}")
 
         logger.info("[bold yellow]Adding and starting torrent")

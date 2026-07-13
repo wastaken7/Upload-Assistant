@@ -957,7 +957,6 @@ async def tmdb_other_meta(
     imdb_id = imdb_id or 0
     tvdb_id = tvdb_id or 0
     _ = aka
-    tmdb_metadata = {}
 
     # Initialize variables that might not be set in all code paths
     adult_media = False

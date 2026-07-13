@@ -72,7 +72,7 @@ def _apply_config(config: Mapping[str, Any]) -> None:
 async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
     # On Linux prefer bundled amd/arm binary when present; otherwise fall back to system ffmpeg.
     if platform.system() == "Linux":
-        base_dir = os.path.dirname(os.path.dirname(__file__))
+        base_dir = str(Path(__file__).parent.parent)
         ff_bin_dir = Path(base_dir) / "bin" / "ffmpeg"
 
         machine = platform.machine().lower()
@@ -795,7 +795,7 @@ async def load_local_cover_if_exists(path: str, dest_path: str) -> bool:
     import shutil
 
     def _check_and_copy():
-        search_dir = path if Path(path).is_dir() else os.path.dirname(path)
+        search_dir = path if Path(path).is_dir() else str(Path(path).parent)
         valid_names = {"cover.png", "cover.jpg", "cover.jpeg", "folder.png", "folder.jpg", "folder.jpeg", "poster.png", "poster.jpg", "poster.jpeg"}
         if Path(search_dir).exists():
             for f in os.listdir(search_dir):
@@ -970,7 +970,7 @@ async def extract_epub_cover(epub_path: str, dest_path: str, confirmed_only: boo
             manifest_items = {}
             cover_item_id = None
             cover_href_direct = None
-            opf_dir = os.path.dirname(rootfile_path)
+            opf_dir = str(Path(rootfile_path).parent)
 
             for elem in root.iter():
                 tag_local = elem.tag.split("}")[-1]
@@ -1024,12 +1024,12 @@ async def extract_epub_cover(epub_path: str, dest_path: str, confirmed_only: boo
                         img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
                         if img_match:
                             img_src = urllib.parse.unquote(img_match.group(1))
-                            html_dir = os.path.dirname(html_zip_path)
+                            html_dir = str(Path(html_zip_path).parent)
                             return resolve_path(html_dir, img_src)
                         svg_match = re.search(r'<image[^>]+(?:xlink:)?href=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
                         if svg_match:
                             img_src = urllib.parse.unquote(svg_match.group(1))
-                            html_dir = os.path.dirname(html_zip_path)
+                            html_dir = str(Path(html_zip_path).parent)
                             return resolve_path(html_dir, img_src)
                 return None
 

@@ -30,7 +30,7 @@ class TransmissionClientMixin:
             path = path.replace(local_path, remote_path)
             path = path.replace(os.sep, "/")
 
-        path = os.path.dirname(path)
+        path = str(Path(path).parent)
 
         if meta.transmission_label is not None:
             label = [meta.transmission_label]

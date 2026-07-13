@@ -355,7 +355,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
         else:
             guess_name = meta.discs[0]["path"].replace("-", " ")
             filename = str(guessit_fn(guess_name, {"excludes": ["country", "language"]}).get("title", ""))
-            untouched_filename = Path(os.path.dirname(meta.discs[0]["path"])).name
+            untouched_filename = Path(meta.discs[0]["path"]).parent.name
         try:
             meta.search_year = guessit_fn(meta.discs[0]["path"])["year"]
         except Exception:
@@ -423,7 +423,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                         if ext in subtitle_exts:
                             meta.subtitle_files.append(str(Path(Path(root) / file).resolve()))
             else:
-                parent_dir = os.path.dirname(meta_path)
+                parent_dir = str(Path(meta_path).parent)
                 if parent_dir and Path(parent_dir).exists():
                     base_name = os.path.splitext(Path(meta_path).name)[0]
                     for file in os.listdir(parent_dir):
@@ -1397,23 +1397,23 @@ async def finalize_metadata(
         if meta.tag == "-SubsPlease":  # SubsPlease-specific
             tracks = meta.mediainfo.get("media", {}).get("track", [])  # Get all tracks
             bitrate = tracks[1].get("BitRate", "") if len(tracks) > 1 and not isinstance(tracks[1].get("BitRate", ""), dict) else ""  # Check that bitrate is not a dict
-            bitrate_oldMediaInfo = (
+            bitrate_old_mediainfo = (
                 tracks[0].get("OverallBitRate", "") if len(tracks) > 0 and not isinstance(tracks[0].get("OverallBitRate", ""), dict) else ""
             )  # Check for old MediaInfo
             meta.episode_title = ""
             if (bitrate.isdigit() and int(bitrate) >= 8000000) or (
-                (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 8000000) and meta.resolution == "1080p"
+                (bitrate_old_mediainfo.isdigit() and int(bitrate_old_mediainfo) >= 8000000) and meta.resolution == "1080p"
             ):  # 8Mbps for 1080p
                 meta.service = "CR"
             elif (
-                bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()
+                bitrate.isdigit() or bitrate_old_mediainfo.isdigit()
             ) and meta.resolution == "1080p":  # Only assign if at least one bitrate is present, otherwise leave it to user
                 meta.service = "HIDI"
             elif (bitrate.isdigit() and int(bitrate) >= 4000000) or (
-                (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 4000000) and meta.resolution == "720p"
+                (bitrate_old_mediainfo.isdigit() and int(bitrate_old_mediainfo) >= 4000000) and meta.resolution == "720p"
             ):  # 4Mbps for 720p
                 meta.service = "CR"
-            elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()) and meta.resolution == "720p":
+            elif (bitrate.isdigit() or bitrate_old_mediainfo.isdigit()) and meta.resolution == "720p":
                 meta.service = "HIDI"
 
         if meta.service in (None, ""):

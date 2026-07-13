@@ -262,7 +262,7 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
                 if matched_editions_with_attributes or matched_editions_without_attributes:
                     # Only use "Theatrical" if we have at least one edition with attributes
                     if matched_editions_with_attributes and matched_editions_without_attributes:
-                        matched_editions = matched_editions_with_attributes + ["Theatrical"]
+                        matched_editions = [*matched_editions_with_attributes, "Theatrical"]
                         logger.debug("[cyan]Adding 'Theatrical' label because we have both attribute and non-attribute editions[/cyan]")
                     elif matched_editions_with_attributes:
                         matched_editions = matched_editions_with_attributes
@@ -277,7 +277,7 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
                             unique_editions = list(set(matched_editions))  # Remove duplicates
                             if "Theatrical" in unique_editions:
                                 unique_editions.remove("Theatrical")
-                                unique_editions = ["Theatrical"] + sorted(unique_editions)
+                                unique_editions = ["Theatrical", *sorted(unique_editions)]
                             edition = f"{len(unique_editions)}in1 " + " / ".join(unique_editions) if len(unique_editions) > 1 else unique_editions[0]  # Just one unique edition
                         else:
                             edition = matched_editions[0]

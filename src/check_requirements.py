@@ -29,11 +29,11 @@ def check_dependencies() -> None:
 
     # Try importing packaging to use robust specifier matching
     try:
-        from packaging.requirements import Requirement
+        from packaging.requirements import Requirement as requirement_cls
 
         has_packaging = True
     except ImportError:
-        Requirement = None
+        requirement_cls = None
         has_packaging = False
         # If packaging is missing, we list it as missing since it's in requirements.txt
         missing_packages.append("  - packaging: not installed (required by Upload Assistant)")
@@ -67,8 +67,8 @@ def check_dependencies() -> None:
 
                 # If packaging is available, use it for parsing
                 try:
-                    if has_packaging and Requirement is not None:
-                        req = Requirement(line)
+                    if has_packaging and requirement_cls is not None:
+                        req = requirement_cls(line)
                         try:
                             installed_version = importlib.metadata.version(req.name)
                             if not req.specifier.contains(installed_version, prereleases=True):

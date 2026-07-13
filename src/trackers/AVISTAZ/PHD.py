@@ -529,7 +529,7 @@ class PHD(AZTrackerBase):
                 )
 
         # Quality check
-        BITRATE_RULES = {
+        bitrate_rules = {
             ("x265", "web", 720): 1500000,
             ("x265", "web", 1080): 2500000,
             ("x265", "bluray", 720): 2000000,
@@ -540,7 +540,7 @@ class PHD(AZTrackerBase):
             ("x264", "bluray", 1080): 6000000,
         }
 
-        WEB_SOURCES = ("hdtv", "web", "hdrip")
+        web_sources = ("hdtv", "web", "hdrip")
 
         if type == "encode":
             bitrate = 0
@@ -552,7 +552,7 @@ class PHD(AZTrackerBase):
                     break
 
             source_type = None
-            if source in WEB_SOURCES:
+            if source in web_sources:
                 source_type = "web"
             elif source == "bluray":
                 source_type = "bluray"
@@ -560,8 +560,8 @@ class PHD(AZTrackerBase):
             if source_type:
                 rule_key = (video_encode, source_type, resolution)
 
-                if rule_key in BITRATE_RULES:
-                    min_bitrate = BITRATE_RULES[rule_key]
+                if rule_key in bitrate_rules:
+                    min_bitrate = bitrate_rules[rule_key]
 
                     if bitrate < min_bitrate:
                         quality_rule_text = "Only upload proper encodes.\nAny encodes where the size and/or the bitrate imply a bad quality will be deleted."

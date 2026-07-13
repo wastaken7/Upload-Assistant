@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
-import os
 import re
 import sys
 from datetime import UTC, datetime, timedelta
@@ -273,7 +272,7 @@ class TRACKER_SETUP:
 
     async def write_banned_groups_to_file(self, file_path: str, json_data: list[Any]) -> None:
         try:
-            Path(os.path.dirname(file_path)).mkdir(parents=True, exist_ok=True)
+            Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
             # Extract group names from either object payloads or plain string payloads.
             names: list[str] = []
@@ -442,7 +441,7 @@ class TRACKER_SETUP:
 
     async def write_internal_claims_to_file(self, file_path: str, data: list[JsonDict]) -> None:
         try:
-            Path(os.path.dirname(file_path)).mkdir(parents=True, exist_ok=True)
+            Path(file_path).parent.mkdir(parents=True, exist_ok=True)
 
             extracted_data: list[JsonDict] = []
             for item in data:
@@ -779,7 +778,7 @@ class TRACKER_SETUP:
             common = COMMON(self.config)
             log_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{tracker_name}_request_results.json"
             if not await common.path_exists(log_path):
-                await common.makedirs(os.path.dirname(log_path))
+                await common.makedirs(str(Path(log_path).parent))
 
             request_data: list[JsonDict] = []
             try:

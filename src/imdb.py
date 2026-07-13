@@ -46,8 +46,7 @@ class ImdbManager:
             return imdb_info
 
         try:
-            if not str(imdbID).startswith("tt"):
-                imdbID = f"tt{imdbID:07d}"
+            imdb_id_str = f"tt{imdbID:07d}" if not str(imdbID).startswith("tt") else str(imdbID)
         except Exception as e:
             logger.error(f"[red]Error:[/red] {e}")
             return imdb_info
@@ -55,7 +54,7 @@ class ImdbManager:
         query = {
             "query": f"""
             query GetTitleInfo {{
-                title(id: "{imdbID}") {{
+                title(id: "{imdb_id_str}") {{
                 id
                 titleText {{
                     text
@@ -288,8 +287,8 @@ class ImdbManager:
         if not title_data:
             return imdb_info  # Return empty if no data found
 
-        imdb_info["imdbID"] = imdbID
-        imdb_info["imdb_url"] = f"https://www.imdb.com/title/{imdbID}"
+        imdb_info["imdbID"] = imdb_id_str
+        imdb_info["imdb_url"] = f"https://www.imdb.com/title/{imdb_id_str}"
         imdb_info["title"] = self.safe_get(title_data, ["titleText", "text"])
         countries_list = cast(list[Mapping[str, Any]], self.safe_get(title_data, ["countriesOfOrigin", "countries"], []))
         if countries_list:
@@ -473,7 +472,7 @@ class ImdbManager:
         unattended: bool = False,
     ) -> int:
         search_results: list[dict[str, Any]] = []
-        imdbID = imdb_id = 0
+        imdb_id_result = imdb_id = 0
         if attempted is None:
             attempted = 0
         logger.debug(f"[yellow]Searching IMDb for {filename} and year {search_year}...[/yellow]")
@@ -695,9 +694,9 @@ class ImdbManager:
                     logger.debug("[yellow]No IMDb ID found in quickie result[/yellow]")
                 if not type_matches:
                     logger.debug(f"[yellow]Type mismatch: found {type_info.get('text', '')}, expected {category}[/yellow]")
-                imdbID = 0
+                imdb_id_result = 0
 
-            return imdbID if imdbID else 0
+            return imdb_id_result if imdb_id_result else 0
 
         if len(search_results) == 1:
             imdb_id = self.safe_get(search_results[0], ["node", "title", "id"], "")
@@ -757,9 +756,9 @@ class ImdbManager:
             if unattended:
                 imdb_id = self.safe_get(sorted_results[0], ["node", "title", "id"], "")
                 if imdb_id:
-                    imdbID = int(imdb_id.replace("tt", "").strip())
-                    logger.debug(f"[green]Unattended mode: auto-selected IMDb ID {imdbID}[/green]")
-                    return imdbID
+                    imdb_id_result = int(imdb_id.replace("tt", "").strip())
+                    logger.debug(f"[green]Unattended mode: auto-selected IMDb ID {imdb_id_result}[/green]")
+                    return imdb_id_result
 
             # Show sorted results to user
             logger.info("[bold yellow]Multiple IMDb results found. Please select the correct entry:[/bold yellow]")
@@ -841,7 +840,7 @@ class ImdbManager:
             else:
                 logger.info("[bold red]No IMDb results found in unattended mode. Skipping IMDb.[/bold red]")
 
-        return imdbID if imdbID else 0
+        return imdb_id_result if imdb_id_result else 0
 
     async def get_imdb_from_episode(self, imdb_id: int | str) -> dict[str, Any] | None:
         if not imdb_id or imdb_id == 0:

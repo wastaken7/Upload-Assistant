@@ -204,7 +204,7 @@ class DiscMenus:
                 else:
                     # Motion menu: try scene detection first
                     limit = max(30, max_menu_screens * 3)
-                    scene_vf_chain = ",".join(["select='gt(scene,0.25)'"] + vf_filters)
+                    scene_vf_chain = ",".join(["select='gt(scene,0.25)'", *vf_filters])
                     cmd = [ffmpeg_path, "-y", "-i", file_path, "-vf", scene_vf_chain, "-fps_mode", "vfr", "-vframes", str(limit), image_pattern]
                     logger.info(f"Extracting motion menu frames via scene detection from {file} (limit: {limit})...")
 
@@ -217,7 +217,7 @@ class DiscMenus:
                     except TimeoutError:
                         with contextlib.suppress(Exception):
                             process.kill()
-                        stdout, stderr = await process.communicate()
+                        _stdout, _stderr = await process.communicate()
                         logger.error(f"[red]FFmpeg timed out processing {file}[/red]")
 
                     # Gather generated screenshots
@@ -243,7 +243,7 @@ class DiscMenus:
                     # Fallback to interval sampling if scene detection yielded nothing for motion menus
                     if duration_sec >= 2.0 and not found_images:
                         logger.info(f"Scene detection returned no valid frames for {file}. Falling back to interval sampling...")
-                        fallback_vf_chain = ",".join(["fps=1/5"] + vf_filters)
+                        fallback_vf_chain = ",".join(["fps=1/5", *vf_filters])
                         cmd_fallback = [
                             ffmpeg_path,
                             "-y",
@@ -379,7 +379,7 @@ class DiscMenus:
         base_dir = meta.base_dir
         uuid_value = meta.uuid
         json_path = Path(base_dir) / "tmp" / uuid_value / "menu_images.json"
-        Path(os.path.dirname(json_path)).mkdir(parents=True, exist_ok=True)
+        json_path.parent.mkdir(parents=True, exist_ok=True)
 
         menu_json = json.dumps(menu_images, indent=4)
         await asyncio.to_thread(Path(json_path).write_text, menu_json)

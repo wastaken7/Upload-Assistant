@@ -364,16 +364,16 @@ class TL:
         return False
 
     async def get_cookie_upload_data(self, meta: Meta) -> dict[str, Any]:
-        tvMazeURL = ""
+        tvmaze_url = ""
         if meta.category == "TV" and meta.tvmaze_id:
-            tvMazeURL = f"https://www.tvmaze.com/shows/{meta.tvmaze_id}"
+            tvmaze_url = f"https://www.tvmaze.com/shows/{meta.tvmaze_id}"
 
         data: dict[str, Any] = {
             "name": await self.get_name(meta),
             "category": self.get_category(meta),
             "nonscene": "on" if not meta.scene else "off",
             "imdbURL": meta.imdb_info.get("imdb_url", ""),
-            "tvMazeURL": tvMazeURL,
+            "tvMazeURL": tvmaze_url,
             "igdbURL": "",
             "torrentNFO": "0",
             "torrentDesc": "1",
@@ -436,3 +436,4 @@ class TL:
             status_message = f"data error - {e!s}"
 
         meta.tracker_status[self.tracker]["status_message"] = status_message
+        return None

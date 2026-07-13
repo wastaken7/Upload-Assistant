@@ -169,7 +169,7 @@ class AZTrackerBase:
                 return True
             logger.info(f"{self.tracker}: Error adding media to the database. Status: {response.status_code}")
             failure_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]Failed_DB_attempt.html"
-            Path(os.path.dirname(failure_path)).mkdir(parents=True, exist_ok=True)
+            Path(failure_path).parent.mkdir(parents=True, exist_ok=True)
             async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
                 await f.write(response.text)
             logger.info(f"The server response was saved to {failure_path} for analysis.")

@@ -192,10 +192,10 @@ class TrackerStatusManager:
 
                         if not local_tracker_status["skipped"]:
                             try:
-                                groupID = await ptp.get_group_by_imdb(local_meta["imdb"])
+                                group_id = await ptp.get_group_by_imdb(local_meta["imdb"])
                                 async with meta_lock:
-                                    meta.ptp_groupID = groupID
-                                dupes = cast(list[Any], await ptp.search_existing(groupID or "", cast(dict[str, Any], local_meta)))
+                                    meta.ptp_groupID = group_id
+                                dupes = cast(list[Any], await ptp.search_existing(group_id or "", cast(dict[str, Any], local_meta)))
                             except Exception as e:
                                 logger.info(f"[bold red]Error searching for duplicates on {tracker_name}: {e}[/bold red]")
                                 if local_meta.get("unattended", False):

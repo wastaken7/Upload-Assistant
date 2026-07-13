@@ -400,7 +400,7 @@ class BHD:
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
         category = meta.category
-        tmdbID = "movie" if category == "MOVIE" else "tv"
+        tmdb_id_type = "movie" if category == "MOVIE" else "tv"
         if category == "MOVIE":
             category = "Movies"
         elif category == "TV":
@@ -411,7 +411,7 @@ class BHD:
             type_id = await self.get_type(meta)
         data: dict[str, Any] = {"action": "search", "types": type_id, "categories": category}
         if meta.tmdb:
-            data["tmdb_id"] = f"{tmdbID}/{meta.tmdb}"
+            data["tmdb_id"] = f"{tmdb_id_type}/{meta.tmdb}"
         if meta.sd == 1:
             data["categories"] = None
             data["types"] = None

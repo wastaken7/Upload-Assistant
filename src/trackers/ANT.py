@@ -196,42 +196,42 @@ class ANT:
         return tags if not no_tags else ""
 
     async def get_type(self, meta: Meta) -> int:
-        antType = None
+        ant_type = None
         imdb_info = meta.imdb_info
         if imdb_info.get("type") is not None:
-            imdbType = imdb_info.get("type", "movie").lower()
-            if imdbType in ("movie", "tv movie", "tvmovie"):
-                antType = 0 if int(imdb_info.get("runtime", "60")) >= 45 or int(imdb_info.get("runtime", "60")) == 0 else 1
-            if imdbType == "short":
-                antType = 1
-            elif imdbType == "tv mini series":
-                antType = 2
-            elif imdbType == "comedy":
-                antType = 3
+            imdb_type = imdb_info.get("type", "movie").lower()
+            if imdb_type in ("movie", "tv movie", "tvmovie"):
+                ant_type = 0 if int(imdb_info.get("runtime", "60")) >= 45 or int(imdb_info.get("runtime", "60")) == 0 else 1
+            if imdb_type == "short":
+                ant_type = 1
+            elif imdb_type == "tv mini series":
+                ant_type = 2
+            elif imdb_type == "comedy":
+                ant_type = 3
         else:
             keywords = [k.lower() for k in meta.keywords]
             tmdb_type = (meta.tmdb_type if meta.tmdb_type is not None else "movie").lower()
             if tmdb_type == "movie":
-                antType = 0 if (meta.runtime if meta.runtime is not None else 60) >= 45 or (meta.runtime if meta.runtime is not None else 60) == 0 else 1
+                ant_type = 0 if (meta.runtime if meta.runtime is not None else 60) >= 45 or (meta.runtime if meta.runtime is not None else 60) == 0 else 1
             if tmdb_type == "miniseries" or "miniseries" in keywords:
-                antType = 2
+                ant_type = 2
             if "short" in keywords or "short film" in keywords:
-                antType = 1
+                ant_type = 1
             elif "stand-up comedy" in keywords:
-                antType = 3
+                ant_type = 3
 
-        if antType is None:
+        if ant_type is None:
             if not meta.unattended:
-                antTypeList = ["Feature Film", "Short Film", "Miniseries", "Other"]
-                choice = cli_ui.ask_choice("Select the proper type for ANT", choices=antTypeList)
+                ant_type_list = ["Feature Film", "Short Film", "Miniseries", "Other"]
+                choice = cli_ui.ask_choice("Select the proper type for ANT", choices=ant_type_list)
                 # Map the choice back to the integer
                 type_map = {"Feature Film": 0, "Short Film": 1, "Miniseries": 2, "Other": 3}
-                antType = type_map.get(choice, 0)
+                ant_type = type_map.get(choice, 0)
             else:
                 logger.debug(f"[bold red]{self.tracker} type could not be determined automatically in unattended mode.")
-                antType = 0  # Default to Feature Film in unattended mode
+                ant_type = 0  # Default to Feature Film in unattended mode
 
-        return antType
+        return ant_type
 
     async def upload(self, meta: Meta) -> bool:
         torrent_filename = "BASE"

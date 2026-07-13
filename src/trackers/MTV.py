@@ -373,6 +373,7 @@ class MTV:
             if meta.sd == 1:
                 return 4
             return 3
+        return None
 
     async def get_source_id(self, meta: Meta) -> str:
         if meta.is_disc == "DVD":

@@ -101,8 +101,8 @@ async def get_tag(video: str, meta: Meta, season_pack_check: bool = False) -> st
                     else:
                         # Rejoin an intra-word hyphen (e.g. "Spider-Man" -> "spiderman") so short
                         # trailing fragments of hyphenated title/author words aren't taken as groups
-                        prefix_match = re.search(r'(\w+)$', basename_stripped[:hyphen_idx])
-                        first_word_match = re.match(r'\w+', release_group)
+                        prefix_match = re.search(r"(\w+)$", basename_stripped[:hyphen_idx])
+                        first_word_match = re.match(r"\w+", release_group)
                         if prefix_match and first_word_match:
                             merged = (prefix_match.group(1) + first_word_match.group(0)).lower()
                             merged = "".join(c for c in merged if c.isalnum())

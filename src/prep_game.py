@@ -304,7 +304,7 @@ async def detect_platform_from_files(
         normalized_basename = basename.replace(".", " ").replace("-", " ").replace("_", " ").replace("[", " ").replace("]", " ")
 
         nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
-        PLATFORM_KEYWORDS = {
+        platform_keywords = {
             "PS5": ["ps5", "playstation 5", "playstation5"],
             "PS4": ["ps4", "playstation 4", "playstation4"],
             "PS3": ["ps3", "playstation 3", "playstation3"],
@@ -326,7 +326,7 @@ async def detect_platform_from_files(
             "PSVITA": ["psvita", "ps vita", "vita"],
         }
 
-        for platform_code, keywords in PLATFORM_KEYWORDS.items():
+        for platform_code, keywords in platform_keywords.items():
             for kw in keywords:
                 if re.search(rf"\b{re.escape(kw)}\b", normalized_basename):
                     return platform_code
@@ -429,7 +429,7 @@ async def gather_game_prep(
     else:
         # Attempt to extract from directory name first
         if path_to_check:
-            search_dir = path_to_check if Path(path_to_check).is_dir() else os.path.dirname(path_to_check)
+            search_dir = path_to_check if Path(path_to_check).is_dir() else str(Path(path_to_check).parent)
             if search_dir:
                 folder_name = Path(search_dir).name
                 version = extract_version_from_text(folder_name)
@@ -440,7 +440,7 @@ async def gather_game_prep(
         if not version:
             nfo_files = [f for f in meta.filelist if f.lower().endswith(".nfo")]
             if path_to_check:
-                search_dir = path_to_check if Path(path_to_check).is_dir() else os.path.dirname(path_to_check)
+                search_dir = path_to_check if Path(path_to_check).is_dir() else str(Path(path_to_check).parent)
                 if Path(search_dir).is_dir():
                     with contextlib.suppress(Exception):
                         for f in os.listdir(search_dir):
@@ -534,7 +534,7 @@ async def gather_game_prep(
         # Also check the input directory or directory containing the file
         path_to_check = meta.path or videopath
         if path_to_check:
-            search_dir = path_to_check if Path(path_to_check).is_dir() else os.path.dirname(path_to_check)
+            search_dir = path_to_check if Path(path_to_check).is_dir() else str(Path(path_to_check).parent)
             if Path(search_dir).is_dir():
                 with contextlib.suppress(Exception):
                     for f in os.listdir(search_dir):
@@ -708,7 +708,7 @@ async def gather_game_prep(
             if raw_platforms:
                 nin_term = bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()
 
-                PLATFORM_MAPPING = {
+                platform_mapping = {
                     "playstation 5": ["ps5", "playstation 5", "playstation5"],
                     "playstation 4": ["ps4", "playstation 4", "playstation4"],
                     "playstation 3": ["ps3", "playstation 3", "playstation3"],
@@ -734,7 +734,7 @@ async def gather_game_prep(
                 for idx, p_name in enumerate(raw_platforms):
                     p_name_norm = p_name.lower()
                     aliases = []
-                    for map_key, map_aliases in PLATFORM_MAPPING.items():
+                    for map_key, map_aliases in platform_mapping.items():
                         if map_key in p_name_norm or p_name_norm in map_key:
                             aliases.extend(map_aliases)
                     aliases.append(p_name_norm)

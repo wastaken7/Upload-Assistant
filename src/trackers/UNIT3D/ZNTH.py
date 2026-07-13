@@ -122,7 +122,7 @@ class ZNTH(UNIT3D):
             if "," in cand:
                 comma_parts = [p.strip() for p in cand.split(",")]
                 if len(comma_parts) == 2:
-                    p1, p2 = comma_parts
+                    _p1, p2 = comma_parts
                     p2_words = p2.split()
                     is_initials = all(len(w.strip(".")) <= 3 for w in p2_words)
                     if len(p2_words) == 1 or is_initials:

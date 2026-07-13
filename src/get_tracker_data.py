@@ -329,7 +329,7 @@ class TrackerDataManager:
                 from src.trackersetup import api_trackers
 
                 other_api = sorted(api_trackers - {"BHD"})
-                tracker_order = ["PTP", "HDB", "BHD"] + other_api
+                tracker_order = ["PTP", "HDB", "BHD", *other_api]
 
                 if cat == "TV" or meta.category == "TV":
                     logger.debug("[yellow]Detected TV content, skipping PTP tracker check")

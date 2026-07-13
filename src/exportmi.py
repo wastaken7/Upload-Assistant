@@ -423,7 +423,7 @@ async def exportInfo(
 
     logger.debug("[bold yellow]Exporting MediaInfo...")
     if not isdir:
-        os.chdir(os.path.dirname(video))
+        os.chdir(Path(video).parent)
 
     if mediainfo_cmd and is_dvd:
         result: subprocess.CompletedProcess[str] | None = None

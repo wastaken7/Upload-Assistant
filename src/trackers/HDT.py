@@ -169,8 +169,14 @@ class HDT:
 
         search_url = f"{self.base_url}/torrents.php?"
         if meta.imdb_id or 0 != 0:
-            imdbID = f"tt{meta.imdb}"
-            params: dict[str, str | int] = {"csrfToken": self.secret_token, "search": imdbID, "active": "0", "options": "2", "category[]": await self.get_category_id(meta)}
+            imdb_id_str = f"tt{meta.imdb}"
+            params: dict[str, str | int] = {
+                "csrfToken": self.secret_token,
+                "search": imdb_id_str,
+                "active": "0",
+                "options": "2",
+                "category[]": await self.get_category_id(meta),
+            }
         else:
             params = {"csrfToken": self.secret_token, "search": meta.title, "category[]": await self.get_category_id(meta), "options": "3"}
 

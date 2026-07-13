@@ -19,7 +19,7 @@ def normalize_series_index(value: str) -> str:
     """Drop a trailing .0 from a series index ("5.0" -> "5"), keeping "5.5"/"0.5"."""
     try:
         idx = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return (value).strip()
     return str(int(idx)) if idx.is_integer() else str(idx)
 
@@ -157,14 +157,14 @@ def extract_cbr_cbz_metadata(filepath: str) -> dict[str, Any]:
             logger.debug(f"[yellow]Debug: Error reading CBZ zip archive: {e}[/yellow]")
     elif ext == ".cbr":
         try:
-            from rarfile import RarFile
+            from rarfile import RarFile as rar_file_cls
         except ImportError:
             logger.debug("[yellow]Debug: rarfile library not available for CBR metadata extraction.[/yellow]")
-            RarFile = None
+            rar_file_cls = None
 
-        if RarFile:
+        if rar_file_cls:
             try:
-                with RarFile(filepath, "r") as r:
+                with rar_file_cls(filepath, "r") as r:
                     xml_name = next((name for name in r.namelist() if name.lower().endswith("comicinfo.xml")), None)
                     if xml_name:
                         xml_data = r.read(xml_name)
@@ -520,7 +520,7 @@ def get_epubmeta_output(epub_path: str) -> str | None:
             creators = []
             dates_map = {}
             sources = []
-            mType = None
+            m_type = None
             coverages = []
             descriptions = []
             formats = []
@@ -617,8 +617,8 @@ def get_epubmeta_output(epub_path: str) -> str | None:
                             source_of = ref_sof["refText"]
                     sources.append({"id_type": id_type, "scheme": scheme_val, "source_of": source_of, "text": text})
 
-                elif tag == "type" and mType is None:
-                    mType = text
+                elif tag == "type" and m_type is None:
+                    m_type = text
 
                 elif tag == "coverage":
                     coverages.append(text)
@@ -744,8 +744,8 @@ def get_epubmeta_output(epub_path: str) -> str | None:
                         lines.append(format_subline("source-of", source["source_of"]))
 
             # 8. Type
-            if mType:
-                lines.append(f"type: {mType}")
+            if m_type:
+                lines.append(f"type: {m_type}")
 
             # 9. Coverage
             lines.extend(f"coverage: {coverage}" for coverage in coverages)

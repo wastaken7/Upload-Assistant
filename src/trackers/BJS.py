@@ -1067,6 +1067,7 @@ class BJS:
             except Exception as e:
                 logger.info(f"{self.tracker}: Falha ao ler ou enviar capa {cover_path}: {e}", extra={"markup": False})
                 return None
+        return None
 
     async def get_screenshots(self, meta: Meta) -> list[str]:
         screenshot_dir = Path(meta.base_dir) / "tmp" / meta.uuid

@@ -105,7 +105,7 @@ class NyuuBinaryManager:
                 # Extract using the 7z binary
                 cmd = [path_7z, "x", "-y", f"-o{bin_dir}", str(temp_file)]
                 process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-                stdout, stderr = await process.communicate()
+                _stdout, stderr = await process.communicate()
                 if process.returncode != 0:
                     raise Exception(f"7z extraction failed: {stderr.decode(errors='replace')}")
 

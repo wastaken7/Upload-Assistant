@@ -1484,7 +1484,7 @@ def _build_config_items(
     for key in merged_keys:
         example_value = example_section.get(key)
         user_value = user_dict.get(key)
-        key_path = path + [key]
+        key_path = [*path, key]
         help_text = comments_map.get("/".join(key_path), [])
         subsection_label = subsection_map.get("/".join(key_path))
         if subsection_label != current_subsection:
@@ -1603,7 +1603,7 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
             key = key_node.value
             lineno = getattr(key_node, "lineno", None)
             if isinstance(lineno, int):
-                comment_map["/".join(path + [key])] = collect_comments(lineno)
+                comment_map["/".join([*path, key])] = collect_comments(lineno)
                 key_entries.append((key, lineno, value_node))
 
             if isinstance(value_node, ast.Dict):
@@ -1613,7 +1613,7 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
                     child_ranges.append((start, end))
 
             if isinstance(value_node, ast.Dict):
-                walk_dict(value_node, path + [key])
+                walk_dict(value_node, [*path, key])
 
         start_line = getattr(node, "lineno", None)
         end_line = getattr(node, "end_lineno", None)
@@ -1627,7 +1627,7 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
                     current_header = headers[header_idx][1]
                     header_idx += 1
                 if current_header:
-                    subsection_map["/".join(path + [key])] = current_header
+                    subsection_map["/".join([*path, key])] = current_header
 
     walk_dict(config_assign.value, [])
     return comment_map, subsection_map
@@ -2249,6 +2249,7 @@ def ip_control_api():
         except Exception as e:
             console.print(f"Error updating IP control: {e}", markup=False)
             return jsonify({"success": False, "error": "Failed to update IP control settings"}), 500
+    return None
 
 
 @app.route("/api/2fa/setup", methods=["POST"])
@@ -2375,7 +2376,7 @@ def browse_roots():
         # Add subtitle if multiple roots share the same folder name
         if len(name_to_roots.get(display_name, [])) > 1:
             # Show parent path or drive letter
-            parent = os.path.dirname(root.rstrip(os.sep))
+            parent = str(Path(root.rstrip(os.sep)).parent)
             if parent:
                 # On Windows, show drive letter + parent; on Unix, show parent path
                 item["subtitle"] = parent
@@ -2688,6 +2689,7 @@ def api_tokens():
         if ok:
             return jsonify({"success": True})
         return jsonify({"success": False, "error": "Failed to revoke token"}), 500
+    return None
 
 
 @app.route("/api/browse")
@@ -3232,7 +3234,7 @@ def execute_command():
                             parsed_args = shlex.split(args)
                             parsed_args = _validate_upload_assistant_args(parsed_args)
 
-                        sys.argv = [upload_script, validated_path] + parsed_args
+                        sys.argv = [upload_script, validated_path, *parsed_args]
 
                         # Store in active_processes so /api/input can post into the queue
                         cast(Any, active_processes)[session_id] = {

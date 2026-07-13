@@ -308,6 +308,7 @@ class IPT:
             if type_ == "XVID":
                 return tv_xvid
             return tv_x264
+        return None
 
     async def get_name(self, meta: Meta):
         name: str = meta.scene_name if meta.scene_name else meta.clean_name

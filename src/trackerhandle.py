@@ -153,8 +153,8 @@ async def process_trackers(
                                 new_dupes = cast(list[Any], await t_class.search_existing(meta))
                             else:
                                 ptp = PTP(config=config)
-                                groupID = meta.ptp_groupID
-                                new_dupes = cast(list[Any], await ptp.search_existing(groupID or "", meta))
+                                group_id = meta.ptp_groupID
+                                new_dupes = cast(list[Any], await ptp.search_existing(group_id or "", meta))
                         except Exception as e:
                             logger.info(f"[bold red]{tracker_name}: Error redoing duplicate check after bandwidth wait: {e}[/bold red]")
                             status = meta.tracker_status.setdefault(tracker_name, {})
@@ -361,12 +361,12 @@ async def process_trackers(
             if upload_status:
                 try:
                     ptp = PTP(config=config)
-                    groupID = meta.ptp_groupID
-                    ptpUrl, ptpData = await ptp.fill_upload_form(groupID, meta)
+                    group_id = meta.ptp_groupID
+                    ptp_url, ptp_data = await ptp.fill_upload_form(group_id, meta)
                     is_uploaded = False
                     try:
                         upload_start_time = time.time()
-                        is_uploaded = await ptp.upload(meta, ptpUrl, ptpData)
+                        is_uploaded = await ptp.upload(meta, ptp_url, ptp_data)
                         upload_duration = time.time() - upload_start_time
                         meta[f"{tracker}_upload_duration"] = upload_duration
                     except Exception as e:

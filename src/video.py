@@ -365,7 +365,7 @@ class VideoManager:
             length = meta.bdinfo.get("length", "")
             if length:
                 try:
-                    hours, minutes, seconds = length.split(":")
+                    hours, minutes, _seconds = length.split(":")
                     return int(hours) * 60 + int(minutes)
                 except ValueError:
                     logger.debug(f"[red]Invalid duration value: {length}[/red]")

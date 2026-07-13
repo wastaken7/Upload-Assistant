@@ -1,7 +1,6 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import contextlib
 import json
-import os
 import time
 from pathlib import Path
 from typing import Any
@@ -44,7 +43,7 @@ class IGDBAPI:
                     expires_at = time.time() + expires_in
 
                     if self.token_file:
-                        Path(os.path.dirname(self.token_file)).mkdir(parents=True, exist_ok=True)
+                        Path(self.token_file).parent.mkdir(parents=True, exist_ok=True)
                         async with aiofiles.open(self.token_file, "w", encoding="utf-8") as f:
                             await f.write(json.dumps({"access_token": self.access_token, "expires_at": expires_at}))
                     return self.access_token

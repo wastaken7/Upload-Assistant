@@ -86,7 +86,7 @@ class SP(UNIT3D):
         return {"type_id": type_id}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        KNOWN_EXTENSIONS = {".mkv", ".mp4", ".avi", ".ts"}
+        known_extensions = {".mkv", ".mp4", ".avi", ".ts"}
         if meta.scene:
             scene_name = meta.scene_name
             name = scene_name if scene_name != "" else meta.basename_no_ext.replace(" ", ".")
@@ -97,7 +97,7 @@ class SP(UNIT3D):
             uuid_name = meta.basename_no_ext.replace(" ", ".")
             name = base_name if meta.mal_id or 0 != 0 else uuid_name
         base, ext = os.path.splitext(name)
-        if ext.lower() in KNOWN_EXTENSIONS:
+        if ext.lower() in known_extensions:
             name = base.replace(" ", ".")
 
         return {"name": name}

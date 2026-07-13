@@ -55,7 +55,7 @@ class UploadScreensManager:
 
 
 async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
-    image, img_host, config, meta = args
+    image, img_host, config, _meta = args
     try:
         timeout = 60  # Default timeout
         img_url, raw_url, web_url = None, None, None

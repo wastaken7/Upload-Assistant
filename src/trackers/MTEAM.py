@@ -164,7 +164,7 @@ class MTEAM:
             d = db_info.get("data", {})
             title = d.get("title", "")
             aka = d.get("aka", [])
-            translated_names = " / ".join([title] + aka) if title else " / ".join(aka)
+            translated_names = " / ".join([title, *aka]) if title else " / ".join(aka)
 
             countries = " / ".join(d.get("countries", []))
             genres = " / ".join(d.get("genres", []))

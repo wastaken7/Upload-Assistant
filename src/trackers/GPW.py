@@ -938,8 +938,8 @@ class GPW:
         movie_type = ""
         imdb_info = meta.imdb_info
         if imdb_info:
-            imdbType = imdb_info.get("type", "movie").lower()
-            if imdbType in ("movie", "tv movie", "tvmovie", "video"):
+            imdb_type = imdb_info.get("type", "movie").lower()
+            if imdb_type in ("movie", "tv movie", "tvmovie", "video"):
                 runtime = int(imdb_info.get("runtime", "60"))
                 movie_type = "1" if runtime >= 45 or runtime == 0 else "2"  # Feature Film/Short Film
 

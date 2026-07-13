@@ -383,12 +383,12 @@ class PTER:
             pter_desc = await desc_handle.read()
         torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
 
-        async with aiofiles.open(torrent_path, "rb") as torrentFile:
-            torrent_bytes = await torrentFile.read()
+        async with aiofiles.open(torrent_path, "rb") as torrent_file_handle:
+            torrent_bytes = await torrent_file_handle.read()
         filelist = meta.filelist
-        torrentFileName = unidecode(Path(meta.video).name.replace(" ", ".")) if len(filelist) == 1 else unidecode(Path(str(meta.path)).name.replace(" ", "."))
+        torrent_file_name = unidecode(Path(meta.video).name.replace(" ", ".")) if len(filelist) == 1 else unidecode(Path(str(meta.path)).name.replace(" ", "."))
         files = {
-            "file": (f"{torrentFileName}.torrent", torrent_bytes, "application/x-bittorent"),
+            "file": (f"{torrent_file_name}.torrent", torrent_bytes, "application/x-bittorent"),
         }
 
         # use chinese small_descr

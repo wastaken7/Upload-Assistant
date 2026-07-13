@@ -140,10 +140,10 @@ class TTG:
         filelist = meta.filelist
         async with aiofiles.open(torrent_path, "rb") as torrent_file:
             torrent_bytes = await torrent_file.read()
-        torrentFileName = unidecode(Path(meta.video).name.replace(" ", ".")) if len(filelist) == 1 else unidecode(Path(str(meta.path)).name.replace(" ", "."))
+        torrent_file_name = unidecode(Path(meta.video).name.replace(" ", ".")) if len(filelist) == 1 else unidecode(Path(str(meta.path)).name.replace(" ", "."))
         async with aiofiles.open(mi_path, encoding="utf-8") as mi_dump:
             mi_text = await mi_dump.read()
-        files = {"file": (f"{torrentFileName}.torrent", torrent_bytes, "application/x-bittorent"), "nfo": ("torrent.nfo", mi_text)}
+        files = {"file": (f"{torrent_file_name}.torrent", torrent_bytes, "application/x-bittorent"), "nfo": ("torrent.nfo", mi_text)}
         data: dict[str, Any] = {
             "MAX_FILE_SIZE": "4000000",
             "team": "",

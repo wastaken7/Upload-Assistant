@@ -139,7 +139,7 @@ class SHRI(UNIT3D):
             elif num_langs == 2:
                 # Two languages ("ITA - [lang]" if ITA is present, "[lang] - [lang]" if not)
                 if "ITA" in audio_langs:
-                    other = [lang for lang in audio_langs if lang != "ITA"][0]
+                    other = next(lang for lang in audio_langs if lang != "ITA")
                     audio_lang_str = f"ITA - {other}"
                 else:
                     audio_lang_str = " - ".join(audio_langs)
@@ -570,7 +570,6 @@ class SHRI(UNIT3D):
 
     async def _get_best_italian_audio_format(self, meta: Meta) -> str:
         """Filter Italian tracks, select best, format via get_audio_v2"""
-        ITALIAN_LANGS = {"it", "italian", "italiano"}
 
         def extract_quality(track: dict[str, Any], is_bdinfo: bool) -> tuple[bool, int, bool, int]:
             if is_bdinfo:

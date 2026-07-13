@@ -387,13 +387,13 @@ class AR:
             return False
 
         # must use scene name if scene release
-        KNOWN_EXTENSIONS = {".mkv", ".mp4", ".avi", ".ts"}
+        known_extensions = {".mkv", ".mp4", ".avi", ".ts"}
         if meta.scene:
             ar_name = meta.scene_name or ""
         else:
             ar_name = meta.uuid
             base, ext = os.path.splitext(ar_name)
-            if ext.lower() in KNOWN_EXTENSIONS:
+            if ext.lower() in known_extensions:
                 ar_name = base
             ar_name = (
                 ar_name.replace(" ", ".")

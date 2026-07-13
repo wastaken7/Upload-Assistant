@@ -95,5 +95,4 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
 
     # If the tracker has specific naming conventions, add them here; otherwise, remove this function
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        UNIT3D_TEMPLATE_name = meta.name
-        return {"name": UNIT3D_TEMPLATE_name}
+        return {"name": meta.name}
