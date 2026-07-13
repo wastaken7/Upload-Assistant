@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from src.book_prep import _resolve_book_language, is_valid_book_language
+from src.book_prep import is_valid_book_language, resolve_book_language
 from src.console import logger
 
 google_color_str = "[#4285f4]G[/#4285f4][#ea4335]o[/#ea4335][#fbbc05]o[/#fbbc05][#4285f4]g[/#4285f4][#34a853]l[/#34a853][#ea4335]e[/#ea4335] [#4285f4]Books[/#4285f4]"
@@ -72,7 +72,7 @@ class GoogleBooksManager:
         lang = volume_info.get("language")
         if lang:
             try:
-                full, iso3 = _resolve_book_language(lang)
+                full, iso3 = resolve_book_language(lang)
                 if is_valid_book_language(full, iso3):
                     metadata["book_language"] = full
                     if iso3:

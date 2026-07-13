@@ -17,7 +17,7 @@ import time
 import traceback
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from src.check_requirements import check_dependencies
 
@@ -38,7 +38,7 @@ from discordbot import DiscordNotifier
 from src.add_comparison import ComparisonManager
 from src.args import Args
 from src.audio_spectrogram import process_audio_spectrograms
-from src.book_prep import _resolve_book_language, detect_newspaper, is_valid_book_language
+from src.book_prep import detect_newspaper, is_valid_book_language, resolve_book_language
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.console import current_release_log_path, logger
@@ -64,10 +64,15 @@ from src.uploadscreens import UploadScreensManager
 cli_ui.setup(color="always", title="Upload Assistant")
 base_dir = str(Path(__file__).resolve().parent)
 
+class WebUIServer(Protocol):
+    def run(self) -> None: ...
+    def close(self) -> None: ...
+
+
 # Global state for shutdown handling (reset via _reset_shutdown_state() for in-process runs)
 _shutdown_requested = False
 _is_webui_mode = False
-_webui_server = None  # Reference to waitress server for graceful shutdown
+_webui_server: WebUIServer | None = None  # Reference to waitress server for graceful shutdown
 _shutdown_event = threading.Event()  # Event for coordinating graceful shutdown
 
 
@@ -489,7 +494,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
     book_required_fields = ["title", "author", "year", "book_language"]
     if meta.audiobook and ("CapybaraBR" in meta.trackers or "Zenith" in meta.trackers):
         book_required_fields.append("narrator")
-    book_missing = []
+    book_missing: list[str] = []
     for f in book_required_fields:
         val = getattr(meta, f, None)
         if not val or str(val).strip().lower() in ("", "none", "null"):
@@ -521,7 +526,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
                     if not value:
                         break
 
-                    full, iso = _resolve_book_language(value)
+                    full, iso = resolve_book_language(value)
                     if is_valid_book_language(full, iso):
                         meta.book_language = full
                         meta.book_language_iso = iso
@@ -565,7 +570,7 @@ async def _prompt_game_meta(meta: Meta) -> None:
     uploads reflect the new values.
     """
     game_required_fields = ["title", "year", "platform", "game_version", "game_subcategory"]
-    game_missing = []
+    game_missing: list[str] = []
     for f in game_required_fields:
         val = getattr(meta, f, None)
         if not val or str(val).strip().lower() in ("", "none", "null") or (f == "platform" and "," in str(val)):
@@ -732,7 +737,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
     if use_discord and bot:
         await DiscordNotifier.send_discord_notification(config, bot, f"Starting upload process for: {meta.path}", meta=meta)
 
-    if not meta.imghost or meta.imghost is None:
+    if not meta.imghost:
         meta.imghost = config["DEFAULT"]["img_host_1"]
         try:
             has_oeimg_config = any(config["DEFAULT"].get(key) == "oeimg" for key in config["DEFAULT"] if key.startswith("img_host_"))
@@ -762,7 +767,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
         try:
             async with aiofiles.open(covers_file, encoding="utf-8") as f:
                 content = await f.read()
-                loaded_covers = json.loads(content)
+                loaded_covers: list[dict[str, Any]] | None = json.loads(content)
                 if isinstance(loaded_covers, list):
                     meta.covers = loaded_covers
                     logger.debug(f"[green]Loaded {len(loaded_covers)} covers from covers.json into meta.covers")
@@ -772,19 +777,13 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
     parser = Args(config)
     helper = UploadHelper(config)
 
-    raw_trackers = meta.trackers
-    trackers: list[str]
+    raw_trackers: list[str] | str = meta.trackers
     if isinstance(raw_trackers, list):
         raw_trackers_list = raw_trackers
-        trackers = [t for t in raw_trackers_list if isinstance(t, str)]
-    elif isinstance(raw_trackers, str):
-        if raw_trackers != "":
-            trackers = [normalize_tracker_name(t) for t in raw_trackers.split(",") if t.strip()]  # type: ignore
-            meta.trackers = trackers
-        else:
-            trackers = []
+        trackers = [t for t in raw_trackers_list if t]
     else:
-        trackers = []
+        trackers = [normalize_tracker_name(t) for t in raw_trackers.split(",") if t.strip()] if raw_trackers != "" else []  # type: ignore
+    meta.trackers = trackers
 
     if isinstance(meta.trackers_remove, str) and meta.trackers_remove:
         remove_list = [normalize_tracker_name(t) for t in meta.trackers_remove.split(",")]
@@ -852,8 +851,8 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                 meta.trackers = [normalize_tracker_name(t) for t in meta.trackers.split(",")]
             else:
                 meta.trackers = [normalize_tracker_name(meta.trackers)]
-        elif isinstance(meta.trackers, list):
-            meta.trackers = [normalize_tracker_name(t) for t in meta.trackers if isinstance(t, str)]
+        else:
+            meta.trackers = [normalize_tracker_name(t) for t in meta.trackers if t]
         logger.debug(f"Trackers list during edit process: {meta.trackers}")
         meta.edit = True
         meta = await prep.gather_prep(meta=meta, mode="cli")
@@ -866,9 +865,9 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
             cleanup_manager.reset_terminal()
             sys.exit(1)
 
-    if "remove_trackers" in meta and meta.remove_trackers:
+    if meta.remove_trackers:
         removed: list[str] = []
-        remove_trackers_list = [t for t in meta.remove_trackers if isinstance(t, str)] if isinstance(meta.remove_trackers, list) else [str(meta.remove_trackers)]
+        remove_trackers_list = [t for t in meta.remove_trackers if t] if isinstance(meta.remove_trackers, list) else [str(meta.remove_trackers)]
         for tracker in remove_trackers_list:
             if tracker in meta.trackers:
                 if meta.debug:
@@ -957,7 +956,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                 meta.skip_uploading = 1
 
     skip_uploading = meta.skip_uploading
-    skip_uploading_int = skip_uploading if isinstance(skip_uploading, (int, str)) else 0
+    skip_uploading_int = skip_uploading if skip_uploading else 0
 
     if successful_trackers < skip_uploading_int and not meta.debug:
         logger.info(f"[red]Not enough successful trackers ({successful_trackers}/{skip_uploading_int}). No uploads being processed.[/red]")
@@ -1040,9 +1039,9 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
 
     progress_task = asyncio.create_task(print_progress("[yellow]Still processing, please wait...", interval=10))
     try:
-        if "manual_frames" not in meta or meta.manual_frames is None:
+        if not meta.manual_frames:
             meta.manual_frames = ""
-        manual_frames = meta.manual_frames if meta.manual_frames is not None else ""
+        manual_frames = meta.manual_frames
 
         if meta.comparison:
             await ComparisonManager(meta, config).add_comparison()
@@ -1366,15 +1365,14 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                     logger.debug("[yellow]Cleaning up resources...[/yellow]")
                     gc.collect()
 
-            elif meta.skip_imghost_upload is True and meta.image_list is False:
-                # pyrefly: ignore [bad-assignment]
+            elif meta.skip_imghost_upload is True and not meta.image_list:
                 meta.image_list = []
 
             # Host book cover if it's a BOOK and save to covers.json
             if meta.category == "BOOK":
                 cover_path = meta.cover_path
                 poster_url = meta.poster
-                if not cover_path and isinstance(poster_url, str) and poster_url:
+                if not cover_path and poster_url:
                     if Path(poster_url).exists():
                         cover_path = poster_url
                     else:
@@ -1452,10 +1450,8 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
     reuse_torrent = None
     if isinstance(meta.trackers, str):
         trackers_list = [normalize_tracker_name(t) for t in meta.trackers.split(",") if t.strip()]
-    elif isinstance(meta.trackers, list):
-        trackers_list = [normalize_tracker_name(t) for t in meta.trackers if (t).strip()]
     else:
-        trackers_list = []
+        trackers_list = [normalize_tracker_name(t) for t in meta.trackers if (t).strip()]
 
     is_usenet_only = len(trackers_list) > 0 and all(t in ("USENET", "MANUAL") or getattr(tracker_class_map.get(t), "is_usenet", False) for t in trackers_list)
     if not is_usenet_only:
@@ -1482,13 +1478,8 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
 
     if Path(torrent_path).exists():
         raw_trackers = meta.trackers
-        if isinstance(raw_trackers, str):
-            trackers_list = [raw_trackers]
-        elif isinstance(raw_trackers, list):
-            trackers_list = [(t) for t in raw_trackers if t.strip()]
-        else:
-            trackers_list = []
-        trackers_normalized = [normalize_tracker_name(t) for t in trackers_list if str(t).strip()]
+        trackers_list = [raw_trackers] if isinstance(raw_trackers, str) else [t for t in raw_trackers if t.strip()]
+        trackers_normalized = [normalize_tracker_name(t) for t in trackers_list if t.strip()]
 
         base_piece_mb: int | None = cast(int | None, meta.base_torrent_piece_mb)
         if base_piece_mb is None and any(t in {"HDBits", "MoreThanTV", "PassThePopcorn"} for t in trackers_normalized):
@@ -1536,24 +1527,37 @@ async def cleanup_screenshot_temp_files(meta: Meta) -> None:
 
 async def save_processed_file(log_file: str, file_path: str) -> None:
     """
-    Adds a processed file to the log, deduplicating and always appending to the end.
+    Adds a processed file to the log, deduplicating and always appending it to the end.
     """
-    if Path(log_file).exists():
-        async with aiofiles.open(log_file, encoding="utf-8") as f:
-            try:
-                content = await f.read()
-                loaded: Any = json.loads(content) if content.strip() else []
-                processed_files = loaded if isinstance(loaded, list) else []
-            except Exception:
-                processed_files = []
-    else:
-        processed_files = []
+    processed_files: list[str] = []
 
-    processed_files_clean: list[str] = [str(entry) for entry in processed_files if entry != file_path]
-    processed_files_clean.append(file_path)
+    log_path = Path(log_file)
 
-    async with aiofiles.open(log_file, "w", encoding="utf-8") as f:
-        await f.write(json.dumps(processed_files_clean, indent=4))
+    if log_path.exists():
+        try:
+            async with aiofiles.open(log_path, encoding="utf-8") as f:
+                loaded = json.loads(await f.read())
+
+                if isinstance(loaded, list):
+                    loaded = cast(list[object], loaded)
+                    processed_files = [str(item) for item in loaded]
+                else:
+                    logger.warning(
+                        f"Log file {log_file} does not contain a JSON list.",
+                        extra={"highlighter": None},
+                    )
+
+        except Exception as e:
+            logger.error(
+                f"[red]Error reading log file {log_file}: {e}[/red]",
+                extra={"highlighter": None},
+            )
+
+    processed_files = [entry for entry in processed_files if entry != file_path]
+    processed_files.append(file_path)
+
+    async with aiofiles.open(log_path, "w", encoding="utf-8") as f:
+        await f.write(json.dumps(processed_files, indent=4))
 
 
 def get_local_version(version_file: str) -> str | None:
@@ -1765,7 +1769,7 @@ async def do_the_thing(base_dir: str) -> None:
             set_runtime_browse_roots(browse_roots)
 
             try:
-                _webui_server = create_server(app, host=host, port=port)
+                _webui_server = cast(WebUIServer, create_server(app, host=host, port=port))
 
                 # Build clickable URL (use localhost for 0.0.0.0 display)
                 display_host = "localhost" if host == "0.0.0.0" else host  # noqa: S104

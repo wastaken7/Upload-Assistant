@@ -100,7 +100,7 @@ def resolve_book_filelist(
 # ---------------------------------------------------------------------------
 
 
-def _resolve_book_language(raw: str) -> tuple[str, str]:
+def resolve_book_language(raw: str) -> tuple[str, str]:
     """Return ``(full_english_name, iso_639_3_alpha3)`` for any language input."""
     raw = raw.strip()
     with contextlib.suppress(Exception):
@@ -135,7 +135,7 @@ def sanitize_book_language(meta: Meta) -> None:
         meta.book_language_iso = ""
         return
 
-    full, iso = _resolve_book_language(lang.strip())
+    full, iso = resolve_book_language(lang.strip())
     if is_valid_book_language(full, iso):
         meta.book_language = full
         meta.book_language_iso = iso
@@ -222,7 +222,7 @@ async def gather_book_prep(
             logger.debug(f"[cyan]EPUB metadata extracted: {epub_meta}[/cyan]")
             for key, val in epub_meta.items():
                 if key == "book_language_raw":
-                    full, iso3 = _resolve_book_language(val)
+                    full, iso3 = resolve_book_language(val)
                     if is_valid_book_language(full, iso3) and not meta.book_language:
                         meta.book_language = full
                         meta.book_language_iso = iso3
@@ -242,7 +242,7 @@ async def gather_book_prep(
             logger.debug(f"[cyan]CBR/CBZ metadata extracted: {cbr_cbz_meta}[/cyan]")
             for key, val in cbr_cbz_meta.items():
                 if key == "book_language_raw":
-                    full, iso3 = _resolve_book_language(val)
+                    full, iso3 = resolve_book_language(val)
                     if is_valid_book_language(full, iso3) and not meta.book_language:
                         meta.book_language = full
                         meta.book_language_iso = iso3
@@ -262,7 +262,7 @@ async def gather_book_prep(
             logger.debug(f"[cyan]MOBI metadata extracted: {mobi_meta}[/cyan]")
             for key, val in mobi_meta.items():
                 if key == "book_language_raw":
-                    full, iso3 = _resolve_book_language(val)
+                    full, iso3 = resolve_book_language(val)
                     if is_valid_book_language(full, iso3) and not meta.book_language:
                         meta.book_language = full
                         meta.book_language_iso = iso3
@@ -415,7 +415,7 @@ async def gather_book_prep(
                 if not meta.book_language:
                     lang_val = _unescape_meta_val(general_track.get("Language") or general_track.get("language"))
                     if lang_val:
-                        full, iso3 = _resolve_book_language(lang_val)
+                        full, iso3 = resolve_book_language(lang_val)
                         if is_valid_book_language(full, iso3):
                             meta.book_language = full
                             meta.book_language_iso = iso3
@@ -426,7 +426,7 @@ async def gather_book_prep(
                         if t.get("@type") == "Audio":
                             lang_val = _unescape_meta_val(t.get("Language") or t.get("language"))
                             if lang_val:
-                                full, iso3 = _resolve_book_language(lang_val)
+                                full, iso3 = resolve_book_language(lang_val)
                                 if is_valid_book_language(full, iso3):
                                     meta.book_language = full
                                     meta.book_language_iso = iso3
@@ -438,7 +438,7 @@ async def gather_book_prep(
                         if t.get("@type") == "Text":
                             lang_val = _unescape_meta_val(t.get("Language") or t.get("language"))
                             if lang_val:
-                                full, iso3 = _resolve_book_language(lang_val)
+                                full, iso3 = resolve_book_language(lang_val)
                                 if is_valid_book_language(full, iso3):
                                     meta.book_language = full
                                     meta.book_language_iso = iso3

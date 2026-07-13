@@ -404,7 +404,7 @@ class Meta:
     tracker_status: dict[str, Any] = field(default_factory=dict)
     trackers_pass: int | None = None
     trackers_remove: str | bool = False
-    trackers: list[str] = field(default_factory=list)
+    trackers: list[str] | str = field(default_factory=list)
     transmission_label: str | None = None
     trump_reason: str | None = None
     trumpable_id: int | str | None = None

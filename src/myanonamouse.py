@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from src.book_prep import _resolve_book_language, is_valid_book_language
+from src.book_prep import is_valid_book_language, resolve_book_language
 from src.console import logger
 
 mam_color = "[#eac117]MyAnonamouse[/#eac117]"
@@ -82,7 +82,7 @@ class MyAnonamouseManager:
         lang = item.get("lang_code")
         if lang:
             try:
-                full, iso3 = _resolve_book_language(str(lang))
+                full, iso3 = resolve_book_language(str(lang))
                 if is_valid_book_language(full, iso3):
                     metadata["book_language"] = full
                     if iso3:
