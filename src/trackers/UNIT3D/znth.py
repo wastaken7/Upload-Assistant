@@ -8,7 +8,7 @@ import aiofiles
 from src.book_prep import extract_first_author as _primary_name
 from src.console import logger
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D, ParamsList
 
 Config = dict[str, Any]
@@ -67,7 +67,7 @@ class Zenith(UNIT3D):
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="Zenith")
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
         self.banned_author_sets: list[set[str]] = []
         for author in self._banned_authors_raw:

@@ -17,7 +17,7 @@ from src.audio import AudioManager
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 _shri_session_data: dict[str, dict[str, str | None]] = {}
@@ -47,7 +47,7 @@ class Shareisland(UNIT3D):
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name="Shareisland")
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.audio_manager = AudioManager(config)
 
     def _get_language_code(self, track_or_string: Any) -> str:

@@ -12,7 +12,7 @@ import guessit
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
@@ -32,7 +32,7 @@ TRACKER_DISC_REQUIREMENTS = {
 class NameManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.common = COMMON(config=config)
+        self.common = Common(config=config)
 
     async def get_name(self, meta: Meta) -> tuple[str, str, str, list[str]]:
         active_trackers: list[str] = [tracker for tracker in TRACKER_DISC_REQUIREMENTS if tracker in meta.trackers]

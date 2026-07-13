@@ -16,7 +16,7 @@ from src.console import console, logger
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
 from src.torrentcreate import TorrentCreator
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -230,7 +230,7 @@ class HDBits:
         return hdb_name.replace(" .", ".").replace("..", ".")
 
     async def upload(self, meta: Meta) -> bool | None:
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         await self.edit_desc(meta)
         hdb_name = await self.edit_name(meta)
         cat_id = await self.get_type_category_id(meta)
@@ -427,7 +427,7 @@ class HDBits:
         return True
 
     async def validate_cookies(self, meta: Meta) -> bool:
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         url = "https://hdbits.org"
         from src.cookie_auth import find_cookie_file
 

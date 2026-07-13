@@ -54,7 +54,7 @@ from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
 from src.trackers.alpharatio import AlphaRatio
-from src.trackers.COMMON import COMMON
+from src.trackers.common import Common
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup, api_trackers, http_trackers, normalize_tracker_name, other_api_trackers, tracker_class_map
 from src.trackerstatus import TrackerStatusManager
@@ -983,7 +983,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
         return True
 
     meta.we_are_uploading = True
-    common = COMMON(config)
+    common = Common(config)
     if meta.site_check:
         tracker_status = cast(dict[str, dict[str, Any]], meta.tracker_status)
         for tracker in meta.trackers:
@@ -2488,7 +2488,7 @@ async def process_cross_seeds(meta: Meta) -> None:
 
     logger.info(f"[cyan]Valid trackers for cross-seed check: {valid_trackers}[/cyan]")
 
-    common = COMMON(config)
+    common = Common(config)
     try:
         concurrency_limit = int(config.get("DEFAULT", {}).get("cross_seed_concurrency", 8))
     except TypeError, ValueError:

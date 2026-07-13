@@ -11,7 +11,7 @@ import langcodes
 from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -31,7 +31,7 @@ class Curupira:
 
     def __init__(self, config: Config) -> None:
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     async def search_existing(self, meta: Meta) -> list[Any]:
         release_name = await self.get_name(meta)

@@ -1,7 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
-from src.trackers.COMMON import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -22,4 +22,4 @@ class FrikiBar(UNIT3D):
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name="FrikiBar")
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)

@@ -10,7 +10,7 @@ from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.tmdb import TmdbManager
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -32,7 +32,7 @@ class NEXUSPHP:
     }
 
     def __init__(self, config: dict[str, Any], tracker_name: str):
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.config = config
         self.cookie_auth_uploader = CookieAuthUploader(config)
         self.cookie_validator = CookieValidator(config)

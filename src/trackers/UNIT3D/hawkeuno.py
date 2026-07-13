@@ -11,7 +11,7 @@ from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -90,7 +90,7 @@ class HawkeUno(UNIT3D):
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, "HawkeUno")
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.rehost_images_manager = RehostImagesManager(config)
         self.announce_url = str(self.config.get("TRACKERS", {}).get(self.tracker, {}).get("announce_url", "")).strip()
 

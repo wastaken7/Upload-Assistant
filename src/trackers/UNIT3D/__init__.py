@@ -15,7 +15,7 @@ from cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 type QueryValue = str | int | float | bool | None
 type ParamsList = list[tuple[str, QueryValue]]
@@ -34,7 +34,7 @@ class UNIT3D:
     def __init__(self, config: dict[str, Any], tracker_name: str):
         self.config = config
         self.tracker = tracker_name
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.tracker_config: dict[str, Any] = self.config["TRACKERS"].get(self.tracker, {})
 
         # Normalize announce_url: must be a non-empty string after stripping

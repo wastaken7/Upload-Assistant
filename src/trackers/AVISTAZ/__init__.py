@@ -21,7 +21,7 @@ from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -36,7 +36,7 @@ class AZTrackerBase:
     def __init__(self, config: Config, tracker_name: str):
         self.config = config
         self.tracker = tracker_name
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.cookie_validator = CookieValidator(config)
         self.az_class = type(self)
 

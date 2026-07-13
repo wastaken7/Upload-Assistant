@@ -5,7 +5,7 @@ from typing import Any
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -110,7 +110,7 @@ class CapybaraBR(UNIT3D):
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="CapybaraBR")
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id: dict[str, str] = {"MOVIE": "1", "TV": "2", "ANIMES": "4", "BOOK": "11", "COMIC_MANGA": "10", "GAME": "5"}

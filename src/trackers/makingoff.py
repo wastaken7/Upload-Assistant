@@ -20,7 +20,7 @@ from src.console import logger
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.languages import languages_manager
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -72,7 +72,7 @@ class MakingOff:
 
     def __init__(self, config: Config):
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
         # Cache for the resolved PT-BR display title, keyed by meta.uuid.
         self._display_title_cache: dict[str, str] = {}

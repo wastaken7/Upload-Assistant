@@ -11,7 +11,7 @@ from cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -34,7 +34,7 @@ class TorrentLeech:
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.session = httpx.AsyncClient(timeout=60.0)
         self.tracker_config: dict[str, Any] = self.config["TRACKERS"][self.tracker]
         self.api_upload: bool = bool(self.tracker_config.get("api_upload", False))

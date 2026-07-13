@@ -12,7 +12,7 @@ from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 
 class BeyondHD:
@@ -89,7 +89,7 @@ class BeyondHD:
         return
 
     async def upload(self, meta: Meta) -> bool:
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta.category)
         source_id = await self.get_source(str(meta.source))
@@ -399,7 +399,7 @@ class BeyondHD:
             else:
                 return False
 
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         return common.check_and_confirm_adult_media_upload(meta, self.tracker)
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:

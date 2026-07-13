@@ -12,7 +12,7 @@ import langcodes
 
 from src.console import logger
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 
 # Specific exception for lossy DTS core duplicate detection
@@ -285,7 +285,7 @@ async def _get_audio_v2(
         first_audio: dict[str, Any] = audio_entries[0] if audio_entries else {}
         additional = first_audio.get("atmos_why_you_be_like_this", "")
         if isinstance(additional, str) and "atmos" in additional.lower():
-            common = COMMON(config)
+            common = Common(config)
             bd_mi = await common.get_bdmv_mediainfo(meta)
             try:
                 base_dir = meta.base_dir

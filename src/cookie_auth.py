@@ -15,7 +15,7 @@ from bs4.element import AttributeValueList
 
 from src.console import logger
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 
 def _attr_to_string(value: str | AttributeValueList | None) -> str:
@@ -170,7 +170,7 @@ def find_cookie_file(base_dir: str, tracker: str, config: dict[str, Any] | None 
 class CookieValidator:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     async def load_session_cookies(self, meta: Meta, tracker: str) -> http.cookiejar.MozillaCookieJar | None:
         cookie_file = find_cookie_file(meta.base_dir, tracker, self.config)
@@ -579,7 +579,7 @@ class CookieValidator:
 class CookieAuthUploader:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     async def handle_upload(
         self,

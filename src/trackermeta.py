@@ -17,7 +17,7 @@ from src.bbcode import BBCODE
 from src.btnid import BtnIdManager
 from src.console import logger
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackersetup import api_trackers
 from src.type_utils import to_int
 
@@ -568,7 +568,7 @@ async def update_metadata_from_tracker(
             logger.debug(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
             tracker_data = cast(
                 Sequence[Any],
-                await COMMON(config).unit3d_torrent_info(
+                await Common(config).unit3d_torrent_info(
                     tracker_name,
                     tracker_instance.id_url,
                     tracker_instance.search_url,
@@ -581,7 +581,7 @@ async def update_metadata_from_tracker(
             logger.debug(f"[yellow]No ID found in meta for {tracker_name}, searching by file name[/yellow]")
             tracker_data = cast(
                 Sequence[Any],
-                await COMMON(config).unit3d_torrent_info(
+                await Common(config).unit3d_torrent_info(
                     tracker_name,
                     tracker_instance.id_url,
                     tracker_instance.search_url,

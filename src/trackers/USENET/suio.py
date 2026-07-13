@@ -16,7 +16,7 @@ from PIL import Image
 from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -36,7 +36,7 @@ class Suio:
 
     def __init__(self, config: Config) -> None:
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
         tracker_cfg = config.get("TRACKERS", {}).get(self.tracker, {})
         base_url = tracker_cfg.get("base_url", "").strip().rstrip("/")
         if base_url:

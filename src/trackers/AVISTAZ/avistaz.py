@@ -3,7 +3,7 @@ from typing import Any
 
 from src.meta import Meta
 from src.trackers.AVISTAZ import AZTrackerBase
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 
 class AvistaZ(AZTrackerBase):
@@ -23,7 +23,7 @@ class AvistaZ(AZTrackerBase):
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="AvistaZ")
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     def rules(self, meta: Meta) -> str:
         warnings: list[str] = []

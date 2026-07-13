@@ -384,9 +384,9 @@ class TrackerDataManager:
     async def ping_unit3d(self, meta: Meta) -> None:
         import re
 
-        from src.trackers.common import COMMON
+        from src.trackers.common import Common
 
-        common = COMMON(self.config)
+        common = Common(self.config)
 
         # Prioritize trackers in this order
         from src.trackersetup import api_trackers

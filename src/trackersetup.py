@@ -25,7 +25,7 @@ from src.trackers.beyondhd import BeyondHD
 from src.trackers.bithdtv import BitHDTV
 from src.trackers.bjshare import BJShare
 from src.trackers.brasiltracker import BrasilTracker
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackers.digitalcore import DigitalCore
 from src.trackers.filelist import FileList
 from src.trackers.funfile import FunFile
@@ -775,7 +775,7 @@ class TrackerSetup:
                     logger.warning("[yellow]Warning: Some categories in meta not found in tracker category mapping.[/yellow]")
 
             # Initialize request log for this tracker
-            common = COMMON(self.config)
+            common = Common(self.config)
             log_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{tracker_name}_request_results.json"
             if not await common.path_exists(log_path):
                 await common.makedirs(str(Path(log_path).parent))

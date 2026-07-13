@@ -16,7 +16,7 @@ from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa E403
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -57,7 +57,7 @@ class PTerClub:
         return True
 
     async def validate_cookies(self, meta: Meta) -> bool:
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         url = "https://pterclub.com"
         from src.cookie_auth import find_cookie_file
 
@@ -74,7 +74,7 @@ class PTerClub:
 
     async def search_existing(self, meta: Meta) -> list[str] | bool:
         dupes: list[str] = []
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         from src.cookie_auth import find_cookie_file
 
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
@@ -189,9 +189,9 @@ class PTerClub:
             base = await base_file.read()
 
         from src.bbcode import BBCODE
-        from src.trackers.common import COMMON
+        from src.trackers.common import Common
 
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
 
         parts: list[str] = []
 
@@ -378,7 +378,7 @@ class PTerClub:
 
     async def upload(self, meta: Meta) -> bool:
 
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
 
         desc_file = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"

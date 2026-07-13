@@ -10,7 +10,7 @@ from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -170,7 +170,7 @@ class OnlyEncodes(UNIT3D):
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="OnlyEncodes")
         self.config: Config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.rehost_images_manager = RehostImagesManager(config)
 
     async def get_additional_checks(self, meta: Meta) -> bool:

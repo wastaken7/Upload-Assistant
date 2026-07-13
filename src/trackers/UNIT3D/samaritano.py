@@ -3,7 +3,7 @@ from typing import Any
 
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 from src.trackers.UNIT3D.capybarabr import CapybaraBR
 
@@ -29,7 +29,7 @@ class Samaritano(UNIT3D):
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="Samaritano")
         self.config: Config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     async def get_resolution_id(self, meta: Meta, resolution: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         resolution_id = {

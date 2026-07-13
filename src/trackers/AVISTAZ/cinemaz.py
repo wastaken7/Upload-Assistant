@@ -4,7 +4,7 @@ from typing import Any
 
 from src.meta import Meta
 from src.trackers.AVISTAZ import AZTrackerBase
-from src.trackers.COMMON import COMMON
+from src.trackers.common import Common
 
 
 class CinemaZ(AZTrackerBase):
@@ -24,7 +24,7 @@ class CinemaZ(AZTrackerBase):
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name="CinemaZ")
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     def rules(self, meta: Meta) -> str:
         warnings: list[str] = []

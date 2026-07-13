@@ -11,7 +11,7 @@ from cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 
 class RetroFlix:
@@ -43,7 +43,7 @@ class RetroFlix:
         Returns:
             True if upload was successful, False otherwise.
         """
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, signature=self.forum_link)
         if meta.bdinfo:
@@ -178,7 +178,7 @@ class RetroFlix:
             return True  # Debug mode - simulated success
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         if not common.check_and_confirm_adult_media_upload(meta, self.tracker):
             return False
 

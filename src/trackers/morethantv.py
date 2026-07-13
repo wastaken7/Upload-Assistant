@@ -19,7 +19,7 @@ from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.torrentcreate import TorrentCreator
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -121,7 +121,7 @@ class MoreThanTV:
         return
 
     async def upload(self, meta: Meta) -> bool | None:
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         from src.cookie_auth import find_cookie_file
 
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)

@@ -19,7 +19,7 @@ from src.bbcode import BBCODE
 from src.console import logger
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -445,7 +445,7 @@ class TVChaosUK:
         return
 
     async def upload(self, meta: Meta) -> bool | None:
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
 
         raw_images = meta.TVC_images_key if meta.TVC_images_key is not None else meta.get("image_list", [])
         image_list_seq: list[Any]

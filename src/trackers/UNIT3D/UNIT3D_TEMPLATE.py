@@ -2,7 +2,7 @@
 from typing import Any
 
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -22,7 +22,7 @@ class Unit3dTemplate(UNIT3D):  # EDIT 'Unit3dTemplate' AS ABBREVIATED TRACKER NA
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="Unit3dTemplate")  # EDIT 'Unit3dTemplate' AS ABBREVIATED TRACKER NAME
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     # The section below can be deleted if no changes are needed, as everything else is handled in UNIT3D.py
     # If advanced changes are required, copy the necessary functions from UNIT3D.py here

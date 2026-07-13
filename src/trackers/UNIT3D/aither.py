@@ -4,7 +4,7 @@ from typing import Any
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -30,7 +30,7 @@ class Aither(UNIT3D):
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="Aither")
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     async def get_additional_checks(self, meta: Meta):
         should_continue = True

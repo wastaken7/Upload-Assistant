@@ -17,7 +17,7 @@ from src.languages import languages_manager
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.tmdb import TmdbManager
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 
 class GreatPosterWall:
@@ -109,7 +109,7 @@ class GreatPosterWall:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         self.rehost_images_manager = RehostImagesManager(config)
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.tmdb_manager = TmdbManager(config)
         self.tracker_config: dict[str, Any] = self.config["TRACKERS"].get(self.tracker, {})
         self.announce = self.tracker_config.get("announce_url", "")

@@ -14,7 +14,7 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.torrentcreate import TorrentCreator
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -110,7 +110,7 @@ class Anthelion:
 
     def __init__(self, config: Config):
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.tracker_config = self.config["TRACKERS"].get(self.tracker, {})
 
     async def get_flags(self, meta: Meta) -> list[str]:

@@ -5,7 +5,7 @@ import cli_ui
 
 from src.console import logger
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 
@@ -28,7 +28,7 @@ class Luminarr(UNIT3D):
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name="Luminarr")
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
         return {

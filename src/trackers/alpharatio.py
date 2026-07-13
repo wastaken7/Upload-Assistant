@@ -17,7 +17,7 @@ from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 
 class AlphaRatio:
@@ -343,7 +343,7 @@ class AlphaRatio:
     async def upload(self, meta: Meta) -> bool:
         """Upload torrent to AlphaRatio using centralized cookie_upload."""
         # Prepare the data for the upload
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
         type_id = await self.get_type(meta)

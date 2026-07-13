@@ -3,7 +3,7 @@ import re
 from typing import Any
 
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -28,7 +28,7 @@ class ReelFlix(UNIT3D):
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="ReelFlix")
         self.config: Config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)

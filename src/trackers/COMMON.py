@@ -29,7 +29,7 @@ from src.meta import Meta
 from src.usenetcreate import verify_nzb_has_password
 
 
-class COMMON:
+class Common:
     LANGUAGE_EQUIVALENCE_GROUPS: tuple[set[str], ...] = (
         {"chinese", "mandarin", "zh", "zho", "chi", "cmn", "chinese simplified", "chinese traditional", "zh hans", "zh hant"},
         {"english", "eng", "en", "en us", "en gb", "english cc", "english sdh", "english forced"},

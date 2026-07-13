@@ -6,7 +6,7 @@ import aiofiles
 
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -30,7 +30,7 @@ class Locadora(UNIT3D):
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="Locadora")
         self.config: Config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         name_value = meta.name if meta.is_disc == "BDMV" else meta.basename_no_ext

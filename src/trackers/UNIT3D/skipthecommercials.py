@@ -8,7 +8,7 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -33,7 +33,7 @@ class SkipTheCommercials(UNIT3D):
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="SkipTheCommercials")
         self.config: Config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.rehost_images_manager = RehostImagesManager(config)
 
     async def get_type_id(

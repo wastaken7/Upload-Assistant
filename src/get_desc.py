@@ -20,7 +20,7 @@ from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.takescreens import TakeScreensManager
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
 
 
@@ -202,7 +202,7 @@ async def gen_desc(
 class DescriptionBuilder:
     def __init__(self, tracker: str, config: dict[str, Any]):
         self.config: dict[str, Any] = config
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.tracker: str = tracker
         self.takescreens_manager = TakeScreensManager(config)
         self.uploadscreens_manager = UploadScreensManager(config)

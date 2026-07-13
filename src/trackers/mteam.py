@@ -12,7 +12,7 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.tmdb import TmdbManager
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -32,7 +32,7 @@ class MTeam:
 
     def __init__(self, config: Config):
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.tmdb_manager = TmdbManager(config)
         raw_url = self.config["TRACKERS"][self.tracker].get("base_url", "kp.m-team.cc").strip()
         parsed_raw = urlparse(raw_url)

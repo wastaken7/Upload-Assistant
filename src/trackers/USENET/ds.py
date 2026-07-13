@@ -8,7 +8,7 @@ import httpx
 
 from src.console import logger
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -27,7 +27,7 @@ class DrunkenSlug:
 
     def __init__(self, config: Config) -> None:
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.upload_url = str(self.config.get("TRACKERS", {}).get(self.tracker, {}).get("upload_url", "").replace("/upload_form", "/upload.php")).strip()
 
     async def search_existing(self, meta: Meta) -> list[Any]:

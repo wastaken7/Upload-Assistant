@@ -7,7 +7,7 @@ import httpx
 from cogs.redaction import Redaction
 from src.console import console, logger
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -33,7 +33,7 @@ class Swarmazon:
         return {"BluRay": "3", "Web": "1", "DVD": "2"}.get(type, "0")
 
     async def upload(self, meta: Meta) -> bool:
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
         cat_id = ""

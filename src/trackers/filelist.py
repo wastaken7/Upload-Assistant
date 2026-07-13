@@ -17,7 +17,7 @@ from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 
 class FileList:
@@ -181,7 +181,7 @@ class FileList:
             return {}
 
     async def upload(self, meta: Meta) -> bool:
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
         fl_name = await self.edit_name(meta)

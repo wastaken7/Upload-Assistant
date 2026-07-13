@@ -25,7 +25,7 @@ from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.takescreens import TakeScreensManager
 from src.torrentcreate import TorrentCreator
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
 
 
@@ -1628,7 +1628,7 @@ class PassThePopcorn:
         return url, data
 
     async def upload(self, meta: Meta, url: str, data: dict[str, Any]) -> bool:
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         base_piece_mb = meta.base_torrent_piece_mb or 0
         torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
 

@@ -19,7 +19,7 @@ from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
 from src.tmdb import TmdbManager
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 
 class AmigosShare:
@@ -82,7 +82,7 @@ class AmigosShare:
         self.season_tmdb_data: dict[str, Any] = {}
         self.episode_tmdb_data: dict[str, Any] = {}
         self.tmdb_manager = TmdbManager(config)
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.cookie_validator = CookieValidator(config)
         self.cookie_auth_uploader = CookieAuthUploader(config)
         self.layout = self.config["TRACKERS"][self.tracker].get("custom_layout", "2")

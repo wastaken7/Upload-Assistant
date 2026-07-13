@@ -5,7 +5,7 @@ import httpx
 
 from src.console import logger
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -28,7 +28,7 @@ class Racing4Everyone(UNIT3D):
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="Racing4Everyone")
         self.config: Config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = (category, reverse, mapping_only)

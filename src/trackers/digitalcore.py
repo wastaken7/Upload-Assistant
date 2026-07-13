@@ -10,7 +10,7 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -32,7 +32,7 @@ class DigitalCore:
 
     def __init__(self, config: Config):
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.rehost_images_manager = RehostImagesManager(config)
         self.api_key = self.config["TRACKERS"][self.tracker].get("api_key")
         self.session = httpx.AsyncClient(headers={"X-API-KEY": self.api_key}, timeout=30.0)

@@ -18,7 +18,7 @@ from cogs.redaction import Redaction
 from src.bbcode import BBCODE
 from src.console import console, logger
 from src.meta import Meta
-from src.trackers.common import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -40,7 +40,7 @@ class TorrentHR:
         self.password = str(config["TRACKERS"][self.tracker].get("password", ""))
 
     async def upload(self, meta: Meta) -> bool | None:
-        common = COMMON(config=self.config)
+        common = Common(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         cat_id = await self.get_cat_id(meta)
         subs = self.get_subtitles(meta)
