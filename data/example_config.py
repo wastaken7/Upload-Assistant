@@ -111,7 +111,7 @@ config: dict[str, Any] = {
         # custom zipline url
         "zipline_url": "",
         "zipline_api_key": "",
-        # Seedpool CDN API key
+        # SEEDPOOL CDN API key
         "seedpool_cdn_api": "",
         # ShareX-style image host (IMageHosting) token
         "sharex_url": "https://img.digitalcore.club/api/upload",
@@ -226,7 +226,7 @@ config: dict[str, Any] = {
         # 6 is a good balance between compression and speed
         "ffmpeg_compression": "6",
 
-        # Optional path to the unRAR executable for CapybaraBR/CBZ extraction.
+        # Optional path to the unRAR executable for CAPYBARABR/CBZ extraction.
         # Leave blank to use the system PATH.
         # Example: "C:\\Program Files\\WinRAR\\UnRAR.exe"
         "unrar_path": "",
@@ -271,11 +271,11 @@ config: dict[str, Any] = {
 
         # Number of screenshots to use for each (ALL) disc/episode when uploading packs to supported sites.
         # 0 equals old behavior where only the original description and images are added.
-        # This setting also affects PassThePopcorn, however PassThePopcorn requires at least 2 images for each.
-        # PassThePopcorn will always use a *minimum* of 2, regardless of what is set here.
+        # This setting also affects PASSTHEPOPCORN, however PASSTHEPOPCORN requires at least 2 images for each.
+        # PASSTHEPOPCORN will always use a *minimum* of 2, regardless of what is set here.
         "multiScreens": "2",
 
-        # The next options for packed content do not effect PassThePopcorn. PassThePopcorn has a set standard.
+        # The next options for packed content do not effect PASSTHEPOPCORN. PASSTHEPOPCORN has a set standard.
         # When uploading packs, you can specify a different screenshot thumbnail size, default 300.
         "pack_thumb_size": "300",
 
@@ -284,7 +284,7 @@ config: dict[str, Any] = {
         # still to be added to the description. You can set this small like 50, to only ever
         # print filenames and screenshots for each file, no mediainfo will be printed.
         # UNIT3D sites have a hard character limit for descriptions. A little over 17000
-        # worked fine in a forum post at Aither. If the description is at 1 < charLimit, the next full
+        # worked fine in a forum post at AITHER. If the description is at 1 < charLimit, the next full
         # description will be added before respecting this cutoff.
         "charLimit": "14000",
 
@@ -397,7 +397,7 @@ config: dict[str, Any] = {
         "mkbrr_threads": "0",
 
         # Set true to prefer torrents with piece size <= 16 MiB when searching for existing torrents in clients
-        # Does not override MoreThanTV preference for small pieces
+        # Does not override MORETHANTV preference for small pieces
         "prefer_max_16_torrent": False,
 
         # Tracker based rehashing cooldown.
@@ -432,7 +432,7 @@ config: dict[str, Any] = {
 
     },
 
-    # these are used for DB links on AlphaRatio
+    # these are used for DB links on ALPHARATIO
     "IMAGES": {
         "imdb_75": 'https://i.imgur.com/Mux5ObG.png',
         "tmdb_75": 'https://i.imgur.com/r3QzUbk.png',
@@ -446,10 +446,10 @@ config: dict[str, Any] = {
         # Note: Description layout settings (like screenshot grids, logos, etc.) can be overridden per-tracker.
         # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
 
-        # Available tracker: Aura4K, AsianCinema, Aither, Anthelion, AlphaRatio, AmigosShare, AvistaZ, BeyondHD, BitHDTV, BJShare, Blutopia, BrasilTracker, CapybaraBR, Curupira, Suio, CinemaZ, DigitalCore, DrunkenSlug, DarkPeers, DesiTorrents, Emuwarez, FunFile, FileList,
-        # FrikiBar, GreatPosterWall, HDBits, HDSpace, HDTorrents, HomieHelpDesk, HawkeUno, InfinityHD, ImmortalSeed, ItaTorrents, Lajidui, Locadora, LastDigitalUnderground, LongPT, LST, LatTeam, Luminarr, MidnightScene, MTeam, MoreThanTV, Nebulance, OnlyEncodes,
-        # OldToonsWorld, PrivateHD, Portugas, PTCafe, PTerClub, PTFans, PTGTK, PassThePopcorn, Ptskit, PolishTorrent, Racing4Everyone, Rastastugan, ReelFlix, RailgunPT, RetroFlix, Samaritano, ShareIsland, Swarmazon, Seedpool, SpeedApp, SkipTheCommercials, TorrentHR,
-        # Cinematik, TorrentLeech, TheLeachZone, TheOldSchool, ToTheGlory, Torrenteros, TVChaosUK, ULCX, Utopia, Yoinked, YUSCENE, Zenith
+        # Available tracker: AURA4K, ASIANCINEMA, AITHER, ANTHELION, ALPHARATIO, AMIGOSSHARE, AVISTAZ, BEYONDHD, BITHDTV, BJSHARE, BLUTOPIA, BRASILTRACKER, CAPYBARABR, CURUPIRA, SUIO, CINEMAZ, DIGITALCORE, DRUNKENSLUG, DARKPEERS, DESITORRENTS, EMUWAREZ, FUNFILE, FILELIST,
+        # FRIKIBAR, GREATPOSTERWALL, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK, HAWKEUNO, INFINITYHD, IMMORTALSEED, ITATORRENTS, LAJIDUI, LOCADORA, LASTDIGITALUNDERGROUND, LONGPT, LST, LATTEAM, LUMINARR, MIDNIGHTSCENE, MTEAM, MORETHANTV, NEBULANCE, ONLYENCODES,
+        # OLDTOONSWORLD, PRIVATEHD, PORTUGAS, PTCAFE, PTERCLUB, PTFANS, PTGTK, PASSTHEPOPCORN, PTSKIT, POLISHTORRENT, RACING4EVERYONE, RASTASTUGAN, REELFLIX, RAILGUNPT, RETROFLIX, SAMARITANO, SHAREISLAND, SWARMAZON, SEEDPOOL, SPEEDAPP, SKIPTHECOMMERCIALS, TORRENTHR,
+        # CINEMATIK, TORRENTLEECH, THELEACHZONE, THEOLDSCHOOL, TOTHEGLORY, TORRENTEROS, TVCHAOSUK, ULCX, UTOPIA, YOINKED, YUSCENE, ZENITH
 
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
@@ -461,7 +461,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to Aura4K modq for staff approval
+            # Send uploads to AURA4K modq for staff approval
             "modq": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -523,7 +523,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to Aither modq for staff approval
+            # Send uploads to AITHER modq for staff approval
             "modq": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -593,9 +593,9 @@ config: dict[str, Any] = {
             # If you have a custom layout, you'll need to inspect the element on the upload page to find the correct layout value
             # Don't change it unless you know what you're doing
             "custom_layout": '2',
-            # anon is not an option when uploading to AmigosShare
-            # for AmigosShare to work you need to export cookies from https://cliente.amigos-share.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # cookies need to be in netscape format and need to be in data/cookies/AmigosShare.txt
+            # anon is not an option when uploading to AMIGOSSHARE
+            # for AMIGOSSHARE to work you need to export cookies from https://cliente.amigos-share.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
+            # cookies need to be in netscape format and need to be in data/cookies/AMIGOSSHARE.txt
             "announce_url": "",
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
@@ -624,8 +624,8 @@ config: dict[str, Any] = {
         "AVISTAZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for AvistaZ to work you need to export cookies from https://avistaz.to using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # cookies need to be in netscape format and need to be in data/cookies/AvistaZ.txt
+            # for AVISTAZ to work you need to export cookies from https://avistaz.to using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
+            # cookies need to be in netscape format and need to be in data/cookies/AVISTAZ.txt
             "announce_url": "",
             "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
@@ -683,8 +683,8 @@ config: dict[str, Any] = {
         "BJSHARE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for BJShare to work you need to export cookies from https://bj-share.info using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/BJShare.txt
+            # for BJSHARE to work you need to export cookies from https://bj-share.info using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/BJSHARE.txt
             # Two-factor authentication must be enabled in your profile settings; otherwise, your cookies will expire fairly quickly
             "announce_url": "",
             "anon": True,
@@ -745,8 +745,8 @@ config: dict[str, Any] = {
         },
         "BRASILTRACKER": {
             "link_dir_name": "",
-            # for BrasilTracker to work you need to export cookies from https://brasiltracker.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/BrasilTracker.txt
+            # for BRASILTRACKER to work you need to export cookies from https://brasiltracker.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/BRASILTRACKER.txt
             "announce_url": "",
             "anon": True,
             # Set this to True if you want to allow external subtitles to be included in the upload
@@ -776,7 +776,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to CapybaraBR modq for staff approval
+            # Send uploads to CAPYBARABR modq for staff approval
             "modq": False,
             # The tag that identifies you or your group when modifying an existing release.
             # If set, the script will try to preserve the original group's name.
@@ -818,8 +818,8 @@ config: dict[str, Any] = {
         "CINEMAZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for CinemaZ to work you need to export cookies from https://cinemaz.to using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # cookies need to be in netscape format and need to be in data/cookies/CinemaZ.txt
+            # for CINEMAZ to work you need to export cookies from https://cinemaz.to using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
+            # cookies need to be in netscape format and need to be in data/cookies/CINEMAZ.txt
             "announce_url": "",
             "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
@@ -867,7 +867,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to DarkPeers modq for staff approval
+            # Send uploads to DARKPEERS modq for staff approval
             "modq": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -895,7 +895,7 @@ config: dict[str, Any] = {
         "DRUNKENSLUG": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # Provide the DrunkenSlug API key here, can be found at https://drunkenslug.com/profile
+            # Provide the DRUNKENSLUG API key here, can be found at https://drunkenslug.com/profile
             "api_key": "",
             "inject_delay": 0,
         },
@@ -966,7 +966,7 @@ config: dict[str, Any] = {
             "link_dir_name": "",
             "username": "",
             "password": "",
-            # You can find your announce URL by downloading any torrent from FunFile, adding it to your client, and then copying the URL from the 'Trackers' tab.
+            # You can find your announce URL by downloading any torrent from FUNFILE, adding it to your client, and then copying the URL from the 'Trackers' tab.
             "announce_url": "",
             # Set to True if you want to check whether your upload fulfills corresponding requests. This may slightly slow down the upload process.
             "check_requests": False,
@@ -1035,9 +1035,9 @@ config: dict[str, Any] = {
             "link_dir_name": "",
             # You can find your API key in Profile Settings -> Access Settings -> API Key. If there is no API, click "Reset your api key" and Save Profile.
             "api_key": "",
-            # Optionally, you can export cookies from GreatPosterWall to improve duplicate searches.
+            # Optionally, you can export cookies from GREATPOSTERWALL to improve duplicate searches.
             # If you do this, you must export cookies from https://greatposterwall.com using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # Cookies must be in Netscape format and must be located in data/cookies/GreatPosterWall.txt
+            # Cookies must be in Netscape format and must be located in data/cookies/GREATPOSTERWALL.txt
             # You can find your announce URL at https://greatposterwall.com/upload.php
             "announce_url": "",
             # Upload with Exclusive flag
@@ -1068,9 +1068,9 @@ config: dict[str, Any] = {
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "use_for_search": False,
-            # for HDBits you **MUST** have been granted uploading approval via Offers, you've been warned
-            # for HDBits to work you need to export cookies from https://hdbits.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/HDBits.txt
+            # for HDBITS you **MUST** have been granted uploading approval via Offers, you've been warned
+            # for HDBITS to work you need to export cookies from https://hdbits.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/HDBITS.txt
             "username": "",
             "passkey": "",
             "announce_url": "",
@@ -1080,8 +1080,8 @@ config: dict[str, Any] = {
         "HDSPACE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for HDSpace to work you need to export cookies from https://hd-space.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/HDSpace.txt
+            # for HDSPACE to work you need to export cookies from https://hd-space.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/HDSPACE.txt
             "announce_url": "",
             "anon": True,
             # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
@@ -1110,9 +1110,9 @@ config: dict[str, Any] = {
         "HDTORRENTS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # For HDTorrents to work, you need to export cookies from the site using:
+            # For HDTORRENTS to work, you need to export cookies from the site using:
             # https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # Cookies must be in Netscape format and saved in: data/cookies/HDTorrents.txt
+            # Cookies must be in Netscape format and saved in: data/cookies/HDTORRENTS.txt
             # You can change the URL if the main site is down or if you encounter upload issues.
             # Keep in mind that changing the URL requires exporting the cookies again from the new domain.
             # Alternative domains:
@@ -1208,11 +1208,11 @@ config: dict[str, Any] = {
         "IPTORRENTS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # For IPTorrents to work, you need to export cookies from the site using:
+            # For IPTORRENTS to work, you need to export cookies from the site using:
             # https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # Cookies must be in Netscape format and saved in: data/cookies/IPTorrents.txt
+            # Cookies must be in Netscape format and saved in: data/cookies/IPTORRENTS.txt
             "announce_url": "",
-            # By default, IPTorrents removes all dots from the upload name, causing audio codecs to be named incorrectly, for example, "DTS 5 1" instead of "DTS 5.1".
+            # By default, IPTORRENTS removes all dots from the upload name, causing audio codecs to be named incorrectly, for example, "DTS 5 1" instead of "DTS 5.1".
             # It also does not have the option to set the IMDb during upload.
             # Set this to True to edit the torrent after the upload to force the correct naming and IMDb.
             "force_data": False,
@@ -1270,8 +1270,8 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "IMMORTALSEED": {
-            # for ImmortalSeed to work you need to export cookies from https://immortalseed.me/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/ImmortalSeed.txt
+            # for IMMORTALSEED to work you need to export cookies from https://immortalseed.me/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/IMMORTALSEED.txt
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "announce_url": "",
@@ -1331,8 +1331,8 @@ config: dict[str, Any] = {
         "LAJIDUI": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for Lajidui to work you need to export cookies from https://pt.lajidui.top/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/Lajidui.txt
+            # for LAJIDUI to work you need to export cookies from https://pt.lajidui.top/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/LAJIDUI.txt
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1422,8 +1422,8 @@ config: dict[str, Any] = {
         "LONGPT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for LongPT to work you need to export cookies from https://longpt.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/LongPT.txt
+            # for LONGPT to work you need to export cookies from https://longpt.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/LONGPT.txt
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1489,7 +1489,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to LatTeam modq for staff approval
+            # Send uploads to LATTEAM modq for staff approval
             "modq": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -1521,7 +1521,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to Luminarr modq for staff approval
+            # Send uploads to LUMINARR modq for staff approval
             "modq": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -1564,7 +1564,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # Send uploads to MidnightScene modq for staff approval
+            # Send uploads to MIDNIGHTSCENE modq for staff approval
             "modq": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -1628,9 +1628,9 @@ config: dict[str, Any] = {
             'anon': False,
             # read the following for more information https://github.com/google/google-authenticator/wiki/Key-Uri-Format
             'otp_uri': 'OTP URI,',
-            # Skip uploading to MoreThanTV if it would require a torrent rehash because existing piece size > 8 MiB
+            # Skip uploading to MORETHANTV if it would require a torrent rehash because existing piece size > 8 MiB
             'skip_if_rehash': False,
-            # Iterate over found torrents and prefer MoreThanTV suitable torrents if found.
+            # Iterate over found torrents and prefer MORETHANTV suitable torrents if found.
             'prefer_mtv_torrent': False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -1721,7 +1721,7 @@ config: dict[str, Any] = {
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "use_for_search": False,
             "api_key": "",
-            # Send uploads to OldToonsWorld modq for staff approval
+            # Send uploads to OLDTOONSWORLD modq for staff approval
             "modq": False,
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1750,8 +1750,8 @@ config: dict[str, Any] = {
         "PRIVATEHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for PrivateHD to work you need to export cookies from https://privatehd.to/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # cookies need to be in netscape format and need to be in data/cookies/PrivateHD.txt
+            # for PRIVATEHD to work you need to export cookies from https://privatehd.to/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
+            # cookies need to be in netscape format and need to be in data/cookies/PRIVATEHD.txt
             "announce_url": "",
             "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
@@ -1795,8 +1795,8 @@ config: dict[str, Any] = {
         "PTCAFE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for PTCafe to work you need to export cookies from https://ptcafe.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/PTCafe.txt
+            # for PTCAFE to work you need to export cookies from https://ptcafe.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/PTCAFE.txt
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1835,8 +1835,8 @@ config: dict[str, Any] = {
         "PTFANS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for PTFans to work you need to export cookies from https://ptfans.cc/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/PTFans.txt
+            # for PTFANS to work you need to export cookies from https://ptfans.cc/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/PTFANS.txt
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1906,8 +1906,8 @@ config: dict[str, Any] = {
         "PTSKIT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for Ptskit to work you need to export cookies from https://www.ptskit.org using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/Ptskit.txt
+            # for PTSKIT to work you need to export cookies from https://www.ptskit.org using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/PTSKIT.txt
             "announce_url": "",
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -2055,8 +2055,8 @@ config: dict[str, Any] = {
         "RAILGUNPT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for RailgunPT to work you need to export cookies from https://bilibili.download using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/RailgunPT.txt
+            # for RAILGUNPT to work you need to export cookies from https://bilibili.download using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/RAILGUNPT.txt
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -2325,12 +2325,12 @@ config: dict[str, Any] = {
             "link_dir_name": "",
             # Set to False if you don't have access to the API (e.g., if you're a trial uploader). Note: this may not work sometimes due to Cloudflare restrictions.
             # If you are not going to use the API, you will need to export cookies from https://www.torrentleech.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/TorrentLeech.txt
+            # cookies need to be in netscape format and need to be in data/cookies/TORRENTLEECH.txt
             "api_upload": True,
             # You can find your passkey at your profile (https://www.torrentleech.org/profile/[YourUserName]/view) -> Torrent Passkey
             "passkey": "",
             "anon": True,
-            # Rehost images to the TorrentLeech image host. Does not work with the API upload method.
+            # Rehost images to the TORRENTLEECH image host. Does not work with the API upload method.
             # Keep in mind that screenshots are only anonymous if you enable the "Anonymous Gallery Uploads" option in your profile settings.
             "img_rehost": True,
             # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.

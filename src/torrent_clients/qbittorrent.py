@@ -309,7 +309,7 @@ class QbittorrentClientMixin:
         proxy_url: str | None = None,
     ) -> str | None:
         trackers_config = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-        mtv_config_value = trackers_config.get("MoreThanTV", {})
+        mtv_config_value = trackers_config.get("MORETHANTV", {})
         mtv_config = cast(dict[str, Any], mtv_config_value) if isinstance(mtv_config_value, dict) else {}
         prefer_small_pieces = bool(mtv_config.get("prefer_mtv_torrent", False))
         logger.debug("[green]Searching qBittorrent for an existing .torrent")
@@ -982,14 +982,14 @@ class QbittorrentClientMixin:
         logger.debug(f"[yellow]Searching for torrents in qBittorrent for path: {content_path}[/yellow]")
         try:
             trackers_config = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-            mtv_config_value = trackers_config.get("MoreThanTV", {})
+            mtv_config_value = trackers_config.get("MORETHANTV", {})
             mtv_config = cast(dict[str, Any], mtv_config_value) if isinstance(mtv_config_value, dict) else {}
             piece_limit = bool(self.config["DEFAULT"].get("prefer_max_16_torrent", False))
             mtv_torrent = bool(mtv_config.get("prefer_mtv_torrent", False))
             piece_size_constraints_enabled: str | bool
-            # MoreThanTV preference takes priority as it's more restrictive (8 MiB vs 16 MiB)
+            # MORETHANTV preference takes priority as it's more restrictive (8 MiB vs 16 MiB)
             if mtv_torrent:
-                piece_size_constraints_enabled = "MoreThanTV"
+                piece_size_constraints_enabled = "MORETHANTV"
             elif piece_limit:
                 piece_size_constraints_enabled = "16MiB"
             else:
@@ -1048,7 +1048,7 @@ class QbittorrentClientMixin:
                     stop_due_to_constraints = (
                         not constraints_enabled
                         or found_piece_size == "no_constraints"
-                        or found_piece_size == "MoreThanTV"
+                        or found_piece_size == "MORETHANTV"
                         or (found_piece_size == "16MiB" and constraints_enabled == "16MiB")
                     )
                     should_stop = stop_due_to_constraints
@@ -1208,7 +1208,7 @@ class QbittorrentClientMixin:
         from src.trackersetup import tracker_class_map
 
         tracker_patterns = {}
-        for name in set(tracker_class_map.keys()) | {"PassThePopcorn", "BeyondHD", "BTN", "HDBits"}:
+        for name in set(tracker_class_map.keys()) | {"PASSTHEPOPCORN", "BEYONDHD", "BTN", "HDBITS"}:
             # Determine URL
             url = ""
             if name in tracker_class_map:
@@ -1220,31 +1220,31 @@ class QbittorrentClientMixin:
             if not url:
                 # Hardcoded fallback
                 hardcoded_urls = {
-                    "PassThePopcorn": "passthepopcorn.me",
-                    "Aither": "https://aither.cc",
+                    "PASSTHEPOPCORN": "passthepopcorn.me",
+                    "AITHER": "https://aither.cc",
                     "LST": "https://lst.gg",
-                    "OnlyEncodes": "https://onlyencodes.cc",
-                    "Blutopia": "https://blutopia.cc",
+                    "ONLYENCODES": "https://onlyencodes.cc",
+                    "BLUTOPIA": "https://blutopia.cc",
                     "ULCX": "https://upload.cx",
-                    "HDBits": "https://hdbits.org",
+                    "HDBITS": "https://hdbits.org",
                     "BTN": "https://broadcasthe.net",
-                    "BeyondHD": "https://beyond-hd.me",
-                    "HawkeUno": "https://hawke.uno",
-                    "ReelFlix": "https://reelflix.xyz",
-                    "OldToonsWorld": "https://oldtoons.world",
+                    "BEYONDHD": "https://beyond-hd.me",
+                    "HAWKEUNO": "https://hawke.uno",
+                    "REELFLIX": "https://reelflix.xyz",
+                    "OLDTOONSWORLD": "https://oldtoons.world",
                     "YUSCENE": "https://yu-scene.net",
-                    "DarkPeers": "https://darkpeers.org",
-                    "Seedpool": "https://seedpool.org",
+                    "DARKPEERS": "https://darkpeers.org",
+                    "SEEDPOOL": "https://seedpool.org",
                 }
                 url = hardcoded_urls.get(name, "")
 
             if url:
                 # Determine pattern
-                if name == "PassThePopcorn":
+                if name == "PASSTHEPOPCORN":
                     pattern = r"torrentid=(\d+)"
-                elif name in ("HDBits", "BTN"):
+                elif name in ("HDBITS", "BTN"):
                     pattern = r"id=(\d+)"
-                elif name == "BeyondHD":
+                elif name == "BEYONDHD":
                     pattern = r"details/(\d+)"
                 else:
                     pattern = r"/(\d+)$"
@@ -1512,11 +1512,11 @@ class QbittorrentClientMixin:
             Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
             # Set up piece size preference logic
-            mtv_config = self.config.get("TRACKERS", {}).get("MoreThanTV", {})
+            mtv_config = self.config.get("TRACKERS", {}).get("MORETHANTV", {})
             prefer_small_pieces = mtv_config.get("prefer_mtv_torrent", False)
             piece_limit = self.config["DEFAULT"].get("prefer_max_16_torrent", False)
 
-            # Use piece preference if MoreThanTV preference is true, otherwise use general piece limit
+            # Use piece preference if MORETHANTV preference is true, otherwise use general piece limit
             use_piece_preference = prefer_small_pieces or piece_limit
             piece_size_best_match: dict[str, Any] | None = None  # Track the best match for fallback if piece preference is enabled
             found_valid_torrent = False
@@ -1541,7 +1541,7 @@ class QbittorrentClientMixin:
                             # For piece_limit: prefer torrents with piece size <= 16 MiB (16777216 bytes)
                             is_better_match = False
                             if prefer_small_pieces:
-                                # MoreThanTV preference: always prefer smaller pieces
+                                # MORETHANTV preference: always prefer smaller pieces
                                 is_better_match = True if piece_size_best_match is None else piece_size < piece_size_best_match["piece_size"]
                             elif piece_limit and piece_size <= 16777216:
                                 # General preference: prefer <= 16 MiB pieces, then smaller within that range
@@ -1599,7 +1599,7 @@ class QbittorrentClientMixin:
                                     # For piece_limit: prefer torrents with piece size <= 16 MiB (16777216 bytes)
                                     is_better_match = False
                                     if prefer_small_pieces:
-                                        # MoreThanTV preference: always prefer smaller pieces
+                                        # MORETHANTV preference: always prefer smaller pieces
                                         is_better_match = True if piece_size_best_match is None else piece_size < piece_size_best_match["piece_size"]
                                     elif piece_limit and piece_size <= 16777216:
                                         # General preference: prefer <= 16 MiB pieces, then smaller within that range
@@ -1641,7 +1641,7 @@ class QbittorrentClientMixin:
             # **Return the best match if piece preference is enabled**
             if use_piece_preference and piece_size_best_match and not found_valid_torrent:
                 try:
-                    preference_type = "MoreThanTV preference" if prefer_small_pieces else "16 MiB piece limit"
+                    preference_type = "MORETHANTV preference" if prefer_small_pieces else "16 MiB piece limit"
                     logger.info(f"[green]Using best match torrent ({preference_type}) with hash: {piece_size_best_match['hash']}")
                     await TorrentCreator.create_base_from_existing_torrent(piece_size_best_match["torrent_path"], meta.base_dir, meta.uuid)
                     if meta.debug:
@@ -1655,7 +1655,7 @@ class QbittorrentClientMixin:
                     # Check if the best match actually meets the piece size constraint
                     piece_size = piece_size_best_match["piece_size"]
                     if prefer_small_pieces and piece_size <= 8388608:  # 8 MiB
-                        meta.found_preferred_piece_size = "MoreThanTV"
+                        meta.found_preferred_piece_size = "MORETHANTV"
                     elif piece_limit and piece_size <= 16777216:  # 16 MiB
                         meta.found_preferred_piece_size = "16MiB"
                     else:
@@ -1766,10 +1766,10 @@ async def match_tracker_url(tracker_urls: list[str], meta: Meta) -> None:
                 if pattern in tracker:
                     found_ids.add(tracker_id.upper())
                     logger.debug(f"[bold cyan]Matched {tracker_id.upper()} in tracker URL: {Redaction.redact_private_info(tracker)}")
-                    if tracker_id.upper() == "PassThePopcorn" and "passthepopcorn.me" in tracker and tracker.startswith("http://"):
-                        logger.info("[red]Found PassThePopcorn announce URL using plaintext HTTP.\n")
+                    if tracker_id.upper() == "PASSTHEPOPCORN" and "passthepopcorn.me" in tracker and tracker.startswith("http://"):
+                        logger.info("[red]Found PASSTHEPOPCORN announce URL using plaintext HTTP.\n")
                         logger.info(
-                            "[red]PassThePopcorn is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PassThePopcorn/forums.php?page=1&action=viewthread&threadid=46663"
+                            "[red]PASSTHEPOPCORN is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PASSTHEPOPCORN/forums.php?page=1&action=viewthread&threadid=46663"
                         )
 
     if "remove_trackers" not in meta or not isinstance(meta.remove_trackers, list):

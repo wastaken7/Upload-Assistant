@@ -22,7 +22,7 @@ class AvistaZ(AZTrackerBase):
     tracker_urls = ("tracker.avistaz.to",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="AvistaZ")
+        super().__init__(config, tracker_name="AVISTAZ")
         self.config = config
         self.common = Common(config)
 
@@ -183,7 +183,7 @@ class AvistaZ(AZTrackerBase):
             "AE",
             "AF",
             "AM",
-            "AvistaZ",
+            "AZ",
             "BD",
             "BH",
             "BN",
@@ -382,10 +382,10 @@ class AvistaZ(AZTrackerBase):
         origin_countries_codes = meta.origin_country
 
         if any(code in phd_countries for code in origin_countries_codes):
-            warnings.append("DO NOT upload content from major English speaking countries (USA, UK, Canada, etc). Upload this to our sister site PrivateHD.to instead.")
+            warnings.append("DO NOT upload content from major English speaking countries (USA, UK, Canada, etc). Upload this to our sister site PRIVATEHD.to instead.")
 
         elif any(code in cinemaz_countries for code in origin_countries_codes):
-            warnings.append("DO NOT upload non-allowed Asian or Western content. Upload this content to our sister site CinemaZ.to instead.")
+            warnings.append("DO NOT upload non-allowed Asian or Western content. Upload this content to our sister site CINEMAZ.to instead.")
 
         if not is_disc and meta.container not in ["mkv", "mp4", "avi"]:
             warnings.append("Allowed containers: MKV, MP4, AVI.")

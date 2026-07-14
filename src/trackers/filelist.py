@@ -144,7 +144,7 @@ class FileList:
                             if len(line_fields) >= 7:
                                 cookies[line_fields[5]] = line_fields[6]
             except Exception as e:
-                logger.error(f"[red]Error parsing FileList Netscape cookie file: {e}[/red]")
+                logger.error(f"[red]Error parsing FILELIST Netscape cookie file: {e}[/red]")
             return cookies
 
         # If it's a pickle file (ends with .pkl or .pickle)
@@ -189,7 +189,7 @@ class FileList:
         cat_id = await self.get_category_id(meta)
         has_ro_audio, _has_ro_sub = await self.get_ro_tracks(meta)
 
-        # Confirm the correct naming order for FileList
+        # Confirm the correct naming order for FILELIST
         cli_ui.info(f"Filelist name: {fl_name}")
         if meta.unattended is False:
             fl_confirm = cli_ui.ask_yes_no("Correct?", default=False)
@@ -263,7 +263,7 @@ class FileList:
         logger.info(data)
         logger.info("\n\n")
         logger.info(up.text)
-        raise UploadError(f"Upload to FileList Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa F405
+        raise UploadError(f"Upload to FILELIST Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa F405
 
     async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
@@ -335,10 +335,10 @@ class FileList:
             soup = BeautifulSoup(r.text, "html.parser")
             validator_input = soup.find("input", {"name": "validator"})
             if validator_input is None:
-                raise LoginError("Unable to locate validator input on FileList login page.")  # noqa: F405
+                raise LoginError("Unable to locate validator input on FILELIST login page.")  # noqa: F405
             validator_value = validator_input.get("value")
             if not isinstance(validator_value, str):
-                raise LoginError("Validator input missing value attribute on FileList login page.")  # noqa: F405
+                raise LoginError("Validator input missing value attribute on FILELIST login page.")  # noqa: F405
             validator = validator_value
             data = {
                 "validator": validator,
@@ -350,10 +350,10 @@ class FileList:
             index = "https://filelist.io/index.php"
             response = await client.get(index)
             if response.text.find("Logout") != -1:
-                logger.info("[green]Successfully logged into FileList")
+                logger.info("[green]Successfully logged into FILELIST")
                 self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # pyright: ignore[reportPrivateUsage]
             else:
-                logger.info("[bold red]Something went wrong while trying to log into FileList")
+                logger.info("[bold red]Something went wrong while trying to log into FILELIST")
                 logger.info(response.url)
         return
 
@@ -365,7 +365,7 @@ class FileList:
             async with aiofiles.open(torrent_path, "wb") as tor:
                 await tor.write(r.content)
         else:
-            logger.info("[red]There was an issue downloading the new .torrent from FileList")
+            logger.info("[red]There was an issue downloading the new .torrent from FILELIST")
             logger.info(r.text)
         return
 

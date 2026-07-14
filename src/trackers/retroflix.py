@@ -35,7 +35,7 @@ class RetroFlix:
         self.config = config
 
     async def upload(self, meta: Meta) -> bool:
-        """Upload a torrent to RetroFlix tracker.
+        """Upload a torrent to RETROFLIX tracker.
 
         Args:
             meta: Metadata dictionary containing torrent information (name, mediainfo, screenshots, etc.).
@@ -159,7 +159,7 @@ class RetroFlix:
                         return False
 
             except httpx.TimeoutException:
-                meta.tracker_status[self.tracker]["status_message"] = "data error: RetroFlix request timed out while uploading."
+                meta.tracker_status[self.tracker]["status_message"] = "data error: RETROFLIX request timed out while uploading."
                 return False
             except httpx.RequestError as e:
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: An error occurred while making the request: {e}"
@@ -169,7 +169,7 @@ class RetroFlix:
                 return False
 
         else:
-            logger.info("[cyan]RetroFlix Request Data:")
+            logger.info("[cyan]RETROFLIX Request Data:")
             debug_data = json_data.copy()
             if debug_data.get("file"):
                 debug_data["file"] = f"{str(debug_data['file'])[:10]}..."
@@ -238,7 +238,7 @@ class RetroFlix:
                 ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365 * 10 + 3)  # add leeway
                 if release_date > ten_years_ago:
                     if not meta.unattended:
-                        logger.info("[red]Content must be older than 10 Years to upload at RetroFlix")
+                        logger.info("[red]Content must be older than 10 Years to upload at RETROFLIX")
                     return False
             except ValueError, AttributeError:
                 # If date parsing fails, fall back to year comparison
@@ -247,7 +247,7 @@ class RetroFlix:
                     year = int(release_year)
                     if datetime.datetime.now(datetime.UTC).date().year - year <= 9:
                         if not meta.unattended:
-                            logger.info("[red]Content must be older than 10 Years to upload at RetroFlix")
+                            logger.info("[red]Content must be older than 10 Years to upload at RETROFLIX")
                         return False
 
         elif meta.category == "TV" and most_recent_aired_date:
@@ -255,18 +255,18 @@ class RetroFlix:
             ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365 * 10 + 3)  # add leeway
             if most_recent_aired_date > ten_years_ago:
                 if not meta.unattended:
-                    logger.info("[red]Content must be older than 10 Years to upload at RetroFlix")
+                    logger.info("[red]Content must be older than 10 Years to upload at RETROFLIX")
                 return False
 
         else:
             if year is not None and datetime.datetime.now(datetime.UTC).date().year - year <= 9:
                 if not meta.unattended:
-                    logger.info("[red]Content must be older than 10 Years to upload at RetroFlix")
+                    logger.info("[red]Content must be older than 10 Years to upload at RETROFLIX")
                 return False
         return True
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
-        """Search for existing torrents on RetroFlix tracker.
+        """Search for existing torrents on RETROFLIX tracker.
 
         Searches for duplicate torrents using IMDB ID or title.
 
@@ -326,7 +326,7 @@ class RetroFlix:
     async def api_test(self, meta: Meta) -> bool | None:
         """Test if the stored API key is valid.
 
-        RetroFlix API keys expire weekly, so this method validates the current key
+        RETROFLIX API keys expire weekly, so this method validates the current key
         and generates a new one if needed.
 
         Args:
@@ -359,7 +359,7 @@ class RetroFlix:
             return None
 
     async def generate_new_api(self, meta: Meta) -> bool | None:
-        """Generate a new API key for RetroFlix tracker.
+        """Generate a new API key for RETROFLIX tracker.
 
         Authenticates using username/password and retrieves a new API token,
         then updates both the in-memory config and the config file on disk.
@@ -397,8 +397,8 @@ class RetroFlix:
                         async with aiofiles.open(config_path, encoding="utf-8") as file:
                             config_data = await file.read()
 
-                        # Find the RetroFlix tracker and replace the api_key value (supports single/double quotes and multiline blocks)
-                        pattern = r"(['\"]RetroFlix['\"]\s*:\s*{.*?['\"]api_key['\"]\s*:\s*)(['\"])[^'\"]*(['\"])"
+                        # Find the RETROFLIX tracker and replace the api_key value (supports single/double quotes and multiline blocks)
+                        pattern = r"(['\"]RETROFLIX['\"]\s*:\s*{.*?['\"]api_key['\"]\s*:\s*)(['\"])[^'\"]*(['\"])"
                         new_config_data, replacements = re.subn(
                             pattern,
                             rf"\1\2{token}\3",
@@ -407,7 +407,7 @@ class RetroFlix:
                             flags=re.DOTALL,
                         )
                         if replacements == 0:
-                            logger.info("[bold red]Failed to update RetroFlix api_key in config file.")
+                            logger.info("[bold red]Failed to update RETROFLIX api_key in config file.")
                             return None
 
                         # Write the updated config back to the file

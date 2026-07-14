@@ -312,7 +312,7 @@ class BJShare:
         return "Outro"
 
     def get_game_platform(self, meta: Meta) -> str:
-        """Map meta.platform to BJShare platform ID for the Jogos category."""
+        """Map meta.platform to BJSHARE platform ID for the Jogos category."""
         platform_map: dict[str, str] = {
             "3DS": "13",
             "MOBILE": "2",
@@ -342,12 +342,12 @@ class BJShare:
         return platform_map.get(platform, "3")  # Default to PC
 
     def get_game_language(self, meta: Meta) -> str:
-        """Map game languages from IGDB/Steam to BJShare idioma field.
+        """Map game languages from IGDB/Steam to BJSHARE idioma field.
 
         Logic (similar to CBR.py get_name):
         - If Portuguese is present AND there are other languages → "Multilinguagem"
-        - If only one language → map to BJShare name
-        - If multiple languages without Portuguese → use the first match from BJShare list
+        - If only one language → map to BJSHARE name
+        - If multiple languages without Portuguese → use the first match from BJSHARE list
         - Fallback → "Outro"
         """
         language_map: dict[str, str] = {
@@ -382,7 +382,7 @@ class BJShare:
                     return bjs_value
             return "Outro"
 
-        # Multiple languages, no Portuguese → try to find first matching BJShare language
+        # Multiple languages, no Portuguese → try to find first matching BJSHARE language
         for ln in lang_names_lower:
             for key, bjs_value in language_map.items():
                 if key in ln:
@@ -391,7 +391,7 @@ class BJShare:
         return "Outro"
 
     def get_game_subcategory(self, meta: Meta) -> str:
-        """Get the game subcategory for BJShare."""
+        """Get the game subcategory for BJSHARE."""
         subcategory = meta.game_subcategory
         subcategory_values = {"full_game": "1", "full_game_dlc": "2", "dlc": "3", "update": "4"}
         return subcategory_values.get(subcategory, "1")
@@ -668,8 +668,8 @@ class BJShare:
 
     def get_database_title(self, soup: BeautifulSoup) -> str:
         """
-        Extracts the original title to ensure consistency with the BJShare database.
-        Since BJShare treats different titles as unique entries regardless of IMDb parity,
+        Extracts the original title to ensure consistency with the BJSHARE database.
+        Since BJSHARE treats different titles as unique entries regardless of IMDb parity,
         this value is used to match existing records.
         """
         original_title = ""

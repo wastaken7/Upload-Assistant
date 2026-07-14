@@ -15,14 +15,14 @@ from src.rehostimages import RehostImagesManager
 from src.trackers.common import Common
 
 
-class BeyondHD:
+class BEYONDHD:
     """
     BHD Private Torrent Tracker
     """
 
     auth_type = "unit3d_api"
     tracker = "BEYONDHD"
-    display_name = "BeyondHD"
+    display_name = "BEYONDHD"
     source_flag = "BHD"
     banned_groups = (
         "4K4U",
@@ -66,7 +66,7 @@ class BeyondHD:
         self.config = config
         self.rehost_images_manager = RehostImagesManager(config)
         trackers_cfg = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-        self.tracker_config = cast(dict[str, Any], trackers_cfg.get("BeyondHD", {}))
+        self.tracker_config = cast(dict[str, Any], trackers_cfg.get("BEYONDHD", {}))
         api_key = str(self.tracker_config.get("api_key", "")).strip()
         self.requests_url = f"https://beyond-hd.me/api/requests/{api_key}"
 
@@ -196,7 +196,7 @@ class BeyondHD:
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: {e}"
                 return False
         else:
-            logger.info("[cyan]BeyondHD Request Data:")
+            logger.info("[cyan]BEYONDHD Request Data:")
             logger.info(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
@@ -374,7 +374,7 @@ class BeyondHD:
             )
         ):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info("[bold red]This is an internal BeyondHD release, skipping upload[/bold red]")
+                logger.info("[bold red]This is an internal BEYONDHD release, skipping upload[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -392,7 +392,7 @@ class BeyondHD:
 
         if meta.type not in ["WEBDL"] and meta.tag and any(x in meta.tag for x in ["EVO"]):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"[bold red]Group {meta.tag} is only allowed for raw type content at BeyondHD[/bold red]")
+                logger.info(f"[bold red]Group {meta.tag} is only allowed for raw type content at BEYONDHD[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -435,7 +435,7 @@ class BeyondHD:
                 if response_data.get("status_code") == 1:
                     results = cast(list[dict[str, Any]], response_data.get("results", []))
                     for each in results:
-                        # Extract HDR flags from BeyondHD data
+                        # Extract HDR flags from BEYONDHD data
                         flags: list[str] = []
                         if each.get("dv") == 1:
                             flags.append("DV")
@@ -452,9 +452,9 @@ class BeyondHD:
                             result["download"] = each.get("download_url", None)
                         dupes.append(result)
                 else:
-                    logger.info(f"[bold red]BeyondHD failed to search torrents. API Error: {response_data.get('message', 'Unknown Error')}")
+                    logger.info(f"[bold red]BEYONDHD failed to search torrents. API Error: {response_data.get('message', 'Unknown Error')}")
             else:
-                logger.info(f"[bold red]BeyondHD HTTP request failed. Status: {response.status_code}")
+                logger.info(f"[bold red]BEYONDHD HTTP request failed. Status: {response.status_code}")
 
         return dupes
 

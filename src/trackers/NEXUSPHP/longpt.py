@@ -10,7 +10,7 @@ Config = dict[str, Any]
 
 class LongPT(NEXUSPHP):
     """
-    LongPT is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
+    LONGPT is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
     banned_groups = ()

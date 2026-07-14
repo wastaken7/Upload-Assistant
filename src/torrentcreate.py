@@ -151,7 +151,7 @@ class TorrentCreator:
         else:
             piece_size = 128 * 1024 * 1024  # 128 MiB
 
-        if any(tracker in meta.trackers for tracker in ["HDBits", "PassThePopcorn"]) and piece_size > 16 * 1024 * 1024:
+        if any(tracker in meta.trackers for tracker in ["HDBITS", "PASSTHEPOPCORN"]) and piece_size > 16 * 1024 * 1024:
             piece_size = 16 * 1024 * 1024
 
         # Enforce minimum and maximum limits
@@ -305,7 +305,7 @@ class TorrentCreator:
                             except ValueError, TypeError:
                                 logger.warning("[yellow]Warning: Invalid max_piece_size value, using default piece length")
 
-                        if not piece_size and not tracker_url and not any(tracker in meta.trackers for tracker in ["HDBits", "PassThePopcorn", "MoreThanTV"]):
+                        if not piece_size and not tracker_url and not any(tracker in meta.trackers for tracker in ["HDBITS", "PASSTHEPOPCORN", "MORETHANTV"]):
                             cmd.extend(["-m", "27"])
 
                         if meta.mkbrr_threads != "0":

@@ -18,7 +18,7 @@ Config = dict[str, Any]
 
 class TorrentLeech:
     """
-    TorrentLeech (TL) is a Private Torrent Tracker for 0DAY / GENERAL. not here _ not scene
+    TORRENTLEECH (TL) is a Private Torrent Tracker for 0DAY / GENERAL. not here _ not scene
     """
 
     auth_type = "other_api"
@@ -50,7 +50,7 @@ class TorrentLeech:
         if self.api_upload and not force:
             return True
 
-        cookies_file = str(Path(f"{meta.base_dir}/data/cookies/TorrentLeech.txt").resolve())
+        cookies_file = str(Path(f"{meta.base_dir}/data/cookies/TORRENTLEECH.txt").resolve())
 
         cookie_path = str(Path(cookies_file).resolve())
         if not Path(cookie_path).exists():
@@ -229,7 +229,7 @@ class TorrentLeech:
 
         login = await self.login(meta, force=True)
         if not login:
-            meta.skipping = "TorrentLeech"
+            meta.skipping = "TORRENTLEECH"
             logger.debug(f"[bold red]Skipping upload to '{self.tracker}' as login failed.[/bold red]")
             return []
         cat_id = self.get_category(meta)
@@ -363,7 +363,7 @@ class TorrentLeech:
                 return True
 
         else:
-            logger.info("[cyan]TorrentLeech Request Data:")
+            logger.info("[cyan]TORRENTLEECH Request Data:")
             logger.info(Redaction.redact_private_info(data))
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
@@ -410,7 +410,7 @@ class TorrentLeech:
         data = await self.get_cookie_upload_data(meta)
 
         if meta.debug:
-            logger.debug("[cyan]TorrentLeech Request Data:")
+            logger.debug("[cyan]TORRENTLEECH Request Data:")
             logger.debug(Redaction.redact_private_info(data))
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success

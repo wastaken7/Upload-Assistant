@@ -10,7 +10,7 @@ Config = dict[str, Any]
 
 class PTCafe(NEXUSPHP):
     """
-    PTCafe (咖啡) is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
+    PTCAFE (咖啡) is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
     banned_groups = ()

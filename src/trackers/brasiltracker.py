@@ -262,7 +262,7 @@ class BrasilTracker:
         return category_map.get(category) if isinstance(category, str) else None
 
     def get_game_language(self, meta: Meta) -> str:
-        """Map game languages from IGDB to BrasilTracker idioma_ori field (same logic as BJS)."""
+        """Map game languages from IGDB to BRASILTRACKER idioma_ori field (same logic as BJS)."""
         language_map: dict[str, str] = {
             "german": "Alemão",
             "spanish": "Espanhol",
@@ -344,7 +344,7 @@ class BrasilTracker:
         return ""
 
     def get_game_platform_bt(self, meta: Meta) -> str:
-        """Map meta.platform to BrasilTracker plataforma_jogo dropdown value."""
+        """Map meta.platform to BRASILTRACKER plataforma_jogo dropdown value."""
         nin_term = (bytes([110, 105, 110, 116, 101, 110, 100, 111]).decode()).capitalize()
         platform_map: dict[str, str] = {
             "PC": "PC",
@@ -370,7 +370,7 @@ class BrasilTracker:
         return platform_map.get(platform, "")
 
     def get_game_os(self, meta: Meta) -> str:
-        """Map meta.platform to BrasilTracker sys_jogo dropdown value."""
+        """Map meta.platform to BRASILTRACKER sys_jogo dropdown value."""
         platform = meta.platform.upper().strip()
         if platform == "PC":
             return "Windows"
@@ -385,7 +385,7 @@ class BrasilTracker:
         return ""
 
     def get_game_format(self, meta: Meta) -> str:
-        """Map game container/type to BrasilTracker formato_jogo dropdown value."""
+        """Map game container/type to BRASILTRACKER formato_jogo dropdown value."""
         platform = meta.platform.upper().strip()
         container = meta.container.lower()
 

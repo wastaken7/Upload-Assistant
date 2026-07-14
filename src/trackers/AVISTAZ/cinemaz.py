@@ -23,7 +23,7 @@ class CinemaZ(AZTrackerBase):
     tracker_urls = ("tracker.cinemaz.to",)
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name="CinemaZ")
+        super().__init__(config, tracker_name="CINEMAZ")
         self.config = config
         self.common = Common(config)
 
@@ -172,7 +172,7 @@ class CinemaZ(AZTrackerBase):
             "BG",
             "BY",
             "CH",
-            "CinemaZ",
+            "CZ",
             "DE",
             "DK",
             "EE",
@@ -218,7 +218,7 @@ class CinemaZ(AZTrackerBase):
             "XC",
         ]
 
-        # Countries that belong on PrivateHD (unless they are old)
+        # Countries that belong on PRIVATEHD (unless they are old)
         phd_countries = [
             "AG",
             "AI",
@@ -248,16 +248,16 @@ class CinemaZ(AZTrackerBase):
             "VI",
         ]
 
-        # Countries that belong on AvistaZ
+        # Countries that belong on AVISTAZ
         az_countries = ["BD", "BN", "BT", "CN", "HK", "ID", "IN", "JP", "KH", "KP", "KR", "LA", "LK", "MM", "MN", "MO", "MY", "NP", "PH", "PK", "SG", "TH", "TL", "TW", "VN"]
 
-        # Countries normally allowed on CinemaZ
+        # Countries normally allowed on CINEMAZ
         set_phd = set(phd_countries)
         set_europe = set(europe)
         set_america = set(america)
         middle_east = ["AE", "BH", "CY", "EG", "IR", "IQ", "IL", "JO", "KW", "LB", "OM", "PS", "QA", "SA", "SY", "TR", "YE"]
 
-        # Combine all allowed regions for CinemaZ
+        # Combine all allowed regions for CINEMAZ
         cz_allowed_countries = list(
             (set_europe - {"GB", "IE"})  # Europe excluding UK and Ireland
             | (set_america - set_phd)  # All of America excluding the PHD countries
@@ -278,25 +278,25 @@ class CinemaZ(AZTrackerBase):
         # Case 1: The content is from a major English-speaking country
         if any(code in phd_countries for code in origin_countries_codes):
             if is_older_than_50_years:
-                # It's old, so it's ALLOWED on CinemaZ
+                # It's old, so it's ALLOWED on CINEMAZ
                 pass
             else:
-                # It's new, so redirect to PrivateHD
-                warnings.append("DO NOT upload recent mainstream English content. Upload this to our sister site PrivateHD.to instead.")
+                # It's new, so redirect to PRIVATEHD
+                warnings.append("DO NOT upload recent mainstream English content. Upload this to our sister site PRIVATEHD.to instead.")
 
-        # Case 2: The content is Asian, redirect to AvistaZ
+        # Case 2: The content is Asian, redirect to AVISTAZ
         elif any(code in az_countries for code in origin_countries_codes):
-            warnings.append("DO NOT upload Asian content. Upload this to our sister site AvistaZ.to instead.")
+            warnings.append("DO NOT upload Asian content. Upload this to our sister site AVISTAZ.to instead.")
 
-        # Case 3: The content is from one of the normally allowed CinemaZ regions
+        # Case 3: The content is from one of the normally allowed CINEMAZ regions
         elif any(code in cz_allowed_countries for code in origin_countries_codes):
-            # It's from a valid region, so it's ALLOWED on CinemaZ
+            # It's from a valid region, so it's ALLOWED on CINEMAZ
             pass
 
         # Case 4: Fallback for any other case (e.g., country not in any list)
         else:
             warnings.append(
-                "This content is not allowed. CinemaZ accepts content from Europe (excluding UK/IE), "
+                "This content is not allowed. CINEMAZ accepts content from Europe (excluding UK/IE), "
                 "Africa, the Middle East, Russia, and the Americas (excluding recent mainstream English content)."
             )
 

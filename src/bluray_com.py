@@ -1758,7 +1758,7 @@ def map_country_to_region_code(country_name: str) -> str | None:
         "Russia": "RUS",
         "Rwanda": "RWA",
         "Saint Lucia": "LCA",
-        "Samoa": "Samaritano",
+        "Samoa": "SAM",
         "San Marino": "SMR",
         "Saudi Arabia": "KSA",
         "Senegal": "SEN",

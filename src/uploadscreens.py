@@ -443,8 +443,8 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
             api_key = config["DEFAULT"].get("seedpool_cdn_api")
 
             if not api_key:
-                logger.info("[red]Seedpool CDN API key not found in config.")
-                return {"status": "failed", "reason": "Missing Seedpool CDN API key"}
+                logger.info("[red]SEEDPOOL CDN API key not found in config.")
+                return {"status": "failed", "reason": "Missing SEEDPOOL CDN API key"}
 
             try:
                 headers = {"Authorization": f"Bearer {api_key}"}
@@ -455,8 +455,8 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     response = await client.post(url, headers=headers, files=files, timeout=timeout)
 
                     if response.status_code not in (200, 201):
-                        logger.info(f"[yellow]Seedpool CDN failed with status code {response.status_code}, trying next image host")
-                        return {"status": "failed", "reason": f"Seedpool CDN upload failed with status code {response.status_code}"}
+                        logger.info(f"[yellow]SEEDPOOL CDN failed with status code {response.status_code}, trying next image host")
+                        return {"status": "failed", "reason": f"SEEDPOOL CDN upload failed with status code {response.status_code}"}
 
                     response_data = response.json()
 
@@ -474,24 +474,24 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                         elif "thumb" in file_data.get("variants", {}):
                             img_url = file_data["variants"]["thumb"]
 
-                        logger.debug(f"[green]Seedpool CDN upload successful: {file_data['cdn_id']}")
+                        logger.debug(f"[green]SEEDPOOL CDN upload successful: {file_data['cdn_id']}")
                         logger.debug(f"[green]Image URLs: img_url={img_url}, raw_url={raw_url}, web_url={web_url}")
 
                         return {"status": "success", "img_url": img_url, "raw_url": raw_url, "web_url": web_url}
-                    logger.info("[yellow]Seedpool CDN returned empty files array")
-                    return {"status": "failed", "reason": "No files in Seedpool CDN response"}
+                    logger.info("[yellow]SEEDPOOL CDN returned empty files array")
+                    return {"status": "failed", "reason": "No files in SEEDPOOL CDN response"}
 
             except httpx.TimeoutException:
-                logger.info("[red]Request to Seedpool CDN timed out.")
+                logger.info("[red]Request to SEEDPOOL CDN timed out.")
                 return {"status": "failed", "reason": "Request timed out"}
             except httpx.RequestError as e:
-                logger.info(f"[red]Seedpool CDN request failed: {e}")
+                logger.info(f"[red]SEEDPOOL CDN request failed: {e}")
                 return {"status": "failed", "reason": str(e)}
             except ValueError as e:
-                logger.info(f"[red]Invalid JSON response from Seedpool CDN: {e}")
+                logger.info(f"[red]Invalid JSON response from SEEDPOOL CDN: {e}")
                 return {"status": "failed", "reason": "Invalid JSON response"}
             except Exception as e:
-                logger.error(f"[red]Unexpected error with Seedpool CDN: {e}")
+                logger.error(f"[red]Unexpected error with SEEDPOOL CDN: {e}")
                 return {"status": "failed", "reason": f"Unexpected error: {e!s}"}
 
         elif img_host == "sharex":

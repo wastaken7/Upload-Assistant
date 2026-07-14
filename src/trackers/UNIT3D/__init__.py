@@ -86,7 +86,7 @@ class UNIT3D:
             if meta.tmdb is not None:
                 params_dict["tmdbId"] = str(meta.tmdb)
 
-            if self.tracker not in ["OldToonsWorld"]:
+            if self.tracker not in ["OLDTOONSWORLD"]:
                 resolutions = await self.get_resolution_id(meta)
                 resolution_id = resolutions["resolution_id"]
                 if resolution_id in ["3", "4"]:
@@ -97,7 +97,7 @@ class UNIT3D:
                 else:
                     params_dict["resolutions[]"] = resolution_id
 
-            if self.tracker not in ["Seedpool", "SkipTheCommercials"]:
+            if self.tracker not in ["SEEDPOOL", "SKIPTHECOMMERCIALS"]:
                 type_id = (await self.get_type_id(meta))["type_id"]
                 if params_list is not None:
                     params_list.append(("types[]", type_id))

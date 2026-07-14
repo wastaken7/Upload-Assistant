@@ -722,7 +722,7 @@ class GreatPosterWall:
         if tmdb_identifier:
             data["tmdb"] = tmdb_identifier
 
-        # GreatPosterWall API still requires explicit main-artist fields for new group creation.
+        # GREATPOSTERWALL API still requires explicit main-artist fields for new group creation.
         data.update(await self._get_artist_data(meta))
         data["main_artist_number"] = "1"
 
@@ -938,7 +938,7 @@ class GreatPosterWall:
                         if score >= 10:
                             return response_data
             except Exception as e:
-                logger.debug(f"Failed to process response payload on GreatPosterWall: {e}", exc_info=True)
+                logger.debug(f"Failed to process response payload on GREATPOSTERWALL: {e}", exc_info=True)
                 continue
 
         return best_response
@@ -1153,7 +1153,7 @@ class GreatPosterWall:
                     error_message = str(response_data.get("error") or response_data.get("message") or "Upload failed")
                     duplicate_phrase = "the exact same torrent file already exists on the site"
                     if duplicate_phrase in error_message.lower():
-                        meta.tracker_status[self.tracker]["status_message"] = "data error: Torrent already exists on GreatPosterWall (duplicate file)."
+                        meta.tracker_status[self.tracker]["status_message"] = "data error: Torrent already exists on GREATPOSTERWALL (duplicate file)."
                         return False
 
                     meta.tracker_status[self.tracker]["status_message"] = f"data error: {error_message}."
@@ -1170,7 +1170,7 @@ class GreatPosterWall:
                 return False
 
         else:
-            logger.info("[cyan]GreatPosterWall Request Data:")
+            logger.info("[cyan]GREATPOSTERWALL Request Data:")
             logger.info(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")

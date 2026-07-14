@@ -23,7 +23,7 @@ Config = dict[str, Any]
 
 class PTerClub:
     """
-    PTerClub (PT之友俱乐部) is a CHINESE Private Torrent Tracker for HD MUSIC VIDEOS / MOVIES / TV / ANIME
+    PTERCLUB (PT之友俱乐部) is a CHINESE Private Torrent Tracker for HD MUSIC VIDEOS / MOVIES / TV / ANIME
     """
 
     auth_type = "cookies"
@@ -37,11 +37,11 @@ class PTerClub:
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.passkey = str(config["TRACKERS"]["PTerClub"].get("passkey", "")).strip()
-        self.username = str(config["TRACKERS"]["PTerClub"].get("username", "")).strip()
-        self.password = str(config["TRACKERS"]["PTerClub"].get("password", "")).strip()
-        self.rehost_images = bool(config["TRACKERS"]["PTerClub"].get("img_rehost", False))
-        self.ptgen_api = str(config["TRACKERS"]["PTerClub"].get("ptgen_api", "")).strip()
+        self.passkey = str(config["TRACKERS"]["PTERCLUB"].get("passkey", "")).strip()
+        self.username = str(config["TRACKERS"]["PTERCLUB"].get("username", "")).strip()
+        self.password = str(config["TRACKERS"]["PTERCLUB"].get("password", "")).strip()
+        self.rehost_images = bool(config["TRACKERS"]["PTERCLUB"].get("img_rehost", False))
+        self.ptgen_api = str(config["TRACKERS"]["PTERCLUB"].get("ptgen_api", "")).strip()
         self.cookie_validator = CookieValidator(config)
 
     def _extract_auth_token(self, text: str, pattern: str) -> str:
@@ -70,7 +70,7 @@ class PTerClub:
 
                 return resp.text.find("""<a href="#" data-url="logout.php" id="logout-confirm">""") != -1
         else:
-            logger.info("[bold red]Missing Cookie File. (data/cookies/PTerClub.txt)")
+            logger.info("[bold red]Missing Cookie File. (data/cookies/PTERCLUB.txt)")
             return False
 
     async def search_existing(self, meta: Meta) -> list[str] | bool:
@@ -80,7 +80,7 @@ class PTerClub:
 
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if not Path(cookiefile).exists():
-            logger.info("[bold red]Missing Cookie File. (data/cookies/PTerClub.txt)")
+            logger.info("[bold red]Missing Cookie File. (data/cookies/PTERCLUB.txt)")
             return False
         cookies = await common.parse_cookie_file(cookiefile)
         imdb_id = meta.imdb_id or 0

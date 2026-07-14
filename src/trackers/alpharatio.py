@@ -170,7 +170,7 @@ class AlphaRatio:
             elif meta.is_disc == "BDMV":
                 description += f"[hide][code]{discs[0]['summary']}[/code][/hide]\n\n"
         else:
-            # Beautify MediaInfo for AlphaRatio using custom template
+            # Beautify MediaInfo for ALPHARATIO using custom template
             filelist = cast(list[str], meta.filelist or [])
             video = filelist[0] if filelist else str(meta.path or "")
             # using custom mediainfo template.
@@ -342,7 +342,7 @@ class AlphaRatio:
         return None
 
     async def upload(self, meta: Meta) -> bool:
-        """Upload torrent to AlphaRatio using centralized cookie_upload."""
+        """Upload torrent to ALPHARATIO using centralized cookie_upload."""
         # Prepare the data for the upload
         common = Common(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)

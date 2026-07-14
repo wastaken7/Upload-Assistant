@@ -103,13 +103,13 @@ class BitHDTV:
             parsed_data: dict[str, Any] | None = cast(dict[str, Any] | None, parsed) if isinstance(parsed, dict) else None
             data_block: dict[str, Any] | None = parsed_data.get("data") if parsed_data else None
             if isinstance(data_block, dict) and "view" in data_block:
-                my_announce_url = self.config["TRACKERS"]["BitHDTV"].get("my_announce_url")
+                my_announce_url = self.config["TRACKERS"]["BITHDTV"].get("my_announce_url")
                 if my_announce_url:
                     await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, my_announce_url, str(data_block["view"]))
                     return True
             return False
 
-        logger.info("[cyan]BitHDTV Request Data:")
+        logger.info("[cyan]BITHDTV Request Data:")
         logger.info(Redaction.redact_private_info(data))
         meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
         await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")

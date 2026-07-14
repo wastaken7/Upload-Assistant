@@ -28,18 +28,18 @@ async def check_mod_q_and_draft(
     meta: Meta,
 ) -> tuple[str | None, str | None, dict[str, Any]]:
     tracker_capabilities = {
-        "Aura4K": {"mod_q": True, "draft": False},
-        "Aither": {"mod_q": True, "draft": False},
-        "BeyondHD": {"draft_live": True},
-        "Blutopia": {"mod_q": True, "draft": False},
+        "AURA4K": {"mod_q": True, "draft": False},
+        "AITHER": {"mod_q": True, "draft": False},
+        "BEYONDHD": {"draft_live": True},
+        "BLUTOPIA": {"mod_q": True, "draft": False},
         "LST": {"mod_q": True, "draft": True},
-        "LatTeam": {"mod_q": True, "draft": False},
-        "Luminarr": {"mod_q": True, "draft": False},
+        "LATTEAM": {"mod_q": True, "draft": False},
+        "LUMINARR": {"mod_q": True, "draft": False},
     }
 
     modq, draft = None, None
     tracker_caps = tracker_capabilities.get(tracker_class.tracker, {})
-    if tracker_class.tracker == "BeyondHD" and tracker_caps.get("draft_live"):
+    if tracker_class.tracker == "BEYONDHD" and tracker_caps.get("draft_live"):
         draft_int = await tracker_class.get_live(meta)
         draft = "Draft" if draft_int == 0 else "Live"
 
@@ -88,7 +88,7 @@ async def process_trackers(
 
             message = None
             if is_success:
-                if tracker == "MoreThanTV" and "status_message" in status and "data error" not in str(status["status_message"]):
+                if tracker == "MORETHANTV" and "status_message" in status and "data error" not in str(status["status_message"]):
                     if print_links:
                         message = f"[green]{status['status_message']!s}[/green]"
                 elif "torrent_id" in status and print_links:
@@ -120,7 +120,7 @@ async def process_trackers(
         """
 
         tracker_class: Any = None
-        if tracker not in {"MANUAL", "TorrentHR", "PassThePopcorn"}:
+        if tracker not in {"MANUAL", "TORRENTHR", "PASSTHEPOPCORN"}:
             tracker_class = tracker_class_map[tracker](config=config)
         if meta.name.endswith("DUPE?"):
             meta.name = meta.name.replace(" DUPE?", "")
@@ -149,7 +149,7 @@ async def process_trackers(
                     if waited:
                         logger.info(f"[yellow]{tracker_name}: Redoing dupe check after bandwidth wait...[/yellow]")
                         try:
-                            if tracker_name not in {"PassThePopcorn"}:
+                            if tracker_name not in {"PASSTHEPOPCORN"}:
                                 new_dupes = cast(list[Any], await t_class.search_existing(meta))
                             else:
                                 ptp = PassThePopcorn(config=config)
@@ -224,7 +224,7 @@ async def process_trackers(
                     print_tracker_result(tracker, tracker_class, status, False)
                     logger.info(f"[red]{tracker} upload failed or returned data error.[/red]")
 
-        elif tracker in other_api_trackers:
+        elif tracker in other_api_trackers or tracker in http_trackers:
             tracker_status = meta.tracker_status
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
             if upload_status:
@@ -244,51 +244,9 @@ async def process_trackers(
                         logger.info(f"[red]Upload failed: {e}")
                         logger.info(traceback.format_exc())
                         return
-                    if tracker == "Swarmazon":
-                        await asyncio.sleep(16)
                 except Exception:
                     logger.info(traceback.format_exc())
                     return
-
-                # Detect and handle None return value from upload method
-                if is_uploaded is None:
-                    logger.warning(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
-                    is_uploaded = False
-
-                status = meta.tracker_status.setdefault(tracker_class.tracker, {})
-                if is_uploaded and "data error" not in str(status.get("status_message", "")):
-                    if not getattr(tracker_class, "is_usenet", False):
-                        await client.add_to_client(meta, tracker_class.tracker)
-                    print_tracker_result(tracker, tracker_class, status, True)
-                else:
-                    print_tracker_result(tracker, tracker_class, status, False)
-                    logger.info(f"[red]{tracker} upload failed or returned data error.[/red]")
-
-        elif tracker in http_trackers:
-            tracker_status = meta.tracker_status
-            upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
-            if upload_status:
-                try:
-                    is_uploaded = False
-                    try:
-                        if not await check_bandwidth_and_dupes(tracker, tracker_class):
-                            status = meta.tracker_status.setdefault(tracker_class.tracker, {})
-                            status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
-                            print_tracker_result(tracker, tracker_class, status, False)
-                            return
-                        upload_start_time = time.time()
-                        is_uploaded = await tracker_class.upload(meta)
-                        upload_duration = time.time() - upload_start_time
-                        meta[f"{tracker}_upload_duration"] = upload_duration
-                    except Exception as e:
-                        logger.info(f"[red]Upload failed: {e}")
-                        logger.info(traceback.format_exc())
-                        return
-
-                except Exception:
-                    logger.info(traceback.format_exc())
-                    return
-
                 # Detect and handle None return value from upload method
                 if is_uploaded is None:
                     logger.warning(f"[yellow]Warning: {tracker_class.tracker} upload method returned None instead of boolean. Treating as failed upload.[/yellow]")
@@ -330,7 +288,7 @@ async def process_trackers(
                     logger.info(f"[green]{meta.name}")
                     logger.info(f"[green]Files can be found at: [yellow]{url}[/yellow]")
 
-        elif tracker == "TorrentHR":
+        elif tracker == "TORRENTHR":
             tracker_status = meta.tracker_status or {}
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
             if upload_status:
@@ -347,15 +305,15 @@ async def process_trackers(
                     logger.info(traceback.format_exc())
                     return
                 if is_uploaded:
-                    await client.add_to_client(meta, "TorrentHR")
-                    status = meta.tracker_status.setdefault("TorrentHR", {})
+                    await client.add_to_client(meta, "TORRENTHR")
+                    status = meta.tracker_status.setdefault("TORRENTHR", {})
                     print_tracker_result(tracker, thr, status, True)
                 else:
-                    status = meta.tracker_status.setdefault("TorrentHR", {})
+                    status = meta.tracker_status.setdefault("TORRENTHR", {})
                     print_tracker_result(tracker, thr, status, False)
                     logger.info(f"[red]{tracker} upload failed or returned data error.[/red]")
 
-        elif tracker == "PassThePopcorn":
+        elif tracker == "PASSTHEPOPCORN":
             tracker_status = meta.tracker_status
             upload_status = cast(Mapping[str, Any], tracker_status.get(tracker, {})).get("upload", False)
             if upload_status:
@@ -375,7 +333,7 @@ async def process_trackers(
                         return
                     status = meta.tracker_status.setdefault(ptp.tracker, {})
                     if is_uploaded and "data error" not in str(status.get("status_message", "")):
-                        await client.add_to_client(meta, "PassThePopcorn")
+                        await client.add_to_client(meta, "PASSTHEPOPCORN")
                         print_tracker_result(tracker, ptp, status, True)
                     else:
                         print_tracker_result(tracker, ptp, status, False)

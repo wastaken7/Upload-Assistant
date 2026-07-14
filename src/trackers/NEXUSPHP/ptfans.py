@@ -10,7 +10,7 @@ Config = dict[str, Any]
 
 class PTFans(NEXUSPHP):
     """
-    PTFans is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
+    PTFANS is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
     banned_groups = ()

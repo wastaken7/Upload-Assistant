@@ -13,7 +13,7 @@ Config = dict[str, Any]
 
 class Racing4Everyone(UNIT3D):
     """
-    Racing4Everyone (R4E) is a Private Torrent Tracker for RACING
+    RACING4EVERYONE (R4E) is a Private Torrent Tracker for RACING
     """
 
     tracker = "RACING4EVERYONE"
@@ -101,7 +101,7 @@ class Racing4Everyone(UNIT3D):
         dupes: list[dict[str, Any]] = []
         url = self.search_url
         params: dict[str, Any] = {
-            "api_token": str(self.config["TRACKERS"]["Racing4Everyone"]["api_key"]).strip(),
+            "api_token": str(self.config["TRACKERS"]["RACING4EVERYONE"]["api_key"]).strip(),
             "tmdb": meta.tmdb,
             "categories[]": (await self.get_category_id(meta))["category_id"],
             "types[]": (await self.get_type_id(meta))["type_id"],

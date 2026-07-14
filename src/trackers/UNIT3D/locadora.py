@@ -14,7 +14,7 @@ Config = dict[str, Any]
 
 class Locadora(UNIT3D):
     """
-    Locadora is a BRAZILIAN Private Torrent Tracker for MOVIES / TV / ANIME
+    LOCADORA is a BRAZILIAN Private Torrent Tracker for MOVIES / TV / ANIME
     """
 
     tracker = "LOCADORA"

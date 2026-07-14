@@ -228,7 +228,7 @@ async def detect_platform_from_files(
     if any(b.endswith(three_ds_exts) for b in basenames_lower):
         return "3DS"
 
-    # DrunkenSlug (NDS)
+    # DS (NDS)
     nds_exts = (".nds", ".srl")
     if any(b.endswith(nds_exts) for b in basenames_lower):
         return "NDS"
@@ -820,7 +820,7 @@ async def gather_game_prep(
         url = "https://store.steampowered.com/api/appdetails"
         params = {"appids": steam_id}
         trackers = [t.upper() for t in meta.trackers]
-        target_trackers = {"AmigosShare", "BrasilTracker", "BJShare", "CapybaraBR", "Samaritano"}
+        target_trackers = {"AMIGOSSHARE", "BRASILTRACKER", "BJSHARE", "CAPYBARABR", "SAMARITANO"}
         if any(t in target_trackers for t in trackers):
             params["l"] = "brazilian"
 

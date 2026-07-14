@@ -25,7 +25,7 @@ Config = dict[str, Any]
 
 class TorrentHR:
     """
-    TorrentHR is a ratioless CROATIAN Private Torrent Tracker for 0DAY / GENERAL
+    TORRENTHR is a ratioless CROATIAN Private Torrent Tracker for 0DAY / GENERAL
     """
 
     tracker = "TORRENTHR"
@@ -48,8 +48,8 @@ class TorrentHR:
         await self.edit_desc(meta)
         thr_name = unidecode(meta.name.replace("DD+", "DDP"))
 
-        # Confirm the correct naming order for TorrentHR
-        cli_ui.info(f"TorrentHR name: {thr_name}")
+        # Confirm the correct naming order for TORRENTHR
+        cli_ui.info(f"TORRENTHR name: {thr_name}")
         if not meta.unattended:
             thr_confirm = cli_ui.ask_yes_no("Correct?", default=False)
             if thr_confirm is not True:
@@ -73,12 +73,12 @@ class TorrentHR:
             # bd_file = None
 
         async with aiofiles.open(
-            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[TorrentHR]DESCRIPTION.txt",
+            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[TORRENTHR]DESCRIPTION.txt",
             encoding="utf-8",
         ) as f:
             desc = await f.read()
 
-        torrent_path = str(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[TorrentHR].torrent").resolve())
+        torrent_path = str(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[TORRENTHR].torrent").resolve())
         async with aiofiles.open(torrent_path, "rb") as f:
             tfile = await f.read()
 
@@ -96,7 +96,7 @@ class TorrentHR:
         headers = {
             "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})"
         }
-        # If pronfo fails, put mediainfo into TorrentHR parser
+        # If pronfo fails, put mediainfo into TORRENTHR parser
         if (meta.is_disc) != "BDMV":
             files["nfo"] = ("MEDIAINFO.txt", mi_file)
         if subs:
@@ -136,7 +136,7 @@ class TorrentHR:
 
                         return False
                 else:
-                    logger.error("[red]Failed to log in to TorrentHR for upload")
+                    logger.error("[red]Failed to log in to TORRENTHR for upload")
                     return False
 
             except Exception as e:
@@ -145,10 +145,10 @@ class TorrentHR:
                 if meta.debug and response is not None:
                     with contextlib.suppress(Exception):
                         logger.info(f"[red]Response: {response.text[:500]}...")
-                logger.info("[yellow]It may have uploaded, please check TorrentHR manually")
+                logger.info("[yellow]It may have uploaded, please check TORRENTHR manually")
                 return False
         else:
-            logger.info("[cyan]TorrentHR Request Data:")
+            logger.info("[cyan]TORRENTHR Request Data:")
             logger.info(Redaction.redact_private_info(payload))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
@@ -280,9 +280,9 @@ class TorrentHR:
             ordered_images.append(image)
 
         image_list: list[str] = []
-        image_api_key = str(self.config["TRACKERS"]["TorrentHR"].get("img_api", "")).strip()
+        image_api_key = str(self.config["TRACKERS"]["TORRENTHR"].get("img_api", "")).strip()
         if ordered_images and not image_api_key:
-            logger.info("[yellow]TorrentHR image API key is not configured, skipping screenshot rehost")
+            logger.info("[yellow]TORRENTHR image API key is not configured, skipping screenshot rehost")
 
         for image in ordered_images:
             if not image_api_key:
@@ -315,14 +315,14 @@ class TorrentHR:
             except httpx.HTTPStatusError:
                 logger.info(f"[yellow]Failed to upload image {Path(image).name}")
                 if response is not None:
-                    logger.info(f"[yellow]TorrentHR image host returned HTTP {response.status_code}")
+                    logger.info(f"[yellow]TORRENTHR image host returned HTTP {response.status_code}")
                     logger.info(response.text)
             except json.decoder.JSONDecodeError:
-                logger.info(f"[yellow]Failed to parse TorrentHR image host response for {Path(image).name}")
+                logger.info(f"[yellow]Failed to parse TORRENTHR image host response for {Path(image).name}")
                 if response is not None:
                     logger.info(response.text)
             except KeyError:
-                logger.info(f"[yellow]TorrentHR image host response was missing an image URL for {Path(image).name}")
+                logger.info(f"[yellow]TORRENTHR image host response was missing an image URL for {Path(image).name}")
                 logger.info(response_data)
             await asyncio.sleep(1)
 
@@ -330,14 +330,14 @@ class TorrentHR:
         if (meta.is_disc) == "BDMV":
             async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt") as bd_file:
                 desc_parts.append(f"[nfo]{await bd_file.read()}[/nfo]")
-        elif self.config["TRACKERS"]["TorrentHR"].get("pronfo_api_key"):
+        elif self.config["TRACKERS"]["TORRENTHR"].get("pronfo_api_key"):
             # ProNFO
-            pronfo_url = f"https://www.pronfo.com/api/v1/access/upload/{self.config['TRACKERS']['TorrentHR'].get('pronfo_api_key', '')}"
+            pronfo_url = f"https://www.pronfo.com/api/v1/access/upload/{self.config['TRACKERS']['TORRENTHR'].get('pronfo_api_key', '')}"
             async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt") as mi_file:
                 data = {
                     "content": await mi_file.read(),
-                    "theme": self.config["TRACKERS"]["TorrentHR"].get("pronfo_theme", "gray"),
-                    "rapi": self.config["TRACKERS"]["TorrentHR"].get("pronfo_rapi_id"),
+                    "theme": self.config["TRACKERS"]["TORRENTHR"].get("pronfo_theme", "gray"),
+                    "rapi": self.config["TRACKERS"]["TORRENTHR"].get("pronfo_rapi_id"),
                 }
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(pronfo_url, data=data)
@@ -348,7 +348,7 @@ class TorrentHR:
                     desc_parts.append(f"\n[img]{mi_img}[/img]\n")
                     pronfo = True
             except Exception:
-                logger.info("[bold red]Error parsing pronfo response, using TorrentHR parser instead")
+                logger.info("[bold red]Error parsing pronfo response, using TORRENTHR parser instead")
                 logger.debug(f"{response}")
                 logger.debug(response.text)
 
@@ -361,7 +361,7 @@ class TorrentHR:
         #         mi_file.close()
         desc_parts.append(f"\n\n[size=2][url=https://www.torrenthr.org/forums.php?action=viewtopic&topicid=8977]{meta.ua_signature}[/url][/size][/align]")
         async with aiofiles.open(
-            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[TorrentHR]DESCRIPTION.txt",
+            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[TORRENTHR]DESCRIPTION.txt",
             "w",
             encoding="utf-8",
         ) as desc:
@@ -383,11 +383,11 @@ class TorrentHR:
         if cookies:
             client_args["cookies"] = cookies
         else:
-            logger.error("[red]Failed to log in to TorrentHR for search")
+            logger.error("[red]Failed to log in to TORRENTHR for search")
             return dupes
 
         async with httpx.AsyncClient(**client_args) as client:
-            # Start with first page (page 0 in TorrentHR's system)
+            # Start with first page (page 0 in TORRENTHR's system)
             current_page = 0
             more_pages = True
             page_count = 0
@@ -501,11 +501,11 @@ class TorrentHR:
         return page_dupes, has_next_page, next_page_number
 
     async def login(self, meta) -> dict[str, Any] | None:
-        logger.info("[yellow]Logging in to TorrentHR...")
+        logger.info("[yellow]Logging in to TORRENTHR...")
         url = "https://www.torrenthr.org/takelogin.php"
 
         if not self.username or not self.password:
-            logger.info("[red]Missing TorrentHR credentials in config.py")
+            logger.info("[red]Missing TORRENTHR credentials in config.py")
             return None
 
         payload: dict[str, Any] = {"username": self.username, "password": self.password, "ssl": "yes"}
@@ -530,14 +530,14 @@ class TorrentHR:
                 resp = await session.post(url, headers=headers, data=payload)
 
                 if "index.php" in str(resp.url) or "logout.php" in resp.text:
-                    logger.info("[green]Successfully logged in to TorrentHR")
+                    logger.info("[green]Successfully logged in to TORRENTHR")
                     return dict(session.cookies)
-                logger.error("[red]Failed to log in to TorrentHR")
+                logger.error("[red]Failed to log in to TORRENTHR")
                 logger.info(f"[red]Login response URL: {resp.url}")
                 logger.info(f"[red]Login status code: {resp.status_code}")
                 return None
 
             except Exception as e:
-                logger.error(f"[red]Error during TorrentHR login: {e!s}")
+                logger.error(f"[red]Error during TORRENTHR login: {e!s}")
                 console.print_exception()
                 return None

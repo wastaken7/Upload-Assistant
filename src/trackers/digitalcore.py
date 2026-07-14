@@ -17,7 +17,7 @@ Config = dict[str, Any]
 
 class DigitalCore:
     """
-    DigitalCore (DC) is a Private Torrent Tracker for 0DAY / GENERAL
+    DIGITALCORE (DC) is a Private Torrent Tracker for 0DAY / GENERAL
     """
 
     auth_type = "other_api"
@@ -166,7 +166,7 @@ class DigitalCore:
 
     async def edit_name(self, meta: Meta) -> str:
         """
-        Edits the name according to DigitalCore's naming conventions.
+        Edits the name according to DIGITALCORE's naming conventions.
         Scene uploads should use the scene name.
         Scene uploads should also have "[UNRAR]" in the name, as the UA only uploads unzipped files, which are considered "altered".
         https://digitalcore.club/forum/17/topic/1051/uploading-for-beginners
@@ -292,7 +292,7 @@ class DigitalCore:
                 return False
 
         else:
-            logger.info("[cyan]DigitalCore Request Data:")
+            logger.info("[cyan]DIGITALCORE Request Data:")
             logger.info(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading"
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")

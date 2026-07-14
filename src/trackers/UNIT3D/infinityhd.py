@@ -14,7 +14,7 @@ Config = dict[str, Any]
 
 class InfinityHD(UNIT3D):
     """
-    InfinityHD is a Private Torrent Tracker for MOVIES / TV / ANIME
+    INFINITYHD is a Private Torrent Tracker for MOVIES / TV / ANIME
     """
 
     tracker = "INFINITYHD"

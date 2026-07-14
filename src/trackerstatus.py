@@ -35,7 +35,7 @@ class TrackerStatusManager:
         tracker_setup.filter_unsupported_trackers(meta)
         helper: Any = UploadHelper(self.config)
         dupe_checker = DupeChecker(self.config)
-        if any(tracker in meta.trackers for tracker in ["MTeam", "Lajidui", "PTFans", "PTGTK", "RailgunPT"]):
+        if any(tracker in meta.trackers for tracker in ["MTEAM", "LAJIDUI", "PTFANS", "PTGTK", "RAILGUNPT"]):
             meta.douban_id = await get_douban_id(meta)
         meta_lock = asyncio.Lock()
         status_map = meta.tracker_status
@@ -45,7 +45,7 @@ class TrackerStatusManager:
 
         # Prompt for IMDB ID once if any tracker needs it and it's missing in attended mode
         if not meta.get("unattended", False) and meta.get("imdb_id", 0) == 0:
-            needs_imdb = any(t in meta.trackers for t in {"TorrentHR", "PassThePopcorn"})
+            needs_imdb = any(t in meta.trackers for t in {"TORRENTHR", "PASSTHEPOPCORN"})
             if needs_imdb:
                 while True:
                     try:
@@ -86,7 +86,7 @@ class TrackerStatusManager:
 
             if tracker_name in tracker_class_map:
                 tracker_class = tracker_class_map[tracker_name](config=self.config)
-                if tracker_name in {"TorrentHR", "PassThePopcorn"} and local_meta.get("imdb_id", 0) == 0:
+                if tracker_name in {"TORRENTHR", "PASSTHEPOPCORN"} and local_meta.get("imdb_id", 0) == 0:
                     local_tracker_status["skipped"] = True
 
                 if not local_tracker_status["skipped"]:
@@ -132,7 +132,7 @@ class TrackerStatusManager:
                     claimed = await tracker_setup.get_torrent_claims(local_meta, tracker_name)
                     local_tracker_status["skipped"] = bool(claimed)
 
-                    if tracker_name not in {"PassThePopcorn"} and not local_tracker_status["skipped"]:
+                    if tracker_name not in {"PASSTHEPOPCORN"} and not local_tracker_status["skipped"]:
                         if hasattr(tracker_class, "get_additional_checks"):
                             import inspect
 
@@ -177,7 +177,7 @@ class TrackerStatusManager:
                                         sys.exit(1)
                         else:
                             dupes = []
-                    elif tracker_name == "PassThePopcorn":
+                    elif tracker_name == "PASSTHEPOPCORN":
                         ptp: Any = PassThePopcorn(config=self.config)
                         if hasattr(ptp, "get_additional_checks"):
                             import inspect
@@ -226,12 +226,12 @@ class TrackerStatusManager:
                             meta.initial_dupes = {}
                         meta.initial_dupes[tracker_name] = copy.deepcopy(dupes)
 
-                    if tracker_name == "AmigosShare" and (meta.anon if meta.anon is not None else "false"):
+                    if tracker_name == "AMIGOSSHARE" and (meta.anon if meta.anon is not None else "false"):
                         logger.info(
-                            "Portugas: [yellow]Aviso: Você solicitou um upload anônimo, mas o AmigosShare não suporta essa opção.[/yellow][red] O envio não será anônimo.[/red]"
+                            "PORTUGAS: [yellow]Aviso: Você solicitou um upload anônimo, mas o AMIGOSSHARE não suporta essa opção.[/yellow][red] O envio não será anônimo.[/red]"
                         )
                         logger.warning(
-                            "EN: [yellow]Warning: You requested an anonymous upload, but AmigosShare does not support this option.[/yellow][red] The upload will not be anonymous.[/red]"
+                            "EN: [yellow]Warning: You requested an anonymous upload, but AMIGOSSHARE does not support this option.[/yellow][red] The upload will not be anonymous.[/red]"
                         )
 
                     if ("skipping" not in local_meta or local_meta["skipping"] is None) and not local_tracker_status["skipped"]:
@@ -256,7 +256,7 @@ class TrackerStatusManager:
                             if cross_seed_key in local_meta and cross_seed_value:
                                 meta[cross_seed_key] = cross_seed_value
 
-                        if tracker_name in ["Aither", "LST"]:
+                        if tracker_name in ["AITHER", "LST"]:
                             were_trumping = local_meta.get("were_trumping", False)
                             trump_reason = local_meta.get("trump_reason")
                             trumpable_id_after_dupe_check = local_meta.get(f"{tracker_name}_trumpable_id")
@@ -271,7 +271,7 @@ class TrackerStatusManager:
                     elif "skipping" in local_meta:
                         local_tracker_status["skipped"] = True
 
-                    if tracker_name == "MoreThanTV" and not local_tracker_status["banned"] and not local_tracker_status["skipped"] and not local_tracker_status["dupe"]:
+                    if tracker_name == "MORETHANTV" and not local_tracker_status["banned"] and not local_tracker_status["skipped"] and not local_tracker_status["dupe"]:
                         tracker_config = self.trackers_config.get(tracker_name, {})
                         if str(tracker_config.get("skip_if_rehash", "false")).lower() == "true":
                             torrent_path = str(Path(f"{local_meta['base_dir']}{'/' + 'tmp' + '/'}{local_meta['uuid']}/BASE.torrent").resolve())

@@ -77,7 +77,7 @@ class Aura4K(UNIT3D):
         ):
             return False
 
-        # check bitrate requirements for Aura4K uploads, but only if it's not a disc upload since discs can have variable bitrates and Aura4K doesn't specify bitrate requirements for disc uploads
+        # check bitrate requirements for AURA4K uploads, but only if it's not a disc upload since discs can have variable bitrates and AURA4K doesn't specify bitrate requirements for disc uploads
         if not meta.is_disc and meta.type in ["ENCODE", "WEBDL"]:
             tracks = meta.mediainfo.get("media", {}).get("track", [])
             for track in tracks:
@@ -96,11 +96,11 @@ class Aura4K(UNIT3D):
                                 bit_rate_kbps = bit_rate_num / 1000
                                 if meta.category == "MOVIE" and bit_rate_kbps < 15000:
                                     if not meta.unattended:
-                                        logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for Aura4K movie uploads.")
+                                        logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for AURA4K movie uploads.")
                                     return False
                                 if meta.category == "TV" and bit_rate_kbps < 10000:
                                     if not meta.unattended:
-                                        logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for Aura4K TV uploads.")
+                                        logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for AURA4K TV uploads.")
                                     return False
                             else:
                                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):

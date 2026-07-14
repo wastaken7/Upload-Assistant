@@ -78,7 +78,7 @@ class MakingOff:
         # Cache for the resolved PT-BR display title, keyed by meta.uuid.
         self._display_title_cache: dict[str, str] = {}
 
-        tracker_config = dict(dict(config.get("TRACKERS", {})).get("MakingOff", {}))
+        tracker_config = dict(dict(config.get("TRACKERS", {})).get("MAKINGOFF", {}))
         public_trackers_raw = tracker_config.get("trackers", [])
         if isinstance(public_trackers_raw, str):
             self._public_trackers: list[str] = [t.strip() for t in public_trackers_raw.splitlines() if t.strip()]

@@ -139,7 +139,7 @@ def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
         "RTF": "RETROFLIX",
         "SPD": "SPEEDAPP",
         "SN": "SWARMAZON",
-        "TTG": "ToTheGlory",
+        "TTG": "TOTHEGLORY",
         "THR": "TORRENTHR",
         "TL": "TORRENTLEECH",
         "TVC": "TVCHAOSUK",
@@ -692,7 +692,7 @@ def configure_trackers(
     existing_tracker_list = [t.strip() for t in existing_tracker_list if t.strip()]
     existing_trackers_str = ", ".join(existing_tracker_list)
 
-    trackers_input = get_user_input("\nEnter tracker acronyms separated by commas (e.g. BeyondHD, PassThePopcorn, Aither)", existing_value=existing_trackers_str).upper()
+    trackers_input = get_user_input("\nEnter tracker acronyms separated by commas (e.g. BEYONDHD, PASSTHEPOPCORN, AITHER)", existing_value=existing_trackers_str).upper()
     trackers_list = [t.strip().upper() for t in trackers_input.split(",") if t.strip()]
 
     trackers_config: dict[str, Any] = {"default_trackers": ", ".join(trackers_list)}
@@ -726,7 +726,7 @@ def configure_trackers(
         if example_tracker:
             for key, default_value in example_tracker.items():
                 # Skip keys that should not be prompted
-                if tracker == "HDTorrents" and key == "announce_url":
+                if tracker == "HDTORRENTS" and key == "announce_url":
                     tracker_config[key] = example_tracker[key]
                     continue
 
@@ -771,7 +771,7 @@ def configure_trackers(
             additional_tracker_config: dict[str, Any] = {}
             if example_tracker:
                 for key, default_value in example_tracker.items():
-                    if tracker == "HDTorrents" and key == "announce_url":
+                    if tracker == "HDTORRENTS" and key == "announce_url":
                         additional_tracker_config[key] = example_tracker[key]
                         continue
                     comment_key = f"TRACKERS.{tracker}.{key}"

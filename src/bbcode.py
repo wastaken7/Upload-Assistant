@@ -71,7 +71,7 @@ class BBCODE:
             next_lines = desc[comp_pos : comp_pos + 500].split("\n", 3)[:3]  # Get comparison line + 2 more lines
             next_lines_text = "\n".join(next_lines)
 
-            # Check if any of these lines contain HDBits URLs
+            # Check if any of these lines contain HDBITS URLs
             if re.search(r"hdbits\.org", next_lines_text, flags=re.IGNORECASE):
                 # Replace the entire section (comparison line + next 2 lines)
                 line_end_pos = comp_pos + len(next_lines_text)
@@ -87,12 +87,12 @@ class BBCODE:
             full_url = "".join(url_parts)
             desc = desc.replace(full_url, "")
 
-        # Remove HDBits image tags
+        # Remove HDBITS image tags
         hdbits_imgs = re.findall(r"\[img\][\s\S]*?(img\.|t\.)?hdbits\.org[\s\S]*?\[\/img\]", desc, flags=re.IGNORECASE)
         for img_tag in hdbits_imgs:
             desc = desc.replace(img_tag, "")
 
-        # Remove any standalone HDBits URLs
+        # Remove any standalone HDBITS URLs
         standalone_urls = re.findall(r"https?:\/\/(img\.|t\.)?hdbits\.org\/[^\s\[\]]+", desc, flags=re.IGNORECASE)
         for url in standalone_urls:
             desc = desc.replace(url, "")
@@ -116,7 +116,7 @@ class BBCODE:
         url_img_pattern = r"\[url=(https?:\/\/[^\]]+)\]\[img\](https?:\/\/[^\]]+)\[\/img\]\[\/url\]"
         url_img_matches: list[tuple[str, str]] = re.findall(url_img_pattern, desc, flags=re.IGNORECASE)
         for web_url, img_url in url_img_matches:
-            # Skip HDBits images
+            # Skip HDBITS images
             if self._is_hdbits_url(web_url) or self._is_hdbits_url(img_url):
                 desc = desc.replace(f"[url={web_url}][img]{img_url}[/img][/url]", "")
                 continue
@@ -210,7 +210,7 @@ class BBCODE:
         return description, imagelist
 
     def clean_ptp_description(self, desc: str, is_disc: str) -> tuple[str, list[dict[str, Any]]]:
-        # console.print("[yellow]Cleaning PassThePopcorn description...")
+        # console.print("[yellow]Cleaning PASSTHEPOPCORN description...")
 
         # Convert Bullet Points to -
         desc = desc.replace("&bull;", "-")
@@ -219,7 +219,7 @@ class BBCODE:
         desc = html.unescape(desc)
         desc = desc.replace("\r\n", "\n")
 
-        # Remove url tags with PassThePopcorn/HDBits links
+        # Remove url tags with PASSTHEPOPCORN/HDBITS links
         url_tags: list[str] = re.findall(
             r"(?:\[url(?:=|\])[^\]]*https?:\/\/passthepopcorn\.m[^\]]*\]|\bhttps?:\/\/passthepopcorn\.m[^\s]+)",
             desc,
@@ -509,7 +509,7 @@ class BBCODE:
             \[center\]\[url=\/torrents\?perPage=\d+&name=[^\]]*\]\[\/url\]\[\/center\]
         """
         desc = re.sub(bot_signature_regex, "", desc, flags=re.IGNORECASE | re.VERBOSE)
-        # Remove Aither internal signature
+        # Remove AITHER internal signature
         desc = re.sub(
             r"\[center\]\[b\]\[size=\d+\]🖌️\[/size\]\[/b\][\s\S]*?This is an internal release which was first released exclusively on Aither\.[\s\S]*?🍻 Cheers to all the Aither.*?\[/center\]",
             "",

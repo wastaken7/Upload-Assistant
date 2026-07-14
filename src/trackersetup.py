@@ -17,11 +17,11 @@ from src.console import logger
 from src.meta import Meta
 from src.trackers.alpharatio import AlphaRatio
 from src.trackers.amigosshare import AmigosShare
-from src.trackers.anthelion import Anthelion
+from src.trackers.anthelion import ANTHELION
 from src.trackers.AVISTAZ.avistaz import AvistaZ
 from src.trackers.AVISTAZ.cinemaz import CinemaZ
 from src.trackers.AVISTAZ.privatehd import PrivateHD
-from src.trackers.beyondhd import BeyondHD
+from src.trackers.beyondhd import BEYONDHD
 from src.trackers.bithdtv import BitHDTV
 from src.trackers.bjshare import BJShare
 from src.trackers.brasiltracker import BrasilTracker
@@ -191,8 +191,8 @@ class TrackerSetup:
         tracker_instance = self._create_tracker_instance(tracker)
         if tracker_instance is None:
             return None
-        if tracker.upper() == "Luminarr":
-            # Luminarr doesn't expose a banned_url; sync TRaSH groups and use the file if present
+        if tracker.upper() == "LUMINARR":
+            # LUMINARR doesn't expose a banned_url; sync TRaSH groups and use the file if present
             await self.sync_trash_groups(file_path)
             if Path(file_path).exists():
                 return file_path
@@ -619,7 +619,7 @@ class TrackerSetup:
         headers = {"Authorization": f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}", "Accept": "application/json"}
         if meta.tmdb is None:
             return requests
-        params = {"tmdbId": meta.tmdb} if tracker == "HawkeUno" else {"tmdb": meta.tmdb}
+        params = {"tmdbId": meta.tmdb} if tracker == "HAWKEUNO" else {"tmdb": meta.tmdb}
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url=url, headers=headers, params=params)
@@ -640,9 +640,9 @@ class TrackerSetup:
 
                     try:
                         for each in results_list:
-                            attributes = each.get("attributes", each) if tracker == "HawkeUno" else cast(JsonDict, each)
+                            attributes = each.get("attributes", each) if tracker == "HAWKEUNO" else cast(JsonDict, each)
                             result: JsonDict = {
-                                "id": each.get("id") if tracker == "HawkeUno" else attributes.get("id"),
+                                "id": each.get("id") if tracker == "HAWKEUNO" else attributes.get("id"),
                                 "name": attributes.get("name"),
                                 "description": attributes.get("description"),
                                 "category": attributes.get("category_id"),
@@ -670,8 +670,8 @@ class TrackerSetup:
         return requests
 
     async def bhd_request_check(self, meta: Meta, tracker: str, url: str) -> list[JsonDict]:
-        if "BeyondHD" not in self.config["TRACKERS"] or not self.config["TRACKERS"]["BeyondHD"].get("api_key"):
-            logger.info("[red]BeyondHD API key not configured. Skipping BeyondHD request check.[/red]")
+        if "BEYONDHD" not in self.config["TRACKERS"] or not self.config["TRACKERS"]["BEYONDHD"].get("api_key"):
+            logger.info("[red]BEYONDHD API key not configured. Skipping BEYONDHD request check.[/red]")
             return []
         logger.debug(f"[bold green]Searching for existing requests on {tracker}[/bold green]")
         requests: list[dict[str, Any]] = []
@@ -725,7 +725,7 @@ class TrackerSetup:
             logger.info(f"[bold red]Unable to search for existing torrents: {e}")
         except Exception as e:
             logger.error(f"[bold red]Unexpected error: {e}")
-        # console.print(f"Debug: BeyondHD requests found: {requests}")
+        # console.print(f"Debug: BEYONDHD requests found: {requests}")
         return requests
 
     async def tracker_request(self, meta: Meta, tracker: str | list[str]) -> bool:
@@ -745,15 +745,15 @@ class TrackerSetup:
             try:
                 url = tracker_instance.requests_url
             except AttributeError:
-                if tracker_name.upper() not in ("AmigosShare", "BJShare", "FunFile", "HDSpace", "AvistaZ", "CinemaZ", "PrivateHD"):
+                if tracker_name.upper() not in ("AMIGOSSHARE", "BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD"):
                     # tracker without requests url not supported
                     return False
 
-            if tracker_name.upper() == "BeyondHD":
+            if tracker_name.upper() == "BEYONDHD":
                 if not url:
                     return False
                 requests = await self.bhd_request_check(meta, tracker_name, url)
-            elif tracker_name.upper() in ("AmigosShare", "BJShare", "FunFile", "HDSpace", "AvistaZ", "CinemaZ", "PrivateHD", "MTeam"):
+            elif tracker_name.upper() in ("AMIGOSSHARE", "BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD", "MTEAM"):
                 # These trackers have custom request handling
                 requests = cast(list[JsonDict], await tracker_instance.get_requests(meta))
                 return False
@@ -816,7 +816,7 @@ class TrackerSetup:
                 api_resolution = each.get("resolution")
                 api_resolution_str = str(api_resolution or "")
                 api_resolution_lower = api_resolution_str.lower()
-                if "BeyondHD" not in tracker_name:
+                if "BEYONDHD" not in tracker_name:
                     if str(api_type) in [str(tid) for tid in type_ids]:
                         type_name = True
                     elif api_type is None:
@@ -1331,11 +1331,11 @@ tracker_class_map: dict[str, Any] = {
     "AURA4K": Aura4K,
     "ASIANCINEMA": AsianCinema,
     "AITHER": Aither,
-    "ANTHELION": Anthelion,
+    "ANTHELION": ANTHELION,
     "ALPHARATIO": AlphaRatio,
     "AMIGOSSHARE": AmigosShare,
     "AVISTAZ": AvistaZ,
-    "BEYONDHD": BeyondHD,
+    "BEYONDHD": BEYONDHD,
     "BITHDTV": BitHDTV,
     "BJSHARE": BJShare,
     "BLUTOPIA": Blutopia,

@@ -16,7 +16,7 @@ import click
 import httpx
 from pymediainfo import MediaInfo
 
-from cogs.redaction import Redaction
+from cogs.redaction import PathAwareEncoder, Redaction
 from src.bbcode import BBCODE
 from src.console import console, logger
 from src.cookie_auth import CookieValidator
@@ -1049,7 +1049,7 @@ class PassThePopcorn:
 
                         meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
                         async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
-                            await f.write(json.dumps(meta.to_dict(), indent=4))
+                            await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
 
         # Handle multiple discs case
         elif len(discs) > 1:
@@ -1127,7 +1127,7 @@ class PassThePopcorn:
 
                             meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
                             async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
-                                await f.write(json.dumps(meta.to_dict(), indent=4))
+                                await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
 
                 elif each["type"] == "DVD":
                     if i == 0:
@@ -1189,7 +1189,7 @@ class PassThePopcorn:
 
                         meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
                         async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
-                            await f.write(json.dumps(meta.to_dict(), indent=4))
+                            await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
 
         # Handle single file case
         elif len(filelist) == 1:
@@ -1311,7 +1311,7 @@ class PassThePopcorn:
 
                     meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
                     async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
-                        await f.write(json.dumps(meta.to_dict(), indent=4))
+                        await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
 
         async with aiofiles.open(
             f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt",

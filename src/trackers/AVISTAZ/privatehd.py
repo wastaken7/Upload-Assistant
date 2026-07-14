@@ -57,7 +57,7 @@ class PrivateHD(AZTrackerBase):
     tracker_urls = ("tracker.privatehd",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="PrivateHD")
+        super().__init__(config, tracker_name="PRIVATEHD")
         self.config: Config = config
         self.common = Common(config)
 
@@ -95,7 +95,7 @@ class PrivateHD(AZTrackerBase):
         if meta.year is not None:
             is_older_than_50_years = (current_year - int(meta.year)) >= 50
             if is_older_than_50_years:
-                warnings.append("Upload movies/series 50+ years old to our sister site CinemaZ.to instead.")
+                warnings.append("Upload movies/series 50+ years old to our sister site CINEMAZ.to instead.")
 
         # https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes
 
@@ -402,11 +402,11 @@ class PrivateHD(AZTrackerBase):
         if any(code in phd_allowed_countries for code in origin_countries_codes):
             pass
 
-        # CinemaZ
+        # CINEMAZ
         elif any(code in cinemaz_countries for code in origin_countries_codes):
-            warnings.append("Upload European (EXCLUDING United Kingdom and Ireland), South American and African content to our sister site CinemaZ.to instead.")
+            warnings.append("Upload European (EXCLUDING United Kingdom and Ireland), South American and African content to our sister site CINEMAZ.to instead.")
 
-        # AvistaZ
+        # AVISTAZ
         elif any(code in asia for code in origin_countries_codes):
             origin_country_str = ", ".join(origin_countries_codes)
             warnings.append(
@@ -417,7 +417,7 @@ class PrivateHD(AZTrackerBase):
 
         elif not any(code in phd_allowed_countries for code in origin_countries_codes):
             warnings.append(
-                "Only upload content to PrivateHD from all major English speaking countries.\nIncluding United States, Canada, UK, Ireland, Australia, and New Zealand."
+                "Only upload content to PRIVATEHD from all major English speaking countries.\nIncluding United States, Canada, UK, Ireland, Australia, and New Zealand."
             )
 
         # Tags

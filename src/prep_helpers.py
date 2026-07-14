@@ -873,7 +873,7 @@ async def search_metadata(
 
     if meta.category == "BOOK":
         meta.type = Path(videopath).suffix.lstrip(".").upper()
-        if meta.type in ("CapybaraBR", "CBZ"):
+        if meta.type in ("CBR", "CBZ"):
             meta.comic = True
     elif meta.category == "GAME":
         meta.type = "GAME"
@@ -1515,7 +1515,7 @@ async def finalize_metadata(
         meta.source = "WEB"
         if not meta.type:
             meta.type = Path(videopath).suffix.lstrip(".").upper()
-        if meta.type.upper() in ("CapybaraBR", "CBZ"):
+        if meta.type.upper() in ("CBR", "CBZ"):
             meta.comic = True
         meta.uhd = ""
         meta.hdr = ""
@@ -1587,7 +1587,7 @@ async def finalize_metadata(
                         if (
                             (data_type == "season" and meta.category != "TV")
                             or (data_type == "episode" and (meta.category != "TV" or meta.tv_pack))
-                            or (data_type == "episode" and tracker_name in ("BJShare", "BrasilTracker") and not prep_instance.config["DEFAULT"].get("episode_overview", False))
+                            or (data_type == "episode" and tracker_name in ("BJSHARE", "BRASILTRACKER") and not prep_instance.config["DEFAULT"].get("episode_overview", False))
                             or (data_type == "main" and meta.category not in ("TV", "MOVIE"))
                         ):
                             continue

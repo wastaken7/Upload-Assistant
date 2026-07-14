@@ -157,9 +157,9 @@ def find_cookie_file(base_dir: str, tracker: str, config: dict[str, Any] | None 
         return str(matching_files[0].resolve())
 
     # 4. Fallback to default
-    if tracker == "FileList":
-        return str((cookies_dir / "FileList.json").resolve())
-    if tracker in ["MoreThanTV", "PassThePopcorn"]:
+    if tracker == "FILELIST":
+        return str((cookies_dir / "FILELIST.json").resolve())
+    if tracker in ["MORETHANTV", "PASSTHEPOPCORN"]:
         return str((cookies_dir / f"{tracker}.json").resolve())
     if tracker == "Pterimg":
         return str((cookies_dir / "Pterimg.json").resolve())
@@ -183,8 +183,8 @@ class CookieValidator:
             logger.info(f"{tracker}: Please ensure the cookie file is in the correct format (Netscape).")
             return None
         except FileNotFoundError:
-            # Attempt automatic login for AlphaRatio tracker
-            if tracker == "AlphaRatio":
+            # Attempt automatic login for ALPHARATIO tracker
+            if tracker == "ALPHARATIO":
                 logger.info(f"{tracker}: [yellow]Cookie file not found. Attempting automatic login...[/yellow]")
                 if await self.ar_login(meta, tracker, cookie_file):
                     # Try loading the newly created cookie file
@@ -219,7 +219,7 @@ class CookieValidator:
             logger.info(f"{tracker}: Failed to update the cookie file: {e}")
 
     async def get_ar_auth_key(self, meta: Meta, tracker: str) -> str | None:
-        """Retrieve the saved auth key for AlphaRatio tracker."""
+        """Retrieve the saved auth key for ALPHARATIO tracker."""
         cookie_file = find_cookie_file(meta.base_dir, tracker, self.config)
         auth_file = cookie_file.replace(".txt", "_auth.txt")
 
@@ -236,7 +236,7 @@ class CookieValidator:
         return None
 
     async def ar_login(self, meta: Meta, tracker: str, cookie_file: str) -> bool:
-        """Perform automatic login to AlphaRatio and save cookies in Netscape format."""
+        """Perform automatic login to ALPHARATIO and save cookies in Netscape format."""
         username = self.config["TRACKERS"][tracker].get("username", "").strip()
         password = self.config["TRACKERS"][tracker].get("password", "").strip()
 

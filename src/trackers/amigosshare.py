@@ -633,7 +633,7 @@ class AmigosShare:
         return re.sub(r"\s{2,}", " ", name).strip()
 
     def get_game_type(self, meta: Meta) -> str:
-        """Map meta.platform to AmigosShare game category (type field) value."""
+        """Map meta.platform to AMIGOSSHARE game category (type field) value."""
         platform_map: dict[str, str] = {
             "ANDROID": "57",
             "DREAMCAST": "52",
@@ -657,7 +657,7 @@ class AmigosShare:
         return platform_map.get(platform, "47")  # Default to PC
 
     def get_game_genre(self, meta: Meta) -> str:
-        """Map IGDB genres to AmigosShare genero field value."""
+        """Map IGDB genres to AMIGOSSHARE genero field value."""
         genre_map: dict[str, str] = {
             "action": "1",
             "hack and slash": "1",
@@ -700,7 +700,7 @@ class AmigosShare:
         return "0"
 
     def get_game_idioma(self, meta: Meta) -> str:
-        """Map game languages to AmigosShare idioma field value."""
+        """Map game languages to AMIGOSSHARE idioma field value."""
         language_map: dict[str, str] = {
             "german": "3",
             "chinese": "9",
@@ -944,7 +944,7 @@ class AmigosShare:
                 response = await self.session.post(url, data=payload, timeout=20)
                 response.raise_for_status()
                 response_json = cast(dict[str, Any], response.json())
-                layout_dict = response_json.get("AmigosShare", {})
+                layout_dict = response_json.get("ASC", {})
 
                 if layout_dict:
                     try:

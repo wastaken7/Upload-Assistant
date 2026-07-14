@@ -148,14 +148,14 @@ class Nebulance:
                                 meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
                             return True
                         except json.JSONDecodeError:
-                            meta.tracker_status[self.tracker]["status_message"] = "data error: Nebulance json decode error, the API is probably down"
+                            meta.tracker_status[self.tracker]["status_message"] = "data error: NEBULANCE json decode error, the API is probably down"
                             return False
                     else:
                         response_data = {"error": f"Unexpected status code: {response.status_code}", "response_content": response.text}
                         meta.tracker_status[self.tracker]["status_message"] = response_data
                     return False
             else:
-                logger.info("[cyan]Nebulance Request Data:")
+                logger.info("[cyan]NEBULANCE Request Data:")
                 logger.info(Redaction.redact_private_info(data))
                 meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
                 await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
@@ -168,7 +168,7 @@ class Nebulance:
         if meta.category != "TV":
             if meta.tvmaze_id != 0:
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    logger.info("[red]Only TV or TV Movies are allowed at Nebulance, this has a tvmaze ID[/red]")
+                    logger.info("[red]Only TV or TV Movies are allowed at NEBULANCE, this has a tvmaze ID[/red]")
                     if cli_ui.ask_yes_no("Do you want to upload it?", default=False):
                         pass
                     else:
@@ -177,7 +177,7 @@ class Nebulance:
                     return False
             else:
                 if not meta.unattended:
-                    logger.info("[red]Only TV Is allowed at Nebulance")
+                    logger.info("[red]Only TV Is allowed at NEBULANCE")
                 return False
 
         if meta.is_disc != "BDMV" and not await self.common.check_language_requirements(
@@ -191,7 +191,7 @@ class Nebulance:
 
         if meta.is_disc:
             if not meta.unattended:
-                logger.info("[bold red]Nebulance does not allow raw discs")
+                logger.info("[bold red]NEBULANCE does not allow raw discs")
             return False
 
         return True
@@ -243,16 +243,16 @@ class Nebulance:
                         message = str(error.get("message", "")) if isinstance(error, dict) else ""
                         if "out of range" in message.lower() and "valid pages" in message.lower():
                             break
-                    logger.info(f"[bold red]Nebulance HTTP request failed. Status: {response.status_code}")
-                    logger.info(f"[bold red]Nebulance Search Response Content (page {page}): {response.text}")
-                    meta.skipping = "Nebulance"
+                    logger.info(f"[bold red]NEBULANCE HTTP request failed. Status: {response.status_code}")
+                    logger.info(f"[bold red]NEBULANCE Search Response Content (page {page}): {response.text}")
+                    meta.skipping = "NEBULANCE"
                     break
 
                 try:
                     data = cast(dict[str, Any], response.json())
                 except json.JSONDecodeError:
-                    logger.info("[bold yellow]Nebulance response content is not valid JSON. Skipping this API call.")
-                    meta.skipping = "Nebulance"
+                    logger.info("[bold yellow]NEBULANCE response content is not valid JSON. Skipping this API call.")
+                    meta.skipping = "NEBULANCE"
                     break
 
                 items_value = data.get("items")

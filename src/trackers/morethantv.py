@@ -132,7 +132,7 @@ class MoreThanTV:
         if base_piece_mb > 8 and not meta.nohash:
             tracker_config = self.config["TRACKERS"].get(self.tracker, {})
             if str(tracker_config.get("skip_if_rehash", "false")).lower() == "false":
-                logger.info("[red]Piece size is OVER 8M and does not work on MoreThanTV. Generating a new .torrent")
+                logger.info("[red]Piece size is OVER 8M and does not work on MORETHANTV. Generating a new .torrent")
                 piece_size = 8
                 tracker_url = str(tracker_config.get("announce_url", "https://fake.tracker")).strip()
                 torrent_create = f"[{self.tracker}]"
@@ -203,7 +203,7 @@ class MoreThanTV:
                 async with httpx.AsyncClient(cookies=cookies, timeout=10.0, follow_redirects=True, headers=headers) as client:
                     response = await client.post(url=self.upload_url, data=data, files=files)
 
-                    # This is not a header or cookie size issue, but MoreThanTV returns this status.
+                    # This is not a header or cookie size issue, but MORETHANTV returns this status.
                     if response.status_code == 400 and ("Request Header" in response.text or "Cookie Too Large" in response.text or "Header Too Large" in response.text):
                         meta.tracker_status[self.tracker]["status_message"] = "data error: Request Header or Cookie Too Large error from server"
                         return False
@@ -242,7 +242,7 @@ class MoreThanTV:
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: {e}"
                 return False
         else:
-            logger.info("[cyan]MoreThanTV Request Data:")
+            logger.info("[cyan]MORETHANTV Request Data:")
             debug_data = data.copy()
             if "auth" in debug_data:
                 auth_value = str(debug_data.get("auth", ""))
@@ -414,7 +414,7 @@ class MoreThanTV:
     async def get_tags(self, meta: Meta) -> str:
         tags: list[str] = []
         # Genres
-        # MoreThanTV takes issue with some of the pulled TMDB tags, and I'm not hand checking and attempting
+        # MORETHANTV takes issue with some of the pulled TMDB tags, and I'm not hand checking and attempting
         # to regex however many tags need changing, so they're just getting skipped
         # tags.extend([x.strip(', ').lower().replace(' ', '.') for x in meta.genres.split(',')])
         # Resolution
@@ -505,7 +505,7 @@ class MoreThanTV:
         if vcookie is not True:
             logger.error("[red]Failed to validate cookies. Please confirm that the site is up and your username and password is valid.")
             if "mtv_timeout" in meta and meta.mtv_timeout:
-                meta.skipping = "MoreThanTV"
+                meta.skipping = "MORETHANTV"
                 return False
             recreate = cli_ui.ask_yes_no("Log in again and create new session?") if not meta.unattended or (meta.unattended and meta.unattended_confirm) else True
             if recreate is True:
@@ -528,7 +528,7 @@ class MoreThanTV:
                 async with httpx.AsyncClient(cookies=cookies_dict, timeout=10) as client:
                     try:
                         resp = await client.get(url=url)
-                        logger.debug("[cyan]Validating MoreThanTV Cookies:")
+                        logger.debug("[cyan]Validating MORETHANTV Cookies:")
 
                         if "Logout" in resp.text:
                             return True
@@ -544,7 +544,7 @@ class MoreThanTV:
                         meta.mtv_timeout = True
                         return False
                     except Exception as e:
-                        logger.error(f"[red]Error connecting to MoreThanTV: {e!s}")
+                        logger.error(f"[red]Error connecting to MORETHANTV: {e!s}")
                         return False
             except Exception as e:
                 logger.error(f"[red]Error loading cookies: {e!s}")
@@ -610,9 +610,9 @@ class MoreThanTV:
                                 otp = pyotp.parse_uri(otp_uri)
                                 mfa_code = pyotp.TOTP(otp.secret).now()
                             except ValueError, TypeError:
-                                mfa_code = console.input("[yellow]MoreThanTV 2FA Code: ")
+                                mfa_code = console.input("[yellow]MORETHANTV 2FA Code: ")
                         else:
-                            mfa_code = console.input("[yellow]MoreThanTV 2FA Code: ")
+                            mfa_code = console.input("[yellow]MORETHANTV 2FA Code: ")
 
                         two_factor_token = resp.text.rsplit('name="token" value="', 1)[1][:48]
                         two_factor_payload = {"token": two_factor_token, "code": mfa_code, "submit": "login"}
@@ -620,25 +620,25 @@ class MoreThanTV:
 
                     await asyncio.sleep(1)
                     if "authkey=" in resp.text:
-                        logger.info("[green]Successfully logged in to MoreThanTV")
+                        logger.info("[green]Successfully logged in to MORETHANTV")
                         cookies_dict = dict(client.cookies)
                         cookies_data = await self.async_json_dumps(cookies_dict)
                         async with aiofiles.open(cookiefile, "w", encoding="utf-8") as cf:
                             await cf.write(cookies_data)
                         logger.info(f"[green]Cookies saved to {cookiefile}")
                         return True
-                    logger.info("[bold red]Something went wrong while trying to log into MoreThanTV")
+                    logger.info("[bold red]Something went wrong while trying to log into MORETHANTV")
                     logger.info(f"[red]Final URL: {resp.url}")
                     return False
 
                 except httpx.TimeoutException:
-                    logger.info("[red]Connection to MoreThanTV timed out. The site may be down or unreachable.")
+                    logger.info("[red]Connection to MORETHANTV timed out. The site may be down or unreachable.")
                     return False
                 except httpx.ConnectError:
-                    logger.error("[red]Failed to connect to MoreThanTV. The site may be down or your connection is blocked.")
+                    logger.error("[red]Failed to connect to MORETHANTV. The site may be down or your connection is blocked.")
                     return False
                 except Exception as e:
-                    logger.error(f"[red]Error during MoreThanTV login: {e!s}")
+                    logger.error(f"[red]Error during MORETHANTV login: {e!s}")
                     logger.info(f"[dim red]{traceback.format_exc()}[/dim red]")
                     return False
         except Exception as e:
@@ -770,7 +770,7 @@ class MoreThanTV:
                         result = {"name": title, "files": title, "file_count": int(files_text), "size": int(size_text), "link": guid, "download": link}
                         dupes.append(result)
                 except ElementTree.ParseError:
-                    logger.error("[red]Failed to parse XML response from MoreThanTV API")
+                    logger.error("[red]Failed to parse XML response from MORETHANTV API")
             else:
                 # Handle potential error messages
                 if response.status_code != 200:

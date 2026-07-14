@@ -10,7 +10,7 @@ Config = dict[str, Any]
 
 class RailgunPT(NEXUSPHP):
     """
-    RailgunPT is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
+    RAILGUNPT is a CHINESE Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
     banned_groups = ()

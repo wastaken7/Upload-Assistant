@@ -125,7 +125,7 @@ class CapybaraBR(UNIT3D):
         if meta.anime is True and resolved_category == "TV":
             resolved_category = "ANIMES"
 
-        if resolved_category == "BOOK" and (str(meta.type).upper() in ("CapybaraBR", "CBZ") or meta.manga or meta.comic):
+        if resolved_category == "BOOK" and (str(meta.type).upper() in ("CBR", "CBZ") or meta.manga or meta.comic):
             resolved_category = "COMIC_MANGA"
 
         if resolved_category:
@@ -144,7 +144,7 @@ class CapybaraBR(UNIT3D):
             "WEBRIP": "5",
             "HDTV": "6",
             "AZW3": "13",
-            "CapybaraBR": "14",
+            "CBR": "14",
             "CBZ": "15",
             "MOBI": "16",
             "PDF": "17",

@@ -82,7 +82,7 @@ class BtnIdManager:
     ) -> tuple[int, int]:
         imdb = 0
         tmdb = 0
-        logger.debug("Fetching BeyondHD data...", extra={"markup": False})
+        logger.debug("Fetching BEYONDHD data...", extra={"markup": False})
         post_query_url = f"https://beyond-hd.me/api/torrents/{bhd_api}"
 
         post_data = {"action": "details", "torrent_id": torrent_id} if torrent_id is not None else {"action": "search", "rsskey": bhd_rss_key}
@@ -105,19 +105,19 @@ class BtnIdManager:
                 try:
                     data = response.json()
                 except ValueError as e:
-                    logger.info(f"[ERROR] Failed to parse BeyondHD response as JSON: {e}", extra={"markup": False})
+                    logger.info(f"[ERROR] Failed to parse BEYONDHD response as JSON: {e}", extra={"markup": False})
                     logger.info(f"Response content: {response.text[:200]}...", extra={"markup": False})
                     return 0, 0
         except (httpx.RequestError, httpx.HTTPStatusError) as e:
-            logger.info(f"[ERROR] Failed to fetch BeyondHD data: {e}", extra={"markup": False})
+            logger.info(f"[ERROR] Failed to fetch BEYONDHD data: {e}", extra={"markup": False})
             return 0, 0
 
         if data.get("status_code") == 0 or data.get("success") is False:
-            error_message = data.get("status_message", "Unknown BeyondHD API error")
-            logger.info(f"[ERROR] BeyondHD API error: {error_message}", extra={"markup": False})
+            error_message = data.get("status_message", "Unknown BEYONDHD API error")
+            logger.info(f"[ERROR] BEYONDHD API error: {error_message}", extra={"markup": False})
             return 0, 0
 
-        # Handle different response formats from BeyondHD API
+        # Handle different response formats from BEYONDHD API
         first_result = None
 
         # For search results that return a list
@@ -129,7 +129,7 @@ class BtnIdManager:
             first_result = data["result"]
 
         if not first_result:
-            logger.info("No valid results found in BeyondHD API response.", extra={"markup": False})
+            logger.info("No valid results found in BEYONDHD API response.", extra={"markup": False})
             return 0, 0
 
         name = str(first_result.get("name", "")).lower()
@@ -155,7 +155,7 @@ class BtnIdManager:
                         logger.info("Successfully retrieved full description", extra={"markup": False})
                     else:
                         description = ""
-                        error_message = desc_data.get("status_message", "Unknown BeyondHD API error")
+                        error_message = desc_data.get("status_message", "Unknown BEYONDHD API error")
                         logger.info(f"[ERROR] Failed to fetch description: {error_message}", extra={"markup": False})
             except (httpx.RequestError, httpx.HTTPStatusError) as e:
                 logger.info(f"[ERROR] Failed to fetch description: {e}", extra={"markup": False})
@@ -193,9 +193,9 @@ class BtnIdManager:
             meta.image_list = imagelist
 
         if (imdb and imdb != 0) or (tmdb and tmdb != 0):
-            logger.info(f"[green]Found BeyondHD IDs: IMDb={imdb}, TMDb={tmdb}")
+            logger.info(f"[green]Found BEYONDHD IDs: IMDb={imdb}, TMDb={tmdb}")
         elif meta.debug:
-            logger.info(f"[yellow]BeyondHD search returned no valid IDs (IMDb={imdb}, TMDb={tmdb})[/yellow]")
+            logger.info(f"[yellow]BEYONDHD search returned no valid IDs (IMDb={imdb}, TMDb={tmdb})[/yellow]")
 
         return imdb, tmdb
 

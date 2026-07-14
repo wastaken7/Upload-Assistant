@@ -260,7 +260,7 @@ class UploadHelper:
                 if meta.filename_match and meta.file_count_match:
                     logger.info(f"[bold red]Exact match found! - {meta.filename_match}[/bold red]")
                     try:
-                        if tracker_name in ["Aither", "LST"]:
+                        if tracker_name in ["AITHER", "LST"]:
                             logger.info(f"[yellow]{tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped.[/yellow]")
                             upload = cli_ui.ask_yes_no("Are you trumping this exact match?", default=False)
                             if upload:
@@ -322,8 +322,8 @@ class UploadHelper:
         display_name = display_name if display_name is not None else meta.name
         display_name = display_name
 
-        if tracker_name in ["BeyondHD"]:
-            logger.debug("[yellow]BeyondHD cross seeding check[/yellow]")
+        if tracker_name in ["BEYONDHD"]:
+            logger.debug("[yellow]BEYONDHD cross seeding check[/yellow]")
             tracker_download_link = meta.get(f"{tracker_name}_matched_download")
             # Ensure display_name is a string before using 'in' operator
             if display_name:

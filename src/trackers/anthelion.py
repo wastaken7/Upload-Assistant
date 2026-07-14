@@ -19,14 +19,14 @@ from src.trackers.common import Common
 Config = dict[str, Any]
 
 
-class Anthelion:
+class ANTHELION:
     """
-    Anthelion (ANT) is a Private Torrent Tracker for MOVIES
+    ANTHELION (ANT) is a Private Torrent Tracker for MOVIES
     """
 
     auth_type = "other_api"
     tracker = "ANTHELION"
-    display_name = "Anthelion"
+    display_name = "ANTHELION"
     source_flag = "ANT"
     banned_groups = (
         "3LTON",
@@ -185,7 +185,7 @@ class Anthelion:
             if tags:
                 logger.info(f"[green]{self.tracker}: Using IMDb genres for tagging: {', '.join(tags)}")
                 logger.info(
-                    "[yellow]Anthelion api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
+                    "[yellow]ANTHELION api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
                 )
                 await asyncio.sleep(3)
                 meta.ant_user_tags = True
@@ -194,7 +194,7 @@ class Anthelion:
             logger.info(f"[yellow]{self.tracker}: No genres found for tagging. Tag required.")
             logger.info("[yellow]Only use a tag in the approved list found in the site search box.")
             logger.info(
-                "[yellow]Anthelion api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
+                "[yellow]ANTHELION api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
             )
             await asyncio.sleep(3)
             user_tag = cli_ui.ask_string("Please enter at least one tag (genre) to use for the upload", default="")
@@ -232,7 +232,7 @@ class Anthelion:
         if ant_type is None:
             if not meta.unattended:
                 ant_type_list = ["Feature Film", "Short Film", "Miniseries", "Other"]
-                choice = cli_ui.ask_choice("Select the proper type for Anthelion", choices=ant_type_list)
+                choice = cli_ui.ask_choice("Select the proper type for ANTHELION", choices=ant_type_list)
                 # Map the choice back to the integer
                 type_map = {"Feature Film": 0, "Short Film": 1, "Miniseries": 2, "Other": 3}
                 ant_type = type_map.get(choice, 0)
@@ -254,8 +254,8 @@ class Anthelion:
         if torrent_file_size_kib > 250:  # 250 KiB
             logger.info("[yellow]Existing .torrent exceeds 250 KiB and will be regenerated to fit constraints.")
             meta.max_piece_size = 128  # 128 MiB
-            await TorrentCreator.create_torrent(meta, str(Path(str(meta.path))), "Anthelion", tracker_url=tracker_url)
-            torrent_filename = "Anthelion"
+            await TorrentCreator.create_torrent(meta, str(Path(str(meta.path))), "ANTHELION", tracker_url=tracker_url)
+            torrent_filename = "ANTHELION"
 
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_filename)
         flags = await self.get_flags(meta)
@@ -332,7 +332,7 @@ class Anthelion:
                     try:
                         response_data: dict[str, Any] = response.json()
                     except json.JSONDecodeError:
-                        meta.tracker_status[self.tracker]["status_message"] = "data error: Anthelion json decode error, the API is probably down"
+                        meta.tracker_status[self.tracker]["status_message"] = "data error: ANTHELION json decode error, the API is probably down"
                         return False
 
                     if response.status_code in [200, 201]:
@@ -343,17 +343,17 @@ class Anthelion:
                         meta.tracker_status[self.tracker]["status_message"] = response_data
                         return True
 
-                    response_data = {"error": f"Anthelion returned status code: {response.status_code}", "response_content": response.text}
+                    response_data = {"error": f"ANTHELION returned status code: {response.status_code}", "response_content": response.text}
                     meta.tracker_status[self.tracker]["status_message"] = f"data error - {response_data}"
                     return False
             else:
-                logger.info("[cyan]Anthelion Request Data:")
+                logger.info("[cyan]ANTHELION Request Data:")
                 logger.info(Redaction.redact_private_info(data))
                 meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
                 await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
                 return True
         except httpx.TimeoutException:
-            meta.tracker_status[self.tracker]["status_message"] = "data error: Anthelion request timed out while uploading."
+            meta.tracker_status[self.tracker]["status_message"] = "data error: ANTHELION request timed out while uploading."
             return False
         except httpx.RequestError as e:
             meta.tracker_status[self.tracker]["status_message"] = f"data error: An error occurred while making the request: {e}"
@@ -364,7 +364,7 @@ class Anthelion:
             error_type = type(e).__name__
             error_msg = str(e) if str(e) else "No error message"
             traceback_str = traceback.format_exc()
-            logger.info(f"[bold red]Anthelion upload exception ({error_type}): {error_msg}[/bold red]")
+            logger.info(f"[bold red]ANTHELION upload exception ({error_type}): {error_msg}[/bold red]")
             logger.info(f"[red]Traceback:\n{traceback_str}[/red]")
             meta.tracker_status[self.tracker]["status_message"] = "data error: double check if it uploaded"
             return False
@@ -487,11 +487,11 @@ class Anthelion:
                         logger.debug(f"[green]Found potential dupe: {result['name']} ({result['size']} bytes)")
 
                 except json.JSONDecodeError:
-                    logger.info("[bold yellow]Anthelion response content is not valid JSON. Skipping this API call.")
-                    meta.skipping = "Anthelion"
+                    logger.info("[bold yellow]ANTHELION response content is not valid JSON. Skipping this API call.")
+                    meta.skipping = "ANTHELION"
             else:
-                logger.info(f"[bold red]Anthelion failed to search torrents. HTTP Status: {response.status_code}")
-                meta.skipping = "Anthelion"
+                logger.info(f"[bold red]ANTHELION failed to search torrents. HTTP Status: {response.status_code}")
+                meta.skipping = "ANTHELION"
 
         return dupes
 
@@ -561,13 +561,13 @@ class Anthelion:
                             if tmdb_id and str(tmdb_id).isdigit() and int(tmdb_id) != 0:
                                 imdb_tmdb_list.append({"tmdb_id": int(tmdb_id)})
                     except json.JSONDecodeError:
-                        logger.info("[bold yellow]Error parsing JSON response from Anthelion")
+                        logger.info("[bold yellow]Error parsing JSON response from ANTHELION")
                         imdb_tmdb_list = []
                 else:
                     logger.info(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
                     imdb_tmdb_list = []
         except httpx.TimeoutException:
-            logger.info("[bold red]Anthelion Request timed out after 5 seconds")
+            logger.info("[bold red]ANTHELION Request timed out after 5 seconds")
             imdb_tmdb_list = []
         except httpx.RequestError as e:
             logger.info(f"[bold red]Unable to search for existing torrents: {e}")

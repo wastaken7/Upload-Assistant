@@ -14,7 +14,7 @@ Config = dict[str, Any]
 
 class Swarmazon:
     """
-    Swarmazon is a Private Torrent Tracker for MOVIES / TV / GENERAL
+    SWARMAZON is a Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
     auth_type = "other_api"
@@ -138,7 +138,7 @@ class Swarmazon:
                 console.print_exception()
                 return False
         else:
-            logger.info("[cyan]Swarmazon Request Data:")
+            logger.info("[cyan]SWARMAZON Request Data:")
             logger.info(Redaction.redact_private_info(data))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})

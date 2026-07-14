@@ -24,8 +24,8 @@ def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, A
 
 TRACKER_DISC_REQUIREMENTS = {
     "ULCX": {"region": "mandatory", "distributor": "mandatory"},
-    "ShareIsland": {"region": "mandatory", "distributor": "optional"},
-    "OldToonsWorld": {"region": "mandatory", "distributor": "optional"},
+    "SHAREISLAND": {"region": "mandatory", "distributor": "optional"},
+    "OLDTOONSWORLD": {"region": "mandatory", "distributor": "optional"},
 }
 
 

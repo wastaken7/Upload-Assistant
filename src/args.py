@@ -315,15 +315,15 @@ class Args:
             required=False,
             help="Use the largest video file for processing instead of the first video file found",
         )
-        parser.add_argument("-ptp", "--ptp", nargs=1, required=False, help="PassThePopcorn torrent id/permalink", type=str)
-        parser.add_argument("-blu", "--blu", nargs=1, required=False, help="Blutopia torrent id/link", type=str)
-        parser.add_argument("-aither", "--aither", nargs=1, required=False, help="Aither torrent id/link", type=str)
+        parser.add_argument("-ptp", "--ptp", nargs=1, required=False, help="PASSTHEPOPCORN torrent id/permalink", type=str)
+        parser.add_argument("-blu", "--blu", nargs=1, required=False, help="BLUTOPIA torrent id/link", type=str)
+        parser.add_argument("-aither", "--aither", nargs=1, required=False, help="AITHER torrent id/link", type=str)
         parser.add_argument("-lst", "--lst", nargs=1, required=False, help="LST torrent id/link", type=str)
-        parser.add_argument("-oe", "--oe", nargs=1, required=False, help="OnlyEncodes torrent id/link", type=str)
-        parser.add_argument("-hdb", "--hdb", nargs=1, required=False, help="HDBits torrent id/link", type=str)
+        parser.add_argument("-oe", "--oe", nargs=1, required=False, help="ONLYENCODES torrent id/link", type=str)
+        parser.add_argument("-hdb", "--hdb", nargs=1, required=False, help="HDBITS torrent id/link", type=str)
         parser.add_argument("-btn", "--btn", nargs=1, required=False, help="BTN torrent id/link", type=str)
-        parser.add_argument("-bhd", "--bhd", nargs=1, required=False, help="BeyondHD torrent_id/link", type=str)
-        parser.add_argument("-huno", "--huno", nargs=1, required=False, help="HawkeUno torrent id/link", type=str)
+        parser.add_argument("-bhd", "--bhd", nargs=1, required=False, help="BEYONDHD torrent_id/link", type=str)
+        parser.add_argument("-huno", "--huno", nargs=1, required=False, help="HAWKEUNO torrent id/link", type=str)
         parser.add_argument("-ulcx", "--ulcx", nargs=1, required=False, help="ULCX torrent id/link", type=str)
         parser.add_argument("-req", "--search_requests", action="store_true", required=False, help="Search for matching requests on supported trackers", default=None)
         parser.add_argument("-sat", "--skip_auto_torrent", action="store_true", required=False, help="Skip automated qbittorrent client torrent searching", default=None)
@@ -336,18 +336,18 @@ class Args:
             help="Only grab meta ids (tmdb/imdb/etc) from tracker, not description/image links.",
             default=None,
         )
-        parser.add_argument("--foreign", dest="foreign", action="store_true", required=False, help="Set for Cinematik Foreign category")
-        parser.add_argument("--opera", dest="opera", action="store_true", required=False, help="Set for Cinematik Opera & Musical category")
-        parser.add_argument("--asian", dest="asian", action="store_true", required=False, help="Set for Cinematik Asian category")
+        parser.add_argument("--foreign", dest="foreign", action="store_true", required=False, help="Set for CINEMATIK Foreign category")
+        parser.add_argument("--opera", dest="opera", action="store_true", required=False, help="Set for CINEMATIK Opera & Musical category")
+        parser.add_argument("--asian", dest="asian", action="store_true", required=False, help="Set for CINEMATIK Asian category")
         parser.add_argument(
             "-disctype",
             "--disctype",
             nargs=1,
             required=False,
-            help="Type of disc for Cinematik (BD100, BD66, BD50, BD25, NTSC DVD9, NTSC DVD5, PAL DVD9, PAL DVD5, Custom, 3D)",
+            help="Type of disc for CINEMATIK (BD100, BD66, BD50, BD25, NTSC DVD9, NTSC DVD5, PAL DVD9, PAL DVD5, Custom, 3D)",
             type=str,
         )
-        parser.add_argument("--untouched", dest="untouched", action="store_true", required=False, help="Set when a completely untouched disc at Cinematik")
+        parser.add_argument("--untouched", dest="untouched", action="store_true", required=False, help="Set when a completely untouched disc at CINEMATIK")
         parser.add_argument(
             "-manual_dvds",
             "--manual_dvds",
@@ -466,7 +466,7 @@ class Args:
             help="(qBitTorrent only with auto torrent searching) Force recheck torrent in client before uploading",
             dest="force_recheck",
         )
-        parser.add_argument("-dr", "--draft", action="store_true", required=False, help="Send to drafts (BeyondHD, LST)")
+        parser.add_argument("-dr", "--draft", action="store_true", required=False, help="Send to drafts (BEYONDHD, LST)")
         parser.add_argument("-mq", "--modq", action="store_true", required=False, help="Send to modQ")
         parser.add_argument("-client", "--client", nargs=1, required=False, help="Use this torrent client instead of default")
         parser.add_argument("-qbt", "--qbit-tag", dest="qbit_tag", nargs=1, required=False, help="Add to qbit with this tag")
@@ -543,7 +543,7 @@ class Args:
             "--channel",
             nargs=1,
             required=False,
-            help="SpeedApp only: Channel ID number or tag to upload to (preferably the ID), without '@'. Example: '-ch spd' when using a tag, or '-ch 1' when using an ID.",
+            help="SPEEDAPP only: Channel ID number or tag to upload to (preferably the ID), without '@'. Example: '-ch spd' when using a tag, or '-ch 1' when using an ID.",
             type=str,
             dest="spd_channel",
             default="",
@@ -743,7 +743,7 @@ class Args:
                                 else:
                                     meta.bhd = bhdpath.split("/")[-1]
 
-                                logger.info(f"[green]Parsed BeyondHD torrent ID: {meta.bhd}")
+                                logger.info(f"[green]Parsed BEYONDHD torrent ID: {meta.bhd}")
                             except Exception as e:
                                 logger.info(f"[red]Unable to parse id from url: {e}")
                                 logger.info("[red]Continuing without --bhd")
@@ -911,7 +911,7 @@ class Args:
             meta.manual_frames = None
 
         # Apply book metadata overrides: --author and --book-title map to meta keys
-        # used by trackers like CapybaraBR when constructing the torrent name for BOOK category.
+        # used by trackers like CAPYBARABR when constructing the torrent name for BOOK category.
         self._apply_book_meta_overrides(meta)
 
         # Apply game metadata overrides: --platform maps to platforms key
@@ -924,7 +924,7 @@ class Args:
         """Normalise CLI book arguments (--author, --book-title, --blang, --isbn) into *meta*.
 
         Maps ``book_author`` / ``book_title`` to the ``author`` / ``title`` keys
-        expected by trackers like CapybaraBR.  Maps ``book_isbn`` to ``isbn``.
+        expected by trackers like CAPYBARABR.  Maps ``book_isbn`` to ``isbn``.
         Resolves the ``book_language`` value via
         *langcodes* so both a human-readable name and the ISO 639-3 code are stored.
         Falls back gracefully when *langcodes* is unavailable or the code is unknown.
