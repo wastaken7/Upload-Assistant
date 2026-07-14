@@ -17,7 +17,7 @@ from src.console import logger
 from src.meta import Meta
 from src.trackers.alpharatio import AlphaRatio
 from src.trackers.amigosshare import AmigosShare
-from src.trackers.anthelion import ANTHELION
+from src.trackers.anthelion import Anthelion
 from src.trackers.AVISTAZ.avistaz import AvistaZ
 from src.trackers.AVISTAZ.cinemaz import CinemaZ
 from src.trackers.AVISTAZ.privatehd import PrivateHD
@@ -1331,7 +1331,7 @@ tracker_class_map: dict[str, Any] = {
     "AURA4K": Aura4K,
     "ASIANCINEMA": AsianCinema,
     "AITHER": Aither,
-    "ANTHELION": ANTHELION,
+    "ANTHELION": Anthelion,
     "ALPHARATIO": AlphaRatio,
     "AMIGOSSHARE": AmigosShare,
     "AVISTAZ": AvistaZ,

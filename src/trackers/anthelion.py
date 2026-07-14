@@ -19,14 +19,14 @@ from src.trackers.common import Common
 Config = dict[str, Any]
 
 
-class ANTHELION:
+class Anthelion:
     """
-    ANTHELION (ANT) is a Private Torrent Tracker for MOVIES
+    Anthelion (ANT) is a Private Torrent Tracker for MOVIES
     """
 
     auth_type = "other_api"
     tracker = "ANTHELION"
-    display_name = "ANTHELION"
+    display_name = "Anthelion"
     source_flag = "ANT"
     banned_groups = (
         "3LTON",

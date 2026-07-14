@@ -15,6 +15,7 @@ import httpx
 from jinja2 import Template
 from pymediainfo import MediaInfo
 
+from cogs.redaction import PathAwareEncoder
 from src.bbcode import BBCODE
 from src.console import logger
 from src.languages import languages_manager
