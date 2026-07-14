@@ -13,6 +13,7 @@ import cli_ui
 from rich.markup import escape
 
 from cogs.redaction import Redaction
+from data.config import config
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
 from src.console import console, logger
@@ -416,7 +417,7 @@ class UploadHelper:
             lines.append(f"Prep material saved to {meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")
         lines.append("")
         lines.append(("Title", f"{meta.title} ({meta.year})"))
-        lines.append(("Category", str(meta.category)))
+        lines.append(("Category", meta.category))
         edition = meta.edition
 
         # BOOK
@@ -451,7 +452,7 @@ class UploadHelper:
             lines.append(("Newspaper", format_value(newspaper)))
             if meta.audiobook:
                 lines.append(("Narrator", narrator))
-                lines.append(("Duration", str(audiobook_duration_formatted)))
+                lines.append(("Duration", audiobook_duration_formatted))
             lines.append(("Cover", poster))
 
         elif meta.category == "GAME":
@@ -484,7 +485,7 @@ class UploadHelper:
             if int(igdb_id) > 0:
                 lines.append(("IGDB", str(igdb_id)))
             if steam_url:
-                lines.append(("Steam", str(steam_url)))
+                lines.append(("Steam", steam_url))
             if languages:
                 if isinstance(languages, dict):
                     lang_summary = ", ".join(f"{lang} ({'/'.join(supports)})" for lang, supports in languages.items())
@@ -496,7 +497,7 @@ class UploadHelper:
 
         lines.append(("Overview", f"{meta.overview[:60]}...."))
         if meta.category == "TV" and not meta.tv_pack and meta.auto_episode_title:
-            lines.append(("Episode Title", str(meta.auto_episode_title)))
+            lines.append(("Episode Title", (meta.auto_episode_title)))
         if meta.category == "TV" and not meta.tv_pack and meta.overview_meta:
             lines.append(("Episode overview:", meta.overview_meta[:60] + "...."))
         lines.append(("Genre", ", ".join(meta.genres)))
@@ -504,7 +505,7 @@ class UploadHelper:
             lines.append(("Demographic", meta.demographic))
 
         if meta.tmdb_id or 0 != 0:
-            lines.append(("TMDB", f"https://www.themoviedb.org/{str(meta.category or '').lower()}/{meta.tmdb_id}"))
+            lines.append(("TMDB", f"https://www.themoviedb.org/{(meta.category or '').lower()}/{meta.tmdb_id}"))
         if meta.imdb_id or 0 != 0:
             lines.append(("IMDB", f"https://www.imdb.com/title/tt{meta.imdb}"))
         if meta.tvdb_id or 0 != 0:
@@ -534,7 +535,7 @@ class UploadHelper:
             lines.append(("Group Tag", tag))
 
         if meta.is_disc:
-            lines.append(("Region", str(region)))
+            lines.append(("Region", region))
             lines.append(("Distributor", distributor))
 
         if meta.freeleech != 0:
@@ -567,7 +568,6 @@ class UploadHelper:
             if meta.debug is True:
                 logger.info("[bold yellow]Unattended mode is enabled, skipping confirmation.[/bold yellow]")
             return True
-        await self.get_missing(meta)
         ring_the_bell = "\a" if bool(self.default_config.get("sfx_on_prompt", True)) else ""
         if ring_the_bell:
             logger.info(ring_the_bell)
@@ -609,8 +609,11 @@ class UploadHelper:
                     elif isinstance(tracker_rename, str):
                         display_name = tracker_rename
 
-                if display_name is not None and display_name != "" and display_name != meta.name:
-                    different_names[tracker_name] = display_name
+                if display_name is not None and display_name != "":
+                    if tracker_name.lower() == "suio" and config.get("TRACKERS", {}).get("Suio", {}).get("display_name", "Suio") != "Suio":
+                        different_names[config.get("TRACKERS", {}).get("Suio", {}).get("display_name", "Suio")] = display_name
+                    else:
+                        different_names[tracker_name] = display_name
 
         if different_names:
             logger.info(f"[bold]Base Name:[/bold] {meta.name}\n", extra={"highlighter": None})
@@ -705,30 +708,3 @@ class UploadHelper:
             return True
 
         return confirm
-
-    async def get_missing(self, meta: Meta) -> None:
-        info_notes = {
-            "edition": "Special Edition/Release",
-            "description": "Please include Remux/Encode Notes if possible",
-            "service": "WEB Service e.g.(AMZN, NF)",
-            "region": "Disc Region",
-            "imdb": "IMDb ID (tt1234567)",
-            "distributor": "Disc Distributor e.g.(BFI, Criterion)",
-        }
-        potential_missing = cast(list[str], meta.potential_missing)
-        if meta.category in ("TV", "MOVIE"):
-            if meta.imdb_id == 0:
-                meta.imdb_id = 0
-                if "imdb_id" not in potential_missing:
-                    potential_missing.append("imdb_id")
-                    meta.potential_missing = potential_missing
-            else:
-                potential_missing = cast(list[str], meta.potential_missing)
-
-        missing = [f"--{each} | {info_notes.get(each, '')}" for each in potential_missing if str(meta.get(each, "")).strip() in ["", "None", "0"]]
-
-        if missing:
-            logger.info("[bold yellow]Potentially missing information:[/bold yellow]")
-            for each in missing:
-                cli_ui.info(each)
-                print()

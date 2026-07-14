@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
 import re
@@ -30,7 +30,8 @@ class MoreThanTV:
     """
 
     auth_type = "cookies"
-    tracker = "MoreThanTV"
+    tracker = "MORETHANTV"
+    display_name = "MoreThanTV"
     source_flag = "MTV"
     approved_image_hosts = ("ptpimg", "imgbox", "imgbb")
     banned_groups = (

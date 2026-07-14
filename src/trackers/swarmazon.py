@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, cast
 
 import aiofiles
@@ -18,7 +18,8 @@ class Swarmazon:
     """
 
     auth_type = "other_api"
-    tracker = "Swarmazon"
+    tracker = "SWARMAZON"
+    display_name = "Swarmazon"
     source_flag = "Swarmazon"
     banned_groups = ("",)
     upload_url = "https://swarmazon.club/api/upload.php"

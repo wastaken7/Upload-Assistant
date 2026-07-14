@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import platform
 import re
 from pathlib import Path
@@ -23,7 +23,8 @@ class HDTorrents:
     """
 
     auth_type = "cookies"
-    tracker = "HDTorrents"
+    tracker = "HDTORRENTS"
+    display_name = "HDTorrents"
     source_flag = "hd-torrents.org"
     auth_token: str | None = None
     banned_groups = ()

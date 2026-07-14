@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from typing import Any, cast
 
@@ -17,7 +17,8 @@ class OldToonsWorld(UNIT3D):
     Old Toons World (OTW) is a Private Torrent Tracker for ANIMATED MOVIES / TV
     """
 
-    tracker = "OldToonsWorld"
+    tracker = "OLDTOONSWORLD"
+    display_name = "OldToonsWorld"
     base_url = "https://oldtoons.world"
     banned_groups = (
         "[Oj]",
@@ -95,7 +96,7 @@ class OldToonsWorld(UNIT3D):
     tracker_urls = ("oldtoons.world",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="OldToonsWorld")
+        super().__init__(config, tracker_name="OLDTOONSWORLD")
         self.config: Config = config
         self.common = Common(config)
 

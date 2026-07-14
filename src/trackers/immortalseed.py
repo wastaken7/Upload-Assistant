@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import platform
 import re
 from pathlib import Path
@@ -21,7 +21,8 @@ class ImmortalSeed:
     """
 
     auth_type = "cookies"
-    tracker = "ImmortalSeed"
+    tracker = "IMMORTALSEED"
+    display_name = "ImmortalSeed"
     source_flag = "https://immortalseed.me"
     banned_groups = ("",)
     base_url = "https://immortalseed.me"

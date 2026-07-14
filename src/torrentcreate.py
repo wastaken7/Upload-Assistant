@@ -315,7 +315,7 @@ class TorrentCreator:
                             exclude_str = cls.build_mkbrr_exclude_string(str(path), creation_filelist, allow_subs=is_subs)
                             cmd.extend(["--exclude", exclude_str])
 
-                        cmd.extend(["-o", output_path])
+                        cmd.extend(["-o", str(output_path)])
                         logger.debug(f"[cyan]mkbrr cmd: {cmd}")
 
                         # Run mkbrr subprocess in thread to avoid blocking

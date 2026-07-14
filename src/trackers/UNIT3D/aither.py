@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 from src.console import logger
@@ -13,7 +13,8 @@ class Aither(UNIT3D):
     Aither is a Private Torrent Tracker for HD MOVIES / TV
     """
 
-    tracker = "Aither"
+    tracker = "AITHER"
+    display_name = "Aither"
     base_url = "https://aither.cc"
     banned_groups: tuple[str, ...] = ()
     banned_url = f"{base_url}/api/blacklists/releasegroups"
@@ -28,7 +29,7 @@ class Aither(UNIT3D):
     tracker_urls = ("https://aither.cc",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="Aither")
+        super().__init__(config, tracker_name="AITHER")
         self.config = config
         self.common = Common(config)
 

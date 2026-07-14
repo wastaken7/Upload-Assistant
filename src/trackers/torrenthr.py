@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import contextlib
 import json
@@ -28,7 +28,8 @@ class TorrentHR:
     TorrentHR is a ratioless CROATIAN Private Torrent Tracker for 0DAY / GENERAL
     """
 
-    tracker = "TorrentHR"
+    tracker = "TORRENTHR"
+    display_name = "TorrentHR"
     source_flag = "[https://www.torrenthr.org] TorrentHR.org"
     banned_groups = ("",)
     supported_categories = ("TV", "MOVIE")

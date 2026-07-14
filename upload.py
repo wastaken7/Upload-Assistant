@@ -56,7 +56,7 @@ from src.trackerhandle import process_trackers
 from src.trackers.alpharatio import AlphaRatio
 from src.trackers.common import Common
 from src.trackers.passthepopcorn import PassThePopcorn
-from src.trackersetup import TrackerSetup, api_trackers, http_trackers, normalize_tracker_name, other_api_trackers, tracker_class_map
+from src.trackersetup import TrackerSetup, api_trackers, http_trackers, other_api_trackers, tracker_class_map
 from src.trackerstatus import TrackerStatusManager
 from src.uphelper import UploadHelper
 from src.uploadscreens import UploadScreensManager
@@ -800,11 +800,11 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
         raw_trackers_list = raw_trackers
         trackers = [t for t in raw_trackers_list if t]
     else:
-        trackers = [normalize_tracker_name(t) for t in raw_trackers.split(",") if t.strip()] if raw_trackers != "" else []  # type: ignore
+        trackers = [t.strip().upper() for t in raw_trackers.split(",") if t.strip()] if raw_trackers != "" else []
     meta.trackers = trackers
 
     if isinstance(meta.trackers_remove, str) and meta.trackers_remove:
-        remove_list = [normalize_tracker_name(t) for t in meta.trackers_remove.split(",")]
+        remove_list = [t.strip().upper() for t in meta.trackers_remove.split(",")]
         for tracker in remove_list:
             if tracker in meta.trackers:
                 meta.trackers.remove(tracker)
@@ -866,11 +866,11 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
             meta.trackers = previous_trackers
         if isinstance(meta.trackers, str):
             if "," in meta.trackers:
-                meta.trackers = [normalize_tracker_name(t) for t in meta.trackers.split(",")]
+                meta.trackers = [t.strip().upper() for t in meta.trackers.split(",")]
             else:
-                meta.trackers = [normalize_tracker_name(meta.trackers)]
+                meta.trackers = [meta.trackers.strip().upper()]
         else:
-            meta.trackers = [normalize_tracker_name(t) for t in meta.trackers if t]
+            meta.trackers = [t.strip().upper() for t in meta.trackers if t]
         logger.debug(f"Trackers list during edit process: {meta.trackers}")
         meta.edit = True
         meta = await prep.gather_prep(meta=meta, mode="cli")
@@ -1221,7 +1221,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                     "DigitalCore",
                     "GreatPosterWall",
                     "HawkeUno",
-                    "MoreThanTV",
+                    "MORETHANTV",
                     "OnlyEncodes",
                     "PassThePopcorn",
                     "SkipTheCommercials",
@@ -1468,10 +1468,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
 
     # 1. Reuse existing torrent from client if possible
     reuse_torrent = None
-    if isinstance(meta.trackers, str):
-        trackers_list = [normalize_tracker_name(t) for t in meta.trackers.split(",") if t.strip()]
-    else:
-        trackers_list = [normalize_tracker_name(t) for t in meta.trackers if (t).strip()]
+    trackers_list = [t.strip().upper() for t in meta.trackers.split(",")] if isinstance(meta.trackers, str) else [t.strip().upper() for t in meta.trackers]
 
     is_usenet_only = len(trackers_list) > 0 and all(t in ("USENET", "MANUAL") or getattr(tracker_class_map.get(t), "is_usenet", False) for t in trackers_list)
     if not is_usenet_only:
@@ -1499,10 +1496,10 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
     if Path(torrent_path).exists():
         raw_trackers = meta.trackers
         trackers_list = [raw_trackers] if isinstance(raw_trackers, str) else [t for t in raw_trackers if t.strip()]
-        trackers_normalized = [normalize_tracker_name(t) for t in trackers_list if t.strip()]
+        trackers_normalized = [t.strip().upper() for t in trackers_list]
 
         base_piece_mb: int | None = cast(int | None, meta.base_torrent_piece_mb)
-        if base_piece_mb is None and any(t in {"HDBits", "MoreThanTV", "PassThePopcorn"} for t in trackers_normalized):
+        if base_piece_mb is None and any(t in {"HDBits", "MORETHANTV", "PassThePopcorn"} for t in trackers_normalized):
             try:
                 torrent = await asyncio.to_thread(TORF_Torrent.read, torrent_path)
                 base_piece_mb = torrent.piece_size // (1024 * 1024)
@@ -1512,15 +1509,15 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
                 logger.debug(f"[yellow]Unable to cache BASE.torrent piece size: {e}")
                 base_piece_mb = None
 
-        if "MoreThanTV" in trackers_normalized:
-            mtv_cfg = config.get("TRACKERS", {}).get("MoreThanTV", {})
+        if "MORETHANTV" in trackers_normalized:
+            mtv_cfg = config.get("TRACKERS", {}).get("MORETHANTV", {})
             if str(mtv_cfg.get("skip_if_rehash", "false")).lower() == "true" and base_piece_mb and base_piece_mb > 8:
-                meta.trackers = [t for t in trackers_list if normalize_tracker_name(t) != "MoreThanTV"]
+                meta.trackers = [t for t in trackers_list if t.strip().upper() != "MORETHANTV"]
                 trackers_list = [str(t) for t in cast(list[Any], meta.trackers or []) if str(t).strip()]
-                trackers_normalized = [normalize_tracker_name(t) for t in trackers_list if t.strip()]
-                logger.debug("[yellow]Removed MoreThanTV from trackers due to skip_if_rehash config and 8 MiB limit.[/yellow]")
+                trackers_normalized = [t.strip().upper() for t in trackers_list]
+                logger.debug("[yellow]Removed MORETHANTV from trackers due to skip_if_rehash config and 8 MiB limit.[/yellow]")
                 if not meta.trackers:
-                    logger.info("[red]No trackers remain after removing MoreThanTV for skip_if_rehash.[/red]")
+                    logger.info("[red]No trackers remain after removing MORETHANTV for skip_if_rehash.[/red]")
                     meta.we_are_uploading = False
                     return True
 
@@ -1831,10 +1828,10 @@ async def do_the_thing(base_dir: str) -> None:
         active_trackers: list[str] | None = None
         if meta.trackers:
             if isinstance(meta.trackers, str):
-                active_trackers = [normalize_tracker_name(t) for t in meta.trackers.split(",") if t.strip()]
+                active_trackers = [t.strip().upper() for t in meta.trackers.split(",") if t.strip()]
             elif isinstance(meta.trackers, list):
                 trackers_list = meta.trackers
-                active_trackers = [normalize_tracker_name(t) for t in trackers_list if (t).strip()]
+                active_trackers = [t.strip().upper() for t in trackers_list if (t).strip()]
 
         # Get active imghost from meta (parsed from command line)
         active_imghost: str | None = None
@@ -2260,7 +2257,7 @@ async def do_the_thing(base_dir: str) -> None:
                     status_dict = cast(dict[str, Any], status)
                     status_message = status_dict.get("status_message")
 
-                    if tracker == "MoreThanTV" and status_message is not None and "data error" not in str(status_message):
+                    if tracker == "MORETHANTV" and status_message is not None and "data error" not in str(status_message):
                         return f"{status_message!s}\n"
 
                     if "torrent_id" in status_dict:
@@ -2268,7 +2265,7 @@ async def do_the_thing(base_dir: str) -> None:
                         torrent_url = tracker_class.torrent_url
                         return f"{tracker}: {torrent_url}{status_dict['torrent_id']}\n"
 
-                    if status_message is not None and "data error" not in str(status_message) and tracker != "MoreThanTV":
+                    if status_message is not None and "data error" not in str(status_message) and tracker != "MORETHANTV":
                         return f"{tracker}: {Redaction.redact_private_info(status_message)}\n"
 
                     if status_message is not None and "data error" in str(status_message):
@@ -2370,9 +2367,9 @@ async def process_cross_seeds(meta: Meta) -> None:
     remove_list: list[str] = []
     if meta.remove_trackers:
         if isinstance(meta.remove_trackers, str):
-            remove_list = [normalize_tracker_name(t) for t in meta.remove_trackers.split(",")]
+            remove_list = [t.strip().upper() for t in meta.remove_trackers.split(",")]
         elif isinstance(meta.remove_trackers, list):
-            remove_list = [normalize_tracker_name(t) for t in meta.remove_trackers if isinstance(t, str)]
+            remove_list = [t.strip().upper() for t in meta.remove_trackers if isinstance(t, str)]
 
     # Check for trackers that haven't been dupe-checked yet
     dupe_checked_trackers = [t for t in meta.dupe_checked_trackers if isinstance(t, str)]

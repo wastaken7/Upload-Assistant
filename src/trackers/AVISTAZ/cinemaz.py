@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from datetime import UTC, datetime
 from typing import Any
 
@@ -12,7 +12,8 @@ class CinemaZ(AZTrackerBase):
     CZ Private Torrent Tracker
     """
 
-    tracker = "CinemaZ"
+    tracker = "CINEMAZ"
+    display_name = "CinemaZ"
     source_flag = "CinemaZ"
     banned_groups = ("",)
     base_url = "https://cinemaz.to"

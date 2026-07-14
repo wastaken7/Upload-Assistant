@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 import cli_ui
@@ -14,7 +14,8 @@ class Luminarr(UNIT3D):
     Luminarr is a Private Torrent Tracker for MOVIES / TV
     """
 
-    tracker = "Luminarr"
+    tracker = "LUMINARR"
+    display_name = "Luminarr"
     base_url = "https://luminarr.me"
     banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"
@@ -26,7 +27,7 @@ class Luminarr(UNIT3D):
     tracker_urls = ("https://luminarr.me",)
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name="Luminarr")
+        super().__init__(config, tracker_name="LUMINARR")
         self.config = config
         self.common = Common(config)
 

@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from typing import Any, cast
 
@@ -18,7 +18,8 @@ class LastDigitalUnderground(UNIT3D):
     Last Digital Underground (LDU) is a Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
-    tracker = "LastDigitalUnderground"
+    tracker = "LASTDIGITALUNDERGROUND"
+    display_name = "LastDigitalUnderground"
     base_url = "https://theldu.to"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -29,7 +30,7 @@ class LastDigitalUnderground(UNIT3D):
     tracker_urls = ("theldu.to",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="LastDigitalUnderground")
+        super().__init__(config, tracker_name="LASTDIGITALUNDERGROUND")
         self.config: Config = config
         self.common = Common(config)
 

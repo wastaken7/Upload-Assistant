@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, cast
 
 import pycountry
@@ -17,7 +17,8 @@ class InfinityHD(UNIT3D):
     InfinityHD is a Private Torrent Tracker for MOVIES / TV / ANIME
     """
 
-    tracker = "InfinityHD"
+    tracker = "INFINITYHD"
+    display_name = "InfinityHD"
     base_url = "https://infinityhd.net"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -29,7 +30,7 @@ class InfinityHD(UNIT3D):
     tracker_urls = ("https://infinityhd.net",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="InfinityHD")
+        super().__init__(config, tracker_name="INFINITYHD")
         self.config: Config = config
         self.common = Common(config)
 

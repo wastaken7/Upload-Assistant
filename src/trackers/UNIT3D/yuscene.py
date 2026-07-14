@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from typing import Any
 
@@ -18,6 +18,7 @@ class YUSCENE(UNIT3D):
     """
 
     tracker = "YUSCENE"
+    display_name = "YUSCENE"
     base_url = "https://yu-scene.net"
     banned_groups = (
         "ADDICTION",

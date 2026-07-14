@@ -48,10 +48,11 @@ def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
             indent = len(line) - len(stripped)
 
             # Track nesting for fully qualified keys
-            if "{" in stripped and ":" in stripped:
+            if "{" in stripped and ":" in stripped and not stripped.startswith("config"):
                 key = stripped.split(":", 1)[0].strip().strip("\"'")
                 while indent_stack and indent <= indent_stack[-1]:
-                    key_stack.pop()
+                    if key_stack:
+                        key_stack.pop()
                     indent_stack.pop()
                 key_stack.append(key)
                 indent_stack.append(indent)
@@ -63,7 +64,7 @@ def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
 
             if stripped.startswith("#"):
                 current_comments.append(stripped)
-            elif ":" in stripped and not stripped.startswith("{"):
+            elif ":" in stripped and not stripped.startswith("{") and not stripped.startswith("config"):
                 key = stripped.split(":", 1)[0].strip().strip("\"'")
                 # Build fully qualified key path
                 fq_key = ".".join([*key_stack, key]) if key_stack else key
@@ -79,7 +80,7 @@ def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
 
         # Extract the config dict from the file content
         content = "".join(lines)
-        match = re.search(r"config\s*=\s*({.*})", content, re.DOTALL)
+        match = re.search(r"config(?:\s*:\s*[^{=]+)?\s*=\s*({.*})", content, re.DOTALL)
         if not match:
             console.print("[!] Warning: Could not parse example config", markup=False)
             return None, comments
@@ -103,88 +104,88 @@ def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
         return config_dict
 
     manual_mapping = {
-        "AR": "AlphaRatio",
-        "ASC": "AmigosShare",
-        "ANT": "Anthelion",
-        "AZ": "AvistaZ",
-        "BHD": "BeyondHD",
-        "CZ": "CinemaZ",
-        "BHDTV": "BitHDTV",
-        "BJS": "BJShare",
-        "PHD": "PrivateHD",
-        "BT": "BrasilTracker",
-        "DC": "DigitalCore",
-        "FL": "FileList",
-        "FF": "FunFile",
-        "GPW": "GreatPosterWall",
-        "HDB": "HDBits",
-        "HDS": "HDSpace",
-        "HDT": "HDTorrents",
-        "IS": "ImmortalSeed",
-        "IPT": "IPTorrents",
-        "MKO": "MakingOff",
-        "MTV": "MoreThanTV",
-        "MTEAM": "MTeam",
-        "NBL": "Nebulance",
-        "LAJIDUI": "Lajidui",
-        "PTP": "PassThePopcorn",
-        "LPT": "LongPT",
-        "PTER": "PTerClub",
-        "PTCAFE": "PTCafe",
-        "PTFANS": "PTFans",
-        "PTS": "Ptskit",
+        "AR": "ALPHARATIO",
+        "ASC": "AMIGOSSHARE",
+        "ANT": "ANTHELION",
+        "AZ": "AVISTAZ",
+        "BHD": "BEYONDHD",
+        "CZ": "CINEMAZ",
+        "BHDTV": "BITHDTV",
+        "BJS": "BJSHARE",
+        "PHD": "PRIVATEHD",
+        "BT": "BRASILTRACKER",
+        "DC": "DIGITALCORE",
+        "FL": "FILELIST",
+        "FF": "FUNFILE",
+        "GPW": "GREATPOSTERWALL",
+        "HDB": "HDBITS",
+        "HDS": "HDSPACE",
+        "HDT": "HDTORRENTS",
+        "IS": "IMMORTALSEED",
+        "IPT": "IPTORRENTS",
+        "MKO": "MAKINGOFF",
+        "MTV": "MORETHANTV",
+        "MTEAM": "MTEAM",
+        "NBL": "NEBULANCE",
+        "LAJIDUI": "LAJIDUI",
+        "PTP": "PASSTHEPOPCORN",
+        "LPT": "LONGPT",
+        "PTER": "PTERCLUB",
+        "PTCAFE": "PTCAFE",
+        "PTFANS": "PTFANS",
+        "PTS": "PTSKIT",
         "PTGTK": "PTGTK",
-        "RPT": "RailgunPT",
-        "RTF": "RetroFlix",
-        "SPD": "SpeedApp",
-        "SN": "Swarmazon",
-        "TTG": "TorrentGUI",
-        "THR": "TorrentHR",
-        "TL": "TorrentLeech",
-        "TVC": "TVChaosUK",
-        "AITHER": "Aither",
-        "ACM": "AsianCinema",
-        "A4K": "Aura4K",
-        "CRP": "Curupira",
-        "DS": "DrunkenSlug",
-        "BLU": "Blutopia",
-        "CBR": "CapybaraBR",
-        "TIK": "Cinematik",
-        "DP": "DarkPeers",
-        "EMUW": "Emuwarez",
-        "HUNO": "HawkeUno",
-        "HHD": "HomieHelpDesk",
-        "IHD": "InfinityHD",
-        "ITT": "ItaTorrents",
-        "LT": "LatTeam",
-        "LCD": "Locadora",
+        "RPT": "RAILGUNPT",
+        "RTF": "RETROFLIX",
+        "SPD": "SPEEDAPP",
+        "SN": "SWARMAZON",
+        "TTG": "ToTheGlory",
+        "THR": "TORRENTHR",
+        "TL": "TORRENTLEECH",
+        "TVC": "TVCHAOSUK",
+        "AITHER": "AITHER",
+        "ACM": "ASIANCINEMA",
+        "A4K": "AURA4K",
+        "CRP": "CURUPIRA",
+        "DS": "DRUNKENSLUG",
+        "BLU": "BLUTOPIA",
+        "CBR": "CAPYBARABR",
+        "TIK": "CINEMATIK",
+        "DP": "DARKPEERS",
+        "EMUW": "EMUWAREZ",
+        "HUNO": "HAWKEUNO",
+        "HHD": "HOMIEHELPDESK",
+        "IHD": "INFINITYHD",
+        "ITT": "ITATORRENTS",
+        "LT": "LATTEAM",
+        "LCD": "LOCADORA",
         "LST": "LST",
-        "LUME": "Luminarr",
-        "MS": "MidnightScene",
-        "OTW": "OldToonsWorld",
-        "OE": "OnlyEncodes",
-        "PTT": "PolishTorrent",
-        "PT": "Portugas",
-        "R4E": "Racing4Everyone",
-        "RAS": "Rastastugan",
-        "RF": "ReelFlix",
-        "SAM": "Samaritano",
-        "SP": "Seedpool",
-        "SHRI": "ShareIsland",
-        "STC": "SkipTheCommercials",
-        "LDU": "LastDigitalUnderground",
-        "TOS": "TheOldSchool",
-        "TLZ": "TheLeachZone",
-        "DT": "DesiTorrents",
-        "TTR": "Torrenteros",
+        "LUME": "LUMINARR",
+        "MS": "MIDNIGHTSCENE",
+        "OTW": "OLDTOONSWORLD",
+        "OE": "ONLYENCODES",
+        "PTT": "POLISHTORRENT",
+        "PT": "PORTUGAS",
+        "R4E": "RACING4EVERYONE",
+        "RAS": "RASTASTUGAN",
+        "RF": "REELFLIX",
+        "SAM": "SAMARITANO",
+        "SP": "SEEDPOOL",
+        "SHRI": "SHAREISLAND",
+        "STC": "SKIPTHECOMMERCIALS",
+        "LDU": "LASTDIGITALUNDERGROUND",
+        "TOS": "THEOLDSCHOOL",
+        "TLZ": "THELEACHZONE",
+        "DT": "DESITORRENTS",
+        "TTR": "TORRENTEROS",
         "ULCX": "ULCX",
-        "UTP": "Utopia",
+        "UTP": "UTOPIA",
         "YUS": "YUSCENE",
-        "ZNTH": "Zenith",
-        "FRIKI": "FrikiBar",
-        "YOINK": "Yoinked",
-        "SUIO": "Suio",
-        "unit3d_template": "Unit3dTemplate",
+        "ZNTH": "ZENITH",
+        "FRIKI": "FRIKIBAR",
+        "YOINK": "YOINKED",
+        "SUIO": "SUIO",
+        "UNIT3D_TEMPLATE": "UNIT3DTEMPLATE",
     }
 
     migrated = False
@@ -236,7 +237,7 @@ def load_existing_config() -> tuple[ConfigDict | None, Path | None]:
                     content = file.read()
 
                 # Extract the config dict from the file
-                match = re.search(r"config\s*=\s*({.*})", content, re.DOTALL)
+                match = re.search(r"config(?:\s*:\s*[^{=]+)?\s*=\s*({.*})", content, re.DOTALL)
                 if match:
                     config_dict_str = match.group(1)
                     # Convert to proper Python dict

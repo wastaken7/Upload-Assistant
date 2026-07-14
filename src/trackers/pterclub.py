@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import glob
 import json
 import re
@@ -27,7 +27,8 @@ class PTerClub:
     """
 
     auth_type = "cookies"
-    tracker = "PTerClub"
+    tracker = "PTERCLUB"
+    display_name = "PTerClub"
     source_flag = "PTER"
     ptgen_retry = 3
     signature: str | None = None

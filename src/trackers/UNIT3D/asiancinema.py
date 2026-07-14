@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 from src.console import logger
@@ -12,7 +12,8 @@ class AsianCinema(UNIT3D):
     AsianCinema is a Private Tracker for ASIAN MOVIES / TV / MUSIC
     """
 
-    tracker = "AsianCinema"
+    tracker = "ASIANCINEMA"
+    display_name = "AsianCinema"
     source_flag = "AsianCinema"
     base_url = "https://eiga.moi"
     banned_groups: tuple[str, ...] = ()
@@ -25,7 +26,7 @@ class AsianCinema(UNIT3D):
     tracker_urls = ("https://eiga.moi",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="AsianCinema")
+        super().__init__(config, tracker_name="ASIANCINEMA")
         self.config = config
         self.common = Common(config)
 

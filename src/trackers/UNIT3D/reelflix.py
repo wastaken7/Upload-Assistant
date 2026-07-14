@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from typing import Any
 
@@ -14,7 +14,8 @@ class ReelFlix(UNIT3D):
     ReelFLiX (HD4Free, LegacyHD) is a Private Torrent Tracker for HD MOVIES
     """
 
-    tracker = "ReelFlix"
+    tracker = "REELFLIX"
+    display_name = "ReelFlix"
     base_url = "https://reelflix.cc"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -26,7 +27,7 @@ class ReelFlix(UNIT3D):
     tracker_urls = ("https://reelflix.xyz", "https://reelflix.cc")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="ReelFlix")
+        super().__init__(config, tracker_name="REELFLIX")
         self.config: Config = config
         self.common = Common(config)
 

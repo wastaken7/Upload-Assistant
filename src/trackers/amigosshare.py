@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
 import platform
@@ -28,7 +28,8 @@ class AmigosShare:
     """
 
     auth_type = "cookies"
-    tracker = "AmigosShare"
+    tracker = "AMIGOSSHARE"
+    display_name = "AmigosShare"
     source_flag = "ASC"
     banned_groups: tuple[str, ...] = ()
     base_url = "https://cliente.amigos-share.club"

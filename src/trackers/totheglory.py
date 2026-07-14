@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import re
 from pathlib import Path
@@ -21,13 +21,14 @@ from src.trackers.common import Common
 Config = dict[str, Any]
 
 
-class TorrentGUI:
+class ToTheGlory:
     """
     TTG Private Torrent Tracker
     """
 
     auth_type = "cookies"
-    tracker = "TorrentGUI"
+    tracker = "TOTHEGLORY"
+    display_name = "ToTheGlory"
     source_flag = "TTG"
     signature = None
     banned_groups = ("",)
@@ -35,12 +36,12 @@ class TorrentGUI:
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.username = str(config["TRACKERS"]["TorrentGUI"].get("username", "")).strip()
-        self.password = str(config["TRACKERS"]["TorrentGUI"].get("password", "")).strip()
-        self.passid = str(config["TRACKERS"]["TorrentGUI"].get("login_question", "0")).strip()
-        self.passan = str(config["TRACKERS"]["TorrentGUI"].get("login_answer", "")).strip()
-        self.uid = str(config["TRACKERS"]["TorrentGUI"].get("user_id", "")).strip()
-        self.passkey = str(config["TRACKERS"]["TorrentGUI"].get("announce_url", "")).strip().split("/")[-1]
+        self.username = str(config["TRACKERS"][self.tracker].get("username", "")).strip()
+        self.password = str(config["TRACKERS"][self.tracker].get("password", "")).strip()
+        self.passid = str(config["TRACKERS"][self.tracker].get("login_question", "0")).strip()
+        self.passan = str(config["TRACKERS"][self.tracker].get("login_answer", "")).strip()
+        self.uid = str(config["TRACKERS"][self.tracker].get("user_id", "")).strip()
+        self.passkey = str(config["TRACKERS"][self.tracker].get("announce_url", "")).strip().split("/")[-1]
         self.cookie_validator = CookieValidator(config)
 
     async def edit_name(self, meta: Meta) -> str:
@@ -171,7 +172,7 @@ class TorrentGUI:
             tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
-        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/TorrentGUI.json").resolve())
+        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.json").resolve())
         raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
         cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
         async with httpx.AsyncClient(cookies=cookies, follow_redirects=True, timeout=60.0) as client:
@@ -184,7 +185,7 @@ class TorrentGUI:
             id_match = re.search(r"(id=)(\d+)", urlparse(str(up.url)).query)
             if not id_match:
                 raise UploadError(  # noqa #F405
-                    f"Upload to TorrentGUI succeeded but torrent id missing from URL {up.url}",
+                    f"Upload to {self.tracker} succeeded but torrent id missing from URL {up.url}",
                     "red",
                 )
             torrent_id = id_match.group(2)
@@ -192,13 +193,13 @@ class TorrentGUI:
             return True
         logger.info(data)
         logger.info("\n\n")
-        raise UploadError(f"Upload to TorrentGUI Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa #F405
+        raise UploadError(f"Upload to {self.tracker} Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa #F405
 
     async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
-        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/TorrentGUI.json").resolve())
+        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.json").resolve())
         if not Path(cookiefile).exists():
-            logger.info("[bold red]Cookie file not found: TorrentGUI.json")
+            logger.info(f"[bold red]Cookie file not found: {self.tracker}.json")
             return []
         cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
 
@@ -231,7 +232,7 @@ class TorrentGUI:
         return dupes
 
     async def validate_credentials(self, meta: Meta) -> bool:
-        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/TorrentGUI.pkl").resolve())
+        cookiefile = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.pkl").resolve())
         if not Path(cookiefile).exists():
             await self.login(cookiefile)
         vcookie = await self.validate_cookies(meta, cookiefile)
@@ -270,13 +271,13 @@ class TorrentGUI:
                 token_input = soup.find("input", {"name": "authenticity_token"})
                 auth_token = token_input.get("value") if token_input else None
                 if not auth_token:
-                    raise UploadError("Missing authenticity token during TorrentGUI login", "red")  # noqa #F405
-                two_factor_data = {"otp": console.input("[yellow]TorrentGUI 2FA Code: "), "authenticity_token": auth_token, "uid": self.uid}
+                    raise UploadError(f"Missing authenticity token during {self.tracker} login", "red")  # noqa #F405
+                two_factor_data = {"otp": console.input(f"[yellow]{self.tracker} 2FA Code: "), "authenticity_token": auth_token, "uid": self.uid}
                 two_factor_url = "https://totheglory.im/take2fa.php"
                 response = await client.post(two_factor_url, data=two_factor_data)
                 await asyncio.sleep(0.5)
             if str(response.url).endswith("my.php"):
-                logger.info("[green]Successfully logged into TorrentGUI")
+                logger.info(f"[green]Successfully logged into {self.tracker}")
                 self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # type: ignore[reportPrivateUsage]
             else:
                 logger.info("[bold red]Something went wrong")
@@ -367,5 +368,5 @@ class TorrentGUI:
             async with aiofiles.open(torrent_path, "wb") as tor:
                 await tor.write(r.content)
         else:
-            logger.info("[red]There was an issue downloading the new .torrent from TorrentGUI")
+            logger.info(f"[red]There was an issue downloading the new .torrent from {self.tracker}")
             logger.info(r.text)

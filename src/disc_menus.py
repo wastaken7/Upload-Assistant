@@ -197,13 +197,13 @@ class DiscMenus:
                 if duration_sec < 2.0:
                     # Static menu: extract all distinct frames up to a safety limit
                     limit = max(10, max_menu_screens)
-                    cmd = [ffmpeg_path, "-y", "-t", "5.0", "-i", file_path, "-vf", vf_chain, "-fps_mode", "passthrough", "-vframes", str(limit), image_pattern]
+                    cmd = [ffmpeg_path, "-y", "-t", "5.0", "-i", str(file_path), "-vf", vf_chain, "-fps_mode", "passthrough", "-vframes", str(limit), str(image_pattern)]
                     logger.info(f"Extracting static menu frames from {file} (limit: {limit})...")
                 else:
                     # Motion menu: try scene detection first
                     limit = max(30, max_menu_screens * 3)
                     scene_vf_chain = ",".join(["select='gt(scene,0.25)'", *vf_filters])
-                    cmd = [ffmpeg_path, "-y", "-i", file_path, "-vf", scene_vf_chain, "-fps_mode", "vfr", "-vframes", str(limit), image_pattern]
+                    cmd = [ffmpeg_path, "-y", "-i", str(file_path), "-vf", scene_vf_chain, "-fps_mode", "vfr", "-vframes", str(limit), str(image_pattern)]
                     logger.info(f"Extracting motion menu frames via scene detection from {file} (limit: {limit})...")
 
                 logger.debug(f"FFmpeg command: {' '.join(cmd)}")
@@ -248,14 +248,14 @@ class DiscMenus:
                             "-ss",
                             "2.0",
                             "-i",
-                            file_path,
+                            str(file_path),
                             "-vf",
                             fallback_vf_chain,
                             "-fps_mode",
                             "vfr",
                             "-vframes",
                             str(max_menu_screens),
-                            image_pattern,
+                            str(image_pattern),
                         ]
                         logger.debug(f"Fallback FFmpeg command: {' '.join(cmd_fallback)}")
                         process_fallback = await asyncio.create_subprocess_exec(*cmd_fallback, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
@@ -287,7 +287,7 @@ class DiscMenus:
                     if not found_images and duration_sec >= 2.0:
                         logger.debug(f"FFmpeg fallback/scene detection failed for {file}. Retrying from start (seek_time=0).")
                         image_path = Path(output_dir) / f"{sanitized_disc_name}-{vob_base}-001.png"
-                        cmd_retry = [ffmpeg_path, "-y", "-i", file_path, "-vframes", "1", "-vf", vf_chain, "-update", "1", image_path]
+                        cmd_retry = [ffmpeg_path, "-y", "-i", str(file_path), "-vframes", "1", "-vf", vf_chain, "-update", "1", str(image_path)]
                         process_retry = await asyncio.create_subprocess_exec(*cmd_retry, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
                         try:
                             await asyncio.wait_for(process_retry.communicate(), timeout=15.0)

@@ -14,6 +14,7 @@ class PTFans(NEXUSPHP):
     """
 
     banned_groups = ()
+    display_name = "PTFans"
     base_url = "https://ptfans.cc"
     source_flag = "[ptfans.cc] PTFans"
     torrent_url = f"{base_url}/details.php?id="
@@ -21,7 +22,7 @@ class PTFans(NEXUSPHP):
     tracker_urls = ("https://ptfans.cc",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, "PTFans")
+        super().__init__(config, "PTFANS")
 
     def get_category(self, meta: Meta) -> int:
         animations = 414

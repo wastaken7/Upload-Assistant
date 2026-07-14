@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import platform
 import re
@@ -33,7 +33,8 @@ class BJShare:
     """
 
     auth_type = "cookies"
-    tracker = "BJShare"
+    tracker = "BJSHARE"
+    display_name = "BJShare"
     banned_groups: tuple[str, ...] = ()
     source_flag = "BJ"
     base_url = "https://bj-share.info"

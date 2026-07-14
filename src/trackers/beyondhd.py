@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import platform
 import re
 from pathlib import Path
@@ -21,7 +21,8 @@ class BeyondHD:
     """
 
     auth_type = "unit3d_api"
-    tracker = "BeyondHD"
+    tracker = "BEYONDHD"
+    display_name = "BeyondHD"
     source_flag = "BHD"
     banned_groups = (
         "4K4U",

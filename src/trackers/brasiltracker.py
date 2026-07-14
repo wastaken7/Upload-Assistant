@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import contextlib
 import platform
@@ -32,7 +32,8 @@ class BrasilTracker:
     """
 
     auth_type = "cookies"
-    tracker = "BrasilTracker"
+    tracker = "BRASILTRACKER"
+    display_name = "BrasilTracker"
     banned_groups: tuple[str, ...] = ()
     source_flag = "BT"
     base_url = "https://brasiltracker.org"

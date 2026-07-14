@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
 import re
@@ -30,7 +30,8 @@ class TVChaosUK:
     """
 
     auth_type = "other_api"
-    tracker = "TVChaosUK"
+    tracker = "TVCHAOSUK"
+    display_name = "TVChaosUK"
     source_flag = "TVCHAOS"
     signature = ""
     banned_groups = ()

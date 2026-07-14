@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from typing import Any
 
@@ -14,7 +14,8 @@ class CapybaraBR(UNIT3D):
     CapybaraBR is a BRAZILIAN Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
-    tracker = "CapybaraBR"
+    tracker = "CAPYBARABR"
+    display_name = "CapybaraBR"
     base_url = "https://capybarabr.com"
     banned_groups = (
         "4K4U",
@@ -108,7 +109,7 @@ class CapybaraBR(UNIT3D):
     tracker_urls = ("capybarabr.com",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="CapybaraBR")
+        super().__init__(config, tracker_name="CAPYBARABR")
         self.config = config
         self.common = Common(config)
 

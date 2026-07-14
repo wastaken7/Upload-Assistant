@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import base64
 import re
 import unicodedata
@@ -25,7 +25,8 @@ class SpeedApp:
 
     auth_type = "other_api"
     url = "https://speedapp.io"
-    tracker = "SpeedApp"
+    tracker = "SPEEDAPP"
+    display_name = "SpeedApp"
     banned_groups = ()
     upload_url = "https://speedapp.io/api/upload"
     torrent_url = "https://speedapp.io/browse/"

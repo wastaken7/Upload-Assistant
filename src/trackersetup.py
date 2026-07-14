@@ -51,9 +51,9 @@ from src.trackers.ptskit import Ptskit
 from src.trackers.retroflix import RetroFlix
 from src.trackers.speedapp import SpeedApp
 from src.trackers.swarmazon import Swarmazon
-from src.trackers.torrentgui import TorrentGUI
 from src.trackers.torrenthr import TorrentHR
 from src.trackers.torrentleech import TorrentLeech
+from src.trackers.totheglory import ToTheGlory
 from src.trackers.tvchaosuk import TVChaosUK
 from src.trackers.UNIT3D.aither import Aither
 from src.trackers.UNIT3D.asiancinema import AsianCinema
@@ -94,8 +94,8 @@ from src.trackers.UNIT3D.utp import Utopia
 from src.trackers.UNIT3D.yoinked import Yoinked
 from src.trackers.UNIT3D.yuscene import YUSCENE
 from src.trackers.UNIT3D.znth import Zenith
-from src.trackers.USENET.crp import Curupira
-from src.trackers.USENET.ds import DrunkenSlug
+from src.trackers.USENET.curupira import Curupira
+from src.trackers.USENET.drunkenslug import DrunkenSlug
 from src.trackers.USENET.suio import Suio
 
 JsonDict = dict[str, Any]
@@ -121,14 +121,14 @@ class TrackerSetup:
         if not trackers:
             return
 
-        supported_trackers = []
+        supported_trackers: list[str] = []
         for tracker_name in trackers:
             tracker_class = tracker_class_map.get(tracker_name.upper())
             if not tracker_class:
                 supported_trackers.append(tracker_name)
                 continue
 
-            tracker_config = self.config["TRACKERS"].get(tracker_name, {})
+            tracker_config: dict[str, Any] = self.config["TRACKERS"].get(tracker_name, {})
             example_tracker_config = example_config["TRACKERS"].get(tracker_name, {})
 
             if isinstance(example_tracker_config, dict) and isinstance(tracker_config, dict):
@@ -282,7 +282,7 @@ class TrackerSetup:
                 elif isinstance(item, str):
                     names.append(item)
             names_csv = ", ".join(names)
-            file_content = {"last_updated": datetime.now(UTC).strftime("%Y-%m-%d"), "banned_groups": names_csv, "raw_data": json_data}
+            file_content: dict[str, Any] = {"last_updated": datetime.now(UTC).strftime("%Y-%m-%d"), "banned_groups": names_csv, "raw_data": json_data}
 
             await asyncio.to_thread(self._write_file, file_path, file_content)
             logger.debug(f"File '{file_path}' updated successfully with {len(names)} groups.")
@@ -382,7 +382,7 @@ class TrackerSetup:
         if "taoe" in group_tags:
             group_tags = "taoe"
 
-        if tracker.upper() in ("Aither", "LST", "Luminarr", "SpeedApp", "Zenith"):
+        if tracker.upper() in ("AITHER", "LST", "LUMINARR", "SPEEDAPP", "ZENITH"):
             file_path = await self.get_banned_groups(meta, tracker)
             if file_path == "empty":
                 logger.info(f"[bold red]No banned groups found for '{tracker}'.")
@@ -466,7 +466,12 @@ class TrackerSetup:
 
             titles_csv = ", ".join([str(entry.get("title", "")) for entry in extracted_data])
 
-            file_content = {"last_updated": datetime.now(UTC).strftime("%Y-%m-%d"), "titles_csv": titles_csv, "extracted_data": extracted_data, "raw_data": data}
+            file_content: dict[str, Any] = {
+                "last_updated": datetime.now(UTC).strftime("%Y-%m-%d"),
+                "titles_csv": titles_csv,
+                "extracted_data": extracted_data,
+                "raw_data": data,
+            }
 
             await asyncio.to_thread(self._write_file, file_path, file_content)
             logger.debug(f"File '{file_path}' updated successfully with {len(extracted_data)} claims.")
@@ -873,7 +878,7 @@ class TrackerSetup:
                                 logger.info("")
 
                             if uuid_str and uuid_str not in existing_uuids:
-                                request_entry = {
+                                request_entry: dict[str, Any] = {
                                     "uuid": uuid_str,
                                     "path": meta.path,
                                     "url": new_url,
@@ -1322,140 +1327,90 @@ class TrackerSetup:
             return True
 
 
-class CaseInsensitiveDict(dict[str, Any]):
-    def __getitem__(self, key: str) -> Any:
-        if not isinstance(key, str):
-            return super().__getitem__(key)
-        if super().__contains__(key):
-            return super().__getitem__(key)
-        key_lower = key.lower()
-        for k in self:
-            if k.lower() == key_lower:
-                return super().__getitem__(k)
-        raise KeyError(key)
+tracker_class_map: dict[str, Any] = {
+    "AURA4K": Aura4K,
+    "ASIANCINEMA": AsianCinema,
+    "AITHER": Aither,
+    "ANTHELION": Anthelion,
+    "ALPHARATIO": AlphaRatio,
+    "AMIGOSSHARE": AmigosShare,
+    "AVISTAZ": AvistaZ,
+    "BEYONDHD": BeyondHD,
+    "BITHDTV": BitHDTV,
+    "BJSHARE": BJShare,
+    "BLUTOPIA": Blutopia,
+    "BRASILTRACKER": BrasilTracker,
+    "CAPYBARABR": CapybaraBR,
+    "CURUPIRA": Curupira,
+    "CINEMAZ": CinemaZ,
+    "DIGITALCORE": DigitalCore,
+    "DARKPEERS": DarkPeers,
+    "DRUNKENSLUG": DrunkenSlug,
+    "DESITORRENTS": DesiTorrents,
+    "EMUWAREZ": Emuwarez,
+    "FUNFILE": FunFile,
+    "FILELIST": FileList,
+    "FRIKIBAR": FrikiBar,
+    "GREATPOSTERWALL": GreatPosterWall,
+    "HDBITS": HDBits,
+    "HDSPACE": HDSpace,
+    "HDTORRENTS": HDTorrents,
+    "HOMIEHELPDESK": HomieHelpDesk,
+    "HAWKEUNO": HawkeUno,
+    "INFINITYHD": InfinityHD,
+    "IPTORRENTS": IPTorrents,
+    "IMMORTALSEED": ImmortalSeed,
+    "ITATORRENTS": ItaTorrents,
+    "LAJIDUI": Lajidui,
+    "LOCADORA": Locadora,
+    "LASTDIGITALUNDERGROUND": LastDigitalUnderground,
+    "LONGPT": LongPT,
+    "LST": LST,
+    "LATTEAM": LatTeam,
+    "LUMINARR": Luminarr,
+    "MAKINGOFF": MakingOff,
+    "MIDNIGHTSCENE": MidnightScene,
+    "MTEAM": MTeam,
+    "MORETHANTV": MoreThanTV,
+    "NEBULANCE": Nebulance,
+    "ONLYENCODES": OnlyEncodes,
+    "OLDTOONSWORLD": OldToonsWorld,
+    "PRIVATEHD": PrivateHD,
+    "PORTUGAS": Portugas,
+    "PTCAFE": PTCafe,
+    "PTERCLUB": PTerClub,
+    "PTFANS": PTFans,
+    "PTGTK": PTGTK,
+    "PASSTHEPOPCORN": PassThePopcorn,
+    "PTSKIT": Ptskit,
+    "POLISHTORRENT": PolishTorrent,
+    "RACING4EVERYONE": Racing4Everyone,
+    "RASTASTUGAN": Rastastugan,
+    "REELFLIX": ReelFlix,
+    "RAILGUNPT": RailgunPT,
+    "RETROFLIX": RetroFlix,
+    "SAMARITANO": Samaritano,
+    "SHAREISLAND": ShareIsland,
+    "SWARMAZON": Swarmazon,
+    "SEEDPOOL": Seedpool,
+    "SPEEDAPP": SpeedApp,
+    "SKIPTHECOMMERCIALS": SkipTheCommercials,
+    "SUIO": Suio,
+    "TORRENTHR": TorrentHR,
+    "CINEMATIK": Cinematik,
+    "TORRENTLEECH": TorrentLeech,
+    "THELEACHZONE": TheLeachZone,
+    "THEOLDSCHOOL": TheOldSchool,
+    "TOTHEGLORY": ToTheGlory,
+    "TORRENTEROS": Torrenteros,
+    "TVCHAOSUK": TVChaosUK,
+    "ULCX": ULCX,
+    "UTOPIA": Utopia,
+    "YOINKED": Yoinked,
+    "YUSCENE": YUSCENE,
+    "ZENITH": Zenith,
+}
 
-    def get(self, key: str, default: Any = None) -> Any:
-        try:
-            return self[key]
-        except KeyError:
-            return default
-
-    def __contains__(self, key: object) -> bool:
-        if not isinstance(key, str):
-            return False
-        if super().__contains__(key):
-            return True
-        key_lower = key.lower()
-        return any(k.lower() == key_lower for k in self)
-
-
-class CaseInsensitiveSet(set[str]):
-    def __contains__(self, item: object) -> bool:
-        if not isinstance(item, str):
-            return False
-        if super().__contains__(item):
-            return True
-        item_lower = item.lower()
-        return any(x.lower() == item_lower for x in self)
-
-
-tracker_class_map: dict[str, type[Any]] = CaseInsensitiveDict(
-    {
-        "Aura4K": Aura4K,
-        "AsianCinema": AsianCinema,
-        "Aither": Aither,
-        "Anthelion": Anthelion,
-        "AlphaRatio": AlphaRatio,
-        "AmigosShare": AmigosShare,
-        "AvistaZ": AvistaZ,
-        "BeyondHD": BeyondHD,
-        "BitHDTV": BitHDTV,
-        "BJShare": BJShare,
-        "Blutopia": Blutopia,
-        "BrasilTracker": BrasilTracker,
-        "CapybaraBR": CapybaraBR,
-        "Curupira": Curupira,
-        "CinemaZ": CinemaZ,
-        "DigitalCore": DigitalCore,
-        "DarkPeers": DarkPeers,
-        "DrunkenSlug": DrunkenSlug,
-        "DesiTorrents": DesiTorrents,
-        "Emuwarez": Emuwarez,
-        "FunFile": FunFile,
-        "FileList": FileList,
-        "FrikiBar": FrikiBar,
-        "GreatPosterWall": GreatPosterWall,
-        "HDBits": HDBits,
-        "HDSpace": HDSpace,
-        "HDTorrents": HDTorrents,
-        "HomieHelpDesk": HomieHelpDesk,
-        "HawkeUno": HawkeUno,
-        "InfinityHD": InfinityHD,
-        "IPTorrents": IPTorrents,
-        "ImmortalSeed": ImmortalSeed,
-        "ItaTorrents": ItaTorrents,
-        "Lajidui": Lajidui,
-        "Locadora": Locadora,
-        "LastDigitalUnderground": LastDigitalUnderground,
-        "LongPT": LongPT,
-        "LST": LST,
-        "LatTeam": LatTeam,
-        "Luminarr": Luminarr,
-        "MakingOff": MakingOff,
-        "MidnightScene": MidnightScene,
-        "MTeam": MTeam,
-        "MoreThanTV": MoreThanTV,
-        "Nebulance": Nebulance,
-        "OnlyEncodes": OnlyEncodes,
-        "OldToonsWorld": OldToonsWorld,
-        "PrivateHD": PrivateHD,
-        "Portugas": Portugas,
-        "PTCafe": PTCafe,
-        "PTerClub": PTerClub,
-        "PTFans": PTFans,
-        "PTGTK": PTGTK,
-        "PassThePopcorn": PassThePopcorn,
-        "Ptskit": Ptskit,
-        "PolishTorrent": PolishTorrent,
-        "Racing4Everyone": Racing4Everyone,
-        "Rastastugan": Rastastugan,
-        "ReelFlix": ReelFlix,
-        "RailgunPT": RailgunPT,
-        "RetroFlix": RetroFlix,
-        "Samaritano": Samaritano,
-        "ShareIsland": ShareIsland,
-        "Swarmazon": Swarmazon,
-        "Seedpool": Seedpool,
-        "SpeedApp": SpeedApp,
-        "SkipTheCommercials": SkipTheCommercials,
-        "Suio": Suio,
-        "TorrentHR": TorrentHR,
-        "Cinematik": Cinematik,
-        "TorrentLeech": TorrentLeech,
-        "TheLeachZone": TheLeachZone,
-        "TheOldSchool": TheOldSchool,
-        "TorrentGUI": TorrentGUI,
-        "Torrenteros": Torrenteros,
-        "TVChaosUK": TVChaosUK,
-        "ULCX": ULCX,
-        "Utopia": Utopia,
-        "Yoinked": Yoinked,
-        "YUSCENE": YUSCENE,
-        "Zenith": Zenith,
-    }
-)
-
-api_trackers: set[str] = CaseInsensitiveSet(name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "unit3d_api")
-other_api_trackers: set[str] = CaseInsensitiveSet(name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "other_api")
-http_trackers: set[str] = CaseInsensitiveSet(name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "cookies")
-
-
-def normalize_tracker_name(name: str) -> str:
-    if not isinstance(name, str):
-        return name
-    name_stripped = name.strip()
-    name_lower = name_stripped.lower()
-    for key in tracker_class_map:
-        if key.lower() == name_lower:
-            return key
-    return name_stripped.upper()
+api_trackers: set[str] = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "unit3d_api"}
+other_api_trackers: set[str] = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "other_api"}
+http_trackers: set[str] = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "cookies"}

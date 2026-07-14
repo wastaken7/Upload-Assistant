@@ -14,6 +14,7 @@ class RailgunPT(NEXUSPHP):
     """
 
     banned_groups = ()
+    display_name = "RailgunPT"
     base_url = "https://bilibili.download"
     source_flag = "[bilibili.download] RailgunPT"
     torrent_url = f"{base_url}/details.php?id="
@@ -21,7 +22,7 @@ class RailgunPT(NEXUSPHP):
     tracker_urls = ("https://bilibili.download",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, "RailgunPT")
+        super().__init__(config, "RAILGUNPT")
 
     def get_category(self, meta: Meta) -> int:
         animations = 405

@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import traceback
 from pathlib import Path
 from typing import Any, cast
@@ -19,7 +19,8 @@ class BitHDTV:
     """
 
     auth_type = "other_api"
-    tracker = "BitHDTV"
+    tracker = "BITHDTV"
+    display_name = "BitHDTV"
     source_flag = "BIT-HDTV"
     banned_groups = ()
     upload_url = "https://www.bit-hdtv.com/takeupload.php"

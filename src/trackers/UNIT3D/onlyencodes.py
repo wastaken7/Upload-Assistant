@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from pathlib import Path
 from typing import Any, cast
@@ -21,7 +21,8 @@ class OnlyEncodes(UNIT3D):
     OnlyEncodes+ is a Private Tracker for MOVIES / TV
     """
 
-    tracker = "OnlyEncodes"
+    tracker = "ONLYENCODES"
+    display_name = "OnlyEncodes"
     base_url = "https://onlyencodes.cc"
     approved_image_hosts = ("ptpimg", "imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage")
     banned_groups = (
@@ -168,7 +169,7 @@ class OnlyEncodes(UNIT3D):
     tracker_urls = ("https://onlyencodes.cc",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="OnlyEncodes")
+        super().__init__(config, tracker_name="ONLYENCODES")
         self.config: Config = config
         self.common = Common(config)
         self.rehost_images_manager = RehostImagesManager(config)

@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from typing import Any
 
@@ -19,6 +19,7 @@ class ULCX(UNIT3D):
     """
 
     tracker = "ULCX"
+    display_name = "ULCX"
     base_url = "https://upload.cx"
     banned_groups = (
         "4K4U",

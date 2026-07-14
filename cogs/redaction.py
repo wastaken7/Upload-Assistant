@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
 import re
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import aiofiles
@@ -26,6 +27,15 @@ SENSITIVE_KEYS: set[str] = {
     "torrent_pass",
     "Popcron",
 }
+
+
+class PathAwareEncoder(json.JSONEncoder):
+    """JSON encoder that converts pathlib.Path objects to strings."""
+
+    def default(self, obj: Any) -> Any:
+        if isinstance(obj, Path):
+            return str(obj)
+        return super().default(obj)
 
 
 class Redaction:
@@ -159,7 +169,7 @@ class Redaction:
 
         output_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
         async with aiofiles.open(output_path, "w", encoding="utf-8") as f:
-            await f.write(json.dumps(meta.to_dict(), indent=4))
+            await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
 
         return meta
 

@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 from src.console import logger
@@ -14,7 +14,8 @@ class HomieHelpDesk(UNIT3D):
     HHD is a Private Torrent Tracker for MOVIES / TV / GAMES
     """
 
-    tracker = "HomieHelpDesk"
+    tracker = "HOMIEHELPDESK"
+    display_name = "HomieHelpDesk"
     base_url = "https://homiehelpdesk.net"
     banned_groups = (
         "aXXo",
@@ -76,7 +77,7 @@ class HomieHelpDesk(UNIT3D):
     tracker_urls = ("https://homiehelpdesk.net",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="HomieHelpDesk")
+        super().__init__(config, tracker_name="HOMIEHELPDESK")
         self.config: Config = config
         self.common = Common(config)
 

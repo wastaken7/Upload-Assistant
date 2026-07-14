@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from typing import Any
 
@@ -19,7 +19,8 @@ class SkipTheCommercials(UNIT3D):
     SkipTheCommercials (STC) is a Private Torrent Tracker for TV
     """
 
-    tracker = "SkipTheCommercials"
+    tracker = "SKIPTHECOMMERCIALS"
+    display_name = "SkipTheCommercials"
     base_url = "https://skipthecommercials.xyz"
     banned_groups = ("",)
     approved_image_hosts = ("imgbox", "imgbb")
@@ -31,7 +32,7 @@ class SkipTheCommercials(UNIT3D):
     tracker_urls = ("https://skipthecommercials.xyz",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="SkipTheCommercials")
+        super().__init__(config, tracker_name="SKIPTHECOMMERCIALS")
         self.config: Config = config
         self.common = Common(config)
         self.rehost_images_manager = RehostImagesManager(config)

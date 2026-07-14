@@ -14,6 +14,7 @@ class LongPT(NEXUSPHP):
     """
 
     banned_groups = ()
+    display_name = "LongPT"
     base_url = "https://longpt.org"
     source_flag = "[longpt.org] LongPT"
     torrent_url = f"{base_url}/details.php?id="
@@ -21,7 +22,7 @@ class LongPT(NEXUSPHP):
     tracker_urls = ("https://longpt.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, "LongPT")
+        super().__init__(config, "LONGPT")
 
     def get_category(self, meta: Meta) -> int:
         animations = 405

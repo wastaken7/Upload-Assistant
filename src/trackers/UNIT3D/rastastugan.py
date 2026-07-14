@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 from src.meta import Meta
@@ -14,7 +14,8 @@ class Rastastugan(UNIT3D):
     Rastastugan is a NORDIC Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
-    tracker = "Rastastugan"
+    tracker = "RASTASTUGAN"
+    display_name = "Rastastugan"
     base_url = "https://rastastugan.org"
     banned_groups = (
         "GalaxyRG",
@@ -35,7 +36,7 @@ class Rastastugan(UNIT3D):
     tracker_urls = ("https://rastastugan.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="Rastastugan")
+        super().__init__(config, tracker_name="RASTASTUGAN")
         self.config: Config = config
         self.tmdb_manager = TmdbManager(config)
         self.common = Common(config)

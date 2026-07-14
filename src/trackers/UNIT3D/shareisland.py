@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import random
 import re
@@ -29,7 +29,8 @@ class ShareIsland(UNIT3D):
     ShareIsland is a ITALIAN Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
-    tracker = "ShareIsland"
+    tracker = "SHAREISLAND"
+    display_name = "ShareIsland"
     base_url = "https://shareisland.org"
     banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"
@@ -45,7 +46,7 @@ class ShareIsland(UNIT3D):
     MARKER_PATTERN = re.compile(r"\b(UNTOUCHED|VU1080|VU720|VU)\b", re.IGNORECASE)
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name="ShareIsland")
+        super().__init__(config, tracker_name="SHAREISLAND")
         self.config = config
         self.common = Common(config)
         self.audio_manager = AudioManager(config)

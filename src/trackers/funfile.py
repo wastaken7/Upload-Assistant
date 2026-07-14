@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import platform
 from pathlib import Path
@@ -21,7 +21,8 @@ class FunFile:
     """
 
     auth_type = "cookies"
-    tracker = "FunFile"
+    tracker = "FUNFILE"
+    display_name = "FunFile"
     banned_groups: tuple[str, ...] = ()
     source_flag = "FunFile"
     base_url = "https://www.funfile.org"

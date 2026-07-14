@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 import urllib.request
 from pathlib import Path
@@ -23,7 +23,8 @@ class Cinematik(UNIT3D):
     Cinematik is a Private tracker for full BD and DVD discs of non-mainstream movies, niche cinema and arthouse.
     """
 
-    tracker = "Cinematik"
+    tracker = "CINEMATIK"
+    display_name = "Cinematik"
     base_url = "https://cinematik.net"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -33,7 +34,7 @@ class Cinematik(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="Cinematik")
+        super().__init__(config, tracker_name="CINEMATIK")
         self.config: Config = config
         self.uploadscreens_manager = UploadScreensManager(config)
 

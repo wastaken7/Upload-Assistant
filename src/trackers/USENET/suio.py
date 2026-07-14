@@ -1,4 +1,4 @@
-# Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import contextlib
 import hashlib
@@ -27,7 +27,8 @@ class Suio:
     """
 
     auth_type = "other_api"
-    tracker = "Suio"
+    tracker = "SUIO"
+    display_name = "Suio"
     banned_groups: tuple[str, ...] = ()
     upload_url: str | None = None
     torrent_url: str | None = None

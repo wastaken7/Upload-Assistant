@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from typing import Any, cast
 
@@ -14,7 +14,8 @@ class LatTeam(UNIT3D):
     Lat-Team is a SPANISH Private Torrent Tracker for MOVIES / TV
     """
 
-    tracker = "LatTeam"
+    tracker = "LATTEAM"
+    display_name = "LatTeam"
     base_url = "https://lat-team.com"
     banned_groups = ("EVO",)
     id_url = f"{base_url}/api/torrents/"
@@ -25,7 +26,7 @@ class LatTeam(UNIT3D):
     tracker_urls = ("https://lat-team.com",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="LatTeam")
+        super().__init__(config, tracker_name="LATTEAM")
         self.config: Config = config
         self.common = Common(config)
 

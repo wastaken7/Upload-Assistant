@@ -1,4 +1,4 @@
-# Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
 from pathlib import Path
 from typing import Any
@@ -19,7 +19,8 @@ class DrunkenSlug:
     """
 
     auth_type = "other_api"
-    tracker = "DrunkenSlug"
+    tracker = "DRUNKENSLUG"
+    display_name = "DrunkenSlug"
     banned_groups = ()
     torrent_url = "https://drunkenslug.com/search/"
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")

@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 from src.meta import Meta
@@ -13,7 +13,8 @@ class TheLeachZone(UNIT3D):
     The Leach Zone (TLZ) is a Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
-    tracker = "TheLeachZone"
+    tracker = "THELEACHZONE"
+    display_name = "TheLeachZone"
     base_url = "https://tlzdigital.com"
     banned_groups = ("",)
     id_url = f"{base_url}/api/torrents/"
@@ -24,7 +25,7 @@ class TheLeachZone(UNIT3D):
     tracker_urls = ("https://tlzdigital.com/",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="TheLeachZone")
+        super().__init__(config, tracker_name="THELEACHZONE")
         self.config: Config = config
         self.common = Common(config)
 

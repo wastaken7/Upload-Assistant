@@ -1,4 +1,4 @@
-from typing import Any
+﻿from typing import Any
 
 from src.meta import Meta
 from src.trackers.UNIT3D import UNIT3D
@@ -9,7 +9,8 @@ class DesiTorrents(UNIT3D):
     DesiTorrents is an INDIAN Private Torrent Tracker for MOVIES / TV
     """
 
-    tracker = "DesiTorrents"
+    tracker = "DESITORRENTS"
+    display_name = "DesiTorrents"
     base_url = "https://torrent.desi"
     banned_groups = ("DusIcTv", "PDHM", "Ranvijay", "BWT", "DDH", "Telly", "YTS", "RARBG", "BonsaiHD", "GalaxyRG", "-=!DrSTAR!=-")
     upload_url = f"{base_url}/api/v1/torrents/upload"
@@ -17,7 +18,7 @@ class DesiTorrents(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name="DesiTorrents")
+        super().__init__(config, tracker_name="DESITORRENTS")
 
         # Banned Groups
 

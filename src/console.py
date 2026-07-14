@@ -4,6 +4,7 @@ import contextvars
 import logging
 import re
 from pathlib import Path
+from typing import Any
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -62,9 +63,10 @@ logger.setLevel(logging.INFO)
 try:
     from data.config import config
 
-    config_default = config.get("DEFAULT", {})
+    config_default: dict[str, Any] = config.get("DEFAULT", {})
 except ImportError:
-    config_default = {}
+    config = {}
+    config_default: dict[str, Any] = {}
 
 # ---------------------------------------------------------------------------
 # Pretty tracker names in console/log output
@@ -80,6 +82,7 @@ except ImportError:
 #   "CapybaraBR": "[yellow]Capybara[/yellow][green]BR[/green]",
 #   "Aither": "[bold cyan]Aither[/bold cyan]",
 #   "Blutopia": "[blue]Blu[/blue][white]topia[/white]",
+suio_display_name = config.get("TRACKERS", {}).get("Suio", {}).get("display_name", "Suio")
 TRACKER_DISPLAY_STYLES: dict[str, str] = {
     "Aither": "[bold #5E4FEA]A[/bold #5E4FEA][bold #5663E9]i[/bold #5663E9][bold #4D77E8]t[/bold #4D77E8][bold #458AE7]h[/bold #458AE7][bold #3C9EE6]e[/bold #3C9EE6][bold #34B2E5]r[/bold #34B2E5]",
     "AlphaRatio": "[bold #0149FE]Alpha[/bold #0149FE][bold #008AFF]Ratio[/bold #008AFF]",
@@ -95,8 +98,10 @@ TRACKER_DISPLAY_STYLES: dict[str, str] = {
     "BrasilTracker": "[bold #FFFFFF]Brasil[/bold #FFFFFF][bold #B39770]Tracker[/bold #B39770]",
     "CapybaraBR": "[bold #FEB100]Capybara[/bold #FEB100][bold #264F37]BR[/bold #264F37]",
     "Cinematik": "[bold #6E605A]Cinema[/bold #6E605A][bold #56975D]tik[/bold #56975D]",
+    "Curupira": "[bold #2B9647]C[/bold #2B9647][bold #428944]u[/bold #428944][bold #587B40]r[/bold #587B40][bold #6F6E3D]u[/bold #6F6E3D][bold #856039]p[/bold #856039][bold #9C5336]i[/bold #9C5336][bold #B24532]r[/bold #B24532][bold #C9382F]a[/bold #C9382F]",
     "DesiTorrents": "[bold #D72E2D]Desi[/bold #D72E2D][bold #F4CF70]Torrents[/bold #F4CF70]",
     "DigitalCore": "[bold #FFFFFF]Digital[/bold #FFFFFF][bold #9B9B9B]Core[/bold #9B9B9B]",
+    "DrunkenSlug": "[bold #F7CF64]D[/bold #F7CF64][bold #F4C55A]r[/bold #F4C55A][bold #F1BB50]u[/bold #F1BB50][bold #EEB046]n[/bold #EEB046][bold #EBA63C]k[/bold #EBA63C][bold #E89C32]e[/bold #E89C32][bold #E69228]n[/bold #E69228][bold #E3881E]S[/bold #E3881E][bold #E07D14]l[/bold #E07D14][bold #DD730A]u[/bold #DD730A][bold #DA6900]g[/bold #DA6900]",
     "FileList": "[bold #FFFFFF]File[/bold #FFFFFF][bold #2E7EE2]List[/bold #2E7EE2]",
     "FunFile": "[bold #F5FAFD]F[/bold #F5FAFD][bold #D4E7F5]u[/bold #D4E7F5][bold #B3D5ED]n[/bold #B3D5ED][bold #8DC0E4]F[/bold #8DC0E4][bold #71B1DE]i[/bold #71B1DE][bold #53A1D7]l[/bold #53A1D7][bold #3C94D1]e[/bold #3C94D1]",
     "GreatPosterWall": "[bold #FFFFFF]G[/bold #FFFFFF][bold #F5FAFE]r[/bold #F5FAFE][bold #ECF5FD]e[/bold #ECF5FD][bold #E2EFFC]a[/bold #E2EFFC][bold #D8EAFB]t[/bold #D8EAFB][bold #CEE5FA]P[/bold #CEE5FA][bold #C5E0F9]o[/bold #C5E0F9][bold #BBDAF8]s[/bold #BBDAF8][bold #B1D5F8]t[/bold #B1D5F8][bold #A8D0F7]e[/bold #A8D0F7][bold #9ECBF6]r[/bold #9ECBF6][bold #94C6F5]W[/bold #94C6F5][bold #8AC0F4]a[/bold #8AC0F4][bold #81BBF3]l[/bold #81BBF3][bold #77B6F2]l[/bold #77B6F2]",
@@ -136,6 +141,7 @@ TRACKER_DISPLAY_STYLES: dict[str, str] = {
     "ShareIsland": "[bold #7E6449]S[/bold #7E6449][bold #886E54]h[/bold #886E54][bold #92785E]a[/bold #92785E][bold #9D8269]r[/bold #9D8269][bold #A78C73]e[/bold #A78C73][bold #B1967E]I[/bold #B1967E][bold #BBA189]s[/bold #BBA189][bold #C5AB93]l[/bold #C5AB93][bold #D0B59E]a[/bold #D0B59E][bold #DABFA8]n[/bold #DABFA8][bold #E4C9B3]d[/bold #E4C9B3]",
     "SkipTheCommercials": "[bold #5E4FEA]S[/bold #5E4FEA][bold #5C55EA]k[/bold #5C55EA][bold #595BE9]i[/bold #595BE9][bold #5760E9]p[/bold #5760E9][bold #5466E9]T[/bold #5466E9][bold #526CE9]h[/bold #526CE9][bold #4F72E8]e[/bold #4F72E8][bold #4D78E8]C[/bold #4D78E8][bold #4A7EE8]o[/bold #4A7EE8][bold #4883E7]m[/bold #4883E7][bold #4589E7]m[/bold #4589E7][bold #438FE7]e[/bold #438FE7][bold #4095E6]r[/bold #4095E6][bold #3E9BE6]c[/bold #3E9BE6][bold #3BA1E6]i[/bold #3BA1E6][bold #39A6E6]a[/bold #39A6E6][bold #36ACE5]l[/bold #36ACE5][bold #34B2E5]s[/bold #34B2E5]",
     "SpeedApp": "[bold #FFC500]SpeedApp[/bold #FFC500]",
+    "Suio": f"[bold #14CB14]{suio_display_name}[/bold #14CB14]",
     "TheLeachZone": "[bold #5E4FEA]T[/bold #5E4FEA][bold #5A58EA]h[/bold #5A58EA][bold #5661E9]e[/bold #5661E9][bold #536AE9]L[/bold #536AE9][bold #4F73E8]e[/bold #4F73E8][bold #4B7CE8]a[/bold #4B7CE8][bold #4785E7]c[/bold #4785E7][bold #438EE7]h[/bold #438EE7][bold #3F97E6]Z[/bold #3F97E6][bold #3CA0E6]o[/bold #3CA0E6][bold #38A9E5]n[/bold #38A9E5][bold #34B2E5]e[/bold #34B2E5]",
     "TheOldSchool": "[bold #509FB2]The[/][bold #BE2A70]O[/bold #BE2A70][bold #509FB2]ldSch[/][bold #BE2A70]oo[/bold #BE2A70][bold #509FB2]l[/bold #509FB2]",
     "Torrenteros": "[bold #F8A83C]T[/bold #F8A83C][bold #F8983D]o[/bold #F8983D][bold #F9873E]r[/bold #F9873E][bold #F9763F]r[/bold #F9763F][bold #F96640]e[/bold #F96640][bold #FA5642]n[/bold #FA5642][bold #FA4543]t[/bold #FA4543][bold #FA3544]e[/bold #FA3544][bold #FA2445]r[/bold #FA2445][bold #FB1446]o[/bold #FB1446][bold #FB0347]s[/bold #FB0347]",
@@ -144,11 +150,8 @@ TRACKER_DISPLAY_STYLES: dict[str, str] = {
     "ULCX": "[bold #5E4FEA]U[/bold #5E4FEA][bold #5070E8]L[/bold #5070E8][bold #4291E7]C[/bold #4291E7][bold #34B2E5]X[/bold #34B2E5]",
     "YUSCENE": "[bold #FC0014]YU[/bold #FC0014][bold #0286E3]SCENE[/bold #0286E3]",
     "Zenith": "[bold #EE9F15]Z[/bold #EE9F15][bold #EA9715]e[/bold #EA9715][bold #E68F15]n[/bold #E68F15][bold #E28615]i[/bold #E28615][bold #DE7E15]t[/bold #DE7E15][bold #DA7615]h[/bold #DA7615]",
+    f"{suio_display_name}": f"[bold #14CB14]{suio_display_name}[/bold #14CB14]",
 }
-
-for style in TRACKER_DISPLAY_STYLES.values():
-    console.print(style)
-
 
 _tracker_name_map: dict[str, str] | None = None  # lower → plain canonical (e.g. "CapybaraBR")
 _tracker_style_map: dict[str, str] | None = None  # lower → Rich markup (if customized)
@@ -192,9 +195,8 @@ def _load_tracker_display_map() -> tuple[dict[str, str], dict[str, str], re.Patt
     _tracker_name_map = mapping
     _tracker_style_map = styles
     if mapping:
-        # Longest first so "PrivateHD" wins over shorter overlapping tokens if any
         names = sorted({re.escape(name) for name in mapping.values()}, key=len, reverse=True)
-        _tracker_name_pattern = re.compile(r"\b(" + "|".join(names) + r")\b", re.IGNORECASE)
+        _tracker_name_pattern = re.compile(r"(https?://\S+)|" + r"\b(" + "|".join(names) + r")\b", re.IGNORECASE)
     else:
         _tracker_name_pattern = None
     return _tracker_name_map, _tracker_style_map, _tracker_name_pattern
@@ -237,7 +239,9 @@ class TrackerNamePrettyFilter(logging.Filter):
                 elif isinstance(record.args, tuple):
                     record.args = tuple(prettify_tracker_names(a, markup=True) if isinstance(a, str) else a for a in record.args)
         except Exception as e:
-            logger.error(f"[bold red]Error while prettifying tracker names: {e}[/bold red]")
+            import sys
+
+            print(f"Error while prettifying tracker names: {e}", file=sys.stderr)
         return True
 
 

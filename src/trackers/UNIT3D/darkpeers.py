@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 import cli_ui
@@ -15,7 +15,8 @@ class DarkPeers(UNIT3D):
     Darkpeers is a Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
-    tracker = "DarkPeers"
+    tracker = "DARKPEERS"
+    display_name = "DarkPeers"
     base_url = "https://darkpeers.org"
     banned_groups = (
         "ARCADE",
@@ -90,7 +91,7 @@ class DarkPeers(UNIT3D):
     tracker_urls = ("https://darkpeers.org",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="DarkPeers")
+        super().__init__(config, tracker_name="DARKPEERS")
         self.config = config
         self.tmdb_manager = TmdbManager(config)
 

@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import base64
 import datetime
 import re
@@ -20,7 +20,8 @@ class RetroFlix:
     """
 
     auth_type = "other_api"
-    tracker = "RetroFlix"
+    tracker = "RETROFLIX"
+    display_name = "RetroFlix"
     source_flag = "sunshine"
     banned_groups: tuple[str, ...] = ()
     upload_url = "https://retroflix.club/api/upload"

@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from typing import Any
 
@@ -17,7 +17,8 @@ class Locadora(UNIT3D):
     Locadora is a BRAZILIAN Private Torrent Tracker for MOVIES / TV / ANIME
     """
 
-    tracker = "Locadora"
+    tracker = "LOCADORA"
+    display_name = "Locadora"
     base_url = "https://locadora.cc"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -28,7 +29,7 @@ class Locadora(UNIT3D):
     tracker_urls = ("locadora.cc",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="Locadora")
+        super().__init__(config, tracker_name="LOCADORA")
         self.config: Config = config
         self.common = Common(config)
 

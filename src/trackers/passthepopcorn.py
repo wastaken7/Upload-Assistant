@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import contextlib
 import glob
@@ -34,7 +34,8 @@ class PassThePopcorn:
     PTP Private Torrent Tracker
     """
 
-    tracker = "PassThePopcorn"
+    tracker = "PASSTHEPOPCORN"
+    display_name = "PassThePopcorn"
     source_flag = "PTP"
     banned_groups = (
         "aXXo",

@@ -137,7 +137,7 @@ class DiscParse:
                     if not file_name.endswith(".mpls"):
                         continue
 
-                    mpls_path = Path(playlists_path) / file_name
+                    mpls_path = str(Path(playlists_path) / file_name)
                     logger.debug(f"[cyan]Processing playlist: {file_name}")
 
                     try:
@@ -168,7 +168,7 @@ class DiscParse:
                                 clip_name = clip_name.strip()
                                 if not clip_name:
                                     continue
-                                m2ts_file = Path(stream_directory) / clip_name + ".m2ts"
+                                m2ts_file = str(Path(stream_directory) / (clip_name + ".m2ts"))
                                 if Path(m2ts_file).exists():
                                     size = Path(m2ts_file).stat().st_size
                                     file_counts[m2ts_file] += 1

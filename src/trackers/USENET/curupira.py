@@ -1,4 +1,4 @@
-# Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import contextlib
 import json
 from pathlib import Path
@@ -22,7 +22,8 @@ class Curupira:
     """
 
     auth_type = "other_api"
-    tracker = "Curupira"
+    tracker = "CURUPIRA"
+    display_name = "Curupira"
     banned_groups = ()
     upload_url = "https://curupira.cc/v1/releases"
     torrent_url = "https://curupira.cc/releases/"

@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, cast
 
 import cli_ui
@@ -17,7 +17,8 @@ class Torrenteros(UNIT3D):
     Torrenteros (TTR) is a SPANISH Torrent Tracker for MOVIES / TV / GENERAL
     """
 
-    tracker = "Torrenteros"
+    tracker = "TORRENTEROS"
+    display_name = "Torrenteros"
     base_url = "https://torrenteros.org"
     banned_groups = ()
     ttr_name = ""  # Initialize instance variable
@@ -29,7 +30,7 @@ class Torrenteros(UNIT3D):
     tracker_urls = ("https://torrenteros.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="Torrenteros")
+        super().__init__(config, tracker_name="TORRENTEROS")
         self.config: Config = config
         self.common = Common(config)
 

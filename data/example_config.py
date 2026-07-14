@@ -1,5 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-config = {
+from typing import Any
+config: dict[str, Any] = {
     "DEFAULT": {
         # MAIN SETTINGS
 
@@ -448,12 +449,12 @@ config = {
         # Available tracker: Aura4K, AsianCinema, Aither, Anthelion, AlphaRatio, AmigosShare, AvistaZ, BeyondHD, BitHDTV, BJShare, Blutopia, BrasilTracker, CapybaraBR, Curupira, Suio, CinemaZ, DigitalCore, DrunkenSlug, DarkPeers, DesiTorrents, Emuwarez, FunFile, FileList,
         # FrikiBar, GreatPosterWall, HDBits, HDSpace, HDTorrents, HomieHelpDesk, HawkeUno, InfinityHD, ImmortalSeed, ItaTorrents, Lajidui, Locadora, LastDigitalUnderground, LongPT, LST, LatTeam, Luminarr, MidnightScene, MTeam, MoreThanTV, Nebulance, OnlyEncodes,
         # OldToonsWorld, PrivateHD, Portugas, PTCafe, PTerClub, PTFans, PTGTK, PassThePopcorn, Ptskit, PolishTorrent, Racing4Everyone, Rastastugan, ReelFlix, RailgunPT, RetroFlix, Samaritano, ShareIsland, Swarmazon, Seedpool, SpeedApp, SkipTheCommercials, TorrentHR,
-        # Cinematik, TorrentLeech, TheLeachZone, TheOldSchool, TorrentGUI, Torrenteros, TVChaosUK, ULCX, Utopia, Yoinked, YUSCENE, Zenith
+        # Cinematik, TorrentLeech, TheLeachZone, TheOldSchool, ToTheGlory, Torrenteros, TVChaosUK, ULCX, Utopia, Yoinked, YUSCENE, Zenith
 
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
 
-        "Aura4K": {
+        "AURA4K": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -485,7 +486,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "AsianCinema": {
+        "ASIANCINEMA": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -515,7 +516,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Aither": {
+        "AITHER": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -547,7 +548,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Anthelion": {
+        "ANTHELION": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
@@ -574,7 +575,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "AlphaRatio": {
+        "ALPHARATIO": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # anon is not an option when uploading you need to change your privacy settings.
@@ -583,7 +584,7 @@ config = {
             "announce_url": "",
             "inject_delay": 0,
         },
-        "AmigosShare": {
+        "AMIGOSSHARE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Set uploader_status to True if you have uploader permissions to automatically approve your uploads
@@ -620,7 +621,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "AvistaZ": {
+        "AVISTAZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # for AvistaZ to work you need to export cookies from https://avistaz.to using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
@@ -635,7 +636,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "BeyondHD": {
+        "BEYONDHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -668,7 +669,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "BitHDTV": {
+        "BITHDTV": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # found under https://www.bit-hdtv.com/my.php
@@ -679,7 +680,7 @@ config = {
             "anon": True,
             "inject_delay": 0,
         },
-        "BJShare": {
+        "BJSHARE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # for BJShare to work you need to export cookies from https://bj-share.info using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
@@ -712,7 +713,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Blutopia": {
+        "BLUTOPIA": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -742,7 +743,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "BrasilTracker": {
+        "BRASILTRACKER": {
             "link_dir_name": "",
             # for BrasilTracker to work you need to export cookies from https://brasiltracker.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/BrasilTracker.txt
@@ -768,7 +769,7 @@ config = {
             "bluray_image_size": "",
             "inject_delay": 0,
         },
-        "CapybaraBR": {
+        "CAPYBARABR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -806,7 +807,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Curupira": {
+        "CURUPIRA": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Your API Key, obtained from Perfil -> API Key
@@ -814,7 +815,7 @@ config = {
             "anon": True,
             "inject_delay": 0,
         },
-        "CinemaZ": {
+        "CINEMAZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # for CinemaZ to work you need to export cookies from https://cinemaz.to using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
@@ -829,7 +830,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "DigitalCore": {
+        "DIGITALCORE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # You can find your api key at Settings -> Security -> API Key -> Generate API Key
@@ -859,7 +860,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "DarkPeers": {
+        "DARKPEERS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -891,14 +892,14 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "DrunkenSlug": {
+        "DRUNKENSLUG": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Provide the DrunkenSlug upload page URL here, it ends with /upload_form
             "upload_url": "",
             "inject_delay": 0,
         },
-        "DesiTorrents": {
+        "DESITORRENTS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -928,7 +929,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Emuwarez": {
+        "EMUWAREZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -960,7 +961,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "FunFile": {
+        "FUNFILE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "username": "",
@@ -992,7 +993,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "FileList": {
+        "FILELIST": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "username": "",
@@ -1001,7 +1002,7 @@ config = {
             "anon": True,
             "inject_delay": 0,
         },
-        "FrikiBar": {
+        "FRIKIBAR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1030,7 +1031,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "GreatPosterWall": {
+        "GREATPOSTERWALL": {
             "link_dir_name": "",
             # You can find your API key in Profile Settings -> Access Settings -> API Key. If there is no API, click "Reset your api key" and Save Profile.
             "api_key": "",
@@ -1062,7 +1063,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "HDBits": {
+        "HDBITS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1076,7 +1077,7 @@ config = {
             "img_rehost": True,
             "inject_delay": 0,
         },
-        "HDSpace": {
+        "HDSPACE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # for HDSpace to work you need to export cookies from https://hd-space.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
@@ -1106,7 +1107,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "HDTorrents": {
+        "HDTORRENTS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # For HDTorrents to work, you need to export cookies from the site using:
@@ -1145,7 +1146,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "HomieHelpDesk": {
+        "HOMIEHELPDESK": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
@@ -1173,7 +1174,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "HawkeUno": {
+        "HAWKEUNO": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "use_for_search": False,
@@ -1204,7 +1205,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "IPTorrents": {
+        "IPTORRENTS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # For IPTorrents to work, you need to export cookies from the site using:
@@ -1238,7 +1239,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "InfinityHD": {
+        "INFINITYHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1268,7 +1269,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "ImmortalSeed": {
+        "IMMORTALSEED": {
             # for ImmortalSeed to work you need to export cookies from https://immortalseed.me/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
             # cookies need to be in netscape format and need to be in data/cookies/ImmortalSeed.txt
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
@@ -1297,7 +1298,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "ItaTorrents": {
+        "ITATORRENTS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1327,7 +1328,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Lajidui": {
+        "LAJIDUI": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # for Lajidui to work you need to export cookies from https://pt.lajidui.top/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
@@ -1356,7 +1357,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Locadora": {
+        "LOCADORA": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1388,7 +1389,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "LastDigitalUnderground": {
+        "LASTDIGITALUNDERGROUND": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1418,7 +1419,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "LongPT": {
+        "LONGPT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # for LongPT to work you need to export cookies from https://longpt.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
@@ -1481,7 +1482,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "LatTeam": {
+        "LATTEAM": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1513,7 +1514,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Luminarr": {
+        "LUMINARR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1545,7 +1546,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "MakingOff":{
+        "MAKINGOFF":{
             # trackers to be added on the torrents
             # one per line
             "trackers":
@@ -1556,7 +1557,7 @@ config = {
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
         },
-        "MidnightScene":{
+        "MIDNIGHTSCENE":{
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1588,7 +1589,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "MTeam": {
+        "MTEAM": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
@@ -1616,7 +1617,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "MoreThanTV": {
+        "MORETHANTV": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # get from security page
@@ -1653,14 +1654,14 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Nebulance": {
+        "NEBULANCE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "announce_url": "",
             "inject_delay": 0,
         },
-        "OnlyEncodes": {
+        "ONLYENCODES": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1690,12 +1691,14 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Suio": {
+        "SUIO": {
             # Secret Usenet Indexer: o[redacted]nzbs
             # Please do not share, discuss or mention this indexer's real name in issues or pull requests; nor should you ask what it is.
             # Paste the indexer's base url below (e.g., https://indexer.com)
             # Upload will only proceed if the domain matches the allowed one, protecting your credentials.
             "base_url": "",
+            # Edit name of the tracker to appear in the console and logs
+            "display_name": "Suio",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Your Username
@@ -1712,7 +1715,7 @@ config = {
             "resolve_language": True,
             "inject_delay": 0,
         },
-        "OldToonsWorld": {
+        "OLDTOONSWORLD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1744,7 +1747,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "PrivateHD": {
+        "PRIVATEHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # for PrivateHD to work you need to export cookies from https://privatehd.to/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
@@ -1759,7 +1762,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Portugas": {
+        "PORTUGAS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1789,7 +1792,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "PTCafe": {
+        "PTCAFE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # for PTCafe to work you need to export cookies from https://ptcafe.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
@@ -1818,7 +1821,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "PTerClub": {  # Does not appear to be working at all
+        "PTERCLUB": {  # Does not appear to be working at all
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "passkey": 'passkey',
@@ -1829,7 +1832,7 @@ config = {
             "anon": True,
             "inject_delay": 0,
         },
-        "PTFans": {
+        "PTFANS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # for PTFans to work you need to export cookies from https://ptfans.cc/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
@@ -1887,7 +1890,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "PassThePopcorn": {
+        "PASSTHEPOPCORN": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1900,7 +1903,7 @@ config = {
             "announce_url": "",
             "inject_delay": 5,
         },
-        "Ptskit": {
+        "PTSKIT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # for Ptskit to work you need to export cookies from https://www.ptskit.org using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
@@ -1928,7 +1931,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "PolishTorrent": {
+        "POLISHTORRENT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1958,7 +1961,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Racing4Everyone": {
+        "RACING4EVERYONE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -1989,7 +1992,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Rastastugan": {
+        "RASTASTUGAN": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2019,7 +2022,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "ReelFlix": {
+        "REELFLIX": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2049,7 +2052,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "RailgunPT": {
+        "RAILGUNPT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # for RailgunPT to work you need to export cookies from https://bilibili.download using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
@@ -2078,7 +2081,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "RetroFlix": {
+        "RETROFLIX": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "username": "",
@@ -2109,7 +2112,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Samaritano": {
+        "SAMARITANO": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2145,7 +2148,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "ShareIsland": {
+        "SHAREISLAND": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2177,14 +2180,14 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Swarmazon": {
+        "SWARMAZON": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "api_key": "",
             "announce_url": "",
             "inject_delay": 0,
         },
-        "Seedpool": {
+        "SEEDPOOL": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2213,7 +2216,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "SpeedApp": {
+        "SPEEDAPP": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # You can create an API key here https://speedapp.io/profile/api-tokens. Required Permission: Upload torrents
@@ -2244,7 +2247,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "SkipTheCommercials": {
+        "SKIPTHECOMMERCIALS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2274,7 +2277,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "TorrentHR": {
+        "TORRENTHR": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "username": "",
@@ -2287,7 +2290,7 @@ config = {
             "anon": True,
             "inject_delay": 0,
         },
-        "Cinematik": {
+        "CINEMATIK": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2317,7 +2320,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "TorrentLeech": {
+        "TORRENTLEECH": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Set to False if you don't have access to the API (e.g., if you're a trial uploader). Note: this may not work sometimes due to Cloudflare restrictions.
@@ -2354,7 +2357,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "TheLeachZone": {
+        "THELEACHZONE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2384,7 +2387,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "TheOldSchool": {
+        "THEOLDSCHOOL": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Mon profil > Réglages > Clé API
@@ -2419,7 +2422,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "TorrentGUI": {
+        "TOTHEGLORY": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "username": "",
@@ -2431,7 +2434,7 @@ config = {
             "anon": True,
             "inject_delay": 0,
         },
-        "Torrenteros": {
+        "TORRENTEROS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2463,7 +2466,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "TVChaosUK": {
+        "TVCHAOSUK": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # 2 is listed as max images in rules. Please do not change unless you have permission
@@ -2505,7 +2508,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Utopia": {
+        "UTOPIA": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2535,7 +2538,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Yoinked": {
+        "YOINKED": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2595,7 +2598,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Zenith": {
+        "ZENITH": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing

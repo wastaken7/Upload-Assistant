@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from pathlib import Path
 from typing import Any, cast
@@ -16,7 +16,8 @@ class Portugas(UNIT3D):
     Portugas is a PORTUGUESE Private Torrent Tracker for 0DAY / GENERAL
     """
 
-    tracker = "Portugas"
+    tracker = "PORTUGAS"
+    display_name = "Portugas"
     base_url = "https://portugas.org"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -27,7 +28,7 @@ class Portugas(UNIT3D):
     tracker_urls = ("https://portugas.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="Portugas")
+        super().__init__(config, tracker_name="PORTUGAS")
         self.config: Config = config
         self.common = Common(config)
 

@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 from src.trackers.common import Common
@@ -12,7 +12,8 @@ class Yoinked(UNIT3D):
     YOINK Private Torrent Tracker
     """
 
-    tracker = "Yoinked"
+    tracker = "YOINKED"
+    display_name = "Yoinked"
     base_url = "https://yoinked.org"
     banned_groups = ("YTS", "YiFY", "LAMA", "MeGUSTA", "NAHOM", "GalaxyRG", "RARBG", "INFINITY")
     id_url = f"{base_url}/api/torrents/"
@@ -24,6 +25,6 @@ class Yoinked(UNIT3D):
     tracker_urls = ("yoinked.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="Yoinked")
+        super().__init__(config, tracker_name="YOINKED")
         self.config = config
         self.common = Common(config)

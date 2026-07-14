@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from pathlib import Path
 from typing import Any, cast
@@ -23,7 +23,8 @@ class MTeam:
     """
 
     auth_type = "other_api"
-    tracker = "MTeam"
+    tracker = "MTEAM"
+    display_name = "MTeam"
     api_base_url = "https://api.m-team.cc/api"
     banned_groups = ("FGT",)
     requests_url = f"{api_base_url}/seek/search"

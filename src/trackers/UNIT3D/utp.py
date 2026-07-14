@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 from src.meta import Meta
@@ -13,7 +13,8 @@ class Utopia(UNIT3D):
     UTOPIA is a UKRAINIAN Private Tracker for HD MOVIES and TV
     """
 
-    tracker = "Utopia"
+    tracker = "UTOPIA"
+    display_name = "Utopia"
     base_url = "https://utp.to"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -23,7 +24,7 @@ class Utopia(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="Utopia")
+        super().__init__(config, tracker_name="UTOPIA")
         self.config = config
         self.common = Common(config)
 

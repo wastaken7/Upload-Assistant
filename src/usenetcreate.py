@@ -855,7 +855,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 cmd_7z.append(f"-v{volume_size.lower()}")
             if archive_password:
                 cmd_7z.extend([f"-p{archive_password}", "-mhe=on"])
-            cmd_7z.extend([archive_out, input_path])
+            cmd_7z.extend([str(archive_out), str(input_path)])
 
             if is_debug and not path_7z:
                 logger.info(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_7z)}[/yellow]")
@@ -891,7 +891,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             # No -n/-u/-l flag: par2cmdline falls back to its default scheme of
             # exponentially-sized recovery volumes, matching standard Usenet posts
             # and letting repair tools fetch only as much recovery data as needed.
-            cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", par2_file, *relative_target_files]
+            cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", par2_file, *[str(f) for f in relative_target_files]]
             if is_debug and not path_par2:
                 logger.info(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_par2)}[/yellow]")
                 mock_par2 = os.path.normpath(Path(usenet_dir) / par2_file)
@@ -962,7 +962,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             "-g",
             usenet_cfg.get("newsgroups"),
             "--out",
-            nzb_file,
+            str(nzb_file),
             "--par2",
             str(par2_percentage),
             "--output-format",
@@ -1066,7 +1066,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             "-s",
             subject,
             "-o",
-            nzb_file,
+            str(nzb_file),
             "--progress",
             "log:2s",
         ]

@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from pathlib import Path
 from typing import Any
@@ -22,7 +22,8 @@ class IPTorrents:
     """
 
     auth_type = "cookies"
-    tracker = "IPTorrents"
+    tracker = "IPTORRENTS"
+    display_name = "IPTorrents"
     source_flag = "IPTorrents"
     base_url = "https://iptorrents.com"
     banned_groups = (

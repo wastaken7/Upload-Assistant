@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import glob
 import json
@@ -26,7 +26,8 @@ class FileList:
     """
 
     auth_type = "cookies"
-    tracker = "FileList"
+    tracker = "FILELIST"
+    display_name = "FileList"
     source_flag = "FL"
     signature: str | None = None
     banned_groups = ("",)

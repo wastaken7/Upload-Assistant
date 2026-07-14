@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, cast
 
 import httpx
@@ -16,7 +16,8 @@ class Racing4Everyone(UNIT3D):
     Racing4Everyone (R4E) is a Private Torrent Tracker for RACING
     """
 
-    tracker = "Racing4Everyone"
+    tracker = "RACING4EVERYONE"
+    display_name = "Racing4Everyone"
     base_url = "https://racing4everyone.eu"
     banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"
@@ -26,7 +27,7 @@ class Racing4Everyone(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="Racing4Everyone")
+        super().__init__(config, tracker_name="RACING4EVERYONE")
         self.config: Config = config
         self.common = Common(config)
 

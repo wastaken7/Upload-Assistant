@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import re
 from typing import Any, cast
@@ -26,7 +26,7 @@ class Emuwarez(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="Emuwarez")
+        super().__init__(config, tracker_name="EMUWAREZ")
         self.tmdb_manager = TmdbManager(config)
 
     async def get_name(self, meta: Meta) -> dict[str, str]:

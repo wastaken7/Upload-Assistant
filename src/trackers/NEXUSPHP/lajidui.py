@@ -14,6 +14,7 @@ class Lajidui(NEXUSPHP):
     """
 
     banned_groups = ()
+    display_name = "Lajidui"
     base_url = "https://pt.lajidui.top"
     source_flag = "[pt.lajidui.top] lajidui"
     torrent_url = f"{base_url}/details.php?id="
@@ -21,7 +22,7 @@ class Lajidui(NEXUSPHP):
     tracker_urls = ("https://pt.lajidui.top",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, "Lajidui")
+        super().__init__(config, "LAJIDUI")
 
     def get_category(self, meta: Meta) -> int:
         animations = 405

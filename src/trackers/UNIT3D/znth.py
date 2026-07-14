@@ -1,4 +1,4 @@
-import re
+﻿import re
 import unicodedata
 from pathlib import Path
 from typing import Any
@@ -35,7 +35,8 @@ class Zenith(UNIT3D):
     Zenith is an Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
-    tracker = "Zenith"
+    tracker = "ZENITH"
+    display_name = "Zenith"
     base_url = "https://znth.cx"
     banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"
@@ -65,7 +66,7 @@ class Zenith(UNIT3D):
     )
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="Zenith")
+        super().__init__(config, tracker_name="ZENITH")
         self.config = config
         self.common = Common(config)
 

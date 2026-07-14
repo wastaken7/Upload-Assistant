@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from typing import Any
 
@@ -16,7 +16,8 @@ class ItaTorrents(UNIT3D):
     ItaTorrents is an ITALIAN Private tracker for MOVIES / TV / GENERAL
     """
 
-    tracker = "ItaTorrents"
+    tracker = "ITATORRENTS"
+    display_name = "ItaTorrents"
     base_url = "https://itatorrents.xyz"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -28,7 +29,7 @@ class ItaTorrents(UNIT3D):
     tracker_urls = ("https://itatorrents.xyz",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="ItaTorrents")
+        super().__init__(config, tracker_name="ITATORRENTS")
         self.config: Config = config
         self.common = Common(config)
 

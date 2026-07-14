@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import platform
 from typing import Any, cast
@@ -21,7 +21,8 @@ class Ptskit:
     """
 
     auth_type = "cookies"
-    tracker = "Ptskit"
+    tracker = "PTSKIT"
+    display_name = "Ptskit"
     banned_groups = ()
     source_flag = "[www.ptskit.org] PTSKIT"
     base_url = "https://www.ptskit.org"

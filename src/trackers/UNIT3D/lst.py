@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 from src.console import logger
@@ -15,6 +15,7 @@ class LST(UNIT3D):
     """
 
     tracker = "LST"
+    display_name = "LST"
     base_url = "https://lst.gg"
     banned_groups = ()
     banned_url = f"{base_url}/api/bannedReleaseGroups"

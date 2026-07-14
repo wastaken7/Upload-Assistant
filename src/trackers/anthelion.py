@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
 import platform
@@ -25,7 +25,8 @@ class Anthelion:
     """
 
     auth_type = "other_api"
-    tracker = "Anthelion"
+    tracker = "ANTHELION"
+    display_name = "Anthelion"
     source_flag = "ANT"
     banned_groups = (
         "3LTON",

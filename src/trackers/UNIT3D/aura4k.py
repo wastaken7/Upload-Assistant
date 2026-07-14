@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 import cli_ui
@@ -18,7 +18,8 @@ class Aura4K(UNIT3D):
     AURA4K is a Private Torrent Tracker for MOVIES / TV
     """
 
-    tracker = "Aura4K"
+    tracker = "AURA4K"
+    display_name = "Aura4K"
     base_url = "https://aura4k.net"
     approved_image_hosts = ("ptpimg", "onlyimage", "imgbox", "ptscreens", "imgbb", "imgur", "postimg")
     banned_groups = ("BiTOR", "DepraveD", "Flights", "SasukeducK", "SPDVD", "TEKNO3D")
@@ -29,7 +30,7 @@ class Aura4K(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="Aura4K")
+        super().__init__(config, tracker_name="AURA4K")
         self.config = config
         self.common = Common(config)
         self.rehost_images_manager = RehostImagesManager(config)

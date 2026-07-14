@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import unicodedata
 from typing import Any, cast
 
@@ -21,7 +21,8 @@ class DigitalCore:
     """
 
     auth_type = "other_api"
-    tracker = "DigitalCore"
+    tracker = "DIGITALCORE"
+    display_name = "DigitalCore"
     base_url = "https://digitalcore.club"
     api_base_url = f"{base_url}/api/v1/torrents"
     banned_groups = ("",)

@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 from src.get_desc import DescriptionBuilder
@@ -15,7 +15,8 @@ class Samaritano(UNIT3D):
     SAMARITANO is a BRAZILIAN Private tracker for MOVIES / TV / GENERAL
     """
 
-    tracker = "Samaritano"
+    tracker = "SAMARITANO"
+    display_name = "Samaritano"
     base_url = "https://samaritano.cc"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -27,7 +28,7 @@ class Samaritano(UNIT3D):
     tracker_urls = ("https://samaritano.cc",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="Samaritano")
+        super().__init__(config, tracker_name="SAMARITANO")
         self.config: Config = config
         self.common = Common(config)
 

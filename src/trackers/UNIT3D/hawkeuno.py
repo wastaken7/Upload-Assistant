@@ -20,7 +20,8 @@ class HawkeUno(UNIT3D):
     hawke-uno (HUNO) is a Private Torrent Tracker for HD MOVIES / TV
     """
 
-    tracker = "HawkeUno"
+    tracker = "HAWKEUNO"
+    display_name = "HawkeUno"
     source_flag = "HUNO"
     base_url = "https://hawke.uno"
     banned_groups = (
@@ -88,7 +89,7 @@ class HawkeUno(UNIT3D):
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, "HawkeUno")
+        super().__init__(config, "HAWKEUNO")
         self.config = config
         self.common = Common(config)
         self.rehost_images_manager = RehostImagesManager(config)

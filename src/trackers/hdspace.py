@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import platform
 import re
 from pathlib import Path
@@ -22,7 +22,8 @@ class HDSpace:
     """
 
     auth_type = "cookies"
-    tracker = "HDSpace"
+    tracker = "HDSPACE"
+    display_name = "HDSpace"
     source_flag = "HD-Space"
     banned_groups = ("",)
     base_url = "https://hd-space.org"

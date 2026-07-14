@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import platform
 import re
 from pathlib import Path
@@ -22,7 +22,8 @@ class TorrentLeech:
     """
 
     auth_type = "other_api"
-    tracker = "TorrentLeech"
+    tracker = "TORRENTLEECH"
+    display_name = "TorrentLeech"
     source_flag = "TorrentLeech.org"
     base_url = "https://www.torrentleech.org"
     banned_groups = ()

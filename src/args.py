@@ -76,8 +76,6 @@ class Args:
         self.config = config
 
     def parse(self, argv: Sequence[str], meta: Meta) -> tuple[Meta, CustomArgumentParser, list[str]]:
-        from src.trackersetup import normalize_tracker_name
-
         input = list(argv)
         parser = CustomArgumentParser(
             usage="upload.py [path...] [options]",
@@ -789,13 +787,13 @@ class Args:
                 if isinstance(value, list):
                     value_list = [str(item) for item in value]
                     if len(value_list) == 1:
-                        meta[key] = normalize_tracker_name(value_list[0])  # Extract the tracker acronym and normalize it
+                        meta[key] = (value_list[0]).upper()  # Extract the tracker acronym and normalize it
                     elif value_list:
-                        meta[key] = normalize_tracker_name(str(value_list))
+                        meta[key] = str(value_list).upper()
                     else:
                         meta[key] = None
                 elif value is not None:
-                    meta[key] = normalize_tracker_name(str(value))
+                    meta[key] = (value).upper()
                 else:
                     meta[key] = None
             if key == "manual_year":
@@ -878,21 +876,21 @@ class Args:
 
                         # Split by comma if present
                         if "," in tracker_value:
-                            meta[key] = [normalize_tracker_name(t) for t in tracker_value.split(",")]
+                            meta[key] = [(t).upper() for t in tracker_value.split(",")]
                         else:
-                            meta[key] = [normalize_tracker_name(tracker_value)]
+                            meta[key] = [(tracker_value).upper()]
                     elif isinstance(tracker_value, list):
                         # Handle list of strings
                         expanded: list[str] = []
                         for t in tracker_value:
                             t_str = str(t)
                             if "," in t_str:
-                                expanded.extend([normalize_tracker_name(x) for x in t_str.split(",")])
+                                expanded.extend([(x).upper() for x in t_str.split(",")])
                             else:
-                                expanded.append(normalize_tracker_name(t_str))
+                                expanded.append((t_str).upper())
                         meta[key] = expanded
                     else:
-                        meta[key] = [normalize_tracker_name(str(tracker_value))]
+                        meta[key] = [(str(tracker_value)).upper()]
                 else:
                     meta[key] = []
             else:

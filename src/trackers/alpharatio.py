@@ -26,7 +26,8 @@ class AlphaRatio:
     """
 
     auth_type = "cookies"
-    tracker = __name__
+    tracker = "ALPHARATIO"
+    display_name = "AlphaRatio"
     source_flag = "AlphaRatio"
     base_url = "https://alpharatio.cc"
     banned_groups = ()
@@ -43,7 +44,7 @@ class AlphaRatio:
         self.cookie_validator = CookieValidator(config)
         self.cookie_uploader = CookieAuthUploader(config)
         trackers_cfg = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-        ar_cfg = cast(dict[str, Any], trackers_cfg.get("AlphaRatio", {}))
+        ar_cfg = cast(dict[str, Any], trackers_cfg.get("ALPHARATIO", {}))
         self.username = str(ar_cfg.get("username", "")).strip()
         self.password = str(ar_cfg.get("password", "")).strip()
 

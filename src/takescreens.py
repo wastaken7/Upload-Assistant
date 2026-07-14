@@ -87,7 +87,7 @@ async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
             candidate = Path(ff_bin_dir) / arch / "ffmpeg"
             if Path(candidate).exists():
                 cmd_list = list(command.compile())
-                cmd_list[0] = candidate
+                cmd_list[0] = str(candidate)
 
                 process = await asyncio.create_subprocess_exec(*cmd_list, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
                 stdout, stderr = await process.communicate()

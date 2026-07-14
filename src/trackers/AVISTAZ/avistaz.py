@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 from src.meta import Meta
@@ -11,7 +11,8 @@ class AvistaZ(AZTrackerBase):
     AZ Private Torrent Tracker
     """
 
-    tracker = "AvistaZ"
+    tracker = "AVISTAZ"
+    display_name = "AvistaZ"
     source_flag = "AvistaZ"
     banned_groups = ("",)
     base_url = "https://avistaz.to"

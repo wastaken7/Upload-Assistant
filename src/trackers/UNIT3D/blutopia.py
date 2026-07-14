@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 import cli_ui
@@ -14,7 +14,8 @@ class Blutopia(UNIT3D):
     Blutopia (BLU) is a Private Torrent Tracker for HD MOVIES / TV
     """
 
-    tracker = "Blutopia"
+    tracker = "BLUTOPIA"
+    display_name = "Blutopia"
     base_url = "https://blutopia.cc"
     banned_groups = (
         "[Oj]",
@@ -114,7 +115,7 @@ class Blutopia(UNIT3D):
     tracker_urls = ("https://blutopia.cc",)
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name="Blutopia")
+        super().__init__(config, tracker_name="BLUTOPIA")
         self.config = config
         self.common = Common(config)
 

@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 from typing import Any
 
@@ -14,7 +14,8 @@ class TheOldSchool(UNIT3D):
     The Old School (TOS) is a FRENCH Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
-    tracker = "TheOldSchool"
+    tracker = "THEOLDSCHOOL"
+    display_name = "TheOldSchool"
     source_flag = "TheOldSchool"
     base_url = "https://theoldschool.cc"
     banned_groups = (
@@ -34,7 +35,7 @@ class TheOldSchool(UNIT3D):
     tracker_urls = ("https://theoldschool.cc",)
 
     def __init__(self, config: dict[str, Any]):
-        super().__init__(config, tracker_name="TheOldSchool")
+        super().__init__(config, tracker_name="THEOLDSCHOOL")
         self.config = config
         self.common = Common(config)
 

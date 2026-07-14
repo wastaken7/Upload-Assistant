@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import re
 import unicodedata
@@ -26,7 +26,8 @@ class GreatPosterWall:
     """
 
     auth_type = "other_api"
-    tracker = "GreatPosterWall"
+    tracker = "GREATPOSTERWALL"
+    display_name = "GreatPosterWall"
     source_flag = "GreatPosterWall"
     base_url = "https://greatposterwall.com"
     auth_token = None

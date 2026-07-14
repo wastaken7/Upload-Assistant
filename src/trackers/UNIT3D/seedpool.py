@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from pathlib import Path
 from typing import Any, cast
@@ -18,7 +18,8 @@ class Seedpool(UNIT3D):
     seedpool is a Private Torrent Tracker for 0-DAY MOVIES / TV / GENERAL
     """
 
-    tracker = "Seedpool"
+    tracker = "SEEDPOOL"
+    display_name = "Seedpool"
     base_url = "https://seedpool.org"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"
@@ -29,7 +30,7 @@ class Seedpool(UNIT3D):
     tracker_urls = ("https://seedpool.org",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="Seedpool")
+        super().__init__(config, tracker_name="SEEDPOOL")
         self.config: Config = config
         self.common = Common(config)
 

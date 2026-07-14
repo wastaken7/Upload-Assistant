@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import contextlib
 import gettext
 import re
@@ -31,7 +31,8 @@ class MakingOff:
     """
 
     auth_type = "cookies"
-    tracker = "MakingOff"
+    tracker = "MAKINGOFF"
+    display_name = "MakingOff"
     source_flag = ""
     base_url = "https://makingoff.org/forum"
     banned_groups: tuple[str, ...] = ()

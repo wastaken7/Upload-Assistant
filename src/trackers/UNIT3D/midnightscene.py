@@ -1,4 +1,4 @@
-# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 from src.languages import languages_manager
@@ -14,7 +14,8 @@ class MidnightScene(UNIT3D):
     MidnightScene is a Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
-    tracker = "MidnightScene"
+    tracker = "MIDNIGHTSCENE"
+    display_name = "MidnightScene"
     base_url = "https://midnightscene.cc"
     banned_groups = (
         "4K4U",
@@ -91,7 +92,7 @@ class MidnightScene(UNIT3D):
     tracker_urls = ("midnightscene.cc",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="MidnightScene")
+        super().__init__(config, tracker_name="MIDNIGHTSCENE")
         self.config: Config = config
         self.common = Common(config)
 
