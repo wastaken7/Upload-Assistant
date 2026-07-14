@@ -894,9 +894,7 @@ config = {
         "DS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # Provide the DrunkenSlug upload page URL here, it ends with /upload_form
-            "upload_url": "",
-            # Provide the DrunkenSlug API key here
+            # Provide the DrunkenSlug API key here, can be found at https://drunkenslug.com/profile
             "api_key": "",
             "inject_delay": 0,
         },

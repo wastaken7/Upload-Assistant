@@ -24,7 +24,6 @@ class DS:
         self.config = config
         self.common = COMMON(config)
         tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
-        self.upload_url = str(tracker_cfg.get("upload_url", "").replace("/upload_form", "/upload.php")).strip()
         self.api_key = str(tracker_cfg.get("api_key", "")).strip()
 
     async def search_existing(self, meta: Meta) -> list[Any]:
@@ -45,14 +44,6 @@ class DS:
         if self.tracker not in status_map:
             status_map[self.tracker] = {}
         status_dict = status_map[self.tracker]
-
-        if not self.upload_url:
-            status_dict["status_message"] = "data error: DS upload_url is not configured in config.py under TRACKERS -> DS -> upload_url"
-            return False
-
-        if not self.api_key:
-            status_dict["status_message"] = "data error: DS api_key is not configured in config.py under TRACKERS -> DS -> api_key"
-            return False
 
         nzb_path = meta.nzb_path
         if not nzb_path or not await self.common.check_nzb_file(self.tracker, meta):
@@ -77,7 +68,7 @@ class DS:
         else:
             try:
                 async with httpx.AsyncClient() as client:
-                    response = await client.post(self.upload_url, headers=headers, files=files)
+                    response = await client.post("https://nzbs.drunkenslug.com/upload.php", headers=headers, files=files)
 
                 if response.status_code not in (200, 201):
                     status_dict["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
