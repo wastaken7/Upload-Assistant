@@ -1707,13 +1707,15 @@ def _build_config_items(
     def flush_subsection() -> None:
         nonlocal subsection_items, current_subsection
         if current_subsection and subsection_items:
-            items.append({
-                "key": current_subsection,
-                "children": subsection_items,
-                "source": "example",
-                "help": [],
-                "subsection": True,
-            })
+            items.append(
+                {
+                    "key": current_subsection,
+                    "children": subsection_items,
+                    "source": "example",
+                    "help": [],
+                    "subsection": True,
+                }
+            )
         subsection_items = []
 
     for key in merged_keys:

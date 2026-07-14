@@ -69,7 +69,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     "LST": "lst.gg",
                     "OnlyEncodes": "onlyencodes.cc",
                     "Blutopia": "blutopia.cc",
-                    "UploadCx": "upload.cx",
+                    "ULCX": "upload.cx",
                     "HDBits": "hdbits.org",
                     "BTN": "broadcasthe.net",
                     "BeyondHD": "beyond-hd.me",

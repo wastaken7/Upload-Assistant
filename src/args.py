@@ -326,7 +326,7 @@ class Args:
         parser.add_argument("-btn", "--btn", nargs=1, required=False, help="BTN torrent id/link", type=str)
         parser.add_argument("-bhd", "--bhd", nargs=1, required=False, help="BeyondHD torrent_id/link", type=str)
         parser.add_argument("-huno", "--huno", nargs=1, required=False, help="HawkeUno torrent id/link", type=str)
-        parser.add_argument("-ulcx", "--ulcx", nargs=1, required=False, help="UploadCx torrent id/link", type=str)
+        parser.add_argument("-ulcx", "--ulcx", nargs=1, required=False, help="ULCX torrent id/link", type=str)
         parser.add_argument("-req", "--search_requests", action="store_true", required=False, help="Search for matching requests on supported trackers", default=None)
         parser.add_argument("-sat", "--skip_auto_torrent", action="store_true", required=False, help="Skip automated qbittorrent client torrent searching", default=None)
         parser.add_argument(

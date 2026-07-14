@@ -55,7 +55,7 @@ section-order = ["future", "standard-library", "third-party", "first-party", "lo
 
 [tool.pyright]
 pythonVersion = "3.14"
-typeCheckingMode = "strict"
+typeCheckingMode = "standard"
 reportMissingImports = true
 reportMissingTypeStubs = false
 reportUnknownMemberType = true

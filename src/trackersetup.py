@@ -82,17 +82,17 @@ from src.trackers.UNIT3D.rastastugan import Rastastugan
 from src.trackers.UNIT3D.reelflix import ReelFlix
 from src.trackers.UNIT3D.samaritano import Samaritano
 from src.trackers.UNIT3D.seedpool import Seedpool
-from src.trackers.UNIT3D.shareisland import Shareisland
+from src.trackers.UNIT3D.shareisland import ShareIsland
 from src.trackers.UNIT3D.skipthecommercials import SkipTheCommercials
 from src.trackers.UNIT3D.theldu import LastDigitalUnderground
 from src.trackers.UNIT3D.theoldschool import TheOldSchool
 from src.trackers.UNIT3D.tlzdigital import TheLeachZone
 from src.trackers.UNIT3D.torrentdesi import DesiTorrents
 from src.trackers.UNIT3D.torrenteros import Torrenteros
-from src.trackers.UNIT3D.uploadcx import UploadCx
+from src.trackers.UNIT3D.ulcx import ULCX
 from src.trackers.UNIT3D.utp import Utopia
 from src.trackers.UNIT3D.yoinked import Yoinked
-from src.trackers.UNIT3D.yuscene import Yuscene
+from src.trackers.UNIT3D.yuscene import YUSCENE
 from src.trackers.UNIT3D.znth import Zenith
 from src.trackers.USENET.crp import Curupira
 from src.trackers.USENET.ds import DrunkenSlug
@@ -1423,7 +1423,7 @@ tracker_class_map: dict[str, type[Any]] = CaseInsensitiveDict(
         "RailgunPT": RailgunPT,
         "RetroFlix": RetroFlix,
         "Samaritano": Samaritano,
-        "Shareisland": Shareisland,
+        "ShareIsland": ShareIsland,
         "Swarmazon": Swarmazon,
         "Seedpool": Seedpool,
         "SpeedApp": SpeedApp,
@@ -1437,10 +1437,10 @@ tracker_class_map: dict[str, type[Any]] = CaseInsensitiveDict(
         "TorrentGUI": TorrentGUI,
         "Torrenteros": Torrenteros,
         "TVChaosUK": TVChaosUK,
-        "UploadCx": UploadCx,
+        "ULCX": ULCX,
         "Utopia": Utopia,
         "Yoinked": Yoinked,
-        "Yuscene": Yuscene,
+        "YUSCENE": YUSCENE,
         "Zenith": Zenith,
     }
 )

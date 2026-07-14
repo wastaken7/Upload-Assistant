@@ -447,8 +447,8 @@ config = {
 
         # Available tracker: Aura4K, AsianCinema, Aither, Anthelion, AlphaRatio, AmigosShare, AvistaZ, BeyondHD, BitHDTV, BJShare, Blutopia, BrasilTracker, CapybaraBR, Curupira, Suio, CinemaZ, DigitalCore, DrunkenSlug, DarkPeers, DesiTorrents, Emuwarez, FunFile, FileList,
         # FrikiBar, GreatPosterWall, HDBits, HDSpace, HDTorrents, HomieHelpDesk, HawkeUno, InfinityHD, ImmortalSeed, ItaTorrents, Lajidui, Locadora, LastDigitalUnderground, LongPT, LST, LatTeam, Luminarr, MidnightScene, MTeam, MoreThanTV, Nebulance, OnlyEncodes,
-        # OldToonsWorld, PrivateHD, Portugas, PTCafe, PTerClub, PTFans, PTGTK, PassThePopcorn, Ptskit, PolishTorrent, Racing4Everyone, Rastastugan, ReelFlix, RailgunPT, RetroFlix, Samaritano, Shareisland, Swarmazon, Seedpool, SpeedApp, SkipTheCommercials, TorrentHR,
-        # Cinematik, TorrentLeech, TheLeachZone, TheOldSchool, TorrentGUI, Torrenteros, TVChaosUK, UploadCx, Utopia, Yoinked, Yuscene, Zenith
+        # OldToonsWorld, PrivateHD, Portugas, PTCafe, PTerClub, PTFans, PTGTK, PassThePopcorn, Ptskit, PolishTorrent, Racing4Everyone, Rastastugan, ReelFlix, RailgunPT, RetroFlix, Samaritano, ShareIsland, Swarmazon, Seedpool, SpeedApp, SkipTheCommercials, TorrentHR,
+        # Cinematik, TorrentLeech, TheLeachZone, TheOldSchool, TorrentGUI, Torrenteros, TVChaosUK, ULCX, Utopia, Yoinked, YUSCENE, Zenith
 
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
@@ -2145,7 +2145,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Shareisland": {
+        "ShareIsland": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2473,7 +2473,7 @@ config = {
             "anon": True,
             "inject_delay": 0,
         },
-        "UploadCx": {
+        "ULCX": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
@@ -2565,7 +2565,7 @@ config = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "Yuscene": {
+        "YUSCENE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing

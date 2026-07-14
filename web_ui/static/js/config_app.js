@@ -262,7 +262,7 @@ const trackerNameMap = {
   RetroFlix: "RetroFlix",
   Samaritano: "Samaritano",
   Seedpool: "seedpool",
-  Shareisland: "ShareIsland",
+  ShareIsland: "ShareIsland",
   SkipTheCommercials: "SkipTheCommercials",
   SpeedApp: "SpeedApp",
   Swarmazon: "Swarmazon",
@@ -273,10 +273,10 @@ const trackerNameMap = {
   Torrenteros: "Torrenteros",
   TorrentLeech: "TorrentLeech",
   TVChaosUK: "TVChaosUK",
-  UploadCx: "UploadCx",
+  ULCX: "ULCX",
   Utopia: "UTOPIA",
   Yoinked: "YOiNKED",
-  Yuscene: "YUSCENE",
+  YUSCENE: "YUSCENE",
 };
 
 const getTrackerDisplayName = (acronym) => {

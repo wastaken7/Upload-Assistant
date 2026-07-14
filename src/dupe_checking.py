@@ -789,7 +789,7 @@ class DupeChecker:
             if (
                 len(dupes) == 1
                 and meta.is_disc != "BDMV"
-                and tracker_name in ["Aither", "BeyondHD", "HawkeUno", "OnlyEncodes", "UploadCx"]
+                and tracker_name in ["Aither", "BeyondHD", "HawkeUno", "OnlyEncodes", "ULCX"]
                 and file_size is not None
                 and "1080" in target_resolution
                 and "x264" in video_encode_lower

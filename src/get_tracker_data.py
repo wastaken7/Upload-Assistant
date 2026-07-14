@@ -114,7 +114,7 @@ class TrackerDataManager:
                 "aither": "Aither",
                 "blu": "Blutopia",
                 "lst": "LST",
-                "ulcx": "UploadCx",
+                "ulcx": "ULCX",
                 "oe": "OnlyEncodes",
                 "huno": "HawkeUno",
                 "ant": "Anthelion",
@@ -124,7 +124,7 @@ class TrackerDataManager:
                 "sp": "Seedpool",
                 "rf": "ReelFlix",
                 "otw": "OldToonsWorld",
-                "yus": "Yuscene",
+                "yus": "YUSCENE",
                 "dp": "DarkPeers",
                 "ptp": "PassThePopcorn",
             }
@@ -391,7 +391,7 @@ class TrackerDataManager:
         # Prioritize trackers in this order
         from src.trackersetup import api_trackers
 
-        prioritized = ["Blutopia", "Aither", "UploadCx", "LST", "OnlyEncodes"]
+        prioritized = ["Blutopia", "Aither", "ULCX", "LST", "OnlyEncodes"]
         tracker_order = prioritized + sorted(api_trackers - set(prioritized) - {"BeyondHD"})
 
         # Check if we have stored torrent comments
@@ -432,7 +432,7 @@ class TrackerDataManager:
                         "Aither": "aither.cc",
                         "LST": "lst.gg",
                         "OnlyEncodes": "onlyencodes.cc",
-                        "UploadCx": "upload.cx",
+                        "ULCX": "upload.cx",
                     }.items():
                         if k not in tracker_hosts:
                             tracker_hosts[k] = v

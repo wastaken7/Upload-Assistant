@@ -13,12 +13,12 @@ from src.trackers.UNIT3D import UNIT3D
 Config = dict[str, Any]
 
 
-class UploadCx(UNIT3D):
+class ULCX(UNIT3D):
     """
     upload.cx (ULCX) is a Private Torrent Tracker for MOVIES / TV
     """
 
-    tracker = "UploadCx"
+    tracker = "ULCX"
     base_url = "https://upload.cx"
     banned_groups = (
         "4K4U",
@@ -75,7 +75,7 @@ class UploadCx(UNIT3D):
     tracker_urls = ("upload.cx",)
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name="UploadCx")
+        super().__init__(config, tracker_name="ULCX")
         self.config = config
 
     async def get_additional_checks(self, meta: Meta) -> bool:

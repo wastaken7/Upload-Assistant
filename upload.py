@@ -933,12 +933,12 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
             "Ptskit",
             "RailgunPT",
             "Samaritano",
-            "Shareisland",
+            "ShareIsland",
             "SpeedApp",
             "Suio",
             "Torrenteros",
             "TVChaosUK",
-            "UploadCx",
+            "ULCX",
         ]:
             if tracker in trackers:
                 if not audio_prompted:

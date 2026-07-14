@@ -24,12 +24,12 @@ _shri_session_data: dict[str, dict[str, str | None]] = {}
 ITALIAN_LANGS = {"it", "ita", "italian"}
 
 
-class Shareisland(UNIT3D):
+class ShareIsland(UNIT3D):
     """
-    Shareisland is a ITALIAN Private Torrent Tracker for MOVIES / TV / GENERAL
+    ShareIsland is a ITALIAN Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
-    tracker = "Shareisland"
+    tracker = "ShareIsland"
     base_url = "https://shareisland.org"
     banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"
@@ -45,7 +45,7 @@ class Shareisland(UNIT3D):
     MARKER_PATTERN = re.compile(r"\b(UNTOUCHED|VU1080|VU720|VU)\b", re.IGNORECASE)
 
     def __init__(self, config: dict[str, Any]) -> None:
-        super().__init__(config, tracker_name="Shareisland")
+        super().__init__(config, tracker_name="ShareIsland")
         self.config = config
         self.common = Common(config)
         self.audio_manager = AudioManager(config)
@@ -289,7 +289,7 @@ class Shareisland(UNIT3D):
             # Prompt for region if not in meta
             if not region_name and (not meta.unattended or meta.unattended_confirm):
                 while True:
-                    region_name = cli_ui.ask_string("Shareisland: Region code not found for disc. Please enter it manually (mandatory): ")
+                    region_name = cli_ui.ask_string("ShareIsland: Region code not found for disc. Please enter it manually (mandatory): ")
                     region_name = region_name.strip().upper() if region_name else None
                     if region_name:
                         break
@@ -297,20 +297,20 @@ class Shareisland(UNIT3D):
 
             # Validate region name was provided
             if not region_name:
-                cli_ui.error("Region required; skipping Shareisland.")
+                cli_ui.error("Region required; skipping ShareIsland.")
                 raise ValueError("Region required for disc upload")
 
             # Validate region code with API
             region_id = await self.common.unit3d_region_ids(region_name)
             if not region_id:
-                cli_ui.error(f"Invalid region code '{region_name}'; skipping Shareisland.")
+                cli_ui.error(f"Invalid region code '{region_name}'; skipping ShareIsland.")
                 raise ValueError(f"Invalid region code: {region_name}")
 
             # Handle optional distributor
             distributor_name = meta.distributor
             distributor_id = None
             if not distributor_name and not meta.unattended:
-                distributor_name = cli_ui.ask_string("Shareisland: Distributor (optional, Enter to skip): ")
+                distributor_name = cli_ui.ask_string("ShareIsland: Distributor (optional, Enter to skip): ")
                 distributor_name = distributor_name.strip().upper() if distributor_name else None
 
             if distributor_name:
@@ -959,7 +959,7 @@ class Shareisland(UNIT3D):
                 tonemapped_text = self._strip_bbcode(tonemapped_header)
 
         if release_group.lower() == "island":
-            base_notes = "Release Shareisland 🏴‍☠️\nFalla girare, condividila e contribuisci a mantenerla viva restando in seed il più possibile.\nGrazie per il supporto!"
+            base_notes = "Release ShareIsland 🏴‍☠️\nFalla girare, condividila e contribuisci a mantenerla viva restando in seed il più possibile.\nGrazie per il supporto!"
             if tonemapped_text:
                 release_notes_section = f"""[size=13][b][color=#e8024b]--- RELEASE NOTES ---[/color][/b][/size]
 [size=11][color=#FFFFFF]{base_notes}

@@ -13,8 +13,7 @@ from src.console import console, logger
 from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 from src.meta import Meta
-
-from .COMMON import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
@@ -36,7 +35,7 @@ class SpeedApp:
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
         api_key = str(self.config["TRACKERS"][self.tracker]["api_key"])
         self.session = httpx.AsyncClient(
             headers={

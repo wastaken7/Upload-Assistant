@@ -555,7 +555,7 @@ def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_origi
         "PTGTK",
         "RailgunPT",
         "Samaritano",
-        "Shareisland",
+        "ShareIsland",
         "Seedpool",
         "TorrentLeech",
         "TheOldSchool",
@@ -612,8 +612,8 @@ def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_origi
         warning_trackers = []
 
         if is_eng_original_with_non_eng:
-            not_allowed_trackers = [t for t in trackers_to_warn if t in ["Anthelion", "BeyondHD", "UploadCx", "MoreThanTV"]]
-            warning_trackers = [t for t in trackers_to_warn if t not in ["Anthelion", "BeyondHD", "UploadCx", "MoreThanTV"]]
+            not_allowed_trackers = [t for t in trackers_to_warn if t in ["Anthelion", "BeyondHD", "ULCX", "MoreThanTV"]]
+            warning_trackers = [t for t in trackers_to_warn if t not in ["Anthelion", "BeyondHD", "ULCX", "MoreThanTV"]]
         else:
             warning_trackers = trackers_to_warn
 

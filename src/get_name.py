@@ -23,8 +23,8 @@ def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, A
 
 
 TRACKER_DISC_REQUIREMENTS = {
-    "UploadCx": {"region": "mandatory", "distributor": "mandatory"},
-    "Shareisland": {"region": "mandatory", "distributor": "optional"},
+    "ULCX": {"region": "mandatory", "distributor": "mandatory"},
+    "ShareIsland": {"region": "mandatory", "distributor": "optional"},
     "OldToonsWorld": {"region": "mandatory", "distributor": "optional"},
 }
 
