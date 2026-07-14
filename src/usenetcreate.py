@@ -465,8 +465,11 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
 
         stderr_accum = []
         check_missing_count = 0
-        check_total = 0
-        check_wait_total = 0
+        check_checked_total = 0
+        # Every posted article also gets checked (see pesto's check.rs), so
+        # the running total_segments count pesto already reports on each
+        # segment_done doubles as the check phase's expected total.
+        check_expected_total = 0
 
         if process.stdout is None or process.stderr is None:
             raise RuntimeError("Process stdout or stderr is None")
@@ -508,6 +511,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                         if "upload" not in tasks:
                             tasks["upload"] = progress.add_task("Posting to Usenet", total=100)
                         progress.update(tasks["upload"], completed=pct)
+                        check_expected_total = event.get("total_segments", check_expected_total)
                     elif etype == "status":
                         text = event.get("text", "").strip()
                         if text:
@@ -537,60 +541,42 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                         if "par2_write" not in tasks:
                             tasks["par2_write"] = progress.add_task("Writing PAR2 recovery files", total=1)
                         progress.advance(tasks["par2_write"])
-                    elif etype == "check_started":
-                        check_total = event.get("total", 0)
-                        if "check" not in tasks:
-                            tasks["check"] = progress.add_task("Verifying articles on server", total=check_total or 1)
-                        else:
-                            progress.update(tasks["check"], description="Verifying articles on server", total=check_total or 1, completed=0)
-                    elif etype == "check_waiting":
-                        remaining = event.get("remaining_secs", 0)
-                        if "check" not in tasks:
-                            check_wait_total = remaining
-                        description = f"Waiting {remaining}s before verifying articles..."
-                        if "check" not in tasks:
-                            tasks["check"] = progress.add_task(description, total=check_wait_total or 1)
-                        progress.update(tasks["check"], description=description, completed=max(check_wait_total - remaining, 0))
                     elif etype == "check_progress":
+                        # pesto >=0.3.51 streams the STAT check concurrently
+                        # with the upload instead of running it as its own
+                        # phase, so it no longer sends its own upfront total
+                        # (check_started was removed). Every posted article
+                        # also gets checked though, so the total_segments
+                        # count already tracked from segment_done above
+                        # doubles as the check phase's total, letting the bar
+                        # show "checked/total" instead of being indeterminate.
                         checked = event.get("checked", 0)
+                        check_checked_total = checked
+                        if not event.get("ok", True):
+                            check_missing_count += 1
                         if "check" not in tasks:
-                            tasks["check"] = progress.add_task("Verifying articles on server", total=check_total or checked or 1)
-                        progress.update(tasks["check"], completed=checked)
+                            tasks["check"] = progress.add_task("Verifying articles on server", total=check_expected_total or None)
+                        else:
+                            progress.update(tasks["check"], total=check_expected_total or None)
+                        description = "Verifying articles on server"
+                        if check_missing_count:
+                            description += f" ({check_missing_count} failed so far)"
+                        progress.update(tasks["check"], description=description, completed=checked)
                     elif etype == "check_done":
                         failed = event.get("failed", 0)
                         check_missing_count = failed
-                        if "check" in tasks and check_total:
-                            progress.update(tasks["check"], completed=check_total)
-                        # Only announce success here; a missing count is always
-                        # immediately followed by a "repost_round_started" event
-                        # (below), which reports it with round context instead.
+                        if "check" in tasks:
+                            final_total = check_expected_total or check_checked_total or 1
+                            progress.update(tasks["check"], total=final_total, completed=final_total)
                         if not failed:
                             logger.info("[green]Article check: all articles verified on server.[/green]")
+                        else:
+                            logger.info(f"[yellow]Article check: {failed} article(s) still missing after every repost attempt.[/yellow]")
                     elif etype == "check_retrying":
                         attempt = event.get("attempt", 0)
                         max_attempts = event.get("max_attempts", 0)
                         delay = event.get("delay_secs", 0)
-                        check_wait_total = delay
                         logger.debug(f"[cyan]Article check: retry {attempt}/{max_attempts} in {delay}s...[/cyan]")
-                    elif etype == "repost_round_started":
-                        round_num = event.get("round", 0)
-                        max_rounds = event.get("max_rounds", 0)
-                        missing = event.get("missing", 0)
-                        logger.info(
-                            f"[yellow]Article check: round {round_num}/{max_rounds} — "
-                            f"{missing} article(s) missing, reposting automatically...[/yellow]"
-                        )
-                    elif etype == "repost_round_done":
-                        round_num = event.get("round", 0)
-                        max_rounds = event.get("max_rounds", 0)
-                        reposted = event.get("reposted", 0)
-                        still_missing = event.get("still_missing", 0)
-                        check_missing_count = still_missing
-                        if still_missing:
-                            logger.info(
-                                f"[yellow]Article check: round {round_num}/{max_rounds} — "
-                                f"reposted {reposted} article(s), {still_missing} still missing[/yellow]"
-                            )
                 except json.JSONDecodeError:
                     pass
 
@@ -993,11 +979,13 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         if archive_password and not skip_archive:
             cmd_pesto.extend(["--nzb-password", archive_password])
 
-        # --check: after posting, verify every article is retrievable via STAT.
-        # Missing articles are reposted and reverified in a loop (up to
-        # --check-post-retries rounds); pesto exits non-zero if any are still
-        # missing after that, so we know the NZB is trustworthy whenever this
-        # command succeeds.
+        # --check: a streaming STAT check that runs concurrently with the
+        # upload, confirming each article shortly after it posts. Missing
+        # articles are reposted and reverified automatically, internally to
+        # pesto; it exits non-zero if any are still missing after that, so we
+        # know the NZB is trustworthy whenever this command succeeds.
+        # pesto >=0.3.51 defaults --check to on, so pesto_check: False must
+        # pass --no-check explicitly or the check would run anyway.
         if usenet_cfg.get("pesto_check", True):
             cmd_pesto.append("--check")
             check_delay = usenet_cfg.get("pesto_check_delay")
@@ -1021,6 +1009,8 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             check_post_retries = usenet_cfg.get("pesto_check_post_retries", 3)
             if str(check_post_retries).strip() != "":
                 cmd_pesto.extend(["--check-post-retries", str(check_post_retries)])
+        else:
+            cmd_pesto.append("--no-check")
 
         cmd_pesto.extend(all_upload_files)
 

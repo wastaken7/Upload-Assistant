@@ -2791,18 +2791,24 @@ config = {
         # Uploader backend: "nyuu" (default) or "pesto"
         # pesto handles PAR2 and NZB password injection internally
         "usenet_uploader": "nyuu",
-        # pesto only: after posting, verify every article is retrievable on the
-        # server via STAT. Missing articles are reposted and reverified
-        # automatically; the upload is only considered successful (and the NZB
-        # kept) once every article is confirmed. Strongly recommended — without
-        # this, a "successfully posted" article can still be missing/unpropagated
-        # on the server, producing a broken NZB.
+        # pesto only: a streaming STAT check that runs concurrently with the
+        # upload, confirming each article shortly after it posts. Missing
+        # articles are reposted and reverified automatically; the upload is
+        # only considered successful (and the NZB kept) once every article is
+        # confirmed. Strongly recommended — without this, a "successfully
+        # posted" article can still be missing/unpropagated on the server,
+        # producing a broken NZB.
         "pesto_check": True,
-        # Seconds to wait after the last article is posted before verifying (pesto --check-delay)
-        "pesto_check_delay": 30,
+        # Seconds to wait after EACH article posts before its first STAT check
+        # (streaming, concurrent with the upload — not a single wait at the end
+        # of the whole run) (pesto --check-delay)
+        "pesto_check_delay": 5,
         # Number of STAT attempts per article before marking it missing (pesto --check-retries)
         "pesto_check_retries": 3,
-        # Parallel connections used for the verification pass (empty = same as "connections")
+        # Dedicated parallel connections for the check queue, carved out of
+        # "connections" (never opened on top of it). Empty = pesto auto-derives
+        # a small pool from "connections"; if "connections" is too low to spare
+        # any, the check is skipped (pesto --check-connections)
         "pesto_check_connections": "",
         # Number of repost+reverify rounds to attempt for articles still missing
         # after the check (pesto --check-post-retries). Raise this on providers
