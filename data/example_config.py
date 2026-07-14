@@ -896,6 +896,8 @@ config = {
             "link_dir_name": "",
             # Provide the DrunkenSlug upload page URL here, it ends with /upload_form
             "upload_url": "",
+            # Provide the DrunkenSlug API key here
+            "api_key": "",
             "inject_delay": 0,
         },
         "DT": {
