@@ -29,7 +29,8 @@ class DrunkenSlug:
     def __init__(self, config: Config) -> None:
         self.config = config
         self.common = Common(config)
-        self.upload_url = str(self.config.get("TRACKERS", {}).get(self.tracker, {}).get("upload_url", "").replace("/upload_form", "/upload.php")).strip()
+        tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
+        self.api_key = str(tracker_cfg.get("api_key", "")).strip()
 
     async def search_existing(self, meta: Meta) -> list[Any]:
         release_name = await self.get_name(meta)
@@ -50,10 +51,6 @@ class DrunkenSlug:
             status_map[self.tracker] = {}
         status_dict = status_map[self.tracker]
 
-        if not self.upload_url:
-            status_dict["status_message"] = "data error: DrunkenSlug upload_url is not configured in config.py under TRACKERS -> DrunkenSlug -> upload_url"
-            return False
-
         nzb_path = meta.nzb_path
         if not nzb_path or not await self.common.check_nzb_file(self.tracker, meta):
             status_dict["status_message"] = "data error: NZB file missing or password missing in header"
@@ -65,13 +62,14 @@ class DrunkenSlug:
             nzb_content = await f.read()
 
         files = {"files[]": (nzb_name, nzb_content, "application/x-nzb")}
+        headers = {"X-API-Key": self.api_key}
 
         if meta.debug:
             status_dict["status_message"] = "Debug mode enabled, skipping upload."
             return True
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(self.upload_url, files=files)
+                response = await client.post("https://nzbs.drunkenslug.com/upload.php", headers=headers, files=files)
 
             if response.status_code not in (200, 201):
                 status_dict["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
