@@ -71,10 +71,9 @@ def get_dynamic_volume_size(total_bytes: int) -> str:
 def compute_nyuu_connections(total_connections: int, nyuu_check_enabled: bool, check_connections_cfg: str | int | None) -> tuple[int, int | None]:
     """Split the configured connection budget between nyuu posting and checking.
 
-    Unlike pesto (which checks in a separate phase after posting finishes), nyuu
-    checks concurrently with posting over its own connections, and throttles
-    posting speed to match if the check connections can't keep up. So by default
-    (check_connections_cfg empty), `total_connections` is split between posting
+    Like pesto, nyuu checks concurrently with posting over its own connections,
+    and throttles posting speed to match if the check connections can't keep up.
+    So by default (check_connections_cfg empty), `total_connections` is split between posting
     and checking, keeping the combined socket count within what was configured
     instead of adding check connections on top of it. An explicit
     check_connections_cfg overrides this and posts at the full connection count,
