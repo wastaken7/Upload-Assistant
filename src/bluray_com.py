@@ -192,11 +192,7 @@ async def extract_bluray_release_info(html_content: str, meta: Meta, product_id:
         return []
 
     matching_releases: list[Release] = []
-    is_3d = meta.three_d.lower() == "yes"
-    resolution = meta.resolution.lower()
-    is_4k = "2160p" in resolution or "4k" in resolution
-    is_dvd = str(meta.is_disc).upper() == "DVD"
-    release_type = "4K" if is_4k else "3D" if is_3d else "DVD" if is_dvd else "BD"
+    release_type, is_3d, is_4k, is_dvd = _derive_release_type(meta)
     release_type_debug = "DVD" if is_dvd else "Blu-ray"
 
     if is_3d:
@@ -303,6 +299,15 @@ async def extract_product_id(url: str) -> str | None:
     return None
 
 
+def _derive_release_type(meta: Meta) -> tuple[str, bool, bool, bool]:
+    is_3d = meta.three_d.lower() == "yes"
+    resolution = meta.resolution.lower()
+    is_4k = "2160p" in resolution or "4k" in resolution
+    is_dvd = str(meta.is_disc).upper() == "DVD"
+    release_type = "4K" if is_4k else "3D" if is_3d else "DVD" if is_dvd else "BD"
+    return release_type, is_3d, is_4k, is_dvd
+
+
 async def get_bluray_releases(meta: Meta) -> list[Release]:
     logger.info("[blue]===== Starting blu-ray.com release search =====[/blue]")
     imdb_id_value = meta.imdb_id or 0
@@ -333,11 +338,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
         ajax_url = f"https://www.blu-ray.com/products/menu_ajax.php?p={product_id}&c=20&action=showreleasesall"
         logger.info(f"[dim]Releases URL: {ajax_url}[/dim]")
 
-        is_3d = meta.three_d.lower() == "yes"
-        resolution = meta.resolution.lower()
-        is_4k = "2160p" in resolution or "4k" in resolution
-        is_dvd = str(meta.is_disc).upper() == "DVD"
-        release_type = "4K" if is_4k else "3D" if is_3d else "DVD" if is_dvd else "BD"
+        release_type, _is_3d, _is_4k, _is_dvd = _derive_release_type(meta)
         release_debug_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/debug_bluray_{release_type}_{product_id}.html"
 
         try:

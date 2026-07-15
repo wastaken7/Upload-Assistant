@@ -2621,9 +2621,8 @@ def twofa_disable():
         return jsonify({"error": "2FA not enabled", "success": False}), 400
 
     try:
-        auth_mod.set_totp_secret(None)
-        auth_mod.set_recovery_hashes([])
-    except Exception:
+        auth_mod.set_twofa_state(None, [])
+    except (OSError, ValueError, TypeError, auth_mod.EncryptionError, json.JSONDecodeError):
         return jsonify({"error": "Failed to disable 2FA", "success": False}), 500
 
     # Update global variable

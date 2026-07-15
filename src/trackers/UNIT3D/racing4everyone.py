@@ -34,7 +34,7 @@ class Racing4Everyone(UNIT3D):
     async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = (category, reverse, mapping_only)
         category_id = "24"
-        genre_ids = str(meta.genre_ids).split(",") if meta and meta.genre_ids else []
+        genre_ids = [genre_id.strip() for genre_id in str(meta.genre_ids).split(",")] if meta and meta.genre_ids else []
         is_docu = "99" in genre_ids
 
         if meta.category == "MOVIE":

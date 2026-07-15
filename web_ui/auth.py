@@ -521,6 +521,35 @@ def set_recovery_hashes(hashes: list[str]) -> None:
         Path(path).chmod(0o600)
 
 
+def set_twofa_state(secret: str | None, recovery_hashes: list[str]) -> None:
+    path = _get_user_file()
+    if path.exists():
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            raise OSError("failed to read existing user file; aborting to avoid overwriting encrypted data") from None
+    else:
+        raw = {}
+
+    extras = {}
+    extras_enc = raw.get("extras_enc")
+    if extras_enc:
+        key = _get_master_key()
+        dec = decrypt_text(key, extras_enc)
+        if not dec:
+            raise EncryptionError("failed to decrypt existing extras_enc; aborting write to preserve data")
+        extras = json.loads(dec)
+
+    _pack_field(extras, "totp_secret", secret)
+    _pack_field(extras, "recovery_hashes", json.dumps(recovery_hashes, separators=(",", ":"), ensure_ascii=False))
+
+    key = _get_master_key()
+    raw["extras_enc"] = encrypt_text(key, json.dumps(extras, separators=(",", ":"), ensure_ascii=False))
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with suppress(Exception):
+        Path(path).chmod(0o600)
+
+
 def get_api_tokens() -> dict:
     u = load_user()
     if not u:

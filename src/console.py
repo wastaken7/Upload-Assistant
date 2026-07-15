@@ -158,6 +158,13 @@ _tracker_style_map: dict[str, str] | None = None  # lower → Rich markup (if cu
 _tracker_name_pattern: re.Pattern[str] | None = None
 
 
+def _compile_tracker_pattern(mapping: dict[str, str]) -> re.Pattern[str] | None:
+    if not mapping:
+        return None
+    names = sorted({re.escape(name) for name in mapping}, key=len, reverse=True)
+    return re.compile(r"(https?://\S+)|" + r"\b(" + "|".join(names) + r")\b", re.IGNORECASE)
+
+
 def _load_tracker_display_map() -> tuple[dict[str, str], dict[str, str], re.Pattern[str] | None]:
     """Build lowercase→canonical name map + optional style map (lazy, avoids import cycles)."""
     global _tracker_name_map, _tracker_style_map, _tracker_name_pattern
@@ -168,11 +175,6 @@ def _load_tracker_display_map() -> tuple[dict[str, str], dict[str, str], re.Patt
     styles: dict[str, str] = {}
     try:
         from src.trackersetup import tracker_class_map
-
-        for key, cls in tracker_class_map.items():
-            canonical = str(getattr(cls, "tracker", None) or key)
-            mapping[(key).lower()] = canonical
-            mapping[canonical.lower()] = canonical
     except Exception:
         # trackersetup may not be importable yet during very early bootstrap;
         # return an uncached partial map so initialization remains retryable.
@@ -182,11 +184,12 @@ def _load_tracker_display_map() -> tuple[dict[str, str], dict[str, str], re.Patt
             key_lower = style_key.strip().lower()
             styles[key_lower] = style_value
             mapping[key_lower] = style_key.strip()
-        pattern = None
-        if mapping:
-            names = sorted({re.escape(name) for name in mapping}, key=len, reverse=True)
-            pattern = re.compile(r"(https?://\S+)|" + r"\b(" + "|".join(names) + r")\b", re.IGNORECASE)
-        return mapping, styles, pattern
+        return mapping, styles, _compile_tracker_pattern(mapping)
+    else:
+        for key, cls in tracker_class_map.items():
+            canonical = str(getattr(cls, "tracker", None) or key)
+            mapping[(key).lower()] = canonical
+            mapping[canonical.lower()] = canonical
 
     # Apply custom styles: resolve keys case-insensitively onto canonical names
     for style_key, style_value in TRACKER_DISPLAY_STYLES.items():
@@ -205,11 +208,7 @@ def _load_tracker_display_map() -> tuple[dict[str, str], dict[str, str], re.Patt
 
     _tracker_name_map = mapping
     _tracker_style_map = styles
-    if mapping:
-        names = sorted({re.escape(name) for name in mapping}, key=len, reverse=True)
-        _tracker_name_pattern = re.compile(r"(https?://\S+)|" + r"\b(" + "|".join(names) + r")\b", re.IGNORECASE)
-    else:
-        _tracker_name_pattern = None
+    _tracker_name_pattern = _compile_tracker_pattern(mapping)
     return _tracker_name_map, _tracker_style_map, _tracker_name_pattern
 
 
