@@ -9,7 +9,13 @@ from pathlib import Path
 
 import httpx
 
-from src.console import logger
+try:
+    from src.console import logger
+except ImportError:
+    import logging
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+    logger = logging.getLogger(__name__)
 
 
 class FfmpegBinaryManager:
