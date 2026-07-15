@@ -46,6 +46,8 @@ config: dict[str, Any] = {
         "console_show_path": False,
         # Enable rich markup parsing in console logs
         "console_markup": True,
+        # Enable colored/formatted tracker names in console logs
+        "console_tracker_name_markup": True,
 
         # File logging configuration
         # Set true to save a plain text log file of the upload flow in each release's tmp folder

@@ -68,6 +68,8 @@ except ImportError:
     config = {}
     config_default: dict[str, Any] = {}
 
+tracker_name_markup_enabled = bool(config_default.get("console_tracker_name_markup", True))
+
 # ---------------------------------------------------------------------------
 # Pretty tracker names in console/log output
 # Keep internal code free to use any casing (usually UPPER); rewrite only for display.
@@ -227,7 +229,7 @@ def prettify_tracker_names(text: str, *, markup: bool = True) -> str:
     def _repl(match: re.Match[str]) -> str:
         token_lower = match.group(0).lower()
         canonical = mapping.get(token_lower, match.group(0))
-        if markup:
+        if markup and tracker_name_markup_enabled:
             styled = styles.get(token_lower) or styles.get(canonical.lower())
             if styled:
                 return styled
