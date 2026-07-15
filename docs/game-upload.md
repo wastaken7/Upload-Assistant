@@ -147,5 +147,5 @@ python upload.py "/path/to/Cool.Game-Now.Even.Cooler.DLC-GROUP" --category game 
 
 ### Upload to a specific tracker with installation notes
 ```bash
-python upload.py "/path/to/pc_game" --category game --platform pc --descfile "/path/to/install_instructions.txt" --site-upload CBR
+python upload.py "/path/to/pc_game" --category game --platform pc --descfile "/path/to/install_instructions.txt" --site-upload CAPYBARABR
 ```

@@ -14,14 +14,14 @@ Below is the detailed list of configuration variables that affect description bu
 
 ### Identity & Logo Settings
 *   `add_logo` (Boolean): If set to `True`, prepends the media's logo to the description.
-    *   For `BJS`, `ANT`, `GPW`, `BT`, `FF`, `HDS`, `HDT`, and `SPD` trackers, the builder fetches the official TMDB logo resized to a width of 300px.
+    *   For `BJSHARE`, `ANTHELION`, `GREATPOSTERWALL`, `BRASILTRACKER`, `FUNFILE`, `HDSPACE`, `HDTORRENTS`, and `SPEEDAPP` trackers, the builder fetches the official TMDB logo resized to a width of 300px.
     *   For other trackers, it uses the logo URL parsed during scraping (`meta.get("logo")`).
 *   `logo_size` (Integer/String): Target width (in pixels) for custom logo rendering. Defaults to `300`.
 
 ### Screenshots & Media Layout
 *   `thumbnail_size` (Integer/String): Default width (in pixels) of screenshot thumbnails in the grid. Defaults to `350`.
 *   `screens_per_row` (Integer): Number of screenshots to lay out horizontally in each row of the grid. Defaults to `2`.
-    *   *Note:* For the `HUNO` tracker, the code dynamically reduces this value if the total width exceeds 1100px to maintain layout responsiveness.
+    *   *Note:* For the `HAWKEUNO` tracker, the code dynamically reduces this value if the total width exceeds 1100px to maintain layout responsiveness.
 *   `multiScreens` (Integer): Number of screenshots generated per file/disc for pack uploads (multiple discs or files). Setting this to `0` disables screenshot generation for subsequent files in a pack. Defaults to `2`.
 *   `pack_thumb_size` (Integer): Thumbnail width (in pixels) for pack screenshots. Defaults to `300`.
 *   `processLimit` (Integer): The maximum number of files/discs in a pack that will be processed individually (meaning they will have screenshots generated and MediaInfo extracted). Prevents excessive resource consumption. Defaults to `10`.
@@ -115,7 +115,7 @@ For the `GAME` category, it renders:
 #### 9. API Overview / Synopsis
 Insert the main synopsis (description) retrieved via external APIs (TMDb, IMDb, etc.).
 *   *Aither Specifics:* If the upload is a `FraMeSToR` release, formatting is customized to clean and style the scene group's information.
-*   *MTV Specifics:* Wraps the description in `[spoiler=Notes]...[/spoiler]`.
+*   *MORETHANTV Specifics:* Wraps the description in `[spoiler=Notes]...[/spoiler]`.
 
 #### 10. NFO Content
 Appends scene group release `.nfo` content wrapped in raw formatting blocks (like `[pre]` or `[nfo]`).
@@ -152,15 +152,15 @@ Before returning the compiled string, the builder executes `tracker_specific_for
 
 | Tracker | Transformations Performed |
 | :--- | :--- |
-| **BT** | Removes image resizing attributes (`[img=size]`) and `[list]` structures. |
-| **BJS** | Converts `[spoiler]` tags to `[hide]`, removes image resize attributes, removes list tags, and formats alignments. |
-| **ANT** | Removes image resizing, `[sup]`, `[sub]`, and `[list]` tags. Normalizes special typographic characters (e.g., smart quotes and dashes). |
-| **DC** | Removes `[user]`, `[align]`, `[alert]`, `[note]`, `[hr]`, `[ul]`, and `[ol]`. Converts headers (`[h1]`, `[h2]`, `[h3]`) to bold-underline (`[u][b]`), and converts named spoilers to standard ones. |
-| **FF** | Replaces all BBCode images and grids with raw HTML markup (`<a href="..." target="_blank"><img src="..." width="..."></a>`), centering elements, and removing spoilers/hide blocks. |
-| **GPW** | Strips hyperlink wrappers around screenshots, converting them to plain `[img]URL[/img]` images. Removes sub, sup, and list tags. |
-| **HDS** | Strips colors, hides, and spoilers. If an image is hosted on a host other than Imgbox, it is forced to reside on a separate line (`\n`) to prevent broken forum grids. |
-| **HDT** | Converts standard spoilers to `[hide]`, strips image resizing, and limits cover heights to a rigid `137px` via HTML elements. |
-| **TL** | Converts BBCode centralizing to HTML `<center>`. Converts `[hr]` to `---`. Replaces screenshot blocks with pure HTML links utilizing inline CSS `style="max-width: XXXpx;"` formatting. Removes lists and spoilers. |
+| **BRASILTRACKER** | Removes image resizing attributes (`[img=size]`) and `[list]` structures. |
+| **BJSHARE** | Converts `[spoiler]` tags to `[hide]`, removes image resize attributes, removes list tags, and formats alignments. |
+| **ANTHELION** | Removes image resizing, `[sup]`, `[sub]`, and `[list]` tags. Normalizes special typographic characters (e.g., smart quotes and dashes). |
+| **DIGITALCORE** | Removes `[user]`, `[align]`, `[alert]`, `[note]`, `[hr]`, `[ul]`, and `[ol]`. Converts headers (`[h1]`, `[h2]`, `[h3]`) to bold-underline (`[u][b]`), and converts named spoilers to standard ones. |
+| **FUNFILE** | Replaces all BBCode images and grids with raw HTML markup (`<a href="..." target="_blank"><img src="..." width="..."></a>`), centering elements, and removing spoilers/hide blocks. |
+| **GREATPOSTERWALL** | Strips hyperlink wrappers around screenshots, converting them to plain `[img]URL[/img]` images. Removes sub, sup, and list tags. |
+| **HDSPACE** | Strips colors, hides, and spoilers. If an image is hosted on a host other than Imgbox, it is forced to reside on a separate line (`\n`) to prevent broken forum grids. |
+| **HDTORRENTS** | Converts standard spoilers to `[hide]`, strips image resizing, and limits cover heights to a rigid `137px` via HTML elements. |
+| **TORRENTLEECH** | Converts BBCode centralizing to HTML `<center>`. Converts `[hr]` to `---`. Replaces screenshot blocks with pure HTML links utilizing inline CSS `style="max-width: XXXpx;"` formatting. Removes lists and spoilers. |
 | **UNIT3D (Generic)** | Converts all legacy `[hide]` blocks to `[spoiler]` for visual consistency across modern UNIT3D tracker layouts. Converts image comparisons to collapsible details tags (`[collapse]`). |
 
 ---

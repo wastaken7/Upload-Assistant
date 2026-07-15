@@ -67,7 +67,7 @@ The duplicate checking module (`dupe_checking.py`) uses custom rules for books t
 - **File Type Validation**: For ebooks, different file formats (e.g., EPUB vs PDF) are checked. Uploading an EPUB will not be marked as a duplicate of an existing PDF, allowing multiple formats of the same book to co-exist.
 
 > [!IMPORTANT]
-> **CBR Tracker Exception**: For the **CBR** tracker, different ebook formats *are* considered duplicates under the `BOOK` category because this tracker only allows one format per book.
+> **CAPYBARABR Tracker Exception**: For the **CAPYBARABR** tracker, different ebook formats *are* considered duplicates under the `BOOK` category because this tracker only allows one format per book.
 
 ---
 
@@ -120,17 +120,17 @@ config = {
 
 The following trackers support the `BOOK` category with custom metadata mapping (e.g., custom form templates, category IDs, and naming patterns):
 
-- **ASC**: Maps book-specific metadata (author, title) and structures the torrent name as `{author} - {title}`.
-- **BJS**: Fully supports books, audiobooks, comics, mangas, magazines, and newspapers with detailed metadata mappings (format, page count, publisher, ISBN, cover image, description).
-- **BT**: Supports standard book metadata mapping.
-- **CBR**: Supports books, audiobooks, and comics/manga. Treats different ebook formats as duplicates since only one format is allowed per book.
-- **DC**: Supports ebooks and audiobooks. Generates a rich description block with cover image, author, narrator, publisher, ISBN, year, duration (for audiobooks), and synopsis.
-- **HHD**: Supports books, audiobooks, comics, manga, and magazines as separate categories (UNIT3D).
-- **IS**: Supports ebooks, audiobooks, comics, and magazines. Uses cookie-based authentication for uploads.
-- **LDU**: Supports ebooks and audiobooks as distinct UNIT3D categories.
+- **AMIGOSSHARE**: Maps book-specific metadata (author, title) and structures the torrent name as `{author} - {title}`.
+- **BJSHARE**: Fully supports books, audiobooks, comics, mangas, magazines, and newspapers with detailed metadata mappings (format, page count, publisher, ISBN, cover image, description).
+- **BRASILTRACKER**: Supports standard book metadata mapping.
+- **CAPYBARABR**: Supports books, audiobooks, and comics/manga. Treats different ebook formats as duplicates since only one format is allowed per book.
+- **DIGITALCORE**: Supports ebooks and audiobooks. Generates a rich description block with cover image, author, narrator, publisher, ISBN, year, duration (for audiobooks), and synopsis.
+- **HOMIEHELPDESK**: Supports books, audiobooks, comics, manga, and magazines as separate categories (UNIT3D).
+- **IMMORTALSEED**: Supports ebooks, audiobooks, comics, and magazines. Uses cookie-based authentication for uploads.
+- **LASTDIGITALUNDERGROUND**: Supports ebooks and audiobooks as distinct UNIT3D categories.
 - **LST**: Supports books with OpenLibrary integration, submitting the OpenLibrary Work ID and ISBN alongside the torrent upload.
-- **LT**: Supports ebooks, audiobooks, comics, and magazines. For audiobooks, appends the narration language to the torrent name (e.g., `(Narración en Castellano)`). Also supports volume/issue and edition info in the name.
-- **SAM**: Brazilian tracker (UNIT3D). Maps books to `LIVROS`, audiobooks to `AUDIOBOOK`, and comics/manga to `HQS_E_MANGAS`.
-- **SPD**: Supports the `BOOK` category as a unified type (category ID 6), without subcategory splitting.
-- **TL**: Supports standard book metadata mapping.
-- **YUS**: Supports ebooks and audiobooks as distinct UNIT3D categories.
+- **LATTEAM**: Supports ebooks, audiobooks, comics, and magazines. For audiobooks, appends the narration language to the torrent name (e.g., `(Narracion en Castellano)`). Also supports volume/issue and edition info in the name.
+- **SAMARITANO**: Brazilian tracker (UNIT3D). Maps books to `LIVROS`, audiobooks to `AUDIOBOOK`, and comics/manga to `HQS_E_MANGAS`.
+- **SPEEDAPP**: Supports the `BOOK` category as a unified type (category ID 6), without subcategory splitting.
+- **TORRENTLEECH**: Supports standard book metadata mapping.
+- **YUSCENE**: Supports ebooks and audiobooks as distinct UNIT3D categories.

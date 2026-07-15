@@ -27,7 +27,7 @@ upload.py [path...] [options]
 - `--queue QUEUE_NAME`: Process an entire folder (including files/subfolders) in a named queue.
 - `-lq`, `--limit-queue N`: Limit the amount of sucessfull uploads processed when running the queue (default `0` unlimited).
 - `-sc`, `--site-check`: Search trackers for suitable uploads and create a log file (no uploading).
-- `-su`, `--site-upload TRACKER`: Process site searches and upload to a single tracker (tracker acronym is uppercased).
+- `-su`, `--site-upload TRACKER`: Process site searches and upload to a single tracker (the tracker identifier is normalized to uppercase).
 - `--unit3d`: Parse a text output file from `UNIT3D-Upload-Checker`.
 
 ### Argument-Embedded Text Queue (.txt)
@@ -140,17 +140,17 @@ Note: if a manual TMDb or IMDb id is present in the incoming `meta` before parsi
 These accept either an id or a full URL; when a URL is provided, the parser attempts to extract the id.
 These will parse the torrent descriptions from supported sites, and grab metadata ids to assist with accuracy.
 
-- `-ptp`, `--ptp ID_OR_URL`: PTP torrent id/permalink. (Extracts `torrentid` from query string.)
-- `-blu`, `--blu ID_OR_URL`: BLU torrent id/link. (Extracts last path segment.)
+- `-ptp`, `--ptp ID_OR_URL`: PASSTHEPOPCORN torrent id/permalink. (Extracts `torrentid` from query string.)
+- `-blu`, `--blu ID_OR_URL`: BLUTOPIA torrent id/link. (Extracts last path segment.)
 - `-aither`, `--aither ID_OR_URL`: Aither torrent id/link. (Extracts last path segment.)
 - `-lst`, `--lst ID_OR_URL`: LST torrent id/link. (Extracts last path segment.)
-- `-oe`, `--oe ID_OR_URL`: OE torrent id/link. (Extracts last path segment.)
-- `-tik`, `--tik ID_OR_URL`: TIK torrent id/link. (No URL parsing here; passes through.)
-- `-hdb`, `--hdb ID_OR_URL`: HDB torrent id/link. (Extracts `id` from query string.)
+- `-oe`, `--oe ID_OR_URL`: ONLYENCODES torrent id/link. (Extracts last path segment.)
+- `-tik`, `--tik ID_OR_URL`: CINEMATIK torrent id/link. (No URL parsing here; passes through.)
+- `-hdb`, `--hdb ID_OR_URL`: HDBITS torrent id/link. (Extracts `id` from query string.)
 - `-btn`, `--btn ID_OR_URL`: BTN torrent id/link. (Extracts `id` from query string.)
-- `-bhd`, `--bhd ID_OR_URL`: BHD torrent id/link.
+- `-bhd`, `--bhd ID_OR_URL`: BEYONDHD torrent id/link.
   - Tries to extract trailing numeric id from URLs like `/download/... .12345`.
-- `-huno`, `--huno ID_OR_URL`: HUNO torrent id/link. (Extracts last path segment.)
+- `-huno`, `--huno ID_OR_URL`: HAWKEUNO torrent id/link. (Extracts last path segment.)
 - `-ulcx`, `--ulcx ID_OR_URL`: ULCX torrent id/link. (Extracts last path segment.)
 
 Thise will use the specified hash to get tracker ids from qBitTorrent or rTorrent.
@@ -159,7 +159,7 @@ Thise will use the specified hash to get tracker ids from qBitTorrent or rTorren
 ## Upload selection / dupe / requests
 
 - `-tk`, `--trackers LIST`: Upload only to these trackers (instead of a default torrent list from config).
-  - Accepts comma-separated tracker acronyms (e.g. `--trackers blu,bhd`) and normalizes to uppercase.
+  - Accepts comma-separated tracker identifiers (e.g. `--trackers blutopia,beyondhd`) and normalizes to uppercase.
 - `-rtk`, `--trackers-remove LIST`: Remove only these trackers when processing default trackers.
 - `-tpc`, `--trackers-pass N`: How many trackers must pass checks (dupe/banned-group/etc) for the uploading process to complete.
 - `-req`, `--search_requests`: Search for matching requests on supported trackers.
@@ -168,7 +168,7 @@ Thise will use the specified hash to get tracker ids from qBitTorrent or rTorren
 - `-sdc`, `--skip-dupe-check`: Ignore dupes and upload anyway (skips dupe check). NOTE: know what you are doing!
 - `-sda`, `--skip-dupe-asking`: Don’t prompt about any dupes that Upload Assistant finds; just treat these dupes as actual dupes.
 - `-ddc`, `--double-dupe-check`: Run a second dupe-check pass on trackers that previously passed checks, immediately before uploading. NOTE: mainly useful when racing as a preventive dupe upload catch.
-- `-dr`, `--draft`: Send to drafts (BHD, LST).
+- `-dr`, `--draft`: Send to drafts (BEYONDHD, LST).
 - `-mq`, `--modq`: Send to modQ. NOTE: only for suppported UNIT3D type sites.
 - `-fl`, `--freeleech N`: Freeleech percentage (1–100). Default `0`. NOTE: accepts any numeric value, although UNIT3D defaults to only allowing filtering of specific percentages.
 
@@ -216,9 +216,9 @@ Thise will use the specified hash to get tracker ids from qBitTorrent or rTorren
 
 - `-vs`, `--vapoursynth`: Use VapourSynth for screenshots (requires VS install). NOTE: probably broken.
 
-## SPD-only
+## SPEEDAPP-only
 
-- `-ch`, `--channel ID_OR_TAG`: SPD: Channel id number or tag (without `@`).
+- `-ch`, `--channel ID_OR_TAG`: SPEEDAPP: Channel id number or tag (without `@`).
 
 ## Usenet uploading
 

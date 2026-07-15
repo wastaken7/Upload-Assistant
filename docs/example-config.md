@@ -24,7 +24,7 @@ The config is a Python dict named `config` with these top-level sections:
 
 Notes:
 - Many numeric values are stored as strings (e.g. `"4"`, `"14000"`). Keep the same type unless you know a specific option is numeric.
-- Tracker lists are usually a comma-separated string (e.g. `"MTV, BHD"`).
+- Tracker lists are usually a comma-separated string using tracker identifiers (e.g. `"MORETHANTV, BEYONDHD"`).
 
 ## How Upload Assistant uses this config (implementation context)
 
@@ -231,7 +231,7 @@ Implementation notes:
 
 ## `IMAGES` section
 
-Static icon images used in some description layouts (notably AR DB link icons):
+Static icon images used in some description layouts (notably ALPHARATIO DB link icons):
 - `imdb_75`, `tmdb_75`, `tvdb_75`, `tvmaze_75`, `mal_75`
 
 ---
@@ -239,19 +239,19 @@ Static icon images used in some description layouts (notably AR DB link icons):
 ## `TRACKERS` section
 
 ### `default_trackers`
-A comma-separated list of tracker acronyms to upload to by default.
+A comma-separated list of tracker identifiers to upload to by default.
 
 Example:
 
 ```python
-"default_trackers": "MTV, BHD, AITHER"
+"default_trackers": "MORETHANTV, BEYONDHD, AITHER"
 ```
 
 ### Per-tracker blocks
-Each tracker acronym (e.g. `"AITHER"`, `"BLU"`) contains a dict of settings.
+Each tracker identifier (e.g. `"AITHER"`, `"BLUTOPIA"`) contains a dict of settings.
 
 Common keys you will see:
-- `link_dir_name` (str): Custom folder name used when linking content (instead of the acronym).
+- `link_dir_name` (str): Custom folder name used when linking content (instead of the tracker identifier).
 - `use_for_search` (bool): Enable tracker API usage for automatic ID searching/description parsing (some trackers only). (Legacy name: `useAPI`)
 - `api_key` (str): Tracker API key (UNIT3D-style trackers commonly use this).
 - `announce_url` (str): Tracker announce URL (often contains `<PASSKEY>` placeholders).
@@ -288,7 +288,7 @@ Typical keys:
 - `qbit_user` / `qbit_pass` (str): Credentials.
 - `qbit_api_key` (str): Optional. API Key to authenticate using stateless API Key authentication (qBittorrent v5.2.0+). When set, `qbit_user` and `qbit_pass` are ignored.
 - `super_seed_trackers` (list[str]): Trackers to enable super-seeding on.
-- `use_tracker_as_tag` (bool): Tag torrents with tracker acronym.
+- `use_tracker_as_tag` (bool): Tag torrents with the tracker identifier.
 - `qbit_tag` / `qbit_cat` (str): Tag/category for uploaded torrents.
 - `qbit_cross_tag` / `qbit_cross_cat` (str): Tag/category for cross-seed torrents.
 - `content_layout` (str): Layout hint (example default `"Original"`).

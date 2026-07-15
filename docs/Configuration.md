@@ -29,7 +29,7 @@
 
 * Default Trackers: `default_trackers` **REQUIRED**
   * A comma separated list of trackers to upload to
-  * Currently Supported: `BLU, BHD, MANUAL`
+  * Currently Supported: `BLUTOPIA, BEYONDHD, MANUAL`
   * `MANUAL` = passing `-m` / `--manual`
 
 * API Key: `api_key`
