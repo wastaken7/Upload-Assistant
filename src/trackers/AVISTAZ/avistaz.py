@@ -1,4 +1,4 @@
-﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 from src.meta import Meta
@@ -41,9 +41,9 @@ class AvistaZ(AZTrackerBase):
         if video_encode:
             video_encode = video_encode.strip().lower()
 
-        type = meta.type
-        if type:
-            type = type.strip().lower()
+        release_type = meta.type
+        if release_type:
+            release_type = release_type.strip().lower()
 
         source = meta.source
         if source:

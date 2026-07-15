@@ -789,6 +789,26 @@ def _get_persistent_cookie_key() -> bytes | None:
         return None
 
 
+def _hash_api_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _normalize_token_store(store: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+    normalized: dict[str, Any] = {}
+    changed = False
+    for key, value in store.items():
+        info_dict = dict(_as_dict(value) or {})
+        token_hash = str(key)
+        if not re.fullmatch(r"[0-9a-f]{64}", token_hash):
+            token_hash = _hash_api_token(token_hash)
+            changed = True
+        if not info_dict.get("token_id"):
+            info_dict["token_id"] = secrets.token_hex(16)
+            changed = True
+        normalized[token_hash] = info_dict
+    return normalized, changed
+
+
 def _load_token_store() -> dict[str, Any]:
     try:
         get_api_tokens_fn = getattr(auth_mod, "get_api_tokens", None)
@@ -800,7 +820,10 @@ def _load_token_store() -> dict[str, Any]:
             result: dict[str, Any] = {}
             for key, value in store_dict.items():
                 result[str(key)] = value
-            return result
+            normalized, changed = _normalize_token_store(result)
+            if changed:
+                _persist_token_store(normalized)
+            return normalized
         return {}
     except Exception:
         return {}
@@ -818,16 +841,16 @@ def _create_api_token(username: str, label: str = "", persist: bool = True, toke
     Optionally accept `token_value` to use an externally-provided token string when persisting.
     """
     store = _load_token_store()
-    token_id = token_value if token_value else secrets.token_urlsafe(96)
-    # Tokens are non-expiring by default and remain valid until revoked.
+    token = token_value if token_value else secrets.token_urlsafe(96)
+    token_hash = _hash_api_token(token)
+    token_id = secrets.token_hex(16)
     expiry = None
-    # Store token metadata (no per-token scopes; tokens are treated as valid/invalid)
-    store[token_id] = {"user": username, "label": label, "created": int(datetime.now(UTC).timestamp()), "expiry": expiry}
+    store[token_hash] = {"token_id": token_id, "user": username, "label": label, "created": int(datetime.now(UTC).timestamp()), "expiry": expiry}
     if persist:
         _persist_token_store(store)
     with contextlib.suppress(Exception):
         _write_audit_log("create_api_token", [username], None, {"id": token_id, "label": label}, True)
-    return token_id
+    return token
 
 
 def _persist_existing_api_token(token: str, username: str, label: str = "") -> bool:
@@ -835,14 +858,15 @@ def _persist_existing_api_token(token: str, username: str, label: str = "") -> b
     if not token:
         return False
     store = _load_token_store()
-    if token in store:
+    token_hash = _hash_api_token(token)
+    if token_hash in store:
         return False
-    # Persisted tokens do not expire unless revoked.
     expiry = None
-    store[token] = {"user": username, "label": label, "created": int(datetime.now(UTC).timestamp()), "expiry": expiry}
+    token_id = secrets.token_hex(16)
+    store[token_hash] = {"token_id": token_id, "user": username, "label": label, "created": int(datetime.now(UTC).timestamp()), "expiry": expiry}
     _persist_token_store(store)
     with contextlib.suppress(Exception):
-        _write_audit_log("create_api_token", [username], None, {"id": token, "label": label}, True)
+        _write_audit_log("create_api_token", [username], None, {"id": token_id, "label": label}, True)
     return True
 
 
@@ -850,7 +874,7 @@ def _verify_api_token(token: str) -> str | None:
     if not token:
         return None
     store = _load_token_store()
-    info = store.get(token)
+    info = store.get(_hash_api_token(token))
     info_dict = _as_dict(info)
     if info_dict is None:
         return None
@@ -866,7 +890,7 @@ def _get_token_info(token: str) -> dict[str, Any] | None:
     if not token:
         return None
     store = _load_token_store()
-    info = store.get(token)
+    info = store.get(_hash_api_token(token))
     info_dict = _as_dict(info)
     if info_dict is None:
         return None
@@ -910,17 +934,26 @@ def _get_bearer_from_header() -> str | None:
     return None
 
 
-def _revoke_api_token(token: str) -> bool:
+def _revoke_api_token(token_or_id: str) -> bool:
     store = _load_token_store()
-    if token in store:
-        owner_info = _as_dict(store[token]) or {}
-        owner = owner_info.get("user")
-        del store[token]
-        _persist_token_store(store)
-        with contextlib.suppress(Exception):
-            _write_audit_log("revoke_api_token", [str(owner)] if owner is not None else [], {"id": token}, None, True)
-        return True
-    return False
+    token_hash = _hash_api_token(token_or_id) if token_or_id else ""
+    store_key = token_hash if token_hash in store else None
+    if store_key is None:
+        for candidate_key, info in store.items():
+            info_dict = _as_dict(info) or {}
+            if info_dict.get("token_id") == token_or_id:
+                store_key = candidate_key
+                break
+    if store_key is None:
+        return False
+    owner_info = _as_dict(store[store_key]) or {}
+    owner = owner_info.get("user")
+    token_id = owner_info.get("token_id")
+    del store[store_key]
+    _persist_token_store(store)
+    with contextlib.suppress(Exception):
+        _write_audit_log("revoke_api_token", [str(owner)] if owner is not None else [], {"id": token_id}, None, True)
+    return True
 
 
 def _list_api_tokens() -> dict[str, Any]:
@@ -1177,10 +1210,6 @@ def _require_auth_for_webui():  # pyright: ignore[reportUnusedFunction]
                         if stored and username == stored:
                             g.authenticated = True
                             g.username = username
-                    else:
-                        # No persisted user yet: accept remembered username as provisional
-                        g.authenticated = True
-                        g.username = username
         # Any failure to validate the cookie should not block request flow; fallback to normal auth
 
     if request.path.startswith("/api/"):
@@ -1431,14 +1460,17 @@ def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: An
             or request.remote_addr
         )
         # Redact sensitive fields from values before serializing to the audit log.
+        path_is_sensitive = any(_is_sensitive_key(component) for component in path)
+        redacted_old_value = "[REDACTED]" if path_is_sensitive and old_value not in (None, "") else _redact_sensitive(old_value)
+        redacted_new_value = "[REDACTED]" if path_is_sensitive and new_value not in (None, "") else _redact_sensitive(new_value)
         audit = {
             "timestamp": datetime.now(UTC).isoformat(),
             "user": user,
             "remote_addr": request.remote_addr,
             "action": action,
             "path": path,
-            "old_value": _json_safe(_redact_sensitive(old_value)),
-            "new_value": _json_safe(_redact_sensitive(new_value)),
+            "old_value": _json_safe(redacted_old_value),
+            "new_value": _json_safe(redacted_new_value),
             "success": success,
             "error": error,
         }
@@ -2096,9 +2128,8 @@ def login_page():
                 auth_mod.create_user(username, password)
             except ValueError as exc:
                 return render_template("login.html", error=str(exc), show_2fa=_totp_enabled())
-            except Exception:  # noqa: S110
-                # Non-fatal persistence error; continue without persisting.
-                pass
+            except Exception:
+                return render_template("login.html", error="Unable to create account", show_2fa=_totp_enabled())
 
             _session_set("authenticated", True)
             with contextlib.suppress(Exception):
@@ -2209,8 +2240,8 @@ def login_recovery():
             auth_mod.create_user(username, password)
         except ValueError as exc:
             return render_template("login_recovery.html", error=str(exc), show_2fa=_totp_enabled())
-        except Exception:  # noqa: S110
-            pass
+        except Exception:
+            return render_template("login_recovery.html", error="Unable to create account", show_2fa=_totp_enabled())
 
         _session_set("authenticated", True)
         with contextlib.suppress(Exception):
@@ -2906,7 +2937,7 @@ def api_tokens():
         tokens: list[dict[str, Any]] = []
         for tid, info in store.items():
             info_dict = _as_dict(info) or {}
-            tokens.append({"id": tid, "user": info_dict.get("user"), "label": info_dict.get("label"), "created": info_dict.get("created"), "expiry": info_dict.get("expiry")})
+            tokens.append({"id": info_dict.get("token_id"), "user": info_dict.get("user"), "label": info_dict.get("label"), "created": info_dict.get("created"), "expiry": info_dict.get("expiry")})
         read_only = False
         return jsonify({"success": True, "tokens": tokens, "read_only": read_only})
 
@@ -3363,6 +3394,18 @@ def execute_command():
                     # Cancellation event for cooperative shutdown
                     cancel_event = threading.Event()
 
+                    # Acquire lock BEFORE any global mutation to prevent concurrent runs
+                    # from corrupting each other's sys.argv and console patches.
+                    try:
+                        acquired = inproc_lock.acquire(timeout=2)
+                    except TypeError:
+                        acquired = inproc_lock.acquire(blocking=False)
+
+                    if not acquired:
+                        console.print(f"Failed to acquire inproc lock for session {session_id}; another inproc run may be active", markup=False)
+                        yield f"data: {json.dumps({'type': 'error', 'data': 'Another in-process run is active'})}\n\n"
+                        return
+
                     # Monkeypatch the existing shared console to record prints and intercept input
                     orig_console: Any = src_console.console
 
@@ -3569,20 +3612,6 @@ def execute_command():
                                 inproc_lock.release()
 
                         worker = threading.Thread(target=run_upload, daemon=True)
-                        # Acquire lock to prevent concurrent inproc runs (avoids cross-session interference)
-                        # Use a timed acquire so we don't block indefinitely; if we fail
-                        # to acquire the lock, return an error to the client.
-                        try:
-                            acquired = inproc_lock.acquire(timeout=2)
-                        except TypeError:
-                            # Some older Python runtimes may not support timeout parameter
-                            acquired = inproc_lock.acquire(blocking=False)
-
-                        if not acquired:
-                            console.print(f"Failed to acquire inproc lock for session {session_id}; another inproc run may be active", markup=False)
-                            yield f"data: {json.dumps({'type': 'error', 'data': 'Another in-process run is active'})}\n\n"
-                            return
-
                         worker.start()
 
                         # Record worker thread for debugging/cleanup
@@ -3925,9 +3954,11 @@ def send_input():
             if not _token_is_valid(bearer):
                 return jsonify({"error": "Forbidden (invalid token)", "success": False}), 403
         else:
-            # Require a web session for non-token callers
+            # Require a web session plus CSRF and same-origin checks for non-token callers
             if not _is_authenticated():
                 return jsonify({"error": "Authentication required (web session)", "success": False}), 401
+            if not _verify_csrf_header() or not _verify_same_origin():
+                return jsonify({"error": "CSRF/Origin validation failed", "success": False}), 403
 
         if session_id not in active_processes:
             return jsonify({"error": "No active process", "success": False}), 404
@@ -3991,6 +4022,8 @@ def kill_process():
         else:
             if not _is_authenticated():
                 return jsonify({"error": "Authentication required (web session)", "success": False}), 401
+            if not _verify_csrf_header() or not _verify_same_origin():
+                return jsonify({"error": "CSRF/Origin validation failed", "success": False}), 403
 
         if session_id not in active_processes:
             return jsonify({"error": "No active process", "success": False}), 404

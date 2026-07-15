@@ -1,4 +1,4 @@
-﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from typing import Any, cast
 
@@ -157,19 +157,16 @@ class OldToonsWorld(UNIT3D):
         return True
 
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
-        meta_type = str(meta.type)
-        if meta.is_disc == "BDMV":
-            return {"type_id": "1"}
-        if meta.is_disc and meta.is_disc != "BDMV":
-            return {"type_id": "7"}
-        if meta_type == "DVDRIP":
-            return {"type_id": "8"}
-        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "3"}
+        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "3", "DVDRIP": "8"}
         if mapping_only:
             return type_id
         if reverse:
             return {v: k for k, v in type_id.items()}
-        type_value = type if type is not None else meta_type
+        if meta.is_disc == "BDMV":
+            return {"type_id": "1"}
+        if meta.is_disc and meta.is_disc != "BDMV":
+            return {"type_id": "7"}
+        type_value = type if type is not None and type != "" else str(meta.type)
         return {"type_id": type_id.get(type_value, "0")}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:

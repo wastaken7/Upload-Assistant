@@ -470,10 +470,12 @@ class AZTrackerBase:
             [img.get("raw_url") for img in meta.spectrograms_images if img.get("raw_url")] if self.config["TRACKERS"][self.tracker].get("add_audio_spectrogram", False) else []
         )
 
+        upload_referer = f"{self.base_url}/upload/{meta.category.lower()}"
+
         async def upload_local_file(path: Path):
             async with aiofiles.open(path, "rb") as f:
                 image_bytes = await f.read()
-            return await self.img_host(meta, self.tracker, image_bytes, path.name)
+            return await self.img_host(meta, upload_referer, image_bytes, path.name)
 
         async def upload_remote_file(url: str):
             try:
@@ -481,7 +483,7 @@ class AZTrackerBase:
                 response.raise_for_status()
                 image_bytes = response.content
                 filename = Path(urlparse(url).path).name or "screenshot.png"
-                return await self.img_host(meta, self.tracker, image_bytes, filename)
+                return await self.img_host(meta, upload_referer, image_bytes, filename)
             except Exception as e:
                 logger.info(f"Failed to process screenshot from URL {url}: {e}", extra={"markup": False})
                 return None
@@ -505,15 +507,15 @@ class AZTrackerBase:
                 if result:
                     results.append(result)
 
-        else:
-            image_links = [str(img.get("raw_url")) for img in meta.image_list if img.get("raw_url")]
-            remaining_slots = max(0, limit - len(results) - len(audio_spectrogram_links))
-            links = image_links[:remaining_slots]
+        # Always fill remaining slots from remote image_list after processing local files
+        image_links = [str(img.get("raw_url")) for img in meta.image_list if img.get("raw_url")]
+        remaining_slots = max(0, limit - len(results) - len(audio_spectrogram_links))
+        links = image_links[:remaining_slots]
 
-            for url in links:
-                result = await upload_remote_file(url)
-                if result:
-                    results.append(result)
+        for url in links:
+            result = await upload_remote_file(url)
+            if result:
+                results.append(result)
 
         # Upload audio spectrogram images
         remaining_slots = max(0, limit - len(results))

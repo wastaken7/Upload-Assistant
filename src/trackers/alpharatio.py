@@ -162,7 +162,7 @@ class AlphaRatio:
                     if each["type"] == "DVD":
                         description += f"{each['name']}:\n"
                         description += (
-                            f"[hide={Path(each['vob']).name}][code][{each['vob_mi']}[/code][/hide] [hide={Path(each['ifo']).name}][code][{each['ifo_mi']}[/code][/hide]\n\n"
+                            f"[hide={Path(each['vob']).name}][code]{each['vob_mi']}[/code][/hide] [hide={Path(each['ifo']).name}][code]{each['ifo_mi']}[/code][/hide]\n\n"
                         )
             # description += common.get_links(movie, "[COLOR=red][size=4]", "[/size][/color]")
             elif discs[0]["type"] == "DVD":
@@ -370,7 +370,10 @@ class AlphaRatio:
         # Tag Compilation
         genres_raw = meta.genres
         genres = ""
-        if isinstance(genres_raw, str) and genres_raw.strip():
+        if isinstance(genres_raw, list):
+            tags_parts = [str(item).strip() for item in genres_raw if str(item).strip()]
+            genres = ", ".join(tags_parts)
+        elif isinstance(genres_raw, str) and genres_raw.strip():
             tags_parts: list[str] = []
             for item in genres_raw.split(","):
                 for subitem in item.split("&"):
@@ -378,7 +381,7 @@ class AlphaRatio:
                     if stripped:
                         tags_parts.append(stripped)
             genres = ", ".join(tags_parts)
-            genres = re.sub(r"\.{2,}", ".", genres)
+        genres = re.sub(r"\.{2,}", ".", genres)
 
         # adding tags
         tags = ""

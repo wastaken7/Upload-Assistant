@@ -729,6 +729,8 @@ async def get_tmdb_id(
                                 await cleanup_manager.cleanup()
                                 cleanup_manager.reset_terminal()
                                 sys.exit(1)
+                            if not selection.strip():
+                                break
                             try:
                                 # Check if it's a manual TMDb ID entry
                                 if "/" in selection and (selection.lower().startswith("tv/") or selection.lower().startswith("movie/")):
@@ -1516,7 +1518,7 @@ async def get_romaji(tmdb_name: str, mal: int | None, meta: Meta) -> tuple[str, 
         result: dict[str, Any] = {"title": {}}
         difference: float = 0.0
         best_match_with_season: dict[str, Any] | None = None
-        best_season_diff = float("inf")
+        best_season_similarity = 0.0
 
         for anime in media:
             anime_title = typing_cast(dict[str, Any], anime.get("title", {}))
@@ -1547,11 +1549,11 @@ async def get_romaji(tmdb_name: str, mal: int | None, meta: Meta) -> tuple[str, 
                         and anime_season is not None
                         and anime_season == expected_season
                         and diff > difference * 0.8
-                        and (best_match_with_season is None or diff > best_season_diff)
+                        and (best_match_with_season is None or diff > best_season_similarity)
                     ):
                         # If season matches and title similarity is reasonable, prefer this
                         best_match_with_season = anime
-                        best_season_diff = diff
+                        best_season_similarity = diff
 
                     # Keep track of best overall match
                     if diff > difference:
@@ -1846,7 +1848,10 @@ async def get_logo(
             # Make HTTP request only if logo_json is not provided
             async with httpx.AsyncClient() as client:
                 endpoint = "tv" if category == "TV" else "movie"
-                image_response = await client.get(f"{tmdb_base_url}/{endpoint}/{tmdb_id}/images", params={"api_key": tmdb_api_key})
+                # Fall back to module-level values when caller did not supply overrides
+                resolved_api_key = tmdb_api_key if tmdb_api_key is not None else globals()["tmdb_api_key"]
+                resolved_base_url = tmdb_base_url if tmdb_base_url is not None else TMDB_BASE_URL
+                image_response = await client.get(f"{resolved_base_url}/{endpoint}/{tmdb_id}/images", params={"api_key": resolved_api_key})
                 try:
                     image_response.raise_for_status()
                     image_data = image_response.json()

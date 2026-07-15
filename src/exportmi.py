@@ -66,13 +66,15 @@ def setup_mediainfo_library(base_dir: str) -> dict[str, Any] | None:
 
         if lib_available:
             # Set library directory for LD_LIBRARY_PATH
+            lib_dir_str = str(lib_dir)
             current_ld_path = os.environ.get("LD_LIBRARY_PATH", "")
-            if lib_dir not in current_ld_path:
+            current_paths = current_ld_path.split(os.pathsep) if current_ld_path else []
+            if lib_dir_str not in current_paths:
                 if current_ld_path:
-                    os.environ["LD_LIBRARY_PATH"] = f"{lib_dir}:{current_ld_path}"
+                    os.environ["LD_LIBRARY_PATH"] = f"{lib_dir_str}{os.pathsep}{current_ld_path}"
                 else:
-                    os.environ["LD_LIBRARY_PATH"] = lib_dir
-                logger.debug(f"[blue]Updated LD_LIBRARY_PATH to include: {lib_dir}[/blue]")
+                    os.environ["LD_LIBRARY_PATH"] = lib_dir_str
+                logger.debug(f"[blue]Updated LD_LIBRARY_PATH to include: {lib_dir_str}[/blue]")
 
         return {"cli": mediainfo_cli if cli_available else None, "lib": mediainfo_lib if lib_available else None, "lib_dir": lib_dir}
     return None

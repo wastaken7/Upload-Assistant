@@ -1,4 +1,4 @@
-﻿import re
+import re
 import unicodedata
 from pathlib import Path
 from typing import Any

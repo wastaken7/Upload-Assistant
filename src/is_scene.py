@@ -105,11 +105,12 @@ class SceneManager:
                     # NFO Download Handling
                     if not meta.nfo and first_result.get("hasNFO") == "yes":
                         try:
-                            release = first_result["release"]
-                            release_lower = release.lower()
+                            release = str(first_result["release"])
+                            safe_release = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(release).name).strip("._") or "scene_release"
+                            release_lower = safe_release.lower()
 
                             # Details Cache
-                            details_cache_file = Path(details_cache_dir) / f"{release}.json"
+                            details_cache_file = Path(details_cache_dir) / f"{safe_release}.json"
                             release_details_dict = None
 
                             if Path(details_cache_file).exists():
@@ -131,8 +132,8 @@ class SceneManager:
                                 try:
                                     for file in release_details_dict.get("files", []):
                                         if file["name"].endswith(".nfo"):
-                                            release_lower = Path(file["name"]).stem
-                                except KeyError, ValueError:
+                                            release_lower = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(file["name"]).stem).strip("._") or release_lower
+                                except (KeyError, ValueError):
                                     pass
 
                             nfo_url = f"https://www.srrdb.com/download/file/{release}/{release_lower}.nfo"

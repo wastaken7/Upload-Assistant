@@ -149,7 +149,7 @@ class SeasonEpisodeManager:
                         meta.mal_id = mal_id_value
                     anilist_episodes = _safe_int(anilist_episodes, 0)
                     if meta.tmdb_id == 0:
-                        year = str(parsed.get("anime_year", season_year))
+                        year = str(parsed.get("anime_year") or season_year)
                         guess_title = _guessit_data(str(parsed.get("anime_title", "")), {"excludes": ["country", "language"]}).get("title", "")
                         tmdb_id_value, category_value = await self.tmdb_manager.get_tmdb_id(str(guess_title), year, meta.category, meta.filename)
                         meta.tmdb_id = tmdb_id_value
@@ -423,7 +423,7 @@ class SeasonEpisodeManager:
         # Normalize season_int once so all (season, episode) tuples are (int, int)
         raw_season_int = meta.season_int
         try:
-            default_season_num = raw_season_int
+            default_season_num = int(raw_season_int)
         except TypeError, ValueError:
             default_season_num = 1
 

@@ -1,4 +1,4 @@
-﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, cast
 
 import aiofiles
@@ -30,8 +30,8 @@ class Swarmazon:
     def __init__(self, config: Config) -> None:
         self.config: Config = config
 
-    async def get_type_id(self, type: str) -> str:
-        return {"BluRay": "3", "Web": "1", "DVD": "2"}.get(type, "0")
+    async def get_type_id(self, media_type: str) -> str:
+        return {"BluRay": "3", "Web": "1", "DVD": "2"}.get(media_type, "0")
 
     async def upload(self, meta: Meta) -> bool:
         common = Common(config=self.config)

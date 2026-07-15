@@ -211,9 +211,9 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
     try:
         base_dir = meta.base_dir
         uuid = meta.uuid
-        debug_path = Path(base_dir) / "tmp" / uuid / f"debug_bluray_{release_type}.html"
+        debug_path = Path(base_dir) / "tmp" / uuid / f"debug_bluray_{release_type}_{product_id}.html"
         await asyncio.to_thread(debug_path.write_text, html_content, encoding="utf-8")
-        logger.debug(f"[dim]Saved releases response to debug_bluray_{release_type}.html[/dim]")
+        logger.debug(f"[dim]Saved releases response to debug_bluray_{release_type}_{product_id}.html[/dim]")
     except Exception as e:
         logger.info(f"[dim]Could not save debug file: {e!s}[/dim]")
 
@@ -243,11 +243,6 @@ async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Rel
             elif not is_3d and not is_4k and "Blu-ray Editions" in section_title and "3D Blu-ray Editions" not in section_title and "4K Blu-ray Editions" not in section_title:
                 filtered_sections.append(section)
                 logger.debug(f"[green]Including standard Blu-ray section: {section_title}[/green]")
-
-        # If no sections match our filter criteria, use all sections
-        if not filtered_sections:
-            logger.info("[yellow]No sections match exact media type, using all available sections[/yellow]")
-            filtered_sections = selected_sections
 
         for _section_idx, section in enumerate(filtered_sections, 1):
             parent_tr: Any = section.find_parent("tr")
@@ -342,7 +337,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
         resolution = meta.resolution.lower()
         is_4k = "2160p" in resolution or "4k" in resolution
         release_type = "4K" if is_4k else "3D" if is_3d else "BD"
-        release_debug_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/debug_bluray_{release_type}.html"
+        release_debug_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/debug_bluray_{release_type}_{product_id}.html"
 
         try:
             if Path(release_debug_filename).exists():

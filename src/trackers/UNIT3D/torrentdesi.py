@@ -1,4 +1,4 @@
-﻿from typing import Any
+from typing import Any
 
 from src.meta import Meta
 from src.trackers.UNIT3D import UNIT3D

@@ -212,7 +212,7 @@ class QueueManager:
                     (Path(alt_path).is_dir() and await QueueManager.should_include_directory(alt_path, allowed_extensions))
                     or (alt_path.is_file() and (allowed_extensions_tuple is None or alt_path.name.lower().endswith(allowed_extensions_tuple)))
                 ):
-                    entry_paths.append(alt_path)
+                    entry_paths.append(str(alt_path))
 
         return entry_paths
 

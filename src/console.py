@@ -195,7 +195,7 @@ def _load_tracker_display_map() -> tuple[dict[str, str], dict[str, str], re.Patt
     _tracker_name_map = mapping
     _tracker_style_map = styles
     if mapping:
-        names = sorted({re.escape(name) for name in mapping.values()}, key=len, reverse=True)
+        names = sorted({re.escape(name) for name in mapping}, key=len, reverse=True)
         _tracker_name_pattern = re.compile(r"(https?://\S+)|" + r"\b(" + "|".join(names) + r")\b", re.IGNORECASE)
     else:
         _tracker_name_pattern = None

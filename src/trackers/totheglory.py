@@ -1,4 +1,4 @@
-﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import re
 from pathlib import Path
@@ -319,8 +319,8 @@ class ToTheGlory:
                 if each["type"] == "DVD":
                     parts.append(f"{each.get('name', '')}:\n")
                     parts.append(
-                        f"[quote={Path(str(each.get('vob', ''))).name}][{each.get('vob_mi', '')}[/quote] "
-                        f"[quote={Path(str(each.get('ifo', ''))).name}][{each.get('ifo_mi', '')}[/quote]\n"
+                        f"[quote={Path(str(each.get('vob', ''))).name}]{each.get('vob_mi', '')}[/quote] "
+                        f"[quote={Path(str(each.get('ifo', ''))).name}]{each.get('ifo_mi', '')}[/quote]\n"
                     )
                     parts.append("\n")
         else:

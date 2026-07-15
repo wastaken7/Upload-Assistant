@@ -216,7 +216,7 @@ class HawkeUno(UNIT3D):
         resolved_id = resolution_id.get(meta_resolution, "10")
         return {"resolution_id": resolved_id}
 
-    async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+    async def get_type_id(self, meta: Meta, media_type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
             "DISC": "1",
             "REMUX": "2",
@@ -230,8 +230,8 @@ class HawkeUno(UNIT3D):
             return type_id
         if reverse:
             return {v: k for k, v in type_id.items()}
-        if type:
-            return {"type_id": type_id.get(type, "0")}
+        if media_type:
+            return {"type_id": type_id.get(media_type, "0")}
         meta_type = meta.type or ""
         resolved_id = type_id.get(meta_type, "0")
         return {"type_id": resolved_id}

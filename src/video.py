@@ -18,13 +18,9 @@ from src.meta import Meta
 
 class VideoManager:
     async def get_uhd(self, type: str, guess: Any, resolution: str, path: str) -> str:
-        try:
-            guess_dict = cast(dict[str, Any], guess)
-            source = guess_dict["Source"]
-            other = guess_dict["Other"]
-        except Exception:
-            source = ""
-            other = ""
+        guess_dict = cast(dict[str, Any], guess)
+        source = str(guess_dict.get("Source", ""))
+        other = str(guess_dict.get("Other", ""))
         uhd = ""
         if (source == "Blu-ray" and other == "Ultra HD") or source == "Ultra HD Blu-ray" or "UHD" in path:
             uhd = "UHD"

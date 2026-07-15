@@ -363,7 +363,7 @@ async def merge_meta(meta: Meta, saved_meta: dict[str, Any]) -> dict[str, Any]:
         "game_subcategory",
         "game_system",
         "game_version",
-        "hardcoded-subs",
+        "hardcoded_subs",
         "hdb",
         "igdb_manual",
         "imdb",
@@ -672,16 +672,16 @@ async def _prompt_game_meta(meta: Meta) -> None:
         is_console = platform not in pc_platforms
 
         if is_console:
-            needs_game_system = meta.game_system in ("PS1", "PS2", "PSP", "WII", "WIIU", "X360")
-            needs_game_region = meta.game_system in (
+            needs_game_system = platform in {"PS1", "PS2", "PSP", "WII", "WIIU", "X360"}
+            needs_game_region = platform in {
                 "3DS",
                 "NDS",
                 "PSVITA",
                 "PS1",
                 "PS2",
                 "PS3",
-            )
-            needs_container = meta.game_system in ("SWITCH")
+            }
+            needs_container = platform in {"SWITCH", "X360"}
 
             if needs_game_system and not meta.game_system:
                 system_choices = ["PAL", "NTSC-U", "NTSC-J", "Skip"]
@@ -798,7 +798,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None) -> bool:
     raw_trackers: list[str] | str = meta.trackers
     if isinstance(raw_trackers, list):
         raw_trackers_list = raw_trackers
-        trackers = [t for t in raw_trackers_list if t]
+        trackers = [t.strip().upper() for t in raw_trackers_list if t.strip()]
     else:
         trackers = [t.strip().upper() for t in raw_trackers.split(",") if t.strip()] if raw_trackers != "" else []
     meta.trackers = trackers

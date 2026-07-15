@@ -482,66 +482,8 @@ class CookieValidator:
     def _load_cookies_secure(self, session: Any, cookiefile: str, tracker: str) -> None:
         """Securely load session cookies from JSON instead of pickle"""
 
-        # Check for legacy pickle file and migrate if needed
-        pickle_file = cookiefile.replace(".json", ".pickle")
-        legacy_pickle_file = f"{Path(cookiefile).parent}/{tracker}"  # Legacy filename without extension
-
-        # Try to migrate from pickle files
-        for potential_pickle in [pickle_file, legacy_pickle_file]:
-            if Path(potential_pickle).exists() and not Path(cookiefile).exists():
-                try:
-                    logger.info(f"[yellow]Migrating legacy cookie file from {potential_pickle} to {cookiefile}[/yellow]")
-
-                    # Load the pickle file
-                    with Path(potential_pickle).open("rb") as f:
-                        session_cookies = pickle.load(f)  # noqa: S301 - Legacy migration only
-
-                    # Convert to JSON format
-                    cookie_dict = {}
-                    for cookie in session_cookies:
-                        cookie_dict[cookie.name] = {
-                            "value": cookie.value,
-                            "domain": cookie.domain,
-                            "path": cookie.path,
-                            "secure": cookie.secure,
-                            "expires": getattr(cookie, "expires", None),
-                        }
-
-                    # Save as JSON
-                    with Path(cookiefile).open("w", encoding="utf-8") as f:
-                        json.dump(cookie_dict, f, indent=2)
-
-                    # Set restrictive permissions
-                    Path(cookiefile).chmod(stat.S_IRUSR | stat.S_IWUSR)
-
-                    # Verify the migration was successful by loading the JSON
-                    try:
-                        with Path(cookiefile).open(encoding="utf-8") as f:
-                            json.load(f)  # Just verify it can be loaded
-
-                        # Migration verified successful - delete the old pickle file
-                        Path(potential_pickle).unlink()
-                        logger.info(f"[green]Successfully migrated cookies to JSON format and removed legacy file {potential_pickle}[/green]")
-
-                    except (OSError, json.JSONDecodeError) as verify_error:
-                        logger.info(f"[red]Migration verification failed: {verify_error}. Keeping original file {potential_pickle}[/red]")
-                        # Remove the potentially corrupted JSON file
-                        if Path(cookiefile).exists():
-                            Path(cookiefile).unlink()
-                        raise
-
-                    break
-
-                except Exception as e:
-                    logger.error(f"[red]Error migrating cookie file {potential_pickle}: {e}[/red]")
-                    # Continue to try next potential file or load JSON normally
-                    continue
-
-            elif Path(potential_pickle).exists() and Path(cookiefile).exists():
-                Path(potential_pickle).unlink()
-                logger.info(f"[yellow]Removed legacy cookie file {potential_pickle}. Using JSON file.[/yellow]")
-
-        # Load cookies from JSON file
+        # Load cookies from JSON file only. Legacy pickle migration is intentionally not automatic
+        # to avoid executing untrusted pickle payloads during normal startup.
         try:
             with Path(cookiefile).open(encoding="utf-8") as f:
                 cookie_dict = json.load(f)

@@ -498,7 +498,7 @@ class ImdbManager:
             if category == "MOVIE":
                 filename = filename.replace("and", "&").replace("And", "&").replace("AND", "&").strip()
 
-            constraints_parts = [f'titleTextConstraint: {{searchTerm: "{filename}"}}']
+            constraints_parts = [f"titleTextConstraint: {{searchTerm: {json.dumps(filename)}}}"]
 
             # Add release date constraint if search_year is provided
             if not wide_search and search_year:

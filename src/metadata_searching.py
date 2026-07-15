@@ -757,7 +757,7 @@ async def get_tv_data(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) 
                 if tvmaze_episode_data:
                     meta.tvmaze_episode_data = tvmaze_episode_data
         if meta.auto_episode_title is None or meta.overview_meta is None:
-            tvmaze_name = meta.tvmaze_episode_data.get("name")
+            tvmaze_name = meta.tvmaze_episode_data.get("episode_name") or meta.tvmaze_episode_data.get("name")
             if meta.auto_episode_title is None and isinstance(tvmaze_name, str):
                 tvmaze_name_lc = tvmaze_name.lower()
                 if tvmaze_name_lc.startswith("episode") or "tba" in tvmaze_name_lc:

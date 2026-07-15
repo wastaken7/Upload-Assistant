@@ -1569,21 +1569,22 @@ class DescriptionBuilder:
                         new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
 
                         # If no screenshots exist, create them
-                        if not new_screens and meta.debug:
-                            logger.info(f"[yellow]No existing screenshots for {new_images_key}; generating new ones.")
-                        try:
-                            await self.takescreens_manager.screenshots(
-                                file,
-                                f"FILE_{i}",
-                                meta.uuid,
-                                meta.base_dir,
-                                meta,
-                                multi_screens,
-                                True,
-                            )
-                            await asyncio.sleep(0.1)
-                        except Exception as e:
-                            logger.info(f"Error during generic screenshot capture: {e}", extra={"markup": False})
+                        if not new_screens:
+                            if meta.debug:
+                                logger.info(f"[yellow]No existing screenshots for {new_images_key}; generating new ones.")
+                            try:
+                                await self.takescreens_manager.screenshots(
+                                    file,
+                                    f"FILE_{i}",
+                                    meta.uuid,
+                                    meta.base_dir,
+                                    meta,
+                                    multi_screens,
+                                    True,
+                                )
+                                await asyncio.sleep(0.1)
+                            except Exception as e:
+                                logger.info(f"Error during generic screenshot capture: {e}", extra={"markup": False})
 
                         new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
 

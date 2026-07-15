@@ -95,7 +95,16 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             if not matched_tracker:
                 continue
 
-            tracker_key = matched_tracker.lower()
+            # Canonical-class-name → established metadata key mapping
+            _tracker_key_aliases: dict[str, str] = {
+                "PASSTHEPOPCORN": "ptp",
+                "HDBITS": "hdb",
+                "BEYONDHD": "bhd",
+                "BLUTOPIA": "blu",
+                "ONLYENCODES": "oe",
+                "BTN": "btn",
+            }
+            tracker_key = _tracker_key_aliases.get(matched_tracker, matched_tracker.lower())
 
             if matched_tracker == "PASSTHEPOPCORN":
                 ptp_id = _query_id(parsed.query, "torrentid")
@@ -260,13 +269,12 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         trackers_config = cast(dict[str, Any], self.config.get("TRACKERS", {}))
         mtv_config = trackers_config.get("MORETHANTV", {})
         piece_limit = bool(self.config["DEFAULT"].get("prefer_max_16_torrent", False))
-        mtv_torrent = False
         if isinstance(mtv_config, dict):
             mtv_config_dict = cast(dict[str, Any], mtv_config)
             mtv_torrent = bool(mtv_config_dict.get("prefer_mtv_torrent", False))
-            prefer_small_pieces = mtv_torrent
         else:
-            prefer_small_pieces = piece_limit
+            mtv_torrent = False
+        prefer_small_pieces = mtv_torrent or piece_limit
         best_match = None  # Track the best match for fallback if prefer_small_pieces is enabled
 
         default_torrent_client = cast(str, self.config["DEFAULT"]["default_torrent_client"])

@@ -1,6 +1,39 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
-__version__ = "v2.2"
+__version__ = "v2.3"
+
+"""
+Changelog for version v2.3 (2026-07-15):
+
+## What's Changed
+* **Features & Improvements**:
+  * feat: add support to MakingOff (MKO) by @heatoz in https://github.com/wastaken7/Upload-Assistant/pull/47
+  * Replaced `print` statements with a proper `logger` throughout the codebase by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/48.
+  * Added `upload_order` option to control Usenet and torrent upload sequence.
+  * Run bandwidth check on tracker upload order regardless of `qbit_bandwidth_control`.
+  * Implemented automatic DVD menu capture.
+  * Improved console game support, prompts, and description formatting.
+  * Config generator now preserves comments in generated configuration file.
+  * Improved BJS title, tags, and overview extraction.
+  * feat(ZNTH): adjust book titles, narrators, covers, and series by @znth-dev in https://github.com/wastaken7/Upload-Assistant/pull/54
+  * refactor: move tracker attributes to class level by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/56
+  * refact(lint): resolve ruff linter issues and prepare for Python 3.14 by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/50
+* **Fixes**:
+  * fix(usenet): adapt pesto integration to v0.3.53+'s streaming --check by @franzopl in https://github.com/wastaken7/Upload-Assistant/pull/57
+  * fix(DS): add new required header api_key by @fabricionaweb in https://github.com/wastaken7/Upload-Assistant/pull/58
+  * fix(MKO): get the correct release name by @heatoz in https://github.com/wastaken7/Upload-Assistant/pull/55
+  * usenet: fix pesto --check repost, add --check-post-retries by @franzopl in https://github.com/wastaken7/Upload-Assistant/pull/53
+  * Brought nyuu to parity with pesto's article-check and fixed filename obfuscation.
+  * Fixed `Meta.copy` to use `deepcopy` and prevent sharing mutable fields.
+  * BT: skip asking tags when uploading books.
+  * SUIO: normalize upload name by stripping accents.
+  * Usenet: honor `skip_archive` over `archive_password`; use exponential PAR2 volumes.
+  * Usenet: do not use passwords that begin with `-`.
+  * Decoded HTML entities in extracted book/audiobook metadata.
+  * Escaped glob paths and added ZNTH book search support.
+  * Clients: respect the `--skip_auto_torrent` argument.
+  * Fixed empty line in config.
+"""
 
 """
 Changelog for version v2.2 (2026-07-03):

@@ -1,4 +1,4 @@
-﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from pathlib import Path
 from typing import Any, cast
@@ -317,36 +317,30 @@ class OnlyEncodes(UNIT3D):
         return {"name": oe_name}
 
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
-        _ = (reverse, mapping_only)
         video_codec = meta.video_codec if meta.video_codec is not None else "N/A"
-        type = str(meta.type).upper()
-
-        if type == "DVDRIP":
-            type = "ENCODE"
-
-        type_id = {
+        type_mapping = {
             "DISC": "19",
             "REMUX": "20",
             "WEBDL": "21",
-        }.get(type, "16")
-        if type == "WEBRIP":
+            "WEBRIP": "16",
+            "ENCODE": "16",
+            "DVDRIP": "16",
+        }
+        if mapping_only:
+            return type_mapping
+        if reverse:
+            return {v: k for k, v in type_mapping.items()}
+
+        type_value = str(type if type is not None and type != "" else meta.type).upper()
+        if type_value == "DVDRIP":
+            type_value = "ENCODE"
+
+        type_id = type_mapping.get(type_value, "16")
+        if type_value in {"WEBRIP", "ENCODE"}:
             if video_codec == "HEVC":
-                # x265 Encode
                 type_id = "10"
             if video_codec == "AV1":
-                # AV1 Encode
                 type_id = "14"
             if video_codec == "AVC":
-                # x264 Encode
-                type_id = "15"
-        if type == "ENCODE":
-            if video_codec == "HEVC":
-                # x265 Encode
-                type_id = "10"
-            if video_codec == "AV1":
-                # AV1 Encode
-                type_id = "14"
-            if video_codec == "AVC":
-                # x264 Encode
                 type_id = "15"
         return {"type_id": type_id}

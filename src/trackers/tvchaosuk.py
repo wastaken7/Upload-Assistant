@@ -1,4 +1,4 @@
-﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
 import re
@@ -502,13 +502,13 @@ class TVChaosUK:
 
         # Naming logic
         if meta.type == "ENCODE" and ("bluray" in str(meta.path).lower() or "brrip" in str(meta.path).lower() or "bdrip" in str(meta.path).lower()):
-            type = "BRRip"
+            release_type = "BRRip"
         else:
-            type = str(meta.type).replace("WEBDL", "WEB-DL")
+            release_type = str(meta.type).replace("WEBDL", "WEB-DL")
 
         if meta.category == "MOVIE":
             year_str_val = str(meta.year) if meta.year is not None else ""
-            tvc_name = f"{meta.title} ({year_str_val}) [{meta.resolution} {type} {str(meta.video[-3:]).upper()}]"
+            tvc_name = f"{meta.title} ({year_str_val}) [{meta.resolution} {release_type} {str(meta.video[-3:]).upper()}]"
         elif meta.category == "TV":
             # Use safe lookups to avoid KeyError if 'search_year' is missing
             search_year = meta.search_year

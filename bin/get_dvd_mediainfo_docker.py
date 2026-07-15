@@ -19,11 +19,16 @@ try:
     from src.console import console, logger
 except ImportError:
     # Fallback for Docker builds where rich is not yet installed
+    import logging
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
     class SimpleConsole:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
             print(message)
 
     console = SimpleConsole()
+    logger = logging.getLogger(__name__)
 
 MEDIAINFO_VERSION = "23.04"
 MEDIAINFO_CLI_BASE_URL = "https://mediaarea.net/download/binary/mediainfo"

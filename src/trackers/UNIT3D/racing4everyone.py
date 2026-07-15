@@ -1,4 +1,4 @@
-﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, cast
 
 import httpx
@@ -53,21 +53,21 @@ class Racing4Everyone(UNIT3D):
         return {"category_id": category_id}
 
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
-        _ = (type, reverse, mapping_only)
         type_id = {
-            "8640p": "2160p",
-            "4320p": "2160p",
-            "2160p": "2160p",
-            "1440p": "1080p",
-            "1080p": "1080p",
-            "1080i": "1080i",
-            "720p": "720p",
-            "576p": "SD",
-            "576i": "SD",
-            "480p": "SD",
-            "480i": "SD",
-        }.get(str(meta.type), "10")
-        return {"type_id": type_id}
+            "DISC": "1",
+            "REMUX": "2",
+            "WEBDL": "4",
+            "WEBRIP": "5",
+            "HDTV": "6",
+            "ENCODE": "3",
+            "DVDRIP": "3",
+        }
+        if mapping_only:
+            return type_id
+        if reverse:
+            return {v: k for k, v in type_id.items()}
+        type_value = type if type is not None and type != "" else str(meta.type)
+        return {"type_id": type_id.get(type_value, "0")}
 
     async def get_personal_release(self, meta: Meta) -> dict[str, str]:
         _ = meta
@@ -94,8 +94,25 @@ class Racing4Everyone(UNIT3D):
         return {}
 
     async def get_resolution_id(self, meta: Meta, resolution: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
-        _ = (meta, resolution, reverse, mapping_only)
-        return {}
+        resolution_id = {
+            "8640p": "2160p",
+            "4320p": "2160p",
+            "2160p": "2160p",
+            "1440p": "1080p",
+            "1080p": "1080p",
+            "1080i": "1080i",
+            "720p": "720p",
+            "576p": "SD",
+            "576i": "SD",
+            "480p": "SD",
+            "480i": "SD",
+        }
+        if mapping_only:
+            return resolution_id
+        if reverse:
+            return {v: k for k, v in resolution_id.items()}
+        resolution_value = resolution if resolution is not None and resolution != "" else str(meta.resolution)
+        return {"resolution_id": resolution_id.get(resolution_value, "SD")}
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []

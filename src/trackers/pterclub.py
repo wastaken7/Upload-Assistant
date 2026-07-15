@@ -1,4 +1,4 @@
-﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import glob
 import json
 import re
@@ -210,7 +210,7 @@ class PTerClub:
                     parts.append("\n")
                 if each["type"] == "DVD":
                     parts.append(f"{each['name']}:\n")
-                    parts.append(f"[hide=mediainfo][{each['vob_mi']}[/hide] [hide=mediainfo][{each['ifo_mi']}[/hide]\n")
+                    parts.append(f"[hide=mediainfo]{each['vob_mi']}[/hide] [hide=mediainfo]{each['ifo_mi']}[/hide]\n")
                     parts.append("\n")
         else:
             async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as mi_file:

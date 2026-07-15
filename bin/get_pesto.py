@@ -11,19 +11,23 @@ import httpx
 try:
     from src.console import console, logger
 except ImportError:
+    import logging
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     class SimpleConsole:
         def print(self, message: str, markup: bool = False) -> None:  # noqa: ARG002
             print(message)
 
     console = SimpleConsole()
+    logger = logging.getLogger(__name__)
 
 
 class PestoBinaryManager:
     """Download Pesto binaries for the host architecture."""
 
     @staticmethod
-    async def ensure_pesto_binary(base_dir: str | Path, version: str = "v0.3.41") -> str:
+    async def ensure_pesto_binary(base_dir: str | Path, version: str = "v0.3.54") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         logger.debug(f"[blue]Pesto: Detected system: {system}, architecture: {machine}[/blue]")

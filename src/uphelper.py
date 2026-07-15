@@ -609,10 +609,12 @@ class UploadHelper:
                     elif isinstance(tracker_rename, str):
                         display_name = tracker_rename
 
-                if display_name is not None and display_name != "":
-                    if tracker_name.lower() == "suio" and config.get("TRACKERS", {}).get("Suio", {}).get("display_name", "Suio") != "Suio":
-                        different_names[config.get("TRACKERS", {}).get("Suio", {}).get("display_name", "Suio")] = display_name
-                    else:
+                if display_name:
+                    if tracker_name.lower() == "suio":
+                        suio_display_name = config.get("TRACKERS", {}).get("Suio", {}).get("display_name", "Suio")
+                        if display_name != meta.name and suio_display_name != "Suio":
+                            different_names[suio_display_name] = display_name
+                    elif display_name != meta.name:
                         different_names[tracker_name] = display_name
 
         if different_names:

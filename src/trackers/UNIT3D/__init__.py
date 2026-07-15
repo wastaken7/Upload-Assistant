@@ -469,6 +469,8 @@ class UNIT3D:
             max_retries = 2
             retry_delay = 5
             timeout = 40.0
+            download_url: str | None = None
+            post_succeeded = False
 
             for attempt in range(max_retries):
                 try:
@@ -487,10 +489,10 @@ class UNIT3D:
 
                         meta.tracker_status[self.tracker]["status_message"] = await self.process_response_data(response_data)
                         torrent_id = await self.get_torrent_id(response_data)
-
                         meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
-                        await self.common.download_tracker_torrent(meta, self.tracker, headers=headers, downurl=response_data["data"])
-                        return True  # Success
+                        download_url = response_data.get("data")
+                        post_succeeded = True
+                        break  # POST definitively succeeded
 
                 except httpx.HTTPStatusError as e:
                     if e.response.status_code in [403, 302]:
@@ -540,6 +542,11 @@ class UNIT3D:
                 except json.JSONDecodeError as e:
                     meta.tracker_status[self.tracker]["status_message"] = f"data error: Invalid JSON response from {self.tracker}. Error: {e}"
                     return False  # JSON parsing error
+
+            if post_succeeded:
+                # Download is outside the retry loop — a POST timeout/error cannot cause re-submission
+                await self.common.download_tracker_torrent(meta, self.tracker, headers=headers, downurl=download_url)
+                return True
         else:
             logger.info(f"[cyan]{self.tracker} Request Data:")
             logger.info(Redaction.redact_private_info(data))

@@ -271,7 +271,7 @@ async def _get_audio_v2(
     is_auro3d = False
     bd_mi = None
     additional: Any = ""
-    format: Any = ""
+    audio_format: Any = ""
     commercial: Any = ""
     chan: str = ""
     format_settings: str = ""
@@ -302,8 +302,8 @@ async def _get_audio_v2(
                 bd_mi = None
         else:
             format_settings = ""
-            format = first_audio.get("codec", "")
-            commercial = format
+            audio_format = first_audio.get("codec", "")
+            commercial = audio_format
             chan = str(first_audio.get("channels", "") or "")
 
     if bdinfo is None or bd_mi is not None:  # Rips or BD with mediainfo
@@ -318,7 +318,7 @@ async def _get_audio_v2(
             if tracks_with_order:
                 try:
                     first_audio_track = min(tracks_with_order, key=lambda x: int(str(x.get("StreamOrder", "999"))))
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     first_audio_track = tracks_with_order[0]
             else:
                 tracks_with_id = [t for t in audio_tracks if t.get("ID") and not isinstance(t.get("ID"), dict)]
@@ -330,13 +330,13 @@ async def _get_audio_v2(
                             return int(id_match.group()) if id_match else 999
 
                         first_audio_track = min(tracks_with_id, key=get_id_num)
-                    except ValueError, TypeError, AttributeError:
+                    except (ValueError, TypeError, AttributeError):
                         first_audio_track = tracks_with_id[0]
                 else:
                     first_audio_track = audio_tracks[0]
 
         track: TrackDict = first_audio_track or {}
-        format = track.get("Format", "")
+        audio_format = track.get("Format", "")
         commercial = track.get("Format_Commercial", "") or track.get("Format_Commercial_IfAny", "")
         if track.get("Language", "") == "zxx":
             meta.silent = True
@@ -357,8 +357,8 @@ async def _get_audio_v2(
             channel_layout = ""
 
         # Enhanced channel count determination based on MediaArea AudioChannelLayout
-        logger.debug(f"DEBUG: Channels: {channels}, Channel Layout: {channel_layout}, Additional: {additional}, Format: {format}")
-        chan = determine_channel_count(channels, channel_layout, additional, format)
+        logger.debug(f"DEBUG: Channels: {channels}, Channel Layout: {channel_layout}, Additional: {additional}, Format: {audio_format}")
+        chan = determine_channel_count(channels, channel_layout, additional, audio_format)
 
         try:
             dts_core_additional_check(meta)
@@ -492,7 +492,7 @@ async def _get_audio_v2(
         additional = ""  # Set empty string if additional is a dictionary
 
     additional_str = str(additional or "")
-    format_str = str(format or "")
+    format_str = str(audio_format or "")
     commercial_str = str(commercial or "")
 
     if commercial_str:

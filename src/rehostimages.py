@@ -230,7 +230,11 @@ async def _check_hosts(
     logger.debug(f"[yellow]No valid images found for {tracker}, will attempt to reupload...")
 
     images_reuploaded = False
-    max_retries = len(approved_image_hosts)
+    configured_indices = sorted(int(match.group(1)) for key in default_config if (match := re.fullmatch(r"img_host_(\d+)", key)) and _as_str(default_config.get(key)))
+    if not configured_indices:
+        return [], True, images_reuploaded
+
+    max_retries = configured_indices[-1]
 
     while img_host_index <= max_retries:
         image_list, retry_mode, images_reuploaded = await _handle_image_upload(
@@ -311,7 +315,7 @@ async def _handle_image_upload(
     # First check if there are any saved screenshots matching those in the image_list
     if meta.image_list and isinstance(meta.image_list, list):
         # Get all PNG files in the screenshots directory
-        all_png_files: list[str] = [file for file in await aio_os.listdir(screenshots_dir) if file.endswith(".png")]
+        all_png_files: list[str] = [str(screenshots_dir / name) for name in await aio_os.listdir(screenshots_dir) if name.endswith(".png")]
         if all_png_files and meta.debug:
             logger.info(f"[cyan]Found {len(all_png_files)} PNG files in screenshots directory")
 
@@ -515,7 +519,11 @@ async def _handle_image_upload(
         uploaded_images: list[dict[str, str]] = []
 
         # Add a max retry limit to prevent infinite loop
-        max_retries = len(approved_image_hosts)
+        configured_indices = sorted(int(match.group(1)) for key in default_config if (match := re.fullmatch(r"img_host_(\d+)", key)) and _as_str(default_config.get(key)))
+        if not configured_indices:
+            return [], True, images_reuploaded
+
+        max_retries = configured_indices[-1]
         while img_host_index <= max_retries:
             current_img_host_key = f"img_host_{img_host_index}"
             current_img_host = _as_str(default_config.get(current_img_host_key))
@@ -533,6 +541,10 @@ async def _handle_image_upload(
             meta.imghost = current_img_host
             logger.debug(f"[green]Uploading to approved host '{current_img_host}'.")
             break
+
+        if not meta.imghost:
+            logger.info("[red]No approved image host was selected; skipping upload.")
+            return [], True, images_reuploaded
 
         uploaded_images, _ = await uploadscreens_manager.upload_screens(
             meta, multi_screens, img_host_index, 0, multi_screens, all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode
@@ -564,7 +576,7 @@ async def _handle_image_upload(
             matched_host = await match_host(netloc, url_host_mapping.keys())
             mapped_host = url_host_mapping.get(matched_host, matched_host)
             valid_hosts.append(mapped_host in approved_image_hosts)
-        if all(valid_hosts) and new_images_key in meta and isinstance(meta[new_images_key], list):
+        if uploaded_images and all(valid_hosts) and new_images_key in meta and isinstance(meta[new_images_key], list):
             output_file = Path(meta.base_dir) / "tmp" / meta.uuid / "covers.json" if tracker == "covers" else Path(screenshots_dir) / "reuploaded_images.json"
 
             existing_data: list[dict[str, str]] = []

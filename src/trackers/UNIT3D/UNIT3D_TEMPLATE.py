@@ -51,9 +51,13 @@ class Unit3dTemplate(UNIT3D):  # EDIT 'Unit3dTemplate' AS ABBREVIATED TRACKER NA
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
-        _ = (type, reverse, mapping_only)
-        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "3"}.get(meta.type or "", "0")
-        return {"type_id": type_id}
+        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "3", "DVDRIP": "3"}
+        if mapping_only:
+            return type_id
+        if reverse:
+            return {v: k for k, v in type_id.items()}
+        type_value = type if type is not None and type != "" else meta.type or ""
+        return {"type_id": type_id.get(type_value, "0")}
 
     # If default UNIT3D resolutions, remove this function
     async def get_resolution_id(
@@ -63,7 +67,6 @@ class Unit3dTemplate(UNIT3D):  # EDIT 'Unit3dTemplate' AS ABBREVIATED TRACKER NA
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
-        _ = (resolution, reverse, mapping_only)
         resolution_id = {
             "8640p": "10",
             "4320p": "1",
@@ -76,8 +79,13 @@ class Unit3dTemplate(UNIT3D):  # EDIT 'Unit3dTemplate' AS ABBREVIATED TRACKER NA
             "576i": "7",
             "480p": "8",
             "480i": "9",
-        }.get(meta.resolution, "10")
-        return {"resolution_id": resolution_id}
+        }
+        if mapping_only:
+            return resolution_id
+        if reverse:
+            return {v: k for k, v in resolution_id.items()}
+        resolution_value = resolution if resolution is not None and resolution != "" else meta.resolution or ""
+        return {"resolution_id": resolution_id.get(resolution_value, "10")}
 
     # If there are tracker specific checks to be done before upload, add them here
     # Is it a movie only tracker? Are concerts banned? Etc.

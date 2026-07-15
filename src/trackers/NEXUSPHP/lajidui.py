@@ -340,7 +340,7 @@ class Lajidui(NEXUSPHP):
             "-other": 5,
             "-ourbits": 12,
             "-pter": 16,
-            "-qhstudIo": 13,
+            "-qhstudio": 13,
             "-tjupt": 10,
             "-ubits": 11,
             "-wiki": 4,

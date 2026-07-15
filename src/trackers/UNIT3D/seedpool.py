@@ -1,4 +1,4 @@
-﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
 from pathlib import Path
 from typing import Any, cast
@@ -84,8 +84,8 @@ class Seedpool(UNIT3D):
 
         return any(re.search(pattern, release_title, re.IGNORECASE) for pattern in patterns)
 
-    async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
-        _ = (type, reverse, mapping_only)
+    async def get_type_id(self, meta: Meta, media_type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        _ = (media_type, reverse, mapping_only)
         type_value = str(meta.type)
         type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "3", "DVDRIP": "3"}.get(type_value, "0")
         return {"type_id": type_id}

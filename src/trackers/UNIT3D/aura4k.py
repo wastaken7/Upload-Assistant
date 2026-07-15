@@ -1,4 +1,4 @@
-﻿# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
 
 import cli_ui
@@ -42,9 +42,13 @@ class Aura4K(UNIT3D):
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
-        _ = (type, reverse, mapping_only)
-        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "ENCODE": "3"}.get(meta.type or "", "0")
-        return {"type_id": type_id}
+        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "ENCODE": "3"}
+        if mapping_only:
+            return type_id
+        if reverse:
+            return {v: k for k, v in type_id.items()}
+        type_value = type if type is not None and type != "" else meta.type or ""
+        return {"type_id": type_id.get(type_value, "0")}
 
     async def get_resolution_id(
         self,
@@ -53,12 +57,16 @@ class Aura4K(UNIT3D):
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
-        _ = (resolution, reverse, mapping_only)
         resolution_id = {
             "4320p": "1",
             "2160p": "2",
-        }.get(meta.resolution, "10")
-        return {"resolution_id": resolution_id}
+        }
+        if mapping_only:
+            return resolution_id
+        if reverse:
+            return {v: k for k, v in resolution_id.items()}
+        resolution_value = resolution if resolution is not None and resolution != "" else meta.resolution or ""
+        return {"resolution_id": resolution_id.get(resolution_value, "10")}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True

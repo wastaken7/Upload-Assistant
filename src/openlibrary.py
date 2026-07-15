@@ -207,11 +207,7 @@ class OpenLibraryManager:
                                     with contextlib.suppress(Exception):
                                         await asyncio.to_thread(Path(cache_file).write_text, json.dumps(metadata, indent=4), encoding="utf-8")
                                 return metadata
-                            if cache_file:
-                                with contextlib.suppress(Exception):
-                                    await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
-                            return None
-                        # Parse metadata directly from details if no work key
+                        # Parse metadata directly from details if no work key or work lookup misses
                         metadata = {}
                         title = details.get("title")
                         if title:
