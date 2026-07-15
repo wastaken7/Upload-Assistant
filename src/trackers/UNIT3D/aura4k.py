@@ -97,7 +97,7 @@ class Aura4K(UNIT3D):
                         if bit_rate:
                             try:
                                 bit_rate_num = int(bit_rate)
-                            except ValueError, TypeError:
+                            except (ValueError, TypeError):
                                 bit_rate_num = None
 
                             if bit_rate_num is not None:
@@ -118,6 +118,8 @@ class Aura4K(UNIT3D):
                                         pass
                                     else:
                                         return False
+                                else:
+                                    return False
                         else:
                             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                                 logger.info(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
@@ -126,6 +128,8 @@ class Aura4K(UNIT3D):
                                     pass
                                 else:
                                     return False
+                            else:
+                                return False
                     else:
                         if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                             logger.info(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
@@ -134,6 +138,8 @@ class Aura4K(UNIT3D):
                                 pass
                             else:
                                 return False
+                        else:
+                            return False
 
         return should_continue
 

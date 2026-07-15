@@ -55,7 +55,7 @@ class Unit3dTemplate(UNIT3D):  # EDIT 'Unit3dTemplate' AS ABBREVIATED TRACKER NA
         if mapping_only:
             return type_id
         if reverse:
-            return {v: k for k, v in type_id.items()}
+            return {"1": "DISC", "2": "REMUX", "3": "ENCODE", "4": "WEBDL", "5": "WEBRIP", "6": "HDTV"}
         type_value = type if type is not None and type != "" else meta.type or ""
         return {"type_id": type_id.get(type_value, "0")}
 
@@ -83,7 +83,18 @@ class Unit3dTemplate(UNIT3D):  # EDIT 'Unit3dTemplate' AS ABBREVIATED TRACKER NA
         if mapping_only:
             return resolution_id
         if reverse:
-            return {v: k for k, v in resolution_id.items()}
+            return {
+                "1": "4320p",
+                "2": "2160p",
+                "3": "1440p",
+                "4": "1080i",
+                "5": "720p",
+                "6": "576p",
+                "7": "576i",
+                "8": "480p",
+                "9": "480i",
+                "10": "8640p",
+            }
         resolution_value = resolution if resolution is not None and resolution != "" else meta.resolution or ""
         return {"resolution_id": resolution_id.get(resolution_value, "10")}
 

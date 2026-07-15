@@ -186,7 +186,7 @@ def extract_bluray_links(html_content: str | None) -> list[MovieLink] | None:
         return None
 
 
-async def extract_bluray_release_info(html_content: str, meta: Meta) -> list[Release]:
+async def extract_bluray_release_info(html_content: str, meta: Meta, product_id: str) -> list[Release]:
     if not html_content:
         logger.info("[red]No HTML content to extract release info from[/red]")
         return []
@@ -336,7 +336,8 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
         is_3d = meta.three_d.lower() == "yes"
         resolution = meta.resolution.lower()
         is_4k = "2160p" in resolution or "4k" in resolution
-        release_type = "4K" if is_4k else "3D" if is_3d else "BD"
+        is_dvd = str(meta.is_disc).upper() == "DVD"
+        release_type = "4K" if is_4k else "3D" if is_3d else "DVD" if is_dvd else "BD"
         release_debug_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/debug_bluray_{release_type}_{product_id}.html"
 
         try:
@@ -345,7 +346,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
                 response_text = await asyncio.to_thread(Path(release_debug_filename).read_text, encoding="utf-8")
 
                 if response_text and "No index" not in response_text:
-                    movie_releases = await extract_bluray_release_info(response_text, meta)
+                    movie_releases = await extract_bluray_release_info(response_text, meta, product_id)
 
                     for release in movie_releases:
                         release["movie_title"] = movie["title"]
@@ -383,7 +384,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
                         response = await client.get(ajax_url, headers=headers)
 
                         if response.status_code == 200 and "No index" not in response.text:
-                            movie_releases = await extract_bluray_release_info(response.text, meta)
+                            movie_releases = await extract_bluray_release_info(response.text, meta, product_id)
 
                             for release in movie_releases:
                                 release["movie_title"] = movie["title"]

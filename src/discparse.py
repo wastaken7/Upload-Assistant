@@ -320,7 +320,7 @@ class DiscParse:
                     # Process the BDInfo report in the while True loop
                     while True:
                         try:
-                            if not Path(bdinfo_text).exists():
+                            if not bdinfo_text or not Path(bdinfo_text).is_file():
                                 logger.info(f"[bold red]No valid BDInfo file found for playlist {playlist_number}.")
                                 break
 
@@ -761,7 +761,7 @@ class DiscParse:
 
                             selected_playlists = [valid_playlists[i] for i in selected_indices]
                             break  # Exit the loop when valid input is provided
-                        except ValueError, IndexError:
+                        except (ValueError, IndexError):
                             logger.info("[red]Invalid input. Please try again.")
 
                 # Extract the .EVO files from the selected playlists

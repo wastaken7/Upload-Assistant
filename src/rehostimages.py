@@ -234,15 +234,16 @@ async def _check_hosts(
     if not configured_indices:
         return [], True, images_reuploaded
 
-    max_retries = configured_indices[-1]
+    current_position = next((i for i, index in enumerate(configured_indices) if index >= img_host_index), len(configured_indices))
 
-    while img_host_index <= max_retries:
+    while current_position < len(configured_indices):
+        current_index = configured_indices[current_position]
         image_list, retry_mode, images_reuploaded = await _handle_image_upload(
             meta,
             tracker,
             url_host_mapping,
             approved_image_hosts,
-            img_host_index=img_host_index,
+            img_host_index=current_index,
             default_config=default_config,
             takescreens_manager=takescreens_manager,
             uploadscreens_manager=uploadscreens_manager,
@@ -252,8 +253,8 @@ async def _check_hosts(
             meta[new_images_key] = image_list
 
         if retry_mode:
-            logger.info(f"[yellow]Switching to the next image host. Current index: {img_host_index}")
-            img_host_index += 1
+            logger.info(f"[yellow]Switching to the next image host. Current index: {current_index}")
+            current_position += 1
             continue  # Retry with next host
 
         break
@@ -523,31 +524,35 @@ async def _handle_image_upload(
         if not configured_indices:
             return [], True, images_reuploaded
 
-        max_retries = configured_indices[-1]
-        while img_host_index <= max_retries:
-            current_img_host_key = f"img_host_{img_host_index}"
+        current_position = next((i for i, index in enumerate(configured_indices) if index >= img_host_index), len(configured_indices))
+        selected_host = False
+        current_upload_index = img_host_index
+        while current_position < len(configured_indices):
+            current_upload_index = configured_indices[current_position]
+            current_img_host_key = f"img_host_{current_upload_index}"
             current_img_host = _as_str(default_config.get(current_img_host_key))
 
             if not current_img_host:
-                logger.info("[red]No more image hosts left to try.")
-                return [], True, images_reuploaded
+                current_position += 1
+                continue
 
             if current_img_host not in approved_image_hosts:
                 logger.info(f"[red]Your preferred image host '{current_img_host}' is not supported at {tracker}, trying next host.")
                 retry_mode = True
                 images_reuploaded = True
-                img_host_index += 1
+                current_position += 1
                 continue
             meta.imghost = current_img_host
+            selected_host = True
             logger.debug(f"[green]Uploading to approved host '{current_img_host}'.")
             break
 
-        if not meta.imghost:
+        if not selected_host:
             logger.info("[red]No approved image host was selected; skipping upload.")
             return [], True, images_reuploaded
 
         uploaded_images, _ = await uploadscreens_manager.upload_screens(
-            meta, multi_screens, img_host_index, 0, multi_screens, all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode
+            meta, multi_screens, current_upload_index, 0, multi_screens, all_screenshots, {new_images_key: meta[new_images_key]}, retry_mode
         )
         if uploaded_images:
             meta[new_images_key] = uploaded_images

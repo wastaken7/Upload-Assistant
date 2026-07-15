@@ -438,23 +438,23 @@ class PrivateHD(AZTrackerBase):
 
         # Video codec
         # 1
-        if type == "remux" and video_codec not in ("mpeg-2", "vc-1", "h.264", "h.265", "avc"):
+        if release_type == "remux" and video_codec not in ("mpeg-2", "vc-1", "h.264", "h.265", "avc"):
             warnings.append("Allowed Video Codecs for BluRay (Untouched + REMUX): MPEG-2, VC-1, H.264, H.265")
 
         # 2
-        if type == "encode" and source == "bluray" and video_encode not in ("h.264", "h.265", "x264", "x265"):
+        if release_type == "encode" and source == "bluray" and video_encode not in ("h.264", "h.265", "x264", "x265"):
             warnings.append("Allowed Video Codecs for BluRay (Encoded): H.264, H.265 (x264 and x265 respectively are the only permitted encoders)")
 
         # 3
-        if type in ("webdl", "web-dl") and source == "web" and video_encode not in ("h.264", "h.265", "vp9"):
+        if release_type in ("webdl", "web-dl") and source == "web" and video_encode not in ("h.264", "h.265", "vp9"):
             warnings.append("Allowed Video Codecs for WEB (Untouched): H.264, H.265, VP9")
 
         # 4
-        if type == "encode" and source == "web" and video_encode not in ("h.264", "h.265", "x264", "x265"):
+        if release_type == "encode" and source == "web" and video_encode not in ("h.264", "h.265", "x264", "x265"):
             warnings.append("Allowed Video Codecs for WEB (Encoded): H.264, H.265 (x264 and x265 respectively are the only permitted encoders)")
 
         # 5
-        if type == "encode" and video_encode == "x265" and meta.bit_depth != "10":
+        if release_type == "encode" and video_encode == "x265" and meta.bit_depth != "10":
             warnings.append("Allowed Video Codecs for x265 encodes must be 10-bit")
 
         # 6
@@ -547,7 +547,7 @@ class PrivateHD(AZTrackerBase):
 
         web_sources = ("hdtv", "web", "hdrip")
 
-        if type == "encode":
+        if release_type == "encode":
             bitrate = 0
             for track in media_tracks:
                 if track.get("@type") == "Video":
@@ -581,7 +581,7 @@ class PrivateHD(AZTrackerBase):
             warnings.append(rule)
 
         # Hybrid
-        if type in ("remux", "encode") and "hybrid" in meta.name.lower():
+        if release_type in ("remux", "encode") and "hybrid" in meta.name.lower():
             warnings.append(
                 "Hybrid Remuxes and Encodes are subject to the following condition:\n\n"
                 "Hybrid user releases are permitted, but are treated similarly to regular "
@@ -590,7 +590,7 @@ class PrivateHD(AZTrackerBase):
             )
 
         # Log
-        if type == "remux":
+        if release_type == "remux":
             warnings.append(
                 "Remuxes must have a demux/eac3to log under spoilers in description.\nDo you have these logs and will you add them to the description after upload?"
             )

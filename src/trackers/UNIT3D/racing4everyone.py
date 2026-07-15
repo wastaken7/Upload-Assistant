@@ -34,21 +34,17 @@ class Racing4Everyone(UNIT3D):
     async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = (category, reverse, mapping_only)
         category_id = "24"
-        # Use stored genre IDs if available
-        if meta and meta.genre_ids:
-            genre_ids = str(meta.genre_ids).split(",")
-            is_docu = "99" in genre_ids
+        genre_ids = str(meta.genre_ids).split(",") if meta and meta.genre_ids else []
+        is_docu = "99" in genre_ids
 
-            if meta.category == "MOVIE":
-                category_id = "70"  # Motorsports Movie
-                if is_docu:
-                    category_id = "66"  # Documentary
-            elif meta.category == "TV":
-                category_id = "79"  # TV Series
-                if is_docu:
-                    category_id = "2"  # TV Documentary
-            else:
-                category_id = "24"
+        if meta.category == "MOVIE":
+            category_id = "70"  # Motorsports Movie
+            if is_docu:
+                category_id = "66"  # Documentary
+        elif meta.category == "TV":
+            category_id = "79"  # TV Series
+            if is_docu:
+                category_id = "2"  # TV Documentary
 
         return {"category_id": category_id}
 

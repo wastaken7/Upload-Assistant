@@ -994,7 +994,7 @@ def _verify_remember_token(token: str) -> str | None:
         elif isinstance(expiry_value, str):
             try:
                 expiry = int(expiry_value)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 return None
         else:
             return None
@@ -1438,6 +1438,15 @@ def _redact_sensitive(value: Any) -> Any:
         return [_redact_sensitive(v) for v in value_seq]
     # For primitives (str/int/etc.) we keep the value as-is — redaction is key-based
     return value
+
+
+def _is_sensitive_key(key: Any) -> bool:
+    """Return True when a config path component names a sensitive field."""
+    if not isinstance(key, str):
+        return False
+    lowered = key.lower()
+    sensitive_parts = ("password", "pass", "secret", "token", "key", "totp", "api", "credential", "auth")
+    return any(part in lowered for part in sensitive_parts)
 
 
 def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: Any, success: bool, error: str | None = None) -> None:
@@ -2447,7 +2456,7 @@ def access_log_entries_api():
         n = int(n)
         if n < 1 or n > 200:
             n = 50
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         n = 50
 
     try:
@@ -2611,12 +2620,11 @@ def twofa_disable():
     if not _totp_enabled():
         return jsonify({"error": "2FA not enabled", "success": False}), 400
 
-    with contextlib.suppress(Exception):
-        # Remove TOTP secret and recovery hashes from the encrypted user record
-        with suppress(Exception):
-            auth_mod.set_totp_secret(None)
-        with suppress(Exception):
-            auth_mod.set_recovery_hashes([])
+    try:
+        auth_mod.set_totp_secret(None)
+        auth_mod.set_recovery_hashes([])
+    except Exception:
+        return jsonify({"error": "Failed to disable 2FA", "success": False}), 500
 
     # Update global variable
     global saved_totp_secret
@@ -3068,7 +3076,7 @@ def browse_path():
                                 continue
 
                     items.append({"name": item, "path": str(full_path), "type": "folder" if is_dir else "file", "children": [] if is_dir else None})
-                except PermissionError, OSError:
+                except (PermissionError, OSError):
                     continue
 
             console.print(f"Found {len(items)} items in {path}", markup=False)
@@ -3108,7 +3116,7 @@ def browse_search():
         max_results = min(int(request.args.get("max_results", "100")), 500)
         if max_results < 1:
             max_results = 100
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         max_results = 100
 
     if not query:

@@ -400,7 +400,7 @@ class PassThePopcorn:
             # console.print(f"[blue]Raw info API Response: {response}[/blue]")
             # title, plot, art, year, tags, Countries, Languages
             tinfo = {key: value for key, value in response[0].items() if value not in (None, "")}
-            if tinfo["tags"] == "":
+            if not tinfo.get("tags"):
                 tags = await self.get_tags([meta.genres, meta.keywords, meta.imdb_info["genres"]])
                 tinfo["tags"] = ", ".join(tags)
         return tinfo
@@ -460,11 +460,11 @@ class PassThePopcorn:
             if isinstance(item, list):
                 for x in item:
                     if isinstance(x, str) and x.strip():
-                        normalized_check_against.extend(x.lower().replace(" ", "").replace("-", ""))
+                        normalized_check_against.append(x.lower().replace(" ", "").replace("-", ""))
             elif isinstance(item, str) and item.strip():
                 for x in item.split(","):
                     if x.strip():
-                        normalized_check_against.extend(x.strip().lower().replace(" ", "").replace("-", ""))
+                        normalized_check_against.append(x.strip().lower().replace(" ", "").replace("-", ""))
         for each in ptp_tags:
             clean_tag = each.replace(".", "")
             if any(clean_tag in item for item in normalized_check_against):
@@ -618,7 +618,7 @@ class PassThePopcorn:
             if tmdb_type == "movie":
                 try:
                     runtime = (meta.runtime) if meta.runtime is not None else 60
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     runtime = 60
                 ptp_type = "Feature Film" if runtime >= 45 or runtime == 0 else "Short Film"
             if tmdb_type == "miniseries" or "miniseries" in keywords:
@@ -1607,11 +1607,14 @@ class PassThePopcorn:
             }
             if new_data["year"] in ["", "0", 0, None] and meta.manual_year not in [0, "", None]:
                 new_data["year"] = meta.manual_year
-            while new_data["tags"] == "":
+            if not new_data["tags"]:
                 if (meta.mode if meta.mode is not None else "discord") == "cli":
-                    logger.info("[yellow]Unable to match any tags")
-                    logger.info("Valid tags can be found on the PassThePopcorn upload form")
-                    new_data["tags"] = console.input("Please enter at least one tag. Comma separated (action, animation, short):")
+                    while not new_data["tags"]:
+                        logger.info("[yellow]Unable to match any tags")
+                        logger.info("Valid tags can be found on the PassThePopcorn upload form")
+                        new_data["tags"] = console.input("Please enter at least one tag. Comma separated (action, animation, short):")
+                else:
+                    raise UploadError("PassThePopcorn requires at least one valid tag.")
             data.update(new_data)
             imdb_info = meta.imdb_info
             directors: list[str] | tuple[str, ...] | None = None
@@ -1641,7 +1644,7 @@ class PassThePopcorn:
             torrent_create = f"[{self.tracker}]"
             try:
                 cooldown = int(self.config.get("DEFAULT", {}).get("rehash_cooldown", 0) or 0)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 cooldown = 0
             if cooldown > 0:
                 await asyncio.sleep(cooldown)  # Small cooldown before rehashing

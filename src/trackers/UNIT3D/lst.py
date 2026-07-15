@@ -87,7 +87,7 @@ class LST(UNIT3D):
         if reverse:
             return {v: k for k, v in type_id.items()}
 
-        resolved_type = type if type is not None and type != "" else meta.type
+        resolved_type = media_type if media_type is not None and media_type != "" else meta.type
         if isinstance(resolved_type, str):
             resolved_type = resolved_type.upper().strip().lstrip(".")
 

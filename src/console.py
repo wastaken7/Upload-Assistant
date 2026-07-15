@@ -165,6 +165,7 @@ def _load_tracker_display_map() -> tuple[dict[str, str], dict[str, str], re.Patt
         return _tracker_name_map, _tracker_style_map, _tracker_name_pattern
 
     mapping: dict[str, str] = {}
+    styles: dict[str, str] = {}
     try:
         from src.trackersetup import tracker_class_map
 
@@ -173,11 +174,21 @@ def _load_tracker_display_map() -> tuple[dict[str, str], dict[str, str], re.Patt
             mapping[(key).lower()] = canonical
             mapping[canonical.lower()] = canonical
     except Exception:
-        # trackersetup may not be importable yet during very early bootstrap
-        mapping = {}
+        # trackersetup may not be importable yet during very early bootstrap;
+        # return an uncached partial map so initialization remains retryable.
+        for style_key, style_value in TRACKER_DISPLAY_STYLES.items():
+            if not style_key or not style_value:
+                continue
+            key_lower = style_key.strip().lower()
+            styles[key_lower] = style_value
+            mapping[key_lower] = style_key.strip()
+        pattern = None
+        if mapping:
+            names = sorted({re.escape(name) for name in mapping}, key=len, reverse=True)
+            pattern = re.compile(r"(https?://\S+)|" + r"\b(" + "|".join(names) + r")\b", re.IGNORECASE)
+        return mapping, styles, pattern
 
     # Apply custom styles: resolve keys case-insensitively onto canonical names
-    styles: dict[str, str] = {}
     for style_key, style_value in TRACKER_DISPLAY_STYLES.items():
         if not style_key or not style_value:
             continue
