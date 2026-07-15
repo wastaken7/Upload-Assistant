@@ -570,12 +570,6 @@ def _validate_trackers_section(trackers: dict[str, Any], active_trackers: list[s
                 # This is an error for active trackers, not just a warning
                 errors.append(f"[TRACKERS][{tracker_name}] announce_url contains placeholder (e.g., <PASSKEY>) - replace with actual value")
 
-        # Check DRUNKENSLUG specific config
-        if tracker_name.upper() == "DRUNKENSLUG" and is_active:
-            upload_url = tracker_config_dict.get("upload_url", "")
-            if not upload_url or (isinstance(upload_url, str) and not upload_url.strip()):
-                errors.append("[TRACKERS][DRUNKENSLUG] upload_url is required when DRUNKENSLUG is active")
-
         # Check boolean fields are actually booleans (must be real bool, not string)
         bool_fields = ["anon", "useAPI", "use_for_search", "modq", "draft", "draft_default", "img_rehost", "allow_ext_subtitles", "resolve_language"]
         for field in bool_fields:
