@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import platform
 import shutil
 import zipfile
@@ -21,50 +20,47 @@ def get_filename(system: str, arch: str, library_type: str = "cli") -> str:
         if library_type == "cli":
             # MediaInfo CLI uses Lambda (pre-compiled) version
             return f"MediaInfo_CLI_{MEDIAINFO_VERSION}_Lambda_{arch}.zip"
-        elif library_type == "lib":
+        if library_type == "lib":
             # MediaInfo library uses DLL version
             return f"MediaInfo_DLL_{MEDIAINFO_VERSION}_Lambda_{arch}.zip"
-        else:
-            raise ValueError(f"Unknown library_type: {library_type}")
-    else:
-        return ""
+        raise ValueError(f"Unknown library_type: {library_type}")
+    return ""
 
 
 def get_url(system: str, arch: str, library_type: str = "cli") -> str:
     filename = get_filename(system, arch, library_type)
     if library_type == "cli":
         return f"{MEDIAINFO_CLI_BASE_URL}/{MEDIAINFO_VERSION}/{filename}"
-    elif library_type == "lib":
+    if library_type == "lib":
         return f"{MEDIAINFO_LIB_BASE_URL}/{MEDIAINFO_VERSION}/{filename}"
-    else:
-        raise ValueError(f"Unknown library_type: {library_type}")
+    raise ValueError(f"Unknown library_type: {library_type}")
 
 
 def download_file(url: str, output_path: Path) -> None:
     response = requests.get(url, stream=True, timeout=30)
     response.raise_for_status()
 
-    with open(output_path, "wb") as f:
+    with Path(output_path).open("wb") as f:
         for chunk in response.iter_content(chunk_size=8192):
             f.write(chunk)
 
 
 def extract_linux(cli_archive: Path, lib_archive: Path, output_dir: Path) -> None:
     # Extract MediaInfo CLI from zip file
-    with zipfile.ZipFile(cli_archive, 'r') as zip_ref:
+    with zipfile.ZipFile(cli_archive, "r") as zip_ref:
         file_list = zip_ref.namelist()
         mediainfo_file = output_dir / "mediainfo"
 
         # Look for the mediainfo binary in the archive
         for member in file_list:
-            if member.endswith('/mediainfo') or member == 'mediainfo':
+            if member.endswith("/mediainfo") or member == "mediainfo":
                 zip_ref.extract(member, output_dir.parent)
                 extracted_path = output_dir.parent / member
                 shutil.move(str(extracted_path), str(mediainfo_file))
                 break
 
     # Extract MediaInfo library
-    with zipfile.ZipFile(lib_archive, 'r') as zip_ref:
+    with zipfile.ZipFile(lib_archive, "r") as zip_ref:
         file_list = zip_ref.namelist()
         lib_file = output_dir / "libmediainfo.so.0"
 
@@ -87,10 +83,10 @@ def download_dvd_mediainfo(base_dir: str) -> str | None:
     logger.debug(f"[blue]System: {system}, arch: {machine}[/blue]")
 
     if system not in ["linux"]:
-        return
+        return None
 
     if system == "linux" and machine not in ["x86_64", "arm64"]:
-        return
+        return None
 
     if machine == "amd64":
         machine = "x86_64"
@@ -138,12 +134,12 @@ def download_dvd_mediainfo(base_dir: str) -> str | None:
 
         logger.debug("[green]Extracted library[/green]")
 
-        with open(version_file, 'w') as f:
+        with Path(version_file).open("w") as f:
             f.write(f"MediaInfo {MEDIAINFO_VERSION}")
 
         # Make CLI binary executable
         if cli_file.exists():
-            os.chmod(cli_file, 0o700)  # rwx------ (owner only)
+            Path(cli_file).chmod(0o700)  # rwx------ (owner only)
 
     if not cli_file.exists():
         raise Exception(f"Failed to extract CLI binary to {cli_file}")

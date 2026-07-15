@@ -81,9 +81,9 @@ class Par2BinaryManager:
 
         # Cleanup old files
         if binary_path.exists():
-            os.remove(binary_path)
+            binary_path.unlink()
         if version_path.exists():
-            os.remove(version_path)
+            version_path.unlink()
 
         download_url = f"https://github.com/animetosho/par2cmdline-turbo/releases/download/{version}/{file_pattern}"
         logger.debug(f"[blue]PAR2 Download URL: {download_url}[/blue]")
@@ -109,9 +109,9 @@ class Par2BinaryManager:
                         perm = info.external_attr >> 16
                         if stat.S_ISLNK(perm):
                             continue
-                        if os.path.isabs(member) or ".." in member or member.startswith("/"):
+                        if Path(member).is_absolute() or ".." in member or member.startswith("/"):
                             continue
-                        full_path = os.path.realpath(os.path.join(bin_dir, member))
+                        full_path = os.path.realpath(Path(bin_dir) / member)
                         base_path = os.path.realpath(bin_dir)
                         if not full_path.startswith(base_path + os.sep) and full_path != base_path:
                             continue

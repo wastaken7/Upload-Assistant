@@ -269,7 +269,7 @@ class Meta:
     nzb_path: str = ""
     ocr: bool | None = None
     oe: str | int | None = None
-    onlyID: bool | None = None
+    only_id: bool | None = None
     openlibrary_book_id: int | None = None
     openlibrary_id: int | None = None
     openlibrary: str | None = None
@@ -300,7 +300,7 @@ class Meta:
     production_companies: list[Any] = field(default_factory=list)
     production_countries: list[Any] = field(default_factory=list)
     ptgen: dict[str, Any] = field(default_factory=dict)
-    ptp_groupID: str | None = None
+    ptp_groupid: str | None = None
     PTP_images_key: list[dict[str, Any]] = field(default_factory=list)
     ptp: str | int | None = None
     publisher: str = ""
@@ -404,7 +404,7 @@ class Meta:
     tracker_status: dict[str, Any] = field(default_factory=dict)
     trackers_pass: int | None = None
     trackers_remove: str | bool = False
-    trackers: list[str] = field(default_factory=list)
+    trackers: list[str] | str = field(default_factory=list)
     transmission_label: str | None = None
     trump_reason: str | None = None
     trumpable_id: int | str | None = None

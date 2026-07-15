@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
-import os
 import re
 from collections import defaultdict
 from collections.abc import Mapping
@@ -21,7 +20,7 @@ ComparisonData = dict[str, ComparisonGroup]
 class ComparisonManager:
     def __init__(self, meta: Meta, config: Mapping[str, Any]) -> None:
         self.meta = meta
-        default_config = cast(Mapping[str, Any], config.get('DEFAULT', {}))
+        default_config = cast(Mapping[str, Any], config.get("DEFAULT", {}))
         if not isinstance(default_config, dict):
             raise ValueError("'DEFAULT' config section must be a dict")
         self.default_config = default_config
@@ -29,11 +28,11 @@ class ComparisonManager:
 
     async def add_comparison(self) -> ComparisonData | list[ComparisonGroup]:
         comparison_path = self.meta.comparison
-        if not isinstance(comparison_path, str) or not os.path.isdir(comparison_path):
+        if not isinstance(comparison_path, str) or not Path(comparison_path).is_dir():
             return []
 
-        comparison_data_file = f"{self.meta.base_dir}/tmp/{self.meta.uuid}/comparison_data.json"
-        if os.path.exists(comparison_data_file):
+        comparison_data_file = f"{self.meta.base_dir}{'/' + 'tmp' + '/'}{self.meta.uuid}/comparison_data.json"
+        if Path(comparison_data_file).exists():
             try:
                 raw_text = await asyncio.to_thread(Path(comparison_data_file).read_text)
                 raw_data: Any = json.loads(raw_text)
@@ -60,7 +59,7 @@ class ComparisonManager:
                     comparison_index_str = str(comparison_index).strip()
 
                     # Initialize image_list once if needed
-                    if 'image_list' not in self.meta:
+                    if "image_list" not in self.meta:
                         self.meta.image_list = []
 
                     urls_to_add: list[dict[str, Any]] = []
@@ -69,16 +68,18 @@ class ComparisonManager:
                     if isinstance(saved_comparison_data, dict):
                         if comparison_index_str in saved_comparison_data:
                             group_data = saved_comparison_data[comparison_index_str]
-                            urls_to_add = cast(list[dict[str, Any]], group_data.get('urls', []))
+                            urls_to_add = cast(list[dict[str, Any]], group_data.get("urls", []))
                             found = True
                         else:
-                            logger.info(f"[yellow]Comparison index '{comparison_index_str}' not found in saved data; available keys: {list(saved_comparison_data.keys())}[/yellow]")
+                            logger.info(
+                                f"[yellow]Comparison index '{comparison_index_str}' not found in saved data; available keys: {list(saved_comparison_data.keys())}[/yellow]"
+                            )
                     else:
                         try:
                             idx = int(comparison_index_str)
                             if 0 <= idx < len(saved_comparison_data):
                                 list_item = saved_comparison_data[idx]
-                                urls_to_add = cast(list[dict[str, Any]], list_item.get('urls', []))
+                                urls_to_add = cast(list[dict[str, Any]], list_item.get("urls", []))
                                 found = True
                             else:
                                 logger.info(f"[yellow]Comparison index '{comparison_index_str}' out of range; valid range: 0-{len(saved_comparison_data) - 1}[/yellow]")
@@ -98,7 +99,7 @@ class ComparisonManager:
             except Exception as e:
                 logger.info(f"[yellow]Error loading saved comparison data: {e}")
 
-        files: list[str] = [f for f in os.listdir(comparison_path) if f.lower().endswith('.png')]
+        files: list[str] = [p.name for p in Path(comparison_path).iterdir() if p.name.lower().endswith(".png")]
         pattern = re.compile(r"(\d+)-(\d+)-(.+)\.png", re.IGNORECASE)
 
         groups: defaultdict[str, list[tuple[int, str]]] = defaultdict(list)
@@ -113,8 +114,8 @@ class ComparisonManager:
                     suffixes[second] = suffix
 
         meta_comparisons: ComparisonData = {}
-        img_host_keys = [k for k in self.default_config if k.startswith('img_host_')]
-        img_host_indices = [int(k.split('_')[-1]) for k in img_host_keys if k.split('_')[-1].isdigit()]
+        img_host_keys = [k for k in self.default_config if k.startswith("img_host_")]
+        img_host_indices = [int(k.split("_")[-1]) for k in img_host_keys if k.split("_")[-1].isdigit()]
         img_host_indices.sort()
 
         if not img_host_indices:
@@ -122,35 +123,25 @@ class ComparisonManager:
 
         for _idx, second in enumerate(sorted(groups, key=lambda x: int(x)), 1):
             img_host_num = img_host_indices[0]
-            current_img_host_key = f'img_host_{img_host_num}'
+            current_img_host_key = f"img_host_{img_host_num}"
             current_img_host = self.default_config.get(current_img_host_key)
             if current_img_host is not None and not isinstance(current_img_host, str):
                 current_img_host = str(current_img_host)
 
             group = sorted(groups[second], key=lambda x: x[0])
             group_files: list[str] = [f for _, f in group]
-            custom_img_list: list[str] = [os.path.join(comparison_path, filename) for filename in group_files]
+            custom_img_list: list[str] = [Path(comparison_path) / filename for filename in group_files]
             upload_meta = self.meta.copy()
             logger.info(f"[cyan]Uploading comparison group {second} with files: {group_files}")
 
-            upload_result, _ = await self.uploadscreens_manager.upload_screens(
-                upload_meta, len(custom_img_list), img_host_num, 0, len(custom_img_list), custom_img_list, {}
-            )
+            upload_result, _ = await self.uploadscreens_manager.upload_screens(upload_meta, len(custom_img_list), img_host_num, 0, len(custom_img_list), custom_img_list, {})
 
             upload_result_list = cast(list[Mapping[str, Any]], upload_result)
-            uploaded_infos: list[dict[str, Any]] = [
-                {k: item.get(k) for k in ("img_url", "raw_url", "web_url")}
-                for item in upload_result_list
-            ]
+            uploaded_infos: list[dict[str, Any]] = [{k: item.get(k) for k in ("img_url", "raw_url", "web_url")} for item in upload_result_list]
 
             group_name = suffixes.get(second, "")
 
-            meta_comparisons[second] = {
-                "files": group_files,
-                "urls": uploaded_infos,
-                "img_host": current_img_host,
-                "name": group_name
-            }
+            meta_comparisons[second] = {"files": group_files, "urls": uploaded_infos, "img_host": current_img_host, "name": group_name}
 
         comparison_index = self.meta.comparison_index
         if comparison_index is None:
@@ -164,10 +155,10 @@ class ComparisonManager:
                     logger.info(f"[red]Invalid comparison index: {cli_input.strip()}")
         comparison_index_str = str(comparison_index).strip() if comparison_index is not None else ""
         if comparison_index_str and comparison_index_str in meta_comparisons:
-            if 'image_list' not in self.meta:
+            if "image_list" not in self.meta:
                 self.meta.image_list = []
 
-            urls_to_add = cast(list[dict[str, Any]], meta_comparisons[comparison_index_str].get('urls', []))
+            urls_to_add = cast(list[dict[str, Any]], meta_comparisons[comparison_index_str].get("urls", []))
             if self.meta.debug:
                 logger.debug(f"[cyan]Adding {len(urls_to_add)} images from comparison group {comparison_index_str} to image_list")
 

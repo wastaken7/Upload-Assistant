@@ -8,10 +8,11 @@ from src.console import logger
 
 ShowInfo = dict[str, Any]
 
+
 class SonarrManager:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.default_config = cast(dict[str, Any], config.get('DEFAULT', {}))
+        self.default_config = cast(dict[str, Any], config.get("DEFAULT", {}))
 
     async def get_sonarr_data(
         self,
@@ -19,7 +20,7 @@ class SonarrManager:
         filename: str | None = None,
         title: str | None = None,
     ) -> ShowInfo | None:
-        if not any(key.startswith('sonarr_api_key') for key in self.default_config):
+        if not any(key.startswith("sonarr_api_key") for key in self.default_config):
             logger.info("[red]No Sonarr API keys are configured.[/red]")
             return None
 
@@ -47,7 +48,7 @@ class SonarrManager:
                 continue
 
             api_key = api_key_value.strip()
-            base_url = base_url_value.strip().rstrip('/')
+            base_url = base_url_value.strip().rstrip("/")
 
             logger.debug(f"[blue]Trying Sonarr instance {instance_index if instance_index > 0 else 'default'}[/blue]")
 
@@ -60,10 +61,7 @@ class SonarrManager:
                 instance_index += 1
                 continue
 
-            headers = {
-                "X-Api-Key": api_key,
-                "Content-Type": "application/json"
-            }
+            headers = {"X-Api-Key": api_key, "Content-Type": "application/json"}
 
             logger.debug(f"[green]TVDB ID {tvdb_id}[/green]")
             logger.debug(f"[blue]Sonarr URL:[/blue] {url}")
@@ -85,7 +83,9 @@ class SonarrManager:
                             logger.info(f"[green]Found valid show data from Sonarr instance {instance_index if instance_index > 0 else 'default'}[/green]")
                             return show_data
                     else:
-                        logger.info(f"[yellow]Failed to fetch from Sonarr instance {instance_index if instance_index > 0 else 'default'}: {response.status_code} - {response.text}[/yellow]")
+                        logger.info(
+                            f"[yellow]Failed to fetch from Sonarr instance {instance_index if instance_index > 0 else 'default'}: {response.status_code} - {response.text}[/yellow]"
+                        )
 
             except httpx.TimeoutException:
                 logger.info(f"[red]Timeout when fetching from Sonarr instance {instance_index if instance_index > 0 else 'default'}[/red]")
@@ -103,23 +103,14 @@ class SonarrManager:
 
     async def extract_show_data(self, sonarr_data: Any) -> ShowInfo:
         if not sonarr_data:
-            return {
-                "tvdb_id": None,
-                "imdb_id": None,
-                "tvmaze_id": None,
-                "tmdb_id": None,
-                "genres": [],
-                "title": "",
-                "year": None,
-                "release_group": None
-            }
+            return {"tvdb_id": None, "imdb_id": None, "tvmaze_id": None, "tmdb_id": None, "genres": [], "title": "", "year": None, "release_group": None}
 
         # Handle response from /api/v3/parse endpoint
-        if isinstance(sonarr_data, dict) and 'series' in sonarr_data:
+        if isinstance(sonarr_data, dict) and "series" in sonarr_data:
             sonarr_dict = cast(Mapping[str, Any], sonarr_data)
-            series = cast(Mapping[str, Any], sonarr_dict['series'])
-            parsed_info = cast(Mapping[str, Any], sonarr_dict.get('parsedEpisodeInfo', {}))
-            release_group = parsed_info.get('releaseGroup')
+            series = cast(Mapping[str, Any], sonarr_dict["series"])
+            parsed_info = cast(Mapping[str, Any], sonarr_dict.get("parsedEpisodeInfo", {}))
+            release_group = parsed_info.get("releaseGroup")
 
             return {
                 "tvdb_id": series.get("tvdbId", None),
@@ -128,7 +119,7 @@ class SonarrManager:
                 "tmdb_id": series.get("tmdbId", None),
                 "genres": series.get("genres", []),
                 "release_group": release_group if release_group else None,
-                "year": series.get("year", None)
+                "year": series.get("year", None),
             }
 
         # Handle response from /api/v3/series endpoint (list format)
@@ -145,19 +136,8 @@ class SonarrManager:
                     "genres": series.get("genres", []),
                     "title": series.get("title", ""),
                     "year": series.get("year", None),
-                    "release_group": series.get("releaseGroup") if series.get("releaseGroup") else None
+                    "release_group": series.get("releaseGroup") if series.get("releaseGroup") else None,
                 }
 
         # Return empty data if the format doesn't match any expected structure
-        return {
-            "tvdb_id": None,
-            "imdb_id": None,
-            "tvmaze_id": None,
-            "tmdb_id": None,
-            "genres": [],
-            "title": "",
-            "year": None,
-            "release_group": None
-        }
-
-
+        return {"tvdb_id": None, "imdb_id": None, "tvmaze_id": None, "tmdb_id": None, "genres": [], "title": "", "year": None, "release_group": None}

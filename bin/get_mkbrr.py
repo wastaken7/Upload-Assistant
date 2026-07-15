@@ -84,20 +84,19 @@ class MkbrrBinaryManager:
         if version_path.exists() and version_path.is_file() and binary_valid:
             logger.debug("[blue]mkbrr version is up to date[/blue]")
             return str(binary_path)
-        else:
-            wrong_version = True
+        wrong_version = True
 
         if binary_path.exists() and binary_path.is_file():
             if system != "windows":
                 # Set secure permissions before removal
-                os.chmod(binary_path, 0o600)
-            os.remove(binary_path)
+                Path(binary_path).chmod(0o600)
+            binary_path.unlink()
             logger.debug(f"[blue]Removed existing binary at: {binary_path}[/blue]")
 
         if wrong_version and version_path.exists():
             if system != "windows":
-                os.chmod(version_path, 0o644)
-            os.remove(version_path)
+                Path(version_path).chmod(0o644)
+            version_path.unlink()
             logger.debug(f"[blue]Removed existing version file at: {version_path}[/blue]")
 
         download_url = f"https://github.com/autobrr/mkbrr/releases/download/{version}/mkbrr_{version[1:]}_{file_pattern}"
@@ -129,7 +128,7 @@ class MkbrrBinaryManager:
                                 continue
 
                             # Check for absolute paths
-                            if os.path.isabs(member):
+                            if Path(member).is_absolute():
                                 logger.debug(f"[yellow]Warning: Skipping absolute path: {member}[/yellow]")
                                 continue
 
@@ -139,7 +138,7 @@ class MkbrrBinaryManager:
                                 continue
 
                             # Check if the final path would be safe
-                            full_path = os.path.realpath(os.path.join(path, member))
+                            full_path = os.path.realpath(Path(path) / member)
                             base_path = os.path.realpath(path)
                             if not full_path.startswith(base_path + os.sep) and full_path != base_path:
                                 logger.debug(f"[yellow]Warning: Skipping path outside target directory: {member}[/yellow]")
@@ -163,7 +162,7 @@ class MkbrrBinaryManager:
                                 continue
 
                             # Check for absolute paths
-                            if os.path.isabs(member.name):
+                            if Path(member.name).is_absolute():
                                 logger.debug(f"[yellow]Warning: Skipping absolute path: {member.name}[/yellow]")
                                 continue
 
@@ -173,7 +172,7 @@ class MkbrrBinaryManager:
                                 continue
 
                             # Check if the final path would be safe
-                            full_path = os.path.realpath(os.path.join(path, member.name))
+                            full_path = os.path.realpath(Path(path) / member.name)
                             base_path = os.path.realpath(path)
                             if not full_path.startswith(base_path + os.sep) and full_path != base_path:
                                 logger.debug(f"[yellow]Warning: Skipping path outside target directory: {member.name}[/yellow]")
@@ -261,7 +260,7 @@ class MkbrrBinaryManager:
             ):
                 response.raise_for_status()
                 temp_archive = bin_dir / f"temp_{file_pattern}"
-                with open(temp_archive, "wb") as f:
+                with Path(temp_archive).open("wb") as f:
                     for chunk in response.iter_bytes(chunk_size=8192):
                         f.write(chunk)
 
@@ -281,11 +280,11 @@ class MkbrrBinaryManager:
                             logger.warning(f"Warning: Skipping hard link: {member.name}", extra={"markup": False})
                             continue
 
-                        if os.path.isabs(member.name):
+                        if Path(member.name).is_absolute():
                             logger.warning(f"Warning: Skipping absolute path: {member.name}", extra={"markup": False})
                             continue
 
-                        if ".." in member.name.split(os.sep):
+                        if ".." in Path(member.name).parts:
                             logger.warning(f"Warning: Skipping path with '..': {member.name}", extra={"markup": False})
                             continue
 
@@ -318,7 +317,7 @@ class MkbrrBinaryManager:
 
                             source = tar.extractfile(member)
                             if source is not None:
-                                with source, open(final_path, "wb") as target:
+                                with source, Path(final_path).open("wb") as target:
                                     target.write(source.read())
 
                             final_path.chmod(0o600)
@@ -334,10 +333,10 @@ class MkbrrBinaryManager:
             temp_archive.unlink()
 
             if binary_path.exists():
-                os.chmod(binary_path, 0o700)
+                Path(binary_path).chmod(0o700)
                 logger.info(f"mkbrr binary ready at: {binary_path}", extra={"markup": False})
 
-                with open(version_path, "w", encoding="utf-8") as version_file:
+                with Path(version_path).open("w", encoding="utf-8") as version_file:
                     version_file.write(f"mkbrr version {version} installed successfully.")
 
                 return str(binary_path)

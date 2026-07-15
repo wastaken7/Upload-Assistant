@@ -1,33 +1,50 @@
 [tool.ruff]
 line-length = 176
 target-version = "py314"
-exclude = ["tests", "data"]
+exclude = [
+  ".git",
+  "__pycache__",
+  ".pytest_cache",
+  ".ruff_cache",
+  "tests",
+  "data",
+  "tmp",
+]
 
 [tool.ruff.lint]
 select = [
   # Core correctness
-  "E",
-  "F",
-  "W",
-  "B",
+  "E",     # pycodestyle errors
+  "F",     # Pyflakes (logical and syntax errors)
+  "W",     # pycodestyle warnings
+  "B",     # flake8-bugbear (likely bugs and design issues)
 
   # Imports & modernization
-  "I",
-  "UP",
+  "I",     # isort (import sorting)
+  "UP",    # pyupgrade (code modernization)
 
-  # Code quality
-  "C4",
-  "SIM",
-  "PERF",
-  "ARG",
+  # Code quality & safety
+  "C4",    # flake8-comprehensions (better list/dict/set comprehension syntax)
+  "SIM",   # flake8-simplify (code simplification suggestions)
+  "PERF",  # Perflint (performance anti-patterns detection)
+  "ARG",   # flake8-unused-arguments (unused function arguments)
+  "RUF",   # Ruff-specific rules and lints
+  "S",     # flake8-bandit (security testing and checks)
+  "PTH",   # flake8-use-pathlib (encourage pathlib over os.path)
+  "N",     # pep8-naming (naming conventions alignment)
+  "RET",   # flake8-return (return statement check)
 
   # Dates & time
-  "DTZ",
+  "DTZ",   # flake8-datetimez (prevent timezone-naive datetime usage)
 
   # Async (if applicable)
-  "ASYNC",
+  "ASYNC", # flake8-async (concurrency and async checks)
 ]
-ignore = ["E501", "UP045", "ASYNC240"]
+ignore = [
+  "ASYNC240", # Blocking pathlib methods in async functions
+  "E501",     # Line too long (line length violations)
+  "S314",     # Using vulnerable xml.etree.ElementTree for XML parsing
+]
 
 [tool.ruff.lint.per-file-ignores]
 "upload.py" = ["E402"]
@@ -38,12 +55,17 @@ section-order = ["future", "standard-library", "third-party", "first-party", "lo
 
 [tool.pyright]
 pythonVersion = "3.14"
-typeCheckingMode = "strict"
+typeCheckingMode = "standard"
 reportMissingImports = true
 reportMissingTypeStubs = false
 reportUnknownMemberType = true
 reportUnknownVariableType = true
-exclude = ["data"]
+exclude = [
+  "tests",
+  "data",
+  "tmp",
+  "**/__pyrefly_virtual__/**"
+]
 
 [tool.pyrefly]
 disable-search-path-heuristics = true

@@ -20,16 +20,7 @@ class BtnIdManager:
         tvdb_id = 0
         logger.debug("Fetching BTN data...", extra={"markup": False})
         post_query_url = "https://api.broadcasthe.net/"
-        post_data = {
-            "jsonrpc": "2.0",
-            "id": (await BtnIdManager.generate_guid())[:8],
-            "method": "getTorrentsSearch",
-            "params": [
-                btn_api,
-                {"id": btn_id},
-                50
-            ]
-        }
+        post_data = {"jsonrpc": "2.0", "id": (await BtnIdManager.generate_guid())[:8], "method": "getTorrentsSearch", "params": [btn_api, {"id": btn_id}, 50]}
         headers = {"Content-Type": "application/json"}
 
         try:
@@ -50,12 +41,12 @@ class BtnIdManager:
             logger.info("[ERROR] BTN API response is empty or invalid.", extra={"markup": False})
             return 0, 0
 
-        error = data.get('error')
+        error = data.get("error")
         if isinstance(error, dict):
             error_map = cast(dict[str, Any], error)
-            code = error_map.get('code', 'unknown')
-            message = str(error_map.get('message', 'Unknown BTN API error'))
-            if 'unauthorized ip' in message.lower():
+            code = error_map.get("code", "unknown")
+            message = str(error_map.get("message", "Unknown BTN API error"))
+            if "unauthorized ip" in message.lower():
                 logger.info(f"[red]BTN API error: Unauthorized IP address (code {code}).[/red]")
                 logger.info("[yellow]Your current public IP isn't whitelisted for your BTN API key.[/yellow]")
             else:
@@ -65,7 +56,7 @@ class BtnIdManager:
 
         logger.debug(f"[green]BTN data fetched successfully for BTN ID {data.get('id')}[/green]")
 
-        result = data.get('result')
+        result = data.get("result")
         if isinstance(result, dict) and "torrents" in result:
             torrents = cast(dict[str, dict[str, Any]], result["torrents"])
             first_torrent = next(iter(torrents.values()), None)
@@ -91,7 +82,7 @@ class BtnIdManager:
     ) -> tuple[int, int]:
         imdb = 0
         tmdb = 0
-        logger.debug("Fetching BHD data...", extra={"markup": False})
+        logger.debug("Fetching BEYONDHD data...", extra={"markup": False})
         post_query_url = f"https://beyond-hd.me/api/torrents/{bhd_api}"
 
         post_data = {"action": "details", "torrent_id": torrent_id} if torrent_id is not None else {"action": "search", "rsskey": bhd_rss_key}
@@ -114,19 +105,19 @@ class BtnIdManager:
                 try:
                     data = response.json()
                 except ValueError as e:
-                    logger.info(f"[ERROR] Failed to parse BHD response as JSON: {e}", extra={"markup": False})
+                    logger.info(f"[ERROR] Failed to parse BEYONDHD response as JSON: {e}", extra={"markup": False})
                     logger.info(f"Response content: {response.text[:200]}...", extra={"markup": False})
                     return 0, 0
         except (httpx.RequestError, httpx.HTTPStatusError) as e:
-            logger.info(f"[ERROR] Failed to fetch BHD data: {e}", extra={"markup": False})
+            logger.info(f"[ERROR] Failed to fetch BEYONDHD data: {e}", extra={"markup": False})
             return 0, 0
 
         if data.get("status_code") == 0 or data.get("success") is False:
-            error_message = data.get("status_message", "Unknown BHD API error")
-            logger.info(f"[ERROR] BHD API error: {error_message}", extra={"markup": False})
+            error_message = data.get("status_message", "Unknown BEYONDHD API error")
+            logger.info(f"[ERROR] BEYONDHD API error: {error_message}", extra={"markup": False})
             return 0, 0
 
-        # Handle different response formats from BHD API
+        # Handle different response formats from BEYONDHD API
         first_result = None
 
         # For search results that return a list
@@ -138,7 +129,7 @@ class BtnIdManager:
             first_result = data["result"]
 
         if not first_result:
-            logger.info("No valid results found in BHD API response.", extra={"markup": False})
+            logger.info("No valid results found in BEYONDHD API response.", extra={"markup": False})
             return 0, 0
 
         name = str(first_result.get("name", "")).lower()
@@ -164,7 +155,7 @@ class BtnIdManager:
                         logger.info("Successfully retrieved full description", extra={"markup": False})
                     else:
                         description = ""
-                        error_message = desc_data.get("status_message", "Unknown BHD API error")
+                        error_message = desc_data.get("status_message", "Unknown BEYONDHD API error")
                         logger.info(f"[ERROR] Failed to fetch description: {error_message}", extra={"markup": False})
             except (httpx.RequestError, httpx.HTTPStatusError) as e:
                 logger.info(f"[ERROR] Failed to fetch description: {e}", extra={"markup": False})
@@ -202,9 +193,9 @@ class BtnIdManager:
             meta.image_list = imagelist
 
         if (imdb and imdb != 0) or (tmdb and tmdb != 0):
-            logger.info(f"[green]Found BHD IDs: IMDb={imdb}, TMDb={tmdb}")
+            logger.info(f"[green]Found BEYONDHD IDs: IMDb={imdb}, TMDb={tmdb}")
         elif meta.debug:
-            logger.info(f"[yellow]BHD search returned no valid IDs (IMDb={imdb}, TMDb={tmdb})[/yellow]")
+            logger.info(f"[yellow]BEYONDHD search returned no valid IDs (IMDb={imdb}, TMDb={tmdb})[/yellow]")
 
         return imdb, tmdb
 
@@ -213,12 +204,12 @@ class BtnIdManager:
         """Parses TMDb ID, ensures correct formatting, and assigns category."""
         tmdb_id_str = tmdb_id.strip().lower()
 
-        if tmdb_id_str.startswith('tv/'):
-            tmdb_id_str = tmdb_id_str.split('/')[1].split('-')[0]
-            category = 'TV'
-        elif tmdb_id_str.startswith('movie/'):
-            tmdb_id_str = tmdb_id_str.split('/')[1].split('-')[0]
-            category = 'MOVIE'
+        if tmdb_id_str.startswith("tv/"):
+            tmdb_id_str = tmdb_id_str.split("/")[1].split("-")[0]
+            category = "TV"
+        elif tmdb_id_str.startswith("movie/"):
+            tmdb_id_str = tmdb_id_str.split("/")[1].split("-")[0]
+            category = "MOVIE"
 
         parsed_id = int(tmdb_id_str) if tmdb_id_str.isdigit() else 0
         return category, parsed_id

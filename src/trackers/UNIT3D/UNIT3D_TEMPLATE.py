@@ -2,16 +2,16 @@
 from typing import Any
 
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
 
 
-class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER NAME
+class Unit3dTemplate(UNIT3D):  # EDIT 'Unit3dTemplate' AS ABBREVIATED TRACKER NAME
     tracker = "Abbreviated Tracker Name"
     base_url = "https://domain.tld"
-    banned_groups = [""]
+    banned_groups = ("",)
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     requests_url = f"{base_url}/api/requests/filter"  # If the site supports requests via API, otherwise remove this line
@@ -20,9 +20,9 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:
-        super().__init__(config, tracker_name='UNIT3D_TEMPLATE')  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER NAME
+        super().__init__(config, tracker_name="Unit3dTemplate")  # EDIT 'Unit3dTemplate' AS ABBREVIATED TRACKER NAME
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     # The section below can be deleted if no changes are needed, as everything else is handled in UNIT3D.py
     # If advanced changes are required, copy the necessary functions from UNIT3D.py here
@@ -41,7 +41,7 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
             "MOVIE": "1",
             "TV": "2",
         }.get(meta.category, "0")
-        return {'category_id': category_id}
+        return {"category_id": category_id}
 
     # If default UNIT3D types, remove this function
     async def get_type_id(
@@ -51,9 +51,13 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
-        _ = (type, reverse, mapping_only)
-        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "3"}.get(meta.type or "", "0")
-        return {'type_id': type_id}
+        type_id = {"DISC": "1", "REMUX": "2", "WEBDL": "4", "WEBRIP": "5", "HDTV": "6", "ENCODE": "3", "DVDRIP": "3"}
+        if mapping_only:
+            return type_id
+        if reverse:
+            return {"1": "DISC", "2": "REMUX", "3": "ENCODE", "4": "WEBDL", "5": "WEBRIP", "6": "HDTV"}
+        type_value = type if type is not None and type != "" else meta.type or ""
+        return {"type_id": type_id.get(type_value, "0")}
 
     # If default UNIT3D resolutions, remove this function
     async def get_resolution_id(
@@ -63,7 +67,6 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
-        _ = (resolution, reverse, mapping_only)
         resolution_id = {
             "8640p": "10",
             "4320p": "1",
@@ -76,8 +79,24 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
             "576i": "7",
             "480p": "8",
             "480i": "9",
-        }.get(meta.resolution, "10")
-        return {'resolution_id': resolution_id}
+        }
+        if mapping_only:
+            return resolution_id
+        if reverse:
+            return {
+                "1": "4320p",
+                "2": "2160p",
+                "3": "1440p",
+                "4": "1080i",
+                "5": "720p",
+                "6": "576p",
+                "7": "576i",
+                "8": "480p",
+                "9": "480i",
+                "10": "8640p",
+            }
+        resolution_value = resolution if resolution is not None and resolution != "" else meta.resolution or ""
+        return {"resolution_id": resolution_id.get(resolution_value, "10")}
 
     # If there are tracker specific checks to be done before upload, add them here
     # Is it a movie only tracker? Are concerts banned? Etc.
@@ -89,13 +108,10 @@ class UNIT3D_TEMPLATE(UNIT3D):  # EDIT 'UNIT3D_TEMPLATE' AS ABBREVIATED TRACKER 
     # If the tracker has modq in the api, otherwise remove this function
     # If no additional data is required, remove this function
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
-        data = {
-            'mod_queue_opt_in': await self.get_flag(meta, 'modq'),
+        return {
+            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
-
-        return data
 
     # If the tracker has specific naming conventions, add them here; otherwise, remove this function
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        UNIT3D_TEMPLATE_name = meta.name
-        return {'name': UNIT3D_TEMPLATE_name}
+        return {"name": meta.name}

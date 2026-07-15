@@ -25,32 +25,24 @@ async def run(config: Mapping[str, Any]) -> None:
     intents = discord.Intents.default()
     intents.message_content = True
 
-    bot = Bot(
-        config=config,
-        description=config['DISCORD']['discord_bot_description'],
-        intents=intents
-    )
+    bot = Bot(config=config, description=config["DISCORD"]["discord_bot_description"], intents=intents)
 
     try:
-        await bot.start(config['DISCORD']['discord_bot_token'])
+        await bot.start(config["DISCORD"]["discord_bot_token"])
     except KeyboardInterrupt:
         await bot.close()
 
 
 class Bot(commands.Bot):
     def __init__(self, *, config: Mapping[str, Any], description: str, intents: discord.Intents) -> None:
-        super().__init__(
-            command_prefix=self.get_prefix_,
-            description=description,
-            intents=intents
-        )
+        super().__init__(command_prefix=self.get_prefix_, description=description, intents=intents)
         self.start_time: datetime.datetime | None = None
         self.app_info: discord.AppInfo | None = None
         self.config: Mapping[str, Any] = config
 
     async def setup_hook(self) -> None:
         # Called before the bot connects to Discord
-        asyncio.create_task(self.track_start())
+        self._track_task = asyncio.create_task(self.track_start())
         await self.load_all_extensions()
 
     async def track_start(self) -> None:
@@ -65,7 +57,7 @@ class Bot(commands.Bot):
         """
         A coroutine that returns a prefix.
         """
-        prefix = [self.config['DISCORD']['command_prefix']]
+        prefix = [self.config["DISCORD"]["command_prefix"]]
         return commands.when_mentioned_or(*prefix)(bot, message)
 
     async def load_all_extensions(self) -> None:
@@ -78,10 +70,10 @@ class Bot(commands.Bot):
         # cogs/commands.py has been removed.
         excluded = {"redaction", "commands"}
 
-        cogs = [x.stem for x in Path('cogs').glob('*.py') if x.stem not in excluded]
+        cogs = [x.stem for x in Path("cogs").glob("*.py") if x.stem not in excluded]
         for extension in cogs:
             try:
-                await self.load_extension(f'cogs.{extension}')
+                await self.load_extension(f"cogs.{extension}")
                 logger.info(f"loaded {extension}", extra={"markup": False})
             except Exception as e:
                 error = f"{extension}\n {type(e).__name__} : {e}"
@@ -100,9 +92,9 @@ class Bot(commands.Bot):
             return
         logger.info(f"Logged in as: {user.name}\nUsing discord.py version: {discord.__version__}\nOwner: {self.app_info.owner}\n", extra={"markup": False})
         logger.info("-" * 10, extra={"markup": False})
-        channel = self.get_channel(int(self.config['DISCORD']['discord_channel_id']))
+        channel = self.get_channel(int(self.config["DISCORD"]["discord_channel_id"]))
         if channel and isinstance(channel, discord.abc.Messageable):
-            await channel.send(f'{user.name} is now online')
+            await channel.send(f"{user.name} is now online")
 
     async def on_message(self, message: discord.Message) -> None:
         """
@@ -135,24 +127,23 @@ class DiscordNotifier:
         Returns:
             bool: True if message was sent successfully, False otherwise
         """
-        only_unattended = config.get('DISCORD', {}).get('only_unattended', False)
+        only_unattended = config.get("DISCORD", {}).get("only_unattended", False)
         unattended = bool(meta and meta.unattended)
         if only_unattended and not unattended:
             return False
-        if not bot or not hasattr(bot, 'is_ready') or not bot.is_ready():
+        if not bot or not hasattr(bot, "is_ready") or not bot.is_ready():
             logger.debug("[yellow]Discord bot not ready - skipping notifications")
             return False
 
         try:
-            channel_id = int(config['DISCORD']['discord_channel_id'])
+            channel_id = int(config["DISCORD"]["discord_channel_id"])
             channel = bot.get_channel(channel_id)
             if channel and isinstance(channel, discord.abc.Messageable):
                 await channel.send(message)
                 logger.debug(f"[green]Discord notification sent: {message}")
                 return True
-            else:
-                logger.info("[yellow]Discord channel not found")
-                return False
+            logger.info("[yellow]Discord channel not found")
+            return False
         except Exception as e:
             logger.info(f"[yellow]Discord notification error: {e}")
             return False
@@ -164,11 +155,11 @@ class DiscordNotifier:
         meta: Meta,
     ) -> bool:
         """Send Discord notification with upload status including failed trackers."""
-        only_unattended = config.get('DISCORD', {}).get('only_unattended', False)
+        only_unattended = config.get("DISCORD", {}).get("only_unattended", False)
         unattended = bool(meta and meta.unattended)
         if only_unattended and not unattended:
             return False
-        if not bot or not hasattr(bot, 'is_ready') or not bot.is_ready():
+        if not bot or not hasattr(bot, "is_ready") or not bot.is_ready():
             return False
 
         tracker_status = meta.tracker_status
@@ -176,20 +167,17 @@ class DiscordNotifier:
             return False
 
         # Get list of trackers where upload is True
-        successful_uploads: list[str] = [
-            tracker for tracker, status in tracker_status.items()
-            if status.get('upload', False)
-        ]
+        successful_uploads: list[str] = [tracker for tracker, status in tracker_status.items() if status.get("upload", False)]
 
         # Get list of failed trackers with reasons
         failed_trackers: list[str] = []
         for tracker, status in tracker_status.items():
-            if not status.get('upload', False):
-                if status.get('banned', False):
+            if not status.get("upload", False):
+                if status.get("banned", False):
                     failed_trackers.append(f"{tracker} (banned)")
-                elif status.get('skipped', False):
+                elif status.get("skipped", False):
                     failed_trackers.append(f"{tracker} (skipped)")
-                elif status.get('dupe', False):
+                elif status.get("dupe", False):
                     failed_trackers.append(f"{tracker} (dupe)")
 
         release_name = meta.name if meta.name is not None else meta.get("title", "Unknown Release")
@@ -207,7 +195,7 @@ class DiscordNotifier:
         message = "\n".join(message_parts)
 
         try:
-            channel_id = int(config['DISCORD']['discord_channel_id'])
+            channel_id = int(config["DISCORD"]["discord_channel_id"])
             channel = bot.get_channel(channel_id)
             if channel and isinstance(channel, discord.abc.Messageable):
                 await channel.send(message)

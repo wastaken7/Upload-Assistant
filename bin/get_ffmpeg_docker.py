@@ -32,25 +32,25 @@ class FfmpegBinaryManager:
         system = platform.system().lower()
         logger.info(f"[blue]Detected system: {system}[/blue]")
 
-        if 'linux' not in system:
+        if "linux" not in system:
             raise Exception(f"This script is for Docker/Linux only, detected: {system}")
 
         base = Path(base_dir)
-        ff_root = base / 'bin' / 'ffmpeg'
+        ff_root = base / "bin" / "ffmpeg"
         ff_root.mkdir(parents=True, exist_ok=True)
 
         results: dict[str, bool] = {}
 
-        for arch, url in (('amd', FfmpegBinaryManager.AMD_URL), ('arm', FfmpegBinaryManager.ARM_URL)):
+        for arch, url in (("amd", FfmpegBinaryManager.AMD_URL), ("arm", FfmpegBinaryManager.ARM_URL)):
             try:
                 arch_dir = ff_root / arch
                 arch_dir.mkdir(parents=True, exist_ok=True)
                 logger.info(f"[blue]Downloading ffmpeg for arch {arch} from {url}[/blue]")
 
                 temp_archive = arch_dir / f"ffmpeg_{arch}.tar.xz"
-                with httpx.Client(timeout=60.0, follow_redirects=True) as client, client.stream('GET', url, timeout=60.0) as response:
+                with httpx.Client(timeout=60.0, follow_redirects=True) as client, client.stream("GET", url, timeout=60.0) as response:
                     response.raise_for_status()
-                    with open(temp_archive, 'wb') as f:
+                    with Path(temp_archive).open("wb") as f:
                         for chunk in response.iter_bytes(chunk_size=8192):
                             f.write(chunk)
 
@@ -59,12 +59,12 @@ class FfmpegBinaryManager:
                 # Extract into a temporary directory to avoid polluting target
                 with tempfile.TemporaryDirectory(dir=str(arch_dir)) as extract_dir:
                     try:
-                        with tarfile.open(temp_archive, 'r:xz') as tar_ref:
+                        with tarfile.open(temp_archive, "r:xz") as tar_ref:
                             # Secure extract: only extract regular files and dirs
                             members = [m for m in tar_ref.getmembers() if (m.isreg() or m.isdir())]
                             for member in members:
                                 # Prevent absolute paths and traversal
-                                if os.path.isabs(member.name) or '..' in Path(member.name).parts:
+                                if Path(member.name).is_absolute() or ".." in Path(member.name).parts:
                                     logger.info(f"[yellow]Skipping unsafe member: {member.name}[/yellow]")
                                     continue
                                 tar_ref.extract(member, path=extract_dir)
@@ -73,8 +73,8 @@ class FfmpegBinaryManager:
                         found = None
                         for root, _dirs, files in os.walk(extract_dir):
                             for fname in files:
-                                if fname == 'ffmpeg':
-                                    found = os.path.join(root, fname)
+                                if fname == "ffmpeg":
+                                    found = Path(root) / fname
                                     break
                             if found:
                                 break
@@ -83,7 +83,7 @@ class FfmpegBinaryManager:
                             logger.info(f"[red]ffmpeg binary not found inside archive for {arch}[/red]")
                             results[arch] = False
                         else:
-                            target_path = arch_dir / 'ffmpeg'
+                            target_path = arch_dir / "ffmpeg"
                             shutil.move(found, target_path)
                             # Ensure executable
                             target_path.chmod(target_path.stat().st_mode | 0o111)
@@ -112,5 +112,5 @@ class FfmpegBinaryManager:
         return str(ff_root)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print(FfmpegBinaryManager.download_ffmpeg_for_docker())

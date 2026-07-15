@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import platform
-from typing import Any
+from typing import Any, ClassVar
 
 import httpx
 from bs4 import BeautifulSoup
@@ -10,28 +10,29 @@ from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.tmdb import TmdbManager
-from src.trackers.COMMON import COMMON
+from src.trackers.common import Common
 
 Config = dict[str, Any]
 
 
 class NEXUSPHP:
-    supported_categories: tuple[str, ...] = ('TV', 'MOVIE')
+    auth_type = "cookies"
+    supported_categories: tuple[str, ...] = ("TV", "MOVIE")
     tracker: str = ""
     source_flag: str = ""
-    banned_groups: list[str] = []
+    banned_groups: tuple[str, ...] = ()
     base_url: str = ""
     search_url: str = ""
     torrent_url: str = ""
     upload_url: str = ""
-    tmdb_localization_requirements = {
+    tmdb_localization_requirements: ClassVar = {
         "zh-cn": {
             "main": "credits",
         }
     }
 
     def __init__(self, config: dict[str, Any], tracker_name: str):
-        self.common = COMMON(config)
+        self.common = Common(config)
         self.config = config
         self.cookie_auth_uploader = CookieAuthUploader(config)
         self.cookie_validator = CookieValidator(config)
@@ -293,7 +294,7 @@ class NEXUSPHP:
         builder = DescriptionBuilder(self.tracker, self.config)
         meta.nexusphp_description = await self.standard_desc(meta)
 
-        description = await builder.general_description_generator(
+        return await builder.general_description_generator(
             meta,
             audio_spectrogram=True,
             bluray=True,
@@ -314,8 +315,6 @@ class NEXUSPHP:
             user_description=True,
             signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta.ua_signature}[/size][/url][/right]",
         )
-
-        return description
 
     def get_category(self, meta: Meta) -> int:
         meta = meta
@@ -425,7 +424,7 @@ class NEXUSPHP:
             self.session.cookies.update(cookies)
         data = await self.get_data(meta)
 
-        is_uploaded = await self.cookie_auth_uploader.handle_upload(
+        return await self.cookie_auth_uploader.handle_upload(
             meta=meta,
             tracker=self.tracker,
             source_flag=self.source_flag,
@@ -437,5 +436,3 @@ class NEXUSPHP:
             upload_url=f"{self.base_url}/takeupload.php",
             success_text="download.php?id=",
         )
-
-        return is_uploaded

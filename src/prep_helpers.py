@@ -6,6 +6,7 @@ import os
 import re
 import sys
 from difflib import SequenceMatcher
+from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlparse
 
@@ -19,7 +20,7 @@ from src.clients import Clients
 from src.console import logger
 from src.edition import get_edition
 from src.exceptions import NoAudioMediaError
-from src.exportmi import exportInfo, get_conformance_error, mi_resolution, validate_mediainfo
+from src.exportmi import export_info, get_conformance_error, mi_resolution, validate_mediainfo
 from src.get_source import get_source
 from src.imdb import imdb_manager
 from src.languages import languages_manager
@@ -75,7 +76,7 @@ def _normalize_search_year(value: Any) -> str | None:
 def _to_int(value: Any, default: int = 0) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -97,7 +98,7 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     meta.cutoff = int(prep_instance.config["DEFAULT"].get("cutoff_screens", 1))
 
     meta.mode = mode
-    meta.isdir = os.path.isdir(meta.path or "")
+    meta.isdir = Path(meta.path or "").is_dir()
     base_dir = meta.base_dir
     meta.saved_description = False
     client = Clients(config=prep_instance.config)
@@ -110,7 +111,7 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     use_radarr = prep_instance.config["DEFAULT"].get("use_radarr", False)
     meta.print_tracker_messages = prep_instance.config["DEFAULT"].get("print_tracker_messages", False)
     meta.print_tracker_links = prep_instance.config["DEFAULT"].get("print_tracker_links", True)
-    only_id_val = meta.onlyID
+    only_id_val = meta.only_id
     skip_tracker_descriptions = bool(prep_instance.config["DEFAULT"].get("skip_tracker_descriptions", False) if only_id_val is None else only_id_val)
     meta.skip_tracker_descriptions = skip_tracker_descriptions
     meta.keep_images = bool(prep_instance.config["DEFAULT"].get("keep_images", True) if not meta.keep_images else True)
@@ -129,15 +130,15 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     meta.subtitle_files = cast(list[str], [])
     meta.adult_media = False
 
-    folder_id = os.path.basename(meta.path or "")
+    folder_id = Path(meta.path or "").name
     if not meta.uuid:
         meta.uuid = folder_id
     if meta.isdir:
         meta.basename_no_ext = folder_id
     else:
-        meta.basename_no_ext = os.path.splitext(folder_id)[0]
-    if not os.path.exists(f"{base_dir}/tmp/{meta.uuid}"):
-        os.makedirs(f"{base_dir}/tmp/{meta.uuid}", mode=0o700, exist_ok=True)
+        meta.basename_no_ext = Path(folder_id).stem
+    if not Path(f"{base_dir}{'/' + 'tmp' + '/'}{meta.uuid}").exists():
+        Path(f"{base_dir}{'/' + 'tmp' + '/'}{meta.uuid}").mkdir(parents=True, mode=0o700, exist_ok=True)
 
     logger.debug(f"[cyan]ID: {meta.uuid}")
 
@@ -159,14 +160,14 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
         video_extensions = {".mkv", ".mp4", ".ts"}
 
         path_to_check = meta.path
-        if path_to_check and os.path.exists(path_to_check):
-            if os.path.isdir(path_to_check):
+        if path_to_check and Path(path_to_check).exists():
+            if Path(path_to_check).is_dir():
                 has_books = False
                 has_audio = False
                 has_video = False
                 for _root, _, files in os.walk(path_to_check):
                     for file in files:
-                        ext = os.path.splitext(file)[1].lower()
+                        ext = Path(file).suffix.lower()
                         if ext in book_extensions:
                             has_books = True
                         elif ext in audiobook_extensions:
@@ -177,7 +178,7 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                 if (has_books or has_audio) and not has_video:
                     is_book = True
             else:
-                ext = os.path.splitext(path_to_check)[1].lower()
+                ext = Path(path_to_check).suffix.lower()
                 if ext in book_extensions or ext in audiobook_extensions:
                     is_book = True
 
@@ -224,44 +225,42 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
         game_groups = {"tenoke", "rune", "flt", "plaza", "codex", "skidrow", "prophet", "gog", "darkzer0", "doge", "tinyiso", "razor1911", "outlaws", "alias", "simplex"}
 
         path_to_check = meta.path
-        if path_to_check and os.path.exists(path_to_check):
+        if path_to_check and Path(path_to_check).exists():
             has_game_ext = False
             has_video = False
             has_steam_link = False
             has_game_group = False
 
-            base_name_lower = os.path.basename(path_to_check).lower()
+            base_name_lower = Path(path_to_check).name.lower()
             for group in game_groups:
                 if f"-{group}" in base_name_lower or base_name_lower.endswith(group):
                     has_game_group = True
                     break
 
-            if os.path.isdir(path_to_check):
+            if Path(path_to_check).is_dir():
                 for root, _, files in os.walk(path_to_check):
                     for file in files:
                         file_lower = file.lower()
-                        ext = os.path.splitext(file_lower)[1]
+                        ext = Path(file_lower).suffix
                         if ext in game_extensions:
                             has_game_ext = True
                         elif ext in video_extensions:
                             has_video = True
                         elif ext == ".nfo":
-                            nfo_path = os.path.join(root, file)
+                            nfo_path = Path(root) / file
                             try:
                                 async with aiofiles.open(nfo_path, encoding="utf-8", errors="ignore") as nf:
                                     nfo_content = await nf.read()
                                     if _nfo_has_store_link(nfo_content):
                                         has_steam_link = True
                             except Exception:
-                                try:
+                                with contextlib.suppress(Exception):
                                     async with aiofiles.open(nfo_path, encoding="latin-1", errors="ignore") as nf:
                                         nfo_content = await nf.read()
                                         if _nfo_has_store_link(nfo_content):
                                             has_steam_link = True
-                                except Exception:
-                                    pass
             else:
-                ext = os.path.splitext(base_name_lower)[1]
+                ext = Path(base_name_lower).suffix
                 if ext in game_extensions:
                     has_game_ext = True
 
@@ -289,7 +288,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
     if meta.is_disc == "BDMV":
         video, meta.scene, meta.imdb_id = await prep_instance.scene_manager.is_scene(meta_path, meta, meta.imdb_id)
         meta.filelist = []  # No filelist for discs, use path
-        search_term = os.path.basename(meta_path)
+        search_term = Path(meta_path).name
         search_file_folder = "folder"
         try:
             title, secondary_title, extracted_year = await prep_instance.name_manager.extract_title_and_year(meta, video)
@@ -342,7 +341,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
     elif meta.is_disc == "DVD":
         video, meta.scene, meta.imdb_id = await prep_instance.scene_manager.is_scene(meta_path, meta, meta.imdb_id)
         meta.filelist = []
-        search_term = os.path.basename(meta_path)
+        search_term = Path(meta_path).name
         search_file_folder = "folder"
         title, secondary_title, extracted_year = await prep_instance.name_manager.extract_title_and_year(meta, video)
         logger.debug(f"Title: {title}, Secondary Title: {secondary_title}, Year: {extracted_year}")
@@ -356,13 +355,13 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
         else:
             guess_name = meta.discs[0]["path"].replace("-", " ")
             filename = str(guessit_fn(guess_name, {"excludes": ["country", "language"]}).get("title", ""))
-            untouched_filename = os.path.basename(os.path.dirname(meta.discs[0]["path"]))
+            untouched_filename = Path(meta.discs[0]["path"]).parent.name
         try:
             meta.search_year = guessit_fn(meta.discs[0]["path"])["year"]
         except Exception:
             meta.search_year = ""
         if not meta.edit:
-            mi = await exportInfo(
+            mi = await export_info(
                 f"{meta.discs[0]['path']}/VTS_{meta.discs[0]['main_set'][0][:2]}_0.IFO",
                 False,
                 meta.uuid,
@@ -380,18 +379,18 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
     elif meta.is_disc == "HDDVD":
         video, meta.scene, meta.imdb_id = await prep_instance.scene_manager.is_scene(meta_path, meta, meta.imdb_id)
         meta.filelist = []
-        search_term = os.path.basename(meta_path)
+        search_term = Path(meta_path).name
         search_file_folder = "folder"
         guess_name = meta.discs[0]["path"].replace("-", "")
         filename = str(guessit_fn(guess_name, {"excludes": ["country", "language"]}).get("title", ""))
-        untouched_filename = os.path.basename(meta.discs[0]["path"])
+        untouched_filename = Path(meta.discs[0]["path"]).name
         videopath = meta.discs[0]["largest_evo"]
         try:
             meta.search_year = guessit_fn(meta.discs[0]["path"])["year"]
         except Exception:
             meta.search_year = ""
         if not meta.edit:
-            mi = await exportInfo(meta.discs[0]["largest_evo"], False, meta.uuid, meta.base_dir)
+            mi = await export_info(meta.discs[0]["largest_evo"], False, meta.uuid, meta.base_dir)
             meta.mediainfo = mi
         else:
             mi = meta.mediainfo
@@ -409,7 +408,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             videopath, meta.filelist = await video_manager.get_video(videoloc, (meta.mode if meta.mode is not None else "discord"), meta.sorted_filelist)
             filelist = meta.filelist
             meta.filelist = filelist
-            search_term = os.path.basename(filelist[0]) if filelist else ""
+            search_term = Path(filelist[0]).name if filelist else ""
             search_file_folder = "file"
 
             # Scan for external subtitle files
@@ -420,23 +419,23 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                     if any(x in root.upper() for x in ["BDMV", "VIDEO_TS", "HVDVD_TS"]):
                         continue
                     for file in files:
-                        ext = os.path.splitext(file)[1].lower()
+                        ext = Path(file).suffix.lower()
                         if ext in subtitle_exts:
-                            meta.subtitle_files.append(os.path.abspath(os.path.join(root, file)))
+                            meta.subtitle_files.append(str(Path(Path(root) / file).resolve()))
             else:
-                parent_dir = os.path.dirname(meta_path)
-                if parent_dir and os.path.exists(parent_dir):
-                    base_name = os.path.splitext(os.path.basename(meta_path))[0]
-                    for file in os.listdir(parent_dir):
-                        if os.path.isfile(os.path.join(parent_dir, file)):
-                            ext = os.path.splitext(file)[1].lower()
+                parent_dir = str(Path(meta_path).parent)
+                if parent_dir and Path(parent_dir).exists():
+                    base_name = Path(meta_path).stem
+                    for file in (p.name for p in Path(parent_dir).iterdir()):
+                        if (Path(parent_dir) / file).is_file():
+                            ext = Path(file).suffix.lower()
                             if ext in subtitle_exts and file.lower().startswith(base_name.lower()):
-                                meta.subtitle_files.append(os.path.abspath(os.path.join(parent_dir, file)))
+                                meta.subtitle_files.append(str(Path(Path(parent_dir) / file).resolve()))
             meta.subtitle_files = sorted(set(meta.subtitle_files))
 
         video, meta.scene, meta.imdb_id = await prep_instance.scene_manager.is_scene(videopath, meta, meta.imdb_id)
         if meta.category == "BOOK" or (meta.manual_category or "").upper() == "BOOK":
-            orig_ext = os.path.splitext(videopath)[1]
+            orig_ext = Path(videopath).suffix
             if video.endswith(".mkv") and not videopath.endswith(".mkv"):
                 video = video[:-4] + orig_ext
 
@@ -448,7 +447,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             if extracted_year and not meta.year:
                 meta.year = int(extracted_year)
 
-            guess_name = (os.path.basename(meta.path).replace("_", "").replace("-", "") if meta.path else "") if meta.isdir else ntpath.basename(video).replace("-", " ")
+            guess_name = (Path(meta.path).name.replace("_", "").replace("-", "") if meta.path else "") if meta.isdir else ntpath.basename(video).replace("-", " ")
         except Exception as e:
             logger.error(f"[red]Error extracting title and year: {e}[/red]")
             raise Exception(f"Error extracting title and year: {e}") from e
@@ -478,7 +477,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                         logger.error(f"[red]Error extracting title from video name: {e}[/red]")
                         raise Exception(f"Error extracting title from video name: {e}") from e
 
-            untouched_filename = os.path.basename(video)
+            untouched_filename = Path(video).name
         except Exception as e:
             logger.error(f"[red]Error processing filename: {e}[/red]")
             raise Exception(f"Error processing filename: {e}") from e
@@ -497,7 +496,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
                     meta.search_year = ""
 
                 if not meta.edit:
-                    mi = await exportInfo(videopath, (meta.isdir), meta.uuid, base_dir, is_dvd=(meta.is_disc == "DVD"))
+                    mi = await export_info(videopath, (meta.isdir), meta.uuid, base_dir, is_dvd=(meta.is_disc == "DVD"))
                     meta.mediainfo = mi
                 else:
                     mi = meta.mediainfo
@@ -527,11 +526,11 @@ def calculate_source_size(_prep_instance: Any, meta: Meta, videopath: str) -> No
         filelist = cast(list[str], meta.filelist or [])
         files_to_measure = filelist if filelist else ([videopath] if videopath else [])
         for file_path in files_to_measure:
-            if not os.path.isfile(file_path):
+            if not Path(file_path).is_file():
                 logger.debug(f"[yellow]Skipping size check for missing file: {file_path}")
                 continue
             try:
-                source_size += os.path.getsize(file_path)
+                source_size += Path(file_path).stat().st_size
             except OSError as exc:
                 logger.debug(f"[yellow]Unable to stat {file_path}: {exc}")
 
@@ -539,12 +538,12 @@ def calculate_source_size(_prep_instance: Any, meta: Meta, videopath: str) -> No
         # Disc structures can span many files; walk the tree rooted at meta.path
         disc_root = meta.path
         disc_root_str = disc_root if isinstance(disc_root, str) else ""
-        if disc_root_str and os.path.exists(disc_root_str):
+        if disc_root_str and Path(disc_root_str).exists():
             for root, _, files in os.walk(disc_root_str):
                 for name in files:
-                    file_path = os.path.join(root, name)
+                    file_path = Path(root) / name
                     try:
-                        source_size += os.path.getsize(file_path)
+                        source_size += Path(file_path).stat().st_size
                     except OSError as exc:
                         logger.debug(f"[yellow]Unable to stat {file_path}: {exc}")
                         continue
@@ -571,14 +570,14 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
                 sys.exit(1)
         if upload is False:
             logger.info("[red]Not uploading. Check if the file has finished downloading and can be played back properly (uncorrupted).")
-            tmp_dir = f"{meta.base_dir}/tmp/{meta.uuid}"
+            tmp_dir = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}"
             # Cleanup meta so we don't reuse it later
-            if os.path.exists(tmp_dir):
+            if Path(tmp_dir).exists():
                 try:
-                    for file in os.listdir(tmp_dir):
-                        file_path = os.path.join(tmp_dir, file)
-                        if os.path.isfile(file_path) and file.endswith((".txt", ".json")):
-                            os.remove(file_path)
+                    for file in (p.name for p in Path(tmp_dir).iterdir()):
+                        file_path = Path(tmp_dir) / file
+                        if file_path.is_file() and file.endswith((".txt", ".json")):
+                            file_path.unlink()
                             logger.debug(f"[yellow]Removed temporary metadata file: {file_path}[/yellow]")
                 except Exception as e:
                     logger.error(f"[red]Error cleaning up temporary metadata files: {e}[/red]", extra={"highlighter": None})
@@ -590,10 +589,10 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
         try:
             valid_mi = validate_mediainfo(meta)
         except NoAudioMediaError as e:
-            logger.info(f"[red]MediaInfo validation failed: {str(e)}[/red]")
-            raise NoAudioMediaError(f"{meta.ua_name} does not support no audio media. Details: {str(e)}") from e
+            logger.info(f"[red]MediaInfo validation failed: {e!s}[/red]")
+            raise NoAudioMediaError(f"{meta.ua_name} does not support no audio media. Details: {e!s}") from e
         except Exception as e:
-            logger.info(f"[red]MediaInfo validation failed: {str(e)}[/red]")
+            logger.info(f"[red]MediaInfo validation failed: {e!s}[/red]")
             raise
         if not valid_mi:
             logger.info("[red]MediaInfo validation failed. This file does not contain (Unique ID).")
@@ -607,7 +606,7 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
     if meta.has_languages:
         try:
             parsed_info = await languages_manager.parsed_mediainfo(meta)
-            audio_languages = [audio_track["language"].lower() for audio_track in parsed_info.get("audio", []) if "language" in audio_track and audio_track["language"]]
+            audio_languages = [audio_track["language"].lower() for audio_track in parsed_info.get("audio", []) if audio_track.get("language")]
             any_of_languages = meta.has_languages.lower().split(",")
             if all(len(lang.strip()) == 2 for lang in any_of_languages):
                 raise Exception(f"Warning: Languages should be full names, not ISO codes. Found: {any_of_languages}")
@@ -630,7 +629,7 @@ async def process_trackers_and_torrent(
     if description_text is None:
         description_text = ""
     async with aiofiles.open(
-        f"{meta.base_dir}/tmp/{meta.uuid}/DESCRIPTION.txt",
+        f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt",
         "w",
         newline="",
         encoding="utf8",
@@ -873,7 +872,7 @@ async def search_metadata(
         meta.original_language = manual_language.lower()
 
     if meta.category == "BOOK":
-        meta.type = os.path.splitext(videopath)[1].lstrip(".").upper()
+        meta.type = Path(videopath).suffix.lstrip(".").upper()
         if meta.type in ("CBR", "CBZ"):
             meta.comic = True
     elif meta.category == "GAME":
@@ -894,7 +893,7 @@ async def search_metadata(
     meta.video_duration = await video_manager.get_video_duration(meta)
     duration = meta.video_duration
 
-    unattended = not (not meta.unattended or meta.unattended and meta.unattended_confirm)
+    unattended = not (not meta.unattended or (meta.unattended and meta.unattended_confirm))
     debug = bool(meta.debug)
 
     # run a search to find tmdb and imdb ids if we don't have them
@@ -1241,7 +1240,7 @@ async def finalize_metadata(
 
     mi_data: dict[str, Any] = mi or {}
     base_dir = meta.base_dir
-    folder_id = os.path.basename(str(meta.path))
+    folder_id = Path(str(meta.path)).name
 
     if meta.category in ("TV", "MOVIE"):
         meta.container = await video_manager.get_container(meta)
@@ -1398,23 +1397,23 @@ async def finalize_metadata(
         if meta.tag == "-SubsPlease":  # SubsPlease-specific
             tracks = meta.mediainfo.get("media", {}).get("track", [])  # Get all tracks
             bitrate = tracks[1].get("BitRate", "") if len(tracks) > 1 and not isinstance(tracks[1].get("BitRate", ""), dict) else ""  # Check that bitrate is not a dict
-            bitrate_oldMediaInfo = (
+            bitrate_old_mediainfo = (
                 tracks[0].get("OverallBitRate", "") if len(tracks) > 0 and not isinstance(tracks[0].get("OverallBitRate", ""), dict) else ""
             )  # Check for old MediaInfo
             meta.episode_title = ""
-            if (
-                (bitrate.isdigit() and int(bitrate) >= 8000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 8000000) and meta.resolution == "1080p"
+            if (bitrate.isdigit() and int(bitrate) >= 8000000) or (
+                (bitrate_old_mediainfo.isdigit() and int(bitrate_old_mediainfo) >= 8000000) and meta.resolution == "1080p"
             ):  # 8Mbps for 1080p
                 meta.service = "CR"
             elif (
-                bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()
+                bitrate.isdigit() or bitrate_old_mediainfo.isdigit()
             ) and meta.resolution == "1080p":  # Only assign if at least one bitrate is present, otherwise leave it to user
                 meta.service = "HIDI"
-            elif (
-                (bitrate.isdigit() and int(bitrate) >= 4000000) or (bitrate_oldMediaInfo.isdigit() and int(bitrate_oldMediaInfo) >= 4000000) and meta.resolution == "720p"
+            elif (bitrate.isdigit() and int(bitrate) >= 4000000) or (
+                (bitrate_old_mediainfo.isdigit() and int(bitrate_old_mediainfo) >= 4000000) and meta.resolution == "720p"
             ):  # 4Mbps for 720p
                 meta.service = "CR"
-            elif (bitrate.isdigit() or bitrate_oldMediaInfo.isdigit()) and meta.resolution == "720p":
+            elif (bitrate.isdigit() or bitrate_old_mediainfo.isdigit()) and meta.resolution == "720p":
                 meta.service = "HIDI"
 
         if meta.service in (None, ""):
@@ -1458,8 +1457,8 @@ async def finalize_metadata(
             # all lowercase filenames will have bad group tag, it's probably a scene release.
             # some extracted files do not match release name so lets double check if it really is a scene release
             if not meta.scene and meta.tag:
-                base = os.path.basename(video)
-                match = re.match(r"^(.+)\.[a-zA-Z0-9]{3,4}$", os.path.basename(video))
+                base = Path(video).name
+                match = re.match(r"^(.+)\.[a-zA-Z0-9]{3,4}$", Path(video).name)
                 if match and (not meta.is_disc or meta.keep_folder):
                     base = match.group(1)
                     is_all_lowercase = base.islower()
@@ -1508,14 +1507,14 @@ async def finalize_metadata(
     meta.tvmaze = meta.tvmaze_id
 
     if meta.category == "BOOK":
-        meta.container = os.path.splitext(videopath)[1].lstrip(".").lower()
+        meta.container = Path(videopath).suffix.lstrip(".").lower()
         meta.audio = ""
         meta.channels = ""
         meta.has_commentary = False
         meta.three_d = ""
         meta.source = "WEB"
         if not meta.type:
-            meta.type = os.path.splitext(videopath)[1].lstrip(".").upper()
+            meta.type = Path(videopath).suffix.lstrip(".").upper()
         if meta.type.upper() in ("CBR", "CBZ"):
             meta.comic = True
         meta.uhd = ""
@@ -1540,7 +1539,7 @@ async def finalize_metadata(
         if not meta.genres:
             meta.genres = []
     elif meta.category == "GAME":
-        meta.container = os.path.splitext(videopath)[1].lstrip(".").lower()
+        meta.container = Path(videopath).suffix.lstrip(".").lower()
         meta.audio = ""
         meta.channels = ""
         meta.has_commentary = False
@@ -1574,6 +1573,7 @@ async def finalize_metadata(
     if (meta.tmdb_id or 0) != 0 and meta.category in ("TV", "MOVIE"):
         try:
             from src.trackersetup import tracker_class_map
+
             requirements: dict[str, dict[str, str]] = {}
             for tracker_name in meta.trackers:
                 tracker_class = tracker_class_map.get(tracker_name)
@@ -1585,10 +1585,10 @@ async def finalize_metadata(
                 for lang, types in reqs.items():
                     for data_type, append_to_response in types.items():
                         if (
-                            (data_type == "season" and meta.category != "TV") or
-                            (data_type == "episode" and (meta.category != "TV" or meta.tv_pack)) or
-                            (data_type == "episode" and tracker_name in ("BJS", "BT") and not prep_instance.config["DEFAULT"].get("episode_overview", False)) or
-                            (data_type == "main" and meta.category not in ("TV", "MOVIE"))
+                            (data_type == "season" and meta.category != "TV")
+                            or (data_type == "episode" and (meta.category != "TV" or meta.tv_pack))
+                            or (data_type == "episode" and tracker_name in ("BJSHARE", "BRASILTRACKER") and not prep_instance.config["DEFAULT"].get("episode_overview", False))
+                            or (data_type == "main" and meta.category not in ("TV", "MOVIE"))
                         ):
                             continue
 
@@ -1600,12 +1600,7 @@ async def finalize_metadata(
             for lang, types in requirements.items():
                 for data_type, append_to_response in types.items():
                     tasks.append(
-                        (lang, data_type, prep_instance.tmdb_manager.get_tmdb_localized_data(
-                            meta,
-                            data_type=data_type,
-                            language=lang,
-                            append_to_response=append_to_response
-                        ))
+                        (lang, data_type, prep_instance.tmdb_manager.get_tmdb_localized_data(meta, data_type=data_type, language=lang, append_to_response=append_to_response))
                     )
             if tasks:
                 logger.debug(f"[cyan]Pre-fetching TMDB localized data for languages: {list(requirements.keys())}[/cyan]")

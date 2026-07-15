@@ -29,11 +29,7 @@ class NyuuBinaryManager:
     """Download Nyuu binaries for the host architecture."""
 
     @staticmethod
-    async def ensure_nyuu_binary(
-        base_dir: str | Path,
-        path_7z: str | None = None,
-        version: str = "v0.4.2"
-    ) -> str:
+    async def ensure_nyuu_binary(base_dir: str | Path, path_7z: str | None = None, version: str = "v0.4.2") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         logger.debug(f"[blue]Nyuu: Detected system: {system}, architecture: {machine}[/blue]")
@@ -84,9 +80,9 @@ class NyuuBinaryManager:
 
         # Cleanup old files
         if binary_path.exists():
-            os.remove(binary_path)
+            binary_path.unlink()
         if version_path.exists():
-            os.remove(version_path)
+            version_path.unlink()
 
         download_url = f"https://github.com/animetosho/Nyuu/releases/download/{version}/{file_pattern}"
         logger.debug(f"[blue]Nyuu Download URL: {download_url}[/blue]")
@@ -100,21 +96,20 @@ class NyuuBinaryManager:
                 temp_file = bin_dir / f"temp_{file_pattern}"
                 async with aiofiles.open(temp_file, "wb") as f:
                     async for chunk in response.aiter_bytes(chunk_size=8192):
-                         await f.write(chunk)
+                        await f.write(chunk)
 
             logger.debug(f"[green]Downloaded Nyuu package: {file_pattern}[/green]")
 
             if file_pattern.endswith(".7z"):
                 if not path_7z:
                     from bin.get_7z import SevenZipBinaryManager
+
                     path_7z = await SevenZipBinaryManager.ensure_7z_binary(base_dir)
 
                 # Extract using the 7z binary
                 cmd = [path_7z, "x", "-y", f"-o{bin_dir}", str(temp_file)]
-                process = await asyncio.create_subprocess_exec(
-                    *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-                )
-                stdout, stderr = await process.communicate()
+                process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                _stdout, stderr = await process.communicate()
                 if process.returncode != 0:
                     raise Exception(f"7z extraction failed: {stderr.decode(errors='replace')}")
 
@@ -134,9 +129,9 @@ class NyuuBinaryManager:
                         for member in tar_ref.getmembers():
                             if member.islnk() or member.issym():
                                 continue
-                            if os.path.isabs(member.name) or ".." in member.name or member.name.startswith("/"):
+                            if Path(member.name).is_absolute() or ".." in member.name or member.name.startswith("/"):
                                 continue
-                            full_path = os.path.realpath(os.path.join(bin_dir, member.name))
+                            full_path = os.path.realpath(Path(bin_dir) / member.name)
                             base_path = os.path.realpath(bin_dir)
                             if not full_path.startswith(base_path + os.sep) and full_path != base_path:
                                 continue

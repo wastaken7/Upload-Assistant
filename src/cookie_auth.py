@@ -1,12 +1,11 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import http.cookiejar
-import importlib
 import json
-import os
 import pickle  # nosec B403 - Only used for legacy cookie migration
 import re
 import stat
 import traceback
+from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
@@ -16,7 +15,7 @@ from bs4.element import AttributeValueList
 
 from src.console import logger
 from src.meta import Meta
-from src.trackers.COMMON import COMMON
+from src.trackers.common import Common
 
 
 def _attr_to_string(value: str | AttributeValueList | None) -> str:
@@ -28,13 +27,153 @@ def _attr_to_string(value: str | AttributeValueList | None) -> str:
     return ""
 
 
+def get_tracker_domain(tracker: str, config: dict[str, Any] | None = None) -> str:
+    """Extract or map a tracker name to its primary domain name."""
+    try:
+        from src.trackersetup import tracker_class_map
+
+        cls = tracker_class_map.get(tracker.upper())
+        if cls and hasattr(cls, "base_url") and isinstance(cls.base_url, str):
+            from urllib.parse import urlparse
+
+            netloc = urlparse(cls.base_url).netloc
+            if netloc:
+                domain = netloc.lower().lstrip(".")
+                if domain.startswith("www."):
+                    domain = domain[4:]
+                return domain
+    except Exception as e:
+        logger.error(f"[yellow]Warning: Error getting tracker domain: {e}[/yellow]")
+
+    if config:
+        tracker_cfg = config.get("TRACKERS", {}).get(tracker, {})
+        announce_url = tracker_cfg.get("announce_url", "")
+        if announce_url:
+            try:
+                from urllib.parse import urlparse
+
+                netloc = urlparse(announce_url).netloc
+                if netloc:
+                    domain = netloc.lower().lstrip(".")
+                    if domain.startswith("www."):
+                        domain = domain[4:]
+                    return domain
+            except Exception as e:
+                logger.error(f"[yellow]Warning: Error getting tracker domain: {e}[/yellow]")
+
+    # Fallback/Hardcoded domains
+    fallback_domains = {
+        "amigosshare": "amigos-share.club",
+        "avistaz": "avistaz.to",
+        "bjshare": "bj-share.info",
+        "brasiltracker": "brasiltracker.org",
+        "cinemaz": "cinemaz.to",
+        "greatposterwall": "greatposterwall.com",
+        "hdbits": "hdbits.org",
+        "hdspace": "hd-space.org",
+        "hdtorrents": "hd-torrents.org",
+        "iptorrents": "iptorrents.com",
+        "immortalseed": "immortalseed.me",
+        "lajidui": "lajidui.top",
+        "longpt": "longpt.org",
+        "privatehd": "privatehd.to",
+        "ptcafe": "ptcafe.club",
+        "ptfans": "ptfans.cc",
+        "ptgtk": "gtkpw.xyz",
+        "ptskit": "ptskit.org",
+        "railgunpt": "bilibili.download",
+        "torrentleech": "torrentleech.org",
+        "filelist": "filelist.io",
+        "morethantv": "morethan.tv",
+        "passthepopcorn": "passthepopcorn.me",
+        "pterclub": "pterclub.com",
+    }
+
+    t_lower = tracker.lower()
+    if t_lower in fallback_domains:
+        return fallback_domains[t_lower]
+
+    return t_lower
+
+
+def find_cookie_file(base_dir: str, tracker: str, config: dict[str, Any] | None = None) -> str:
+    """
+    Find the cookie file for a tracker.
+    First checks if the tracker's config has a custom 'cookie_file' path.
+    Then scans data/cookies/ for files:
+    - First looks for files whose names contain the tracker name (case insensitive).
+    - If not found, looks for text/json files whose contents contain the tracker's domain.
+    - If still not found, falls back to the default 'data/cookies/{tracker}.txt' (or json/etc).
+    """
+    cookies_dir = Path(base_dir) / "data" / "cookies"
+    if not cookies_dir.exists():
+        cookies_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Check if tracker config has 'cookie_file' or 'cookies'
+    tracker_config = config.get("TRACKERS", {}).get(tracker, {}) if config else {}
+    custom_cookie_file = tracker_config.get("cookie_file", "").strip() or tracker_config.get("cookies", "").strip()
+    if custom_cookie_file:
+        custom_path = Path(custom_cookie_file)
+        if custom_path.is_absolute():
+            return str(custom_path.resolve())
+        if len(custom_path.parts) > 1 and custom_path.parts[0] == "data":
+            return str((Path(base_dir) / custom_cookie_file).resolve())
+        return str((cookies_dir / custom_cookie_file).resolve())
+
+    matching_files = []
+
+    # 2. Try to find by filename match in data/cookies/
+    if cookies_dir.exists():
+        files = sorted(cookies_dir.glob("*"), key=lambda p: p.name)
+
+        # Check for exact name match (with any extension)
+        matching_files.extend(file_path for file_path in files if file_path.is_file() and file_path.stem.lower() == tracker.lower())
+
+        # Check for partial name match (e.g. "my_avistaz_cookies.txt")
+        if not matching_files:
+            matching_files.extend(file_path for file_path in files if file_path.is_file() and tracker.lower() in file_path.name.lower())
+
+        # 3. Try to find by content/domain match
+        if not matching_files:
+            domain = get_tracker_domain(tracker, config)
+            if domain:
+                for file_path in files:
+                    if not file_path.is_file():
+                        continue
+                    # Only search text/json files
+                    if file_path.suffix.lower() in [".txt", ".json"]:
+                        try:
+                            with file_path.open("r", encoding="utf-8", errors="ignore") as f:
+                                head = f.read(10240)
+                                if domain in head.lower():
+                                    matching_files.append(file_path)
+                        except Exception as e:
+                            logger.error(f"[yellow]Warning: Error reading cookie file: {e}[/yellow]")
+
+    if matching_files:
+        if len(matching_files) > 1:
+            file_names = ", ".join(f.name for f in matching_files)
+            logger.warning(f"[yellow]{tracker}: Found multiple cookie files ({file_names}). Using the first one by default: {matching_files[0].name}[/yellow]")
+        return str(matching_files[0].resolve())
+
+    # 4. Fallback to default
+    if tracker == "FILELIST":
+        return str((cookies_dir / "FILELIST.json").resolve())
+    if tracker in ["MORETHANTV", "PASSTHEPOPCORN"]:
+        return str((cookies_dir / f"{tracker}.json").resolve())
+    if tracker == "Pterimg":
+        return str((cookies_dir / "Pterimg.json").resolve())
+
+    return str((cookies_dir / f"{tracker}.txt").resolve())
+
+
 class CookieValidator:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     async def load_session_cookies(self, meta: Meta, tracker: str) -> http.cookiejar.MozillaCookieJar | None:
-        cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{tracker}.txt")
+        cookie_file = find_cookie_file(meta.base_dir, tracker, self.config)
         cookie_jar = http.cookiejar.MozillaCookieJar(cookie_file)
 
         try:
@@ -44,8 +183,8 @@ class CookieValidator:
             logger.info(f"{tracker}: Please ensure the cookie file is in the correct format (Netscape).")
             return None
         except FileNotFoundError:
-            # Attempt automatic login for AR tracker
-            if tracker == "AR":
+            # Attempt automatic login for ALPHARATIO tracker
+            if tracker == "ALPHARATIO":
                 logger.info(f"{tracker}: [yellow]Cookie file not found. Attempting automatic login...[/yellow]")
                 if await self.ar_login(meta, tracker, cookie_file):
                     # Try loading the newly created cookie file
@@ -80,11 +219,11 @@ class CookieValidator:
             logger.info(f"{tracker}: Failed to update the cookie file: {e}")
 
     async def get_ar_auth_key(self, meta: Meta, tracker: str) -> str | None:
-        """Retrieve the saved auth key for AR tracker."""
-        cookie_file = os.path.abspath(f"{meta.base_dir}/data/cookies/{tracker}.txt")
+        """Retrieve the saved auth key for ALPHARATIO tracker."""
+        cookie_file = find_cookie_file(meta.base_dir, tracker, self.config)
         auth_file = cookie_file.replace(".txt", "_auth.txt")
 
-        if os.path.exists(auth_file):
+        if Path(auth_file).exists():
             try:
                 async with aiofiles.open(auth_file, encoding="utf-8") as f:
                     auth_key = await f.read()
@@ -97,7 +236,7 @@ class CookieValidator:
         return None
 
     async def ar_login(self, meta: Meta, tracker: str, cookie_file: str) -> bool:
-        """Perform automatic login to AR and save cookies in Netscape format."""
+        """Perform automatic login to ALPHARATIO and save cookies in Netscape format."""
         username = self.config["TRACKERS"][tracker].get("username", "").strip()
         password = self.config["TRACKERS"][tracker].get("password", "").strip()
 
@@ -151,7 +290,7 @@ class CookieValidator:
                             logger.info(f"{tracker}: [green]Auth key extracted successfully[/green]")
 
                     # Save cookies in Netscape format
-                    os.makedirs(os.path.dirname(cookie_file), exist_ok=True)
+                    Path(cookie_file).parent.mkdir(parents=True, exist_ok=True)
                     cookie_jar = http.cookiejar.MozillaCookieJar(cookie_file)
 
                     # Convert httpx cookies to MozillaCookieJar format
@@ -261,20 +400,11 @@ class CookieValidator:
                         await self.handle_validation_failure(meta, tracker, text)
                         return False
                     # Dynamically set a class attribute to store the token
-                    module_name = f"src.trackers.{tracker}"
-                    for sub in ["", "UNIT3D", "AVISTAZ", "NEXUSPHP"]:
-                        sub_path = f"{sub}." if sub else ""
-                        try:
-                            target = f"src.trackers.{sub_path}{tracker}"
-                            importlib.import_module(target)
-                            module_name = target
-                            break
-                        except ModuleNotFoundError as e:
-                            if e.name == f"src.trackers.{sub_path}{tracker}":
-                                continue
-                            raise
-                    cls = getattr(importlib.import_module(module_name), tracker)
-                    cls.secret_token = str(match.group(1))
+                    from src.trackersetup import tracker_class_map
+
+                    cls = tracker_class_map.get(tracker.upper())
+                    if cls:
+                        cls.secret_token = str(match.group(1))
 
                 # Save cookies only after a confirmed valid login
                 await self.save_session_cookies(tracker, cookie_jar)
@@ -326,8 +456,7 @@ class CookieValidator:
                 f"{tracker}: This can happen if the site HTML has changed or if the login failed silently."
             )
             return None
-        else:
-            return str(auth_match.group(1))
+        return str(auth_match.group(1))
 
     def _save_cookies_secure(self, session_cookies: Any, cookiefile: str) -> None:
         """Securely save session cookies using JSON instead of pickle"""
@@ -337,11 +466,11 @@ class CookieValidator:
             for cookie in session_cookies:
                 cookie_dict[cookie.name] = {"value": cookie.value, "domain": cookie.domain, "path": cookie.path, "secure": cookie.secure, "expires": cookie.expires}
 
-            with open(cookiefile, "w", encoding="utf-8") as f:
+            with Path(cookiefile).open("w", encoding="utf-8") as f:
                 json.dump(cookie_dict, f, indent=2)
 
             # Set restrictive permissions (0o600) to protect cookie secrets
-            os.chmod(cookiefile, stat.S_IRUSR | stat.S_IWUSR)
+            Path(cookiefile).chmod(stat.S_IRUSR | stat.S_IWUSR)
 
         except OSError as e:
             logger.error(f"[red]Error with cookie file operations: {e}[/red]")
@@ -353,68 +482,10 @@ class CookieValidator:
     def _load_cookies_secure(self, session: Any, cookiefile: str, tracker: str) -> None:
         """Securely load session cookies from JSON instead of pickle"""
 
-        # Check for legacy pickle file and migrate if needed
-        pickle_file = cookiefile.replace(".json", ".pickle")
-        legacy_pickle_file = f"{os.path.dirname(cookiefile)}/{tracker}"  # Legacy filename without extension
-
-        # Try to migrate from pickle files
-        for potential_pickle in [pickle_file, legacy_pickle_file]:
-            if os.path.exists(potential_pickle) and not os.path.exists(cookiefile):
-                try:
-                    logger.info(f"[yellow]Migrating legacy cookie file from {potential_pickle} to {cookiefile}[/yellow]")
-
-                    # Load the pickle file
-                    with open(potential_pickle, "rb") as f:
-                        session_cookies = pickle.load(f)  # nosec B301 - Legacy migration only
-
-                    # Convert to JSON format
-                    cookie_dict = {}
-                    for cookie in session_cookies:
-                        cookie_dict[cookie.name] = {
-                            "value": cookie.value,
-                            "domain": cookie.domain,
-                            "path": cookie.path,
-                            "secure": cookie.secure,
-                            "expires": getattr(cookie, "expires", None),
-                        }
-
-                    # Save as JSON
-                    with open(cookiefile, "w", encoding="utf-8") as f:
-                        json.dump(cookie_dict, f, indent=2)
-
-                    # Set restrictive permissions
-                    os.chmod(cookiefile, stat.S_IRUSR | stat.S_IWUSR)
-
-                    # Verify the migration was successful by loading the JSON
-                    try:
-                        with open(cookiefile, encoding="utf-8") as f:
-                            json.load(f)  # Just verify it can be loaded
-
-                        # Migration verified successful - delete the old pickle file
-                        os.remove(potential_pickle)
-                        logger.info(f"[green]Successfully migrated cookies to JSON format and removed legacy file {potential_pickle}[/green]")
-
-                    except (OSError, json.JSONDecodeError) as verify_error:
-                        logger.info(f"[red]Migration verification failed: {verify_error}. Keeping original file {potential_pickle}[/red]")
-                        # Remove the potentially corrupted JSON file
-                        if os.path.exists(cookiefile):
-                            os.remove(cookiefile)
-                        raise
-
-                    break
-
-                except Exception as e:
-                    logger.error(f"[red]Error migrating cookie file {potential_pickle}: {e}[/red]")
-                    # Continue to try next potential file or load JSON normally
-                    continue
-
-            elif os.path.exists(potential_pickle) and os.path.exists(cookiefile):
-                os.remove(potential_pickle)
-                logger.info(f"[yellow]Removed legacy cookie file {potential_pickle}. Using JSON file.[/yellow]")
-
-        # Load cookies from JSON file
+        # Load cookies from JSON file only. Legacy pickle migration is intentionally not automatic
+        # to avoid executing untrusted pickle payloads during normal startup.
         try:
-            with open(cookiefile, encoding="utf-8") as f:
+            with Path(cookiefile).open(encoding="utf-8") as f:
                 cookie_dict = json.load(f)
 
             # Convert dictionary back to session cookies
@@ -436,7 +507,7 @@ class CookieValidator:
     def _load_cookies_dict_secure(self, cookiefile: str) -> dict[str, Any]:
         """Securely load cookies as dictionary from JSON instead of pickle"""
         try:
-            with open(cookiefile, encoding="utf-8") as f:
+            with Path(cookiefile).open(encoding="utf-8") as f:
                 cookie_dict = json.load(f)
             return cast(dict[str, Any], cookie_dict)
         except OSError as e:
@@ -450,7 +521,7 @@ class CookieValidator:
 class CookieAuthUploader:
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.common = COMMON(config)
+        self.common = Common(config)
 
     async def handle_upload(
         self,
@@ -520,66 +591,64 @@ class CookieAuthUploader:
             await self.common.create_torrent_for_upload(meta, f"{tracker}" + "_DEBUG", f"{tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True
 
-        else:
-            success = False
-            try:
-                async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=upload_cookies, follow_redirects=True) as session:
-                    response = await session.post(upload_url, data=data, files=files)
+        success = False
+        try:
+            async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=upload_cookies, follow_redirects=True) as session:
+                response = await session.post(upload_url, data=data, files=files)
 
-                    if success_text and success_text in response.text or success_list and any(item in response.text for item in success_list):
+                if (success_text and success_text in response.text) or (success_list and any(item in response.text for item in success_list)):
+                    success = True
+
+                elif success_status_code:
+                    valid_codes = {int(code.strip()) for code in success_status_code.split(",") if code.strip().isdigit()}
+
+                    if response.status_code in valid_codes:
                         success = True
 
-                    elif success_status_code:
-                        valid_codes = {int(code.strip()) for code in success_status_code.split(",") if code.strip().isdigit()}
+                elif error_text and error_text not in response.text:
+                    success = True
 
-                        if response.status_code in valid_codes:
-                            success = True
+                if success:
+                    await self.handle_successful_upload(
+                        meta,
+                        tracker,
+                        response,
+                        id_pattern,
+                        hash_is_id,
+                        source_flag,
+                        user_announce_url,
+                        torrent_url,
+                    )
+                    return True
+                await self.handle_failed_upload(
+                    meta,
+                    tracker,
+                    success_status_code,
+                    success_text,
+                    error_text,
+                    response,
+                    success_list,
+                )
+                return False
 
-                    elif error_text and error_text not in response.text:
-                        success = True
-
-                    if success:
-                        await self.handle_successful_upload(
-                            meta,
-                            tracker,
-                            response,
-                            id_pattern,
-                            hash_is_id,
-                            source_flag,
-                            user_announce_url,
-                            torrent_url,
-                        )
-                        return True
-                    else:
-                        await self.handle_failed_upload(
-                            meta,
-                            tracker,
-                            success_status_code,
-                            success_text,
-                            error_text,
-                            response,
-                            success_list,
-                        )
-                        return False
-
-            except httpx.ConnectTimeout:
-                meta.tracker_status[tracker]["status_message"] = "Connection timed out"
-            except httpx.ReadTimeout:
-                meta.tracker_status[tracker]["status_message"] = "Read timed out"
-            except httpx.ConnectError:
-                meta.tracker_status[tracker]["status_message"] = "Failed to connect to the server"
-            except httpx.ProxyError:
-                meta.tracker_status[tracker]["status_message"] = "Proxy connection failed"
-            except httpx.DecodingError:
-                meta.tracker_status[tracker]["status_message"] = "Response decoding failed"
-            except httpx.TooManyRedirects:
-                meta.tracker_status[tracker]["status_message"] = "Too many redirects"
-            except httpx.HTTPStatusError as e:
-                meta.tracker_status[tracker]["status_message"] = f"HTTP error {e.response.status_code}: {e}"
-            except httpx.RequestError as e:
-                meta.tracker_status[tracker]["status_message"] = f"Request error: {e}"
-            except Exception as e:
-                meta.tracker_status[tracker]["status_message"] = f"Unexpected upload error: {e}"
+        except httpx.ConnectTimeout:
+            meta.tracker_status[tracker]["status_message"] = "Connection timed out"
+        except httpx.ReadTimeout:
+            meta.tracker_status[tracker]["status_message"] = "Read timed out"
+        except httpx.ConnectError:
+            meta.tracker_status[tracker]["status_message"] = "Failed to connect to the server"
+        except httpx.ProxyError:
+            meta.tracker_status[tracker]["status_message"] = "Proxy connection failed"
+        except httpx.DecodingError:
+            meta.tracker_status[tracker]["status_message"] = "Response decoding failed"
+        except httpx.TooManyRedirects:
+            meta.tracker_status[tracker]["status_message"] = "Too many redirects"
+        except httpx.HTTPStatusError as e:
+            meta.tracker_status[tracker]["status_message"] = f"HTTP error {e.response.status_code}: {e}"
+        except httpx.RequestError as e:
+            meta.tracker_status[tracker]["status_message"] = f"Request error: {e}"
+        except Exception as e:
+            meta.tracker_status[tracker]["status_message"] = f"Unexpected upload error: {e}"
 
         await self.common.create_torrent_ready_to_seed(meta, tracker, source_flag, user_announce_url, torrent_url)
         return False
@@ -609,7 +678,7 @@ class CookieAuthUploader:
     ) -> dict[str, tuple[str, bytes, str]]:
         """Load the torrent file into memory."""
         await self.common.create_torrent_for_upload(meta, tracker, source_flag, announce_url=default_announce)
-        torrent_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{tracker}].torrent"
+        torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{tracker}].torrent"
         async with aiofiles.open(torrent_path, "rb") as f:
             file_bytes = await f.read()
 

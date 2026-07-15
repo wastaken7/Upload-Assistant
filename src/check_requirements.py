@@ -1,7 +1,10 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import importlib.metadata
+import logging
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def check_dependencies() -> None:
@@ -29,17 +32,16 @@ def check_dependencies() -> None:
 
     # Try importing packaging to use robust specifier matching
     try:
-        from packaging.requirements import Requirement
+        import packaging.requirements
 
         has_packaging = True
     except ImportError:
-        Requirement = None
         has_packaging = False
         # If packaging is missing, we list it as missing since it's in requirements.txt
         missing_packages.append("  - packaging: not installed (required by Upload Assistant)")
 
     try:
-        with open(requirements_file, encoding="utf-8") as f:
+        with Path(requirements_file).open(encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 # Ignore empty lines, comments or pip flags
@@ -67,16 +69,17 @@ def check_dependencies() -> None:
 
                 # If packaging is available, use it for parsing
                 try:
-                    if has_packaging and Requirement is not None:
-                        req = Requirement(line)
+                    if has_packaging:
+                        req = packaging.requirements.Requirement(line)
                         try:
                             installed_version = importlib.metadata.version(req.name)
                             if not req.specifier.contains(installed_version, prereleases=True):
                                 mismatched_versions.append(f"  - {req.name}: installed {installed_version}, required {req.specifier}")
                         except importlib.metadata.PackageNotFoundError:
                             missing_packages.append(f"  - {req.name}: not installed (required: {line})")
-                except Exception:
+                except Exception as exc:
                     # Ignore lines with parsing errors (e.g. custom URLs, local paths)
+                    logger.debug(f"Failed to parse requirement line '{line}': {exc}", exc_info=True)
                     continue
     except Exception as e:
         # Prevent check failure from crashing the entire app if requirements.txt cannot be read

@@ -2,17 +2,17 @@
 import asyncio
 import html
 import json
-import os
 import re
 from pathlib import Path
 from typing import Any
 
 import httpx
 
-from src.book_prep import _resolve_book_language, is_valid_book_language
+from src.book_prep import is_valid_book_language, resolve_book_language
 from src.console import logger
 
 mam_color = "[#eac117]MyAnonamouse[/#eac117]"
+
 
 class MyAnonamouseManager:
     def _parse_torrent_info(self, item: dict[str, Any]) -> dict[str, Any]:
@@ -82,7 +82,7 @@ class MyAnonamouseManager:
         lang = item.get("lang_code")
         if lang:
             try:
-                full, iso3 = _resolve_book_language(str(lang))
+                full, iso3 = resolve_book_language(str(lang))
                 if is_valid_book_language(full, iso3):
                     metadata["book_language"] = full
                     if iso3:
@@ -139,18 +139,18 @@ class MyAnonamouseManager:
         # Check local cache first
         cache_file = None
         if base_dir:
-            cache_dir = os.path.join(base_dir, "tmp", "myanonamouse_cache")
+            cache_dir = Path(base_dir) / "tmp" / "myanonamouse_cache"
             try:
-                os.makedirs(cache_dir, exist_ok=True)
-                cache_file = os.path.join(cache_dir, f"{clean_id}.json")
-                if os.path.exists(cache_file):
+                Path(cache_dir).mkdir(parents=True, exist_ok=True)
+                cache_file = Path(cache_dir) / f"{clean_id}.json"
+                if Path(cache_file).exists():
                     try:
                         cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
                         cached_data = json.loads(cache_content)
                         if cached_data:
                             logger.info(f"{mam_color}: ID match found (cached): {clean_id}")
 
-                            if "data" in cached_data and cached_data["data"]:
+                            if cached_data.get("data"):
                                 return self._parse_torrent_info(cached_data["data"][0])
                     except Exception as ex:
                         logger.debug(f"{mam_color}: [yellow]Warning: Could not read cache file for ID '{clean_id}': {ex}[/yellow]")
@@ -162,20 +162,12 @@ class MyAnonamouseManager:
             return None
 
         url = "https://www.myanonamouse.net/tor/js/loadSearchJSONbasic.php"
-        payload = {
-            "tor": {
-                "id": int(clean_id)
-            },
-            "description": "",
-            "isbn": ""
-        }
+        payload = {"tor": {"id": int(clean_id)}, "description": "", "isbn": ""}
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Content-Type": "application/json",
         }
-        cookies = {
-            "mam_id": api_key
-        }
+        cookies = {"mam_id": api_key}
 
         logger.debug(f"{mam_color}: Searching API for ID: {clean_id}")
 
@@ -196,7 +188,7 @@ class MyAnonamouseManager:
                                     await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
                                     logger.debug(f"{mam_color}: Saved cache for ID: {clean_id}")
                                 except Exception as ex:
-                                        logger.debug(f"{mam_color}: [yellow]Warning: Could not write cache for ID '{clean_id}': {ex}[/yellow]")
+                                    logger.debug(f"{mam_color}: [yellow]Warning: Could not write cache for ID '{clean_id}': {ex}[/yellow]")
 
                             return metadata
                     else:

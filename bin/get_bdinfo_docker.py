@@ -3,6 +3,7 @@
 """
 Docker-specific script to download bdinfo binaries for Linux containers.
 """
+
 import os
 import platform
 import shutil
@@ -34,7 +35,7 @@ def download_file(url: str, output_path: Path) -> None:
     logger.info(f"Downloading: {url}", extra={"markup": False})
     resp = requests.get(url, stream=True, timeout=60)
     resp.raise_for_status()
-    with open(output_path, "wb") as f:
+    with Path(output_path).open("wb") as f:
         for chunk in resp.iter_content(chunk_size=8192):
             f.write(chunk)
     logger.info(f"Downloaded: {output_path.name}", extra={"markup": False})
@@ -47,7 +48,7 @@ def secure_extract_tar(tar_path: Path, extract_to: Path) -> None:
             if member.issym() or member.islnk():
                 logger.warning(f"Warning: Skipping link: {member.name}", extra={"markup": False})
                 continue
-            if os.path.isabs(member.name) or ".." in member.name.split(os.sep):
+            if Path(member.name).is_absolute() or ".." in Path(member.name).parts:
                 logger.warning(f"Warning: Skipping dangerous path: {member.name}", extra={"markup": False})
                 continue
             try:
@@ -81,7 +82,7 @@ def secure_extract_tar(tar_path: Path, extract_to: Path) -> None:
                 target_file.parent.mkdir(parents=True, exist_ok=True)
                 source = tar_ref.extractfile(member)
                 if source is not None:
-                    with source, open(target_file, "wb") as out_f:
+                    with source, Path(target_file).open("wb") as out_f:
                         out_f.write(source.read())
                     target_file.chmod(0o600)
 
@@ -138,9 +139,9 @@ def download_bdinfo_for_docker(base_dir: Path = Path("/Upload-Assistant"), versi
     if not binary_path.exists():
         raise Exception(f"Failed to extract bdinfo binary to {binary_path}")
 
-    os.chmod(binary_path, 0o700)
+    Path(binary_path).chmod(0o700)
 
-    with open(version_path, "w", encoding="utf-8") as vf:
+    with Path(version_path).open("w", encoding="utf-8") as vf:
         vf.write(f"BDInfoCLI-ng version {version} installed successfully.")
 
     logger.info(f"Installed bdinfo: {binary_path}", extra={"markup": False})

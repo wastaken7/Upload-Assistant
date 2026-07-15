@@ -11,14 +11,14 @@ from src.console import logger
 from src.imdb import imdb_manager
 from src.meta import Meta
 from src.tmdb import TmdbManager
-from src.tvdb import tvdb_data
+from src.tvdb import TvdbData
 from src.tvmaze import tvmaze_manager
 
 
 def _coerce_int(value: Any) -> int | None:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -29,18 +29,18 @@ def _apply_tvdb_series_metadata(meta: Meta, episodes_data: Any, series_name: Any
     if series_name:
         meta.tvdb_series_name = series_name
     if isinstance(episodes_data, dict):
-        series_title = episodes_data.get('series_title')
+        series_title = episodes_data.get("series_title")
         if series_title and not meta.tvdb_series_name:
             meta.tvdb_series_name = series_title
-        series_year = episodes_data.get('series_year')
-        if isinstance(series_year, (str, int)) and re.fullmatch(r'19\d\d|20[0-3]\d', str(series_year)):
+        series_year = episodes_data.get("series_year")
+        if isinstance(series_year, (str, int)) and re.fullmatch(r"19\d\d|20[0-3]\d", str(series_year)):
             meta.tvdb_series_year = int(series_year)
             meta.search_year = str(series_year)
 
 
 class MetadataSearchingManager:
     def __init__(self, config: dict[str, Any]) -> None:
-        self.tvdb_handler = tvdb_data(config)
+        self.tvdb_handler = TvdbData(config)
         self.tmdb_manager = TmdbManager(config)
 
     async def all_ids(self, meta: Meta) -> Meta:
@@ -63,7 +63,7 @@ class MetadataSearchingManager:
         tmdb: int | str | None,
         manual_date: str | None = None,
         tvmaze_manual: str | None = None,
-        year: str = '',
+        year: str = "",
         tv_movie: bool = False,
     ) -> tuple[int, int, Any | None, str]:
         return await get_tvmaze_tvdb(
@@ -126,20 +126,13 @@ async def all_ids(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) -> M
     tvmaze_task_idx: int | None = None
     tmdb_task_idx: int | None = None
     if meta.category == "TV" and not meta.tv_pack and "season_int" in meta and "episode_int" in meta and meta.episode_int != 0:
-
         # Add TVMaze episode details task
         tvmaze_id = _coerce_int(meta.tvmaze_id)
         season_int = _coerce_int(meta.season_int)
         episode_int = _coerce_int(meta.episode_int)
         if tvmaze_id is not None and season_int is not None and episode_int is not None:
             tvmaze_task_idx = len(all_tasks)
-            all_tasks.append(
-                tvmaze_manager.get_tvmaze_episode_data(
-                    tvmaze_id,
-                    season_int,
-                    episode_int
-                )
-            )
+            all_tasks.append(tvmaze_manager.get_tvmaze_episode_data(tvmaze_id, season_int, episode_int))
         # TMDb last
         tmdb_id = _coerce_int(meta.tmdb_id)
         season_int = _coerce_int(meta.season_int)
@@ -413,7 +406,7 @@ async def imdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_manager: 
             meta.tvdb_id,
             manual_date=meta.manual_date,
             tvmaze_manual=meta.tvmaze_manual,
-            return_full_tuple=False
+            return_full_tuple=False,
         ),
         imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language),
     ]
@@ -532,7 +525,7 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
     tmdb_metadata = None
     # Process the results
     if isinstance(results[0], Exception):
-        error_msg = f"TMDB metadata retrieval failed: {str(results[0])}"
+        error_msg = f"TMDB metadata retrieval failed: {results[0]!s}"
         logger.info(f"[bold red]{error_msg}[/bold red]")
     elif not results[0]:  # Check if the result is empty (empty dict)
         error_msg = f"Failed to retrieve essential metadata from TMDB ID: {meta.tmdb_id}"
@@ -597,7 +590,7 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
                 elif isinstance(episode_details_result, Exception):
                     logger.info(f"[red]TMDb episode details API call failed: {episode_details_result}[/red]")
         else:
-            if 'season_int' in meta and len(results) > 3:
+            if "season_int" in meta and len(results) > 3:
                 season_details_result = results[3]
                 if isinstance(season_details_result, dict):
                     meta.tmdb_season_data = season_details_result
@@ -617,7 +610,7 @@ async def get_tvmaze_tvdb(
     tvdb_handler: Any,
     manual_date: str | None = None,
     tvmaze_manual: str | None = None,
-    year: str = '',
+    year: str = "",
     tv_movie: bool = False,
 ) -> tuple[int, int, Any | None, str]:
     tvdb_data = None
@@ -626,22 +619,11 @@ async def get_tvmaze_tvdb(
     tvdb_name = ""
     logger.debug("[yellow]Finding both TVMaze and TVDb IDs[/yellow]")
     # Core metadata tasks that run in parallel
-    tasks: list[Awaitable[Any]] = [
-        tvmaze_manager.search_tvmaze(
-            filename, search_year, imdb, 0,
-            manual_date=manual_date,
-            tvmaze_manual=tvmaze_manual,
-            return_full_tuple=True
-        )
-    ]
+    tasks: list[Awaitable[Any]] = [tvmaze_manager.search_tvmaze(filename, search_year, imdb, 0, manual_date=manual_date, tvmaze_manual=tvmaze_manual, return_full_tuple=True)]
     if (imdb and imdb != 0) or (tmdb and tmdb != 0):
-        tasks.append(
-            tvdb_handler.get_tvdb_by_external_id(imdb=imdb, tmdb=tmdb, tv_movie=tv_movie)
-        )
+        tasks.append(tvdb_handler.get_tvdb_by_external_id(imdb=imdb, tmdb=tmdb, tv_movie=tv_movie))
     else:
-        tasks.append(
-            tvdb_handler.search_tvdb_series(filename=filename, year=year)
-        )
+        tasks.append(tvdb_handler.search_tvdb_series(filename=filename, year=year))
 
     results: list[Any] = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -740,16 +722,14 @@ async def get_tv_data(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) 
                     meta.tvdb_episode,
                     meta.tvdb_episode_year,
                     meta.tvdb_episode_id,
-                ) = await tvdb_handler.get_specific_episode_data(
-                    meta.tvdb_episode_data, meta.season_int, meta.episode_int, aired_date=meta.daily_episode_title
-                )
+                ) = await tvdb_handler.get_specific_episode_data(meta.tvdb_episode_data, meta.season_int, meta.episode_int, aired_date=meta.daily_episode_title)
             except Exception as e:
                 logger.error(f"[red]Error fetching TVDb episode data: {e}[/red]")
 
         tvdb_episode_name = meta.tvdb_episode_name
         if isinstance(tvdb_episode_name, str):
             tvdb_name_lc = tvdb_episode_name.lower()
-            if tvdb_name_lc.startswith('episode') or 'tba' in tvdb_name_lc:
+            if tvdb_name_lc.startswith("episode") or "tba" in tvdb_name_lc:
                 meta.auto_episode_title = None
             else:
                 meta.auto_episode_title = tvdb_episode_name
@@ -773,19 +753,14 @@ async def get_tv_data(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) 
             season_int = _coerce_int(meta.season_int)
             episode_int = _coerce_int(meta.episode_int)
             if tvmaze_id is not None and season_int is not None and episode_int is not None:
-                tvmaze_episode_data = await tvmaze_manager.get_tvmaze_episode_data(
-                    tvmaze_id,
-                    season_int,
-                    episode_int,
-                    meta
-                )
+                tvmaze_episode_data = await tvmaze_manager.get_tvmaze_episode_data(tvmaze_id, season_int, episode_int, meta)
                 if tvmaze_episode_data:
                     meta.tvmaze_episode_data = tvmaze_episode_data
         if meta.auto_episode_title is None or meta.overview_meta is None:
-            tvmaze_name = meta.tvmaze_episode_data.get("name")
+            tvmaze_name = meta.tvmaze_episode_data.get("episode_name") or meta.tvmaze_episode_data.get("name")
             if meta.auto_episode_title is None and isinstance(tvmaze_name, str):
                 tvmaze_name_lc = tvmaze_name.lower()
-                if tvmaze_name_lc.startswith('episode') or 'tba' in tvmaze_name_lc:
+                if tvmaze_name_lc.startswith("episode") or "tba" in tvmaze_name_lc:
                     meta.auto_episode_title = None
                 else:
                     meta.auto_episode_title = tvmaze_name
@@ -818,7 +793,7 @@ async def get_tv_data(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) 
             episode_name = episode_details.get("name")
             if meta.auto_episode_title is None and isinstance(episode_name, str):
                 episode_name_lc = episode_name.lower()
-                if episode_name_lc.startswith('episode') or 'tba' in episode_name_lc:
+                if episode_name_lc.startswith("episode") or "tba" in episode_name_lc:
                     meta.auto_episode_title = None
                 else:
                     meta.auto_episode_title = episode_name
@@ -849,9 +824,7 @@ async def get_tv_data(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) 
                     meta.tvdb_episode,
                     meta.tvdb_episode_year,
                     meta.tvdb_episode_id,
-                ) = await tvdb_handler.get_specific_episode_data(
-                    meta.tvdb_episode_data, meta.season_int, meta.episode_int, aired_date=meta.daily_episode_title
-                )
+                ) = await tvdb_handler.get_specific_episode_data(meta.tvdb_episode_data, meta.season_int, meta.episode_int, aired_date=meta.daily_episode_title)
             except Exception as e:
                 logger.error(f"[red]Error fetching TVDb episode data: {e}[/red]")
 
@@ -875,14 +848,8 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
         season_int = _coerce_int(meta.season_int)
         episode_int = _coerce_int(meta.episode_int)
         if tvmaze_id is not None and season_int is not None and episode_int is not None:
-            tasks.append(
-                tvmaze_manager.get_tvmaze_episode_data(
-                    tvmaze_id,
-                    season_int,
-                    episode_int
-                )
-            )
-            task_map['tvmaze'] = len(tasks) - 1
+            tasks.append(tvmaze_manager.get_tvmaze_episode_data(tvmaze_id, season_int, episode_int))
+            task_map["tvmaze"] = len(tasks) - 1
 
     # Add TVDb episode data task
     if meta.tvdb_id:
@@ -897,7 +864,7 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
                 original_language=meta.original_language,
             )
         )
-        task_map['tvdb'] = len(tasks) - 1
+        task_map["tvdb"] = len(tasks) - 1
 
     if meta.tmdb_id:
         logger.debug("[yellow]Fetching TMDb episode data...[/yellow]")
@@ -906,7 +873,7 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
         episode_int = _coerce_int(meta.episode_int)
         if tmdb_id is not None and season_int is not None and episode_int is not None:
             tasks.append(tmdb_manager.get_episode_details(tmdb_id, season_int, episode_int))
-            task_map['tmdb'] = len(tasks) - 1
+            task_map["tmdb"] = len(tasks) - 1
 
     if not tasks:
         return meta
@@ -914,8 +881,8 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
     results: list[Any] = await asyncio.gather(*tasks, return_exceptions=True)
 
     # Process TVMaze results
-    if 'tvmaze' in task_map:
-        tvmaze_episode_data = results[task_map['tvmaze']]
+    if "tvmaze" in task_map:
+        tvmaze_episode_data = results[task_map["tvmaze"]]
         if tvmaze_episode_data and not isinstance(tvmaze_episode_data, Exception):
             meta.tvmaze_episode_data = tvmaze_episode_data
             meta.we_asked_tvmaze = True
@@ -925,8 +892,8 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
             logger.info(f"[yellow]TVMaze episode data retrieval failed: {tvmaze_episode_data}[/yellow]")
 
     # Process TVDB results
-    if 'tvdb' in task_map:
-        tvdb_episodes_result = results[task_map['tvdb']]
+    if "tvdb" in task_map:
+        tvdb_episodes_result = results[task_map["tvdb"]]
         if tvdb_episodes_result and not isinstance(tvdb_episodes_result, Exception):
             tvdb_episode_data: Any = None
             tvdb_name: Any = None
@@ -949,8 +916,8 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
             logger.info(f"[yellow]TVDb episode data retrieval failed: {tvdb_episodes_result}[/yellow]")
 
     # Process TMDb episode details results
-    if 'tmdb' in task_map:
-        tmdb_episode_data = results[task_map['tmdb']]
+    if "tmdb" in task_map:
+        tmdb_episode_data = results[task_map["tmdb"]]
         if not isinstance(tmdb_episode_data, Exception) and tmdb_episode_data:
             meta.tmdb_episode_data = tmdb_episode_data
             meta.we_checked_tmdb = True
@@ -964,7 +931,7 @@ async def get_douban_id(meta) -> int:
     douban_id: int = 0
     try:
         douban_manual = int(meta.douban_manual or 0)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         logger.info("[bold yellow]Invalid douban_manual value, ignoring.[/bold yellow]")
         douban_manual = 0
 
@@ -993,8 +960,7 @@ async def get_douban_id(meta) -> int:
                 link_mobile = str(link_tag["href"])
                 match = re.search(r"subject/(\d+)", link_mobile)
                 if match:
-                    douban_id = int(match.group(1))
-                    return douban_id
+                    return int(match.group(1))
 
         logger.info(f"[bold yellow]No Douban ID found for IMDb ID {imdb_id}.[/bold yellow]")
         return douban_id
@@ -1002,4 +968,3 @@ async def get_douban_id(meta) -> int:
     except Exception as e:
         logger.info(f"[bold yellow]Failed to fetch Douban ID for IMDb ID {imdb_id}: {e}[/bold yellow]")
         return douban_id
-

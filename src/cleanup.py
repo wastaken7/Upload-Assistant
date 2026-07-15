@@ -9,6 +9,7 @@ import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any
 
 import psutil
@@ -21,13 +22,11 @@ else:
     termios = None
 
 # Detect Android environment
-IS_ANDROID = ('android' in platform.platform().lower() or
-              os.path.exists('/system/build.prop') or
-              'ANDROID_ROOT' in os.environ)
+IS_ANDROID = "android" in platform.platform().lower() or Path("/system/build.prop").exists() or "ANDROID_ROOT" in os.environ
 
 running_subprocesses: set[subprocess.Popen[Any]] = set()
 thread_executor: ThreadPoolExecutor | None = None
-IS_MACOS = sys.platform == 'darwin'
+IS_MACOS = sys.platform == "darwin"
 erase_key: str | None = None
 
 
@@ -69,7 +68,7 @@ class CleanupManager:
                             # console.print(f"[red]Subprocess {proc.pid} did not exit in time, force killing.[/red]")
                             with contextlib.suppress(PermissionError, OSError):
                                 proc.kill()  # Force kill if it doesn't exit
-                except (PermissionError, OSError):
+                except PermissionError, OSError:
                     # Android doesn't allow process termination in many cases
                     if not IS_ANDROID:
                         logger.info(f"[yellow]Cannot terminate process {proc.pid}: Permission denied[/yellow]")
@@ -119,16 +118,14 @@ class CleanupManager:
         if IS_MACOS:
             # If you add shared memory or semaphore usage, append their (name, kind)
             # pairs below so unregister can release them.
-            resource_tracker = getattr(multiprocessing, 'resource_tracker', None)
-            if resource_tracker and hasattr(resource_tracker, 'unregister'):
+            resource_tracker = getattr(multiprocessing, "resource_tracker", None)
+            if resource_tracker and hasattr(resource_tracker, "unregister"):
                 resources_to_release: list[tuple[str, str]] = []
-                for name, kind in resources_to_release:  # noqa: PERF203 - per-item logging is required here
+                for name, kind in resources_to_release:
                     try:
                         resource_tracker.unregister(name, kind)
-                    except Exception as exc:  # noqa: PERF203 - per-item logging is required here
-                        logger.info(
-                            f"[red]Error unregistering multiprocessing resource {name} ({kind}): {exc}[/red]"
-                        )
+                    except Exception as exc:
+                        logger.info(f"[red]Error unregistering multiprocessing resource {name} ({kind}): {exc}[/red]")
 
         # console.print("[green]Cleanup completed. Exiting safely.[/green]")
 
@@ -139,15 +136,13 @@ class CleanupManager:
         # 🔹 Kill any lingering subprocesses
         if IS_ANDROID:
             # On Android, we have limited process access - just clean up what we can
-            try:
+            with contextlib.suppress(Exception):
                 # Only try to clean up processes we directly spawned
                 for proc in list(running_subprocesses):
                     if proc.returncode is None:
                         with contextlib.suppress(PermissionError, psutil.AccessDenied, OSError):
                             proc.terminate()
-            except Exception:
                 # Silently handle Android permission issues
-                pass
         else:
             # Standard process cleanup for non-Android systems
             try:
@@ -167,7 +162,7 @@ class CleanupManager:
                             # console.print(f"[red]Force killing stubborn process: {child.pid}[/red]")
                             with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied, PermissionError):
                                 child.kill()
-                    except (psutil.AccessDenied, PermissionError):
+                    except psutil.AccessDenied, PermissionError:
                         # Handle systems where we can't wait for processes
                         pass
             except (PermissionError, psutil.AccessDenied, OSError) as e:
@@ -177,7 +172,7 @@ class CleanupManager:
                 logger.error(f"[red]Error during process cleanup: {e}[/red]")
 
         # 🔹 For macOS, specifically check and terminate any multiprocessing processes
-        if IS_MACOS and hasattr(multiprocessing, 'active_children'):
+        if IS_MACOS and hasattr(multiprocessing, "active_children"):
             for child in multiprocessing.active_children():
                 with contextlib.suppress(Exception):
                     child.terminate()
@@ -187,7 +182,7 @@ class CleanupManager:
         try:
             for thread in threading.enumerate():
                 if thread != threading.current_thread() and not thread.is_alive():
-                    delete_fn = getattr(thread, '_delete', None)
+                    delete_fn = getattr(thread, "_delete", None)
                     if callable(delete_fn):
                         with contextlib.suppress(Exception):
                             delete_fn()
@@ -211,16 +206,16 @@ class CleanupManager:
             if not sys.stderr.closed:
                 sys.stderr.flush()
 
-            if hasattr(sys.stdin, 'isatty') and sys.stdin.isatty() and not sys.stdin.closed:
+            if hasattr(sys.stdin, "isatty") and sys.stdin.isatty() and not sys.stdin.closed:
                 try:
-                    subprocess.run(["stty", "sane"], check=False)
+                    subprocess.run(["stty", "sane"], check=False)  # noqa: S607
                     if erase_key is not None:
-                        subprocess.run(["stty", "erase", erase_key], check=False)  # explicitly restore backspace character to original value
-                    if termios is not None and hasattr(termios, 'tcflush'):
-                        tciflush = getattr(termios, 'TCIOFLUSH', None)
+                        subprocess.run(["stty", "erase", erase_key], check=False)  # noqa: S603, S607
+                    if termios is not None and hasattr(termios, "tcflush"):
+                        tciflush = getattr(termios, "TCIOFLUSH", None)
                         if tciflush is not None:
                             termios.tcflush(sys.stdin.fileno(), tciflush)
-                    subprocess.run(["stty", "-ixon"], check=False)
+                    subprocess.run(["stty", "-ixon"], check=False)  # noqa: S607
                 except OSError:
                     pass
 
@@ -230,33 +225,31 @@ class CleanupManager:
                     sys.stdout.flush()
                     sys.stdout.write("\033[?25h")
                     sys.stdout.flush()
-                except (OSError, ValueError):
+                except OSError, ValueError:
                     pass
 
             # Kill background jobs
             with contextlib.suppress(Exception):
                 if IS_MACOS:
-                    subprocess.run(["sh", "-c", "jobs -p | xargs kill 2>/dev/null"], check=False)
+                    subprocess.run(["sh", "-c", "jobs -p | xargs kill 2>/dev/null"], check=False)  # noqa: S607
                 else:
-                    subprocess.run(["sh", "-c", "jobs -p | xargs -r kill 2>/dev/null"], check=False)
+                    subprocess.run(["sh", "-c", "jobs -p | xargs -r kill 2>/dev/null"], check=False)  # noqa: S607
 
             if not sys.stderr.closed:
                 sys.stderr.flush()
 
         except Exception as e:
-            try:
+            with contextlib.suppress(Exception):
                 if not sys.stderr.closed:
                     sys.stderr.write(f"Error during terminal reset: {e}\n")
                     sys.stderr.flush()
-            except Exception:
-                pass  # At this point we can't do much more
 
 
 # Wrapped "erase key check and save" in tty check so that Python won't complain if UA is called by a script
-if hasattr(sys.stdin, 'isatty') and sys.stdin.isatty() and not sys.stdin.closed:
+if hasattr(sys.stdin, "isatty") and sys.stdin.isatty() and not sys.stdin.closed:
     try:
-        output = subprocess.check_output(['stty', '-a']).decode()
-        match = re.search(r' erase = (\S+);', output)
+        output = subprocess.check_output(["stty", "-a"]).decode()  # noqa: S607
+        match = re.search(r" erase = (\S+);", output)
         if match:
             erase_key = match.group(1)
     except OSError:

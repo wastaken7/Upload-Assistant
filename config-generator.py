@@ -2,7 +2,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import ast
 import json
-import os
 import re
 from collections.abc import Callable
 from pathlib import Path
@@ -36,7 +35,7 @@ def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
         return None, comments
 
     try:
-        with open(example_path, encoding="utf-8") as file:
+        with Path(example_path).open(encoding="utf-8") as file:
             lines = file.readlines()
 
         current_comments: list[str] = []
@@ -49,10 +48,11 @@ def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
             indent = len(line) - len(stripped)
 
             # Track nesting for fully qualified keys
-            if "{" in stripped and ":" in stripped:
-                key = stripped.split(":", 1)[0].strip().strip('"\'')
+            if "{" in stripped and ":" in stripped and not stripped.startswith("config"):
+                key = stripped.split(":", 1)[0].strip().strip("\"'")
                 while indent_stack and indent <= indent_stack[-1]:
-                    key_stack.pop()
+                    if key_stack:
+                        key_stack.pop()
                     indent_stack.pop()
                 key_stack.append(key)
                 indent_stack.append(indent)
@@ -64,10 +64,10 @@ def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
 
             if stripped.startswith("#"):
                 current_comments.append(stripped)
-            elif ":" in stripped and not stripped.startswith("{"):
-                key = stripped.split(":", 1)[0].strip().strip('"\'')
+            elif ":" in stripped and not stripped.startswith("{") and not stripped.startswith("config"):
+                key = stripped.split(":", 1)[0].strip().strip("\"'")
                 # Build fully qualified key path
-                fq_key = ".".join(key_stack + [key]) if key_stack else key
+                fq_key = ".".join([*key_stack, key]) if key_stack else key
 
                 if current_comments:
                     comments[key] = list(current_comments)
@@ -79,8 +79,8 @@ def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
                 current_comments = []  # Clear comments on other lines
 
         # Extract the config dict from the file content
-        content = ''.join(lines)
-        match = re.search(r"config\s*=\s*({.*})", content, re.DOTALL)
+        content = "".join(lines)
+        match = re.search(r"config(?:\s*:\s*[^{=]+)?\s*=\s*({.*})", content, re.DOTALL)
         if not match:
             console.print("[!] Warning: Could not parse example config", markup=False)
             return None, comments
@@ -91,28 +91,153 @@ def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
             console.print("[!] Warning: Example config is not a dict", markup=False)
             return None, comments
 
-        console.print("[✓] Successfully loaded example config template", markup=False)
+        console.print("[OK] Successfully loaded example config template", markup=False)
         return cast(ConfigDict, example_config), comments
     except Exception as e:
-        console.print(f"[!] Error parsing example config: {str(e)}", markup=False)
+        console.print(f"[!] Error parsing example config: {e!s}", markup=False)
         return None, comments
+
+
+def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
+    """Migrate old tracker names/acronyms to new display names in the config dictionary."""
+    if not config_dict:
+        return config_dict
+
+    manual_mapping = {
+        "AR": "ALPHARATIO",
+        "ASC": "AMIGOSSHARE",
+        "ANT": "ANTHELION",
+        "AZ": "AVISTAZ",
+        "BHD": "BEYONDHD",
+        "CZ": "CINEMAZ",
+        "BHDTV": "BITHDTV",
+        "BJS": "BJSHARE",
+        "PHD": "PRIVATEHD",
+        "BT": "BRASILTRACKER",
+        "DC": "DIGITALCORE",
+        "FL": "FILELIST",
+        "FF": "FUNFILE",
+        "GPW": "GREATPOSTERWALL",
+        "HDB": "HDBITS",
+        "HDS": "HDSPACE",
+        "HDT": "HDTORRENTS",
+        "IS": "IMMORTALSEED",
+        "IPT": "IPTORRENTS",
+        "MKO": "MAKINGOFF",
+        "MTV": "MORETHANTV",
+        "MTEAM": "MTEAM",
+        "NBL": "NEBULANCE",
+        "LAJIDUI": "LAJIDUI",
+        "PTP": "PASSTHEPOPCORN",
+        "LPT": "LONGPT",
+        "PTER": "PTERCLUB",
+        "PTCAFE": "PTCAFE",
+        "PTFANS": "PTFANS",
+        "PTS": "PTSKIT",
+        "PTGTK": "PTGTK",
+        "RPT": "RAILGUNPT",
+        "RTF": "RETROFLIX",
+        "SPD": "SPEEDAPP",
+        "SN": "SWARMAZON",
+        "TTG": "TOTHEGLORY",
+        "THR": "TORRENTHR",
+        "TL": "TORRENTLEECH",
+        "TVC": "TVCHAOSUK",
+        "AITHER": "AITHER",
+        "ACM": "ASIANCINEMA",
+        "A4K": "AURA4K",
+        "CRP": "CURUPIRA",
+        "DS": "DRUNKENSLUG",
+        "BLU": "BLUTOPIA",
+        "CBR": "CAPYBARABR",
+        "TIK": "CINEMATIK",
+        "DP": "DARKPEERS",
+        "EMUW": "EMUWAREZ",
+        "HUNO": "HAWKEUNO",
+        "HHD": "HOMIEHELPDESK",
+        "IHD": "INFINITYHD",
+        "ITT": "ITATORRENTS",
+        "LT": "LATTEAM",
+        "LCD": "LOCADORA",
+        "LST": "LST",
+        "LUME": "LUMINARR",
+        "MS": "MIDNIGHTSCENE",
+        "OTW": "OLDTOONSWORLD",
+        "OE": "ONLYENCODES",
+        "PTT": "POLISHTORRENT",
+        "PT": "PORTUGAS",
+        "R4E": "RACING4EVERYONE",
+        "RAS": "RASTASTUGAN",
+        "RF": "REELFLIX",
+        "SAM": "SAMARITANO",
+        "SP": "SEEDPOOL",
+        "SHRI": "SHAREISLAND",
+        "STC": "SKIPTHECOMMERCIALS",
+        "LDU": "LASTDIGITALUNDERGROUND",
+        "TOS": "THEOLDSCHOOL",
+        "TLZ": "THELEACHZONE",
+        "DT": "DESITORRENTS",
+        "TTR": "TORRENTEROS",
+        "ULCX": "ULCX",
+        "UTP": "UTOPIA",
+        "YUS": "YUSCENE",
+        "ZNTH": "ZENITH",
+        "FRIKI": "FRIKIBAR",
+        "YOINK": "YOINKED",
+        "SUIO": "SUIO",
+        "UNIT3D_TEMPLATE": "UNIT3DTEMPLATE",
+    }
+
+    migrated = False
+
+    # Migrate DEFAULT -> default_trackers
+    if "DEFAULT" in config_dict and "default_trackers" in config_dict["DEFAULT"]:
+        val = config_dict["DEFAULT"]["default_trackers"]
+        if isinstance(val, str):
+            trackers_list = [t.strip() for t in val.split(",") if t.strip()]
+            new_list = []
+            for t in trackers_list:
+                t_upper = t.upper()
+                if t_upper in manual_mapping:
+                    new_list.append(manual_mapping[t_upper])
+                    migrated = True
+                else:
+                    new_list.append(t)
+            config_dict["DEFAULT"]["default_trackers"] = ",".join(new_list)
+
+    # Migrate TRACKERS section keys
+    if "TRACKERS" in config_dict:
+        trackers_section = config_dict["TRACKERS"]
+        if isinstance(trackers_section, dict):
+            new_trackers_section = {}
+            for k, v in trackers_section.items():
+                k_upper = k.upper()
+                if k_upper in manual_mapping:
+                    new_key = manual_mapping[k_upper]
+                    new_trackers_section[new_key] = v
+                    migrated = True
+                else:
+                    new_trackers_section[k] = v
+            config_dict["TRACKERS"] = new_trackers_section
+
+    if migrated:
+        console.print("\n[OK] Migrated old tracker names/acronyms to new display names in your configuration.", markup=False)
+
+    return config_dict
 
 
 def load_existing_config() -> tuple[ConfigDict | None, Path | None]:
     """Load an existing config file if available"""
-    config_paths = [
-        Path("data/config.py"),
-        Path("data/config1.py")
-    ]
+    config_paths = [Path("data/config.py"), Path("data/config1.py")]
 
     for path in config_paths:
         if path.exists():
             try:
-                with open(path, encoding="utf-8") as file:
+                with Path(path).open(encoding="utf-8") as file:
                     content = file.read()
 
                 # Extract the config dict from the file
-                match = re.search(r"config\s*=\s*({.*})", content, re.DOTALL)
+                match = re.search(r"config(?:\s*:\s*[^{=]+)?\s*=\s*({.*})", content, re.DOTALL)
                 if match:
                     config_dict_str = match.group(1)
                     # Convert to proper Python dict
@@ -120,8 +245,8 @@ def load_existing_config() -> tuple[ConfigDict | None, Path | None]:
                     if not isinstance(config_dict, dict):
                         console.print(f"\n[!] Error loading config from {path}: config is not a dict", markup=False)
                         continue
-                    console.print(f"\n[✓] Found existing config at {path}", markup=False)
-                    return cast(ConfigDict, config_dict), path
+                    console.print(f"\n[OK] Found existing config at {path}", markup=False)
+                    return migrate_old_config(cast(ConfigDict, config_dict)), path
             except Exception as e:
                 console.print(f"\n[!] Error loading config from {path}: {e}", markup=False)
 
@@ -162,7 +287,7 @@ def validate_config(existing_config: ConfigDict, example_config: ConfigDict) -> 
     if unexpected_keys:
         console.print("\n[!] The following keys in your existing configuration are not in the example config:", markup=False)
         for i, (key_path, _parent_dict, _key) in enumerate(unexpected_keys):
-            console.print(f"  {i+1}. {key_path}", markup=False)
+            console.print(f"  {i + 1}. {key_path}", markup=False)
 
         console.print("\n\n[i] The keys have been removed or renamed.", markup=False)
         console.print("[i] You can choose what to do with each key:", markup=False)
@@ -177,7 +302,7 @@ def validate_config(existing_config: ConfigDict, example_config: ConfigDict) -> 
             if len(value_display) > 50:
                 value_display = value_display[:47] + "..."
 
-            console.print(f"\nKey {i+1}/{len(unexpected_keys)}: {key_path} = {value_display}", markup=False)
+            console.print(f"\nKey {i + 1}/{len(unexpected_keys)}: {key_path} = {value_display}", markup=False)
             keep = input("Keep this key? (y/N): ").lower()
 
             # Remove the key if user chooses not to keep it
@@ -345,34 +470,27 @@ def configure_default_section(
 
     # Settings that should only be prompted if a parent setting has a specific value
     linked_settings: dict[str, LinkedSetting] = {
-        "update_notification": {
-            "condition": lambda value: value.lower() == "true",
-            "settings": ["verbose_notification"]
-        },
-        "tone_map": {
-            "condition": lambda value: value.lower() == "true",
-            "settings": ["algorithm", "desat", "tonemapped_header"]
-        },
-        "add_logo": {
-            "condition": lambda value: value.lower() == "true",
-            "settings": ["logo_size", "logo_language"]
-        },
-        "frame_overlay": {
-            "condition": lambda value: value.lower() == "true",
-            "settings": ["overlay_text_size"]
-        },
+        "update_notification": {"condition": lambda value: value.lower() == "true", "settings": ["verbose_notification"]},
+        "tone_map": {"condition": lambda value: value.lower() == "true", "settings": ["algorithm", "desat", "tonemapped_header"]},
+        "add_logo": {"condition": lambda value: value.lower() == "true", "settings": ["logo_size", "logo_language"]},
+        "frame_overlay": {"condition": lambda value: value.lower() == "true", "settings": ["overlay_text_size"]},
         "multiScreens": {
-            "condition": lambda value: (value.isdigit() and int(value) > 0),
-            "settings": ["pack_thumb_size", "charLimit", "fileLimit", "processLimit", ]
+            "condition": lambda value: value.isdigit() and int(value) > 0,
+            "settings": [
+                "pack_thumb_size",
+                "charLimit",
+                "fileLimit",
+                "processLimit",
+            ],
         },
         "get_bluray_info": {
             "condition": lambda value: value.lower() == "true",
-            "settings": ["add_bluray_link", "use_bluray_images", "bluray_image_size", "bluray_score", "bluray_single_score"]
+            "settings": ["add_bluray_link", "use_bluray_images", "bluray_image_size", "bluray_score", "bluray_single_score"],
         },
         "qbit_bandwidth_control": {
             "condition": lambda value: value.lower() == "true",
             "settings": ["qbit_bandwidth_threshold", "qbit_bandwidth_time"],
-        }
+        },
     }
 
     # Store which settings should be skipped based on linked settings
@@ -386,9 +504,7 @@ def configure_default_section(
             console.print("[i] Quick setup selected. You'll only be prompted for essential settings.", markup=False)
 
     # Define essential settings for quick setup mode
-    essential_settings = [
-        "tmdb_api"
-    ]
+    essential_settings = ["tmdb_api"]
 
     for key, default_value in example_defaults.items():
         if key in ["default_torrent_client"]:
@@ -411,9 +527,7 @@ def configure_default_section(
         if isinstance(default_value, bool):
             default_str = str(default_value)
             existing_value = str(existing_defaults.get(key, default_value))
-            value = get_user_input(f"Setting '{key}'? (True/False)",
-                                   default=default_str,
-                                   existing_value=existing_value)
+            value = get_user_input(f"Setting '{key}'? (True/False)", default=default_str, existing_value=existing_value)
             config_defaults[key] = value
 
             # Check if this is a linked setting that controls other settings
@@ -424,13 +538,14 @@ def configure_default_section(
                     console.print(f"[i] Skipping {key}-related settings since {key} is {value}", markup=False)
                     skip_settings.update(linked_group["settings"])
         else:
-            is_password = key in ["api_key", "passkey", "rss_key", "tvdb_token", "tmdb_api", "tvdb_api", "btn_api"] or "password" in key.lower() or key.endswith("_key") or key.endswith("_api") or key.endswith("_url")
-            value = get_user_input(
-                f"Setting '{key}'",
-                default=str(default_value),
-                is_password=is_password,
-                existing_value=existing_defaults.get(key)
+            is_password = (
+                key in ["api_key", "passkey", "rss_key", "tvdb_token", "tmdb_api", "tvdb_api", "btn_api"]
+                or "password" in key.lower()
+                or key.endswith("_key")
+                or key.endswith("_api")
+                or key.endswith("_url")
             )
+            value = get_user_input(f"Setting '{key}'", default=str(default_value), is_password=is_password, existing_value=existing_defaults.get(key))
 
             if default_value is None and (value == "" or value == "None"):
                 config_defaults[key] = None
@@ -471,7 +586,7 @@ def get_img_host(
         "utppm": "utppm_api",
         "lostimg": "lostimg_api",
         "imgbox": None,
-        "pixhost": None
+        "pixhost": None,
     }
 
     console.print("\n==== IMAGE HOST CONFIGURATION ====", markup=False)
@@ -482,7 +597,7 @@ def get_img_host(
     existing_hosts: list[str] = []
     for i in range(1, 11):
         key = f"img_host_{i}"
-        if key in existing_defaults and existing_defaults[key]:
+        if existing_defaults.get(key):
             existing_hosts.append(str(existing_defaults[key]).strip().lower())
 
     if existing_hosts:
@@ -499,7 +614,7 @@ def get_img_host(
     # Ask for each image host in sequence
     for i in range(1, number_hosts + 1):
         # Get existing value for this position if available
-        existing_host = existing_hosts[i-1] if i <= len(existing_hosts) else None
+        existing_host = existing_hosts[i - 1] if i <= len(existing_hosts) else None
         existing_display = f" [existing: {existing_host}]" if existing_host else ""
 
         valid_host = False
@@ -535,7 +650,7 @@ def get_img_host(
                             f"Setting '{api_key}' for {host_input}",
                             default=str(example_defaults.get(api_key, "")),
                             is_password=is_password,
-                            existing_value=existing_defaults.get(api_key)
+                            existing_value=existing_defaults.get(api_key),
                         )
             else:
                 console.print(f"[!] Invalid host: {host_input}. Available hosts: {', '.join(img_host_api_map.keys())}", markup=False)
@@ -565,10 +680,7 @@ def configure_trackers(
     console.print("\n====== TRACKERS ======", markup=False)
 
     # Get list of trackers to configure
-    example_tracker_list = [
-        t for t in example_trackers
-        if t != "default_trackers" and isinstance(example_trackers[t], dict)
-    ]
+    example_tracker_list = [t for t in example_trackers if t != "default_trackers" and isinstance(example_trackers[t], dict)]
     if example_tracker_list:
         console.print(f"[i] Available trackers in example config: \n{', '.join(example_tracker_list)}", markup=False)
         console.print("\n[i] (default trackers list) Only add the trackers you want to upload to on a regular basis.", markup=False)
@@ -580,10 +692,7 @@ def configure_trackers(
     existing_tracker_list = [t.strip() for t in existing_tracker_list if t.strip()]
     existing_trackers_str = ", ".join(existing_tracker_list)
 
-    trackers_input = get_user_input(
-        "\nEnter tracker acronyms separated by commas (e.g. BHD, PTP, AITHER)",
-        existing_value=existing_trackers_str
-    ).upper()
+    trackers_input = get_user_input("\nEnter tracker acronyms separated by commas (e.g. BEYONDHD, PASSTHEPOPCORN, AITHER)", existing_value=existing_trackers_str).upper()
     trackers_list = [t.strip().upper() for t in trackers_input.split(",") if t.strip()]
 
     trackers_config: dict[str, Any] = {"default_trackers": ", ".join(trackers_list)}
@@ -617,7 +726,7 @@ def configure_trackers(
         if example_tracker:
             for key, default_value in example_tracker.items():
                 # Skip keys that should not be prompted
-                if tracker == "HDT" and key == "announce_url":
+                if tracker == "HDTORRENTS" and key == "announce_url":
                     tracker_config[key] = example_tracker[key]
                     continue
 
@@ -628,9 +737,7 @@ def configure_trackers(
                 if isinstance(default_value, bool):
                     default_str = str(default_value)
                     existing_value = str(existing_tracker_config.get(key, default_value))
-                    value = get_user_input(f"Tracker setting '{key}'? (True/False)",
-                                           default=default_str,
-                                           existing_value=existing_value)
+                    value = get_user_input(f"Tracker setting '{key}'? (True/False)", default=default_str, existing_value=existing_value)
                     tracker_config[key] = value
                 else:
                     is_password = key in ["api_key", "passkey", "rss_key", "password", "opt_uri"] or key.endswith("rss_key")
@@ -640,7 +747,7 @@ def configure_trackers(
                         default=str(default_value) if default_value else "",
                         is_password=is_password,
                         is_announce_url=is_announce_url,
-                        existing_value=existing_tracker_config.get(key)
+                        existing_value=existing_tracker_config.get(key),
                     )
         else:
             console.print(f"[!] No example config found for tracker '{tracker}'.", markup=False)
@@ -654,9 +761,7 @@ def configure_trackers(
         console.print(", ".join(remaining_trackers), markup=False)
         console.print("\n[i] This just adds the tracker config, not to your list of default trackers.", markup=False)
         console.print("\nFor example so you can use with -tk.", markup=False)
-        add_more = get_user_input(
-            "\nEnter any additional tracker acronyms to add (comma separated), or leave blank to skip"
-        )
+        add_more = get_user_input("\nEnter any additional tracker acronyms to add (comma separated), or leave blank to skip")
         additional = [t.strip().upper() for t in add_more.split(",") if t.strip()]
         for tracker in additional:
             if tracker in trackers_config:
@@ -666,7 +771,7 @@ def configure_trackers(
             additional_tracker_config: dict[str, Any] = {}
             if example_tracker:
                 for key, default_value in example_tracker.items():
-                    if tracker == "HDT" and key == "announce_url":
+                    if tracker == "HDTORRENTS" and key == "announce_url":
                         additional_tracker_config[key] = example_tracker[key]
                         continue
                     comment_key = f"TRACKERS.{tracker}.{key}"
@@ -675,17 +780,13 @@ def configure_trackers(
 
                     if isinstance(default_value, bool):
                         default_str = str(default_value)
-                        value = get_user_input(f"Tracker setting '{key}'? (True/False)",
-                                               default=default_str)
+                        value = get_user_input(f"Tracker setting '{key}'? (True/False)", default=default_str)
                         additional_tracker_config[key] = value
                     else:
                         is_password = key in ["api_key", "passkey", "rss_key", "password", "opt_uri"] or key.endswith("rss_key")
                         is_announce_url = key.endswith("announce_url")
                         additional_tracker_config[key] = get_user_input(
-                            f"Tracker setting '{key}'",
-                            default=str(default_value) if default_value else "",
-                            is_password=is_password,
-                            is_announce_url=is_announce_url
+                            f"Tracker setting '{key}'", default=str(default_value) if default_value else "", is_password=is_password, is_announce_url=is_announce_url
                         )
             else:
                 console.print(f"[!] No example config found for tracker '{tracker}'.", markup=False)
@@ -717,9 +818,7 @@ def configure_torrent_clients(
             console.print("Available clients in example config:", markup=False)
             for client_name in example_clients:
                 console.print(f"  - {client_name}", markup=False)
-            new_client = get_user_input("Enter the name of the torrent client to use",
-                                        default="qbittorrent",
-                                        existing_value=default_client_name)
+            new_client = get_user_input("Enter the name of the torrent client to use", default="qbittorrent", existing_value=default_client_name)
             default_client_name = new_client
     else:
         # No default client specified or not in existing_clients, ask user to select one
@@ -728,8 +827,7 @@ def configure_torrent_clients(
         console.print("Available clients in example config:", markup=False)
         for client_name in example_clients:
             console.print(f"  - {client_name}", markup=False)
-        default_client_name = get_user_input("Enter the name of the torrent client to use",
-                                             default="qbittorrent")
+        default_client_name = get_user_input("Enter the name of the torrent client to use", default="qbittorrent")
 
     # Configure the default client
     console.print(f"\nConfiguring default client: {default_client_name}", markup=False)
@@ -809,9 +907,7 @@ def configure_single_client(
         if isinstance(default_value, bool):
             default_str = str(default_value)
             existing_value = str(existing_client_config.get(key, default_value))
-            value = get_user_input(f"Client setting '{key}'? (True/False)",
-                                   default=default_str,
-                                   existing_value=existing_value)
+            value = get_user_input(f"Client setting '{key}'? (True/False)", default=default_str, existing_value=existing_value)
             client_config[key] = value
         else:
             is_password = key.endswith("pass") or key.endswith("password")
@@ -819,7 +915,7 @@ def configure_single_client(
                 f"Client setting '{key}'",
                 default=str(default_value) if default_value is not None else "",
                 is_password=is_password,
-                existing_value=existing_client_config.get(key)
+                existing_value=existing_client_config.get(key),
             )
 
     config_clients[client_name] = client_config
@@ -840,11 +936,7 @@ def configure_discord(
 
     discord_config: ConfigDict = {}
     existing_use_discord = existing_discord.get("use_discord", False)
-    enable_discord = get_user_input(
-        "Enable Discord bot functionality? (True/False)",
-        default="False",
-        existing_value=str(existing_use_discord)
-    )
+    enable_discord = get_user_input("Enable Discord bot functionality? (True/False)", default="False", existing_value=str(existing_use_discord))
     discord_config["use_discord"] = enable_discord
 
     # If Discord is disabled, set defaults and return
@@ -866,19 +958,12 @@ def configure_discord(
         if isinstance(default_value, bool):
             default_str = str(default_value)
             existing_value = str(existing_discord.get(key, default_value))
-            value = get_user_input(
-                f"Discord setting '{key}'? (True/False)",
-                default=default_str,
-                existing_value=existing_value
-            )
+            value = get_user_input(f"Discord setting '{key}'? (True/False)", default=default_str, existing_value=existing_value)
             discord_config[key] = value
         else:
             is_password = key in ["discord_bot_token"]
             discord_config[key] = get_user_input(
-                f"Discord setting '{key}'",
-                default=str(default_value) if default_value else "",
-                is_password=is_password,
-                existing_value=existing_discord.get(key)
+                f"Discord setting '{key}'", default=str(default_value) if default_value else "", is_password=is_password, existing_value=existing_discord.get(key)
             )
 
     return discord_config
@@ -891,7 +976,7 @@ def generate_config_file(
 ) -> bool:
     """Generate the config.py file from the config dictionary"""
     # Create output directory if it doesn't exist
-    os.makedirs("data", exist_ok=True)
+    Path("data").mkdir(parents=True, exist_ok=True)
 
     # Determine the output path
     if existing_path:
@@ -899,7 +984,7 @@ def generate_config_file(
         backup_path = Path(f"{existing_path}.bak")
         # Create backup of existing config
         if existing_path.exists():
-            with open(existing_path, encoding="utf-8") as src, open(backup_path, "w", encoding="utf-8") as dst:
+            with Path(existing_path).open(encoding="utf-8") as src, Path(backup_path).open("w", encoding="utf-8") as dst:
                 dst.write(src.read())
             console.print(f"\n[✓] Created backup of existing config at {backup_path}", markup=False)
     else:
@@ -908,7 +993,7 @@ def generate_config_file(
         if config_path.exists():
             overwrite = input(f"{config_path} already exists. Overwrite? (y/n): ").lower()
             if overwrite == "y":
-                with open(config_path, encoding="utf-8") as src, open(backup_path, "w", encoding="utf-8") as dst:
+                with Path(config_path).open(encoding="utf-8") as src, Path(backup_path).open("w", encoding="utf-8") as dst:
                     dst.write(src.read())
                 console.print(f"\n[✓] Created backup of existing config at {backup_path}", markup=False)
             else:
@@ -920,15 +1005,15 @@ def generate_config_file(
             # Process each key-value pair in dictionaries
             obj_dict = obj
             return {str(k): format_config(v) for k, v in obj_dict.items()}
-        elif isinstance(obj, list):
+        if isinstance(obj, list):
             # Process each item in lists
             obj_list = obj
             return [format_config(item) for item in obj_list]
-        elif isinstance(obj, str):
+        if isinstance(obj, str):
             # Convert string "true"/"false" to Python True/False
             if obj.lower() == "true":
                 return True
-            elif obj.lower() == "false":
+            if obj.lower() == "false":
                 return False
         # Return unchanged for other types
         return obj
@@ -937,7 +1022,7 @@ def generate_config_file(
     formatted_config = cast(ConfigDict, format_config(config_data))
 
     # Generate the config file with properly formatted Python syntax
-    with open(config_path, "w", encoding="utf-8") as file:
+    with Path(config_path).open("w", encoding="utf-8") as file:
         file.write("# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0\n")
         file.write("config = {\n")
 
@@ -947,7 +1032,7 @@ def generate_config_file(
                 key_stack = []
             indent = "    " * indent_level
             for key, value in d.items():
-                fq_key = ".".join(key_stack + [key]) if key_stack else key
+                fq_key = ".".join([*key_stack, key]) if key_stack else key
                 if comments and fq_key in comments:
                     for comment in comments[fq_key]:
                         file.write(f"{indent}{comment}\n")
@@ -956,7 +1041,7 @@ def generate_config_file(
 
                 if isinstance(value, dict):
                     file.write("{\n")
-                    write_dict(cast(ConfigDict, value), indent_level + 1, key_stack + [key])
+                    write_dict(cast(ConfigDict, value), indent_level + 1, [*key_stack, key])
                     file.write(f"{indent}}},\n")
                 elif isinstance(value, bool):
                     # Ensure booleans are capitalized
@@ -1011,9 +1096,7 @@ if __name__ == "__main__":
                 # TORRENT_CLIENTS section
                 example_clients = example_config.get("TORRENT_CLIENTS", {})
                 default_client = None
-                client_configs, default_client = configure_torrent_clients(
-                    {}, example_clients, default_client, config_comments
-                )
+                client_configs, default_client = configure_torrent_clients({}, example_clients, default_client, config_comments)
                 config_data["TORRENT_CLIENTS"] = client_configs
                 config_data["DEFAULT"]["default_torrent_client"] = default_client
 
@@ -1070,9 +1153,7 @@ if __name__ == "__main__":
                     default_client = config_data["DEFAULT"].get("default_torrent_client", None)
 
                     # Get updated client config and default client name
-                    client_configs, default_client = configure_torrent_clients(
-                        existing_clients, example_clients, default_client, config_comments
-                    )
+                    client_configs, default_client = configure_torrent_clients(existing_clients, example_clients, default_client, config_comments)
 
                     # Update client configs and default client name
                     config_data["TORRENT_CLIENTS"] = client_configs
@@ -1122,9 +1203,7 @@ if __name__ == "__main__":
         # TORRENT_CLIENTS section
         example_clients = example_config.get("TORRENT_CLIENTS", {})
         default_client = None
-        client_configs, default_client = configure_torrent_clients(
-            {}, example_clients, default_client, config_comments
-        )
+        client_configs, default_client = configure_torrent_clients({}, example_clients, default_client, config_comments)
         config_data["TORRENT_CLIENTS"] = client_configs
         config_data["DEFAULT"]["default_torrent_client"] = default_client
 

@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import json
-import os
 import re
 import time
 import urllib.parse
@@ -19,7 +18,7 @@ from src.meta import Meta
 
 class SceneManager:
     def __init__(self, config: Mapping[str, Any]) -> None:
-        self.default_config = cast(Mapping[str, Any], config.get('DEFAULT', {}))
+        self.default_config = cast(Mapping[str, Any], config.get("DEFAULT", {}))
         if not isinstance(self.default_config, dict):
             raise ValueError("'DEFAULT' config section must be a dict")
 
@@ -39,8 +38,8 @@ class SceneManager:
 
         scene = False
         is_all_lowercase = False
-        base = os.path.basename(video)
-        match = re.match(r"^(.+)\.[a-zA-Z0-9]{3,4}$", os.path.basename(video))
+        base = Path(video).name
+        match = re.match(r"^(.+)\.[a-zA-Z0-9]{3,4}$", Path(video).name)
 
         if match and (not meta.is_disc or meta.keep_folder):
             base = match.group(1)
@@ -49,7 +48,7 @@ class SceneManager:
         # For games uploaded from a folder, prefer the release folder name
         # instead of a split archive part or generic installer name.
         if meta.category == "GAME" and meta.isdir:
-            folder_name = os.path.basename(str(meta.path))
+            folder_name = Path(str(meta.path)).name
             if folder_name:
                 base = folder_name
                 is_all_lowercase = base.islower()
@@ -57,22 +56,22 @@ class SceneManager:
         quoted_base = urllib.parse.quote(base)
 
         # Define cache directories
-        cache_dir = os.path.join(meta.base_dir, "tmp", meta.uuid, "srrdb")
-        search_cache_dir = os.path.join(cache_dir, 'search')
-        details_cache_dir = os.path.join(cache_dir, 'details')
-        os.makedirs(search_cache_dir, exist_ok=True)
-        os.makedirs(details_cache_dir, exist_ok=True)
+        cache_dir = Path(meta.base_dir) / "tmp" / meta.uuid / "srrdb"
+        search_cache_dir = Path(cache_dir) / "search"
+        details_cache_dir = Path(cache_dir) / "details"
+        Path(search_cache_dir).mkdir(parents=True, exist_ok=True)
+        Path(details_cache_dir).mkdir(parents=True, exist_ok=True)
 
         async with httpx.AsyncClient() as client:
             if "scene" not in meta and not lower:
                 # Cache file for search
-                search_cache_file = os.path.join(search_cache_dir, f"{quoted_base}.json")
+                search_cache_file = Path(search_cache_dir) / f"{quoted_base}.json"
                 response_json = None
 
                 # Try to load from cache
-                if os.path.exists(search_cache_file):
+                if Path(search_cache_file).exists():
                     try:
-                        search_text = await asyncio.to_thread(Path(search_cache_file).read_text, encoding='utf-8')
+                        search_text = await asyncio.to_thread(Path(search_cache_file).read_text, encoding="utf-8")
                         response_json = json.loads(search_text)
                         logger.debug(f"[cyan]SRRDB: Using cached search for {base}")
                     except Exception:
@@ -87,35 +86,36 @@ class SceneManager:
                             response_json = response.json()
                             # Save to cache
                             search_text = json.dumps(response_json)
-                            await asyncio.to_thread(Path(search_cache_file).write_text, search_text, encoding='utf-8')
+                            await asyncio.to_thread(Path(search_cache_file).write_text, search_text, encoding="utf-8")
                     except Exception as e:
                         logger.info(f"[yellow]SRRDB: Search request failed: {e}")
 
-                if response_json and int(response_json.get('resultsCount', 0)) > 0:
-                    first_result = response_json['results'][0]
+                if response_json and int(response_json.get("resultsCount", 0)) > 0:
+                    first_result = response_json["results"][0]
                     meta.scene_name = first_result["release"]
                     video = f"{first_result['release']}.mkv"
                     scene = True
                     if is_all_lowercase and not meta.tag:
                         meta.we_need_tag = True
-                    if first_result.get('imdbId'):
-                        imdb_str = first_result['imdbId']
+                    if first_result.get("imdbId"):
+                        imdb_str = first_result["imdbId"]
                         imdb_val = int(imdb_str) if (imdb_str.isdigit() and not meta.imdb_manual) else 0
                         imdb = imdb_val if imdb_val != 0 else None
 
                     # NFO Download Handling
                     if not meta.nfo and first_result.get("hasNFO") == "yes":
                         try:
-                            release = first_result['release']
-                            release_lower = release.lower()
+                            release = str(first_result["release"])
+                            safe_release = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(release).name).strip("._") or "scene_release"
+                            release_lower = safe_release.lower()
 
                             # Details Cache
-                            details_cache_file = os.path.join(details_cache_dir, f"{release}.json")
+                            details_cache_file = Path(details_cache_dir) / f"{safe_release}.json"
                             release_details_dict = None
 
-                            if os.path.exists(details_cache_file):
+                            if Path(details_cache_file).exists():
                                 try:
-                                    details_text = await asyncio.to_thread(Path(details_cache_file).read_text, encoding='utf-8')
+                                    details_text = await asyncio.to_thread(Path(details_cache_file).read_text, encoding="utf-8")
                                     release_details_dict = json.loads(details_text)
                                 except Exception:
                                     release_details_dict = None
@@ -126,24 +126,24 @@ class SceneManager:
                                 if release_details_response.status_code == 200:
                                     release_details_dict = release_details_response.json()
                                     details_text = json.dumps(release_details_dict)
-                                    await asyncio.to_thread(Path(details_cache_file).write_text, details_text, encoding='utf-8')
+                                    await asyncio.to_thread(Path(details_cache_file).write_text, details_text, encoding="utf-8")
 
                             if release_details_dict:
                                 try:
-                                    for file in release_details_dict.get('files', []):
-                                        if file['name'].endswith('.nfo'):
-                                            release_lower = os.path.splitext(file['name'])[0]
+                                    for file in release_details_dict.get("files", []):
+                                        if file["name"].endswith(".nfo"):
+                                            release_lower = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(file["name"]).stem).strip("._") or release_lower
                                 except (KeyError, ValueError):
                                     pass
 
                             nfo_url = f"https://www.srrdb.com/download/file/{release}/{release_lower}.nfo"
-                            save_path = os.path.join(meta.base_dir, "tmp", meta.uuid)
-                            os.makedirs(save_path, exist_ok=True)
-                            nfo_file_path = os.path.join(save_path, f"{release_lower}.nfo")
+                            save_path = Path(meta.base_dir) / "tmp" / meta.uuid
+                            Path(save_path).mkdir(parents=True, exist_ok=True)
+                            nfo_file_path = Path(save_path) / f"{release_lower}.nfo"
                             meta.scene_nfo_file = nfo_file_path
 
                             # Check if NFO already exists (Local Cache)
-                            if os.path.exists(nfo_file_path):
+                            if Path(nfo_file_path).exists():
                                 meta.nfo = True
                                 meta.auto_nfo = True
                             else:
@@ -176,23 +176,23 @@ class SceneManager:
                         response = await client.get(url, timeout=10.0)
                         response_json = response.json()
 
-                        if int(response_json.get('resultsCount', 0)) > 0:
-                            first_result = response_json['results'][0]
-                            imdb_str = first_result.get('imdbId')
+                        if int(response_json.get("resultsCount", 0)) > 0:
+                            first_result = response_json["results"][0]
+                            imdb_str = first_result.get("imdbId")
                             if imdb_str and imdb_str == str(meta.imdb_id).zfill(7) and meta.imdb_id != 0:
                                 meta.scene = True
-                                release_name = first_result['release']
+                                release_name = first_result["release"]
 
                                 if not meta.nfo and first_result.get("hasNFO") == "yes":
                                     try:
-                                        release = first_result['release']
+                                        release = first_result["release"]
                                         release_lower = release.lower()
                                         nfo_url = f"https://www.srrdb.com/download/file/{release}/{quoted_base}.nfo"
-                                        save_path = os.path.join(meta.base_dir, "tmp", meta.uuid)
-                                        os.makedirs(save_path, exist_ok=True)
-                                        nfo_file_path = os.path.join(save_path, f"{release_lower}.nfo")
+                                        save_path = Path(meta.base_dir) / "tmp" / meta.uuid
+                                        Path(save_path).mkdir(parents=True, exist_ok=True)
+                                        nfo_file_path = Path(save_path) / f"{release_lower}.nfo"
 
-                                        if not os.path.exists(nfo_file_path):
+                                        if not Path(nfo_file_path).exists():
                                             nfo_response = await client.get(nfo_url, timeout=30.0)
                                             if nfo_response.status_code == 200:
                                                 await asyncio.to_thread(Path(nfo_file_path).write_bytes, nfo_response.content)
@@ -215,7 +215,7 @@ class SceneManager:
                 else:
                     logger.debug("[yellow]SRRDB: Missing name or tag for lower/tag search")
 
-        check_predb = bool(self.default_config.get('check_predb', False))
+        check_predb = bool(self.default_config.get("check_predb", False))
         if not scene and check_predb:
             logger.debug("[yellow]SRRDB: No scene match found, checking predb")
             scene = await self.predb_check(meta, video)
@@ -227,7 +227,7 @@ class SceneManager:
         return video, scene, imdb
 
     async def predb_check(self, meta: Meta, video: str) -> bool:
-        url = f"https://predb.pw/search.php?search={urllib.parse.quote(os.path.basename(video))}"
+        url = f"https://predb.pw/search.php?search={urllib.parse.quote(Path(video).name)}"
         logger.debug(f"Using predb url: {url}")
         try:
             async with httpx.AsyncClient() as client:
@@ -235,14 +235,14 @@ class SceneManager:
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, "lxml")
                 found = False
-                video_base = os.path.basename(video).lower()
-                for row in soup.select('table.zebra-striped tbody tr'):
-                    tds = row.find_all('td')
+                video_base = Path(video).name.lower()
+                for row in soup.select("table.zebra-striped tbody tr"):
+                    tds = row.find_all("td")
                     if len(tds) >= 3:
                         # The 3rd <td> contains the release name link
-                        release_a = tds[2].find('a', title=True)
+                        release_a = tds[2].find("a", title=True)
                         if release_a:
-                            release_attr = self._attr_to_string(release_a.get('title')).strip()
+                            release_attr = self._attr_to_string(release_a.get("title")).strip()
                             if not release_attr:
                                 continue
                             release_name = release_attr.lower()
@@ -253,7 +253,7 @@ class SceneManager:
                                 logger.info("[green]Predb: Match found")
                                 # The 4th <td> contains the group
                                 if len(tds) >= 4:
-                                    group_a = tds[3].find('a')
+                                    group_a = tds[3].find("a")
                                     if group_a:
                                         group = self._attr_to_string(group_a.get_text()).strip()
                                         meta.tag = f"-{group}" if group and not group.startswith("-") else group

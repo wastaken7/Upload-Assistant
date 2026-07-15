@@ -81,7 +81,7 @@ This branch introduces new media categories and automation features not present 
 | Aither | AITHER | MOVIE, TV |
 | Alpharatio | AR | MOVIE, TV |
 | Amigos-Share | ASC | MOVIE, TV, BOOK, GAME |
-| Anthelion | ANT | MOVIE |
+| ANTHELION | ANT | MOVIE |
 | AsianCinema | ACM | MOVIE, TV |
 | Aura4K | A4K | MOVIE, TV |
 | AvistaZ | AZ | MOVIE, TV |

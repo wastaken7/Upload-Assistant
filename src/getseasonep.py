@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import os
 import re
 import sys
 from collections.abc import Callable, Mapping
@@ -38,7 +37,7 @@ def _anitopy_parse(value: str) -> dict[str, Any]:
 def _safe_int(value: Any, default: int = 0) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -140,7 +139,7 @@ class SeasonEpisodeManager:
                 # if the mal id is set, then we've already run get_romaji in tmdb.py
                 if meta.mal_id == 0 and meta.category == "TV":
                     parsed = _anitopy_parse(Path(video).name)
-                    romaji, mal_id, eng_title, seasonYear, anilist_episodes, meta.demographic = await self.tmdb_manager.get_romaji(
+                    romaji, mal_id, eng_title, season_year, anilist_episodes, meta.demographic = await self.tmdb_manager.get_romaji(
                         str(parsed.get("anime_title", "")),
                         _safe_int(meta.mal_id, 0),
                         meta,
@@ -150,7 +149,7 @@ class SeasonEpisodeManager:
                         meta.mal_id = mal_id_value
                     anilist_episodes = _safe_int(anilist_episodes, 0)
                     if meta.tmdb_id == 0:
-                        year = str(parsed.get("anime_year", seasonYear))
+                        year = str(parsed.get("anime_year") or season_year)
                         guess_title = _guessit_data(str(parsed.get("anime_title", "")), {"excludes": ["country", "language"]}).get("title", "")
                         tmdb_id_value, category_value = await self.tmdb_manager.get_tmdb_id(str(guess_title), year, meta.category, meta.filename)
                         meta.tmdb_id = tmdb_id_value
@@ -196,7 +195,7 @@ class SeasonEpisodeManager:
                                             episode_int = int(match.group(1))
                                             episode = f"E{str(episode_int).zfill(2)}"
                                             break
-                                        except (ValueError, IndexError):
+                                        except ValueError, IndexError:
                                             continue
 
                             if episode_int == 1:  # Still using fallback
@@ -230,7 +229,7 @@ class SeasonEpisodeManager:
                                 async with httpx.AsyncClient(timeout=30.0) as client:
                                     response = (await client.post(url, params=params)).json()
                                 if response["result"] == "failure":
-                                    raise XEMNotFound  # noqa: F405
+                                    raise XEMNotFoundError  # noqa: F405
                                 logger.debug(f"[cyan]TheXEM Absolute -> Standard[/cyan]\n{response}")
                                 season_int = int(response["data"]["scene"]["season"])  # Convert to integer
                                 season = f"S{str(season_int).zfill(2)}"
@@ -240,7 +239,7 @@ class SeasonEpisodeManager:
                             else:
                                 season_int = 1  # Default to 1 if error occurs
                                 season = "S01"
-                                names_url = f"https://thexem.info/map/names?origin=tvdb&id={str(meta.tvdb_id)}"
+                                names_url = f"https://thexem.info/map/names?origin=tvdb&id={meta.tvdb_id!s}"
                                 async with httpx.AsyncClient(timeout=30.0) as client:
                                     names_response = (await client.get(names_url)).json()
                                 logger.debug(f"[cyan]Matching Season Number from TheXEM\n{names_response}")
@@ -267,7 +266,7 @@ class SeasonEpisodeManager:
                                                         season = f"S{str(season_int).zfill(2)}"
                                                         difference = diff
                                 else:
-                                    raise XEMNotFound  # noqa: F405
+                                    raise XEMNotFoundError  # noqa: F405
                         except Exception:
                             if meta.debug:
                                 console.print_exception()
@@ -315,7 +314,7 @@ class SeasonEpisodeManager:
             # Guess the part of the episode (if available)
             meta.part = ""
             if meta.tv_pack == 1:
-                part = _guessit_data(os.path.dirname(video)).get("part")
+                part = _guessit_data(str(Path(video).parent)).get("part")
                 meta.part = f"Part {part}" if part else ""  # pyrefly: ignore [bad-assignment]
 
         return meta
@@ -349,7 +348,7 @@ class SeasonEpisodeManager:
 
                 logger.info(f"[cyan]Filelist ({len(filelist)} files):")
                 for i, file in enumerate(filelist[:batch_size]):
-                    logger.info(f"[cyan]  {i + 1:2d}. {os.path.basename(file)}")
+                    logger.info(f"[cyan]  {i + 1:2d}. {Path(file).name}")
 
                 files_shown = min(batch_size, len(filelist))
 
@@ -369,13 +368,13 @@ class SeasonEpisodeManager:
                         # Show next batch of files
                         next_batch = filelist[files_shown : files_shown + batch_size]
                         for i, file in enumerate(next_batch):
-                            logger.info(f"[cyan]  {files_shown + i + 1:2d}. {os.path.basename(file)}")
+                            logger.info(f"[cyan]  {files_shown + i + 1:2d}. {Path(file).name}")
                         files_shown += len(next_batch)
                     elif response.lower() == "a":
                         # Show all remaining files
                         remaining_batch = filelist[files_shown:]
                         for i, file in enumerate(remaining_batch):
-                            logger.info(f"[cyan]  {files_shown + i + 1:2d}. {os.path.basename(file)}")
+                            logger.info(f"[cyan]  {files_shown + i + 1:2d}. {Path(file).name}")
                         files_shown = len(filelist)
                     elif response.lower() == "c":
                         just_go = True
@@ -424,12 +423,12 @@ class SeasonEpisodeManager:
         # Normalize season_int once so all (season, episode) tuples are (int, int)
         raw_season_int = meta.season_int
         try:
-            default_season_num = raw_season_int
-        except (TypeError, ValueError):
+            default_season_num = int(raw_season_int)
+        except TypeError, ValueError:
             default_season_num = 1
 
         for file_path in files:
-            filename = os.path.basename(file_path)
+            filename = Path(file_path).name
 
             # Extract group tag from each file
             file_tag = await get_tag(file_path, meta, season_pack_check=True)

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, cast
 
@@ -6,7 +8,6 @@ from src.meta import Meta
 console: Any = None
 
 try:
-    import os
     import re
     import time
 
@@ -31,7 +32,7 @@ try:
     from src.rehostimages import RehostImagesManager
     from src.sonarr import SonarrManager
     from src.tmdb import TmdbManager
-    from src.tvdb import tvdb_data
+    from src.tvdb import TvdbData
 
 except ModuleNotFoundError:
     print("Missing Module Found. Please reinstall required dependencies from requirements.txt.")
@@ -53,7 +54,7 @@ class Prep:
         self.screens = screens
         self.config = config
         self.img_host = img_host.lower()
-        self.tvdb_handler = tvdb_data(config)
+        self.tvdb_handler = TvdbData(config)
         self.overrides = ApplyOverrides(config)
         self.audio_manager = AudioManager(config)
         self.disc_info_manager = DiscInfoManager(config)
@@ -174,7 +175,7 @@ class Prep:
                 return "TV"
 
         for pattern in filename_patterns:
-            if re.search(pattern, uuid) or re.search(pattern, os.path.basename(path)):
+            if re.search(pattern, uuid) or re.search(pattern, Path(path).name):
                 logger.debug(f"[cyan]Matched TV pattern in filename: {pattern}[/cyan]")
                 return "TV"
 
@@ -187,8 +188,7 @@ class Prep:
         return "MOVIE"
 
     async def stream_optimized(self, stream_opt: bool) -> int:
-        stream = 1 if stream_opt is True else 0
-        return stream
+        return 1 if stream_opt is True else 0
 
     async def parse_scene_nfo(self, meta: Meta) -> None:
         try:

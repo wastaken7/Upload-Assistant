@@ -82,9 +82,9 @@ class SevenZipBinaryManager:
 
         # Cleanup old files
         if binary_path.exists():
-            os.remove(binary_path)
+            binary_path.unlink()
         if version_path.exists():
-            os.remove(version_path)
+            version_path.unlink()
 
         download_url = f"https://github.com/ip7z/7zip/releases/download/{version}/{file_pattern}"
         logger.debug(f"[blue]7-Zip Download URL: {download_url}[/blue]")
@@ -113,9 +113,9 @@ class SevenZipBinaryManager:
                         for member in tar_ref.getmembers():
                             if member.islnk() or member.issym():
                                 continue
-                            if os.path.isabs(member.name) or ".." in member.name or member.name.startswith("/"):
+                            if Path(member.name).is_absolute() or ".." in member.name or member.name.startswith("/"):
                                 continue
-                            full_path = os.path.realpath(os.path.join(bin_dir, member.name))
+                            full_path = os.path.realpath(Path(bin_dir) / member.name)
                             base_path = os.path.realpath(bin_dir)
                             if not full_path.startswith(base_path + os.sep) and full_path != base_path:
                                 continue

@@ -1,0 +1,614 @@
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import re
+import urllib.request
+from pathlib import Path
+from typing import Any, cast
+from urllib.parse import urlparse
+
+import aiofiles
+import cli_ui
+import click
+
+from src.console import logger
+from src.get_desc import DescriptionBuilder
+from src.meta import Meta
+from src.trackers.UNIT3D import UNIT3D
+from src.uploadscreens import UploadScreensManager
+
+Config = dict[str, Any]
+
+
+class Cinematik(UNIT3D):
+    """
+    Cinematik is a Private tracker for full BD and DVD discs of non-mainstream movies, niche cinema and arthouse.
+    """
+
+    tracker = "CINEMATIK"
+    display_name = "Cinematik"
+    base_url = "https://cinematik.net"
+    banned_groups = ()
+    id_url = f"{base_url}/api/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
+    supported_categories = ("TV", "MOVIE")
+
+    def __init__(self, config: Config) -> None:
+        super().__init__(config, tracker_name="CINEMATIK")
+        self.config: Config = config
+        self.uploadscreens_manager = UploadScreensManager(config)
+
+    async def get_additional_checks(self, meta: Meta) -> bool:
+        if not meta.is_disc:
+            logger.info("[red]Only disc-based content allowed at Cinematik")
+            return False
+
+        return True
+
+    async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "mod_queue_opt_in": await self.get_flag(meta, "modq"),
+        }
+
+        return data
+
+    async def get_name(self, meta: Meta) -> dict[str, str]:
+        disctype = meta.disctype
+        filelist = meta.filelist
+        basename = Path(next(iter(filelist), str(meta.path))).name
+        type_value = str(meta.type)
+        title = meta.title.replace("AKA", "/").strip()
+        alt_title = meta.aka.replace("AKA", "/").strip()
+        year = str(meta.year) if meta.year is not None else ""
+        resolution = meta.resolution
+        season = str(meta.season)
+        repack = meta.repack
+        if repack.strip():
+            repack = f"[{repack}]"
+        three_d = meta.three_d
+        three_d_tag = f"[{three_d}]" if three_d else ""
+        tag = meta.tag.replace("-", "- ") if meta.tag else ""
+        if tag == "":
+            tag = "- NOGRP"
+        source = str(meta.source)
+        hdr = meta.hdr
+        if not hdr.strip():
+            hdr = "SDR"
+        video_codec = meta.video_codec
+        video_encode = meta.video_encode.replace(".", "")
+        if "x265" in basename:
+            video_encode = video_encode.replace("H", "x")
+        dvd_size = meta.dvd_size
+        search_year = str(meta.search_year)
+        if not search_year.strip():
+            search_year = year
+        meta.category_id = (await self.get_category_id(meta))["category_id"]
+
+        name = ""
+        alt_title_part = f" {alt_title}" if alt_title else ""
+        if meta.category_id in ("1", "3", "5", "6"):
+            if meta.is_disc == "BDMV":
+                name = f"{title}{alt_title_part} ({year}) {disctype} {resolution} {video_codec} {three_d_tag}"
+            elif meta.is_disc == "DVD":
+                name = f"{title}{alt_title_part} ({year}) {source} {dvd_size}"
+        elif meta.category == "TV" and type_value == "DISC":  # TV SPECIFIC - Disk
+            if meta.is_disc == "BDMV":
+                name = f"{title}{alt_title_part} ({search_year}) {season} {disctype} {resolution} {video_codec}"
+            if meta.is_disc == "DVD":
+                name = f"{title}{alt_title_part} ({search_year}) {season} {source} {dvd_size}"
+
+        return {"name": name}
+
+    async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        _ = (category, reverse, mapping_only)
+        category_name = str(meta.category)
+        foreign = meta.foreign
+        opera = meta.opera
+        asian = meta.asian
+        category_id = {
+            "FILM": "1",
+            "TV": "2",
+            "Foreign Film": "3",
+            "Foreign TV": "4",
+            "Opera & Musical": "5",
+            "Asian Film": "6",
+        }.get(category_name, "0")
+
+        if category_name == "MOVIE":
+            if foreign:
+                category_id = "3"
+            elif opera:
+                category_id = "5"
+            elif asian:
+                category_id = "6"
+            else:
+                category_id = "1"
+        elif category_name == "TV":
+            if foreign:
+                category_id = "4"
+            elif opera:
+                category_id = "5"
+            else:
+                category_id = "2"
+
+        return {"category_id": category_id}
+
+    async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        _ = (type, reverse, mapping_only)
+        disctype = meta.disctype
+        type_id_map = {"Custom": "1", "BD100": "3", "BD66": "4", "BD50": "5", "BD25": "6", "NTSC DVD9": "7", "NTSC DVD5": "8", "PAL DVD9": "9", "PAL DVD5": "10", "3D": "11"}
+
+        if not disctype:
+            logger.info("[red]You must specify a --disctype")
+            # Raise an exception since we can't proceed without disctype
+            raise ValueError("disctype is required for Cinematik tracker but was not provided")
+
+        disctype_value = str(cast(Any, disctype[0])) if isinstance(disctype, list) and disctype else str(cast(Any, disctype))
+        type_id = type_id_map.get(disctype_value, "1")  # '1' is the default fallback
+
+        return {"type_id": type_id}
+
+    async def get_resolution_id(self, meta: Meta, resolution: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        _ = (resolution, reverse, mapping_only)
+        resolution_id = {
+            "Other": "10",
+            "4320p": "1",
+            "2160p": "2",
+            "1440p": "3",
+            "1080p": "3",
+            "1080i": "4",
+            "720p": "5",
+            "576p": "6",
+            "576i": "7",
+            "480p": "8",
+            "480i": "9",
+        }.get(meta.resolution, "10")
+        return {"resolution_id": resolution_id}
+
+    async def get_description(self, meta: Meta) -> dict[str, str]:
+        if meta.description_link or meta.description_file:
+            desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)
+
+            logger.info(f"Custom Description Link/File Path: {desc}", extra={"markup": False})
+            return {"description": desc}
+
+        discs = cast(list[dict[str, Any]], meta.discs)
+        summary = discs[0].get("summary", "") if len(discs) > 0 else None
+
+        # Proceed with matching Total Bitrate if the summary exists
+        if summary:
+            match = re.search(r"Total Bitrate: ([\d.]+ Mbps)", summary)
+            total_bitrate = match.group(1) if match else "Unknown"
+        else:
+            total_bitrate = "Unknown"
+
+        country_name = self.country_code_to_name(str(meta.region))
+
+        # Rehost poster if tmdb_poster is available
+        poster_url = f"https://image.tmdb.org/t/p/original{meta.tmdb_poster}"
+
+        # Define the paths for both jpg and png poster images
+        poster_jpg_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/poster.jpg"
+        poster_png_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/poster.png"
+
+        # Check if either poster.jpg or poster.png already exists
+        if Path(poster_jpg_path).exists():
+            poster_path = poster_jpg_path
+            logger.info("[green]Cover already exists as poster.jpg, skipping download.[/green]")
+        elif Path(poster_png_path).exists():
+            poster_path = poster_png_path
+            logger.info("[green]Cover already exists as poster.png, skipping download.[/green]")
+        else:
+            # No poster file exists, download the poster image
+            poster_path = poster_jpg_path  # Default to saving as poster.jpg
+            try:
+                parsed_url = urlparse(poster_url)
+                if parsed_url.scheme not in ("http", "https"):
+                    raise ValueError(f"Invalid URL scheme: {parsed_url.scheme}")
+                urllib.request.urlretrieve(poster_url, poster_path)  # noqa: S310
+                logger.info(f"[green]Cover downloaded to {poster_path}[/green]")
+            except Exception as e:
+                logger.error(f"[red]Error downloading poster: {e}[/red]")
+
+        # Upload the downloaded or existing poster image once
+        if Path(poster_path).exists():
+            try:
+                logger.info("Uploading standard poster to image host....")
+                new_poster_url, _ = await self.uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [poster_path], {})
+
+                # Ensure that the new poster URL is assigned only once
+                poster_urls = new_poster_url
+                if len(poster_urls) > 0:
+                    poster_url = str(poster_urls[0].get("raw_url", poster_url))
+            except Exception as e:
+                logger.error(f"[red]Error uploading poster: {e}[/red]")
+        else:
+            logger.info("[red]Cover file not found, cannot upload.[/red]")
+
+        # Generate the description text
+        desc_text: list[str] = []
+
+        images = meta.image_list
+
+        if len(images) >= 6:
+            image_link_1 = images[0]["raw_url"]
+            image_link_2 = images[1]["raw_url"]
+            image_link_3 = images[2]["raw_url"]
+            image_link_4 = images[3]["raw_url"]
+            image_link_5 = images[4]["raw_url"]
+            image_link_6 = images[5]["raw_url"]
+        else:
+            image_link_1 = image_link_2 = image_link_3 = image_link_4 = image_link_5 = image_link_6 = ""
+
+        # Write the cover section with rehosted poster URL
+        desc_text.append(
+            "[h3]Cover[/h3] [color=red]A stock poster has been automatically added, but you'll get more love if you include a proper cover, see rule 6.6[/color]\n"
+        )
+        desc_text.append("[center]\n")
+        desc_text.append(f"[IMG=500]{poster_url}[/IMG]\n")
+        desc_text.append("[/center]\n\n")
+
+        # Write screenshots section
+        desc_text.append("[h3]Screenshots[/h3]\n")
+        desc_text.append("[center]\n")
+        desc_text.append(f"[URL={image_link_1}][IMG=300]{image_link_1}[/IMG][/URL] ")
+        desc_text.append(f"[URL={image_link_2}][IMG=300]{image_link_2}[/IMG][/URL] ")
+        desc_text.append(f"[URL={image_link_3}][IMG=300]{image_link_3}[/IMG][/URL]\n ")
+        desc_text.append(f"[URL={image_link_4}][IMG=300]{image_link_4}[/IMG][/URL] ")
+        desc_text.append(f"[URL={image_link_5}][IMG=300]{image_link_5}[/IMG][/URL] ")
+        desc_text.append(f"[URL={image_link_6}][IMG=300]{image_link_6}[/IMG][/URL]\n")
+        desc_text.append("[/center]\n\n")
+
+        # Write synopsis section with the custom title
+        desc_text.append("[h3]Synopsis/Review/Personal Thoughts (edit as needed)[/h3]\n")
+        desc_text.append(
+            "[color=red]Default TMDB sypnosis added, more love if you use a sypnosis from credible film institutions such as the BFI or directly quoting well-known film critics, see rule 6.3[/color]\n"
+        )
+        desc_text.append("[quote]\n")
+        desc_text.append(f"{(meta.overview if meta.overview is not None else 'No synopsis available.')}\n")
+        desc_text.append("[/quote]\n\n")
+
+        # Write technical info section
+        desc_text.append("[h3]Technical Info[/h3]\n")
+        desc_text.append("[code]\n")
+        bdinfo = meta.bdinfo
+        if meta.is_disc == "BDMV":
+            desc_text.append(f"  Disc Label.........:{bdinfo.get('label', '')}\n")
+        imdb_info = cast(dict[str, Any], meta.imdb_info)
+        desc_text.append(f"  IMDb...............: [url]{imdb_info.get('imdb_url', '')!s}{meta.imdb_rating}[/url]\n")
+        year_val = meta.year if meta.year is not None else ""
+        desc_text.append(f"  Year...............: {year_val}\n")
+        desc_text.append(f"  Country............: {country_name}\n")
+        if meta.is_disc == "BDMV":
+            desc_text.append(f"  Runtime............: {bdinfo.get('length', '')} hrs [color=red](double check this is actual runtime)[/color]\n")
+        else:
+            desc_text.append("  Runtime............:  [color=red]Insert the actual runtime[/color]\n")
+
+        if meta.is_disc == "BDMV":
+            audio_tracks = cast(list[dict[str, Any]], bdinfo.get("audio", []))
+            audio_languages = ", ".join([f"{track.get('language', 'Unknown')} {track.get('codec', 'Unknown')} {track.get('channels', 'Unknown')}" for track in audio_tracks])
+            desc_text.append(f"  Audio..............: {audio_languages}\n")
+            subtitles = cast(list[Any], bdinfo.get("subtitles", []))
+            desc_text.append(f"  Subtitles..........: {', '.join([str(sub) for sub in subtitles])}\n")
+        else:
+            # Process each disc's `vob_mi` or `ifo_mi` to extract audio and subtitles separately
+            for disc in discs:
+                vob_mi = str(disc.get("vob_mi", ""))
+                ifo_mi = str(disc.get("ifo_mi", ""))
+
+                unique_audio: set[str] = set()  # Store unique audio strings
+
+                audio_section = vob_mi.split("\n\nAudio\n")[1].split("\n\n")[0] if "Audio\n" in vob_mi else None
+                if audio_section:
+                    if "AC-3" in audio_section:
+                        codec = "AC-3"
+                    elif "DTS" in audio_section:
+                        codec = "DTS"
+                    elif "MPEG Audio" in audio_section:
+                        codec = "MPEG Audio"
+                    elif "PCM" in audio_section:
+                        codec = "PCM"
+                    elif "AAC" in audio_section:
+                        codec = "AAC"
+                    else:
+                        codec = "Unknown"
+
+                    channels = audio_section.split("Channel(s)")[1].split(":")[1].strip().split(" ")[0] if "Channel(s)" in audio_section else "Unknown"
+                    # Convert 6 channels to 5.1, otherwise leave as is
+                    channels = "5.1" if channels == "6" else channels
+                    ifo_full = str(disc.get("ifo_mi_full", ""))
+                    language = ifo_full.split("Language")[1].split(":")[1].strip().split("\n")[0] if "Language" in ifo_full else "Unknown"
+                    audio_info = f"{language} {codec} {channels}"
+                    unique_audio.add(audio_info)
+
+                # Append audio information to the description
+                if unique_audio:
+                    desc_text.append(f"  Audio..............: {', '.join(sorted(unique_audio))}\n")
+
+                # Subtitle extraction using the helper function
+                unique_subtitles = self.parse_subtitles(ifo_mi)
+
+                # Append subtitle information to the description
+                if unique_subtitles:
+                    desc_text.append(f"  Subtitles..........: {', '.join(sorted(unique_subtitles))}\n")
+
+        if meta.is_disc == "BDMV":
+            video_info = cast(list[dict[str, Any]], bdinfo.get("video", []))
+            video_resolution = video_info[0].get("resolution", "Unknown") if video_info else "Unknown"
+            desc_text.append(f"  Video Format.......: {video_resolution}\n")
+        else:
+            desc_text.append(f"  DVD Format.........: {(meta.source if meta.source is not None else 'Unknown')}\n")
+        desc_text.append("  Film Aspect Ratio..: [color=red]The actual aspect ratio of the content, not including the black bars[/color]\n")
+        if meta.is_disc == "BDMV":
+            desc_text.append(f"  Source.............: {(meta.disctype if meta.disctype is not None else 'Unknown')}\n")
+        else:
+            desc_text.append(f"  Source.............: {(meta.dvd_size if meta.dvd_size is not None else 'Unknown')}\n")
+        desc_text.append(
+            f"  Film Distributor...: [url={meta.distributor_link}]{(meta.distributor if meta.distributor is not None else 'Unknown')}[/url] [color=red]Don't forget the actual distributor link\n"
+        )
+        desc_text.append(f"  Average Bitrate....: {total_bitrate}\n")
+        desc_text.append("  Ripping Program....:  [color=red]Specify - if it's your rip or custom version, otherwise 'Not my rip'[/color]\n")
+        desc_text.append("\n")
+        if meta.untouched is True:
+            desc_text.append("  Menus......: [X] Untouched\n")
+            desc_text.append("  Video......: [X] Untouched\n")
+            desc_text.append("  Extras.....: [X] Untouched\n")
+            desc_text.append("  Audio......: [X] Untouched\n")
+        else:
+            desc_text.append("  Menus......: [ ] Untouched\n")
+            desc_text.append("               [ ] Stripped\n")
+            desc_text.append("  Video......: [ ] Untouched\n")
+            desc_text.append("               [ ] Re-encoded\n")
+            desc_text.append("  Extras.....: [ ] Untouched\n")
+            desc_text.append("               [ ] Stripped\n")
+            desc_text.append("               [ ] Re-encoded\n")
+            desc_text.append("               [ ] None\n")
+            desc_text.append("  Audio......: [ ] Untouched\n")
+            desc_text.append("               [ ] Stripped tracks\n")
+
+        desc_text.append("[/code]\n\n")
+
+        # Extras
+        desc_text.append("[h4]Extras[/h4]\n")
+        desc_text.append("[*] Insert special feature 1 here\n")
+        desc_text.append("[*] Insert special feature 2 here\n")
+        desc_text.append("... (add more special features as needed)\n\n")
+
+        # Uploader Comments
+        desc_text.append("[h4]Uploader Comments[/h4]\n")
+        desc_text.append(f" - {(meta.uploader_comments if meta.uploader_comments is not None else 'No comments.')}\n")
+
+        # Convert the list to a single string for the description
+        description = "".join(desc_text)
+
+        # Ask user if they want to edit or keep the description
+        logger.info(f"Current description: {description}", extra={"markup": False})
+        logger.info("[cyan]Do you want to edit or keep the description?[/cyan]")
+        edit_choice = cli_ui.ask_string("Enter 'e' to edit, or press Enter to keep it as is: ")
+
+        if (edit_choice or "").lower() == "e":
+            edited_description = cast(str | None, click.edit(description))  # pyrefly: ignore [bad-argument-type]
+            if edited_description:
+                description = edited_description.strip()
+            logger.info(f"Final description after editing: {description}", extra={"markup": False})
+        else:
+            logger.info("[green]Keeping the original description.[/green]")
+
+        # Write the final description to the file
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as desc_file:
+            await desc_file.write(description)
+
+        return {"description": description}
+
+    def parse_subtitles(self, disc_mi: str) -> set[str]:
+        unique_subtitles: set[str] = set()  # Store unique subtitle strings
+        lines = disc_mi.splitlines()  # Split the multiline text into individual lines
+        current_block = None
+
+        for line in lines:
+            # Detect the start of a subtitle block (Text #)
+            if line.startswith("Text #"):
+                current_block = "subtitle"
+                continue
+
+            # Extract language information for subtitles
+            if current_block == "subtitle" and "Language" in line:
+                language = line.split(":")[1].strip()
+                unique_subtitles.add(language)
+
+        return unique_subtitles
+
+    def country_code_to_name(self, code: str) -> str:
+        country_mapping = {
+            "AFG": "Afghanistan",
+            "ALB": "Albania",
+            "DZA": "Algeria",
+            "AND": "Andorra",
+            "AGO": "Angola",
+            "ARG": "Argentina",
+            "ARM": "Armenia",
+            "AUS": "Australia",
+            "AUT": "Austria",
+            "AZE": "Azerbaijan",
+            "BHS": "Bahamas",
+            "BHR": "Bahrain",
+            "BGD": "Bangladesh",
+            "BRB": "Barbados",
+            "BLR": "Belarus",
+            "BEL": "Belgium",
+            "BLZ": "Belize",
+            "BEN": "Benin",
+            "BTN": "Bhutan",
+            "BOL": "Bolivia",
+            "BIH": "Bosnia and Herzegovina",
+            "BWA": "Botswana",
+            "BRA": "Brazil",
+            "BRN": "Brunei",
+            "BGR": "Bulgaria",
+            "BFA": "Burkina Faso",
+            "BDI": "Burundi",
+            "CPV": "Cabo Verde",
+            "KHM": "Cambodia",
+            "CMR": "Cameroon",
+            "CAN": "Canada",
+            "CAF": "Central African Republic",
+            "TCD": "Chad",
+            "CHL": "Chile",
+            "CHN": "China",
+            "COL": "Colombia",
+            "COM": "Comoros",
+            "COG": "Congo",
+            "CRI": "Costa Rica",
+            "HRV": "Croatia",
+            "CUB": "Cuba",
+            "CYP": "Cyprus",
+            "CZE": "Czech Republic",
+            "DNK": "Denmark",
+            "DJI": "Djibouti",
+            "DMA": "Dominica",
+            "DOM": "Dominican Republic",
+            "ECU": "Ecuador",
+            "EGY": "Egypt",
+            "SLV": "El Salvador",
+            "GNQ": "Equatorial Guinea",
+            "ERI": "Eritrea",
+            "EST": "Estonia",
+            "SWZ": "Eswatini",
+            "ETH": "Ethiopia",
+            "FJI": "Fiji",
+            "FIN": "Finland",
+            "FRA": "France",
+            "GAB": "Gabon",
+            "GMB": "Gambia",
+            "GEO": "Georgia",
+            "DEU": "Germany",
+            "GHA": "Ghana",
+            "GRC": "Greece",
+            "GRD": "Grenada",
+            "GTM": "Guatemala",
+            "GIN": "Guinea",
+            "GNB": "Guinea-Bissau",
+            "GUY": "Guyana",
+            "HTI": "Haiti",
+            "HND": "Honduras",
+            "HUN": "Hungary",
+            "ISL": "Iceland",
+            "IND": "India",
+            "IDN": "Indonesia",
+            "IRN": "Iran",
+            "IRQ": "Iraq",
+            "IRL": "Ireland",
+            "ISR": "Israel",
+            "ITA": "Italy",
+            "JAM": "Jamaica",
+            "JPN": "Japan",
+            "JOR": "Jordan",
+            "KAZ": "Kazakhstan",
+            "KEN": "Kenya",
+            "KIR": "Kiribati",
+            "KOR": "Korea",
+            "KWT": "Kuwait",
+            "KGZ": "Kyrgyzstan",
+            "LAO": "Laos",
+            "LVA": "Latvia",
+            "LBN": "Lebanon",
+            "LSO": "Lesotho",
+            "LBR": "Liberia",
+            "LBY": "Libya",
+            "LIE": "Liechtenstein",
+            "LTU": "Lithuania",
+            "LUX": "Luxembourg",
+            "MDG": "Madagascar",
+            "MWI": "Malawi",
+            "MYS": "Malaysia",
+            "MDV": "Maldives",
+            "MLI": "Mali",
+            "MLT": "Malta",
+            "MHL": "Marshall Islands",
+            "MRT": "Mauritania",
+            "MUS": "Mauritius",
+            "MEX": "Mexico",
+            "FSM": "Micronesia",
+            "MDA": "Moldova",
+            "MCO": "Monaco",
+            "MNG": "Mongolia",
+            "MNE": "Montenegro",
+            "MAR": "Morocco",
+            "MOZ": "Mozambique",
+            "MMR": "Myanmar",
+            "NAM": "Namibia",
+            "NRU": "Nauru",
+            "NPL": "Nepal",
+            "NLD": "Netherlands",
+            "NZL": "New Zealand",
+            "NIC": "Nicaragua",
+            "NER": "Niger",
+            "NGA": "Nigeria",
+            "MKD": "North Macedonia",
+            "NOR": "Norway",
+            "OMN": "Oman",
+            "PAK": "Pakistan",
+            "PLW": "Palau",
+            "PAN": "Panama",
+            "PNG": "Papua New Guinea",
+            "PRY": "Paraguay",
+            "PER": "Peru",
+            "PHL": "Philippines",
+            "POL": "Poland",
+            "PRT": "Portugal",
+            "QAT": "Qatar",
+            "ROU": "Romania",
+            "RUS": "Russia",
+            "RWA": "Rwanda",
+            "KNA": "Saint Kitts and Nevis",
+            "LCA": "Saint Lucia",
+            "VCT": "Saint Vincent and the Grenadines",
+            "WSM": "Samoa",
+            "SMR": "San Marino",
+            "STP": "Sao Tome and Principe",
+            "SAU": "Saudi Arabia",
+            "SEN": "Senegal",
+            "SRB": "Serbia",
+            "SYC": "Seychelles",
+            "SLE": "Sierra Leone",
+            "SGP": "Singapore",
+            "SVK": "Slovakia",
+            "SVN": "Slovenia",
+            "SLB": "Solomon Islands",
+            "SOM": "Somalia",
+            "ZAF": "South Africa",
+            "SSD": "South Sudan",
+            "ESP": "Spain",
+            "LKA": "Sri Lanka",
+            "SDN": "Sudan",
+            "SUR": "Suriname",
+            "SWE": "Sweden",
+            "CHE": "Switzerland",
+            "SYR": "Syria",
+            "TWN": "Taiwan",
+            "TJK": "Tajikistan",
+            "TZA": "Tanzania",
+            "THA": "Thailand",
+            "TLS": "Timor-Leste",
+            "TGO": "Togo",
+            "TON": "Tonga",
+            "TTO": "Trinidad and Tobago",
+            "TUN": "Tunisia",
+            "TUR": "Turkey",
+            "TKM": "Turkmenistan",
+            "TUV": "Tuvalu",
+            "UGA": "Uganda",
+            "UKR": "Ukraine",
+            "ARE": "United Arab Emirates",
+            "GBR": "United Kingdom",
+            "USA": "United States",
+            "URY": "Uruguay",
+            "UZB": "Uzbekistan",
+            "VUT": "Vanuatu",
+            "VEN": "Venezuela",
+            "VNM": "Vietnam",
+            "YEM": "Yemen",
+            "ZMB": "Zambia",
+            "ZWE": "Zimbabwe",
+        }
+        return country_mapping.get(code.upper(), "Unknown Country")

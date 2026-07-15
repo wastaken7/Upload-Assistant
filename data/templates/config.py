@@ -40,7 +40,7 @@ config = {
         # custom zipline url
         "zipline_url": "",
         "zipline_api_key": "",
-        # Seedpool CDN API key
+        # SEEDPOOL CDN API key
         "seedpool_cdn_api": "",
         # ShareX-style image host (IMageHosting) token
         "sharex_url": "https://img.digitalcore.club/api/upload",
