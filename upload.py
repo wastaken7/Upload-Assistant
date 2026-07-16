@@ -2180,7 +2180,6 @@ async def do_the_thing(base_dir: str) -> None:
                         if torrent_trackers:
                             meta_torrent = meta.copy()
                             meta_torrent["trackers"] = torrent_trackers
-                            logger.info(f"[yellow]Processing uploads to torrent trackers: {', '.join(torrent_trackers)}.....")
                             await process_trackers(
                                 meta_torrent,
                                 config,

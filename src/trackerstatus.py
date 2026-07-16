@@ -103,7 +103,7 @@ class TrackerStatusManager:
                     from src.book_prep import is_valid_book_language
 
                     book_required_fields = ["title", "author", "year", "book_language"]
-                    book_missing = []
+                    book_missing: list[str] = []
                     for f in book_required_fields:
                         val = local_meta.get(f)
                         if not val or str(val).strip().lower() in ("", "none", "null"):
@@ -119,7 +119,7 @@ class TrackerStatusManager:
                 # Check for missing required GAME fields in unattended mode
                 elif local_meta.get("category") == "GAME" and local_meta.get("unattended", False):
                     game_required_fields = ["title", "year", "platform", "game_version"]
-                    game_missing = []
+                    game_missing: list[str] = []
                     for f in game_required_fields:
                         val = local_meta.get(f)
                         if not val or str(val).strip().lower() in ("", "none", "null") or (f == "platform" and "," in str(val)):
@@ -310,7 +310,7 @@ class TrackerStatusManager:
 
         searching_trackers: list[str] = [name for name in meta.trackers if name in tracker_class_map]
         if searching_trackers:
-            logger.info(f"[yellow]Searching for existing torrents on: {', '.join(searching_trackers)}...")
+            logger.info("[yellow]Searching for existing torrents on selected trackers...")
         tasks = [process_single_tracker(tracker_name, meta) for tracker_name in meta.trackers]
         results = await asyncio.gather(*tasks)
 

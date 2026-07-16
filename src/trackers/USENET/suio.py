@@ -39,7 +39,7 @@ class Suio:
         self.config = config
         self.common = Common(config)
         tracker_cfg = config.get("TRACKERS", {}).get(self.tracker, {})
-        base_url = tracker_cfg.get("base_url", "").strip().rstrip("/")
+        base_url = str(tracker_cfg.get("base_url", "")).strip().rstrip("/")
         if base_url:
             # Verify the domain matches the expected indexer domain hash to prevent credentials leak
             url_to_parse = base_url if base_url.startswith(("http://", "https://")) else "https://" + base_url
@@ -271,13 +271,13 @@ class Suio:
             elif Path(cover_png_path).exists():
                 cover_path = cover_png_path
             if cover_path:
-                if cover_path.lower().endswith((".jpg", ".jpeg")):
+                if cover_path.suffix.lower() in {".jpg", ".jpeg"}:
                     async with aiofiles.open(cover_path, "rb") as f:
                         cover_content = await f.read()
-                    filename = Path(cover_path).name
+                    filename = cover_path.name
                 else:
 
-                    def _convert_to_jpg(path: str) -> bytes:
+                    def _convert_to_jpg(path: str | Path) -> bytes:
                         with Image.open(path) as img:
                             if img.mode in ("RGBA", "LA"):
                                 background = Image.new("RGB", img.size, (255, 255, 255))
@@ -291,7 +291,7 @@ class Suio:
                             return buf.getvalue()
 
                     cover_content = await asyncio.to_thread(_convert_to_jpg, cover_path)
-                    filename = Path(cover_path).stem + ".jpg"
+                    filename = cover_path.stem + ".jpg"
                 files["cover"] = (filename, cover_content, "image/jpeg")
         return files
 

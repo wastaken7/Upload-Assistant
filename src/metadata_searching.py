@@ -927,7 +927,7 @@ async def get_tvdb_tvmaze_tmdb_episode_data(meta: Meta, tvdb_handler: Any, tmdb_
     return meta
 
 
-async def get_douban_id(meta) -> int:
+async def get_douban_id(meta: Meta) -> int:
     douban_id: int = 0
     try:
         douban_manual = int(meta.douban_manual or 0)
