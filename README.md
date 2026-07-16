@@ -23,6 +23,7 @@
 - [Updating](#updating)
 - [CLI Usage](#cli-usage)
 - [Docker Usage](#docker-usage)
+- [Seedbox / Linux Install](docs/seedbox.md)
 - [Attributions](#attributions)
 
 ## Fork Features & Differences from Upstream (Audionut/Upload-Assistant)
@@ -292,6 +293,7 @@ In your terminal, run the command for your operating system and follow the on-sc
 
 **Additional Resources:**
 * Check out our [Wiki Help Page](docs/Home.md).
+* Need a no-root Linux or seedbox setup? See [Seedbox / Linux Install](docs/seedbox.md).
 * Feel free to contact me if you need help, I'm not that hard to find.
 
 
