@@ -41,6 +41,7 @@ With optional Discord support:
 --with-discord          Install optional Discord dependencies
 --skip-pyenv-install    Fail instead of installing pyenv automatically
 --force-update          Recreate .venv and reinstall packages
+-h, --help              Show this help
 ```
 
 ## Requirements
@@ -50,7 +51,6 @@ These commands should already exist on the seedbox:
 ```bash
 bash --version
 git --version
-curl --version
 ```
 
 To build Python with `pyenv`, many providers also need common build tooling already installed, such as:

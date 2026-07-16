@@ -6,6 +6,9 @@ UA_DIR="${HOME}/tools/ua"
 WITH_DISCORD=0
 SKIP_PYENV_INSTALL=0
 FORCE_UPDATE=0
+PYENV_ROOT_DEFAULT="${HOME}/.pyenv"
+PYENV_GIT_REF="v2.6.7"
+PYENV_REPO_URL="https://github.com/pyenv/pyenv.git"
 
 usage() {
     cat <<'EOF'
@@ -53,7 +56,7 @@ EOF
 }
 
 setup_pyenv_env() {
-    export PYENV_ROOT="${HOME}/.pyenv"
+    export PYENV_ROOT="${PYENV_ROOT_DEFAULT}"
     export PATH="${PYENV_ROOT}/bin:${PATH}"
     eval "$(pyenv init -)"
 }
@@ -68,11 +71,14 @@ install_pyenv_if_needed() {
         fail "pyenv is not installed and --skip-pyenv-install was requested"
     fi
 
-    require_command curl
     require_command git
 
     log "Installing pyenv"
-    curl -fsSL https://pyenv.run | bash
+    if [ -e "${PYENV_ROOT_DEFAULT}" ] && [ ! -d "${PYENV_ROOT_DEFAULT}/.git" ]; then
+        fail "Refusing to install pyenv because ${PYENV_ROOT_DEFAULT} exists and is not a git checkout"
+    fi
+
+    git clone --branch "$PYENV_GIT_REF" --depth 1 "$PYENV_REPO_URL" "${PYENV_ROOT_DEFAULT}"
     setup_pyenv_env
     append_pyenv_init "${HOME}/.bashrc"
     append_pyenv_init "${HOME}/.profile"
@@ -99,7 +105,8 @@ clone_or_update_repo() {
 }
 
 install_dependencies() {
-    cd "$UA_DIR"
+    cd -- "$UA_DIR"
+    UA_DIR="$PWD"
 
     log "Selecting Python ${PYTHON_VERSION} for this checkout"
     pyenv local "$PYTHON_VERSION"
@@ -112,6 +119,18 @@ install_dependencies() {
     if [ ! -d ".venv" ]; then
         log "Creating virtual environment"
         python -m venv .venv
+    elif [ -x ".venv/bin/python" ]; then
+        local venv_python_version
+        venv_python_version="$("./.venv/bin/python" -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+        if [ "$venv_python_version" != "$PYTHON_VERSION" ]; then
+            if [ "$FORCE_UPDATE" -eq 1 ]; then
+                log "Recreating virtual environment for Python ${PYTHON_VERSION}"
+                rm -rf "${UA_DIR}/.venv"
+                python -m venv .venv
+            else
+                fail "Existing .venv uses Python ${venv_python_version}; rerun with --force-update to recreate it for ${PYTHON_VERSION}"
+            fi
+        fi
     fi
 
     # shellcheck disable=SC1091
@@ -197,12 +216,11 @@ Location:
   ${UA_DIR}
 
 Run:
-  cd ${UA_DIR}
+  cd -- "${UA_DIR}"
   ./run-ua.sh "/path/to/content" --trackers yourtracker
 
 Optional next steps:
-  - Configure UA with: python config-generator.py
+  - Configure UA with: ${UA_DIR}/.venv/bin/python ${UA_DIR}/config-generator.py
   - Enable Discord later with:
-      source .venv/bin/activate
-      pip install -r requirements-discord.txt
+      ${UA_DIR}/.venv/bin/python -m pip install -r ${UA_DIR}/requirements-discord.txt
 EOF
