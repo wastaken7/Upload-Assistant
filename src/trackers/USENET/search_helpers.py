@@ -1,9 +1,16 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
+import json
+import time
+from pathlib import Path
 from typing import Any
 
 from defusedxml import ElementTree
 
 from src.meta import Meta
+
+API_HIT_WINDOW_SECONDS = 24 * 60 * 60
+API_HIT_COUNTER_FILENAME = "usenet_api_hit_counters.json"
 
 
 def get_newznab_search_category_id(meta: Meta) -> str:
@@ -101,3 +108,53 @@ def parse_newznab_dupes(
         })
 
     return dupes
+
+
+def get_daily_api_hit_limit(tracker_cfg: dict[str, Any]) -> int:
+    try:
+        limit = int(tracker_cfg.get("daily_api_hit_limit", 0))
+    except (TypeError, ValueError):
+        return 0
+    return max(limit, 0)
+
+
+def _get_api_hit_counter_path(base_dir: str) -> Path:
+    return Path(base_dir) / "tmp" / API_HIT_COUNTER_FILENAME
+
+
+def _reserve_daily_api_hit_sync(base_dir: str, tracker: str, limit: int) -> tuple[bool, int]:
+    cache_path = _get_api_hit_counter_path(base_dir)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+    raw_cache: dict[str, Any] = {}
+    if cache_path.exists():
+        try:
+            raw_cache = json.loads(cache_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            raw_cache = {}
+
+    now = time.time()
+    cutoff = now - API_HIT_WINDOW_SECONDS
+    tracker_hits = raw_cache.get(tracker, [])
+    if not isinstance(tracker_hits, list):
+        tracker_hits = []
+
+    recent_hits: list[float] = []
+    for hit in tracker_hits:
+        if isinstance(hit, (int, float)):
+            hit_value = float(hit)
+            if hit_value >= cutoff:
+                recent_hits.append(hit_value)
+    if len(recent_hits) >= limit:
+        raw_cache[tracker] = recent_hits
+        cache_path.write_text(json.dumps(raw_cache, indent=2, sort_keys=True), encoding="utf-8")
+        return False, len(recent_hits)
+
+    recent_hits.append(now)
+    raw_cache[tracker] = recent_hits
+    cache_path.write_text(json.dumps(raw_cache, indent=2, sort_keys=True), encoding="utf-8")
+    return True, len(recent_hits)
+
+
+async def reserve_daily_api_hit(base_dir: str, tracker: str, limit: int) -> tuple[bool, int]:
+    return await asyncio.to_thread(_reserve_daily_api_hit_sync, base_dir, tracker, limit)

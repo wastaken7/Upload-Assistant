@@ -18,7 +18,13 @@ from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
-from src.trackers.USENET.search_helpers import build_newznab_search_query, get_newznab_search_category_id, parse_newznab_dupes
+from src.trackers.USENET.search_helpers import (
+    build_newznab_search_query,
+    get_daily_api_hit_limit,
+    get_newznab_search_category_id,
+    parse_newznab_dupes,
+    reserve_daily_api_hit,
+)
 
 Config = dict[str, Any]
 
@@ -43,6 +49,7 @@ class Suio:
         self.common = Common(config)
         self.tracker_cfg = config.get("TRACKERS", {}).get(self.tracker, {})
         self.api_key = str(self.tracker_cfg.get("api_key", "")).strip()
+        self.daily_api_hit_limit = get_daily_api_hit_limit(self.tracker_cfg)
         base_url = str(self.tracker_cfg.get("base_url", "")).strip().rstrip("/")
         if base_url:
             # Verify the domain matches the expected indexer domain hash to prevent credentials leak
@@ -92,8 +99,11 @@ class Suio:
 
         if not self.search_url:
             return []
-        if not bool(self.tracker_cfg.get("search_api", False)):
-            logger.info(f"{self.tracker}: [yellow]Duplicate search via API is disabled in config.[/yellow]")
+        if not self.api_key:
+            logger.info(f"{self.tracker}: [yellow]Duplicate search skipped due to missing API key.[/yellow]")
+            return []
+        if self.daily_api_hit_limit <= 0:
+            logger.info(f"{self.tracker}: [yellow]Duplicate search via API is disabled because daily_api_hit_limit is 0.[/yellow]")
             return []
 
         params_list: list[dict[str, str]] = []
@@ -138,6 +148,13 @@ class Suio:
             seen_keys: set[str] = set()
             async with httpx.AsyncClient(timeout=10.0) as client:
                 for query_params in params_list:
+                    allowed, used_hits = await reserve_daily_api_hit(meta.base_dir, self.tracker, self.daily_api_hit_limit)
+                    if not allowed:
+                        logger.info(
+                            f"{self.tracker}: [yellow]Duplicate search stopped because the 24-hour API hit limit "
+                            f"({self.daily_api_hit_limit}) has been reached.[/yellow]"
+                        )
+                        break
                     request_params = {
                         "apikey": self.api_key,
                         "limit": "100",
@@ -146,6 +163,9 @@ class Suio:
                         **query_params,
                     }
                     response = await client.get(self.search_url, params=request_params)
+                    logger.debug(
+                        f"{self.tracker}: Duplicate search used API hit {used_hits}/{self.daily_api_hit_limit} in the last 24 hours."
+                    )
 
                     if response.status_code != 200 or not response.text.strip():
                         logger.info(f"{self.tracker}: [yellow]Duplicate search failed with HTTP {response.status_code}.[/yellow]")

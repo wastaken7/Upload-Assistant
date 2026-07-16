@@ -899,9 +899,9 @@ config: dict[str, Any] = {
             "link_dir_name": "",
             # Provide the DRUNKENSLUG API key here, can be found at https://drunkenslug.com/profile
             "api_key": "",
-            # Enable duplicate search using the API.
-            # Default False because DrunkenSlug has a limited daily API hit quota.
-            "search_api": False,
+            # Maximum number of API hits the script may make within 24 hours for duplicate search.
+            # Set to 0 to disable duplicate search via API.
+            "daily_api_hit_limit": 0,
             "inject_delay": 0,
         },
         "DESITORRENTS": {
@@ -1710,9 +1710,9 @@ config: dict[str, Any] = {
             "username": "",
             # Your API Key
             "api_key": "",
-            # Enable duplicate search using the API.
-            # Default False because this indexer has a limited daily API hit quota.
-            "search_api": False,
+            # Maximum number of API hits the script may make within 24 hours for duplicate search.
+            # Set to 0 to disable duplicate search via API.
+            "daily_api_hit_limit": 0,
             "anon": True,
             # If False, the indexer will decide (uses ID "0").
             # If True, the script will resolve the audio language ID:
