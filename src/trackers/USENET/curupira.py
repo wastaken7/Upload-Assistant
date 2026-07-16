@@ -98,11 +98,11 @@ class Curupira:
 
         params_list.append(params)
 
-        try:
-            dupes: list[dict[str, Any]] = []
-            seen_keys: set[str] = set()
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                for query_params in params_list:
+        dupes: list[dict[str, Any]] = []
+        seen_keys: set[str] = set()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            for query_params in params_list:
+                try:
                     request_params = {
                         "apikey": str(self.api_key),
                         "limit": "100",
@@ -120,16 +120,14 @@ class Curupira:
                             continue
                         seen_keys.add(key)
                         dupes.append(dupe)
+                except ElementTree.ParseError:
+                    logger.info(f"{self.tracker}: [yellow]Failed to parse duplicate search response.[/yellow]")
+                except httpx.TimeoutException:
+                    logger.info(f"{self.tracker}: [yellow]Duplicate search timed out.[/yellow]")
+                except httpx.RequestError as e:
+                    logger.info(f"{self.tracker}: [yellow]Duplicate search request failed: {e}[/yellow]")
 
-            return dupes
-        except ElementTree.ParseError:
-            logger.info(f"{self.tracker}: [yellow]Failed to parse duplicate search response.[/yellow]")
-        except httpx.TimeoutException:
-            logger.info(f"{self.tracker}: [yellow]Duplicate search timed out.[/yellow]")
-        except httpx.RequestError as e:
-            logger.info(f"{self.tracker}: [yellow]Duplicate search request failed: {e}[/yellow]")
-
-        return []
+        return dupes
 
     async def get_additional_checks(self, _meta: Meta) -> bool:
         return True

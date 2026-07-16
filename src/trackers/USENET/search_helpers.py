@@ -1,6 +1,7 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any
-from xml.etree import ElementTree
+
+from defusedxml import ElementTree
 
 from src.meta import Meta
 
@@ -36,7 +37,11 @@ def get_newznab_search_category_id(meta: Meta) -> str:
 
 def build_newznab_search_query(meta: Meta) -> str:
     title = str(meta.title or meta.original_title or "").strip()
-    year = int(meta.year or meta.search_year or 0)
+    raw_year = meta.year or meta.search_year or 0
+    try:
+        year = int(raw_year)
+    except (TypeError, ValueError):
+        year = 0
 
     if meta.category.upper() == "TV":
         if title and meta.season_int > 0 and meta.episode_int > 0:
@@ -84,6 +89,7 @@ def parse_newznab_dupes(
             elif use_guid_attr_as_id and attr_name == "guid" and attr_value and not guid:
                 guid = attr_value
 
+        item_link = str(item.findtext("link") or item_link)
         if item_link and not item_link.startswith(("http://", "https://")) and guid and torrent_url:
             item_link = f"{torrent_url}{guid}"
 
