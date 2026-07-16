@@ -367,6 +367,108 @@ const SpinnerIcon = () => (
   </svg>
 );
 
+const metadataProviderStyles = {
+  tmdb: {
+    light: 'border-[#06B4E2] bg-transparent text-[#067A98]',
+    dark: 'border-[#06B4E2]/70 bg-transparent text-[#B9F3FF]'
+  },
+  imdb: {
+    light: 'border-[#F5C518] bg-transparent text-[#6F5700]',
+    dark: 'border-[#F5C518]/70 bg-transparent text-[#FFF3B5]'
+  },
+  tvdb: {
+    light: 'border-[#6CD591] bg-transparent text-[#2F7D49]',
+    dark: 'border-[#6CD591]/70 bg-transparent text-[#D9F9E4]'
+  },
+  tvmaze: {
+    light: 'border-[#6EC4BA] bg-transparent text-[#2E7B73]',
+    dark: 'border-[#6EC4BA]/70 bg-transparent text-[#D4F4EF]'
+  },
+  mal: {
+    light: 'border-[#2E51A1] bg-transparent text-[#2E51A1]',
+    dark: 'border-[#2E51A1]/75 bg-transparent text-[#C9D6F4]'
+  },
+  douban: {
+    light: 'border-[#007610] bg-transparent text-[#007610]',
+    dark: 'border-[#007610]/75 bg-transparent text-[#B9F2C2]'
+  },
+  igdb: {
+    light: 'border-[#9147FF] bg-transparent text-[#9147FF]',
+    dark: 'border-[#9147FF]/75 bg-transparent text-[#E2D2FF]'
+  },
+  steam: {
+    light: 'border-slate-300 bg-transparent text-slate-900',
+    dark: 'border-slate-700 bg-transparent text-slate-100'
+  },
+  google_books: {
+    light: 'border-green-300 bg-transparent text-green-900',
+    dark: 'border-green-900/80 bg-transparent text-green-100'
+  },
+  openlibrary: {
+    light: 'border-orange-300 bg-transparent text-orange-900',
+    dark: 'border-orange-900/80 bg-transparent text-orange-100'
+  },
+  default: {
+    light: 'border-gray-300 bg-transparent text-gray-900',
+    dark: 'border-gray-700 bg-transparent text-gray-100'
+  }
+};
+
+const getMetadataProviderStyle = (key, isDarkMode) => {
+  const providerStyle = metadataProviderStyles[key] || metadataProviderStyles.default;
+  return isDarkMode ? providerStyle.dark : providerStyle.light;
+};
+
+const metadataProviderIcons = {
+  tmdb: { src: '/static/img/providers/tmdb.svg', alt: 'TMDb' },
+  imdb: { src: '/static/img/providers/imdb.svg', alt: 'IMDb' },
+  tvdb: { src: '/static/img/providers/tvdb.svg', alt: 'TVDb' },
+  mal: { src: '/static/img/providers/mal.svg', alt: 'MyAnimeList' },
+  igdb: {
+    src: '/static/img/providers/igdb.svg',
+    lightSrc: '/static/img/providers/igdb_light.svg',
+    alt: 'IGDB'
+  },
+  douban: { src: '/static/img/providers/douban.svg', alt: 'Douban' },
+  google_books: { src: '/static/img/providers/google_books.svg', alt: 'Google Books' },
+  openlibrary: { src: '/static/img/providers/openlibrary.svg', alt: 'Open Library' },
+  steam: { src: '/static/img/providers/steam.svg', alt: 'Steam' },
+  tvmaze: { src: '/static/img/providers/tvmaze.svg', alt: 'TVMaze' }
+};
+
+const renderMetadataProviderIcon = (key, isDarkMode) => {
+  const iconAsset = metadataProviderIcons[key];
+  if (iconAsset) {
+    const iconSrc = !isDarkMode && iconAsset.lightSrc ? iconAsset.lightSrc : iconAsset.src;
+    return (
+      <img
+        src={iconSrc}
+        alt={iconAsset.alt}
+        className="block h-3.5 w-auto max-w-[3.75rem] object-contain"
+      />
+    );
+  }
+
+  switch (key) {
+    case 'google_books':
+      return (
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 6.25A2.25 2.25 0 017.25 4h10.5A1.25 1.25 0 0119 5.25v13.5A1.25 1.25 0 0117.75 20H7.25A2.25 2.25 0 015 17.75V6.25z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7.5 6H18M8 9.5h6.5M8 13h7.5" />
+        </svg>
+      );
+    case 'openlibrary':
+      return (
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4.5 6.5A2.5 2.5 0 017 4h11.5v15.5H7a2.5 2.5 0 010-5h11.5" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.5 8.5h6M8.5 12h6" />
+        </svg>
+      );
+    default:
+      return <span className="text-[11px] font-black tracking-wide">{String(key || 'META').slice(0, 4).toUpperCase()}</span>;
+  }
+};
+
 function AudionutsUAGUI() {
   const API_BASE = window.location.origin + '/api';
   // Derive an application base path from the API base so links work under subpath deployments
@@ -392,6 +494,7 @@ function AudionutsUAGUI() {
   const [isDarkMode, setIsDarkMode] = useState(getStoredTheme);
   const [argSearchFilter, setArgSearchFilter] = useState('');
   const [collapsedSections, setCollapsedSections] = useState(new Set());
+  const [executionPreview, setExecutionPreview] = useState(null);
 
   // Mobile state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -574,6 +677,38 @@ function AudionutsUAGUI() {
       setDescLinkError('');
     }
   }, [hasDescFile, hasDescLink]);
+
+  useEffect(() => {
+    if (!isExecuting || !sessionId) {
+      setExecutionPreview(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const loadExecutionPreview = async () => {
+      try {
+        const response = await apiFetch(`${API_BASE}/execution_preview?session_id=${encodeURIComponent(sessionId)}`);
+        if (!response.ok) {
+          return;
+        }
+        const data = await response.json();
+        if (!cancelled && data && data.success && data.media) {
+          setExecutionPreview(data.media);
+        }
+      } catch (_error) {
+        // Ignore preview polling failures while execution continues.
+      }
+    };
+
+    loadExecutionPreview();
+    const intervalId = window.setInterval(loadExecutionPreview, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [API_BASE, isExecuting, sessionId]);
 
   // Update descfile in args
   const updateDescFile = (path) => {
@@ -1345,6 +1480,238 @@ function AudionutsUAGUI() {
 
   const filteredCategories = getFilteredCategories();
 
+  const renderExecutionPreviewPanel = (compact = false) => {
+    const media = executionPreview;
+    const category = media?.category || '';
+    const previewTitle = media?.title || media?.name || media?.filename || 'Detecting media metadata...';
+    const subtitleParts = [media?.original_title, media?.year].filter(Boolean);
+    const infoBadges = [
+      media?.category,
+      media?.media_type,
+      media?.source,
+      media?.resolution
+    ].filter(Boolean);
+    const metadataSources = Array.isArray(media?.metadata_sources) ? media.metadata_sources.filter((source) => source && source.value) : [];
+    const previewProviders = metadataSources.length > 0
+      ? metadataSources
+      : [
+          media?.tmdb ? { key: 'tmdb', label: 'TMDb', value: String(media.tmdb) } : null,
+          media?.imdb ? { key: 'imdb', label: 'IMDb', value: String(media.imdb).startsWith('tt') ? String(media.imdb) : `tt${media.imdb}` } : null
+        ].filter(Boolean);
+    const genres = Array.isArray(media?.genres) ? media.genres.filter(Boolean).slice(0, 4) : [];
+    const networks = Array.isArray(media?.networks) ? media.networks.filter(Boolean).slice(0, 3) : [];
+    const panelPadding = compact ? 'p-3' : 'p-4';
+    const titleSize = compact ? 'text-base' : 'text-lg';
+    const posterHeight = compact ? 'h-64' : 'h-80';
+    const episodeLabel = media?.episode_title || media?.episode_name || [media?.season, media?.episode].filter(Boolean).join(' ');
+    const overviewText = category === 'TV'
+      ? (media?.episode_overview || media?.overview)
+      : media?.overview;
+
+    const detailRows = (rows) => rows.filter((row) => row.value);
+    const renderDetailGrid = (title, rows) => {
+      const visibleRows = detailRows(rows);
+      if (visibleRows.length === 0) return null;
+
+      return (
+        <div className={`rounded-xl p-3 ${isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-gray-50 border border-gray-200'}`}>
+          <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            {title}
+          </p>
+          <div className="grid grid-cols-1 gap-2">
+            {visibleRows.map((row) => (
+              <div key={row.label} className="flex items-start justify-between gap-3">
+                <span className={`text-xs font-semibold ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {row.label}
+                </span>
+                <span className={`text-xs text-right ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                  {row.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    const tvRows = detailRows([
+      { label: 'Episode', value: episodeLabel },
+      { label: 'Format', value: media?.tv_pack ? 'Season Pack' : 'Single Episode' },
+      { label: 'Service', value: media?.service },
+      { label: 'Network', value: networks.join(', ') },
+      { label: 'Audio', value: media?.audio }
+    ]);
+    const movieRows = detailRows([
+      { label: 'Audio', value: media?.audio },
+      { label: 'Service', value: media?.service },
+      { label: 'Network', value: networks.join(', ') }
+    ]);
+    const bookRows = detailRows([
+      { label: 'Author', value: media?.author },
+      { label: 'Narrator', value: media?.narrator },
+      { label: 'Language', value: media?.book_language },
+      { label: 'Publisher', value: media?.publisher },
+      { label: 'Duration', value: media?.audiobook_duration },
+      { label: 'Bitrate', value: media?.audiobook_bitrate },
+      { label: 'Series', value: media?.book_series ? [media.book_series, media?.book_series_index ? `#${media.book_series_index}` : ''].filter(Boolean).join(' ') : '' },
+      { label: 'Format', value: media?.audiobook ? 'Audiobook' : 'Book' }
+    ]);
+    const gameRows = detailRows([
+      { label: 'Platform', value: media?.platform },
+      { label: 'Version', value: media?.game_version },
+      { label: 'Release Type', value: media?.game_subcategory },
+      { label: 'Developer', value: media?.developer },
+      { label: 'Publisher', value: media?.publisher },
+      { label: 'Region', value: media?.game_region },
+      { label: 'System', value: media?.game_system }
+    ]);
+    let categorySection = null;
+    if (category === 'TV') categorySection = renderDetailGrid('TV Details', tvRows);
+    else if (category === 'BOOK') categorySection = renderDetailGrid('Book Details', bookRows);
+    else if (category === 'GAME') categorySection = renderDetailGrid('Game Details', gameRows);
+    else categorySection = renderDetailGrid('Movie Details', movieRows);
+
+    return (
+      <div className="flex flex-col h-full">
+        <div className={`${panelPadding} border-b flex-shrink-0 ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gradient-to-l from-amber-50 to-orange-50'}`}>
+          <h2 className={`${titleSize} font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
+            <UploadIcon />
+            Now Processing
+          </h2>
+          <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            The sidebar is showing live media metadata while the upload runs.
+          </p>
+        </div>
+
+        <div className={`flex-1 overflow-y-auto ${panelPadding} space-y-4`}>
+          <div className={`rounded-2xl overflow-hidden border ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-white'} shadow-sm`}>
+            {media?.poster_url ? (
+              <div className={`w-full ${posterHeight} flex items-center justify-center p-3 ${isDarkMode ? 'bg-gray-950' : 'bg-stone-100'}`}>
+                <img
+                  src={media.poster_url}
+                  alt={previewTitle}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+            ) : (
+              <div className={`w-full ${posterHeight} flex flex-col items-center justify-center gap-2 ${isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+                <UploadIcon />
+                <span className="text-sm">Poster not available yet</span>
+              </div>
+            )}
+
+            <div className={`${panelPadding} space-y-3`}>
+              <div>
+                <h3 className={`${titleSize} font-bold leading-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {previewTitle}
+                </h3>
+                {subtitleParts.length > 0 && (
+                  <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {subtitleParts.join(' • ')}
+                  </p>
+                )}
+              </div>
+
+              {infoBadges.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {infoBadges.map((badge) => (
+                    <span
+                      key={badge}
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold ${isDarkMode ? 'bg-gray-800 text-gray-200 border border-gray-700' : 'bg-orange-50 text-orange-700 border border-orange-200'}`}
+                    >
+                      {badge}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {previewProviders.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {previewProviders.map((source) => {
+                    const providerClass = getMetadataProviderStyle(source.key, isDarkMode);
+                    const content = (
+                      <>
+                        <span className="inline-flex items-center justify-center min-w-[2.6rem] px-2 h-6 rounded-full">
+                          {renderMetadataProviderIcon(source.key, isDarkMode)}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-[11px] font-semibold font-mono truncate">
+                            {source.value}
+                          </span>
+                        </span>
+                      </>
+                    );
+                    const sharedClassName = `inline-flex items-center gap-1.5 max-w-full rounded-full border px-2.5 py-1 transition-colors ${providerClass}`;
+
+                    if (source.url) {
+                      return (
+                        <a
+                          key={`${source.key}-${source.value}`}
+                          href={source.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`${sharedClassName} hover:brightness-105`}
+                          title={`${source.label || source.key}: ${source.value}`}
+                        >
+                          {content}
+                        </a>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={`${source.key}-${source.value}`}
+                        className={sharedClassName}
+                        title={`${source.label || source.key}: ${source.value}`}
+                      >
+                        {content}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {genres.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {genres.map((genre) => (
+                    <span
+                      key={genre}
+                      className={`px-2 py-1 rounded-md text-xs ${isDarkMode ? 'bg-purple-900/40 text-purple-200 border border-purple-800' : 'bg-purple-50 text-purple-700 border border-purple-200'}`}
+                    >
+                      {genre}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {categorySection}
+
+              <div className={`rounded-xl p-3 ${isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-gray-50 border border-gray-200'}`}>
+                <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {category === 'TV' && media?.episode_overview ? 'Episode Overview' : 'Overview'}
+                </p>
+                <p className={`text-sm leading-6 ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                  {overviewText || (media?.status === 'waiting' ? 'Metadata will appear here as soon as Upload-Assistant writes the first meta snapshot.' : 'No overview available for this item.')}
+                </p>
+              </div>
+
+              <div className={`rounded-xl p-3 ${isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-gray-50 border border-gray-200'}`}>
+                <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Source Path
+                </p>
+                <p className={`text-xs break-all font-mono ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {media?.path || selectedPath}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const isAwaitingTerminalInput = Boolean(isExecuting && executionPreview?.awaiting_input);
+
   // Mobile Layout
   if (isMobile) {
     const navButton = (panel, icon, label) => (
@@ -1550,7 +1917,7 @@ function AudionutsUAGUI() {
                   type="text"
                   value={customArgs}
                   onChange={(e) => setCustomArgs(e.target.value)}
-                  placeholder="--tmdb movie/12345 --trackers ptp,aither"
+                  placeholder="--tmdb movie/12345 --trackers passthepopcorn,aither"
                   className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                     isDarkMode
                       ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
@@ -1632,19 +1999,19 @@ function AudionutsUAGUI() {
                   className={`flex-1 rounded-lg overflow-auto p-2 border text-sm ${isDarkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
                 ></div>
                 {isExecuting && (
-                  <div className="mt-2 flex gap-2">
+                  <div className={`mt-2 flex gap-2 ${isAwaitingTerminalInput ? 'animate-pulse' : ''}`}>
                     <input
                       ref={inputRef}
                       value={userInput}
                       onChange={(e) => setUserInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendInput(sessionId, userInput); } }}
                       placeholder="Type input and press Enter"
-                      className={`flex-1 px-3 py-2 text-sm rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                      className={`flex-1 px-3 py-2 text-sm rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'} ${isAwaitingTerminalInput ? (isDarkMode ? 'border-amber-400 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]' : 'border-amber-500 shadow-[0_0_0_2px_rgba(245,158,11,0.18)]') : (isDarkMode ? 'border-gray-600' : 'border-gray-300')}`}
                     />
                     <button
                       onClick={() => sendInput(sessionId, userInput)}
                       disabled={!sessionId || !userInput}
-                      className="px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 text-sm"
+                      className={`px-3 py-2 rounded-lg text-white disabled:opacity-50 text-sm ${isAwaitingTerminalInput ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}
                     >
                       Send
                     </button>
@@ -1655,6 +2022,7 @@ function AudionutsUAGUI() {
 
           {/* Args Panel */}
           {activePanel === 'args' && (
+            isExecuting ? renderExecutionPreviewPanel(true) : (
             <div className="flex flex-col h-full">
               <div className={`p-3 border-b flex-shrink-0 ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gradient-to-l from-purple-50 to-blue-50'}`}>
                 <h2 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
@@ -1781,6 +2149,7 @@ function AudionutsUAGUI() {
                 )}
               </div>
             </div>
+            )
           )}
         </div>
 
@@ -1788,7 +2157,7 @@ function AudionutsUAGUI() {
         <div className={`flex border-t flex-shrink-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
           {navButton('files', <FolderIcon />, 'Files')}
           {navButton('main', <UploadIcon />, 'Upload')}
-          {navButton('args', <TerminalIcon />, 'Arguments')}
+          {navButton('args', isExecuting ? <UploadIcon /> : <TerminalIcon />, isExecuting ? 'Processing' : 'Arguments')}
         </div>
       </div>
     );
@@ -2013,7 +2382,7 @@ function AudionutsUAGUI() {
                 type="text"
                 value={customArgs}
                 onChange={(e) => setCustomArgs(e.target.value)}
-                placeholder="--tmdb movie/12345 --trackers ptp,aither,ulcx --no-edition --no-tag"
+                placeholder="--tmdb movie/12345 --trackers passthepopcorn,aither,ulcx --no-edition --no-tag"
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                   isDarkMode
                     ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
@@ -2142,19 +2511,19 @@ function AudionutsUAGUI() {
               className={`flex-1 rounded-lg overflow-auto p-3 border ${isDarkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
             ></div>
             {isExecuting && (
-              <div className="mt-2 flex gap-2">
+              <div className={`mt-2 flex gap-2 ${isAwaitingTerminalInput ? 'animate-pulse' : ''}`}>
                 <input
                   ref={inputRef}
                   value={userInput}
                   onChange={(e) => setUserInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendInput(sessionId, userInput); } }}
                   placeholder="Type input and press Enter"
-                  className={`flex-1 px-3 py-2 rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                  className={`flex-1 px-3 py-2 rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'} ${isAwaitingTerminalInput ? (isDarkMode ? 'border-amber-400 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]' : 'border-amber-500 shadow-[0_0_0_2px_rgba(245,158,11,0.18)]') : (isDarkMode ? 'border-gray-600' : 'border-gray-300')}`}
                 />
                 <button
                   onClick={() => sendInput(sessionId, userInput)}
                   disabled={!sessionId || !userInput}
-                  className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                  className={`px-4 py-2 rounded-lg text-white disabled:opacity-50 ${isAwaitingTerminalInput ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}
                 >
                   Send
                 </button>
@@ -2170,11 +2539,13 @@ function AudionutsUAGUI() {
         style={{ userSelect: 'none' }}
       />
 
-      {/* Right Sidebar - Arguments */}
+      {/* Right Sidebar - Arguments / Execution Preview */}
       <div
         className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-l flex flex-col`}
         style={{ width: `${rightSidebarWidth}px`, minWidth: '200px', maxWidth: '800px' }}
       >
+        {isExecuting ? renderExecutionPreviewPanel() : (
+        <>
         <div className={`p-4 border-b ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gradient-to-l from-purple-50 to-blue-50'}`}>
           <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
             <TerminalIcon />
@@ -2307,6 +2678,8 @@ function AudionutsUAGUI() {
             ))
           )}
         </div>
+        </>
+        )}
       </div>
     </div>
   );
