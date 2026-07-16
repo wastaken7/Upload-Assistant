@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree
 
 import aiofiles
 import httpx
@@ -9,6 +10,7 @@ import httpx
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.USENET.search_helpers import build_newznab_search_query, get_newznab_search_category_id, parse_newznab_dupes
 
 Config = dict[str, Any]
 
@@ -22,6 +24,7 @@ class DrunkenSlug:
     tracker = "DRUNKENSLUG"
     display_name = "DrunkenSlug"
     banned_groups = ()
+    search_url = "https://drunkenslug.com/api"
     torrent_url = "https://drunkenslug.com/search/"
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")
     is_usenet = True
@@ -39,11 +42,84 @@ class DrunkenSlug:
             logger.info(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
             return [release_name]
 
-        logger.info(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
+        if not self.api_key:
+            logger.info(f"{self.tracker}: [yellow]Duplicate search skipped due to missing API key.[/yellow]")
+            return []
+        if not bool(self.config.get("TRACKERS", {}).get(self.tracker, {}).get("search_api", False)):
+            logger.info(f"{self.tracker}: [yellow]Duplicate search via API is disabled in config.[/yellow]")
+            return []
+
+        params: dict[str, str] = {
+            "cat": get_newznab_search_category_id(meta),
+        }
+        category = meta.category.upper()
+        if category == "TV":
+            params["t"] = "tvsearch"
+            if meta.tvdb_id and str(meta.tvdb_id).isdigit() and int(meta.tvdb_id) > 0:
+                params["tvdbid"] = str(meta.tvdb_id)
+            elif meta.tmdb_id and str(meta.tmdb_id).isdigit() and int(meta.tmdb_id) > 0:
+                params["tmdbid"] = str(meta.tmdb_id)
+            elif meta.imdb_id and int(meta.imdb_id) > 0:
+                params["imdbid"] = str(meta.imdb_id)
+            else:
+                params["q"] = self.get_search_query(meta)
+
+            if meta.season_int > 0:
+                params["season"] = str(meta.season_int)
+            if meta.episode_int > 0:
+                params["ep"] = str(meta.episode_int)
+        elif category == "MOVIE":
+            params["t"] = "movie"
+            if meta.imdb_id and int(meta.imdb_id) > 0:
+                params["imdbid"] = str(meta.imdb_id)
+            elif meta.tmdb_id and str(meta.tmdb_id).isdigit() and int(meta.tmdb_id) > 0:
+                params["tmdbid"] = str(meta.tmdb_id)
+            else:
+                params["q"] = self.get_search_query(meta)
+        else:
+            params["t"] = "search"
+            params["q"] = self.get_search_query(meta)
+
+        try:
+            dupes: list[dict[str, Any]] = []
+            seen_keys: set[str] = set()
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                request_params = {
+                    "apikey": self.api_key,
+                    "limit": "100",
+                    "extended": "1",
+                    **params,
+                }
+                response = await client.get(self.search_url, params=request_params)
+                if response.status_code != 200 or not response.text.strip():
+                    logger.info(f"{self.tracker}: [yellow]Duplicate search failed with HTTP {response.status_code}.[/yellow]")
+                    return []
+
+                for dupe in self._parse_dupes_from_response(response.text):
+                    key = str(dupe.get("link") or dupe.get("name") or "")
+                    if key in seen_keys:
+                        continue
+                    seen_keys.add(key)
+                    dupes.append(dupe)
+
+            return dupes
+        except ElementTree.ParseError:
+            logger.info(f"{self.tracker}: [yellow]Failed to parse duplicate search response.[/yellow]")
+        except httpx.TimeoutException:
+            logger.info(f"{self.tracker}: [yellow]Duplicate search timed out.[/yellow]")
+        except httpx.RequestError as e:
+            logger.info(f"{self.tracker}: [yellow]Duplicate search request failed: {e}[/yellow]")
+
         return []
 
     async def get_name(self, meta: Meta) -> str:
         return meta.scene_name or meta.basename_no_ext
+
+    def get_search_query(self, meta: Meta) -> str:
+        return build_newznab_search_query(meta)
+
+    def _parse_dupes_from_response(self, response_text: str) -> list[dict[str, Any]]:
+        return parse_newznab_dupes(response_text)
 
     async def upload(self, meta: Meta) -> bool:
         status_map = meta.tracker_status
