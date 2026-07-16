@@ -14,6 +14,7 @@ import langcodes
 import pycountry
 from bs4 import BeautifulSoup, Tag
 from langcodes.tag_parser import LanguageTagError
+from unidecode import unidecode
 
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
@@ -1214,6 +1215,35 @@ class BJShare:
 
         return " / ".join(ordered_tags)
 
+    def _normalize_credit_name(self, name: str) -> str:
+        normalized = re.sub(r"\s+", " ", unidecode(name).strip())
+        normalized = re.sub(r"[^A-Za-z0-9 .'\-]", "", normalized)
+        return re.sub(r"\s+", " ", normalized).strip()
+
+    def _collect_credit_names(self, raw_names: list[Any], limit: int) -> list[str]:
+        normalized_names: list[str] = []
+        seen: set[str] = set()
+
+        for raw_name in raw_names:
+            if not isinstance(raw_name, str):
+                continue
+
+            normalized_name = self._normalize_credit_name(raw_name)
+            if not normalized_name:
+                continue
+
+            dedupe_key = normalized_name.casefold()
+            if dedupe_key in seen:
+                continue
+
+            seen.add(dedupe_key)
+            normalized_names.append(normalized_name)
+
+            if len(normalized_names) >= limit:
+                break
+
+        return normalized_names
+
     async def get_credits(self, meta: Meta, role: str) -> str:
         if BJShare.already_has_the_info:
             return "N/A"
@@ -1241,7 +1271,7 @@ class BJShare:
         names = imdb_names + tmdb_names
 
         limit = 1 if role in ("director", "creator") else 5
-        unique_names = list(dict.fromkeys(names))[:limit]
+        unique_names = self._collect_credit_names(names, limit)
 
         if unique_names:
             return ", ".join(unique_names)
@@ -1253,9 +1283,10 @@ class BJShare:
         user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f"{prompt_message}")
         user_input = (user_input_raw or "").strip()
         if user_input:
-            if role in ("director", "creator"):
-                return user_input.split(",")[0].strip()
-            return user_input
+            entered_names = [name.strip() for name in user_input.split(",")]
+            normalized_input = self._collect_credit_names(entered_names, limit)
+            if normalized_input:
+                return ", ".join(normalized_input)
 
         return "skipped"
 
@@ -1501,16 +1532,15 @@ class BJShare:
                 if category == "TV":
                     # Convert country code to name
                     country_list = [country.name for code in self.main_tmdb_data.get("origin_country", []) if (country := pycountry.countries.get(alpha_2=code))]
-                    data.update(
-                        {
-                            "network": ", ".join([p.get("name", "") for p in self.main_tmdb_data.get("networks", [])]) or "",  # Optional
-                            "numtemporadas": self.main_tmdb_data.get("number_of_seasons", ""),  # Optional
-                            "datalancamento": self.get_release_date(),
-                            "pais": ", ".join(country_list),  # Optional
-                            "diretorserie": ", ".join(list(dict.fromkeys(meta.tmdb_directors or meta.imdb_info.get("directors", [])))[:1]),  # Optional
-                            "avaliacao": self.get_rating(),  # Optional
-                        }
-                    )
+                    series_directors = self._collect_credit_names(list(meta.tmdb_directors or meta.imdb_info.get("directors", [])), 1)
+                    data.update({
+                        "network": ", ".join([p.get("name", "") for p in self.main_tmdb_data.get("networks", [])]) or "",  # Optional
+                        "numtemporadas": self.main_tmdb_data.get("number_of_seasons", ""),  # Optional
+                        "datalancamento": self.get_release_date(),
+                        "pais": ", ".join(country_list),  # Optional
+                        "diretorserie": ", ".join(series_directors),  # Optional
+                        "avaliacao": self.get_rating(),  # Optional
+                    })
 
             # Anime-specific data
             if meta.anime:
