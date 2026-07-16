@@ -1383,16 +1383,23 @@ def _load_config_from_file(path: Path) -> dict[str, Any] | None:
             content = f.read()
         tree = ast.parse(content)
         for node in ast.walk(tree):
+            config_node: ast.expr | None = None
             if isinstance(node, ast.Assign):
                 for target in node.targets:
                     if isinstance(target, ast.Name) and target.id == "config":
-                        config_value = ast.literal_eval(node.value)
-                        if isinstance(config_value, dict):
-                            config_value_dict = cast(dict[Any, Any], config_value)
-                            result: dict[str, Any] = {}
-                            for key, value in config_value_dict.items():
-                                result[str(key)] = value
-                            return result
+                        config_node = node.value
+                        break
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "config":
+                config_node = node.value
+
+            if config_node is not None:
+                config_value = ast.literal_eval(config_node)
+                if isinstance(config_value, dict):
+                    config_value_dict = cast(dict[Any, Any], config_value)
+                    result: dict[str, Any] = {}
+                    for key, value in config_value_dict.items():
+                        result[str(key)] = value
+                    return result
         console.print(f"[yellow]Config file {path.name} does not contain a valid 'config' dict assignment.[/yellow]")
         return None
     except Exception as exc:
