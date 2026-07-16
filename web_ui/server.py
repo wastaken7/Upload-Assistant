@@ -1127,13 +1127,18 @@ def _stringify_optional_id(value: object) -> str:
 def _set_process_awaiting_input(session_id: str, waiting: bool) -> None:
     with active_processes_lock:
         process_info = active_processes.get(session_id)
-    if process_info is not None:
-        process_info["awaiting_input"] = waiting
+        if process_info is not None:
+            process_info["awaiting_input"] = waiting
 
 
 def _set_process_awaiting_input_if_current(session_id: str, process_state: Mapping[str, object], waiting: bool) -> None:
-    if _session_state_is_current(session_id, process_state):
-        _set_process_awaiting_input(session_id, waiting)
+    with active_processes_lock:
+        current_state = active_processes.get(session_id)
+        if current_state is not process_state:
+            return
+        run_token = process_state.get("run_token")
+        if run_token and current_state.get("run_token") == run_token:
+            current_state["awaiting_input"] = waiting
 
 
 def _make_process_state(path: str, args: str) -> dict[str, object]:
@@ -3918,6 +3923,7 @@ def execute_command():
                         validated_args = _validate_upload_assistant_args(parsed_args)
                     except ValueError as err:
                         console.print(f"Invalid execution arguments: {err}", markup=False)
+                        _discard_session_state(session_id, process_state)
                         yield f"data: {json.dumps({'type': 'error', 'data': 'Invalid execution arguments'})}\n\n"
                         return
                     command.extend(validated_args)
@@ -3978,12 +3984,14 @@ def execute_command():
 
                     if not acquired:
                         console.print(f"Failed to acquire inproc lock for session {session_id}; another inproc run may be active", markup=False)
+                        _discard_session_state(session_id, process_state)
                         yield f"data: {json.dumps({'type': 'error', 'data': 'Another in-process run is active'})}\n\n"
                         return
 
                     if not _session_state_is_current(session_id, process_state):
                         with contextlib.suppress(Exception):
                             inproc_lock.release()
+                        _discard_session_state(session_id, process_state)
                         yield f"data: {json.dumps({'type': 'error', 'data': 'Execution session was replaced'})}\n\n"
                         return
 
@@ -4021,19 +4029,19 @@ def execute_command():
                             with contextlib.suppress(Exception):
                                 wrapped_print(prompt)
                             # Wait for input while respecting cancellation
-                            _set_process_awaiting_input(session_id, True)
+                            _set_process_awaiting_input_if_current(session_id, process_state, True)
                             while True:
                                 if cancel_event.is_set():
-                                    _set_process_awaiting_input(session_id, False)
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     raise EOFError()
                                 try:
                                     result = input_queue.get(timeout=0.5)
-                                    _set_process_awaiting_input(session_id, False)
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     return result
                                 except queue.Empty:
                                     continue
                                 except Exception:
-                                    _set_process_awaiting_input(session_id, False)
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     raise
 
                         orig_console.input = cast(Any, wrapped_input)
@@ -4078,6 +4086,9 @@ def execute_command():
                                     _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     raise
                                 resp = (resp or "").strip().lower()
+                                if not resp:
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
+                                    return default
                                 if resp in ("y", "yes"):
                                     _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     return True
@@ -4103,19 +4114,19 @@ def execute_command():
                                 with contextlib.suppress(Exception):
                                     wrapped_print(prompt)
                                 # Wait for input or cancellation
-                                _set_process_awaiting_input(session_id, True)
+                                _set_process_awaiting_input_if_current(session_id, process_state, True)
                                 while True:
                                     if cancel_event.is_set():
-                                        _set_process_awaiting_input(session_id, False)
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
                                         raise EOFError()
                                     try:
                                         result = input_queue.get(timeout=0.5)
-                                        _set_process_awaiting_input(session_id, False)
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
                                         return result
                                     except queue.Empty:
                                         continue
                                     except Exception:
-                                        _set_process_awaiting_input(session_id, False)
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
                                         raise
 
                             _cli_ui.ask_string = wrapped_ask_string
@@ -4137,30 +4148,30 @@ def execute_command():
                                     wrapped_print(prompt)
                                     for index, choice_text in enumerate(rendered_choices, start=1):
                                         wrapped_print(f"{index}. {choice_text}")
-                                _set_process_awaiting_input(session_id, True)
+                                _set_process_awaiting_input_if_current(session_id, process_state, True)
                                 while True:
                                     if cancel_event.is_set():
-                                        _set_process_awaiting_input(session_id, False)
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
                                         raise EOFError()
                                     try:
                                         resp = (input_queue.get(timeout=0.5) or "").strip()
                                     except queue.Empty:
                                         continue
                                     except Exception:
-                                        _set_process_awaiting_input(session_id, False)
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
                                         raise
 
                                     if not rendered_choices:
-                                        _set_process_awaiting_input(session_id, False)
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
                                         return resp
                                     if resp.isdigit():
                                         selected_index = int(resp) - 1
                                         if 0 <= selected_index < len(rendered_choices):
-                                            _set_process_awaiting_input(session_id, False)
+                                            _set_process_awaiting_input_if_current(session_id, process_state, False)
                                             return rendered_choices[selected_index]
                                     for choice_text in rendered_choices:
                                         if resp.lower() == choice_text.lower():
-                                            _set_process_awaiting_input(session_id, False)
+                                            _set_process_awaiting_input_if_current(session_id, process_state, False)
                                             return choice_text
 
                             _cli_ui.ask_choice = wrapped_ask_choice
@@ -4415,6 +4426,7 @@ def execute_command():
                                 raise ValueError("Invalid characters in command argument")
                     except Exception as err:
                         console.print(f"Refusing to run unsafe command: {err}", markup=False)
+                        _discard_session_state(session_id, process_state)
                         yield f"data: {json.dumps({'type': 'error', 'data': 'Unsafe execution request'})}\n\n"
                         return
 
