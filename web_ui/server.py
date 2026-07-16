@@ -7,6 +7,7 @@ import importlib
 import hashlib
 import hmac
 import json
+import mimetypes
 import time
 import os
 import queue
@@ -137,6 +138,7 @@ jsonify: Callable[..., object] = flask.jsonify
 redirect: Callable[..., _ResponseLike] = flask.redirect
 render_template: Callable[..., object] = flask.render_template
 request: _RequestLike = flask.request
+send_file: Callable[..., object] = flask.send_file
 session: _SessionLike = flask.session
 url_for: Callable[..., str] = flask.url_for
 CORS: Callable[..., object] = flask_cors.CORS
@@ -401,7 +403,7 @@ def _json_load_list(text: str) -> list[Any]:
     loaded = json.loads(text)
     if isinstance(loaded, Sequence) and not isinstance(loaded, (str, bytes, bytearray)):
         loaded_seq: Sequence[Any] = cast(Sequence[Any], loaded)
-        return [item for item in loaded_seq]
+        return list(loaded_seq)
     return []
 
 
@@ -438,7 +440,7 @@ def _request_json_dict() -> dict[str, Any]:
             for key, value in data_dict.items():
                 result[str(key)] = value
             return result
-    except Exception:
+    except Exception:  # noqa: S110
         pass
     return {}
 
@@ -677,6 +679,7 @@ _BROWSE_SEARCH_SEP_RE = re.compile(r"[\s.\-_]+")
 
 # Lock to prevent concurrent in-process uploads (avoids cross-session interference)
 inproc_lock = threading.Lock()
+active_processes_lock = threading.Lock()
 
 # Runtime browse roots (set by upload.py when starting web UI)
 _runtime_browse_roots: str | None = None
@@ -1108,6 +1111,472 @@ def _debug_process_snapshot(session_id: str | None = None) -> dict[str, object]:
         return {"error": "failed to build snapshot"}
 
 
+def _stringify_preview_value(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    return str(value).strip()
+
+
+def _stringify_optional_id(value: object) -> str:
+    text = _stringify_preview_value(value)
+    return "" if text in {"", "0"} else text
+
+
+def _set_process_awaiting_input(session_id: str, waiting: bool) -> None:
+    with active_processes_lock:
+        process_info = active_processes.get(session_id)
+        if process_info is not None:
+            process_info["awaiting_input"] = waiting
+
+
+def _set_process_awaiting_input_if_current(session_id: str, process_state: Mapping[str, object], waiting: bool) -> None:
+    with active_processes_lock:
+        current_state = active_processes.get(session_id)
+        if current_state is not process_state:
+            return
+        run_token = process_state.get("run_token")
+        if run_token and current_state.get("run_token") == run_token:
+            current_state["awaiting_input"] = waiting
+
+
+def _make_process_state(path: str, args: str) -> dict[str, object]:
+    return {
+        "run_token": secrets.token_hex(8),
+        "mode": "starting",
+        "path": path,
+        "args": args,
+        "started_at": time.time(),
+        "awaiting_input": False,
+    }
+
+
+def _session_state_is_current(session_id: str, process_state: Mapping[str, object]) -> bool:
+    with active_processes_lock:
+        current_state = active_processes.get(session_id)
+        if current_state is not process_state:
+            return False
+        run_token = process_state.get("run_token")
+        return bool(run_token and current_state.get("run_token") == run_token)
+
+
+def _discard_session_state(session_id: str, process_state: Mapping[str, object]) -> None:
+    with active_processes_lock:
+        current_state = active_processes.get(session_id)
+        if current_state is not process_state:
+            return
+        run_token = process_state.get("run_token")
+        if run_token and current_state.get("run_token") == run_token:
+            active_processes.pop(session_id, None)
+
+
+def _string_list_preview_values(value: object) -> list[str]:
+    results: list[str] = []
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if cleaned:
+            results.append(cleaned)
+        return results
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        for item in value:
+            label = _stringify_preview_value(item.get("name")) if isinstance(item, Mapping) else _stringify_preview_value(item)
+            if label:
+                results.append(label)
+    return results
+
+
+def _book_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: str) -> str:
+    covers_value = meta_data.get("covers")
+    if isinstance(covers_value, Sequence) and not isinstance(covers_value, (str, bytes, bytearray)):
+        for item in covers_value:
+            if not isinstance(item, Mapping):
+                continue
+            for key in ("raw_url", "img_url", "web_url"):
+                candidate = _stringify_preview_value(item.get(key))
+                if candidate:
+                    return candidate
+
+    meta_uuid = _stringify_preview_value(meta_data.get("uuid"))
+    if not meta_uuid:
+        return ""
+
+    tmp_dir = Path(__file__).parent.parent / "tmp" / meta_uuid
+    for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg", "cover.jpg", "cover.png"):
+        if (tmp_dir / filename).exists():
+            return f"/api/execution_preview_cover?session_id={preview_session_id}"
+    return ""
+
+
+def _is_http_url(value: str) -> bool:
+    return value.startswith(("http://", "https://"))
+
+
+def _read_execution_preview_meta_file(meta_file: Path) -> Mapping[str, object] | None:
+    try:
+        return _json_load_dict(meta_file.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _resolve_execution_preview_meta(session_id: str) -> tuple[str, Path | None, Mapping[str, object] | None]:
+    process_info = active_processes.get(session_id, {})
+    execution_path = _stringify_preview_value(process_info.get("path"))
+    if not execution_path:
+        return "", None, None
+
+    base_tmp_dir = Path(__file__).parent.parent / "tmp"
+    alias_meta_file = base_tmp_dir / Path(execution_path).name / "meta.json"
+    alias_meta = _read_execution_preview_meta_file(alias_meta_file) if alias_meta_file.exists() else None
+    meta_uuid = _stringify_preview_value(process_info.get("meta_uuid"))
+    if not meta_uuid and alias_meta is not None:
+        meta_uuid = _stringify_preview_value(alias_meta.get("uuid"))
+
+    if meta_uuid:
+        canonical_meta_file = base_tmp_dir / meta_uuid / "meta.json"
+        canonical_meta = _read_execution_preview_meta_file(canonical_meta_file) if canonical_meta_file.exists() else None
+        if canonical_meta is not None:
+            process_info["meta_uuid"] = meta_uuid
+            return execution_path, canonical_meta_file, canonical_meta
+
+    if alias_meta is not None:
+        alias_uuid = _stringify_preview_value(alias_meta.get("uuid"))
+        if alias_uuid:
+            process_info["meta_uuid"] = alias_uuid
+        return execution_path, alias_meta_file, alias_meta
+
+    return execution_path, None, None
+
+
+def _looks_like_subprocess_prompt(buffer: str) -> bool:
+    last_line = buffer.splitlines()[-1] if buffer else ""
+    stripped = last_line.strip()
+    if not stripped:
+        return False
+    lowered = stripped.lower()
+    if "running:" in lowered:
+        return False
+    return (
+        stripped.endswith(":")
+        or stripped.endswith("?")
+        or lowered.endswith("(y/n)")
+        or lowered.endswith("(y/n):")
+        or " enter " in f" {lowered} "
+        or " select " in f" {lowered} "
+        or lowered.startswith("select ")
+    )
+
+
+def _append_metadata_source(
+    sources: list[MetadataSource],
+    seen_keys: set[str],
+    key: str,
+    label: str,
+    value: str,
+    url: str = "",
+) -> None:
+    normalized_value = value.strip()
+    if not normalized_value:
+        return
+    dedupe_key = f"{key}:{normalized_value.lower()}"
+    if dedupe_key in seen_keys:
+        return
+    seen_keys.add(dedupe_key)
+    source: MetadataSource = {
+        "key": key,
+        "label": label,
+        "value": normalized_value,
+    }
+    if url:
+        source["url"] = url
+    sources.append(source)
+
+
+def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataSource]:
+    from urllib.parse import quote
+
+    category = _stringify_preview_value(meta_data.get("category")).upper()
+    tmdb_value = _stringify_optional_id(meta_data.get("tmdb_id")) or _stringify_optional_id(meta_data.get("tmdb"))
+    imdb_value = _stringify_optional_id(meta_data.get("imdb_id")) or _stringify_optional_id(meta_data.get("imdb_tt")) or _stringify_optional_id(meta_data.get("imdb"))
+    tvdb_value = _stringify_optional_id(meta_data.get("tvdb_id")) or _stringify_optional_id(meta_data.get("tvdb"))
+    tvmaze_value = _stringify_optional_id(meta_data.get("tvmaze_id")) or _stringify_optional_id(meta_data.get("tvmaze"))
+    mal_value = _stringify_optional_id(meta_data.get("mal_id")) or _stringify_optional_id(meta_data.get("mal"))
+    douban_value = _stringify_optional_id(meta_data.get("douban_id"))
+    igdb_value = _stringify_optional_id(meta_data.get("igdb_id"))
+    steam_url = _stringify_preview_value(meta_data.get("steam_url"))
+    openlibrary_value = (
+        _stringify_preview_value(meta_data.get("openlibrary"))
+        or _stringify_preview_value(meta_data.get("openlibrary_id"))
+        or _stringify_preview_value(meta_data.get("openlibrary_book_id"))
+    )
+    isbn_value = _stringify_preview_value(meta_data.get("isbn"))
+
+    sources: list[MetadataSource] = []
+    seen_keys: set[str] = set()
+
+    if category in {"MOVIE", "TV"} and tmdb_value:
+        tmdb_kind = "tv" if category == "TV" else "movie"
+        _append_metadata_source(
+            sources,
+            seen_keys,
+            "tmdb",
+            "TMDb",
+            tmdb_value,
+            f"https://www.themoviedb.org/{tmdb_kind}/{quote(tmdb_value)}",
+        )
+
+    if category in {"MOVIE", "TV"} and imdb_value:
+        imdb_id = imdb_value if imdb_value.startswith("tt") else f"tt{imdb_value}"
+        _append_metadata_source(
+            sources,
+            seen_keys,
+            "imdb",
+            "IMDb",
+            imdb_id,
+            f"https://www.imdb.com/title/{quote(imdb_id)}/",
+        )
+
+    if category == "TV" and tvdb_value:
+        _append_metadata_source(
+            sources,
+            seen_keys,
+            "tvdb",
+            "TVDb",
+            tvdb_value,
+            f"https://thetvdb.com/dereferrer/series/{quote(tvdb_value)}",
+        )
+
+    if category == "TV" and tvmaze_value:
+        _append_metadata_source(
+            sources,
+            seen_keys,
+            "tvmaze",
+            "TVMaze",
+            tvmaze_value,
+            f"https://www.tvmaze.com/shows/{quote(tvmaze_value)}",
+        )
+
+    if category in {"TV", "BOOK"} and mal_value:
+        mal_kind = "manga" if category == "BOOK" else "anime"
+        _append_metadata_source(
+            sources,
+            seen_keys,
+            "mal",
+            "MyAnimeList",
+            mal_value,
+            f"https://myanimelist.net/{mal_kind}/{quote(mal_value)}",
+        )
+
+    if category in {"MOVIE", "TV"} and douban_value:
+        _append_metadata_source(
+            sources,
+            seen_keys,
+            "douban",
+            "Douban",
+            douban_value,
+            f"https://movie.douban.com/subject/{quote(douban_value)}/",
+        )
+
+    if category == "GAME" and igdb_value:
+        _append_metadata_source(
+            sources,
+            seen_keys,
+            "igdb",
+            "IGDB",
+            igdb_value,
+            f"https://www.igdb.com/search?type=1&q={quote(igdb_value)}",
+        )
+
+    if category == "GAME" and steam_url:
+        steam_value = steam_url.rstrip("/").split("/")[-1] or steam_url
+        _append_metadata_source(sources, seen_keys, "steam", "Steam", steam_value, steam_url)
+
+    if openlibrary_value:
+        if openlibrary_value.startswith("OL"):
+            if "W" in openlibrary_value:
+                openlibrary_url = f"https://openlibrary.org/works/{quote(openlibrary_value)}"
+            elif "M" in openlibrary_value:
+                openlibrary_url = f"https://openlibrary.org/books/{quote(openlibrary_value)}"
+            else:
+                openlibrary_url = f"https://openlibrary.org/search?q={quote(openlibrary_value)}"
+        else:
+            openlibrary_url = f"https://openlibrary.org/search?q={quote(openlibrary_value)}"
+        _append_metadata_source(
+            sources,
+            seen_keys,
+            "openlibrary",
+            "Open Library",
+            openlibrary_value,
+            openlibrary_url,
+        )
+
+    if category == "BOOK" and isbn_value:
+        _append_metadata_source(
+            sources,
+            seen_keys,
+            "google_books",
+            "Google Books",
+            isbn_value,
+        )
+
+    return sources
+
+
+def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: str) -> ExecutionPreview:
+    title = _stringify_preview_value(meta_data.get("title")) or _stringify_preview_value(meta_data.get("name"))
+    original_title = _stringify_preview_value(meta_data.get("original_title"))
+    poster_url = _stringify_preview_value(meta_data.get("poster"))
+    tmdb_poster = _stringify_preview_value(meta_data.get("tmdb_poster"))
+    if not poster_url and tmdb_poster:
+        poster_url = tmdb_poster if tmdb_poster.startswith("http") else f"https://image.tmdb.org/t/p/w500{tmdb_poster}"
+    genres = _string_list_preview_values(meta_data.get("genres"))
+    networks = _string_list_preview_values(meta_data.get("networks"))
+    audiobook_bitrate = _stringify_preview_value(meta_data.get("audiobook_bitrate"))
+    if audiobook_bitrate.isdigit():
+        audiobook_bitrate = f"{audiobook_bitrate} kbps"
+    tv_pack_raw = _stringify_preview_value(meta_data.get("tv_pack")).lower()
+
+    return {
+        "path": _stringify_preview_value(meta_data.get("path")) or fallback_path,
+        "filename": Path(fallback_path).name,
+        "title": title,
+        "original_title": original_title,
+        "year": _stringify_preview_value(meta_data.get("year")),
+        "category": _stringify_preview_value(meta_data.get("category")),
+        "media_type": _stringify_preview_value(meta_data.get("type")),
+        "source": _stringify_preview_value(meta_data.get("source")),
+        "resolution": _stringify_preview_value(meta_data.get("resolution")),
+        "tmdb": _stringify_optional_id(meta_data.get("tmdb_id")) or _stringify_optional_id(meta_data.get("tmdb")),
+        "imdb": (_stringify_optional_id(meta_data.get("imdb_id")) or _stringify_optional_id(meta_data.get("imdb_tt")) or _stringify_optional_id(meta_data.get("imdb"))),
+        "metadata_sources": _extract_metadata_sources(meta_data),
+        "poster_url": poster_url,
+        "overview": _stringify_preview_value(meta_data.get("overview")),
+        "genres": genres,
+        "name": _stringify_preview_value(meta_data.get("name")),
+        "status": "ready",
+        "audio": _stringify_preview_value(meta_data.get("audio")),
+        "service": _stringify_preview_value(meta_data.get("service_longname")),
+        "networks": networks,
+        "season": _stringify_preview_value(meta_data.get("season")),
+        "episode": _stringify_preview_value(meta_data.get("episode")),
+        "episode_title": _stringify_preview_value(meta_data.get("episode_title")),
+        "episode_name": _stringify_preview_value(meta_data.get("episode_name")),
+        "episode_overview": _stringify_preview_value(meta_data.get("episode_overview")),
+        "tv_pack": tv_pack_raw not in ("", "0", "false", "none", "null"),
+        "author": _stringify_preview_value(meta_data.get("author")),
+        "narrator": _stringify_preview_value(meta_data.get("narrator")),
+        "publisher": _stringify_preview_value(meta_data.get("publisher")),
+        "book_language": _stringify_preview_value(meta_data.get("book_language")),
+        "audiobook": bool(meta_data.get("audiobook")),
+        "audiobook_duration": _stringify_preview_value(meta_data.get("audiobook_duration_formatted")),
+        "audiobook_bitrate": audiobook_bitrate,
+        "book_series": _stringify_preview_value(meta_data.get("book_series")),
+        "book_series_index": _stringify_preview_value(meta_data.get("book_series_index")),
+        "platform": _stringify_preview_value(meta_data.get("platform")),
+        "game_version": _stringify_preview_value(meta_data.get("game_version")),
+        "game_subcategory": _stringify_preview_value(meta_data.get("game_subcategory")),
+        "game_region": _stringify_preview_value(meta_data.get("game_region")),
+        "game_system": _stringify_preview_value(meta_data.get("game_system")),
+        "developer": _stringify_preview_value(meta_data.get("developer")),
+        "awaiting_input": False,
+    }
+
+
+def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
+    process_info = active_processes.get(session_id, {})
+    execution_path, resolved_meta_file, resolved_meta = _resolve_execution_preview_meta(session_id)
+    if not execution_path:
+        return None
+
+    execution_name = Path(execution_path).name
+    if resolved_meta_file is not None and resolved_meta is not None:
+        try:
+            meta_data = resolved_meta
+            if _stringify_preview_value(meta_data.get("category")) == "BOOK":
+                current_poster = _stringify_preview_value(meta_data.get("poster"))
+                if not _is_http_url(current_poster):
+                    try:
+                        enriched_meta = dict(meta_data)
+                        enriched_meta["poster"] = _book_cover_from_meta(meta_data, session_id)
+                        meta_data = enriched_meta
+                    except Exception as err:
+                        console.print(f"Execution preview cover enrichment failed for session {session_id}: {err}", markup=False)
+            preview = _extract_execution_preview(meta_data, execution_path)
+            preview["awaiting_input"] = bool(process_info.get("awaiting_input"))
+            return preview
+        except Exception:  # noqa: S110
+            pass
+
+    return {
+        "path": execution_path,
+        "filename": execution_name,
+        "title": "",
+        "original_title": "",
+        "year": "",
+        "category": "",
+        "media_type": "",
+        "source": "",
+        "resolution": "",
+        "tmdb": "",
+        "imdb": "",
+        "metadata_sources": [],
+        "poster_url": "",
+        "overview": "",
+        "genres": [],
+        "name": "",
+        "status": "waiting",
+        "audio": "",
+        "service": "",
+        "networks": [],
+        "season": "",
+        "episode": "",
+        "episode_title": "",
+        "episode_name": "",
+        "episode_overview": "",
+        "tv_pack": False,
+        "author": "",
+        "narrator": "",
+        "publisher": "",
+        "book_language": "",
+        "audiobook": False,
+        "audiobook_duration": "",
+        "audiobook_bitrate": "",
+        "book_series": "",
+        "book_series_index": "",
+        "platform": "",
+        "game_version": "",
+        "game_subcategory": "",
+        "game_region": "",
+        "game_system": "",
+        "developer": "",
+        "awaiting_input": bool(process_info.get("awaiting_input")),
+    }
+
+
+def _find_execution_preview_cover_file(session_id: str) -> Path | None:
+    execution_path, _resolved_meta_file, resolved_meta = _resolve_execution_preview_meta(session_id)
+    if not execution_path:
+        return None
+
+    meta_uuid = _stringify_preview_value(resolved_meta.get("uuid")) if resolved_meta is not None else ""
+    candidate_dirs: list[Path] = []
+    if meta_uuid:
+        candidate_dirs.append(Path(__file__).parent.parent / "tmp" / meta_uuid)
+    candidate_dirs.append(Path(__file__).parent.parent / "tmp" / Path(execution_path).name)
+
+    seen: set[str] = set()
+    for tmp_dir in candidate_dirs:
+        tmp_dir_key = str(tmp_dir)
+        if tmp_dir_key in seen or not tmp_dir.exists():
+            continue
+        seen.add(tmp_dir_key)
+        for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg", "cover.jpg", "cover.png"):
+            candidate = tmp_dir / filename
+            if candidate.exists():
+                return candidate
+    return None
+
+
 class BrowseItem(TypedDict, total=False):
     """Serialized representation of an entry returned by the browse API."""
 
@@ -1116,6 +1585,62 @@ class BrowseItem(TypedDict, total=False):
     type: Literal["folder", "file"]
     children: list[BrowseItem] | None
     subtitle: str  # Optional hint  (eg, when parent path when names collide)
+
+
+class MetadataSource(TypedDict, total=False):
+    """Serialized metadata provider/source entry for the execution preview."""
+
+    key: str
+    label: str
+    value: str
+    url: str
+
+
+class ExecutionPreview(TypedDict, total=False):
+    """Serialized preview data for the media currently being processed."""
+
+    path: str
+    filename: str
+    title: str
+    original_title: str
+    year: str
+    category: str
+    media_type: str
+    source: str
+    resolution: str
+    tmdb: str
+    imdb: str
+    metadata_sources: list[MetadataSource]
+    poster_url: str
+    overview: str
+    genres: list[str]
+    name: str
+    status: str
+    audio: str
+    service: str
+    networks: list[str]
+    season: str
+    episode: str
+    episode_title: str
+    episode_name: str
+    episode_overview: str
+    tv_pack: bool
+    author: str
+    narrator: str
+    publisher: str
+    book_language: str
+    audiobook: bool
+    audiobook_duration: str
+    audiobook_bitrate: str
+    book_series: str
+    book_series_index: str
+    platform: str
+    game_version: str
+    game_subcategory: str
+    game_region: str
+    game_system: str
+    developer: str
+    awaiting_input: bool
 
 
 class ConfigItem(TypedDict, total=False):
@@ -2799,7 +3324,7 @@ def torrent_clients():
     user_clients = cast(dict[str, Any], user_clients_raw) if isinstance(user_clients_raw, Mapping) else {}
 
     # Include all configured clients in the dropdown
-    client_names: list[str] = [str(key) for key in user_clients.keys()]
+    client_names: list[str] = [str(key) for key in user_clients]
 
     return jsonify({"success": True, "clients": sorted(client_names)})
 
@@ -3239,6 +3764,35 @@ def browse_search():
         return jsonify({"error": "Error searching files", "success": False}), 500
 
 
+@app.route("/api/execution_preview")
+def execution_preview():
+    """Return the current media preview for an active execution session."""
+    session_id = str(request.args.get("session_id", "")).strip()
+    if not session_id:
+        return jsonify({"success": False, "error": "Missing session_id"}), 400
+
+    preview = _find_execution_preview(session_id)
+    if preview is None:
+        return jsonify({"success": False, "error": "Session not found"}), 404
+
+    return jsonify({"success": True, "media": preview})
+
+
+@app.route("/api/execution_preview_cover")
+def execution_preview_cover():
+    """Serve a local preview cover image for the active execution session."""
+    session_id = str(request.args.get("session_id", "")).strip()
+    if not session_id:
+        return jsonify({"success": False, "error": "Missing session_id"}), 400
+
+    cover_file = _find_execution_preview_cover_file(session_id)
+    if cover_file is None:
+        return jsonify({"success": False, "error": "Cover not found"}), 404
+
+    mimetype = mimetypes.guess_type(str(cover_file))[0] or "application/octet-stream"
+    return send_file(cover_file, mimetype=mimetype, conditional=True, max_age=30)
+
+
 @app.route("/api/execute", methods=["POST", "OPTIONS"])
 @limiter.limit("100 per hour", key_func=_rate_limit_key_func)
 def execute_command():
@@ -3356,6 +3910,10 @@ def execute_command():
                 upload_script = str(base_dir / "upload.py")
                 command = [sys.executable, "-u", upload_script, validated_path]
 
+                process_state = _make_process_state(validated_path, args)
+                with active_processes_lock:
+                    active_processes[session_id] = process_state
+
                 # Add arguments if provided
                 if args:
                     import shlex
@@ -3365,6 +3923,7 @@ def execute_command():
                         validated_args = _validate_upload_assistant_args(parsed_args)
                     except ValueError as err:
                         console.print(f"Invalid execution arguments: {err}", markup=False)
+                        _discard_session_state(session_id, process_state)
                         yield f"data: {json.dumps({'type': 'error', 'data': 'Invalid execution arguments'})}\n\n"
                         return
                     command.extend(validated_args)
@@ -3425,7 +3984,15 @@ def execute_command():
 
                     if not acquired:
                         console.print(f"Failed to acquire inproc lock for session {session_id}; another inproc run may be active", markup=False)
+                        _discard_session_state(session_id, process_state)
                         yield f"data: {json.dumps({'type': 'error', 'data': 'Another in-process run is active'})}\n\n"
+                        return
+
+                    if not _session_state_is_current(session_id, process_state):
+                        with contextlib.suppress(Exception):
+                            inproc_lock.release()
+                        _discard_session_state(session_id, process_state)
+                        yield f"data: {json.dumps({'type': 'error', 'data': 'Execution session was replaced'})}\n\n"
                         return
 
                     # Monkeypatch the existing shared console to record prints and intercept input
@@ -3440,6 +4007,7 @@ def execute_command():
                             "orig_input": getattr(orig_console, "input", None),
                             "orig_ask_yes_no": None,
                             "orig_ask_string": None,
+                            "orig_ask_choice": None,
                         }
 
                         # Wrap print to duplicate into the recorder
@@ -3461,14 +4029,19 @@ def execute_command():
                             with contextlib.suppress(Exception):
                                 wrapped_print(prompt)
                             # Wait for input while respecting cancellation
+                            _set_process_awaiting_input_if_current(session_id, process_state, True)
                             while True:
                                 if cancel_event.is_set():
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     raise EOFError()
                                 try:
-                                    return input_queue.get(timeout=0.5)
+                                    result = input_queue.get(timeout=0.5)
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
+                                    return result
                                 except queue.Empty:
                                     continue
                                 except Exception:
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     raise
 
                         orig_console.input = cast(Any, wrapped_input)
@@ -3481,6 +4054,7 @@ def execute_command():
                     # Monkeypatch cli_ui.ask_yes_no and ask_string similarly
                     orig_ask_yes_no = None
                     orig_ask_string = None
+                    orig_ask_choice = None
                     try:
                         orig_ask_yes_no = _cli_ui.ask_yes_no
 
@@ -3496,27 +4070,33 @@ def execute_command():
                             else:
                                 question = kwargs.get("question", "")
 
-                            # If default was passed positionally (third arg), use it.
-                            default_val = args[2] if len(args) >= 3 else kwargs.get("default", default)
-
                             with contextlib.suppress(Exception):
                                 wrapped_print(str(question))
                             # Wait for a response or cancellation
+                            _set_process_awaiting_input_if_current(session_id, process_state, True)
                             while True:
                                 if cancel_event.is_set():
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     raise EOFError()
                                 try:
                                     resp = input_queue.get(timeout=0.5)
                                 except queue.Empty:
                                     continue
                                 except Exception:
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     raise
                                 resp = (resp or "").strip().lower()
+                                if not resp:
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
+                                    return default
                                 if resp in ("y", "yes"):
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     return True
                                 if resp in ("n", "no"):
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     return False
-                                return default_val
+                                with contextlib.suppress(Exception):
+                                    wrapped_print("Please answer y or n.")
 
                         _cli_ui.ask_yes_no = wrapped_ask_yes_no
                         # Save original ask_yes_no so external cleaners (eg. /api/kill)
@@ -3534,14 +4114,19 @@ def execute_command():
                                 with contextlib.suppress(Exception):
                                     wrapped_print(prompt)
                                 # Wait for input or cancellation
+                                _set_process_awaiting_input_if_current(session_id, process_state, True)
                                 while True:
                                     if cancel_event.is_set():
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
                                         raise EOFError()
                                     try:
-                                        return input_queue.get(timeout=0.5)
+                                        result = input_queue.get(timeout=0.5)
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
+                                        return result
                                     except queue.Empty:
                                         continue
                                     except Exception:
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
                                         raise
 
                             _cli_ui.ask_string = wrapped_ask_string
@@ -3551,6 +4136,50 @@ def execute_command():
                                     _ua_console_store[console_key]["orig_ask_string"] = orig_ask_string
                         except Exception:
                             orig_ask_string = None
+
+                        # ask_choice: prompt user to select one option from a list
+                        try:
+                            orig_ask_choice = _cli_ui.ask_choice
+
+                            def wrapped_ask_choice(question: object, choices: Sequence[object] | None = None, **_kwargs: Any) -> str:
+                                prompt = str(question)
+                                rendered_choices = [str(choice) for choice in (choices or [])]
+                                with contextlib.suppress(Exception):
+                                    wrapped_print(prompt)
+                                    for index, choice_text in enumerate(rendered_choices, start=1):
+                                        wrapped_print(f"{index}. {choice_text}")
+                                _set_process_awaiting_input_if_current(session_id, process_state, True)
+                                while True:
+                                    if cancel_event.is_set():
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
+                                        raise EOFError()
+                                    try:
+                                        resp = (input_queue.get(timeout=0.5) or "").strip()
+                                    except queue.Empty:
+                                        continue
+                                    except Exception:
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
+                                        raise
+
+                                    if not rendered_choices:
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
+                                        return resp
+                                    if resp.isdigit():
+                                        selected_index = int(resp) - 1
+                                        if 0 <= selected_index < len(rendered_choices):
+                                            _set_process_awaiting_input_if_current(session_id, process_state, False)
+                                            return rendered_choices[selected_index]
+                                    for choice_text in rendered_choices:
+                                        if resp.lower() == choice_text.lower():
+                                            _set_process_awaiting_input_if_current(session_id, process_state, False)
+                                            return choice_text
+
+                            _cli_ui.ask_choice = wrapped_ask_choice
+                            with contextlib.suppress(Exception):
+                                if console_key in _ua_console_store:
+                                    _ua_console_store[console_key]["orig_ask_choice"] = orig_ask_choice
+                        except Exception:
+                            orig_ask_choice = None
                     except Exception:
                         orig_ask_yes_no = None
 
@@ -3567,12 +4196,16 @@ def execute_command():
                         sys.argv = [upload_script, validated_path, *parsed_args]
 
                         # Store in active_processes so /api/input can post into the queue
-                        active_processes[session_id] = {
-                            "mode": "inproc",
-                            "input_queue": input_queue,
-                            "record_console": record_console,
-                            "cancel_event": cancel_event,
-                        }
+                        process_state.update(
+                            {
+                                "mode": "inproc",
+                                "input_queue": input_queue,
+                                "record_console": record_console,
+                                "cancel_event": cancel_event,
+                            }
+                        )
+                        if not _session_state_is_current(session_id, process_state):
+                            raise RuntimeError("Execution session was replaced before in-process startup completed")
 
                         # Run the upload main loop in a separate thread to avoid blocking SSE generator
                         def run_upload():
@@ -3629,6 +4262,8 @@ def execute_command():
                                     with contextlib.suppress(Exception):
                                         if "orig_ask_string" in origs and origs["orig_ask_string"] is not None:
                                             _cli_ui.ask_string = origs["orig_ask_string"]
+                                        if "orig_ask_choice" in origs and origs["orig_ask_choice"] is not None:
+                                            _cli_ui.ask_choice = origs["orig_ask_choice"]
                                     del _ua_console_store[console_key]
                                 # Release lock to allow next inproc run
                                 inproc_lock.release()
@@ -3638,8 +4273,8 @@ def execute_command():
 
                         # Record worker thread for debugging/cleanup
                         with contextlib.suppress(Exception):
-                            if session_id in active_processes:
-                                active_processes[session_id]["worker"] = worker
+                            if _session_state_is_current(session_id, process_state):
+                                process_state["worker"] = worker
 
                         console.print(f"Started inproc worker for session {session_id}: {worker.name}", markup=False)
 
@@ -3731,12 +4366,14 @@ def execute_command():
                         with contextlib.suppress(Exception):
                             if orig_ask_string is not None:
                                 _cli_ui.ask_string = orig_ask_string
+                            if orig_ask_choice is not None:
+                                _cli_ui.ask_choice = orig_ask_choice
 
                         sys.argv = old_argv
 
                         # Remove process tracking for this session
                         with contextlib.suppress(Exception):
-                            active_processes.pop(session_id, None)
+                            _discard_session_state(session_id, process_state)
 
                     return
 
@@ -3789,27 +4426,35 @@ def execute_command():
                                 raise ValueError("Invalid characters in command argument")
                     except Exception as err:
                         console.print(f"Refusing to run unsafe command: {err}", markup=False)
+                        _discard_session_state(session_id, process_state)
                         yield f"data: {json.dumps({'type': 'error', 'data': 'Unsafe execution request'})}\n\n"
                         return
 
                     # codeql[py/command-line-injection]
-                    process = subprocess.Popen(  # lgtm[py/command-line-injection]  # noqa: S603
-                        command,
-                        stdin=subprocess.PIPE,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True,
-                        bufsize=0,  # Completely unbuffered
-                        cwd=str(base_dir),
-                        env=env,
-                        universal_newlines=True,
-                    )
-
-                    # Store process for input handling (no queue needed)
-                    active_processes[session_id] = {"process": process}
-
+                    process = None
                     # Wrap subprocess handling in try/finally to guarantee cleanup
                     try:
+                        process = subprocess.Popen(  # lgtm[py/command-line-injection]  # noqa: S603
+                            command,
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            bufsize=0,  # Completely unbuffered
+                            cwd=str(base_dir),
+                            env=env,
+                            universal_newlines=True,
+                        )
+
+                        process_state.update(
+                            {
+                                "mode": "subprocess",
+                                "process": process,
+                            }
+                        )
+                        if not _session_state_is_current(session_id, process_state):
+                            raise RuntimeError("Execution session was replaced before subprocess startup completed")
+
                         # Thread to read stdout - stream raw output with ANSI codes
                         def read_stdout():
                             try:
@@ -3848,11 +4493,10 @@ def execute_command():
 
                         # Record threads and output queue for debugging/cleanup
                         with contextlib.suppress(Exception):
-                            if session_id in active_processes:
-                                info = active_processes[session_id]
-                                info["stdout_thread"] = stdout_thread
-                                info["stderr_thread"] = stderr_thread
-                                info["output_queue"] = output_queue
+                            if _session_state_is_current(session_id, process_state):
+                                process_state["stdout_thread"] = stdout_thread
+                                process_state["stderr_thread"] = stderr_thread
+                                process_state["output_queue"] = output_queue
 
                         console.print(f"Started subprocess reader threads for session {session_id}: stdout={stdout_thread.name}, stderr={stderr_thread.name}", markup=False)
 
@@ -3873,9 +4517,14 @@ def execute_command():
                                 if output_type not in buffers:
                                     buffers[output_type] = ""
                                 buffers[output_type] += char
+                                is_prompt_chunk = _looks_like_subprocess_prompt(buffers[output_type])
+                                if is_prompt_chunk:
+                                    _set_process_awaiting_input_if_current(session_id, process_state, True)
 
                                 # Flush on newline or when buffer grows large
                                 if char == "\n" or len(buffers[output_type]) > 512:
+                                    if not is_prompt_chunk:
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     chunk = buffers[output_type]
                                     buffers[output_type] = ""
 
@@ -3923,10 +4572,13 @@ def execute_command():
                         process.wait()
 
                         # Clean up (normal path)
-                        active_processes.pop(session_id, None)
+                        _discard_session_state(session_id, process_state)
 
                         yield f"data: {json.dumps({'type': 'exit', 'code': process.returncode})}\n\n"
                     finally:
+                        with contextlib.suppress(Exception):
+                            if process is not None and not _session_state_is_current(session_id, process_state) and process.poll() is None:
+                                process.kill()
                         # Ensure subprocess pipes are closed to avoid leaking file handles
                         with contextlib.suppress(Exception):
                             if process.stdin is not None:
@@ -3939,7 +4591,7 @@ def execute_command():
                                 process.stderr.close()
                         # Ensure we remove tracking entry if still present
                         with contextlib.suppress(Exception):
-                            active_processes.pop(session_id, None)
+                            _discard_session_state(session_id, process_state)
 
             except Exception as e:
                 console.print(f"Execution error for session {session_id}: {e}", markup=False)
@@ -3947,7 +4599,9 @@ def execute_command():
                 yield f"data: {json.dumps({'type': 'error', 'data': 'Execution error'})}\n\n"
 
                 # Clean up on error
-                active_processes.pop(session_id, None)
+                with contextlib.suppress(Exception):
+                    if "process_state" in locals():
+                        _discard_session_state(session_id, cast(Mapping[str, object], process_state))
 
         return Response(generate(), mimetype="text/event-stream")
 
@@ -3993,6 +4647,7 @@ def send_input():
                 if raw_q is None:
                     return jsonify({"error": "No input queue", "success": False}), 500
                 q = raw_q
+                _set_process_awaiting_input(session_id, False)
                 q.put(user_input)
                 return jsonify({"success": True})
 
@@ -4006,6 +4661,7 @@ def send_input():
 
             if process.poll() is None:  # Process still running
                 if process.stdin is not None:
+                    _set_process_awaiting_input(session_id, False)
                     process.stdin.write(input_with_newline)
                     process.stdin.flush()
                     console.print(f"Sent to stdin: '{input_with_newline.strip()}'", markup=False)
@@ -4092,6 +4748,8 @@ def kill_process():
                             with contextlib.suppress(Exception):
                                 if "orig_ask_string" in origs and origs["orig_ask_string"] is not None:
                                     _cli_ui.ask_string = origs["orig_ask_string"]
+                                if "orig_ask_choice" in origs and origs["orig_ask_choice"] is not None:
+                                    _cli_ui.ask_choice = origs["orig_ask_choice"]
                 except Exception:
                     # Best-effort: if we can't import src.console, fall back to
                     # restoring any stored callables into the module-level

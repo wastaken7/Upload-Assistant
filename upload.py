@@ -899,6 +899,8 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None, discord_notif
         meta.edit = True
         meta = await prep.gather_prep(meta=meta, mode="cli")
         meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
+            await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
         try:
             confirm = await helper.get_confirmation(meta)
         except EOFError:
