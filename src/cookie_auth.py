@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import http.cookiejar
 import json
-import pickle  # nosec B403 - Only used for legacy cookie migration
 import re
 import stat
 import traceback

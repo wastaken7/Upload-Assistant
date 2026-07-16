@@ -994,7 +994,7 @@ def _verify_remember_token(token: str) -> str | None:
         elif isinstance(expiry_value, str):
             try:
                 expiry = int(expiry_value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None
         else:
             return None
@@ -2456,7 +2456,7 @@ def access_log_entries_api():
         n = int(n)
         if n < 1 or n > 200:
             n = 50
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         n = 50
 
     try:
@@ -2622,7 +2622,7 @@ def twofa_disable():
 
     try:
         auth_mod.set_twofa_state(None, [])
-    except (OSError, ValueError, TypeError, auth_mod.EncryptionError, json.JSONDecodeError):
+    except OSError, ValueError, TypeError, auth_mod.EncryptionError, json.JSONDecodeError:
         return jsonify({"error": "Failed to disable 2FA", "success": False}), 500
 
     # Update global variable
@@ -2944,7 +2944,15 @@ def api_tokens():
         tokens: list[dict[str, Any]] = []
         for tid, info in store.items():
             info_dict = _as_dict(info) or {}
-            tokens.append({"id": info_dict.get("token_id"), "user": info_dict.get("user"), "label": info_dict.get("label"), "created": info_dict.get("created"), "expiry": info_dict.get("expiry")})
+            tokens.append(
+                {
+                    "id": info_dict.get("token_id"),
+                    "user": info_dict.get("user"),
+                    "label": info_dict.get("label"),
+                    "created": info_dict.get("created"),
+                    "expiry": info_dict.get("expiry"),
+                }
+            )
         read_only = False
         return jsonify({"success": True, "tokens": tokens, "read_only": read_only})
 
@@ -3075,7 +3083,7 @@ def browse_path():
                                 continue
 
                     items.append({"name": item, "path": str(full_path), "type": "folder" if is_dir else "file", "children": [] if is_dir else None})
-                except (PermissionError, OSError):
+                except PermissionError, OSError:
                     continue
 
             console.print(f"Found {len(items)} items in {path}", markup=False)
@@ -3115,7 +3123,7 @@ def browse_search():
         max_results = min(int(request.args.get("max_results", "100")), 500)
         if max_results < 1:
             max_results = 100
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         max_results = 100
 
     if not query:

@@ -56,10 +56,12 @@ class Curupira:
         params_list: list[dict[str, str]] = []
         exact_name = await self.get_search_name(meta)
         if exact_name:
-            params_list.append({
-                "t": "search",
-                "q": exact_name,
-            })
+            params_list.append(
+                {
+                    "t": "search",
+                    "q": exact_name,
+                }
+            )
 
         params: dict[str, str] = {}
 
