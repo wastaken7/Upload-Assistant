@@ -62,11 +62,18 @@ const argumentCategories = [
     title: "Metadata / IDs",
     subtitle: "Getting these correct is 90% of a successful upload!",
     args: [
+      { label: "--category", placeholder: "MOVIE", description: "Override detected category" },
+      { label: "--type", placeholder: "REMUX", description: "Override detected type" },
+      { label: "--source", placeholder: "Blu-ray", description: "Override detected source" },
+      { label: "--resolution", placeholder: "2160p", description: "Override detected resolution" },
       { label: "--tmdb", placeholder: "movie/123", description: "TMDb id" },
       { label: "--imdb", placeholder: "tt0111161", description: "IMDb id" },
       { label: "--mal", placeholder: "ID", description: "MAL id" },
       { label: "--tvmaze", placeholder: "ID", description: "TVMaze id" },
-      { label: "--tvdb", placeholder: "ID", description: "TVDB id" }
+      { label: "--tvdb", placeholder: "ID", description: "TVDB id" },
+      { label: "--douban", placeholder: "ID", description: "Douban id" },
+      { label: "--igdb", placeholder: "ID", description: "IGDB id" },
+      { label: "--steam", placeholder: "APP_ID_OR_URL", description: "Steam app id or URL" }
     ]
   },
   {
@@ -114,7 +121,8 @@ const argumentCategories = [
     args: [
       { label: "--desclink", placeholder: "URL", description: "Link to pastebin/hastebin with description" },
       { label: "--descfile", placeholder: "PATH", description: "Path to description file (.txt, .nfo, .md)" },
-      { label: "--nfo", description: "Use .nfo for description" }
+      { label: "--nfo", description: "Use .nfo for description" },
+      { label: "--keywords", placeholder: "keyword1,keyword2", description: "Comma-separated keywords" }
     ]
   },
   {
@@ -131,9 +139,38 @@ const argumentCategories = [
       { label: "--sfx-subtitles", description: "SFX subtitles" },
       { label: "--extras", description: "Extras included" },
       { label: "--distributor", placeholder: "NAME", description: "Disc distributor" },
+      { label: "--disctype", placeholder: "BD50", description: "Disc type override" },
+      { label: "--untouched", description: "Mark as untouched disc" },
+      { label: "--menus", description: "Path to menus screenshots (PNGs)" },
       { label: "--sorted-filelist", description: "Sorted filelist (handles typical anime nonsense)" },
       { label: "--keep-folder", description: "Keep top folder with single file uploads" },
       { label: "--keep-nfo", description: "Keep nfo (extremely site specific)" },
+    ]
+  },
+  {
+    title: "Books / Reading",
+    args: [
+      { label: "--author", placeholder: "AUTHOR", description: "Override detected book author" },
+      { label: "--book-title", placeholder: "TITLE", description: "Override detected book title" },
+      { label: "--comic", description: "Mark upload as comic" },
+      { label: "--manga", description: "Mark upload as manga" },
+      { label: "--magazine", description: "Mark upload as magazine" },
+      { label: "--newspaper", description: "Mark upload as newspaper" },
+      { label: "--book-translator", placeholder: "NAME", description: "Book translator" },
+      { label: "--book-language", placeholder: "LANG", description: "Book language" },
+      { label: "--isbn", placeholder: "ISBN", description: "ISBN identifier" },
+      { label: "--asin", placeholder: "ASIN", description: "Amazon ASIN" },
+      { label: "--openlibrary", placeholder: "ID", description: "OpenLibrary id" },
+      { label: "--publisher", placeholder: "NAME", description: "Book publisher" }
+    ]
+  },
+  {
+    title: "Games",
+    args: [
+      { label: "--platform", placeholder: "PC", description: "Primary platform override" },
+      { label: "--platforms", placeholder: "PC,PS5", description: "Platforms list" },
+      { label: "--game-version", placeholder: "v1.0", description: "Game version" },
+      { label: "--game-subcategory", placeholder: "dlc", description: "Game subcategory" }
     ]
   },
   {
@@ -157,8 +194,8 @@ const argumentCategories = [
   {
     title: "Upload Selection / Dupe",
     args: [
-      { label: "--trackers", placeholder: "aither,lst,ptp,etc", description: "Specific Trackers list for uploading" },
-      { label: "--trackers-remove", placeholder: "blu,xyz,etc", description: "Remove these trackers from the default list for this upload" },
+      { label: "--trackers", placeholder: "aither,blutopia,lst,etc", description: "Specific Trackers list for uploading" },
+      { label: "--trackers-remove", placeholder: "blutopia,xyz,etc", description: "Remove these trackers from the default list for this upload" },
       { label: "--trackers-pass", placeholder: "N", description: "How many trackers need to pass all checks for upload to proceed" },
       { label: "--skip_auto_torrent", description: "Skip auto torrent searching" },
       { label: "--skip-dupe-check", description: "Skip dupe check" },
@@ -182,12 +219,22 @@ const argumentCategories = [
     ]
   },
   {
+    title: "Tracker / Site Specific",
+    args: [
+      { label: "--foreign", description: "CINEMATIK foreign category" },
+      { label: "--opera", description: "CINEMATIK opera and musical category" },
+      { label: "--asian", description: "CINEMATIK Asian category" },
+      { label: "--exclusive", placeholder: "1", description: "Set exclusive flag where supported" }
+    ]
+  },
+  {
     title: "Torrent Creation / Hashing",
     args: [
       { label: "--max-piece-size", placeholder: "N", description: "Max piece size (in MiB) of created torrent (1 <> 128)" },
       { label: "--nohash", description: "Don't rehash torrent even if it was needed" },
       { label: "--rehash", description: "Create a fresh torrent from the actual data, not an existing .torrent file" },
       { label: "--mkbrr", description: "Use mkbrr for torrent creation (config)" },
+      { label: "--vapoursynth", description: "Use VapourSynth for screenshots" },
       { label: "--entropy", placeholder: "N", description: "Entropy" },
       { label: "--randomized", placeholder: "N", description: "Randomized" },
       { label: "--infohash", placeholder: "HASH", description: "Use this Infohash as the existing torrent from client" },
@@ -200,12 +247,16 @@ const argumentCategories = [
       { label: "--client", placeholder: "NAME", description: "Client name (config)" },
       { label: "--qbit-tag", placeholder: "TAG", description: "qBittorrent tag (config)" },
       { label: "--qbit-cat", placeholder: "CATEGORY", description: "qBittorrent category (config)" },
+      { label: "--qbit-bw-control", description: "Enable qBittorrent bandwidth control" },
+      { label: "--qbit-bw-threshold", placeholder: "KiB/s", description: "qBittorrent bandwidth threshold" },
+      { label: "--qbit-bw-time", placeholder: "SECONDS", description: "qBittorrent bandwidth wait time" },
       { label: "--rtorrent-label", placeholder: "LABEL", description: "rTorrent label (config)" }
     ]
   },
   {
     title: "Cleanup / Temp",
     args: [
+      { label: "--delete-meta", description: "Delete only meta.json from tmp folder" },
       { label: "--delete-tmp", description: "Delete the tmp folder associated with this upload" },
       { label: "--cleanup", description: "Cleanup the entire UA tmp folder" }
     ]
@@ -215,6 +266,8 @@ const argumentCategories = [
     args: [
       { label: "--debug", description: "Debug mode" },
       { label: "--ffdebug", description: "FFmpeg debug" },
+      { label: "--upload-order", placeholder: "tracker1,tracker2", description: "Preferred upload order" },
+      { label: "--webui", description: "Launch the WebUI mode" },
       { label: "--upload-timer", description: "Upload timer (config)" }
     ]
   },
@@ -223,6 +276,10 @@ const argumentCategories = [
     args: [
       { label: "--not-anime", description: "Can speed up tv data extraction when not anime content" },
       { label: "--channel", placeholder: "ID_OR_TAG", description: "SPD channel" },
+      { label: "--audio-spectrogram", description: "Generate audio spectrograms" },
+      { label: "--audio-spectrogram-tracks", placeholder: "1,2", description: "Specific tracks for spectrograms" },
+      { label: "--usenet", description: "Upload files to Usenet (NNTP)" },
+      { label: "--usenet-subject", placeholder: "TEXT", description: "Custom Usenet subject line" },
       { label: "--unattended", description: "Unattended (no prompts (AT ALL))" },
       { label: "--unattended_confirm", description: "Unattended confirm (use with --unattended, some prompting)" }
     ]
