@@ -1,6 +1,8 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
+import contextlib
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -10,7 +12,9 @@ from defusedxml import ElementTree
 from src.meta import Meta
 
 API_HIT_WINDOW_SECONDS = 24 * 60 * 60
-API_HIT_COUNTER_FILENAME = "usenet_api_hit_counters.json"
+API_HIT_COUNTER_DIRNAME = "usenet_api_hit_counters"
+API_HIT_COUNTER_LOCK_TIMEOUT_SECONDS = 10.0
+API_HIT_COUNTER_LOCK_POLL_SECONDS = 0.05
 
 
 def get_newznab_search_category_id(meta: Meta) -> str:
@@ -118,42 +122,77 @@ def get_daily_api_hit_limit(tracker_cfg: dict[str, Any]) -> int:
     return max(limit, 0)
 
 
-def _get_api_hit_counter_path(base_dir: str) -> Path:
-    return Path(base_dir) / "tmp" / API_HIT_COUNTER_FILENAME
+def _get_api_hit_counter_filename(tracker: str) -> str:
+    safe_tracker = "".join(char if char.isalnum() else "_" for char in tracker.strip().lower())
+    safe_tracker = safe_tracker.strip("_") or "default"
+    return f"{safe_tracker}.json"
+
+
+def _get_api_hit_counter_path(base_dir: str, tracker: str) -> Path:
+    return Path(base_dir) / "tmp" / API_HIT_COUNTER_DIRNAME / _get_api_hit_counter_filename(tracker)
+
+
+def _get_api_hit_counter_lock_path(base_dir: str, tracker: str) -> Path:
+    return _get_api_hit_counter_path(base_dir, tracker).with_suffix(".lock")
+
+
+def _acquire_api_hit_counter_lock(lock_path: Path) -> int:
+    deadline = time.monotonic() + API_HIT_COUNTER_LOCK_TIMEOUT_SECONDS
+    while True:
+        try:
+            return os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_RDWR)
+        except FileExistsError:
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"Timed out waiting for API hit counter lock: {lock_path}") from None
+            time.sleep(API_HIT_COUNTER_LOCK_POLL_SECONDS)
+
+
+def _release_api_hit_counter_lock(lock_fd: int, lock_path: Path) -> None:
+    try:
+        os.close(lock_fd)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            lock_path.unlink()
+
+
+def _write_api_hit_cache(cache_path: Path, tracker_hits: list[float]) -> None:
+    temp_path = cache_path.with_suffix(f"{cache_path.suffix}.tmp.{os.getpid()}")
+    temp_path.write_text(json.dumps(tracker_hits, indent=2), encoding="utf-8")
+    temp_path.replace(cache_path)
 
 
 def _reserve_daily_api_hit_sync(base_dir: str, tracker: str, limit: int) -> tuple[bool, int]:
-    cache_path = _get_api_hit_counter_path(base_dir)
+    cache_path = _get_api_hit_counter_path(base_dir, tracker)
     cache_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = _get_api_hit_counter_lock_path(base_dir, tracker)
+    lock_fd = _acquire_api_hit_counter_lock(lock_path)
+    try:
+        tracker_hits: list[Any] = []
+        if cache_path.exists():
+            try:
+                loaded_cache = json.loads(cache_path.read_text(encoding="utf-8"))
+                if isinstance(loaded_cache, list):
+                    tracker_hits = loaded_cache
+            except OSError, json.JSONDecodeError:
+                tracker_hits = []
 
-    raw_cache: dict[str, Any] = {}
-    if cache_path.exists():
-        try:
-            raw_cache = json.loads(cache_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            raw_cache = {}
+        now = time.time()
+        cutoff = now - API_HIT_WINDOW_SECONDS
+        recent_hits: list[float] = []
+        for hit in tracker_hits:
+            if isinstance(hit, (int, float)):
+                hit_value = float(hit)
+                if hit_value >= cutoff:
+                    recent_hits.append(hit_value)
+        if len(recent_hits) >= limit:
+            _write_api_hit_cache(cache_path, recent_hits)
+            return False, len(recent_hits)
 
-    now = time.time()
-    cutoff = now - API_HIT_WINDOW_SECONDS
-    tracker_hits = raw_cache.get(tracker, [])
-    if not isinstance(tracker_hits, list):
-        tracker_hits = []
-
-    recent_hits: list[float] = []
-    for hit in tracker_hits:
-        if isinstance(hit, (int, float)):
-            hit_value = float(hit)
-            if hit_value >= cutoff:
-                recent_hits.append(hit_value)
-    if len(recent_hits) >= limit:
-        raw_cache[tracker] = recent_hits
-        cache_path.write_text(json.dumps(raw_cache, indent=2, sort_keys=True), encoding="utf-8")
-        return False, len(recent_hits)
-
-    recent_hits.append(now)
-    raw_cache[tracker] = recent_hits
-    cache_path.write_text(json.dumps(raw_cache, indent=2, sort_keys=True), encoding="utf-8")
-    return True, len(recent_hits)
+        recent_hits.append(now)
+        _write_api_hit_cache(cache_path, recent_hits)
+        return True, len(recent_hits)
+    finally:
+        _release_api_hit_counter_lock(lock_fd, lock_path)
 
 
 async def reserve_daily_api_hit(base_dir: str, tracker: str, limit: int) -> tuple[bool, int]:
