@@ -738,8 +738,8 @@ class QbittorrentClientMixin:
             if norm_save_path.startswith(norm_local_path):
                 # Get the relative part of the path
                 rel_path = os.path.relpath(save_path, local_path)
-                # Combine remote path with relative path
-                save_path = Path(remote_path) / rel_path
+                # Combine remote path with relative path while keeping a string path
+                save_path = str(Path(remote_path) / rel_path)
 
             # For direct replacement if the above approach doesn't work
             elif local_path.lower() in save_path.lower():
