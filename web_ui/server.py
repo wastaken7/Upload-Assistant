@@ -403,7 +403,7 @@ def _json_load_list(text: str) -> list[Any]:
     loaded = json.loads(text)
     if isinstance(loaded, Sequence) and not isinstance(loaded, (str, bytes, bytearray)):
         loaded_seq: Sequence[Any] = cast(Sequence[Any], loaded)
-        return [item for item in loaded_seq]
+        return list(loaded_seq)
     return []
 
 
@@ -440,7 +440,7 @@ def _request_json_dict() -> dict[str, Any]:
             for key, value in data_dict.items():
                 result[str(key)] = value
             return result
-    except Exception:
+    except Exception:  # noqa: S110
         pass
     return {}
 
@@ -1129,6 +1129,30 @@ def _set_process_awaiting_input(session_id: str, waiting: bool) -> None:
         process_info["awaiting_input"] = waiting
 
 
+def _make_process_state(path: str, args: str) -> dict[str, object]:
+    return {
+        "run_token": secrets.token_hex(8),
+        "mode": "starting",
+        "path": path,
+        "args": args,
+        "started_at": time.time(),
+        "awaiting_input": False,
+    }
+
+
+def _session_state_is_current(session_id: str, process_state: Mapping[str, object]) -> bool:
+    current_state = active_processes.get(session_id)
+    if current_state is not process_state:
+        return False
+    run_token = process_state.get("run_token")
+    return bool(run_token and current_state.get("run_token") == run_token)
+
+
+def _discard_session_state(session_id: str, process_state: Mapping[str, object]) -> None:
+    if _session_state_is_current(session_id, process_state):
+        active_processes.pop(session_id, None)
+
+
 def _string_list_preview_values(value: object) -> list[str]:
     results: list[str] = []
     if isinstance(value, str):
@@ -1138,10 +1162,7 @@ def _string_list_preview_values(value: object) -> list[str]:
         return results
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         for item in value:
-            if isinstance(item, Mapping):
-                label = _stringify_preview_value(item.get("name"))
-            else:
-                label = _stringify_preview_value(item)
+            label = _stringify_preview_value(item.get("name")) if isinstance(item, Mapping) else _stringify_preview_value(item)
             if label:
                 results.append(label)
     return results
@@ -1456,13 +1477,16 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
             if _stringify_preview_value(meta_data.get("category")) == "BOOK":
                 current_poster = _stringify_preview_value(meta_data.get("poster"))
                 if not _is_http_url(current_poster):
-                    enriched_meta = dict(meta_data)
-                    enriched_meta["poster"] = _book_cover_from_meta(meta_data, session_id)
-                    meta_data = enriched_meta
+                    try:
+                        enriched_meta = dict(meta_data)
+                        enriched_meta["poster"] = _book_cover_from_meta(meta_data, session_id)
+                        meta_data = enriched_meta
+                    except Exception as err:
+                        console.print(f"Execution preview cover enrichment failed for session {session_id}: {err}", markup=False)
             preview = _extract_execution_preview(meta_data, execution_path)
             preview["awaiting_input"] = bool(process_info.get("awaiting_input"))
             return preview
-        except Exception:
+        except Exception:  # noqa: S110
             pass
 
     return {
@@ -3282,7 +3306,7 @@ def torrent_clients():
     user_clients = cast(dict[str, Any], user_clients_raw) if isinstance(user_clients_raw, Mapping) else {}
 
     # Include all configured clients in the dropdown
-    client_names: list[str] = [str(key) for key in user_clients.keys()]
+    client_names: list[str] = [str(key) for key in user_clients]
 
     return jsonify({"success": True, "clients": sorted(client_names)})
 
@@ -3868,13 +3892,8 @@ def execute_command():
                 upload_script = str(base_dir / "upload.py")
                 command = [sys.executable, "-u", upload_script, validated_path]
 
-                active_processes[session_id] = {
-                    "mode": "starting",
-                    "path": validated_path,
-                    "args": args,
-                    "started_at": time.time(),
-                    "awaiting_input": False,
-                }
+                process_state = _make_process_state(validated_path, args)
+                active_processes[session_id] = process_state
 
                 # Add arguments if provided
                 if args:
@@ -3946,6 +3965,12 @@ def execute_command():
                     if not acquired:
                         console.print(f"Failed to acquire inproc lock for session {session_id}; another inproc run may be active", markup=False)
                         yield f"data: {json.dumps({'type': 'error', 'data': 'Another in-process run is active'})}\n\n"
+                        return
+
+                    if not _session_state_is_current(session_id, process_state):
+                        with contextlib.suppress(Exception):
+                            inproc_lock.release()
+                        yield f"data: {json.dumps({'type': 'error', 'data': 'Execution session was replaced'})}\n\n"
                         return
 
                     # Monkeypatch the existing shared console to record prints and intercept input
@@ -4023,9 +4048,6 @@ def execute_command():
                             else:
                                 question = kwargs.get("question", "")
 
-                            # If default was passed positionally (third arg), use it.
-                            default_val = args[2] if len(args) >= 3 else kwargs.get("default", default)
-
                             with contextlib.suppress(Exception):
                                 wrapped_print(str(question))
                             # Wait for a response or cancellation
@@ -4047,7 +4069,8 @@ def execute_command():
                                     return True
                                 if resp in ("n", "no"):
                                     return False
-                                return default_val
+                                with contextlib.suppress(Exception):
+                                    wrapped_print("Please answer y or n.")
 
                         _cli_ui.ask_yes_no = wrapped_ask_yes_no
                         # Save original ask_yes_no so external cleaners (eg. /api/kill)
@@ -4147,14 +4170,14 @@ def execute_command():
                         sys.argv = [upload_script, validated_path, *parsed_args]
 
                         # Store in active_processes so /api/input can post into the queue
-                        active_processes[session_id].update(
-                            {
-                                "mode": "inproc",
-                                "input_queue": input_queue,
-                                "record_console": record_console,
-                                "cancel_event": cancel_event,
-                            }
-                        )
+                        process_state.update({
+                            "mode": "inproc",
+                            "input_queue": input_queue,
+                            "record_console": record_console,
+                            "cancel_event": cancel_event,
+                        })
+                        if not _session_state_is_current(session_id, process_state):
+                            raise RuntimeError("Execution session was replaced before in-process startup completed")
 
                         # Run the upload main loop in a separate thread to avoid blocking SSE generator
                         def run_upload():
@@ -4222,8 +4245,8 @@ def execute_command():
 
                         # Record worker thread for debugging/cleanup
                         with contextlib.suppress(Exception):
-                            if session_id in active_processes:
-                                active_processes[session_id]["worker"] = worker
+                            if _session_state_is_current(session_id, process_state):
+                                process_state["worker"] = worker
 
                         console.print(f"Started inproc worker for session {session_id}: {worker.name}", markup=False)
 
@@ -4322,7 +4345,7 @@ def execute_command():
 
                         # Remove process tracking for this session
                         with contextlib.suppress(Exception):
-                            active_processes.pop(session_id, None)
+                            _discard_session_state(session_id, process_state)
 
                     return
 
@@ -4379,28 +4402,28 @@ def execute_command():
                         return
 
                     # codeql[py/command-line-injection]
-                    process = subprocess.Popen(  # lgtm[py/command-line-injection]  # noqa: S603
-                        command,
-                        stdin=subprocess.PIPE,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        text=True,
-                        bufsize=0,  # Completely unbuffered
-                        cwd=str(base_dir),
-                        env=env,
-                        universal_newlines=True,
-                    )
-
-                    # Store process for input handling (no queue needed)
-                    active_processes[session_id].update(
-                        {
-                            "mode": "subprocess",
-                            "process": process,
-                        }
-                    )
-
+                    process = None
                     # Wrap subprocess handling in try/finally to guarantee cleanup
                     try:
+                        process = subprocess.Popen(  # lgtm[py/command-line-injection]  # noqa: S603
+                            command,
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            bufsize=0,  # Completely unbuffered
+                            cwd=str(base_dir),
+                            env=env,
+                            universal_newlines=True,
+                        )
+
+                        process_state.update({
+                            "mode": "subprocess",
+                            "process": process,
+                        })
+                        if not _session_state_is_current(session_id, process_state):
+                            raise RuntimeError("Execution session was replaced before subprocess startup completed")
+
                         # Thread to read stdout - stream raw output with ANSI codes
                         def read_stdout():
                             try:
@@ -4439,11 +4462,10 @@ def execute_command():
 
                         # Record threads and output queue for debugging/cleanup
                         with contextlib.suppress(Exception):
-                            if session_id in active_processes:
-                                info = active_processes[session_id]
-                                info["stdout_thread"] = stdout_thread
-                                info["stderr_thread"] = stderr_thread
-                                info["output_queue"] = output_queue
+                            if _session_state_is_current(session_id, process_state):
+                                process_state["stdout_thread"] = stdout_thread
+                                process_state["stderr_thread"] = stderr_thread
+                                process_state["output_queue"] = output_queue
 
                         console.print(f"Started subprocess reader threads for session {session_id}: stdout={stdout_thread.name}, stderr={stderr_thread.name}", markup=False)
 
@@ -4517,10 +4539,13 @@ def execute_command():
                         process.wait()
 
                         # Clean up (normal path)
-                        active_processes.pop(session_id, None)
+                        _discard_session_state(session_id, process_state)
 
                         yield f"data: {json.dumps({'type': 'exit', 'code': process.returncode})}\n\n"
                     finally:
+                        with contextlib.suppress(Exception):
+                            if process is not None and not _session_state_is_current(session_id, process_state) and process.poll() is None:
+                                process.kill()
                         # Ensure subprocess pipes are closed to avoid leaking file handles
                         with contextlib.suppress(Exception):
                             if process.stdin is not None:
@@ -4533,7 +4558,7 @@ def execute_command():
                                 process.stderr.close()
                         # Ensure we remove tracking entry if still present
                         with contextlib.suppress(Exception):
-                            active_processes.pop(session_id, None)
+                            _discard_session_state(session_id, process_state)
 
             except Exception as e:
                 console.print(f"Execution error for session {session_id}: {e}", markup=False)
@@ -4541,7 +4566,9 @@ def execute_command():
                 yield f"data: {json.dumps({'type': 'error', 'data': 'Execution error'})}\n\n"
 
                 # Clean up on error
-                active_processes.pop(session_id, None)
+                with contextlib.suppress(Exception):
+                    if "process_state" in locals():
+                        _discard_session_state(session_id, cast(Mapping[str, object], process_state))
 
         return Response(generate(), mimetype="text/event-stream")
 
