@@ -2,7 +2,8 @@
 import contextlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+from xml.etree import ElementTree
 
 import aiofiles
 import httpx
@@ -12,6 +13,7 @@ from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.USENET.search_helpers import build_newznab_search_query, parse_newznab_dupes
 
 Config = dict[str, Any]
 
@@ -33,6 +35,16 @@ class Curupira:
     def __init__(self, config: Config) -> None:
         self.config = config
         self.common = Common(config)
+        self.api_key = self.config.get("TRACKERS", {}).get(self.tracker, {}).get("api_key", "").strip()
+
+    async def get_search_name(self, meta: Meta) -> str:
+        return await self.get_name(meta)
+
+    def get_search_query(self, meta: Meta) -> str:
+        return build_newznab_search_query(meta)
+
+    def _parse_dupes_from_response(self, response_text: str) -> list[dict[str, Any]]:
+        return parse_newznab_dupes(response_text)
 
     async def search_existing(self, meta: Meta) -> list[Any]:
         release_name = await self.get_name(meta)
@@ -41,8 +53,81 @@ class Curupira:
             logger.info(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
             return [release_name]
 
-        logger.info(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
-        return []
+        params_list: list[dict[str, str]] = []
+        exact_name = await self.get_search_name(meta)
+        if exact_name:
+            params_list.append({
+                "t": "search",
+                "q": exact_name,
+            })
+
+        params: dict[str, str] = {}
+
+        category = meta.category.upper()
+
+        if category == "TV":
+            params["t"] = "tvsearch"
+            if meta.tvdb_id and str(meta.tvdb_id).isdigit() and int(meta.tvdb_id) > 0:
+                params["tvdbid"] = str(meta.tvdb_id)
+            elif meta.tmdb_id and str(meta.tmdb_id).isdigit() and int(meta.tmdb_id) > 0:
+                params["tmdbid"] = str(meta.tmdb_id)
+            elif meta.imdb_id and int(meta.imdb_id) > 0:
+                params["imdbid"] = f"tt{meta.imdb}"
+            else:
+                params["q"] = self.get_search_query(meta)
+
+            if meta.season_int > 0:
+                params["season"] = str(meta.season_int)
+            if meta.episode_int > 0:
+                params["ep"] = str(meta.episode_int)
+        elif category == "MOVIE":
+            params["t"] = "movie"
+            if meta.imdb_id and int(meta.imdb_id) > 0:
+                params["imdbid"] = f"tt{meta.imdb}"
+            elif meta.tmdb_id and str(meta.tmdb_id).isdigit() and int(meta.tmdb_id) > 0:
+                params["tmdbid"] = str(meta.tmdb_id)
+            else:
+                params["q"] = self.get_search_query(meta)
+        else:
+            params["t"] = "search"
+            params["cat"] = self.get_category_id(meta)
+            params["q"] = self.get_search_query(meta)
+
+        if "q" not in params or not params["q"]:
+            params["q"] = self.get_search_query(meta)
+
+        params_list.append(params)
+
+        dupes: list[dict[str, Any]] = []
+        seen_keys: set[str] = set()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            for query_params in params_list:
+                try:
+                    request_params = {
+                        "apikey": str(self.api_key),
+                        "limit": "100",
+                        **query_params,
+                    }
+                    response = await client.get("https://curupira.cc/api", params=request_params)
+
+                    if response.status_code != 200 or not response.text.strip():
+                        logger.info(f"{self.tracker}: [yellow]Duplicate search failed with HTTP {response.status_code}.[/yellow]")
+                        continue
+
+                    for dupe in self._parse_dupes_from_response(response.text):
+                        key = str(dupe.get("link") or dupe.get("name") or "")
+                        if key in seen_keys:
+                            continue
+                        seen_keys.add(key)
+                        dupes.append(dupe)
+                except ElementTree.ParseError:
+                    logger.info(f"{self.tracker}: [yellow]Failed to parse duplicate search response.[/yellow]")
+                except httpx.TimeoutException:
+                    logger.info(f"{self.tracker}: [yellow]Duplicate search timed out.[/yellow]")
+                except httpx.RequestError as e:
+                    logger.info(f"{self.tracker}: [yellow]Duplicate search request failed: {e}[/yellow]")
+
+        return dupes
 
     async def get_additional_checks(self, _meta: Meta) -> bool:
         return True
@@ -168,19 +253,21 @@ class Curupira:
         return ""
 
     async def get_screens(self, meta: Meta) -> list[str]:
-        menu_images = meta.menu_images
-        images_list = meta.get(f"{self.tracker}_images_key", meta.image_list)
-        spectrograms_images = meta.spectrograms_images
+        menu_images = [cast(dict[str, Any], img) for img in meta.menu_images if isinstance(img, dict)]
+        images_value = meta.get(f"{self.tracker}_images_key", meta.image_list)
+        image_entries: list[Any] = cast(list[Any], images_value) if isinstance(images_value, list) else []
+        images_list = [cast(dict[str, Any], img) for img in image_entries if isinstance(img, dict)]
+        spectrograms_images = [cast(dict[str, Any], img) for img in meta.spectrograms_images if isinstance(img, dict)]
 
-        combined_images = []
-        if isinstance(menu_images, list):
-            combined_images.extend([img for img in menu_images if isinstance(img, dict)])
-        if isinstance(images_list, list):
-            combined_images.extend([img for img in images_list if isinstance(img, dict)])
-        if isinstance(spectrograms_images, list):
-            combined_images.extend([img for img in spectrograms_images if isinstance(img, dict)])
+        combined_images: list[dict[str, Any]] = []
+        if menu_images:
+            combined_images.extend(menu_images)
+        if images_list:
+            combined_images.extend(images_list)
+        if spectrograms_images:
+            combined_images.extend(spectrograms_images)
 
-        urls = []
+        urls: list[str] = []
         for image in combined_images:
             raw_url = image.get("raw_url")
             if isinstance(raw_url, str) and raw_url:
@@ -188,7 +275,7 @@ class Curupira:
 
         return urls
 
-    async def _prepare_data(self, meta: Meta, tracker_cfg: Config) -> dict[str, Any]:
+    async def _prepare_data(self, meta: Meta) -> dict[str, Any]:
         screenshot_urls = await self.get_screens(meta)
         data = {
             "name": await self.get_name(meta),
@@ -217,15 +304,19 @@ class Curupira:
 
         if meta.is_disc:
             # Audio and Subtitles languages (optional, as ISO 639-1 JSON array)
-            audio_langs = []
+            audio_langs: list[str] = []
             for lang in meta.audio_languages or []:
                 iso = self.get_iso_639_1(lang)
                 if iso:
                     audio_langs.append(iso)
             if audio_langs:
                 data["audio_langs"] = json.dumps(audio_langs)
-            subs_langs = []
-            for lang in meta.subtitle_languages or []:
+            subtitle_languages = meta.subtitle_languages
+            subtitle_langs = (
+                subtitle_languages if isinstance(subtitle_languages, list) else [subtitle_languages] if isinstance(subtitle_languages, str) and subtitle_languages else []
+            )
+            subs_langs: list[str] = []
+            for lang in subtitle_langs:
                 iso = self.get_iso_639_1(lang)
                 if iso:
                     subs_langs.append(iso)
@@ -246,7 +337,7 @@ class Curupira:
             data["mal_id"] = str(mal_id)
 
         # Anonymous (optional)
-        anon = 0 if meta.anon == 0 and not tracker_cfg.get("anon", False) else 1
+        anon = 0 if meta.anon == 0 and not self.config.get("TRACKERS", {}).get(self.tracker, {}).get("anon", False) else 1
         if anon:
             data["anonymous"] = "true"
 
@@ -266,16 +357,13 @@ class Curupira:
             status_dict["status_message"] = "data error: NZB file missing or password missing in header"
             return False
 
-        tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
-        api_key = tracker_cfg.get("api_key", "").strip()
-
         files = await self._prepare_files(meta)
         if not files:
             logger.error(f"[red]Error: NZB file not found for {self.tracker}.[/red]")
             status_dict["status_message"] = "data error: NZB file not found"
             return False
 
-        data = await self._prepare_data(meta, tracker_cfg)
+        data = await self._prepare_data(meta)
 
         if meta.debug:
             logger.debug("[cyan]Curupira Upload (DEBUG MODE):[/cyan]")
@@ -290,7 +378,7 @@ class Curupira:
             return True
 
         # Perform actual upload
-        params = {"apikey": api_key}
+        params = {"apikey": self.api_key}
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(

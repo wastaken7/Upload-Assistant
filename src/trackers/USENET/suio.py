@@ -8,6 +8,7 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+from xml.etree import ElementTree
 
 import aiofiles
 import httpx
@@ -17,6 +18,7 @@ from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
+from src.trackers.USENET.search_helpers import build_newznab_search_query, get_newznab_search_category_id, parse_newznab_dupes
 
 Config = dict[str, Any]
 
@@ -32,14 +34,16 @@ class Suio:
     banned_groups: tuple[str, ...] = ()
     upload_url: str | None = None
     torrent_url: str | None = None
+    search_url: str | None = None
     supported_categories = ("MOVIE", "TV", "GAME", "BOOK")
     is_usenet = True
 
     def __init__(self, config: Config) -> None:
         self.config = config
         self.common = Common(config)
-        tracker_cfg = config.get("TRACKERS", {}).get(self.tracker, {})
-        base_url = str(tracker_cfg.get("base_url", "")).strip().rstrip("/")
+        self.tracker_cfg = config.get("TRACKERS", {}).get(self.tracker, {})
+        self.api_key = str(self.tracker_cfg.get("api_key", "")).strip()
+        base_url = str(self.tracker_cfg.get("base_url", "")).strip().rstrip("/")
         if base_url:
             # Verify the domain matches the expected indexer domain hash to prevent credentials leak
             url_to_parse = base_url if base_url.startswith(("http://", "https://")) else "https://" + base_url
@@ -52,16 +56,32 @@ class Suio:
                 if domain_hash == "a0fcf409be81cbcec4e212cb69331960e5d709449c0e9cad40e36369d8da8f3c":
                     self.upload_url = f"{base_url}/api-upload"
                     self.torrent_url = f"{base_url}/details.php?id="
+                    parsed_url = urlparse(url_to_parse)
+                    scheme = parsed_url.scheme or "https"
+                    hostname = parsed_url.netloc or parsed_url.path
+                    self.search_url = f"{scheme}://api.{hostname.split('@')[-1]}/api"
                 else:
                     self.upload_url = None
                     self.torrent_url = None
+                    self.search_url = None
                     logger.info(f"{self.tracker} [red]base_url from config.py does not match the expected domain. Skipping...[/red]")
             except Exception:
                 self.upload_url = None
                 self.torrent_url = None
+                self.search_url = None
         else:
             self.upload_url = None
             self.torrent_url = None
+            self.search_url = None
+
+    def get_search_query(self, meta: Meta) -> str:
+        return build_newznab_search_query(meta)
+
+    async def get_search_name(self, meta: Meta) -> str:
+        return await self.get_name(meta)
+
+    def _parse_dupes_from_response(self, response_text: str) -> list[dict[str, Any]]:
+        return parse_newznab_dupes(response_text, self.torrent_url, use_guid_attr_as_id=True)
 
     async def search_existing(self, meta: Meta) -> list[Any]:
         release_name = await self.get_name(meta)
@@ -70,7 +90,82 @@ class Suio:
             logger.info(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
             return [release_name]
 
-        logger.info(f"{self.tracker}: [yellow]Searching for existing releases is not supported.[/yellow]")
+        if not self.search_url:
+            return []
+        if not bool(self.tracker_cfg.get("search_api", False)):
+            logger.info(f"{self.tracker}: [yellow]Duplicate search via API is disabled in config.[/yellow]")
+            return []
+
+        params_list: list[dict[str, str]] = []
+        exact_name = await self.get_search_name(meta)
+        if exact_name:
+            params_list.append({
+                "t": "search",
+                "q": exact_name,
+                "pw": "0",
+            })
+
+        params: dict[str, str] = {
+            "cat": get_newznab_search_category_id(meta),
+        }
+
+        category = meta.category.upper()
+        if category == "TV":
+            params["t"] = "tvsearch"
+            if meta.tvdb_id and str(meta.tvdb_id).isdigit() and int(meta.tvdb_id) > 0:
+                params["tvdbid"] = str(meta.tvdb_id)
+            else:
+                params["q"] = self.get_search_query(meta)
+
+            if meta.season_int > 0:
+                params["season"] = str(meta.season_int)
+            if meta.episode_int > 0:
+                params["ep"] = str(meta.episode_int)
+        elif category == "MOVIE":
+            params["t"] = "movie"
+            if meta.imdb_tt:
+                params["imdbid"] = meta.imdb_tt
+            else:
+                params["q"] = self.get_search_query(meta)
+        else:
+            params["t"] = "search"
+            params["q"] = self.get_search_query(meta)
+
+        params_list.append(params)
+
+        try:
+            dupes: list[dict[str, Any]] = []
+            seen_keys: set[str] = set()
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                for query_params in params_list:
+                    request_params = {
+                        "apikey": self.api_key,
+                        "limit": "100",
+                        "extended": "1",
+                        "pw": "2",
+                        **query_params,
+                    }
+                    response = await client.get(self.search_url, params=request_params)
+
+                    if response.status_code != 200 or not response.text.strip():
+                        logger.info(f"{self.tracker}: [yellow]Duplicate search failed with HTTP {response.status_code}.[/yellow]")
+                        continue
+
+                    for dupe in self._parse_dupes_from_response(response.text):
+                        key = str(dupe.get("link") or dupe.get("name") or "")
+                        if key in seen_keys:
+                            continue
+                        seen_keys.add(key)
+                        dupes.append(dupe)
+
+            return dupes
+        except ElementTree.ParseError:
+            logger.info(f"{self.tracker}: [yellow]Failed to parse duplicate search response.[/yellow]")
+        except httpx.TimeoutException:
+            logger.info(f"{self.tracker}: [yellow]Duplicate search timed out.[/yellow]")
+        except httpx.RequestError as e:
+            logger.info(f"{self.tracker}: [yellow]Duplicate search request failed: {e}[/yellow]")
+
         return []
 
     async def get_additional_checks(self, _meta: Meta) -> bool:
@@ -320,9 +415,7 @@ class Suio:
             status_dict["status_message"] = "data error: base_url missing"
             return False
 
-        tracker_cfg = self.config.get("TRACKERS", {}).get(self.tracker, {})
-        username = tracker_cfg.get("username", "").strip()
-        api_key = tracker_cfg.get("api_key", "").strip()
+        username = self.tracker_cfg.get("username", "").strip()
 
         files = await self._prepare_files(meta)
         if not files:
@@ -339,10 +432,12 @@ class Suio:
             logger.debug({k: v[0] for k, v in files.items()})
             status_dict["status_message"] = "Debug mode enabled, skipping upload."
             return True
+
         params = {
-            "user": username,
-            "api": api_key,
+            "user": str(username),
+            "api": self.api_key,
         }
+
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(

@@ -189,6 +189,7 @@ class Meta:
     imdb_mismatch: bool = False
     imdb_rating: str = ""
     imdb: str | None = ""
+    imdb_tt: str = ""
     imghost: str = ""
     infohash: str = ""
     initial_dupes: dict[str, Any] = field(default_factory=dict)

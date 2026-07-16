@@ -1500,8 +1500,10 @@ async def finalize_metadata(
     if imdb_id_value != 0:
         imdb_str = str(imdb_id_value).zfill(7)
         meta.imdb = imdb_str
+        meta.imdb_tt = f"tt{imdb_str}"
     else:
         meta.imdb = "0"
+        meta.imdb_tt = ""
     meta.mal = meta.mal_id
     meta.tvdb = meta.tvdb_id
     meta.tvmaze = meta.tvmaze_id
