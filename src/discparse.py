@@ -761,7 +761,7 @@ class DiscParse:
 
                             selected_playlists = [valid_playlists[i] for i in selected_indices]
                             break  # Exit the loop when valid input is provided
-                        except (ValueError, IndexError):
+                        except ValueError, IndexError:
                             logger.info("[red]Invalid input. Please try again.")
 
                 # Extract the .EVO files from the selected playlists

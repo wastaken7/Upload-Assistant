@@ -109,11 +109,13 @@ class Suio:
         params_list: list[dict[str, str]] = []
         exact_name = await self.get_search_name(meta)
         if exact_name:
-            params_list.append({
-                "t": "search",
-                "q": exact_name,
-                "pw": "0",
-            })
+            params_list.append(
+                {
+                    "t": "search",
+                    "q": exact_name,
+                    "pw": "0",
+                }
+            )
 
         params: dict[str, str] = {
             "cat": get_newznab_search_category_id(meta),
@@ -151,8 +153,7 @@ class Suio:
                     allowed, used_hits = await reserve_daily_api_hit(meta.base_dir, self.tracker, self.daily_api_hit_limit)
                     if not allowed:
                         logger.info(
-                            f"{self.tracker}: [yellow]Duplicate search stopped because the 24-hour API hit limit "
-                            f"({self.daily_api_hit_limit}) has been reached.[/yellow]"
+                            f"{self.tracker}: [yellow]Duplicate search stopped because the 24-hour API hit limit ({self.daily_api_hit_limit}) has been reached.[/yellow]"
                         )
                         break
                     request_params = {
@@ -163,9 +164,7 @@ class Suio:
                         **query_params,
                     }
                     response = await client.get(self.search_url, params=request_params)
-                    logger.debug(
-                        f"{self.tracker}: Duplicate search used API hit {used_hits}/{self.daily_api_hit_limit} in the last 24 hours."
-                    )
+                    logger.debug(f"{self.tracker}: Duplicate search used API hit {used_hits}/{self.daily_api_hit_limit} in the last 24 hours.")
 
                     if response.status_code != 200 or not response.text.strip():
                         logger.info(f"{self.tracker}: [yellow]Duplicate search failed with HTTP {response.status_code}.[/yellow]")

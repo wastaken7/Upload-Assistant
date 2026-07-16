@@ -1,11 +1,20 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import contextlib
 import json
 import os
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None
 
 from defusedxml import ElementTree
 
@@ -51,7 +60,7 @@ def build_newznab_search_query(meta: Meta) -> str:
     raw_year = meta.year or meta.search_year or 0
     try:
         year = int(raw_year)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         year = 0
 
     if meta.category.upper() == "TV":
@@ -104,12 +113,14 @@ def parse_newznab_dupes(
         if item_link and not item_link.startswith(("http://", "https://")) and guid and torrent_url:
             item_link = f"{torrent_url}{guid}"
 
-        dupes.append({
-            "name": title,
-            "files": title,
-            "size": int(size_text) if size_text.isdigit() else 0,
-            "link": item_link,
-        })
+        dupes.append(
+            {
+                "name": title,
+                "files": title,
+                "size": int(size_text) if size_text.isdigit() else 0,
+                "link": item_link,
+            }
+        )
 
     return dupes
 
@@ -117,7 +128,7 @@ def parse_newznab_dupes(
 def get_daily_api_hit_limit(tracker_cfg: dict[str, Any]) -> int:
     try:
         limit = int(tracker_cfg.get("daily_api_hit_limit", 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 0
     return max(limit, 0)
 
@@ -136,23 +147,51 @@ def _get_api_hit_counter_lock_path(base_dir: str, tracker: str) -> Path:
     return _get_api_hit_counter_path(base_dir, tracker).with_suffix(".lock")
 
 
-def _acquire_api_hit_counter_lock(lock_path: Path) -> int:
+def _lock_api_hit_counter_file(lock_file: BinaryIO) -> None:
+    if msvcrt is not None:
+        lock_file.seek(0)
+        msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+        return
+    if fcntl is not None:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore
+        return
+    raise RuntimeError("No supported file locking mechanism is available")
+
+
+def _unlock_api_hit_counter_file(lock_file: BinaryIO) -> None:
+    if msvcrt is not None:
+        lock_file.seek(0)
+        msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+    if fcntl is not None:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)  # type: ignore
+        return
+
+
+def _acquire_api_hit_counter_lock(lock_path: Path) -> BinaryIO:
     deadline = time.monotonic() + API_HIT_COUNTER_LOCK_TIMEOUT_SECONDS
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_file = lock_path.open("a+b")
+    lock_file.seek(0, os.SEEK_END)
+    if lock_file.tell() == 0:
+        lock_file.write(b"\0")
+        lock_file.flush()
     while True:
         try:
-            return os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_RDWR)
-        except FileExistsError:
+            _lock_api_hit_counter_file(lock_file)
+            return lock_file
+        except BlockingIOError, OSError:
             if time.monotonic() >= deadline:
+                lock_file.close()
                 raise TimeoutError(f"Timed out waiting for API hit counter lock: {lock_path}") from None
             time.sleep(API_HIT_COUNTER_LOCK_POLL_SECONDS)
 
 
-def _release_api_hit_counter_lock(lock_fd: int, lock_path: Path) -> None:
+def _release_api_hit_counter_lock(lock_file: BinaryIO) -> None:
     try:
-        os.close(lock_fd)
+        _unlock_api_hit_counter_file(lock_file)
     finally:
-        with contextlib.suppress(FileNotFoundError):
-            lock_path.unlink()
+        lock_file.close()
 
 
 def _write_api_hit_cache(cache_path: Path, tracker_hits: list[float]) -> None:
@@ -165,14 +204,14 @@ def _reserve_daily_api_hit_sync(base_dir: str, tracker: str, limit: int) -> tupl
     cache_path = _get_api_hit_counter_path(base_dir, tracker)
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     lock_path = _get_api_hit_counter_lock_path(base_dir, tracker)
-    lock_fd = _acquire_api_hit_counter_lock(lock_path)
+    lock_file = _acquire_api_hit_counter_lock(lock_path)
     try:
         tracker_hits: list[Any] = []
         if cache_path.exists():
             try:
                 loaded_cache = json.loads(cache_path.read_text(encoding="utf-8"))
                 if isinstance(loaded_cache, list):
-                    tracker_hits = loaded_cache
+                    tracker_hits = loaded_cache  # type: ignore
             except OSError, json.JSONDecodeError:
                 tracker_hits = []
 
@@ -192,7 +231,7 @@ def _reserve_daily_api_hit_sync(base_dir: str, tracker: str, limit: int) -> tupl
         _write_api_hit_cache(cache_path, recent_hits)
         return True, len(recent_hits)
     finally:
-        _release_api_hit_counter_lock(lock_fd, lock_path)
+        _release_api_hit_counter_lock(lock_file)
 
 
 async def reserve_daily_api_hit(base_dir: str, tracker: str, limit: int) -> tuple[bool, int]:

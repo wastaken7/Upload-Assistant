@@ -93,10 +93,7 @@ class DrunkenSlug:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 allowed, used_hits = await reserve_daily_api_hit(meta.base_dir, self.tracker, self.daily_api_hit_limit)
                 if not allowed:
-                    logger.info(
-                        f"{self.tracker}: [yellow]Duplicate search skipped because the 24-hour API hit limit "
-                        f"({self.daily_api_hit_limit}) has been reached.[/yellow]"
-                    )
+                    logger.info(f"{self.tracker}: [yellow]Duplicate search skipped because the 24-hour API hit limit ({self.daily_api_hit_limit}) has been reached.[/yellow]")
                     return []
                 request_params = {
                     "apikey": self.api_key,
@@ -105,9 +102,7 @@ class DrunkenSlug:
                     **params,
                 }
                 response = await client.get(self.search_url, params=request_params)
-                logger.debug(
-                    f"{self.tracker}: Duplicate search used API hit {used_hits}/{self.daily_api_hit_limit} in the last 24 hours."
-                )
+                logger.debug(f"{self.tracker}: Duplicate search used API hit {used_hits}/{self.daily_api_hit_limit} in the last 24 hours.")
                 if response.status_code != 200 or not response.text.strip():
                     logger.info(f"{self.tracker}: [yellow]Duplicate search failed with HTTP {response.status_code}.[/yellow]")
                     return []
