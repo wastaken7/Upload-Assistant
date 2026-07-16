@@ -2865,7 +2865,7 @@ config: dict[str, Any] = {
         "usenet_tmp_dir": "",
     },
     "DISCORD": {
-        # Set to True to enable Discord bot functionality
+        # Optional: install requirements-discord.txt before enabling Discord bot functionality
         "use_discord": False,
         # Set to True to only run the bot in unattended mode
         "only_unattended": True,

@@ -1533,14 +1533,16 @@ class BJShare:
                     # Convert country code to name
                     country_list = [country.name for code in self.main_tmdb_data.get("origin_country", []) if (country := pycountry.countries.get(alpha_2=code))]
                     series_directors = self._collect_credit_names(list(meta.tmdb_directors or meta.imdb_info.get("directors", [])), 1)
-                    data.update({
-                        "network": ", ".join([p.get("name", "") for p in self.main_tmdb_data.get("networks", [])]) or "",  # Optional
-                        "numtemporadas": self.main_tmdb_data.get("number_of_seasons", ""),  # Optional
-                        "datalancamento": self.get_release_date(),
-                        "pais": ", ".join(country_list),  # Optional
-                        "diretorserie": ", ".join(series_directors),  # Optional
-                        "avaliacao": self.get_rating(),  # Optional
-                    })
+                    data.update(
+                        {
+                            "network": ", ".join([p.get("name", "") for p in self.main_tmdb_data.get("networks", [])]) or "",  # Optional
+                            "numtemporadas": self.main_tmdb_data.get("number_of_seasons", ""),  # Optional
+                            "datalancamento": self.get_release_date(),
+                            "pais": ", ".join(country_list),  # Optional
+                            "diretorserie": ", ".join(series_directors),  # Optional
+                            "avaliacao": self.get_rating(),  # Optional
+                        }
+                    )
 
             # Anime-specific data
             if meta.anime:

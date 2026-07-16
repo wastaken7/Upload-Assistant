@@ -1,6 +1,14 @@
 The discord bot can send notifications about UA progress to a discord channel.
 Currently, the notifications are limited too a UA process starting, which sites succeeded and which sites failed to upload, and UA process finished.
 
+Discord support is optional. Before enabling `use_discord`, install the extra dependency set:
+
+```bash
+pip install -r requirements-discord.txt
+```
+
+If you skip that package set, UA will continue to run normally without Discord notifications.
+
 Apart from turning the bot on and off, the only other option currently is whether or not the bot should only post notifications during unattended processing. See the bottom of the `example-config` for config options.
 
 This wiki will only give a brief overview that may help you create and setup a discord bot.

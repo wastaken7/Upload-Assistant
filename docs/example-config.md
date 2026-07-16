@@ -327,6 +327,8 @@ Typical keys:
 
 Enables an optional Discord bot.
 
+Install `requirements-discord.txt` before enabling this section.
+
 - `use_discord` (bool): Enable Discord bot.
 - `only_unattended` (bool): Only run the bot in unattended mode.
 - `send_upload_links` (bool): Send tracker torrent URLs.

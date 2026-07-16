@@ -232,6 +232,17 @@ Open your terminal (Command Prompt/PowerShell on Windows, Terminal on Mac/Linux)
   pip3 install --user -U -r requirements.txt
   ```
 
+Discord notifications are optional and are no longer part of the default install. If you want Discord bot support, install the extra package set after the base dependencies:
+
+* **Windows:**
+  ```cmd
+  pip install -U -r requirements-discord.txt
+  ```
+* **Linux / macOS:**
+  ```bash
+  pip3 install --user -U -r requirements-discord.txt
+  ```
+
 > [!TIP]
 > **Getting an "externally managed environment" error?**
 > This means your system prefers keeping Python packages separated. You can set up a "Virtual Environment" (a private workspace for this tool) by running:
@@ -248,6 +259,8 @@ Open your terminal (Command Prompt/PowerShell on Windows, Terminal on Mac/Linux)
 >   source venv/bin/activate
 >   pip install -r requirements.txt
 >   ```
+>
+> If you also want Discord notifications inside the virtual environment, run `pip install -r requirements-discord.txt` after the base install.
 
 ---
 
@@ -293,6 +306,9 @@ In your terminal, run the command for your operating system and follow the on-sc
 * Run the command to update dependencies:
   * **Windows:** `pip install -U -r requirements.txt`
   * **Linux / macOS:** `python3 -m pip install --user -U -r requirements.txt`
+* If you use the optional Discord bot integration, update that extra package set too:
+  * **Windows:** `pip install -U -r requirements-discord.txt`
+  * **Linux / macOS:** `python3 -m pip install --user -U -r requirements-discord.txt`
 * Run the configuration generator to fetch any new settings:
   * **Windows:** `python config-generator.py`
   * **Linux / macOS:** `python3 config-generator.py`
