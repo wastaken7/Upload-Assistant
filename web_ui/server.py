@@ -679,6 +679,7 @@ _BROWSE_SEARCH_SEP_RE = re.compile(r"[\s.\-_]+")
 
 # Lock to prevent concurrent in-process uploads (avoids cross-session interference)
 inproc_lock = threading.Lock()
+active_processes_lock = threading.Lock()
 
 # Runtime browse roots (set by upload.py when starting web UI)
 _runtime_browse_roots: str | None = None
@@ -1124,9 +1125,15 @@ def _stringify_optional_id(value: object) -> str:
 
 
 def _set_process_awaiting_input(session_id: str, waiting: bool) -> None:
-    process_info = active_processes.get(session_id)
+    with active_processes_lock:
+        process_info = active_processes.get(session_id)
     if process_info is not None:
         process_info["awaiting_input"] = waiting
+
+
+def _set_process_awaiting_input_if_current(session_id: str, process_state: Mapping[str, object], waiting: bool) -> None:
+    if _session_state_is_current(session_id, process_state):
+        _set_process_awaiting_input(session_id, waiting)
 
 
 def _make_process_state(path: str, args: str) -> dict[str, object]:
@@ -1141,16 +1148,22 @@ def _make_process_state(path: str, args: str) -> dict[str, object]:
 
 
 def _session_state_is_current(session_id: str, process_state: Mapping[str, object]) -> bool:
-    current_state = active_processes.get(session_id)
-    if current_state is not process_state:
-        return False
-    run_token = process_state.get("run_token")
-    return bool(run_token and current_state.get("run_token") == run_token)
+    with active_processes_lock:
+        current_state = active_processes.get(session_id)
+        if current_state is not process_state:
+            return False
+        run_token = process_state.get("run_token")
+        return bool(run_token and current_state.get("run_token") == run_token)
 
 
 def _discard_session_state(session_id: str, process_state: Mapping[str, object]) -> None:
-    if _session_state_is_current(session_id, process_state):
-        active_processes.pop(session_id, None)
+    with active_processes_lock:
+        current_state = active_processes.get(session_id)
+        if current_state is not process_state:
+            return
+        run_token = process_state.get("run_token")
+        if run_token and current_state.get("run_token") == run_token:
+            active_processes.pop(session_id, None)
 
 
 def _string_list_preview_values(value: object) -> list[str]:
@@ -3893,7 +3906,8 @@ def execute_command():
                 command = [sys.executable, "-u", upload_script, validated_path]
 
                 process_state = _make_process_state(validated_path, args)
-                active_processes[session_id] = process_state
+                with active_processes_lock:
+                    active_processes[session_id] = process_state
 
                 # Add arguments if provided
                 if args:
@@ -4051,23 +4065,24 @@ def execute_command():
                             with contextlib.suppress(Exception):
                                 wrapped_print(str(question))
                             # Wait for a response or cancellation
-                            _set_process_awaiting_input(session_id, True)
+                            _set_process_awaiting_input_if_current(session_id, process_state, True)
                             while True:
                                 if cancel_event.is_set():
-                                    _set_process_awaiting_input(session_id, False)
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     raise EOFError()
                                 try:
                                     resp = input_queue.get(timeout=0.5)
                                 except queue.Empty:
                                     continue
                                 except Exception:
-                                    _set_process_awaiting_input(session_id, False)
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     raise
-                                _set_process_awaiting_input(session_id, False)
                                 resp = (resp or "").strip().lower()
                                 if resp in ("y", "yes"):
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     return True
                                 if resp in ("n", "no"):
+                                    _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     return False
                                 with contextlib.suppress(Exception):
                                     wrapped_print("Please answer y or n.")
@@ -4170,12 +4185,14 @@ def execute_command():
                         sys.argv = [upload_script, validated_path, *parsed_args]
 
                         # Store in active_processes so /api/input can post into the queue
-                        process_state.update({
-                            "mode": "inproc",
-                            "input_queue": input_queue,
-                            "record_console": record_console,
-                            "cancel_event": cancel_event,
-                        })
+                        process_state.update(
+                            {
+                                "mode": "inproc",
+                                "input_queue": input_queue,
+                                "record_console": record_console,
+                                "cancel_event": cancel_event,
+                            }
+                        )
                         if not _session_state_is_current(session_id, process_state):
                             raise RuntimeError("Execution session was replaced before in-process startup completed")
 
@@ -4417,10 +4434,12 @@ def execute_command():
                             universal_newlines=True,
                         )
 
-                        process_state.update({
-                            "mode": "subprocess",
-                            "process": process,
-                        })
+                        process_state.update(
+                            {
+                                "mode": "subprocess",
+                                "process": process,
+                            }
+                        )
                         if not _session_state_is_current(session_id, process_state):
                             raise RuntimeError("Execution session was replaced before subprocess startup completed")
 
@@ -4486,12 +4505,14 @@ def execute_command():
                                 if output_type not in buffers:
                                     buffers[output_type] = ""
                                 buffers[output_type] += char
-                                if _looks_like_subprocess_prompt(buffers[output_type]):
-                                    _set_process_awaiting_input(session_id, True)
+                                is_prompt_chunk = _looks_like_subprocess_prompt(buffers[output_type])
+                                if is_prompt_chunk:
+                                    _set_process_awaiting_input_if_current(session_id, process_state, True)
 
                                 # Flush on newline or when buffer grows large
                                 if char == "\n" or len(buffers[output_type]) > 512:
-                                    _set_process_awaiting_input(session_id, False)
+                                    if not is_prompt_chunk:
+                                        _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     chunk = buffers[output_type]
                                     buffers[output_type] = ""
 
