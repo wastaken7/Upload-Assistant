@@ -685,10 +685,17 @@ function AudionutsUAGUI() {
     }
 
     let cancelled = false;
+    let timeoutId;
+    let activeController = null;
 
     const loadExecutionPreview = async () => {
+      const controller = new AbortController();
+      activeController = controller;
       try {
-        const response = await apiFetch(`${API_BASE}/execution_preview?session_id=${encodeURIComponent(sessionId)}`);
+        const response = await apiFetch(
+          `${API_BASE}/execution_preview?session_id=${encodeURIComponent(sessionId)}`,
+          { signal: controller.signal }
+        );
         if (!response.ok) {
           return;
         }
@@ -698,15 +705,24 @@ function AudionutsUAGUI() {
         }
       } catch (_error) {
         // Ignore preview polling failures while execution continues.
+      } finally {
+        if (activeController === controller) {
+          activeController = null;
+        }
+        if (!cancelled) {
+          timeoutId = window.setTimeout(loadExecutionPreview, 2000);
+        }
       }
     };
 
     loadExecutionPreview();
-    const intervalId = window.setInterval(loadExecutionPreview, 2000);
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+      activeController?.abort();
     };
   }, [API_BASE, isExecuting, sessionId]);
 
@@ -1536,7 +1552,7 @@ function AudionutsUAGUI() {
 
     const tvRows = detailRows([
       { label: 'Episode', value: episodeLabel },
-      { label: 'Format', value: media?.tv_pack ? 'Season Pack' : 'Single Episode' },
+      { label: 'Format', value: typeof media?.tv_pack === 'boolean' ? (media.tv_pack ? 'Season Pack' : 'Single Episode') : '' },
       { label: 'Service', value: media?.service },
       { label: 'Network', value: networks.join(', ') },
       { label: 'Audio', value: media?.audio }
@@ -1554,7 +1570,7 @@ function AudionutsUAGUI() {
       { label: 'Duration', value: media?.audiobook_duration },
       { label: 'Bitrate', value: media?.audiobook_bitrate },
       { label: 'Series', value: media?.book_series ? [media.book_series, media?.book_series_index ? `#${media.book_series_index}` : ''].filter(Boolean).join(' ') : '' },
-      { label: 'Format', value: media?.audiobook ? 'Audiobook' : 'Book' }
+      { label: 'Format', value: typeof media?.audiobook === 'boolean' ? (media.audiobook ? 'Audiobook' : 'Book') : '' }
     ]);
     const gameRows = detailRows([
       { label: 'Platform', value: media?.platform },
@@ -2156,7 +2172,7 @@ function AudionutsUAGUI() {
         {/* Bottom Nav */}
         <div className={`flex border-t flex-shrink-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
           {navButton('files', <FolderIcon />, 'Files')}
-          {navButton('main', <UploadIcon />, 'Upload')}
+          {navButton('main', isAwaitingTerminalInput ? <TerminalIcon /> : <UploadIcon />, isAwaitingTerminalInput ? 'Input Required' : 'Upload')}
           {navButton('args', isExecuting ? <UploadIcon /> : <TerminalIcon />, isExecuting ? 'Processing' : 'Arguments')}
         </div>
       </div>

@@ -1169,6 +1169,65 @@ def _book_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: s
     return ""
 
 
+def _is_http_url(value: str) -> bool:
+    return value.startswith(("http://", "https://"))
+
+
+def _read_execution_preview_meta_file(meta_file: Path) -> Mapping[str, object] | None:
+    try:
+        return _json_load_dict(meta_file.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _resolve_execution_preview_meta(session_id: str) -> tuple[str, Path | None, Mapping[str, object] | None]:
+    process_info = active_processes.get(session_id, {})
+    execution_path = _stringify_preview_value(process_info.get("path"))
+    if not execution_path:
+        return "", None, None
+
+    base_tmp_dir = Path(__file__).parent.parent / "tmp"
+    alias_meta_file = base_tmp_dir / Path(execution_path).name / "meta.json"
+    alias_meta = _read_execution_preview_meta_file(alias_meta_file) if alias_meta_file.exists() else None
+    meta_uuid = _stringify_preview_value(process_info.get("meta_uuid"))
+    if not meta_uuid and alias_meta is not None:
+        meta_uuid = _stringify_preview_value(alias_meta.get("uuid"))
+
+    if meta_uuid:
+        canonical_meta_file = base_tmp_dir / meta_uuid / "meta.json"
+        canonical_meta = _read_execution_preview_meta_file(canonical_meta_file) if canonical_meta_file.exists() else None
+        if canonical_meta is not None:
+            process_info["meta_uuid"] = meta_uuid
+            return execution_path, canonical_meta_file, canonical_meta
+
+    if alias_meta is not None:
+        alias_uuid = _stringify_preview_value(alias_meta.get("uuid"))
+        if alias_uuid:
+            process_info["meta_uuid"] = alias_uuid
+        return execution_path, alias_meta_file, alias_meta
+
+    return execution_path, None, None
+
+
+def _looks_like_subprocess_prompt(buffer: str) -> bool:
+    last_line = buffer.splitlines()[-1] if buffer else ""
+    stripped = last_line.strip()
+    if not stripped:
+        return False
+    lowered = stripped.lower()
+    if "running:" in lowered:
+        return False
+    return (
+        stripped.endswith(":")
+        or stripped.endswith("?")
+        or lowered.endswith("(y/n)")
+        or lowered.endswith("(y/n):")
+        or " enter " in f" {lowered} "
+        or " select " in f" {lowered} "
+        or lowered.startswith("select ")
+    )
+
+
 def _append_metadata_source(
     sources: list[MetadataSource],
     seen_keys: set[str],
@@ -1198,8 +1257,8 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
     from urllib.parse import quote
 
     category = _stringify_preview_value(meta_data.get("category")).upper()
-    tmdb_value = _stringify_optional_id(meta_data.get("tmdb")) or _stringify_optional_id(meta_data.get("tmdb_id"))
-    imdb_value = _stringify_optional_id(meta_data.get("imdb_tt")) or _stringify_optional_id(meta_data.get("imdb"))
+    tmdb_value = _stringify_optional_id(meta_data.get("tmdb_id")) or _stringify_optional_id(meta_data.get("tmdb"))
+    imdb_value = _stringify_optional_id(meta_data.get("imdb_id")) or _stringify_optional_id(meta_data.get("imdb_tt")) or _stringify_optional_id(meta_data.get("imdb"))
     tvdb_value = _stringify_optional_id(meta_data.get("tvdb_id")) or _stringify_optional_id(meta_data.get("tvdb"))
     tvmaze_value = _stringify_optional_id(meta_data.get("tvmaze_id")) or _stringify_optional_id(meta_data.get("tvmaze"))
     mal_value = _stringify_optional_id(meta_data.get("mal_id")) or _stringify_optional_id(meta_data.get("mal"))
@@ -1258,7 +1317,7 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
             f"https://www.tvmaze.com/shows/{quote(tvmaze_value)}",
         )
 
-    if category == "TV" and mal_value:
+    if category in {"TV", "BOOK"} and mal_value:
         mal_kind = "manga" if category == "BOOK" else "anime"
         _append_metadata_source(
             sources,
@@ -1348,8 +1407,8 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
         "media_type": _stringify_preview_value(meta_data.get("type")),
         "source": _stringify_preview_value(meta_data.get("source")),
         "resolution": _stringify_preview_value(meta_data.get("resolution")),
-        "tmdb": _stringify_preview_value(meta_data.get("tmdb")),
-        "imdb": _stringify_preview_value(meta_data.get("imdb_tt")) or _stringify_preview_value(meta_data.get("imdb")),
+        "tmdb": _stringify_optional_id(meta_data.get("tmdb_id")) or _stringify_optional_id(meta_data.get("tmdb")),
+        "imdb": (_stringify_optional_id(meta_data.get("imdb_id")) or _stringify_optional_id(meta_data.get("imdb_tt")) or _stringify_optional_id(meta_data.get("imdb"))),
         "metadata_sources": _extract_metadata_sources(meta_data),
         "poster_url": poster_url,
         "overview": _stringify_preview_value(meta_data.get("overview")),
@@ -1386,58 +1445,25 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
 
 def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
     process_info = active_processes.get(session_id, {})
-    execution_path = _stringify_preview_value(process_info.get("path"))
+    execution_path, resolved_meta_file, resolved_meta = _resolve_execution_preview_meta(session_id)
     if not execution_path:
         return None
 
-    started_at_raw = process_info.get("started_at")
-    started_at = float(started_at_raw) if isinstance(started_at_raw, (int, float)) else 0.0
-
-    base_tmp_dir = Path(__file__).parent.parent / "tmp"
-    expected_meta = base_tmp_dir / Path(execution_path).name / "meta.json"
-    candidates: list[Path] = []
-    if expected_meta.exists():
-        candidates.append(expected_meta)
-
-    if base_tmp_dir.exists():
-        threshold = started_at - 30 if started_at else 0
-        for meta_file in base_tmp_dir.glob("*/meta.json"):
-            if meta_file == expected_meta:
-                continue
-            with contextlib.suppress(OSError):
-                if threshold and meta_file.stat().st_mtime < threshold:
-                    continue
-            candidates.append(meta_file)
-
-    newest_preview: ExecutionPreview | None = None
-    newest_mtime = -1.0
     execution_name = Path(execution_path).name
-    for meta_file in candidates:
+    if resolved_meta_file is not None and resolved_meta is not None:
         try:
-            meta_text = meta_file.read_text(encoding="utf-8")
-            meta_data = _json_load_dict(meta_text)
-            meta_path = _stringify_preview_value(meta_data.get("path"))
-            meta_uuid = _stringify_preview_value(meta_data.get("uuid"))
-            if meta_path and os.path.normcase(meta_path) != os.path.normcase(execution_path):
-                if meta_uuid != execution_name:
-                    continue
+            meta_data = resolved_meta
             if _stringify_preview_value(meta_data.get("category")) == "BOOK":
                 current_poster = _stringify_preview_value(meta_data.get("poster"))
-                if not current_poster:
+                if not _is_http_url(current_poster):
                     enriched_meta = dict(meta_data)
                     enriched_meta["poster"] = _book_cover_from_meta(meta_data, session_id)
                     meta_data = enriched_meta
             preview = _extract_execution_preview(meta_data, execution_path)
             preview["awaiting_input"] = bool(process_info.get("awaiting_input"))
-            mtime = meta_file.stat().st_mtime
-            if mtime > newest_mtime:
-                newest_preview = preview
-                newest_mtime = mtime
+            return preview
         except Exception:
-            continue
-
-    if newest_preview is not None:
-        return newest_preview
+            pass
 
     return {
         "path": execution_path,
@@ -1486,14 +1512,15 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
 
 
 def _find_execution_preview_cover_file(session_id: str) -> Path | None:
-    process_info = active_processes.get(session_id, {})
-    execution_path = _stringify_preview_value(process_info.get("path"))
+    execution_path, _resolved_meta_file, resolved_meta = _resolve_execution_preview_meta(session_id)
     if not execution_path:
         return None
 
-    candidate_dirs = [Path(__file__).parent.parent / "tmp" / Path(execution_path).name]
-    for meta_dir in (Path(__file__).parent.parent / "tmp").glob("*/"):
-        candidate_dirs.append(meta_dir)
+    meta_uuid = _stringify_preview_value(resolved_meta.get("uuid")) if resolved_meta is not None else ""
+    candidate_dirs: list[Path] = []
+    if meta_uuid:
+        candidate_dirs.append(Path(__file__).parent.parent / "tmp" / meta_uuid)
+    candidate_dirs.append(Path(__file__).parent.parent / "tmp" / Path(execution_path).name)
 
     seen: set[str] = set()
     for tmp_dir in candidate_dirs:
@@ -1501,19 +1528,6 @@ def _find_execution_preview_cover_file(session_id: str) -> Path | None:
         if tmp_dir_key in seen or not tmp_dir.exists():
             continue
         seen.add(tmp_dir_key)
-
-        meta_file = tmp_dir / "meta.json"
-        if meta_file.exists():
-            try:
-                meta_data = _json_load_dict(meta_file.read_text(encoding="utf-8"))
-                meta_path = _stringify_preview_value(meta_data.get("path"))
-                meta_uuid = _stringify_preview_value(meta_data.get("uuid"))
-                if meta_path and os.path.normcase(meta_path) != os.path.normcase(execution_path):
-                    if meta_uuid != Path(execution_path).name:
-                        continue
-            except Exception:
-                continue
-
         for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg", "cover.jpg", "cover.png"):
             candidate = tmp_dir / filename
             if candidate.exists():
@@ -4133,12 +4147,14 @@ def execute_command():
                         sys.argv = [upload_script, validated_path, *parsed_args]
 
                         # Store in active_processes so /api/input can post into the queue
-                        active_processes[session_id].update({
-                            "mode": "inproc",
-                            "input_queue": input_queue,
-                            "record_console": record_console,
-                            "cancel_event": cancel_event,
-                        })
+                        active_processes[session_id].update(
+                            {
+                                "mode": "inproc",
+                                "input_queue": input_queue,
+                                "record_console": record_console,
+                                "cancel_event": cancel_event,
+                            }
+                        )
 
                         # Run the upload main loop in a separate thread to avoid blocking SSE generator
                         def run_upload():
@@ -4376,10 +4392,12 @@ def execute_command():
                     )
 
                     # Store process for input handling (no queue needed)
-                    active_processes[session_id].update({
-                        "mode": "subprocess",
-                        "process": process,
-                    })
+                    active_processes[session_id].update(
+                        {
+                            "mode": "subprocess",
+                            "process": process,
+                        }
+                    )
 
                     # Wrap subprocess handling in try/finally to guarantee cleanup
                     try:
@@ -4446,9 +4464,12 @@ def execute_command():
                                 if output_type not in buffers:
                                     buffers[output_type] = ""
                                 buffers[output_type] += char
+                                if _looks_like_subprocess_prompt(buffers[output_type]):
+                                    _set_process_awaiting_input(session_id, True)
 
                                 # Flush on newline or when buffer grows large
                                 if char == "\n" or len(buffers[output_type]) > 512:
+                                    _set_process_awaiting_input(session_id, False)
                                     chunk = buffers[output_type]
                                     buffers[output_type] = ""
 
