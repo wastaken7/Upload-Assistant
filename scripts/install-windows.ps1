@@ -78,33 +78,16 @@ function Invoke-ExternalProcess {
     }
 
     $process = $null
-    $stdoutHandler = $null
-    $stderrHandler = $null
+    $stdoutTask = $null
+    $stderrTask = $null
 
     try {
-        $stdoutBuilder = [System.Text.StringBuilder]::new()
-        $stderrBuilder = [System.Text.StringBuilder]::new()
         $process = [System.Diagnostics.Process]::new()
         $process.StartInfo = $startInfo
 
-        $stdoutHandler = [System.Diagnostics.DataReceivedEventHandler]{
-            param($sender, $eventArgs)
-            if ($null -ne $eventArgs.Data) {
-                [void]$stdoutBuilder.AppendLine($eventArgs.Data)
-            }
-        }
-        $stderrHandler = [System.Diagnostics.DataReceivedEventHandler]{
-            param($sender, $eventArgs)
-            if ($null -ne $eventArgs.Data) {
-                [void]$stderrBuilder.AppendLine($eventArgs.Data)
-            }
-        }
-
-        $process.add_OutputDataReceived($stdoutHandler)
-        $process.add_ErrorDataReceived($stderrHandler)
         [void]$process.Start()
-        $process.BeginOutputReadLine()
-        $process.BeginErrorReadLine()
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
 
         if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
             try {
@@ -118,13 +101,15 @@ function Invoke-ExternalProcess {
         }
 
         $process.WaitForExit()
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
 
-        if ($stdoutBuilder.Length -gt 0) {
-            $stdoutBuilder.ToString().TrimEnd("`r", "`n") | Write-Host
+        if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+            $stdout.TrimEnd("`r", "`n") | Write-Host
         }
 
-        if ($stderrBuilder.Length -gt 0) {
-            $stderrBuilder.ToString().TrimEnd("`r", "`n") | Write-Host
+        if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+            $stderr.TrimEnd("`r", "`n") | Write-Host
         }
 
         if ($process.ExitCode -ne 0) {
@@ -133,14 +118,6 @@ function Invoke-ExternalProcess {
     }
     finally {
         if ($null -ne $process) {
-            if ($null -ne $stdoutHandler) {
-                $process.remove_OutputDataReceived($stdoutHandler)
-            }
-
-            if ($null -ne $stderrHandler) {
-                $process.remove_ErrorDataReceived($stderrHandler)
-            }
-
             $process.Dispose()
         }
     }
@@ -240,6 +217,22 @@ function Get-PythonInstallerUrl {
     return "$PythonDownloadBaseUrl/$fullVersion/python-$fullVersion-$archName.exe"
 }
 
+function Test-PythonVersionMatch {
+    param(
+        [Parameter(Mandatory)]
+        [string]$InstalledVersion,
+
+        [Parameter(Mandatory)]
+        [string]$RequestedVersion
+    )
+
+    if ($RequestedVersion -match '^\d+\.\d+$') {
+        return $InstalledVersion.StartsWith("$RequestedVersion.", [System.StringComparison]::Ordinal)
+    }
+
+    return [System.StringComparer]::Ordinal.Equals($InstalledVersion, $RequestedVersion)
+}
+
 function Get-GitInstallerUrl {
     $response = Invoke-RestMethod -Uri $GitReleaseApiUrl -Headers @{ "User-Agent" = "Upload-Assistant" }
     $assetPattern = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) {
@@ -319,8 +312,8 @@ function Ensure-Git {
 function Ensure-IsolatedPython {
     $pythonExe = Join-Path $PythonInstallDir "python.exe"
     if (Test-Path -LiteralPath $pythonExe) {
-        $installedVersion = (& $pythonExe -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')").Trim()
-        if ($installedVersion -eq $PythonVersion) {
+        $installedVersion = (& $pythonExe -c "import platform; print(platform.python_version())").Trim()
+        if (Test-PythonVersionMatch -InstalledVersion $installedVersion -RequestedVersion $PythonVersion) {
             return $pythonExe
         }
 
@@ -457,8 +450,8 @@ function Install-Dependencies {
         }
     }
     else {
-        $venvVersion = (& $venvPython -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')").Trim()
-        if ($venvVersion -ne $PythonVersion) {
+        $venvVersion = (& $venvPython -c "import platform; print(platform.python_version())").Trim()
+        if (-not (Test-PythonVersionMatch -InstalledVersion $venvVersion -RequestedVersion $PythonVersion)) {
             if (-not $ForceUpdate) {
                 Fail "Existing .venv uses Python $venvVersion; rerun with -ForceUpdate to recreate it for Python $PythonVersion."
             }
