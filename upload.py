@@ -116,15 +116,36 @@ _shutdown_requested = False
 _is_webui_mode = False
 _webui_server: WebUIServer | None = None  # Reference to waitress server for graceful shutdown
 _shutdown_event = threading.Event()  # Event for coordinating graceful shutdown
+_webui_session_id: str | None = None
 
 
 def _reset_shutdown_state() -> None:
     """Reset global shutdown state for clean in-process runs from web UI."""
-    global _shutdown_requested, _is_webui_mode, _webui_server
+    global _shutdown_requested, _is_webui_mode, _webui_server, _webui_session_id
     _shutdown_requested = False
     _is_webui_mode = False
     _webui_server = None
+    _webui_session_id = None
     _shutdown_event.clear()
+
+
+def set_webui_session_id(session_id: str | None) -> None:
+    """Store the active Web UI execution session for in-process preview updates."""
+    global _webui_session_id
+    cleaned = (session_id or "").strip()
+    _webui_session_id = cleaned or None
+
+
+def _publish_webui_preview_target(path: str, meta_uuid: str | None = None) -> None:
+    """Push the current queue item to the Web UI execution preview, when active."""
+    if not _is_webui_mode or not _webui_session_id or not path:
+        return
+    try:
+        from web_ui.server import set_execution_preview_target
+
+        set_execution_preview_target(_webui_session_id, path, meta_uuid)
+    except Exception:
+        return
 
 
 def _handle_shutdown_signal(signum: int, _frame: Any) -> None:
@@ -838,6 +859,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None, discord_notif
     logger.debug(f"Trackers list before editing: {meta.trackers}")
     async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
         await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+    _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
 
     # For BOOK category, certain trackers (e.g. CAPYBARABR) require title, author, year and language.
     # Prompt here - on the shared meta - so the data flows into every tracker's upload
@@ -901,6 +923,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None, discord_notif
         meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
             await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+        _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
         try:
             confirm = await helper.get_confirmation(meta)
         except EOFError:
@@ -982,6 +1005,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None, discord_notif
         await asyncio.sleep(0.2)
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
             await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+        _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
         await asyncio.sleep(0.2)
 
         try:
@@ -1467,6 +1491,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None, discord_notif
 
             async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
                 await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+            _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
 
             if "image_list" in meta and meta.image_list:
                 try:
@@ -1552,6 +1577,7 @@ async def process_meta(meta: Meta, base_dir: str, bot: Any = None, discord_notif
 
     async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
         await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+    _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
     return True
 
 
@@ -1972,6 +1998,7 @@ async def do_the_thing(base_dir: str) -> None:
 
                 meta.path = path
                 meta.uuid = ""
+                _publish_webui_preview_target(path)
 
                 if not path:
                     raise ValueError("The 'path' variable is not defined or is empty.")
@@ -2014,6 +2041,7 @@ async def do_the_thing(base_dir: str) -> None:
                         saved_meta = cast(dict[str, Any], json.loads(content)) if content.strip() else {}
                         logger.info("[yellow]Existing metadata file found, it holds cached values")
                         await merge_meta(meta, saved_meta)
+                        _publish_webui_preview_target(path, meta.uuid or None)
 
             except Exception as e:
                 logger.info(f"[red]Exception: '{path}': {e}")
@@ -2602,7 +2630,12 @@ def check_python_version() -> None:
 
 async def main() -> None:
     # Reset global state for clean in-process runs (when called from web UI)
+    pending_webui_session_id = _webui_session_id
     _reset_shutdown_state()
+    if pending_webui_session_id:
+        global _is_webui_mode
+        _is_webui_mode = True
+        set_webui_session_id(pending_webui_session_id)
 
     try:
         await do_the_thing(base_dir)

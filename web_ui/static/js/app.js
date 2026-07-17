@@ -495,6 +495,7 @@ function AudionutsUAGUI() {
   const [argSearchFilter, setArgSearchFilter] = useState('');
   const [collapsedSections, setCollapsedSections] = useState(new Set());
   const [executionPreview, setExecutionPreview] = useState(null);
+  const [progressItems, setProgressItems] = useState([]);
 
   // Mobile state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -523,6 +524,131 @@ function AudionutsUAGUI() {
   const lastFullHashRef = useRef('');
   const inputRef = useRef(null);
   const sseAbortControllerRef = useRef(null);
+  const visibleProgressItems = progressItems.filter((item) => item.status !== 'completed');
+
+  const sortProgressItems = (items) => {
+    return [...items].sort((a, b) => {
+      const aRunning = a.status === 'running' ? 0 : 1;
+      const bRunning = b.status === 'running' ? 0 : 1;
+      if (aRunning !== bRunning) return aRunning - bRunning;
+      return String(a.id || '').localeCompare(String(b.id || ''));
+    });
+  };
+
+  const applyProgressEvent = (event) => {
+    if (!event || typeof event !== 'object') return;
+    if (event.op === 'reset') {
+      setProgressItems([]);
+      return;
+    }
+    if (!event.id) return;
+    setProgressItems((prev) => {
+      const existingIndex = prev.findIndex((item) => item.id === event.id);
+      if (existingIndex === -1) {
+        return sortProgressItems([...prev, event]);
+      }
+      const next = [...prev];
+      next[existingIndex] = { ...next[existingIndex], ...event };
+      return sortProgressItems(next);
+    });
+  };
+
+  const renderProgressPanel = (compact = false) => {
+    if (!visibleProgressItems.length) return null;
+
+    return (
+      <div className={`rounded-lg border p-3 shadow-xl backdrop-blur-sm ${isDarkMode ? 'border-gray-700 bg-gray-800/90' : 'border-gray-200 bg-white/95'}`}>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <h4 className={`font-semibold ${compact ? 'text-sm' : 'text-base'} ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Binary Progress</h4>
+            <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Live progress from external tools</p>
+          </div>
+          <span className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{visibleProgressItems.length} active</span>
+        </div>
+        <div className={`${compact ? 'space-y-2' : 'space-y-3'} max-h-[40vh] overflow-y-auto pr-1`}>
+          {visibleProgressItems.map((item) => {
+            const current = Number(item.current ?? 0);
+            const total = Number(item.total ?? 0);
+            const hasTotal = Number.isFinite(total) && total > 0;
+            const clampedPercent = hasTotal ? Math.max(0, Math.min(100, (current / total) * 100)) : 0;
+            const isCompleted = item.status === 'completed';
+            const isFailed = item.status === 'failed';
+            const statusTone = isCompleted
+              ? (isDarkMode ? 'text-emerald-300' : 'text-emerald-700')
+              : isFailed
+                ? (isDarkMode ? 'text-rose-300' : 'text-rose-700')
+                : (isDarkMode ? 'text-sky-300' : 'text-sky-700');
+            const progressTone = isCompleted
+              ? 'bg-emerald-500'
+              : isFailed
+                ? 'bg-rose-500'
+                : 'bg-sky-500';
+            let summary = '';
+            if (hasTotal) {
+              if (item.unit === 'percent') summary = `${Math.round(clampedPercent)}%`;
+              else summary = `${Math.round(current)}/${Math.round(total)}`;
+            }
+            return (
+              <div key={item.id} className={`rounded-lg border px-3 py-2 ${isDarkMode ? 'border-gray-700 bg-gray-900/80' : 'border-gray-200 bg-gray-50'}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className={`font-medium truncate ${compact ? 'text-sm' : 'text-[15px]'} ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{item.label || item.id}</p>
+                    {item.detail && (
+                      <p className={`text-xs truncate ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{item.detail}</p>
+                    )}
+                  </div>
+                  <div className={`text-xs font-semibold whitespace-nowrap ${statusTone}`}>
+                    {summary || (isCompleted ? 'Done' : isFailed ? 'Failed' : 'Running')}
+                  </div>
+                </div>
+                <div className={`mt-2 h-2.5 overflow-hidden rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                  <div
+                    className={`h-full rounded-full transition-[width] duration-300 ${progressTone}`}
+                    style={{ width: `${hasTotal ? clampedPercent : 100}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderFloatingProgressPanel = () => {
+    if (isMobile) return null;
+    const panel = renderProgressPanel(true);
+    if (!panel) return null;
+
+    return (
+      <div className={`pointer-events-none absolute left-3 bottom-3 z-20 ${isMobile ? 'right-3' : 'w-[24rem] max-w-[calc(100%-1.5rem)]'}`}>
+        <div className="pointer-events-auto">
+          {panel}
+        </div>
+      </div>
+    );
+  };
+
+  const renderMobileProgressPanel = () => {
+    if (!visibleProgressItems.length) return null;
+
+    return (
+      <div className="flex flex-col h-full">
+        <div className={`p-3 border-b flex-shrink-0 ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gradient-to-l from-cyan-50 to-sky-50'}`}>
+          <h2 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
+            <TerminalIcon />
+            Binary Progress
+          </h2>
+          <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            Live progress from external tools while the queue is running.
+          </p>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3">
+          {renderProgressPanel()}
+        </div>
+      </div>
+    );
+  };
 
   // Detect if --descfile or --desclink is present in arguments
   const hasDescFile = customArgs.includes('--descfile');
@@ -681,6 +807,7 @@ function AudionutsUAGUI() {
   useEffect(() => {
     if (!isExecuting || !sessionId) {
       setExecutionPreview(null);
+      setProgressItems([]);
       return undefined;
     }
 
@@ -702,6 +829,9 @@ function AudionutsUAGUI() {
         const data = await response.json();
         if (!cancelled && data && data.success && data.media) {
           setExecutionPreview(data.media);
+          if (Array.isArray(data.media.progress)) {
+            setProgressItems(sortProgressItems(data.media.progress));
+          }
         }
       } catch (_error) {
         // Ignore preview polling failures while execution continues.
@@ -937,6 +1067,12 @@ function AudionutsUAGUI() {
       }, 50);
     }
   }, [isExecuting]);
+
+  useEffect(() => {
+    if (isMobile && activePanel === 'progress' && visibleProgressItems.length === 0) {
+      setActivePanel('main');
+    }
+  }, [activePanel, isMobile, visibleProgressItems.length]);
 
   const toggleFolder = async (path) => {
     const newExpanded = new Set(expandedFolders);
@@ -1217,6 +1353,7 @@ function AudionutsUAGUI() {
     const newSessionId = 'session_' + Date.now();
     setSessionId(newSessionId);
     setIsExecuting(true);
+    setProgressItems([]);
     // Clear the initial welcome text so execution output appears immediately
     if (rootContainer) {
       rootContainer.innerHTML = '';
@@ -1294,6 +1431,8 @@ function AudionutsUAGUI() {
             } catch (e) {
               console.error('Failed to render HTML fragment:', e);
             }
+              } else if (data.type === 'progress') {
+            applyProgressEvent(data.data || {});
               } else if (data.type === 'exit') {
             if (!(localController && localController.signal.aborted)) {
               appendSystemMessage('');
@@ -1341,6 +1480,7 @@ function AudionutsUAGUI() {
     } finally {
       setIsExecuting(false);
       setSessionId('');
+      setProgressItems([]);
       // Clear controller reference when finished, but only if it hasn't been
       // replaced by another concurrent run.
       try {
@@ -1369,6 +1509,7 @@ function AudionutsUAGUI() {
 
         setIsExecuting(false);
         setSessionId('');
+        setProgressItems([]);
       } catch (error) {
         console.error('Failed to kill process:', error);
       }
@@ -1378,6 +1519,7 @@ function AudionutsUAGUI() {
     const container = richOutputRef.current;
     if (container) {
       container.innerHTML = '';
+      setProgressItems([]);
       appendSystemMessage('Upload-Assistant Interactive Output');
       appendSystemMessage('\nQuick Start:\n  1. Select a file or folder from the left panel\n  2. Add Upload-Assistant arguments (optional)\n  3. Click "Execute Upload" to start\n');
     }
@@ -2167,6 +2309,11 @@ function AudionutsUAGUI() {
             </div>
             )
           )}
+
+          {/* Progress Panel */}
+          {activePanel === 'progress' && (
+            renderMobileProgressPanel()
+          )}
         </div>
 
         {/* Bottom Nav */}
@@ -2174,6 +2321,7 @@ function AudionutsUAGUI() {
           {navButton('files', <FolderIcon />, 'Files')}
           {navButton('main', isAwaitingTerminalInput ? <TerminalIcon /> : <UploadIcon />, isAwaitingTerminalInput ? 'Input Required' : 'Upload')}
           {navButton('args', isExecuting ? <UploadIcon /> : <TerminalIcon />, isExecuting ? 'Processing' : 'Arguments')}
+          {visibleProgressItems.length > 0 && navButton('progress', <TerminalIcon />, 'Progress')}
         </div>
       </div>
     );
@@ -2341,171 +2489,204 @@ function AudionutsUAGUI() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Panel */}
-        <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b p-4 flex-shrink-0`}>
-          <div className="max-w-6xl mx-auto space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
-                  <UploadIcon />
-                  Upload-Assistant Web UI
-                </h1>
-                <a
-                  href={`${APP_BASE}/logout`}
-                  className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors bg-red-600 text-white hover:bg-red-700"
-                >
-                  Logout
-                </a>
-              </div>
-
-              {/* Controls */}
-              <div className="flex items-center gap-3">
-                <a
-                  href={`${APP_BASE}/config`}
-                  className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700"
-                >
-                  View Config
-                </a>
-                <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                  {isDarkMode ? '🌙 Dark' : '☀️ Light'}
-                </span>
+        <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b ${isExecuting ? 'p-3' : 'p-4'} flex-shrink-0`}>
+          <div className={`max-w-6xl mx-auto ${isExecuting ? '' : 'space-y-4'}`}>
+            {isExecuting ? (
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-green-400 animate-pulse">● Running</span>
+                    {selectedPath && (
+                      <span className={`text-xs uppercase tracking-wide ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Selected path
+                      </span>
+                    )}
+                  </div>
+                  {selectedPath && (
+                    <p
+                      className={`mt-1 truncate font-mono text-sm ${isDarkMode ? 'text-white' : 'text-gray-800'}`}
+                      title={selectedPath}
+                    >
+                      {selectedPath}
+                    </p>
+                  )}
+                </div>
                 <button
-                  onClick={() => setIsDarkMode(!isDarkMode)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    isDarkMode ? 'bg-purple-600' : 'bg-gray-300'
-                  }`}
+                  onClick={clearTerminal}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors bg-red-600 hover:bg-red-700 text-white flex-shrink-0"
+                  title="Kill process and clear terminal"
                 >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      isDarkMode ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
+                  <TrashIcon />
+                  Kill
                 </button>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
+                      <UploadIcon />
+                      Upload-Assistant Web UI
+                    </h1>
+                    <a
+                      href={`${APP_BASE}/logout`}
+                      className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors bg-red-600 text-white hover:bg-red-700"
+                    >
+                      Logout
+                    </a>
+                  </div>
 
-            {/* Selected Path Display */}
-            {selectedPath && (
-              <div className={`p-3 ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-200'} border rounded-lg`}>
-                <p className={`text-xs font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Selected Path:</p>
-                <p className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-800'} break-all font-mono`}>{selectedPath}</p>
-              </div>
-            )}
+                  {/* Controls */}
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={`${APP_BASE}/config`}
+                      className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      View Config
+                    </a>
+                    <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                      {isDarkMode ? '🌙 Dark' : '☀️ Light'}
+                    </span>
+                    <button
+                      onClick={() => setIsDarkMode(!isDarkMode)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        isDarkMode ? 'bg-purple-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          isDarkMode ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
 
-            {/* Arguments */}
-            <div className="space-y-2">
-              <label className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Additional Arguments:</label>
-              <input
-                type="text"
-                value={customArgs}
-                onChange={(e) => setCustomArgs(e.target.value)}
-                placeholder="--tmdb movie/12345 --trackers passthepopcorn,aither,ulcx --no-edition --no-tag"
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                  isDarkMode
-                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                    : 'bg-white border-gray-300 text-gray-900'
-                }`}
-                disabled={isExecuting}
-              />
-            </div>
+                {/* Selected Path Display */}
+                {selectedPath && (
+                  <div className={`p-3 ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-200'} border rounded-lg`}>
+                    <p className={`text-xs font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Selected Path:</p>
+                    <p className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-800'} break-all font-mono`}>{selectedPath}</p>
+                  </div>
+                )}
 
-            {/* Description Link URL Input - shown when --desclink is in args */}
-            {/* Hide when valid URL and not focused; show when empty, focused, or invalid */}
-            {hasDescLink && (!descLinkUrl || descLinkFocused || descLinkError) && (
-              <div className="space-y-2">
-                <label className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} flex items-center gap-2`}>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                  Description Link URL (pastebin, hastebin, etc.):
-                </label>
-                <input
-                  type="url"
-                  value={descLinkUrl}
-                  onChange={(e) => updateDescLink(e.target.value)}
-                  onFocus={() => setDescLinkFocused(true)}
-                  onBlur={() => setDescLinkFocused(false)}
-                  placeholder="https://pastebin.com/abc123"
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                    descLinkError
-                      ? 'border-red-500 focus:ring-red-500'
-                      : isDarkMode
+                {/* Arguments */}
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Additional Arguments:</label>
+                  <input
+                    type="text"
+                    value={customArgs}
+                    onChange={(e) => setCustomArgs(e.target.value)}
+                    placeholder="--tmdb movie/12345 --trackers passthepopcorn,aither,ulcx --no-edition --no-tag"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                      isDarkMode
                         ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
                         : 'bg-white border-gray-300 text-gray-900'
-                  }`}
-                  disabled={isExecuting}
-                />
-                {descLinkError && (
-                  <p className="text-xs text-red-500 mt-1">{descLinkError}</p>
-                )}
-                {descLinkUrl && !descLinkError && (
-                  <p className="text-xs text-green-500 mt-1">Valid paste URL</p>
-                )}
-              </div>
-            )}
-
-            {/* Description File Status - only show on error or when no file selected */}
-            {hasDescFile && (descFileError || !descFilePath) && (
-              <div className={`p-3 rounded-lg ${
-                descFileError
-                  ? isDarkMode ? 'bg-red-900 border border-red-700' : 'bg-red-50 border border-red-200'
-                  : isDarkMode ? 'bg-yellow-900 border border-yellow-700' : 'bg-yellow-50 border border-yellow-200'
-              }`}>
-                <div className="flex items-center gap-2">
-                  <svg className={`w-4 h-4 ${
-                    descFileError ? 'text-red-500' : 'text-yellow-500'
-                  }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {descFileError ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    )}
-                  </svg>
-                  <span className={`text-sm font-medium ${
-                    descFileError
-                      ? isDarkMode ? 'text-red-300' : 'text-red-700'
-                      : isDarkMode ? 'text-yellow-300' : 'text-yellow-700'
-                  }`}>
-                    {descFileError
-                      ? 'Invalid description file path'
-                      : 'Select a description file from the left panel or enter a path'}
-                  </span>
+                    }`}
+                    disabled={isExecuting}
+                  />
                 </div>
-                {descFilePath && descFileError && (
-                  <p className={`text-xs mt-1 break-all font-mono ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
-                    {descFilePath}
-                  </p>
-                )}
-                {descFileError && (
-                  <p className={`text-xs mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
-                    {descFileError}
-                  </p>
-                )}
-              </div>
-            )}
 
-            {/* Execute Button */}
-            <div className="flex gap-2">
-              <button
-                onClick={executeCommand}
-                disabled={!selectedPath || isExecuting}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium text-lg"
-              >
-                <PlayIcon />
-                {isExecuting ? 'Executing...' : 'Execute Upload'}
-              </button>
-              <button
-                onClick={clearTerminal}
-                className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${
-                  isExecuting
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : 'bg-gray-600 hover:bg-gray-700 text-white'
-                }`}
-                title={isExecuting ? 'Kill process and clear terminal' : 'Clear terminal'}
-              >
-                <TrashIcon />
-                {isExecuting ? 'Kill & Clear' : 'Clear'}
-              </button>
-            </div>
+                {/* Description Link URL Input - shown when --desclink is in args */}
+                {/* Hide when valid URL and not focused; show when empty, focused, or invalid */}
+                {hasDescLink && (!descLinkUrl || descLinkFocused || descLinkError) && (
+                  <div className="space-y-2">
+                    <label className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} flex items-center gap-2`}>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                      Description Link URL (pastebin, hastebin, etc.):
+                    </label>
+                    <input
+                      type="url"
+                      value={descLinkUrl}
+                      onChange={(e) => updateDescLink(e.target.value)}
+                      onFocus={() => setDescLinkFocused(true)}
+                      onBlur={() => setDescLinkFocused(false)}
+                      placeholder="https://pastebin.com/abc123"
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                        descLinkError
+                          ? 'border-red-500 focus:ring-red-500'
+                          : isDarkMode
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                            : 'bg-white border-gray-300 text-gray-900'
+                      }`}
+                      disabled={isExecuting}
+                    />
+                    {descLinkError && (
+                      <p className="text-xs text-red-500 mt-1">{descLinkError}</p>
+                    )}
+                    {descLinkUrl && !descLinkError && (
+                      <p className="text-xs text-green-500 mt-1">Valid paste URL</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Description File Status - only show on error or when no file selected */}
+                {hasDescFile && (descFileError || !descFilePath) && (
+                  <div className={`p-3 rounded-lg ${
+                    descFileError
+                      ? isDarkMode ? 'bg-red-900 border border-red-700' : 'bg-red-50 border border-red-200'
+                      : isDarkMode ? 'bg-yellow-900 border border-yellow-700' : 'bg-yellow-50 border border-yellow-200'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <svg className={`w-4 h-4 ${
+                        descFileError ? 'text-red-500' : 'text-yellow-500'
+                      }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {descFileError ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        )}
+                      </svg>
+                      <span className={`text-sm font-medium ${
+                        descFileError
+                          ? isDarkMode ? 'text-red-300' : 'text-red-700'
+                          : isDarkMode ? 'text-yellow-300' : 'text-yellow-700'
+                      }`}>
+                        {descFileError
+                          ? 'Invalid description file path'
+                          : 'Select a description file from the left panel or enter a path'}
+                      </span>
+                    </div>
+                    {descFilePath && descFileError && (
+                      <p className={`text-xs mt-1 break-all font-mono ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
+                        {descFilePath}
+                      </p>
+                    )}
+                    {descFileError && (
+                      <p className={`text-xs mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
+                        {descFileError}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Execute Button */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={executeCommand}
+                    disabled={!selectedPath || isExecuting}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium text-lg"
+                  >
+                    <PlayIcon />
+                    {isExecuting ? 'Executing...' : 'Execute Upload'}
+                  </button>
+                  <button
+                    onClick={clearTerminal}
+                    className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${
+                      isExecuting
+                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                        : 'bg-gray-600 hover:bg-gray-700 text-white'
+                    }`}
+                    title={isExecuting ? 'Kill process and clear terminal' : 'Clear terminal'}
+                  >
+                    <TrashIcon />
+                    {isExecuting ? 'Kill & Clear' : 'Clear'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -2519,7 +2700,6 @@ function AudionutsUAGUI() {
                 <span className="ml-auto text-sm text-green-400 animate-pulse">● Running</span>
               )}
             </div>
-
             {/* Rich HTML output (rendered from Rich export_html fragments) */}
             <div
               ref={richOutputRef}
@@ -2547,6 +2727,7 @@ function AudionutsUAGUI() {
             )}
           </div>
         </div>
+        {renderFloatingProgressPanel()}
       </div>
       {/* Right Resize Handle */}
       <div

@@ -23,6 +23,7 @@ from torf import Torrent
 
 from src.console import console, logger
 from src.meta import Meta
+from src.webui_progress import complete_progress, publish_progress
 
 PIECE_SIZE_MIN = 32 * 1024  # 32 KiB
 PIECE_SIZE_MAX = 134_217_728  # 128 MiB
@@ -337,6 +338,7 @@ class TorrentCreator:
                                 transient=False,
                             ) as progress:
                                 task = progress.add_task("mkbrr hashing...", total=total_pieces)
+                                publish_progress("mkbrr-hash", "mkbrr hashing...", current=0, total=total_pieces, detail="Starting mkbrr hashing")
 
                                 for line in process.stdout:
                                     line = line.strip()
@@ -363,16 +365,32 @@ class TorrentCreator:
                                                 eta = "--:--"  # Placeholder if we can't estimate yet
 
                                         progress.update(task, description=f"mkbrr hashing... {speed} | ETA: {eta}", completed=pieces_done)
+                                        publish_progress(
+                                            "mkbrr-hash",
+                                            "mkbrr hashing...",
+                                            current=pieces_done,
+                                            total=total_pieces,
+                                            detail=f"{speed} | ETA: {eta}",
+                                        )
 
                                     # Detect final output line
                                     if "Wrote" in line and ".torrent" in line and meta.debug:
                                         logger.info(f"[bold cyan]{line}")  # Print the final torrent file creation message
 
-                                # Clean up progress bar at the end
-                                progress.update(task, completed=total_pieces)
-
-                            # Wait for the process to finish
-                            return process.wait()
+                                result = process.wait()
+                                if result == 0:
+                                    progress.update(task, completed=total_pieces)
+                                    complete_progress("mkbrr-hash", "mkbrr hashing...", current=total_pieces, total=total_pieces)
+                                else:
+                                    publish_progress(
+                                        "mkbrr-hash",
+                                        "mkbrr hashing...",
+                                        current=pieces_done,
+                                        total=total_pieces,
+                                        detail=f"mkbrr exited with status code {result}",
+                                        status="failed",
+                                    )
+                                return result
 
                         result = await asyncio.to_thread(run_mkbrr)
 
