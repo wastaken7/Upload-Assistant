@@ -1,6 +1,38 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
-__version__ = "v2.3"
+__version__ = "v2.4"
+
+"""
+Changelog for version v2.4 (2026-07-17):
+
+## What's Changed
+* **Upgrade Alert**:
+  * This release renames tracker config keys to match the new descriptive tracker modules.
+  * If you are upgrading from `v2.3` or earlier, run `python config-generator.py` and review your `TRACKERS` section before uploading.
+* **Merged Pull Requests**:
+  * refactor: apply Ruff fixes and rename trackers to descriptive modules by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/59
+  * feat(usenet): add duplicate search support by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/60
+  * fix(tmdb): tighten anime detection from TMDB by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/62
+  * Add daily API hit limits for USENET duplicate search by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/61
+  * fix: avoid Path.replace error when adding torrents to qBittorrent by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/64
+  * feat(seedbox): add no-root Linux installer by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/66
+  * feat(webui): add live execution preview by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/65
+  * Fix Usenet posting when indexer dupe check fails by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/69
+  * feat(webui): stream live upload progress by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/70
+* **Direct Commits Since v2.3**:
+  * ci: add PR validation workflow
+  * add option to disable tracker name markup
+  * docs: align tracker names with modules
+  * remove check for drunkenslug upload URL
+  * fix: tighten tracker typing checks
+  * fix: keep rtorrent save path as string
+  * feat(webui): show missing CLI args
+  * fix(web-ui): support annotated config dicts
+  * fix(bjshare): normalize and dedupe credit names
+  * feat(discord): make bot deps optional
+  * feat(args): add `--multi` for GAME uploads
+* **Full Changelog**: https://github.com/wastaken7/Upload-Assistant/compare/v2.3...v2.4
+"""
 
 """
 Changelog for version v2.3 (2026-07-15):
