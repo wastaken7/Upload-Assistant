@@ -993,7 +993,8 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
 
         if target_files:
             logger.info("[cyan]Generating PAR2 parity files...[/cyan]")
-            par2_file = f"{archive_name}.par2"
+            par2_output_dir = usenet_dir if skip_archive else upload_root
+            par2_file = str(Path(par2_output_dir) / f"{archive_name}.par2")
             relative_target_files = [str(Path(f).relative_to(upload_root)) for f in target_files]
             # No -n/-u/-l flag: par2cmdline falls back to its default scheme of
             # exponentially-sized recovery volumes, matching standard Usenet posts
@@ -1001,11 +1002,18 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", par2_file, *[str(f) for f in relative_target_files]]
             if is_debug and not path_par2:
                 logger.info(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_par2)}[/yellow]")
-                mock_par2 = os.path.normpath(Path(upload_root) / par2_file)
+                mock_par2 = os.path.normpath(par2_file)
                 async with aiofiles.open(mock_par2, "wb") as f:
                     await f.write(b"mock par2 content")
             else:
                 await run_par2_with_progress(cmd_par2, cwd=str(upload_root))
+
+            generated_par2_files = [
+                file_path
+                for file_path in sorted(Path(par2_output_dir).glob(f"{archive_name}.par2*"))
+                if file_path.is_file()
+            ]
+            upload_files.extend(file_path for file_path in generated_par2_files if file_path not in upload_files)
 
     # 4. Poster / From header
     random_poster = usenet_cfg.get("random_poster", True)
@@ -1032,7 +1040,14 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     # 6. Collect files to upload
     nzb_file = Path(tmp_base) / uuid / f"{safe_nzb_name}.nzb"
 
-    all_upload_files = [str(file_path.relative_to(upload_root)) for file_path in upload_files if file_path.is_file()]
+    all_upload_files = []
+    for file_path in upload_files:
+        if not file_path.is_file():
+            continue
+        with contextlib.suppress(ValueError):
+            all_upload_files.append(str(file_path.relative_to(upload_root)))
+            continue
+        all_upload_files.append(str(file_path))
 
     logger.info(f"[yellow]Posting {len(all_upload_files)} files to Usenet via NNTP ({uploader})...[/yellow]")
 
