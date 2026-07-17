@@ -83,7 +83,9 @@ config = {
 ```
 
 ### Dynamic Volume Size Mapping (`auto`)
+
 When `"rar_volume_size"` is set to `"auto"`, the assistant dynamically selects the volume size based on the total payload size:
+
 - **Payload < 2 GB**: `100m` volumes
 - **Payload < 10 GB**: `200m` volumes
 - **Payload < 50 GB**: `500m` volumes
@@ -95,32 +97,39 @@ When `"rar_volume_size"` is set to `"auto"`, the assistant dynamically selects t
 
 You can control Usenet uploads directly from the command line using these arguments:
 
-| Flag | Full Argument | Description |
-| :--- | :--- | :--- |
-| `-u` | `--usenet` | Triggers Usenet upload. |
-| | `--usenet-subject` | Specifies a custom subject line for the Usenet post (overrides `obscure_subject`). |
+| Flag | Full Argument      | Description                                                                        |
+| :--- | :----------------- | :--------------------------------------------------------------------------------- |
+| `-u` | `--usenet`         | Triggers Usenet upload.                                                            |
+|      | `--usenet-subject` | Specifies a custom subject line for the Usenet post (overrides `obscure_subject`). |
 
 ---
 
 ## 5. Example Commands
 
 ### Upload to Usenet Only (Skipping Torrent Trackers)
+
 To upload content to Usenet and skip any torrent generation/client seeding:
+
 ```bash
 python upload.py "/path/to/Movie.Name.2026.1080p.mkv" -u
 ```
-*(or specify `USENET` directly as the target tracker)*:
+
+_(or specify `USENET` directly as the target tracker)_:
+
 ```bash
 python upload.py "/path/to/Movie.Name.2026.1080p.mkv" -tk USENET
 ```
 
 ### Upload to Usenet with a Custom Subject
+
 ```bash
 python upload.py "/path/to/Folder_Name" -u --usenet-subject "My.Custom.Post.Subject"
 ```
 
 ### Upload to both Usenet and Torrent Trackers
+
 You can combine torrent tracker uploads and Usenet posting in a single run:
+
 ```bash
 python upload.py "/path/to/Movie.Name.2026.1080p.mkv" -tk BLUTOPIA,CURUPIRA
 ```

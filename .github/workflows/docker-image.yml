@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       use_latest_tag:
-        description: 'Tag as latest instead of branch name'
+        description: "Tag as latest instead of branch name"
         required: false
         type: boolean
         default: false

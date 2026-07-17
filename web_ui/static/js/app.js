@@ -1,5 +1,5 @@
 const { useState, useRef, useEffect, useCallback } = React;
-const THEME_KEY = 'ua_config_theme';
+const THEME_KEY = "ua_config_theme";
 
 const storage = window.UAStorage;
 const getStoredTheme = window.getUAStoredTheme;
@@ -9,15 +9,17 @@ let localCsrf = null;
 const loadLocalCsrf = async (force = false) => {
   if (localCsrf && !force) return;
 
-  let apiBase = '';
-  if (typeof window !== 'undefined' && window.location) {
-    apiBase = window.location.origin + '/api';
+  let apiBase = "";
+  if (typeof window !== "undefined" && window.location) {
+    apiBase = window.location.origin + "/api";
   } else {
-    apiBase = '/api';
+    apiBase = "/api";
   }
 
   try {
-    const r = await fetch(`${apiBase}/csrf_token`, { credentials: 'same-origin' });
+    const r = await fetch(`${apiBase}/csrf_token`, {
+      credentials: "same-origin",
+    });
     if (!r.ok) return;
     const d = await r.json();
     localCsrf = d && d.csrf_token ? String(d.csrf_token) : null;
@@ -28,20 +30,30 @@ const loadLocalCsrf = async (force = false) => {
 
 // Prefer shared `uaApiFetch` when available (provides CSRF handling and retry-on-auth-fail),
 // otherwise fall back to a local implementation.
-const apiFetch = (typeof window !== 'undefined' && window.uaApiFetch) || (async (url, options = {}) => {
-  // Local fallback: load CSRF token once and retry on 401/403 once.
-  await loadLocalCsrf();
-  const headers = { ...(options.headers || {}) };
-  if (localCsrf) headers['X-CSRF-Token'] = localCsrf;
-  let response = await fetch(url, { ...options, headers, credentials: 'same-origin' });
-  if (response.status === 401 || response.status === 403) {
-    await loadLocalCsrf(true);
-    const headers2 = { ...(options.headers || {}) };
-    if (localCsrf) headers2['X-CSRF-Token'] = localCsrf;
-    response = await fetch(url, { ...options, headers: headers2, credentials: 'same-origin' });
-  }
-  return response;
-});
+const apiFetch =
+  (typeof window !== "undefined" && window.uaApiFetch) ||
+  (async (url, options = {}) => {
+    // Local fallback: load CSRF token once and retry on 401/403 once.
+    await loadLocalCsrf();
+    const headers = { ...(options.headers || {}) };
+    if (localCsrf) headers["X-CSRF-Token"] = localCsrf;
+    let response = await fetch(url, {
+      ...options,
+      headers,
+      credentials: "same-origin",
+    });
+    if (response.status === 401 || response.status === 403) {
+      await loadLocalCsrf(true);
+      const headers2 = { ...(options.headers || {}) };
+      if (localCsrf) headers2["X-CSRF-Token"] = localCsrf;
+      response = await fetch(url, {
+        ...options,
+        headers: headers2,
+        credentials: "same-origin",
+      });
+    }
+    return response;
+  });
 
 const sanitizeHtml = window.sanitizeHtml;
 
@@ -50,22 +62,56 @@ const argumentCategories = [
   {
     title: "Modes / Workflows",
     args: [
-      { label: "--queue", placeholder: "QUEUE_NAME", description: "Process a named queue from a folder path" },
-      { label: "--limit-queue", placeholder: "N", description: "Limit queue successful uploads" },
+      {
+        label: "--queue",
+        placeholder: "QUEUE_NAME",
+        description: "Process a named queue from a folder path",
+      },
+      {
+        label: "--limit-queue",
+        placeholder: "N",
+        description: "Limit queue successful uploads",
+      },
       { label: "--site-check", description: "Site check (can it be uploaded)" },
-      { label: "--site-upload", placeholder: "TRACKER", description: "Site upload (process site check content)" },
-      { label: "--search_requests", description: "Search supported site for matching requests (config)" },
-      { label: "--unit3d", description: "Upload from UNIT3D-Upload-Checker results" }
-    ]
+      {
+        label: "--site-upload",
+        placeholder: "TRACKER",
+        description: "Site upload (process site check content)",
+      },
+      {
+        label: "--search_requests",
+        description: "Search supported site for matching requests (config)",
+      },
+      {
+        label: "--unit3d",
+        description: "Upload from UNIT3D-Upload-Checker results",
+      },
+    ],
   },
   {
     title: "Metadata / IDs",
     subtitle: "Getting these correct is 90% of a successful upload!",
     args: [
-      { label: "--category", placeholder: "MOVIE", description: "Override detected category" },
-      { label: "--type", placeholder: "REMUX", description: "Override detected type" },
-      { label: "--source", placeholder: "Blu-ray", description: "Override detected source" },
-      { label: "--resolution", placeholder: "2160p", description: "Override detected resolution" },
+      {
+        label: "--category",
+        placeholder: "MOVIE",
+        description: "Override detected category",
+      },
+      {
+        label: "--type",
+        placeholder: "REMUX",
+        description: "Override detected type",
+      },
+      {
+        label: "--source",
+        placeholder: "Blu-ray",
+        description: "Override detected source",
+      },
+      {
+        label: "--resolution",
+        placeholder: "2160p",
+        description: "Override detected resolution",
+      },
       { label: "--tmdb", placeholder: "movie/123", description: "TMDb id" },
       { label: "--imdb", placeholder: "tt0111161", description: "IMDb id" },
       { label: "--mal", placeholder: "ID", description: "MAL id" },
@@ -73,29 +119,68 @@ const argumentCategories = [
       { label: "--tvdb", placeholder: "ID", description: "TVDB id" },
       { label: "--douban", placeholder: "ID", description: "Douban id" },
       { label: "--igdb", placeholder: "ID", description: "IGDB id" },
-      { label: "--steam", placeholder: "APP_ID_OR_URL", description: "Steam app id or URL" }
-    ]
+      {
+        label: "--steam",
+        placeholder: "APP_ID_OR_URL",
+        description: "Steam app id or URL",
+      },
+    ],
   },
   {
     title: "Screenshots / Images",
     args: [
-      { label: "--screens", placeholder: "N", description: "Number of screenshots to use" },
-      { label: "--manual_frames", placeholder: '"1,250,500"', description: "Manual frame numbers for screenshots" },
-      { label: "--comparison", placeholder: "PATH", description: "Comparison images folder" },
-      { label: "--comparison_index", placeholder: "N", description: "Comparison main index" },
-      { label: "--disc-menus", placeholder: "PATH", description: "Folder containing disc menus screenshots" },
-      { label: "--imghost", placeholder: "HOST", description: "Specific image host to use" },
-      { label: "--skip-imagehost-upload", description: "Skip uploading screenshots" }
-    ]
+      {
+        label: "--screens",
+        placeholder: "N",
+        description: "Number of screenshots to use",
+      },
+      {
+        label: "--manual_frames",
+        placeholder: '"1,250,500"',
+        description: "Manual frame numbers for screenshots",
+      },
+      {
+        label: "--comparison",
+        placeholder: "PATH",
+        description: "Comparison images folder",
+      },
+      {
+        label: "--comparison_index",
+        placeholder: "N",
+        description: "Comparison main index",
+      },
+      {
+        label: "--disc-menus",
+        placeholder: "PATH",
+        description: "Folder containing disc menus screenshots",
+      },
+      {
+        label: "--imghost",
+        placeholder: "HOST",
+        description: "Specific image host to use",
+      },
+      {
+        label: "--skip-imagehost-upload",
+        description: "Skip uploading screenshots",
+      },
+    ],
   },
   {
     title: "TV Fields",
     args: [
       { label: "--season", placeholder: "S01", description: "Season number" },
       { label: "--episode", placeholder: "E01", description: "Episode number" },
-      { label: "--manual-episode-title", placeholder: "TITLE", description: "Manual episode title" },
-      { label: "--daily", placeholder: "YYYY-MM-DD", description: "Air date for daily shows" }
-    ]
+      {
+        label: "--manual-episode-title",
+        placeholder: "TITLE",
+        description: "Manual episode title",
+      },
+      {
+        label: "--daily",
+        placeholder: "YYYY-MM-DD",
+        description: "Air date for daily shows",
+      },
+    ],
   },
   {
     title: "Title Shaping",
@@ -110,27 +195,56 @@ const argumentCategories = [
       { label: "--no-edition", description: "Remove edition" },
       { label: "--dual-audio", description: "Add Dual-Audio" },
       { label: "--tag", placeholder: "GROUP", description: "Group tag" },
-      { label: "--service", placeholder: "SERVICE", description: "Streaming service" },
+      {
+        label: "--service",
+        placeholder: "SERVICE",
+        description: "Streaming service",
+      },
       { label: "--region", placeholder: "REGION", description: "Disc Region" },
-      { label: "--edition", placeholder: "TEXT", description: "Edition marker" },
-      { label: "--repack", placeholder: "TEXT", description: "Repack" }
-    ]
+      {
+        label: "--edition",
+        placeholder: "TEXT",
+        description: "Edition marker",
+      },
+      { label: "--repack", placeholder: "TEXT", description: "Repack" },
+    ],
   },
   {
     title: "Description / NFO",
     args: [
-      { label: "--desclink", placeholder: "URL", description: "Link to pastebin/hastebin with description" },
-      { label: "--descfile", placeholder: "PATH", description: "Path to description file (.txt, .nfo, .md)" },
+      {
+        label: "--desclink",
+        placeholder: "URL",
+        description: "Link to pastebin/hastebin with description",
+      },
+      {
+        label: "--descfile",
+        placeholder: "PATH",
+        description: "Path to description file (.txt, .nfo, .md)",
+      },
       { label: "--nfo", description: "Use .nfo for description" },
-      { label: "--keywords", placeholder: "keyword1,keyword2", description: "Comma-separated keywords" }
-    ]
+      {
+        label: "--keywords",
+        placeholder: "keyword1,keyword2",
+        description: "Comma-separated keywords",
+      },
+    ],
   },
   {
     title: "Language",
     args: [
-      { label: "--original-language", placeholder: "en", description: "Original language of content" },
-      { label: "--only-if-languages", placeholder: "en,fr", description: "Only proceed with upload if the content has these languages" }
-    ]
+      {
+        label: "--original-language",
+        placeholder: "en",
+        description: "Original language of content",
+      },
+      {
+        label: "--only-if-languages",
+        placeholder: "en,fr",
+        description:
+          "Only proceed with upload if the content has these languages",
+      },
+    ],
   },
   {
     title: "Misc Metadata Flags",
@@ -138,85 +252,205 @@ const argumentCategories = [
       { label: "--commentary", description: "Commentary" },
       { label: "--sfx-subtitles", description: "SFX subtitles" },
       { label: "--extras", description: "Extras included" },
-      { label: "--distributor", placeholder: "NAME", description: "Disc distributor" },
-      { label: "--disctype", placeholder: "BD50", description: "Disc type override" },
+      {
+        label: "--distributor",
+        placeholder: "NAME",
+        description: "Disc distributor",
+      },
+      {
+        label: "--disctype",
+        placeholder: "BD50",
+        description: "Disc type override",
+      },
       { label: "--untouched", description: "Mark as untouched disc" },
       { label: "--menus", description: "Path to menus screenshots (PNGs)" },
-      { label: "--sorted-filelist", description: "Sorted filelist (handles typical anime nonsense)" },
-      { label: "--keep-folder", description: "Keep top folder with single file uploads" },
-      { label: "--keep-nfo", description: "Keep nfo (extremely site specific)" },
-    ]
+      {
+        label: "--sorted-filelist",
+        description: "Sorted filelist (handles typical anime nonsense)",
+      },
+      {
+        label: "--keep-folder",
+        description: "Keep top folder with single file uploads",
+      },
+      {
+        label: "--keep-nfo",
+        description: "Keep nfo (extremely site specific)",
+      },
+    ],
   },
   {
     title: "Books / Reading",
     args: [
-      { label: "--author", placeholder: "AUTHOR", description: "Override detected book author" },
-      { label: "--book-title", placeholder: "TITLE", description: "Override detected book title" },
+      {
+        label: "--author",
+        placeholder: "AUTHOR",
+        description: "Override detected book author",
+      },
+      {
+        label: "--book-title",
+        placeholder: "TITLE",
+        description: "Override detected book title",
+      },
       { label: "--comic", description: "Mark upload as comic" },
       { label: "--manga", description: "Mark upload as manga" },
       { label: "--magazine", description: "Mark upload as magazine" },
       { label: "--newspaper", description: "Mark upload as newspaper" },
-      { label: "--book-translator", placeholder: "NAME", description: "Book translator" },
-      { label: "--book-language", placeholder: "LANG", description: "Book language" },
+      {
+        label: "--book-translator",
+        placeholder: "NAME",
+        description: "Book translator",
+      },
+      {
+        label: "--book-language",
+        placeholder: "LANG",
+        description: "Book language",
+      },
       { label: "--isbn", placeholder: "ISBN", description: "ISBN identifier" },
       { label: "--asin", placeholder: "ASIN", description: "Amazon ASIN" },
-      { label: "--openlibrary", placeholder: "ID", description: "OpenLibrary id" },
-      { label: "--publisher", placeholder: "NAME", description: "Book publisher" }
-    ]
+      {
+        label: "--openlibrary",
+        placeholder: "ID",
+        description: "OpenLibrary id",
+      },
+      {
+        label: "--publisher",
+        placeholder: "NAME",
+        description: "Book publisher",
+      },
+    ],
   },
   {
     title: "Games",
     args: [
-      { label: "--platform", placeholder: "PC", description: "Primary platform override" },
-      { label: "--platforms", placeholder: "PC,PS5", description: "Platforms list" },
-      { label: "--game-version", placeholder: "v1.0", description: "Game version" },
-      { label: "--game-subcategory", placeholder: "dlc", description: "Game subcategory" }
-    ]
+      {
+        label: "--platform",
+        placeholder: "PC",
+        description: "Primary platform override",
+      },
+      {
+        label: "--platforms",
+        placeholder: "PC,PS5",
+        description: "Platforms list",
+      },
+      {
+        label: "--game-version",
+        placeholder: "v1.0",
+        description: "Game version",
+      },
+      {
+        label: "--game-subcategory",
+        placeholder: "dlc",
+        description: "Game subcategory",
+      },
+    ],
   },
   {
     title: "Tracker References",
-    subtitle: "Pull metadata ids, descriptions, and screenshots from these trackers",
+    subtitle:
+      "Pull metadata ids, descriptions, and screenshots from these trackers",
     args: [
-      { label: "--onlyID", description: "Only grab meta ids, not descriptions" },
+      {
+        label: "--onlyID",
+        description: "Only grab meta ids, not descriptions",
+      },
       { label: "--ptp", placeholder: "ID_OR_URL", description: "PTP id/link" },
       { label: "--blu", placeholder: "ID_OR_URL", description: "BLU id/link" },
-      { label: "--aither", placeholder: "ID_OR_URL", description: "Aither id/link" },
+      {
+        label: "--aither",
+        placeholder: "ID_OR_URL",
+        description: "Aither id/link",
+      },
       { label: "--lst", placeholder: "ID_OR_URL", description: "LST id/link" },
       { label: "--oe", placeholder: "ID_OR_URL", description: "OE id/link" },
       { label: "--hdb", placeholder: "ID_OR_URL", description: "HDB id/link" },
       { label: "--btn", placeholder: "ID_OR_URL", description: "BTN id/link" },
       { label: "--bhd", placeholder: "ID_OR_URL", description: "BHD id/link" },
-      { label: "--huno", placeholder: "ID_OR_URL", description: "HUNO id/link" },
-      { label: "--ulcx", placeholder: "ID_OR_URL", description: "ULCX id/link" },
-      { label: "--torrenthash", placeholder: "HASH", description: "(qBitTorrent only) Get site id from Torrent hash" }
-    ]
+      {
+        label: "--huno",
+        placeholder: "ID_OR_URL",
+        description: "HUNO id/link",
+      },
+      {
+        label: "--ulcx",
+        placeholder: "ID_OR_URL",
+        description: "ULCX id/link",
+      },
+      {
+        label: "--torrenthash",
+        placeholder: "HASH",
+        description: "(qBitTorrent only) Get site id from Torrent hash",
+      },
+    ],
   },
   {
     title: "Upload Selection / Dupe",
     args: [
-      { label: "--trackers", placeholder: "aither,blutopia,lst,etc", description: "Specific Trackers list for uploading" },
-      { label: "--trackers-remove", placeholder: "blutopia,xyz,etc", description: "Remove these trackers from the default list for this upload" },
-      { label: "--trackers-pass", placeholder: "N", description: "How many trackers need to pass all checks for upload to proceed" },
-      { label: "--skip_auto_torrent", description: "Skip auto torrent searching" },
+      {
+        label: "--trackers",
+        placeholder: "aither,blutopia,lst,etc",
+        description: "Specific Trackers list for uploading",
+      },
+      {
+        label: "--trackers-remove",
+        placeholder: "blutopia,xyz,etc",
+        description:
+          "Remove these trackers from the default list for this upload",
+      },
+      {
+        label: "--trackers-pass",
+        placeholder: "N",
+        description:
+          "How many trackers need to pass all checks for upload to proceed",
+      },
+      {
+        label: "--skip_auto_torrent",
+        description: "Skip auto torrent searching",
+      },
       { label: "--skip-dupe-check", description: "Skip dupe check" },
-      { label: "--skip-dupe-asking", description: "Accept any reported dupes without prompting about it" },
-      { label: "--double-dupe-check", description: "Run another dupe check right before upload" },
-      { label: "--dupe-size-difference-tolerance", placeholder: "PERCENTAGE", description: "Ignore dupes with size difference >= percentage" },
-      { label: "--draft", description: "Send to Draft at supported sites (config)" },
-      { label: "--modq", description: "Send to modQ at supported sites (config)" },
-      { label: "--freeleech", placeholder: "25%", description: "Mark upload as Freeleech (percentage)" }
-    ]
+      {
+        label: "--skip-dupe-asking",
+        description: "Accept any reported dupes without prompting about it",
+      },
+      {
+        label: "--double-dupe-check",
+        description: "Run another dupe check right before upload",
+      },
+      {
+        label: "--dupe-size-difference-tolerance",
+        placeholder: "PERCENTAGE",
+        description: "Ignore dupes with size difference >= percentage",
+      },
+      {
+        label: "--draft",
+        description: "Send to Draft at supported sites (config)",
+      },
+      {
+        label: "--modq",
+        description: "Send to modQ at supported sites (config)",
+      },
+      {
+        label: "--freeleech",
+        placeholder: "25%",
+        description: "Mark upload as Freeleech (percentage)",
+      },
+    ],
   },
   {
     title: "Anonymity / Seeding / Streaming",
     args: [
-      { label: "--anon", description: "Anon upload at supported sites (config)" },
+      {
+        label: "--anon",
+        description: "Anon upload at supported sites (config)",
+      },
       { label: "--no-seed", description: "Don't send torrents to client" },
       { label: "--stream", description: "Stream" },
       { label: "--webdv", description: "Dolby Vision hybrid" },
-      { label: "--hardcoded-subs", description: "Release contains hardcoded subs" },
-      { label: "--personalrelease", description: "Personal release" }
-    ]
+      {
+        label: "--hardcoded-subs",
+        description: "Release contains hardcoded subs",
+      },
+      { label: "--personalrelease", description: "Personal release" },
+    ],
   },
   {
     title: "Tracker / Site Specific",
@@ -224,222 +458,457 @@ const argumentCategories = [
       { label: "--foreign", description: "CINEMATIK foreign category" },
       { label: "--opera", description: "CINEMATIK opera and musical category" },
       { label: "--asian", description: "CINEMATIK Asian category" },
-      { label: "--exclusive", placeholder: "1", description: "Set exclusive flag where supported" }
-    ]
+      {
+        label: "--exclusive",
+        placeholder: "1",
+        description: "Set exclusive flag where supported",
+      },
+    ],
   },
   {
     title: "Torrent Creation / Hashing",
     args: [
-      { label: "--max-piece-size", placeholder: "N", description: "Max piece size (in MiB) of created torrent (1 <> 128)" },
-      { label: "--nohash", description: "Don't rehash torrent even if it was needed" },
-      { label: "--rehash", description: "Create a fresh torrent from the actual data, not an existing .torrent file" },
-      { label: "--mkbrr", description: "Use mkbrr for torrent creation (config)" },
-      { label: "--vapoursynth", description: "Use VapourSynth for screenshots" },
+      {
+        label: "--max-piece-size",
+        placeholder: "N",
+        description: "Max piece size (in MiB) of created torrent (1 <> 128)",
+      },
+      {
+        label: "--nohash",
+        description: "Don't rehash torrent even if it was needed",
+      },
+      {
+        label: "--rehash",
+        description:
+          "Create a fresh torrent from the actual data, not an existing .torrent file",
+      },
+      {
+        label: "--mkbrr",
+        description: "Use mkbrr for torrent creation (config)",
+      },
+      {
+        label: "--vapoursynth",
+        description: "Use VapourSynth for screenshots",
+      },
       { label: "--entropy", placeholder: "N", description: "Entropy" },
       { label: "--randomized", placeholder: "N", description: "Randomized" },
-      { label: "--infohash", placeholder: "HASH", description: "Use this Infohash as the existing torrent from client" },
-      { label: "--force-recheck", description: "(qBitTorrent only) Force recheck the file in client before upload" }
-    ]
+      {
+        label: "--infohash",
+        placeholder: "HASH",
+        description: "Use this Infohash as the existing torrent from client",
+      },
+      {
+        label: "--force-recheck",
+        description:
+          "(qBitTorrent only) Force recheck the file in client before upload",
+      },
+    ],
   },
   {
     title: "Torrent Client Integration",
     args: [
-      { label: "--client", placeholder: "NAME", description: "Client name (config)" },
-      { label: "--qbit-tag", placeholder: "TAG", description: "qBittorrent tag (config)" },
-      { label: "--qbit-cat", placeholder: "CATEGORY", description: "qBittorrent category (config)" },
-      { label: "--qbit-bw-control", description: "Enable qBittorrent bandwidth control" },
-      { label: "--qbit-bw-threshold", placeholder: "KiB/s", description: "qBittorrent bandwidth threshold" },
-      { label: "--qbit-bw-time", placeholder: "SECONDS", description: "qBittorrent bandwidth wait time" },
-      { label: "--rtorrent-label", placeholder: "LABEL", description: "rTorrent label (config)" }
-    ]
+      {
+        label: "--client",
+        placeholder: "NAME",
+        description: "Client name (config)",
+      },
+      {
+        label: "--qbit-tag",
+        placeholder: "TAG",
+        description: "qBittorrent tag (config)",
+      },
+      {
+        label: "--qbit-cat",
+        placeholder: "CATEGORY",
+        description: "qBittorrent category (config)",
+      },
+      {
+        label: "--qbit-bw-control",
+        description: "Enable qBittorrent bandwidth control",
+      },
+      {
+        label: "--qbit-bw-threshold",
+        placeholder: "KiB/s",
+        description: "qBittorrent bandwidth threshold",
+      },
+      {
+        label: "--qbit-bw-time",
+        placeholder: "SECONDS",
+        description: "qBittorrent bandwidth wait time",
+      },
+      {
+        label: "--rtorrent-label",
+        placeholder: "LABEL",
+        description: "rTorrent label (config)",
+      },
+    ],
   },
   {
     title: "Cleanup / Temp",
     args: [
-      { label: "--delete-meta", description: "Delete only meta.json from tmp folder" },
-      { label: "--delete-tmp", description: "Delete the tmp folder associated with this upload" },
-      { label: "--cleanup", description: "Cleanup the entire UA tmp folder" }
-    ]
+      {
+        label: "--delete-meta",
+        description: "Delete only meta.json from tmp folder",
+      },
+      {
+        label: "--delete-tmp",
+        description: "Delete the tmp folder associated with this upload",
+      },
+      { label: "--cleanup", description: "Cleanup the entire UA tmp folder" },
+    ],
   },
   {
     title: "Debug / Output",
     args: [
       { label: "--debug", description: "Debug mode" },
       { label: "--ffdebug", description: "FFmpeg debug" },
-      { label: "--upload-order", placeholder: "tracker1,tracker2", description: "Preferred upload order" },
+      {
+        label: "--upload-order",
+        placeholder: "tracker1,tracker2",
+        description: "Preferred upload order",
+      },
       { label: "--webui", description: "Launch the WebUI mode" },
-      { label: "--upload-timer", description: "Upload timer (config)" }
-    ]
+      { label: "--upload-timer", description: "Upload timer (config)" },
+    ],
   },
   {
     title: "Misc Options",
     args: [
-      { label: "--not-anime", description: "Can speed up tv data extraction when not anime content" },
-      { label: "--channel", placeholder: "ID_OR_TAG", description: "SPD channel" },
-      { label: "--audio-spectrogram", description: "Generate audio spectrograms" },
-      { label: "--audio-spectrogram-tracks", placeholder: "1,2", description: "Specific tracks for spectrograms" },
+      {
+        label: "--not-anime",
+        description: "Can speed up tv data extraction when not anime content",
+      },
+      {
+        label: "--channel",
+        placeholder: "ID_OR_TAG",
+        description: "SPD channel",
+      },
+      {
+        label: "--audio-spectrogram",
+        description: "Generate audio spectrograms",
+      },
+      {
+        label: "--audio-spectrogram-tracks",
+        placeholder: "1,2",
+        description: "Specific tracks for spectrograms",
+      },
       { label: "--usenet", description: "Upload files to Usenet (NNTP)" },
-      { label: "--usenet-subject", placeholder: "TEXT", description: "Custom Usenet subject line" },
-      { label: "--unattended", description: "Unattended (no prompts (AT ALL))" },
-      { label: "--unattended_confirm", description: "Unattended confirm (use with --unattended, some prompting)" }
-    ]
-  }
+      {
+        label: "--usenet-subject",
+        placeholder: "TEXT",
+        description: "Custom Usenet subject line",
+      },
+      {
+        label: "--unattended",
+        description: "Unattended (no prompts (AT ALL))",
+      },
+      {
+        label: "--unattended_confirm",
+        description:
+          "Unattended confirm (use with --unattended, some prompting)",
+      },
+    ],
+  },
 ];
 
 // Icon components
 const FolderIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+    />
   </svg>
 );
 
 const FolderOpenIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"
+    />
   </svg>
 );
 
 const FileIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+    />
   </svg>
 );
 
 const TerminalIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+    />
   </svg>
 );
 
 const PlayIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+    />
   </svg>
 );
 
 const TrashIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+    />
   </svg>
 );
 
 const UploadIcon = () => (
-  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+  <svg
+    className="w-6 h-6"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+    />
   </svg>
 );
 
 const ChevronDownIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M19 9l-7 7-7-7"
+    />
   </svg>
 );
 
 const ChevronRightIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M9 5l7 7-7 7"
+    />
   </svg>
 );
 
 const SearchIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+    />
   </svg>
 );
 
 const CollapseAllIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+    />
   </svg>
 );
 
 const ExpandAllIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+    />
   </svg>
 );
 
 const SpinnerIcon = () => (
   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    <circle
+      className="opacity-25"
+      cx="12"
+      cy="12"
+      r="10"
+      stroke="currentColor"
+      strokeWidth="4"
+    ></circle>
+    <path
+      className="opacity-75"
+      fill="currentColor"
+      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+    ></path>
   </svg>
 );
 
 const metadataProviderStyles = {
   tmdb: {
-    light: 'border-[#06B4E2] bg-transparent text-[#067A98]',
-    dark: 'border-[#06B4E2]/70 bg-transparent text-[#B9F3FF]'
+    light: "border-[#06B4E2] bg-transparent text-[#067A98]",
+    dark: "border-[#06B4E2]/70 bg-transparent text-[#B9F3FF]",
   },
   imdb: {
-    light: 'border-[#F5C518] bg-transparent text-[#6F5700]',
-    dark: 'border-[#F5C518]/70 bg-transparent text-[#FFF3B5]'
+    light: "border-[#F5C518] bg-transparent text-[#6F5700]",
+    dark: "border-[#F5C518]/70 bg-transparent text-[#FFF3B5]",
   },
   tvdb: {
-    light: 'border-[#6CD591] bg-transparent text-[#2F7D49]',
-    dark: 'border-[#6CD591]/70 bg-transparent text-[#D9F9E4]'
+    light: "border-[#6CD591] bg-transparent text-[#2F7D49]",
+    dark: "border-[#6CD591]/70 bg-transparent text-[#D9F9E4]",
   },
   tvmaze: {
-    light: 'border-[#6EC4BA] bg-transparent text-[#2E7B73]',
-    dark: 'border-[#6EC4BA]/70 bg-transparent text-[#D4F4EF]'
+    light: "border-[#6EC4BA] bg-transparent text-[#2E7B73]",
+    dark: "border-[#6EC4BA]/70 bg-transparent text-[#D4F4EF]",
   },
   mal: {
-    light: 'border-[#2E51A1] bg-transparent text-[#2E51A1]',
-    dark: 'border-[#2E51A1]/75 bg-transparent text-[#C9D6F4]'
+    light: "border-[#2E51A1] bg-transparent text-[#2E51A1]",
+    dark: "border-[#2E51A1]/75 bg-transparent text-[#C9D6F4]",
   },
   douban: {
-    light: 'border-[#007610] bg-transparent text-[#007610]',
-    dark: 'border-[#007610]/75 bg-transparent text-[#B9F2C2]'
+    light: "border-[#007610] bg-transparent text-[#007610]",
+    dark: "border-[#007610]/75 bg-transparent text-[#B9F2C2]",
   },
   igdb: {
-    light: 'border-[#9147FF] bg-transparent text-[#9147FF]',
-    dark: 'border-[#9147FF]/75 bg-transparent text-[#E2D2FF]'
+    light: "border-[#9147FF] bg-transparent text-[#9147FF]",
+    dark: "border-[#9147FF]/75 bg-transparent text-[#E2D2FF]",
   },
   steam: {
-    light: 'border-slate-300 bg-transparent text-slate-900',
-    dark: 'border-slate-700 bg-transparent text-slate-100'
+    light: "border-slate-300 bg-transparent text-slate-900",
+    dark: "border-slate-700 bg-transparent text-slate-100",
   },
   google_books: {
-    light: 'border-green-300 bg-transparent text-green-900',
-    dark: 'border-green-900/80 bg-transparent text-green-100'
+    light: "border-green-300 bg-transparent text-green-900",
+    dark: "border-green-900/80 bg-transparent text-green-100",
   },
   openlibrary: {
-    light: 'border-orange-300 bg-transparent text-orange-900',
-    dark: 'border-orange-900/80 bg-transparent text-orange-100'
+    light: "border-orange-300 bg-transparent text-orange-900",
+    dark: "border-orange-900/80 bg-transparent text-orange-100",
   },
   default: {
-    light: 'border-gray-300 bg-transparent text-gray-900',
-    dark: 'border-gray-700 bg-transparent text-gray-100'
-  }
+    light: "border-gray-300 bg-transparent text-gray-900",
+    dark: "border-gray-700 bg-transparent text-gray-100",
+  },
 };
 
 const getMetadataProviderStyle = (key, isDarkMode) => {
-  const providerStyle = metadataProviderStyles[key] || metadataProviderStyles.default;
+  const providerStyle =
+    metadataProviderStyles[key] || metadataProviderStyles.default;
   return isDarkMode ? providerStyle.dark : providerStyle.light;
 };
 
 const metadataProviderIcons = {
-  tmdb: { src: '/static/img/providers/tmdb.svg', alt: 'TMDb' },
-  imdb: { src: '/static/img/providers/imdb.svg', alt: 'IMDb' },
-  tvdb: { src: '/static/img/providers/tvdb.svg', alt: 'TVDb' },
-  mal: { src: '/static/img/providers/mal.svg', alt: 'MyAnimeList' },
+  tmdb: { src: "/static/img/providers/tmdb.svg", alt: "TMDb" },
+  imdb: { src: "/static/img/providers/imdb.svg", alt: "IMDb" },
+  tvdb: { src: "/static/img/providers/tvdb.svg", alt: "TVDb" },
+  mal: { src: "/static/img/providers/mal.svg", alt: "MyAnimeList" },
   igdb: {
-    src: '/static/img/providers/igdb.svg',
-    lightSrc: '/static/img/providers/igdb_light.svg',
-    alt: 'IGDB'
+    src: "/static/img/providers/igdb.svg",
+    lightSrc: "/static/img/providers/igdb_light.svg",
+    alt: "IGDB",
   },
-  douban: { src: '/static/img/providers/douban.svg', alt: 'Douban' },
-  google_books: { src: '/static/img/providers/google_books.svg', alt: 'Google Books' },
-  openlibrary: { src: '/static/img/providers/openlibrary.svg', alt: 'Open Library' },
-  steam: { src: '/static/img/providers/steam.svg', alt: 'Steam' },
-  tvmaze: { src: '/static/img/providers/tvmaze.svg', alt: 'TVMaze' }
+  douban: { src: "/static/img/providers/douban.svg", alt: "Douban" },
+  google_books: {
+    src: "/static/img/providers/google_books.svg",
+    alt: "Google Books",
+  },
+  openlibrary: {
+    src: "/static/img/providers/openlibrary.svg",
+    alt: "Open Library",
+  },
+  steam: { src: "/static/img/providers/steam.svg", alt: "Steam" },
+  tvmaze: { src: "/static/img/providers/tvmaze.svg", alt: "TVMaze" },
 };
 
 const renderMetadataProviderIcon = (key, isDarkMode) => {
   const iconAsset = metadataProviderIcons[key];
   if (iconAsset) {
-    const iconSrc = !isDarkMode && iconAsset.lightSrc ? iconAsset.lightSrc : iconAsset.src;
+    const iconSrc =
+      !isDarkMode && iconAsset.lightSrc ? iconAsset.lightSrc : iconAsset.src;
     return (
       <img
         src={iconSrc}
@@ -450,63 +919,115 @@ const renderMetadataProviderIcon = (key, isDarkMode) => {
   }
 
   switch (key) {
-    case 'google_books':
+    case "google_books":
       return (
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 6.25A2.25 2.25 0 017.25 4h10.5A1.25 1.25 0 0119 5.25v13.5A1.25 1.25 0 0117.75 20H7.25A2.25 2.25 0 015 17.75V6.25z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7.5 6H18M8 9.5h6.5M8 13h7.5" />
+        <svg
+          className="w-4 h-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.8}
+            d="M5 6.25A2.25 2.25 0 017.25 4h10.5A1.25 1.25 0 0119 5.25v13.5A1.25 1.25 0 0117.75 20H7.25A2.25 2.25 0 015 17.75V6.25z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.8}
+            d="M7.5 6H18M8 9.5h6.5M8 13h7.5"
+          />
         </svg>
       );
-    case 'openlibrary':
+    case "openlibrary":
       return (
-        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4.5 6.5A2.5 2.5 0 017 4h11.5v15.5H7a2.5 2.5 0 010-5h11.5" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.5 8.5h6M8.5 12h6" />
+        <svg
+          className="w-4 h-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.8}
+            d="M4.5 6.5A2.5 2.5 0 017 4h11.5v15.5H7a2.5 2.5 0 010-5h11.5"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.8}
+            d="M8.5 8.5h6M8.5 12h6"
+          />
         </svg>
       );
     default:
-      return <span className="text-[11px] font-black tracking-wide">{String(key || 'META').slice(0, 4).toUpperCase()}</span>;
+      return (
+        <span className="text-[11px] font-black tracking-wide">
+          {String(key || "META")
+            .slice(0, 4)
+            .toUpperCase()}
+        </span>
+      );
   }
 };
 
 function AudionutsUAGUI() {
-  const API_BASE = window.location.origin + '/api';
+  const API_BASE = window.location.origin + "/api";
   // Derive an application base path from the API base so links work under subpath deployments
-  const APP_BASE = API_BASE.replace(/\/api$/, '');
+  const APP_BASE = API_BASE.replace(/\/api$/, "");
 
   const [directories, setDirectories] = useState([
-    { name: 'data', type: 'folder', path: '/data', children: [] },
-    { name: 'torrent_storage_dir', type: 'folder', path: '/torrent_storage_dir', children: [] },
-    { name: 'Upload-Assistant', type: 'folder', path: '/Upload-Assistant', children: [] }
+    { name: "data", type: "folder", path: "/data", children: [] },
+    {
+      name: "torrent_storage_dir",
+      type: "folder",
+      path: "/torrent_storage_dir",
+      children: [],
+    },
+    {
+      name: "Upload-Assistant",
+      type: "folder",
+      path: "/Upload-Assistant",
+      children: [],
+    },
   ]);
 
-  const [selectedPath, setSelectedPath] = useState('');
-  const [, setSelectedName] = useState('');
-  const [customArgs, setCustomArgs] = useState('');
+  const [selectedPath, setSelectedPath] = useState("");
+  const [, setSelectedName] = useState("");
+  const [customArgs, setCustomArgs] = useState("");
   const [isExecuting, setIsExecuting] = useState(false);
-  const [expandedFolders, setExpandedFolders] = useState(new Set(['/data', '/torrent_storage_dir']));
-  const [sessionId, setSessionId] = useState('');
+  const [expandedFolders, setExpandedFolders] = useState(
+    new Set(["/data", "/torrent_storage_dir"]),
+  );
+  const [sessionId, setSessionId] = useState("");
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(320);
   const [isResizingRight, setIsResizingRight] = useState(false);
-  const [userInput, setUserInput] = useState('');
+  const [userInput, setUserInput] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(getStoredTheme);
-  const [argSearchFilter, setArgSearchFilter] = useState('');
+  const [argSearchFilter, setArgSearchFilter] = useState("");
   const [collapsedSections, setCollapsedSections] = useState(new Set());
   const [executionPreview, setExecutionPreview] = useState(null);
   const [progressItems, setProgressItems] = useState([]);
 
   // Mobile state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [activePanel, setActivePanel] = useState('main'); // 'main' | 'files' | 'args'
+  const [activePanel, setActivePanel] = useState("main"); // 'main' | 'files' | 'args'
 
   // File Browser search states
-  const [fileBrowserSearch, setFileBrowserSearch] = useState('');
-  const [fileBrowserSearchResults, setFileBrowserSearchResults] = useState(null);
-  const [fileBrowserSearchLoading, setFileBrowserSearchLoading] = useState(false);
+  const [fileBrowserSearch, setFileBrowserSearch] = useState("");
+  const [fileBrowserSearchResults, setFileBrowserSearchResults] =
+    useState(null);
+  const [fileBrowserSearchLoading, setFileBrowserSearchLoading] =
+    useState(false);
   const fileBrowserSearchTimer = useRef(null);
-  const fileBrowserSearchQuery = useRef('');
+  const fileBrowserSearchQuery = useRef("");
 
   // Folder loading states
   const [loadingFolders, setLoadingFolders] = useState(new Set());
@@ -515,23 +1036,25 @@ function AudionutsUAGUI() {
   const [descDirectories, setDescDirectories] = useState([]);
   const [descExpandedFolders, setDescExpandedFolders] = useState(new Set());
   const [descLoadingFolders, setDescLoadingFolders] = useState(new Set());
-  const [descLinkError, setDescLinkError] = useState('');
-  const [descFileError, setDescFileError] = useState('');
+  const [descLinkError, setDescLinkError] = useState("");
+  const [descFileError, setDescFileError] = useState("");
   const [descBrowserCollapsed, setDescBrowserCollapsed] = useState(false);
   const [descLinkFocused, setDescLinkFocused] = useState(false);
 
   const richOutputRef = useRef(null);
-  const lastFullHashRef = useRef('');
+  const lastFullHashRef = useRef("");
   const inputRef = useRef(null);
   const sseAbortControllerRef = useRef(null);
-  const visibleProgressItems = progressItems.filter((item) => item.status !== 'completed');
+  const visibleProgressItems = progressItems.filter(
+    (item) => item.status !== "completed",
+  );
 
   const sortProgressItems = (items) => {
     return [...items].sort((a, b) => {
-      const aRunning = a.status === 'running' ? 0 : 1;
-      const bRunning = b.status === 'running' ? 0 : 1;
+      const aRunning = a.status === "running" ? 0 : 1;
+      const bRunning = b.status === "running" ? 0 : 1;
       if (aRunning !== bRunning) return aRunning - bRunning;
-      return String(a.id || '').localeCompare(String(b.id || ''));
+      return String(a.id || "").localeCompare(String(b.id || ""));
     });
   };
 
@@ -540,7 +1063,10 @@ function AudionutsUAGUI() {
     incomingItems.forEach((item) => {
       if (!item || !item.id) return;
       const existing = itemsById.get(item.id);
-      if (!existing || Number(item.updated_at || 0) >= Number(existing.updated_at || 0)) {
+      if (
+        !existing ||
+        Number(item.updated_at || 0) >= Number(existing.updated_at || 0)
+      ) {
         itemsById.set(item.id, existing ? { ...existing, ...item } : item);
       }
     });
@@ -548,8 +1074,8 @@ function AudionutsUAGUI() {
   };
 
   const applyProgressEvent = (event) => {
-    if (!event || typeof event !== 'object') return;
-    if (event.op === 'reset') {
+    if (!event || typeof event !== "object") return;
+    if (event.op === "reset") {
       setProgressItems([]);
       return;
     }
@@ -569,54 +1095,97 @@ function AudionutsUAGUI() {
     if (!visibleProgressItems.length) return null;
 
     return (
-      <div className={`rounded-lg border p-3 shadow-xl backdrop-blur-sm ${isDarkMode ? 'border-gray-700 bg-gray-800/90' : 'border-gray-200 bg-white/95'}`}>
+      <div
+        className={`rounded-lg border p-3 shadow-xl backdrop-blur-sm ${isDarkMode ? "border-gray-700 bg-gray-800/90" : "border-gray-200 bg-white/95"}`}
+      >
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
-            <h4 className={`font-semibold ${compact ? 'text-sm' : 'text-base'} ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Binary Progress</h4>
-            <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Live progress from external tools</p>
+            <h4
+              className={`font-semibold ${compact ? "text-sm" : "text-base"} ${isDarkMode ? "text-white" : "text-gray-900"}`}
+            >
+              Binary Progress
+            </h4>
+            <p
+              className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+            >
+              Live progress from external tools
+            </p>
           </div>
-          <span className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{visibleProgressItems.length} active</span>
+          <span
+            className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+          >
+            {visibleProgressItems.length} active
+          </span>
         </div>
-        <div className={`${compact ? 'space-y-2' : 'space-y-3'} max-h-[40vh] overflow-y-auto pr-1`}>
+        <div
+          className={`${compact ? "space-y-2" : "space-y-3"} max-h-[40vh] overflow-y-auto pr-1`}
+        >
           {visibleProgressItems.map((item) => {
             const current = Number(item.current ?? 0);
             const total = Number(item.total ?? 0);
             const hasTotal = Number.isFinite(total) && total > 0;
-            const clampedPercent = hasTotal ? Math.max(0, Math.min(100, (current / total) * 100)) : 0;
-            const isCompleted = item.status === 'completed';
-            const isFailed = item.status === 'failed';
+            const clampedPercent = hasTotal
+              ? Math.max(0, Math.min(100, (current / total) * 100))
+              : 0;
+            const isCompleted = item.status === "completed";
+            const isFailed = item.status === "failed";
             const statusTone = isCompleted
-              ? (isDarkMode ? 'text-emerald-300' : 'text-emerald-700')
+              ? isDarkMode
+                ? "text-emerald-300"
+                : "text-emerald-700"
               : isFailed
-                ? (isDarkMode ? 'text-rose-300' : 'text-rose-700')
-                : (isDarkMode ? 'text-sky-300' : 'text-sky-700');
+                ? isDarkMode
+                  ? "text-rose-300"
+                  : "text-rose-700"
+                : isDarkMode
+                  ? "text-sky-300"
+                  : "text-sky-700";
             const progressTone = isCompleted
-              ? 'bg-emerald-500'
+              ? "bg-emerald-500"
               : isFailed
-                ? 'bg-rose-500'
-                : 'bg-sky-500';
-            let summary = '';
+                ? "bg-rose-500"
+                : "bg-sky-500";
+            let summary = "";
             if (hasTotal) {
-              if (item.unit === 'percent') summary = `${Math.round(clampedPercent)}%`;
+              if (item.unit === "percent")
+                summary = `${Math.round(clampedPercent)}%`;
               else summary = `${Math.round(current)}/${Math.round(total)}`;
             }
             return (
-              <div key={item.id} className={`rounded-lg border px-3 py-2 ${isDarkMode ? 'border-gray-700 bg-gray-900/80' : 'border-gray-200 bg-gray-50'}`}>
+              <div
+                key={item.id}
+                className={`rounded-lg border px-3 py-2 ${isDarkMode ? "border-gray-700 bg-gray-900/80" : "border-gray-200 bg-gray-50"}`}
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className={`font-medium truncate ${compact ? 'text-sm' : 'text-[15px]'} ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{item.label || item.id}</p>
+                    <p
+                      className={`font-medium truncate ${compact ? "text-sm" : "text-[15px]"} ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                    >
+                      {item.label || item.id}
+                    </p>
                     {item.detail && (
-                      <p className={`text-xs truncate ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{item.detail}</p>
+                      <p
+                        className={`text-xs truncate ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                      >
+                        {item.detail}
+                      </p>
                     )}
                   </div>
-                  <div className={`text-xs font-semibold whitespace-nowrap ${statusTone}`}>
-                    {summary || (isCompleted ? 'Done' : isFailed ? 'Failed' : 'Running')}
+                  <div
+                    className={`text-xs font-semibold whitespace-nowrap ${statusTone}`}
+                  >
+                    {summary ||
+                      (isCompleted ? "Done" : isFailed ? "Failed" : "Running")}
                   </div>
                 </div>
-                <div className={`mt-2 h-2.5 overflow-hidden rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                <div
+                  className={`mt-2 h-2.5 overflow-hidden rounded-full ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
+                >
                   <div
-                    className={`h-full rounded-full transition-[width] duration-300 ${progressTone} ${!hasTotal && !isFailed ? 'animate-pulse' : ''}`}
-                    style={{ width: `${hasTotal ? clampedPercent : isFailed ? 100 : 35}%` }}
+                    className={`h-full rounded-full transition-[width] duration-300 ${progressTone} ${!hasTotal && !isFailed ? "animate-pulse" : ""}`}
+                    style={{
+                      width: `${hasTotal ? clampedPercent : isFailed ? 100 : 35}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -633,10 +1202,10 @@ function AudionutsUAGUI() {
     if (!panel) return null;
 
     return (
-      <div className={`pointer-events-none absolute left-3 bottom-3 z-20 ${isMobile ? 'right-3' : 'w-[24rem] max-w-[calc(100%-1.5rem)]'}`}>
-        <div className="pointer-events-auto">
-          {panel}
-        </div>
+      <div
+        className={`pointer-events-none absolute left-3 bottom-3 z-20 ${isMobile ? "right-3" : "w-[24rem] max-w-[calc(100%-1.5rem)]"}`}
+      >
+        <div className="pointer-events-auto">{panel}</div>
       </div>
     );
   };
@@ -646,12 +1215,18 @@ function AudionutsUAGUI() {
 
     return (
       <div className="flex flex-col h-full">
-        <div className={`p-3 border-b flex-shrink-0 ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gradient-to-l from-cyan-50 to-sky-50'}`}>
-          <h2 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
+        <div
+          className={`p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-cyan-50 to-sky-50"}`}
+        >
+          <h2
+            className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+          >
             <TerminalIcon />
             Binary Progress
           </h2>
-          <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          <p
+            className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+          >
             Live progress from external tools while the queue is running.
           </p>
         </div>
@@ -663,14 +1238,14 @@ function AudionutsUAGUI() {
   };
 
   // Detect if --descfile or --desclink is present in arguments
-  const hasDescFile = customArgs.includes('--descfile');
-  const hasDescLink = customArgs.includes('--desclink');
+  const hasDescFile = customArgs.includes("--descfile");
+  const hasDescLink = customArgs.includes("--desclink");
 
   // URL validation helper - accepts any HTTP/HTTPS URL (server fetches and parses any URL)
   const isValidUrl = (string) => {
     try {
       const url = new URL(string);
-      return url.protocol === 'http:' || url.protocol === 'https:';
+      return url.protocol === "http:" || url.protocol === "https:";
     } catch (_) {
       return false;
     }
@@ -678,59 +1253,71 @@ function AudionutsUAGUI() {
 
   // Path validation helper - checks if string looks like a valid file path
   const isValidDescFilePath = (path) => {
-    if (!path || path.trim() === '') return { valid: false, error: '' };
+    if (!path || path.trim() === "") return { valid: false, error: "" };
 
     const trimmed = path.trim();
 
     // Check for valid description file extensions
-    const validExtensions = ['.txt', '.nfo', '.md'];
-    const hasValidExt = validExtensions.some(ext => trimmed.toLowerCase().endsWith(ext));
+    const validExtensions = [".txt", ".nfo", ".md"];
+    const hasValidExt = validExtensions.some((ext) =>
+      trimmed.toLowerCase().endsWith(ext),
+    );
 
     // Check if it looks like a path (has separators or starts with drive letter/root)
-    const hasPathSeparator = trimmed.includes('/') || trimmed.includes('\\');
-    const startsWithRoot = /^[a-zA-Z]:/.test(trimmed) || trimmed.startsWith('/') || trimmed.startsWith('\\');
+    const hasPathSeparator = trimmed.includes("/") || trimmed.includes("\\");
+    const startsWithRoot =
+      /^[a-zA-Z]:/.test(trimmed) ||
+      trimmed.startsWith("/") ||
+      trimmed.startsWith("\\");
     const looksLikePath = hasPathSeparator || startsWithRoot;
 
     if (!looksLikePath) {
       return {
         valid: false,
-        error: 'Path should be a full file path (e.g., /path/to/desc.txt or C:\\path\\desc.txt)'
+        error:
+          "Path should be a full file path (e.g., /path/to/desc.txt or C:\\path\\desc.txt)",
       };
     }
 
     if (!hasValidExt) {
       return {
         valid: false,
-        error: 'File should have a valid extension (.txt, .nfo, or .md)'
+        error: "File should have a valid extension (.txt, .nfo, or .md)",
       };
     }
 
-    return { valid: true, error: '' };
+    return { valid: true, error: "" };
   };
 
   // Extract value from argument string (e.g., --descfile "path" or --desclink "url")
   // Supports both space-separated (--arg "value") and equals-separated (--arg="value") formats
   const extractArgValue = (args, argName) => {
     // First try equals-separated format: --argname="value" or --argname='value' or --argname=value
-    const equalsRegex = new RegExp(`${argName}=(?:"([^"]+)"|'([^']+)'|([^\\s]+))`, 'i');
+    const equalsRegex = new RegExp(
+      `${argName}=(?:"([^"]+)"|'([^']+)'|([^\\s]+))`,
+      "i",
+    );
     const equalsMatch = args.match(equalsRegex);
     if (equalsMatch) {
-      const val = equalsMatch[1] || equalsMatch[2] || equalsMatch[3] || '';
+      const val = equalsMatch[1] || equalsMatch[2] || equalsMatch[3] || "";
       // Double-check: don't return values that look like arguments
-      if (val.startsWith('--')) return '';
+      if (val.startsWith("--")) return "";
       return val.trim();
     }
 
     // Then try space-separated format: --argname "value" or --argname 'value' or --argname value
-    const spaceRegex = new RegExp(`${argName}\\s+(?:"([^"]+)"|'([^']+)'|([^\\s-][^\\s]*|(?!--)[^\\s]+))`, 'i');
+    const spaceRegex = new RegExp(
+      `${argName}\\s+(?:"([^"]+)"|'([^']+)'|([^\\s-][^\\s]*|(?!--)[^\\s]+))`,
+      "i",
+    );
     const spaceMatch = args.match(spaceRegex);
     if (spaceMatch) {
-      const val = spaceMatch[1] || spaceMatch[2] || spaceMatch[3] || '';
+      const val = spaceMatch[1] || spaceMatch[2] || spaceMatch[3] || "";
       // Double-check: don't return values that look like arguments
-      if (val.startsWith('--')) return '';
+      if (val.startsWith("--")) return "";
       return val.trim();
     }
-    return '';
+    return "";
   };
 
   // Update argument value in string
@@ -742,50 +1329,70 @@ function AudionutsUAGUI() {
     }
 
     // Check which format is being used
-    const hasEqualsFormat = new RegExp(`${argName}=`, 'i').test(args);
-    const hasSpaceValue = new RegExp(`${argName}\\s+(?:"[^"]*"|'[^']*'|(?!--)[^\\s]+)`, 'i').test(args);
+    const hasEqualsFormat = new RegExp(`${argName}=`, "i").test(args);
+    const hasSpaceValue = new RegExp(
+      `${argName}\\s+(?:"[^"]*"|'[^']*'|(?!--)[^\\s]+)`,
+      "i",
+    ).test(args);
 
     // If value is empty, remove the value but keep the flag
     if (!value) {
       if (hasEqualsFormat) {
         // Remove equals-format value: --arg="value" or --arg='value' or --arg=value
-        return args.replace(new RegExp(`(${argName})=(?:"[^"]*"|'[^']*'|[^\\s]*)`, 'i'), '$1');
+        return args.replace(
+          new RegExp(`(${argName})=(?:"[^"]*"|'[^']*'|[^\\s]*)`, "i"),
+          "$1",
+        );
       } else if (hasSpaceValue) {
         // Remove space-format value
-        return args.replace(new RegExp(`(${argName})\\s+(?:"[^"]*"|'[^']*'|(?!--)[^\\s]+)`, 'i'), '$1');
+        return args.replace(
+          new RegExp(`(${argName})\\s+(?:"[^"]*"|'[^']*'|(?!--)[^\\s]+)`, "i"),
+          "$1",
+        );
       }
       return args;
     }
 
     // Quote the value if it contains spaces
-    const quotedValue = value.includes(' ') ? `"${value}"` : `"${value}"`;
+    const quotedValue = value.includes(" ") ? `"${value}"` : `"${value}"`;
 
     if (hasEqualsFormat) {
       // Replace equals-format value: --arg="value" or --arg='value' or --arg=value
-      return args.replace(new RegExp(`(${argName})=(?:"[^"]*"|'[^']*'|[^\\s]*)`, 'i'), `$1=${quotedValue}`);
+      return args.replace(
+        new RegExp(`(${argName})=(?:"[^"]*"|'[^']*'|[^\\s]*)`, "i"),
+        `$1=${quotedValue}`,
+      );
     } else if (hasSpaceValue) {
       // Replace space-format value
-      return args.replace(new RegExp(`(${argName})\\s+(?:"[^"]*"|'[^']*'|(?!--)[^\\s]+)`, 'i'), `$1 ${quotedValue}`);
+      return args.replace(
+        new RegExp(`(${argName})\\s+(?:"[^"]*"|'[^']*'|(?!--)[^\\s]+)`, "i"),
+        `$1 ${quotedValue}`,
+      );
     } else {
       // Add value after the flag (no existing value)
-      return args.replace(new RegExp(`(${argName})(\\s|$)`, 'i'), `$1 ${quotedValue}$2`);
+      return args.replace(
+        new RegExp(`(${argName})(\\s|$)`, "i"),
+        `$1 ${quotedValue}$2`,
+      );
     }
   };
 
   // Get current values from args
-  const descFilePath = extractArgValue(customArgs, '--descfile');
-  const descLinkUrl = extractArgValue(customArgs, '--desclink');
+  const descFilePath = extractArgValue(customArgs, "--descfile");
+  const descLinkUrl = extractArgValue(customArgs, "--desclink");
 
   // Validate desclink URL when it changes
   useEffect(() => {
     if (hasDescLink && descLinkUrl) {
       if (!isValidUrl(descLinkUrl)) {
-        setDescLinkError('Please enter a valid paste URL (pastebin, hastebin, etc.)');
+        setDescLinkError(
+          "Please enter a valid paste URL (pastebin, hastebin, etc.)",
+        );
       } else {
-        setDescLinkError('');
+        setDescLinkError("");
       }
     } else {
-      setDescLinkError('');
+      setDescLinkError("");
     }
   }, [descLinkUrl, hasDescLink]);
 
@@ -799,7 +1406,7 @@ function AudionutsUAGUI() {
         setDescBrowserCollapsed(true);
       }
     } else {
-      setDescFileError('');
+      setDescFileError("");
     }
   }, [descFilePath, hasDescFile]);
 
@@ -808,11 +1415,11 @@ function AudionutsUAGUI() {
     if (!hasDescFile) {
       setDescDirectories([]);
       setDescExpandedFolders(new Set());
-      setDescFileError('');
+      setDescFileError("");
       setDescBrowserCollapsed(false);
     }
     if (!hasDescLink) {
-      setDescLinkError('');
+      setDescLinkError("");
     }
   }, [hasDescFile, hasDescLink]);
 
@@ -833,7 +1440,7 @@ function AudionutsUAGUI() {
       try {
         const response = await apiFetch(
           `${API_BASE}/execution_preview?session_id=${encodeURIComponent(sessionId)}`,
-          { signal: controller.signal }
+          { signal: controller.signal },
         );
         if (!response.ok) {
           return;
@@ -842,7 +1449,9 @@ function AudionutsUAGUI() {
         if (!cancelled && data && data.success && data.media) {
           setExecutionPreview(data.media);
           if (Array.isArray(data.media.progress)) {
-            setProgressItems((prev) => mergeProgressItemsById(prev, data.media.progress));
+            setProgressItems((prev) =>
+              mergeProgressItemsById(prev, data.media.progress),
+            );
           }
         }
       } catch (_error) {
@@ -870,45 +1479,45 @@ function AudionutsUAGUI() {
 
   // Update descfile in args
   const updateDescFile = (path) => {
-    setCustomArgs(prev => updateArgValue(prev, '--descfile', path));
+    setCustomArgs((prev) => updateArgValue(prev, "--descfile", path));
   };
 
   // Update desclink in args
   const updateDescLink = (url) => {
-    setCustomArgs(prev => updateArgValue(prev, '--desclink', url));
+    setCustomArgs((prev) => updateArgValue(prev, "--desclink", url));
   };
 
   const appendHtmlFragment = (rawHtml) => {
     const container = richOutputRef.current;
     if (container) {
-      const clean = sanitizeHtml((rawHtml || '').trim());
-      const wrapper = document.createElement('div');
+      const clean = sanitizeHtml((rawHtml || "").trim());
+      const wrapper = document.createElement("div");
       wrapper.innerHTML = clean;
       container.appendChild(wrapper);
       // Use scrollIntoView to avoid clipping of the last line
       setTimeout(() => {
         const last = container.lastElementChild;
-        if (last && last.scrollIntoView) last.scrollIntoView({ block: 'end' });
+        if (last && last.scrollIntoView) last.scrollIntoView({ block: "end" });
         else container.scrollTop = container.scrollHeight;
       }, 0);
     }
   };
 
-  const appendSystemMessage = (text, kind = 'info') => {
+  const appendSystemMessage = (text, kind = "info") => {
     const rootContainer = richOutputRef.current;
     if (!rootContainer) return;
-    const el = document.createElement('div');
+    const el = document.createElement("div");
     // Support multiple kinds: error, user-input, and default info
-    if (kind === 'error') el.className = 'text-red-400';
-    else if (kind === 'user-input') el.className = 'text-green-300';
-    else el.className = 'text-blue-300';
-    el.style.whiteSpace = 'pre-wrap';
+    if (kind === "error") el.className = "text-red-400";
+    else if (kind === "user-input") el.className = "text-green-300";
+    else el.className = "text-blue-300";
+    el.style.whiteSpace = "pre-wrap";
     el.textContent = text;
     rootContainer.appendChild(el);
     // ensure fully visible
     setTimeout(() => {
       const last = rootContainer.lastElementChild;
-      if (last && last.scrollIntoView) last.scrollIntoView({ block: 'end' });
+      if (last && last.scrollIntoView) last.scrollIntoView({ block: "end" });
       else rootContainer.scrollTop = rootContainer.scrollHeight;
     }, 0);
   };
@@ -916,24 +1525,26 @@ function AudionutsUAGUI() {
   const sendInput = async (session_id, input) => {
     // Optimistically echo the user's input locally so it appears before
     // any subsequent server-generated prompt / output.
-    appendSystemMessage('> ' + input, 'user-input');
-    setUserInput('');
+    appendSystemMessage("> " + input, "user-input");
+    setUserInput("");
     try {
-        await apiFetch(`${API_BASE}/input`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id, input }),
-        });
+      await apiFetch(`${API_BASE}/input`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id, input }),
+      });
     } catch (err) {
-      console.error('Failed to send input:', err);
-      appendSystemMessage('Failed to send input', 'error');
+      console.error("Failed to send input:", err);
+      appendSystemMessage("Failed to send input", "error");
     }
   };
 
   // Initial welcome message in the rich output area
   useEffect(() => {
-    appendSystemMessage('Upload-Assistant Interactive Output');
-    appendSystemMessage('\nQuick Start:\n  1. Select a file or folder from the left panel\n  2. Add Upload-Assistant arguments (optional)\n  3. Click "Execute Upload" to start\n');
+    appendSystemMessage("Upload-Assistant Interactive Output");
+    appendSystemMessage(
+      '\nQuick Start:\n  1. Select a file or folder from the left panel\n  2. Add Upload-Assistant arguments (optional)\n  3. Click "Execute Upload" to start\n',
+    );
   }, []);
 
   const loadBrowseRoots = async () => {
@@ -946,7 +1557,7 @@ function AudionutsUAGUI() {
         setExpandedFolders(new Set());
       }
     } catch (error) {
-      console.error('Failed to load browse roots:', error);
+      console.error("Failed to load browse roots:", error);
     }
   };
 
@@ -961,28 +1572,30 @@ function AudionutsUAGUI() {
         setDescExpandedFolders(new Set());
       }
     } catch (error) {
-      console.error('Failed to load desc browse roots:', error);
+      console.error("Failed to load desc browse roots:", error);
     }
   };
 
   // Load description folder contents
   const loadDescFolderContents = async (path) => {
     try {
-      const response = await apiFetch(`${API_BASE}/browse?path=${encodeURIComponent(path)}&filter=desc`);
+      const response = await apiFetch(
+        `${API_BASE}/browse?path=${encodeURIComponent(path)}&filter=desc`,
+      );
       const data = await response.json();
 
       if (data.success && data.items) {
         updateDescDirectoryTree(path, data.items);
       }
     } catch (error) {
-      console.error('Failed to load desc folder:', error);
+      console.error("Failed to load desc folder:", error);
     }
   };
 
   // Update description directory tree
   const updateDescDirectoryTree = (path, items) => {
     const updateTree = (nodes) => {
-      return nodes.map(node => {
+      return nodes.map((node) => {
         if (node.path === path) {
           return { ...node, children: items };
         } else if (node.children) {
@@ -1007,11 +1620,11 @@ function AudionutsUAGUI() {
       setDescExpandedFolders(newExpanded);
 
       // Show loading indicator while fetching
-      setDescLoadingFolders(prev => new Set(prev).add(path));
+      setDescLoadingFolders((prev) => new Set(prev).add(path));
       try {
         await loadDescFolderContents(path);
       } finally {
-        setDescLoadingFolders(prev => {
+        setDescLoadingFolders((prev) => {
           const next = new Set(prev);
           next.delete(path);
           return next;
@@ -1027,17 +1640,17 @@ function AudionutsUAGUI() {
     }
   }, [hasDescFile]);
   useEffect(() => {
-    storage.set(THEME_KEY, isDarkMode ? 'dark' : 'light');
+    storage.set(THEME_KEY, isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
 
   useEffect(() => {
     const handleStorage = (event) => {
       if (event.key === THEME_KEY) {
-        setIsDarkMode(event.newValue === 'dark');
+        setIsDarkMode(event.newValue === "dark");
       }
     };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
   // Mobile resize listener
@@ -1048,13 +1661,13 @@ function AudionutsUAGUI() {
       resizeTimer = setTimeout(() => {
         const mobile = window.innerWidth < 768;
         setIsMobile(mobile);
-        if (!mobile) setActivePanel('main');
+        if (!mobile) setActivePanel("main");
       }, 100);
     };
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
     return () => {
       clearTimeout(resizeTimer);
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener("resize", handleResize);
     };
   }, []);
 
@@ -1075,14 +1688,22 @@ function AudionutsUAGUI() {
   useEffect(() => {
     if (isExecuting && inputRef.current) {
       setTimeout(() => {
-        try { inputRef.current.focus(); } catch (e) { /* ignore */ }
+        try {
+          inputRef.current.focus();
+        } catch (e) {
+          /* ignore */
+        }
       }, 50);
     }
   }, [isExecuting]);
 
   useEffect(() => {
-    if (isMobile && activePanel === 'progress' && visibleProgressItems.length === 0) {
-      setActivePanel('main');
+    if (
+      isMobile &&
+      activePanel === "progress" &&
+      visibleProgressItems.length === 0
+    ) {
+      setActivePanel("main");
     }
   }, [activePanel, isMobile, visibleProgressItems.length]);
 
@@ -1097,11 +1718,11 @@ function AudionutsUAGUI() {
       setExpandedFolders(newExpanded);
 
       // Show loading indicator while fetching
-      setLoadingFolders(prev => new Set(prev).add(path));
+      setLoadingFolders((prev) => new Set(prev).add(path));
       try {
         await loadFolderContents(path);
       } finally {
-        setLoadingFolders(prev => {
+        setLoadingFolders((prev) => {
           const next = new Set(prev);
           next.delete(path);
           return next;
@@ -1112,20 +1733,22 @@ function AudionutsUAGUI() {
 
   const loadFolderContents = async (path) => {
     try {
-      const response = await apiFetch(`${API_BASE}/browse?path=${encodeURIComponent(path)}`);
+      const response = await apiFetch(
+        `${API_BASE}/browse?path=${encodeURIComponent(path)}`,
+      );
       const data = await response.json();
 
       if (data.success && data.items) {
         updateDirectoryTree(path, data.items);
       }
     } catch (error) {
-      console.error('Failed to load folder:', error);
+      console.error("Failed to load folder:", error);
     }
   };
 
   const updateDirectoryTree = (path, items) => {
     const updateTree = (nodes) => {
-      return nodes.map(node => {
+      return nodes.map((node) => {
         if (node.path === path) {
           return { ...node, children: items };
         } else if (node.children) {
@@ -1154,7 +1777,9 @@ function AudionutsUAGUI() {
     setFileBrowserSearchLoading(true);
     fileBrowserSearchTimer.current = setTimeout(async () => {
       try {
-        const response = await apiFetch(`${API_BASE}/browse_search?q=${encodeURIComponent(searchQuery)}`);
+        const response = await apiFetch(
+          `${API_BASE}/browse_search?q=${encodeURIComponent(searchQuery)}`,
+        );
         if (!response.ok) {
           throw new Error(`Search request failed (${response.status})`);
         }
@@ -1164,12 +1789,20 @@ function AudionutsUAGUI() {
         if (data.success) {
           setFileBrowserSearchResults(data);
         } else {
-          setFileBrowserSearchResults({ items: [], query: searchQuery, count: 0 });
+          setFileBrowserSearchResults({
+            items: [],
+            query: searchQuery,
+            count: 0,
+          });
         }
       } catch (error) {
-        console.error('File browser search failed:', error);
+        console.error("File browser search failed:", error);
         if (fileBrowserSearchQuery.current === searchQuery) {
-          setFileBrowserSearchResults({ items: [], query: searchQuery, count: 0 });
+          setFileBrowserSearchResults({
+            items: [],
+            query: searchQuery,
+            count: 0,
+          });
         }
       } finally {
         if (fileBrowserSearchQuery.current === searchQuery) {
@@ -1183,41 +1816,54 @@ function AudionutsUAGUI() {
     if (!results || !results.items) return null;
     if (results.items.length === 0) {
       return (
-        <div className={`p-4 text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+        <div
+          className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+        >
           <p className="text-sm">No results found</p>
         </div>
       );
     }
     return results.items.map((item, idx) => {
-      const separatorIdx = Math.max(item.path.lastIndexOf('/'), item.path.lastIndexOf('\\'));
-      const parentPath = separatorIdx > 0 ? item.path.substring(0, separatorIdx) : '';
+      const separatorIdx = Math.max(
+        item.path.lastIndexOf("/"),
+        item.path.lastIndexOf("\\"),
+      );
+      const parentPath =
+        separatorIdx > 0 ? item.path.substring(0, separatorIdx) : "";
       return (
         <div key={idx}>
           <div
-            className={`flex items-center gap-2 px-3 ${isMobile ? 'py-3' : 'py-2'} cursor-pointer transition-colors ${
+            className={`flex items-center gap-2 px-3 ${isMobile ? "py-3" : "py-2"} cursor-pointer transition-colors ${
               selectedPath === item.path
                 ? isDarkMode
-                  ? 'bg-purple-900 border-l-4 border-purple-500'
-                  : 'bg-blue-100 border-l-4 border-blue-500'
+                  ? "bg-purple-900 border-l-4 border-purple-500"
+                  : "bg-blue-100 border-l-4 border-blue-500"
                 : isDarkMode
-                  ? 'hover:bg-gray-700'
-                  : 'hover:bg-gray-100'
+                  ? "hover:bg-gray-700"
+                  : "hover:bg-gray-100"
             }`}
-            style={{ paddingLeft: '12px' }}
+            style={{ paddingLeft: "12px" }}
             onClick={() => {
               setSelectedPath(item.path);
               setSelectedName(item.name);
-              if (isMobile) setActivePanel('main');
+              if (isMobile) setActivePanel("main");
             }}
           >
-            <span className={`flex-shrink-0 ${item.type === 'folder' ? 'text-yellow-600' : 'text-blue-600'}`}>
-              {item.type === 'folder' ? <FolderIcon /> : <FileIcon />}
+            <span
+              className={`flex-shrink-0 ${item.type === "folder" ? "text-yellow-600" : "text-blue-600"}`}
+            >
+              {item.type === "folder" ? <FolderIcon /> : <FileIcon />}
             </span>
             <div className="flex flex-col min-w-0">
-              <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-200' : 'text-gray-700'} truncate`}>
+              <span
+                className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"} truncate`}
+              >
                 {item.name}
               </span>
-              <span className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} truncate`} title={parentPath}>
+              <span
+                className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"} truncate`}
+                title={parentPath}
+              >
                 {parentPath}
               </span>
             </div>
@@ -1229,49 +1875,75 @@ function AudionutsUAGUI() {
 
   const renderFileTree = (items, level = 0) => {
     return items.map((item, idx) => {
-      const isLoading = item.type === 'folder' && loadingFolders.has(item.path);
+      const isLoading = item.type === "folder" && loadingFolders.has(item.path);
       return (
         <div key={idx}>
           <div
-            className={`flex items-center gap-2 px-3 ${isMobile ? 'py-3' : 'py-2'} cursor-pointer transition-colors ${
+            className={`flex items-center gap-2 px-3 ${isMobile ? "py-3" : "py-2"} cursor-pointer transition-colors ${
               selectedPath === item.path
                 ? isDarkMode
-                  ? 'bg-purple-900 border-l-4 border-purple-500'
-                  : 'bg-blue-100 border-l-4 border-blue-500'
+                  ? "bg-purple-900 border-l-4 border-purple-500"
+                  : "bg-blue-100 border-l-4 border-blue-500"
                 : isDarkMode
-                  ? 'hover:bg-gray-700'
-                  : 'hover:bg-gray-100'
+                  ? "hover:bg-gray-700"
+                  : "hover:bg-gray-100"
             }`}
             style={{ paddingLeft: `${level * 20 + 12}px` }}
             onClick={() => {
-              if (item.type === 'folder') {
+              if (item.type === "folder") {
                 toggleFolder(item.path);
               }
               setSelectedPath(item.path);
               setSelectedName(item.name);
-              if (isMobile && item.type !== 'folder') setActivePanel('main');
+              if (isMobile && item.type !== "folder") setActivePanel("main");
             }}
           >
-            <span className={`flex-shrink-0 ${isLoading ? 'text-purple-500' : 'text-yellow-600'}`}>
-              {item.type === 'folder' ? (
-                isLoading ? <SpinnerIcon /> : (expandedFolders.has(item.path) ? <FolderOpenIcon /> : <FolderIcon />)
+            <span
+              className={`flex-shrink-0 ${isLoading ? "text-purple-500" : "text-yellow-600"}`}
+            >
+              {item.type === "folder" ? (
+                isLoading ? (
+                  <SpinnerIcon />
+                ) : expandedFolders.has(item.path) ? (
+                  <FolderOpenIcon />
+                ) : (
+                  <FolderIcon />
+                )
               ) : (
-                <span className="text-blue-600"><FileIcon /></span>
+                <span className="text-blue-600">
+                  <FileIcon />
+                </span>
               )}
             </span>
             <div className="flex flex-col min-w-0">
-              <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-200' : 'text-gray-700'} truncate`}>
+              <span
+                className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"} truncate`}
+              >
                 {item.name}
-                {isLoading && <span className={`ml-2 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Loading...</span>}
+                {isLoading && (
+                  <span
+                    className={`ml-2 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                  >
+                    Loading...
+                  </span>
+                )}
               </span>
               {item.subtitle && (
-                <span className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} truncate`} title={item.subtitle}>{item.subtitle}</span>
+                <span
+                  className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"} truncate`}
+                  title={item.subtitle}
+                >
+                  {item.subtitle}
+                </span>
               )}
             </div>
           </div>
-          {item.type === 'folder' && expandedFolders.has(item.path) && item.children && item.children.length > 0 && (
-            <div>{renderFileTree(item.children, level + 1)}</div>
-          )}
+          {item.type === "folder" &&
+            expandedFolders.has(item.path) &&
+            item.children &&
+            item.children.length > 0 && (
+              <div>{renderFileTree(item.children, level + 1)}</div>
+            )}
         </div>
       );
     });
@@ -1280,22 +1952,23 @@ function AudionutsUAGUI() {
   // Render description file tree
   const renderDescFileTree = (items, level = 0) => {
     return items.map((item, idx) => {
-      const isLoading = item.type === 'folder' && descLoadingFolders.has(item.path);
+      const isLoading =
+        item.type === "folder" && descLoadingFolders.has(item.path);
       return (
         <div key={idx}>
           <div
-            className={`flex items-center gap-2 px-3 ${isMobile ? 'py-3' : 'py-2'} cursor-pointer transition-colors ${
+            className={`flex items-center gap-2 px-3 ${isMobile ? "py-3" : "py-2"} cursor-pointer transition-colors ${
               descFilePath === item.path
                 ? isDarkMode
-                  ? 'bg-green-900 border-l-4 border-green-500'
-                  : 'bg-green-100 border-l-4 border-green-500'
+                  ? "bg-green-900 border-l-4 border-green-500"
+                  : "bg-green-100 border-l-4 border-green-500"
                 : isDarkMode
-                  ? 'hover:bg-gray-700'
-                  : 'hover:bg-gray-100'
+                  ? "hover:bg-gray-700"
+                  : "hover:bg-gray-100"
             }`}
             style={{ paddingLeft: `${level * 20 + 12}px` }}
             onClick={() => {
-              if (item.type === 'folder') {
+              if (item.type === "folder") {
                 toggleDescFolder(item.path);
               } else {
                 // Update the argument directly with the selected file path
@@ -1303,26 +1976,52 @@ function AudionutsUAGUI() {
               }
             }}
           >
-            <span className={`flex-shrink-0 ${isLoading ? 'text-green-500' : 'text-yellow-600'}`}>
-              {item.type === 'folder' ? (
-                isLoading ? <SpinnerIcon /> : (descExpandedFolders.has(item.path) ? <FolderOpenIcon /> : <FolderIcon />)
+            <span
+              className={`flex-shrink-0 ${isLoading ? "text-green-500" : "text-yellow-600"}`}
+            >
+              {item.type === "folder" ? (
+                isLoading ? (
+                  <SpinnerIcon />
+                ) : descExpandedFolders.has(item.path) ? (
+                  <FolderOpenIcon />
+                ) : (
+                  <FolderIcon />
+                )
               ) : (
-                <span className="text-green-600"><FileIcon /></span>
+                <span className="text-green-600">
+                  <FileIcon />
+                </span>
               )}
             </span>
             <div className="flex flex-col min-w-0">
-              <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-200' : 'text-gray-700'} truncate`}>
+              <span
+                className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"} truncate`}
+              >
                 {item.name}
-                {isLoading && <span className={`ml-2 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Loading...</span>}
+                {isLoading && (
+                  <span
+                    className={`ml-2 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                  >
+                    Loading...
+                  </span>
+                )}
               </span>
               {item.subtitle && (
-                <span className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} truncate`} title={item.subtitle}>{item.subtitle}</span>
+                <span
+                  className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"} truncate`}
+                  title={item.subtitle}
+                >
+                  {item.subtitle}
+                </span>
               )}
             </div>
           </div>
-          {item.type === 'folder' && descExpandedFolders.has(item.path) && item.children && item.children.length > 0 && (
-            <div>{renderDescFileTree(item.children, level + 1)}</div>
-          )}
+          {item.type === "folder" &&
+            descExpandedFolders.has(item.path) &&
+            item.children &&
+            item.children.length > 0 && (
+              <div>{renderDescFileTree(item.children, level + 1)}</div>
+            )}
         </div>
       );
     });
@@ -1330,19 +2029,25 @@ function AudionutsUAGUI() {
 
   const executeCommand = async () => {
     if (!selectedPath) {
-      appendSystemMessage('✗ Please select a file or folder first', 'error');
+      appendSystemMessage("✗ Please select a file or folder first", "error");
       return;
     }
 
     // Validate --descfile: must have a valid description file path
     if (hasDescFile) {
       if (!descFilePath) {
-        appendSystemMessage('✗ Please select or enter a description file path when using --descfile', 'error');
+        appendSystemMessage(
+          "✗ Please select or enter a description file path when using --descfile",
+          "error",
+        );
         return;
       }
       const pathValidation = isValidDescFilePath(descFilePath);
       if (!pathValidation.valid) {
-        appendSystemMessage(`✗ Invalid description file: ${pathValidation.error}`, 'error');
+        appendSystemMessage(
+          `✗ Invalid description file: ${pathValidation.error}`,
+          "error",
+        );
         return;
       }
     }
@@ -1350,11 +2055,17 @@ function AudionutsUAGUI() {
     // Validate --desclink: must have a valid URL
     if (hasDescLink) {
       if (!descLinkUrl) {
-        appendSystemMessage('✗ Please enter a description URL when using --desclink', 'error');
+        appendSystemMessage(
+          "✗ Please enter a description URL when using --desclink",
+          "error",
+        );
         return;
       }
       if (!isValidUrl(descLinkUrl)) {
-        appendSystemMessage('✗ Please enter a valid paste URL for --desclink (pastebin, hastebin, etc.)', 'error');
+        appendSystemMessage(
+          "✗ Please enter a valid paste URL for --desclink (pastebin, hastebin, etc.)",
+          "error",
+        );
         return;
       }
     }
@@ -1362,20 +2073,20 @@ function AudionutsUAGUI() {
     const rootContainer = richOutputRef.current;
     if (!rootContainer) return;
 
-    const newSessionId = 'session_' + Date.now();
+    const newSessionId = "session_" + Date.now();
     setSessionId(newSessionId);
     setIsExecuting(true);
     setProgressItems([]);
     // Clear the initial welcome text so execution output appears immediately
     if (rootContainer) {
-      rootContainer.innerHTML = '';
+      rootContainer.innerHTML = "";
     }
     // Reset last-full snapshot key to allow appending fresh full snapshots
-    if (lastFullHashRef) lastFullHashRef.current = '';
+    if (lastFullHashRef) lastFullHashRef.current = "";
 
-    appendSystemMessage('');
+    appendSystemMessage("");
     appendSystemMessage(`$ python upload.py "${selectedPath}" ${customArgs}`);
-    appendSystemMessage('→ Starting execution...');
+    appendSystemMessage("→ Starting execution...");
 
     // Local controller binding for this run. Declare here so it's visible
     // to `catch`/`finally` blocks and inner callbacks.
@@ -1390,50 +2101,56 @@ function AudionutsUAGUI() {
       localController = controller;
 
       const response = await apiFetch(`${API_BASE}/execute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           path: selectedPath,
           args: customArgs,
-          session_id: newSessionId
-        })
-      , signal: controller.signal
+          session_id: newSessionId,
+        }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
         const errText = await response.text();
-        appendSystemMessage(`✗ Execute failed (${response.status}): ${errText || 'Request failed'}`, 'error');
+        appendSystemMessage(
+          `✗ Execute failed (${response.status}): ${errText || "Request failed"}`,
+          "error",
+        );
         return;
       }
       if (!response.body) {
-        appendSystemMessage('✗ Execute failed: empty response body', 'error');
+        appendSystemMessage("✗ Execute failed: empty response body", "error");
         return;
       }
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = '';
+      let buffer = "";
 
       const processSSELine = (line) => {
         if (localController && localController.signal.aborted) return;
-        if (!line.trim() || !line.startsWith('data: ')) return;
+        if (!line.trim() || !line.startsWith("data: ")) return;
         try {
           const data = JSON.parse(line.substring(6));
-          if (data.type === 'html' || data.type === 'html_full') {
+          if (data.type === "html" || data.type === "html_full") {
             try {
-              const rawHtml = data.data || '';
+              const rawHtml = data.data || "";
               const clean = sanitizeHtml(rawHtml);
-              if (data.type === 'html_full') {
+              if (data.type === "html_full") {
                 const shortSample = clean.slice(0, 200);
                 const key = `${clean.length}:${shortSample}`;
                 if (lastFullHashRef.current !== key) {
                   lastFullHashRef.current = key;
-                  const wrapper = document.createElement('div');
+                  const wrapper = document.createElement("div");
                   wrapper.innerHTML = clean;
                   if (rootContainer) rootContainer.appendChild(wrapper);
                   setTimeout(() => {
-                    const last = rootContainer && rootContainer.lastElementChild;
-                    if (last && last.scrollIntoView) last.scrollIntoView({ block: 'end' });
-                    else if (rootContainer) rootContainer.scrollTop = rootContainer.scrollHeight;
+                    const last =
+                      rootContainer && rootContainer.lastElementChild;
+                    if (last && last.scrollIntoView)
+                      last.scrollIntoView({ block: "end" });
+                    else if (rootContainer)
+                      rootContainer.scrollTop = rootContainer.scrollHeight;
                   }, 0);
                 }
                 return;
@@ -1441,18 +2158,18 @@ function AudionutsUAGUI() {
               // delegate to shared helper for fragments
               appendHtmlFragment(clean);
             } catch (e) {
-              console.error('Failed to render HTML fragment:', e);
+              console.error("Failed to render HTML fragment:", e);
             }
-              } else if (data.type === 'progress') {
+          } else if (data.type === "progress") {
             applyProgressEvent(data.data || {});
-              } else if (data.type === 'exit') {
+          } else if (data.type === "exit") {
             if (!(localController && localController.signal.aborted)) {
-              appendSystemMessage('');
+              appendSystemMessage("");
               appendSystemMessage(`✓ Process exited with code ${data.code}`);
             }
           }
         } catch (e) {
-          console.error('Parse error:', e);
+          console.error("Parse error:", e);
         }
       };
 
@@ -1462,7 +2179,7 @@ function AudionutsUAGUI() {
         if (done) {
           // process any remaining buffered content
           if (buffer) {
-            const finalLines = buffer.split('\n');
+            const finalLines = buffer.split("\n");
             for (const line of finalLines) {
               processSSELine(line);
             }
@@ -1471,7 +2188,7 @@ function AudionutsUAGUI() {
         }
 
         buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split('\n');
+        const parts = buffer.split("\n");
         buffer = parts.pop(); // last item may be incomplete
 
         for (const line of parts) {
@@ -1481,17 +2198,17 @@ function AudionutsUAGUI() {
       /* eslint-enable no-constant-condition */
       // Only append the final completion message when not aborted.
       if (!(localController && localController.signal.aborted)) {
-        appendSystemMessage('✓ Execution completed');
-        appendSystemMessage('');
+        appendSystemMessage("✓ Execution completed");
+        appendSystemMessage("");
       }
     } catch (error) {
       // Suppress abort errors as they are expected when a user cancels.
       if (!(localController && localController.signal.aborted)) {
-        appendSystemMessage('✗ Execution error: ' + error.message, 'error');
+        appendSystemMessage("✗ Execution error: " + error.message, "error");
       }
     } finally {
       setIsExecuting(false);
-      setSessionId('');
+      setSessionId("");
       setProgressItems([]);
       // Clear controller reference when finished, but only if it hasn't been
       // replaced by another concurrent run.
@@ -1499,7 +2216,9 @@ function AudionutsUAGUI() {
         if (sseAbortControllerRef.current === localController) {
           sseAbortControllerRef.current = null;
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) {
+        /* ignore */
+      }
     }
   };
 
@@ -1509,31 +2228,37 @@ function AudionutsUAGUI() {
       try {
         // Abort the SSE fetch so the client stops processing incoming events
         if (sseAbortControllerRef.current) {
-          try { sseAbortControllerRef.current.abort(); } catch (e) { /* ignore */ }
+          try {
+            sseAbortControllerRef.current.abort();
+          } catch (e) {
+            /* ignore */
+          }
         }
         await apiFetch(`${API_BASE}/kill`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId })
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId }),
         });
 
-        appendSystemMessage('✗ Process terminated by user', 'error');
+        appendSystemMessage("✗ Process terminated by user", "error");
 
         setIsExecuting(false);
-        setSessionId('');
+        setSessionId("");
         setProgressItems([]);
       } catch (error) {
-        console.error('Failed to kill process:', error);
+        console.error("Failed to kill process:", error);
       }
     }
 
     // Clear the rich output container
     const container = richOutputRef.current;
     if (container) {
-      container.innerHTML = '';
+      container.innerHTML = "";
       setProgressItems([]);
-      appendSystemMessage('Upload-Assistant Interactive Output');
-      appendSystemMessage('\nQuick Start:\n  1. Select a file or folder from the left panel\n  2. Add Upload-Assistant arguments (optional)\n  3. Click "Execute Upload" to start\n');
+      appendSystemMessage("Upload-Assistant Interactive Output");
+      appendSystemMessage(
+        '\nQuick Start:\n  1. Select a file or folder from the left panel\n  2. Add Upload-Assistant arguments (optional)\n  3. Click "Execute Upload" to start\n',
+      );
     }
   };
 
@@ -1546,20 +2271,23 @@ function AudionutsUAGUI() {
     setIsResizing(false);
   }, [setIsResizing]);
 
-  const resize = useCallback((e) => {
-    const newWidth = e.clientX;
-    if (newWidth >= 200 && newWidth <= 600) {
-      setSidebarWidth(newWidth);
-    }
-  }, [setSidebarWidth]);
+  const resize = useCallback(
+    (e) => {
+      const newWidth = e.clientX;
+      if (newWidth >= 200 && newWidth <= 600) {
+        setSidebarWidth(newWidth);
+      }
+    },
+    [setSidebarWidth],
+  );
 
   useEffect(() => {
     if (isResizing) {
-      window.addEventListener('mousemove', resize);
-      window.addEventListener('mouseup', stopResizing);
+      window.addEventListener("mousemove", resize);
+      window.addEventListener("mouseup", stopResizing);
       return () => {
-        window.removeEventListener('mousemove', resize);
-        window.removeEventListener('mouseup', stopResizing);
+        window.removeEventListener("mousemove", resize);
+        window.removeEventListener("mouseup", stopResizing);
       };
     }
   }, [isResizing, resize, stopResizing]);
@@ -1573,21 +2301,24 @@ function AudionutsUAGUI() {
     setIsResizingRight(false);
   }, [setIsResizingRight]);
 
-  const resizeRight = useCallback((e) => {
-    // Calculate width from right edge
-    const newWidth = window.innerWidth - e.clientX;
-    if (newWidth >= 200 && newWidth <= 800) {
-      setRightSidebarWidth(newWidth);
-    }
-  }, [setRightSidebarWidth]);
+  const resizeRight = useCallback(
+    (e) => {
+      // Calculate width from right edge
+      const newWidth = window.innerWidth - e.clientX;
+      if (newWidth >= 200 && newWidth <= 800) {
+        setRightSidebarWidth(newWidth);
+      }
+    },
+    [setRightSidebarWidth],
+  );
 
   useEffect(() => {
     if (isResizingRight) {
-      window.addEventListener('mousemove', resizeRight);
-      window.addEventListener('mouseup', stopResizingRight);
+      window.addEventListener("mousemove", resizeRight);
+      window.addEventListener("mouseup", stopResizingRight);
       return () => {
-        window.removeEventListener('mousemove', resizeRight);
-        window.removeEventListener('mouseup', stopResizingRight);
+        window.removeEventListener("mousemove", resizeRight);
+        window.removeEventListener("mouseup", stopResizingRight);
       };
     }
   }, [isResizingRight, resizeRight, stopResizingRight]);
@@ -1633,8 +2364,10 @@ function AudionutsUAGUI() {
         const filteredArgs = cat.args.filter(
           (a) =>
             a.label.toLowerCase().includes(searchLower) ||
-            (a.description && a.description.toLowerCase().includes(searchLower)) ||
-            (a.placeholder && a.placeholder.toLowerCase().includes(searchLower))
+            (a.description &&
+              a.description.toLowerCase().includes(searchLower)) ||
+            (a.placeholder &&
+              a.placeholder.toLowerCase().includes(searchLower)),
         );
         if (filteredArgs.length > 0) {
           return { ...cat, args: filteredArgs };
@@ -1652,31 +2385,56 @@ function AudionutsUAGUI() {
 
   const renderExecutionPreviewPanel = (compact = false) => {
     const media = executionPreview;
-    const category = media?.category || '';
-    const previewTitle = media?.title || media?.name || media?.filename || 'Detecting media metadata...';
+    const category = media?.category || "";
+    const previewTitle =
+      media?.title ||
+      media?.name ||
+      media?.filename ||
+      "Detecting media metadata...";
     const subtitleParts = [media?.original_title, media?.year].filter(Boolean);
     const infoBadges = [
       media?.category,
       media?.media_type,
       media?.source,
-      media?.resolution
+      media?.resolution,
     ].filter(Boolean);
-    const metadataSources = Array.isArray(media?.metadata_sources) ? media.metadata_sources.filter((source) => source && source.value) : [];
-    const previewProviders = metadataSources.length > 0
-      ? metadataSources
-      : [
-          media?.tmdb ? { key: 'tmdb', label: 'TMDb', value: String(media.tmdb) } : null,
-          media?.imdb ? { key: 'imdb', label: 'IMDb', value: String(media.imdb).startsWith('tt') ? String(media.imdb) : `tt${media.imdb}` } : null
-        ].filter(Boolean);
-    const genres = Array.isArray(media?.genres) ? media.genres.filter(Boolean).slice(0, 4) : [];
-    const networks = Array.isArray(media?.networks) ? media.networks.filter(Boolean).slice(0, 3) : [];
-    const panelPadding = compact ? 'p-3' : 'p-4';
-    const titleSize = compact ? 'text-base' : 'text-lg';
-    const posterHeight = compact ? 'h-64' : 'h-80';
-    const episodeLabel = media?.episode_title || media?.episode_name || [media?.season, media?.episode].filter(Boolean).join(' ');
-    const overviewText = category === 'TV'
-      ? (media?.episode_overview || media?.overview)
-      : media?.overview;
+    const metadataSources = Array.isArray(media?.metadata_sources)
+      ? media.metadata_sources.filter((source) => source && source.value)
+      : [];
+    const previewProviders =
+      metadataSources.length > 0
+        ? metadataSources
+        : [
+            media?.tmdb
+              ? { key: "tmdb", label: "TMDb", value: String(media.tmdb) }
+              : null,
+            media?.imdb
+              ? {
+                  key: "imdb",
+                  label: "IMDb",
+                  value: String(media.imdb).startsWith("tt")
+                    ? String(media.imdb)
+                    : `tt${media.imdb}`,
+                }
+              : null,
+          ].filter(Boolean);
+    const genres = Array.isArray(media?.genres)
+      ? media.genres.filter(Boolean).slice(0, 4)
+      : [];
+    const networks = Array.isArray(media?.networks)
+      ? media.networks.filter(Boolean).slice(0, 3)
+      : [];
+    const panelPadding = compact ? "p-3" : "p-4";
+    const titleSize = compact ? "text-base" : "text-lg";
+    const posterHeight = compact ? "h-64" : "h-80";
+    const episodeLabel =
+      media?.episode_title ||
+      media?.episode_name ||
+      [media?.season, media?.episode].filter(Boolean).join(" ");
+    const overviewText =
+      category === "TV"
+        ? media?.episode_overview || media?.overview
+        : media?.overview;
 
     const detailRows = (rows) => rows.filter((row) => row.value);
     const renderDetailGrid = (title, rows) => {
@@ -1684,17 +2442,28 @@ function AudionutsUAGUI() {
       if (visibleRows.length === 0) return null;
 
       return (
-        <div className={`rounded-xl p-3 ${isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-gray-50 border border-gray-200'}`}>
-          <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+        <div
+          className={`rounded-xl p-3 ${isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-50 border border-gray-200"}`}
+        >
+          <p
+            className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+          >
             {title}
           </p>
           <div className="grid grid-cols-1 gap-2">
             {visibleRows.map((row) => (
-              <div key={row.label} className="flex items-start justify-between gap-3">
-                <span className={`text-xs font-semibold ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              <div
+                key={row.label}
+                className="flex items-start justify-between gap-3"
+              >
+                <span
+                  className={`text-xs font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                >
                   {row.label}
                 </span>
-                <span className={`text-xs text-right ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                <span
+                  className={`text-xs text-right ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}
+                >
                   {row.value}
                 </span>
               </div>
@@ -1705,58 +2474,97 @@ function AudionutsUAGUI() {
     };
 
     const tvRows = detailRows([
-      { label: 'Episode', value: episodeLabel },
-      { label: 'Format', value: typeof media?.tv_pack === 'boolean' ? (media.tv_pack ? 'Season Pack' : 'Single Episode') : '' },
-      { label: 'Service', value: media?.service },
-      { label: 'Network', value: networks.join(', ') },
-      { label: 'Audio', value: media?.audio }
+      { label: "Episode", value: episodeLabel },
+      {
+        label: "Format",
+        value:
+          typeof media?.tv_pack === "boolean"
+            ? media.tv_pack
+              ? "Season Pack"
+              : "Single Episode"
+            : "",
+      },
+      { label: "Service", value: media?.service },
+      { label: "Network", value: networks.join(", ") },
+      { label: "Audio", value: media?.audio },
     ]);
     const movieRows = detailRows([
-      { label: 'Audio', value: media?.audio },
-      { label: 'Service', value: media?.service },
-      { label: 'Network', value: networks.join(', ') }
+      { label: "Audio", value: media?.audio },
+      { label: "Service", value: media?.service },
+      { label: "Network", value: networks.join(", ") },
     ]);
     const bookRows = detailRows([
-      { label: 'Author', value: media?.author },
-      { label: 'Narrator', value: media?.narrator },
-      { label: 'Language', value: media?.book_language },
-      { label: 'Publisher', value: media?.publisher },
-      { label: 'Duration', value: media?.audiobook_duration },
-      { label: 'Bitrate', value: media?.audiobook_bitrate },
-      { label: 'Series', value: media?.book_series ? [media.book_series, media?.book_series_index ? `#${media.book_series_index}` : ''].filter(Boolean).join(' ') : '' },
-      { label: 'Format', value: typeof media?.audiobook === 'boolean' ? (media.audiobook ? 'Audiobook' : 'Book') : '' }
+      { label: "Author", value: media?.author },
+      { label: "Narrator", value: media?.narrator },
+      { label: "Language", value: media?.book_language },
+      { label: "Publisher", value: media?.publisher },
+      { label: "Duration", value: media?.audiobook_duration },
+      { label: "Bitrate", value: media?.audiobook_bitrate },
+      {
+        label: "Series",
+        value: media?.book_series
+          ? [
+              media.book_series,
+              media?.book_series_index ? `#${media.book_series_index}` : "",
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : "",
+      },
+      {
+        label: "Format",
+        value:
+          typeof media?.audiobook === "boolean"
+            ? media.audiobook
+              ? "Audiobook"
+              : "Book"
+            : "",
+      },
     ]);
     const gameRows = detailRows([
-      { label: 'Platform', value: media?.platform },
-      { label: 'Version', value: media?.game_version },
-      { label: 'Release Type', value: media?.game_subcategory },
-      { label: 'Developer', value: media?.developer },
-      { label: 'Publisher', value: media?.publisher },
-      { label: 'Region', value: media?.game_region },
-      { label: 'System', value: media?.game_system }
+      { label: "Platform", value: media?.platform },
+      { label: "Version", value: media?.game_version },
+      { label: "Release Type", value: media?.game_subcategory },
+      { label: "Developer", value: media?.developer },
+      { label: "Publisher", value: media?.publisher },
+      { label: "Region", value: media?.game_region },
+      { label: "System", value: media?.game_system },
     ]);
     let categorySection = null;
-    if (category === 'TV') categorySection = renderDetailGrid('TV Details', tvRows);
-    else if (category === 'BOOK') categorySection = renderDetailGrid('Book Details', bookRows);
-    else if (category === 'GAME') categorySection = renderDetailGrid('Game Details', gameRows);
-    else categorySection = renderDetailGrid('Movie Details', movieRows);
+    if (category === "TV")
+      categorySection = renderDetailGrid("TV Details", tvRows);
+    else if (category === "BOOK")
+      categorySection = renderDetailGrid("Book Details", bookRows);
+    else if (category === "GAME")
+      categorySection = renderDetailGrid("Game Details", gameRows);
+    else categorySection = renderDetailGrid("Movie Details", movieRows);
 
     return (
       <div className="flex flex-col h-full">
-        <div className={`${panelPadding} border-b flex-shrink-0 ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gradient-to-l from-amber-50 to-orange-50'}`}>
-          <h2 className={`${titleSize} font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
+        <div
+          className={`${panelPadding} border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-amber-50 to-orange-50"}`}
+        >
+          <h2
+            className={`${titleSize} font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+          >
             <UploadIcon />
             Now Processing
           </h2>
-          <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          <p
+            className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+          >
             The sidebar is showing live media metadata while the upload runs.
           </p>
         </div>
 
         <div className={`flex-1 overflow-y-auto ${panelPadding} space-y-4`}>
-          <div className={`rounded-2xl overflow-hidden border ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-white'} shadow-sm`}>
+          <div
+            className={`rounded-2xl overflow-hidden border ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-white"} shadow-sm`}
+          >
             {media?.poster_url ? (
-              <div className={`w-full ${posterHeight} flex items-center justify-center p-3 ${isDarkMode ? 'bg-gray-950' : 'bg-stone-100'}`}>
+              <div
+                className={`w-full ${posterHeight} flex items-center justify-center p-3 ${isDarkMode ? "bg-gray-950" : "bg-stone-100"}`}
+              >
                 <img
                   src={media.poster_url}
                   alt={previewTitle}
@@ -1764,7 +2572,9 @@ function AudionutsUAGUI() {
                 />
               </div>
             ) : (
-              <div className={`w-full ${posterHeight} flex flex-col items-center justify-center gap-2 ${isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+              <div
+                className={`w-full ${posterHeight} flex flex-col items-center justify-center gap-2 ${isDarkMode ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-500"}`}
+              >
                 <UploadIcon />
                 <span className="text-sm">Poster not available yet</span>
               </div>
@@ -1772,12 +2582,16 @@ function AudionutsUAGUI() {
 
             <div className={`${panelPadding} space-y-3`}>
               <div>
-                <h3 className={`${titleSize} font-bold leading-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                <h3
+                  className={`${titleSize} font-bold leading-tight ${isDarkMode ? "text-white" : "text-gray-900"}`}
+                >
                   {previewTitle}
                 </h3>
                 {subtitleParts.length > 0 && (
-                  <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {subtitleParts.join(' • ')}
+                  <p
+                    className={`text-sm mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+                  >
+                    {subtitleParts.join(" • ")}
                   </p>
                 )}
               </div>
@@ -1787,7 +2601,7 @@ function AudionutsUAGUI() {
                   {infoBadges.map((badge) => (
                     <span
                       key={badge}
-                      className={`px-2.5 py-1 rounded-full text-xs font-semibold ${isDarkMode ? 'bg-gray-800 text-gray-200 border border-gray-700' : 'bg-orange-50 text-orange-700 border border-orange-200'}`}
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold ${isDarkMode ? "bg-gray-800 text-gray-200 border border-gray-700" : "bg-orange-50 text-orange-700 border border-orange-200"}`}
                     >
                       {badge}
                     </span>
@@ -1798,7 +2612,10 @@ function AudionutsUAGUI() {
               {previewProviders.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {previewProviders.map((source) => {
-                    const providerClass = getMetadataProviderStyle(source.key, isDarkMode);
+                    const providerClass = getMetadataProviderStyle(
+                      source.key,
+                      isDarkMode,
+                    );
                     const content = (
                       <>
                         <span className="inline-flex items-center justify-center min-w-[2.6rem] px-2 h-6 rounded-full">
@@ -1846,7 +2663,7 @@ function AudionutsUAGUI() {
                   {genres.map((genre) => (
                     <span
                       key={genre}
-                      className={`px-2 py-1 rounded-md text-xs ${isDarkMode ? 'bg-purple-900/40 text-purple-200 border border-purple-800' : 'bg-purple-50 text-purple-700 border border-purple-200'}`}
+                      className={`px-2 py-1 rounded-md text-xs ${isDarkMode ? "bg-purple-900/40 text-purple-200 border border-purple-800" : "bg-purple-50 text-purple-700 border border-purple-200"}`}
                     >
                       {genre}
                     </span>
@@ -1856,20 +2673,37 @@ function AudionutsUAGUI() {
 
               {categorySection}
 
-              <div className={`rounded-xl p-3 ${isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-gray-50 border border-gray-200'}`}>
-                <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {category === 'TV' && media?.episode_overview ? 'Episode Overview' : 'Overview'}
+              <div
+                className={`rounded-xl p-3 ${isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-50 border border-gray-200"}`}
+              >
+                <p
+                  className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                >
+                  {category === "TV" && media?.episode_overview
+                    ? "Episode Overview"
+                    : "Overview"}
                 </p>
-                <p className={`text-sm leading-6 ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
-                  {overviewText || (media?.status === 'waiting' ? 'Metadata will appear here as soon as Upload-Assistant writes the first meta snapshot.' : 'No overview available for this item.')}
+                <p
+                  className={`text-sm leading-6 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
+                >
+                  {overviewText ||
+                    (media?.status === "waiting"
+                      ? "Metadata will appear here as soon as Upload-Assistant writes the first meta snapshot."
+                      : "No overview available for this item.")}
                 </p>
               </div>
 
-              <div className={`rounded-xl p-3 ${isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-gray-50 border border-gray-200'}`}>
-                <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              <div
+                className={`rounded-xl p-3 ${isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-50 border border-gray-200"}`}
+              >
+                <p
+                  className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                >
                   Source Path
                 </p>
-                <p className={`text-xs break-all font-mono ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <p
+                  className={`text-xs break-all font-mono ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+                >
                   {media?.path || selectedPath}
                 </p>
               </div>
@@ -1880,7 +2714,9 @@ function AudionutsUAGUI() {
     );
   };
 
-  const isAwaitingTerminalInput = Boolean(isExecuting && executionPreview?.awaiting_input);
+  const isAwaitingTerminalInput = Boolean(
+    isExecuting && executionPreview?.awaiting_input,
+  );
 
   // Mobile Layout
   if (isMobile) {
@@ -1890,8 +2726,10 @@ function AudionutsUAGUI() {
         onClick={() => setActivePanel(panel)}
         className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-colors ${
           activePanel === panel
-            ? 'text-purple-400 border-t-2 border-purple-400'
-            : isDarkMode ? 'text-gray-400' : 'text-gray-500'
+            ? "text-purple-400 border-t-2 border-purple-400"
+            : isDarkMode
+              ? "text-gray-400"
+              : "text-gray-500"
         }`}
       >
         {icon}
@@ -1900,10 +2738,16 @@ function AudionutsUAGUI() {
     );
 
     return (
-      <div className={`flex flex-col h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+      <div
+        className={`flex flex-col h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}
+      >
         {/* Mobile Header */}
-        <div className={`flex items-center justify-between px-4 py-3 border-b flex-shrink-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-          <h1 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
+        <div
+          className={`flex items-center justify-between px-4 py-3 border-b flex-shrink-0 ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+        >
+          <h1
+            className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+          >
             <UploadIcon />
             Upload-Assistant
           </h1>
@@ -1916,9 +2760,11 @@ function AudionutsUAGUI() {
             </a>
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isDarkMode ? 'bg-purple-600' : 'bg-gray-300'}`}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isDarkMode ? "bg-purple-600" : "bg-gray-300"}`}
             >
-              <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${isDarkMode ? 'translate-x-5' : 'translate-x-1'}`} />
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${isDarkMode ? "translate-x-5" : "translate-x-1"}`}
+              />
             </button>
             <a
               href={`${APP_BASE}/logout`}
@@ -1932,10 +2778,14 @@ function AudionutsUAGUI() {
         {/* Mobile Content Area. Main panel always mounted (hidden when inactive) to preserve terminal output ref; Files and Args panels conditionally rendered */}
         <div className="flex-1 overflow-hidden relative">
           {/* Files Panel */}
-          {activePanel === 'files' && (
+          {activePanel === "files" && (
             <div className="flex flex-col h-full">
-              <div className={`p-3 border-b flex-shrink-0 ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50'}`}>
-                <h2 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
+              <div
+                className={`p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50"}`}
+              >
+                <h2
+                  className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+                >
                   <FolderIcon />
                   File Browser
                 </h2>
@@ -1947,39 +2797,67 @@ function AudionutsUAGUI() {
                     placeholder="Search files and folders..."
                     className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
                       isDarkMode
-                        ? 'bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500 focus:border-purple-500'
-                        : 'bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500'
-                    } focus:outline-none focus:ring-1 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-blue-500'}`}
+                        ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500 focus:border-purple-500"
+                        : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
+                    } focus:outline-none focus:ring-1 ${isDarkMode ? "focus:ring-purple-500" : "focus:ring-blue-500"}`}
                   />
-                  <svg className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  <svg
+                    className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
                   </svg>
                   {fileBrowserSearch && (
                     <button
-                      onClick={() => handleFileBrowserSearch('')}
-                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-500'}`}
+                      onClick={() => handleFileBrowserSearch("")}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   )}
                 </div>
               </div>
-              <div className={`flex-1 overflow-y-auto ${hasDescFile && !descBrowserCollapsed ? 'max-h-[50%]' : ''}`}>
+              <div
+                className={`flex-1 overflow-y-auto ${hasDescFile && !descBrowserCollapsed ? "max-h-[50%]" : ""}`}
+              >
                 {fileBrowserSearch ? (
                   fileBrowserSearchLoading ? (
-                    <div className={`p-4 text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <div
+                      className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                    >
                       <SpinnerIcon />
                       <p className="text-sm mt-2">Searching...</p>
                     </div>
                   ) : (
                     <>
-                      {fileBrowserSearchResults && fileBrowserSearchResults.truncated && (
-                        <div className={`px-3 py-1.5 text-xs ${isDarkMode ? 'text-yellow-400 bg-gray-900' : 'text-yellow-700 bg-yellow-50'} border-b ${isDarkMode ? 'border-gray-700' : 'border-yellow-200'}`}>
-                          Results limited to {fileBrowserSearchResults.count} items
-                        </div>
-                      )}
+                      {fileBrowserSearchResults &&
+                        fileBrowserSearchResults.truncated && (
+                          <div
+                            className={`px-3 py-1.5 text-xs ${isDarkMode ? "text-yellow-400 bg-gray-900" : "text-yellow-700 bg-yellow-50"} border-b ${isDarkMode ? "border-gray-700" : "border-yellow-200"}`}
+                          >
+                            Results limited to {fileBrowserSearchResults.count}{" "}
+                            items
+                          </div>
+                        )}
                       {renderSearchResults(fileBrowserSearchResults)}
                     </>
                   )
@@ -1992,60 +2870,112 @@ function AudionutsUAGUI() {
               {hasDescFile && (
                 <>
                   <div
-                    className={`p-3 border-t flex-shrink-0 ${!descBrowserCollapsed ? 'border-b' : ''} ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50'} ${descBrowserCollapsed ? 'cursor-pointer' : ''}`}
-                    onClick={descBrowserCollapsed ? () => setDescBrowserCollapsed(false) : undefined}
+                    className={`p-3 border-t flex-shrink-0 ${!descBrowserCollapsed ? "border-b" : ""} ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50"} ${descBrowserCollapsed ? "cursor-pointer" : ""}`}
+                    onClick={
+                      descBrowserCollapsed
+                        ? () => setDescBrowserCollapsed(false)
+                        : undefined
+                    }
                   >
                     <div className="flex items-center justify-between">
-                      <h2 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
+                      <h2
+                        className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+                      >
                         <FileIcon />
                         Description File
-                        {descBrowserCollapsed && descFilePath && !descFileError && (
-                          <span className="text-green-500 ml-1">
-                            <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </span>
-                        )}
+                        {descBrowserCollapsed &&
+                          descFilePath &&
+                          !descFileError && (
+                            <span className="text-green-500 ml-1">
+                              <svg
+                                className="w-4 h-4 inline"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            </span>
+                          )}
                       </h2>
                       {descBrowserCollapsed ? (
                         <button
-                          onClick={(e) => { e.stopPropagation(); setDescBrowserCollapsed(false); }}
-                          className={`p-1 rounded ${isDarkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-500'}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDescBrowserCollapsed(false);
+                          }}
+                          className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                         >
                           <ChevronDownIcon />
                         </button>
-                      ) : descFilePath && !descFileError && (
-                        <button
-                          onClick={() => setDescBrowserCollapsed(true)}
-                          className={`p-1 rounded ${isDarkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-500'}`}
-                        >
-                          <ChevronRightIcon />
-                        </button>
+                      ) : (
+                        descFilePath &&
+                        !descFileError && (
+                          <button
+                            onClick={() => setDescBrowserCollapsed(true)}
+                            className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+                          >
+                            <ChevronRightIcon />
+                          </button>
+                        )
                       )}
                     </div>
                     {descBrowserCollapsed && descFilePath ? (
                       <div className="flex items-center gap-2 mt-1">
-                        <p className={`text-xs ${descFileError ? (isDarkMode ? 'text-red-400' : 'text-red-600') : (isDarkMode ? 'text-green-400' : 'text-green-700')} break-all font-mono flex-1`}>{descFilePath}</p>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); updateDescFile(''); setDescBrowserCollapsed(false); }}
-                          className={`p-1 rounded ${isDarkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-500'}`}
+                        <p
+                          className={`text-xs ${descFileError ? (isDarkMode ? "text-red-400" : "text-red-600") : isDarkMode ? "text-green-400" : "text-green-700"} break-all font-mono flex-1`}
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          {descFilePath}
+                        </p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateDescFile("");
+                            setDescBrowserCollapsed(false);
+                          }}
+                          className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
                           </svg>
                         </button>
                       </div>
-                    ) : !descBrowserCollapsed && (
-                      <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        Select a .txt, .nfo, or .md file
-                      </p>
+                    ) : (
+                      !descBrowserCollapsed && (
+                        <p
+                          className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                        >
+                          Select a .txt, .nfo, or .md file
+                        </p>
+                      )
                     )}
                   </div>
                   {!descBrowserCollapsed && (
                     <div className="flex-1 overflow-y-auto">
-                      {descDirectories.length > 0 ? renderDescFileTree(descDirectories) : (
-                        <div className={`p-4 text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                          <p className="text-sm">Loading description files...</p>
+                      {descDirectories.length > 0 ? (
+                        renderDescFileTree(descDirectories)
+                      ) : (
+                        <div
+                          className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                        >
+                          <p className="text-sm">
+                            Loading description files...
+                          </p>
                         </div>
                       )}
                     </div>
@@ -2056,50 +2986,71 @@ function AudionutsUAGUI() {
           )}
 
           {/* Main Upload Panel */}
-          <div className={`flex flex-col h-full ${activePanel === 'main' ? '' : 'hidden'}`}>
-              {/* Top controls */}
-              <div className={`p-3 space-y-3 border-b flex-shrink-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-                {selectedPath ? (
-                  <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-200'} border`}>
-                    <div className="flex items-center justify-between">
-                      <p className={`text-xs font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Selected:</p>
-                      <button
-                        onClick={() => setActivePanel('files')}
-                        className={`text-xs px-2 py-0.5 rounded ${isDarkMode ? 'bg-gray-600 text-gray-200 hover:bg-gray-500' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
-                      >
-                        Browse
-                      </button>
-                    </div>
-                    <p className={`text-xs ${isDarkMode ? 'text-white' : 'text-gray-800'} break-all font-mono mt-1`}>{selectedPath}</p>
+          <div
+            className={`flex flex-col h-full ${activePanel === "main" ? "" : "hidden"}`}
+          >
+            {/* Top controls */}
+            <div
+              className={`p-3 space-y-3 border-b flex-shrink-0 ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+            >
+              {selectedPath ? (
+                <div
+                  className={`p-2 rounded-lg ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-blue-50 border-blue-200"} border`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p
+                      className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+                    >
+                      Selected:
+                    </p>
+                    <button
+                      onClick={() => setActivePanel("files")}
+                      className={`text-xs px-2 py-0.5 rounded ${isDarkMode ? "bg-gray-600 text-gray-200 hover:bg-gray-500" : "bg-blue-100 text-blue-700 hover:bg-blue-200"}`}
+                    >
+                      Browse
+                    </button>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setActivePanel('files')}
-                    className={`w-full p-3 rounded-lg border-2 border-dashed text-center inline-flex items-center justify-center ${isDarkMode ? 'border-gray-600 text-gray-400 hover:border-purple-500 hover:text-purple-400' : 'border-gray-300 text-gray-500 hover:border-purple-500 hover:text-purple-600'}`}
+                  <p
+                    className={`text-xs ${isDarkMode ? "text-white" : "text-gray-800"} break-all font-mono mt-1`}
                   >
-                    <FolderIcon />
-                    <span className="text-sm ml-2">Tap to select a file or folder</span>
-                  </button>
-                )}
+                    {selectedPath}
+                  </p>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setActivePanel("files")}
+                  className={`w-full p-3 rounded-lg border-2 border-dashed text-center inline-flex items-center justify-center ${isDarkMode ? "border-gray-600 text-gray-400 hover:border-purple-500 hover:text-purple-400" : "border-gray-300 text-gray-500 hover:border-purple-500 hover:text-purple-600"}`}
+                >
+                  <FolderIcon />
+                  <span className="text-sm ml-2">
+                    Tap to select a file or folder
+                  </span>
+                </button>
+              )}
 
-                {/* Args input */}
-                <input
-                  type="text"
-                  value={customArgs}
-                  onChange={(e) => setCustomArgs(e.target.value)}
-                  placeholder="--tmdb movie/12345 --trackers passthepopcorn,aither"
-                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                    isDarkMode
-                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                      : 'bg-white border-gray-300 text-gray-900'
-                  }`}
-                  disabled={isExecuting}
-                />
+              {/* Args input */}
+              <input
+                type="text"
+                value={customArgs}
+                onChange={(e) => setCustomArgs(e.target.value)}
+                placeholder="--tmdb movie/12345 --trackers passthepopcorn,aither"
+                className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                  isDarkMode
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-gray-900"
+                }`}
+                disabled={isExecuting}
+              />
 
-                {/* Desc Link Input */}
-                {hasDescLink && (!descLinkUrl || descLinkFocused || descLinkError) && (
+              {/* Desc Link Input */}
+              {hasDescLink &&
+                (!descLinkUrl || descLinkFocused || descLinkError) && (
                   <div className="space-y-1">
-                    <label className={`text-xs font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Description Link URL:</label>
+                    <label
+                      className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+                    >
+                      Description Link URL:
+                    </label>
                     <input
                       type="url"
                       value={descLinkUrl}
@@ -2109,231 +3060,325 @@ function AudionutsUAGUI() {
                       placeholder="https://pastebin.com/abc123"
                       className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                         descLinkError
-                          ? 'border-red-500 focus:ring-red-500'
+                          ? "border-red-500 focus:ring-red-500"
                           : isDarkMode
-                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                            : 'bg-white border-gray-300 text-gray-900'
+                            ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                            : "bg-white border-gray-300 text-gray-900"
                       }`}
                       disabled={isExecuting}
                     />
-                    {descLinkError && <p className="text-xs text-red-500">{descLinkError}</p>}
+                    {descLinkError && (
+                      <p className="text-xs text-red-500">{descLinkError}</p>
+                    )}
                   </div>
                 )}
 
-                {hasDescFile && (descFileError || !descFilePath) && (
-                  <div className={`p-2 rounded-lg text-xs ${
-                    descFileError
-                      ? isDarkMode ? 'bg-red-900 border border-red-700 text-red-300' : 'bg-red-50 border border-red-200 text-red-700'
-                      : isDarkMode ? 'bg-yellow-900 border border-yellow-700 text-yellow-300' : 'bg-yellow-50 border border-yellow-200 text-yellow-700'
-                  }`}>
-                    {descFileError || 'Select a description file from the Files panel'}
-                  </div>
-                )}
-
-                {/* Execute & Kill buttons */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={executeCommand}
-                    disabled={!selectedPath || isExecuting}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
-                  >
-                    <PlayIcon />
-                    {isExecuting ? 'Executing...' : 'Execute Upload'}
-                  </button>
-                  <button
-                    onClick={clearTerminal}
-                    className={`flex items-center gap-1 px-3 py-3 rounded-lg transition-colors ${
-                      isExecuting
-                        ? 'bg-red-600 hover:bg-red-700 text-white'
-                        : 'bg-gray-600 hover:bg-gray-700 text-white'
-                    }`}
-                    title={isExecuting ? 'Kill process and clear terminal' : 'Clear terminal'}
-                  >
-                    <TrashIcon />
-                  </button>
-                </div>
-              </div>
-
-              {/* Terminal output */}
-              <div className={`flex-1 p-3 flex flex-col min-h-0 overflow-hidden ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
-                <div className="flex items-center gap-2 mb-2 flex-shrink-0">
-                  <span className={isDarkMode ? 'text-white' : 'text-gray-800'}><TerminalIcon /></span>
-                  <h3 className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Output</h3>
-                  {isExecuting && (
-                    <span className="ml-auto text-xs text-green-400 animate-pulse">● Running</span>
-                  )}
-                </div>
+              {hasDescFile && (descFileError || !descFilePath) && (
                 <div
-                  ref={richOutputRef}
-                  id="rich-output"
-                  className={`flex-1 rounded-lg overflow-auto p-2 border text-sm ${isDarkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
-                ></div>
-                {isExecuting && (
-                  <div className={`mt-2 flex gap-2 ${isAwaitingTerminalInput ? 'animate-pulse' : ''}`}>
-                    <input
-                      ref={inputRef}
-                      value={userInput}
-                      onChange={(e) => setUserInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendInput(sessionId, userInput); } }}
-                      placeholder="Type input and press Enter"
-                      className={`flex-1 px-3 py-2 text-sm rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'} ${isAwaitingTerminalInput ? (isDarkMode ? 'border-amber-400 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]' : 'border-amber-500 shadow-[0_0_0_2px_rgba(245,158,11,0.18)]') : (isDarkMode ? 'border-gray-600' : 'border-gray-300')}`}
-                    />
-                    <button
-                      onClick={() => sendInput(sessionId, userInput)}
-                      disabled={!sessionId || !userInput}
-                      className={`px-3 py-2 rounded-lg text-white disabled:opacity-50 text-sm ${isAwaitingTerminalInput ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}
-                    >
-                      Send
-                    </button>
-                  </div>
-                )}
+                  className={`p-2 rounded-lg text-xs ${
+                    descFileError
+                      ? isDarkMode
+                        ? "bg-red-900 border border-red-700 text-red-300"
+                        : "bg-red-50 border border-red-200 text-red-700"
+                      : isDarkMode
+                        ? "bg-yellow-900 border border-yellow-700 text-yellow-300"
+                        : "bg-yellow-50 border border-yellow-200 text-yellow-700"
+                  }`}
+                >
+                  {descFileError ||
+                    "Select a description file from the Files panel"}
+                </div>
+              )}
+
+              {/* Execute & Kill buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={executeCommand}
+                  disabled={!selectedPath || isExecuting}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+                >
+                  <PlayIcon />
+                  {isExecuting ? "Executing..." : "Execute Upload"}
+                </button>
+                <button
+                  onClick={clearTerminal}
+                  className={`flex items-center gap-1 px-3 py-3 rounded-lg transition-colors ${
+                    isExecuting
+                      ? "bg-red-600 hover:bg-red-700 text-white"
+                      : "bg-gray-600 hover:bg-gray-700 text-white"
+                  }`}
+                  title={
+                    isExecuting
+                      ? "Kill process and clear terminal"
+                      : "Clear terminal"
+                  }
+                >
+                  <TrashIcon />
+                </button>
               </div>
             </div>
+
+            {/* Terminal output */}
+            <div
+              className={`flex-1 p-3 flex flex-col min-h-0 overflow-hidden ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}
+            >
+              <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+                <span className={isDarkMode ? "text-white" : "text-gray-800"}>
+                  <TerminalIcon />
+                </span>
+                <h3
+                  className={`text-sm font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}
+                >
+                  Output
+                </h3>
+                {isExecuting && (
+                  <span className="ml-auto text-xs text-green-400 animate-pulse">
+                    ● Running
+                  </span>
+                )}
+              </div>
+              <div
+                ref={richOutputRef}
+                id="rich-output"
+                className={`flex-1 rounded-lg overflow-auto p-2 border text-sm ${isDarkMode ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+              ></div>
+              {isExecuting && (
+                <div
+                  className={`mt-2 flex gap-2 ${isAwaitingTerminalInput ? "animate-pulse" : ""}`}
+                >
+                  <input
+                    ref={inputRef}
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        sendInput(sessionId, userInput);
+                      }
+                    }}
+                    placeholder="Type input and press Enter"
+                    className={`flex-1 px-3 py-2 text-sm rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"} ${isAwaitingTerminalInput ? (isDarkMode ? "border-amber-400 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]" : "border-amber-500 shadow-[0_0_0_2px_rgba(245,158,11,0.18)]") : isDarkMode ? "border-gray-600" : "border-gray-300"}`}
+                  />
+                  <button
+                    onClick={() => sendInput(sessionId, userInput)}
+                    disabled={!sessionId || !userInput}
+                    className={`px-3 py-2 rounded-lg text-white disabled:opacity-50 text-sm ${isAwaitingTerminalInput ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"}`}
+                  >
+                    Send
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Args Panel */}
-          {activePanel === 'args' && (
-            isExecuting ? renderExecutionPreviewPanel(true) : (
-            <div className="flex flex-col h-full">
-              <div className={`p-3 border-b flex-shrink-0 ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gradient-to-l from-purple-50 to-blue-50'}`}>
-                <h2 className={`text-base font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
-                  <TerminalIcon />
-                  Arguments
-                </h2>
-              </div>
+          {activePanel === "args" &&
+            (isExecuting ? (
+              renderExecutionPreviewPanel(true)
+            ) : (
+              <div className="flex flex-col h-full">
+                <div
+                  className={`p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-purple-50 to-blue-50"}`}
+                >
+                  <h2
+                    className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+                  >
+                    <TerminalIcon />
+                    Arguments
+                  </h2>
+                </div>
 
-              {/* Search and Collapse Controls */}
-              <div className={`p-3 border-b flex-shrink-0 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} space-y-2`}>
-                <div className="relative">
-                  <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    <SearchIcon />
-                  </div>
-                  <input
-                    type="text"
-                    value={argSearchFilter}
-                    onChange={(e) => setArgSearchFilter(e.target.value)}
-                    placeholder="Search arguments..."
-                    className={`w-full pl-10 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                      isDarkMode
-                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                        : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                    }`}
-                  />
-                  {argSearchFilter && (
-                    <button
-                      onClick={() => setArgSearchFilter('')}
-                      className={`absolute inset-y-0 right-0 pr-3 flex items-center ${isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
+                {/* Search and Collapse Controls */}
+                <div
+                  className={`p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700" : "border-gray-200"} space-y-2`}
+                >
+                  <div className="relative">
+                    <div
+                      className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                      <SearchIcon />
+                    </div>
+                    <input
+                      type="text"
+                      value={argSearchFilter}
+                      onChange={(e) => setArgSearchFilter(e.target.value)}
+                      placeholder="Search arguments..."
+                      className={`w-full pl-10 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                        isDarkMode
+                          ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                          : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+                      }`}
+                    />
+                    {argSearchFilter && (
+                      <button
+                        onClick={() => setArgSearchFilter("")}
+                        className={`absolute inset-y-0 right-0 pr-3 flex items-center ${isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={collapseAllSections}
+                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                        isDarkMode
+                          ? "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
+                          : "bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      <CollapseAllIcon />
+                      Collapse All
                     </button>
+                    <button
+                      onClick={expandAllSections}
+                      className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                        isDarkMode
+                          ? "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
+                          : "bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      <ExpandAllIcon />
+                      Expand All
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                  {filteredCategories.length === 0 ? (
+                    <div
+                      className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      <p className="text-sm">
+                        No arguments found matching "{argSearchFilter}"
+                      </p>
+                    </div>
+                  ) : (
+                    filteredCategories.map((cat) => (
+                      <div
+                        key={cat.title}
+                        className={`rounded-lg border ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
+                      >
+                        <button
+                          onClick={() => toggleSectionCollapse(cat.title)}
+                          className={`w-full flex items-center justify-between p-3 text-left transition-colors rounded-t-lg ${
+                            isDarkMode
+                              ? "hover:bg-gray-700"
+                              : "hover:bg-gray-50"
+                          } ${collapsedSections.has(cat.title) ? "rounded-b-lg" : ""}`}
+                        >
+                          <div className="flex-1">
+                            <div
+                              className={`text-sm font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"} flex items-center gap-2`}
+                            >
+                              <span
+                                className={
+                                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                                }
+                              >
+                                {collapsedSections.has(cat.title) ? (
+                                  <ChevronRightIcon />
+                                ) : (
+                                  <ChevronDownIcon />
+                                )}
+                              </span>
+                              {cat.title}
+                              <span
+                                className={`text-xs font-normal px-1.5 py-0.5 rounded ${isDarkMode ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-500"}`}
+                              >
+                                {cat.args.length}
+                              </span>
+                            </div>
+                            {cat.subtitle &&
+                              !collapsedSections.has(cat.title) && (
+                                <div
+                                  className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                                >
+                                  {cat.subtitle}
+                                </div>
+                              )}
+                          </div>
+                        </button>
+                        {!collapsedSections.has(cat.title) && (
+                          <div
+                            className={`px-3 pb-3 pt-2 ${isDarkMode ? "border-t border-gray-700" : "border-t border-gray-200"}`}
+                          >
+                            <div className="grid grid-cols-1 gap-2">
+                              {cat.args.map((a) => (
+                                <div
+                                  key={a.label}
+                                  className={`w-full p-2 rounded-lg border ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <button
+                                      onClick={() => addArgument(a.label)}
+                                      disabled={isExecuting}
+                                      className={`px-3 py-1.5 text-sm font-mono rounded-md border ${isDarkMode ? "bg-gray-700 border-gray-600 text-white hover:bg-purple-600 hover:text-white" : "bg-white border-gray-200 text-gray-800 hover:bg-purple-600 hover:text-white"} transition-colors`}
+                                    >
+                                      {a.label}
+                                    </button>
+                                    <div className="flex-1 text-right">
+                                      {a.placeholder && (
+                                        <div
+                                          className={`text-xs ${isDarkMode ? "text-gray-300" : "text-gray-500"} font-mono`}
+                                        >
+                                          {a.placeholder}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {a.description && (
+                                    <div
+                                      className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                                    >
+                                      {a.description}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={collapseAllSections}
-                    className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                      isDarkMode
-                        ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
-                        : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    <CollapseAllIcon />
-                    Collapse All
-                  </button>
-                  <button
-                    onClick={expandAllSections}
-                    className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                      isDarkMode
-                        ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
-                        : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    <ExpandAllIcon />
-                    Expand All
-                  </button>
-                </div>
               </div>
-
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {filteredCategories.length === 0 ? (
-                  <div className={`text-center py-8 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    <p className="text-sm">No arguments found matching "{argSearchFilter}"</p>
-                  </div>
-                ) : (
-                  filteredCategories.map((cat) => (
-                    <div key={cat.title} className={`rounded-lg border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                      <button
-                        onClick={() => toggleSectionCollapse(cat.title)}
-                        className={`w-full flex items-center justify-between p-3 text-left transition-colors rounded-t-lg ${
-                          isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
-                        } ${collapsedSections.has(cat.title) ? 'rounded-b-lg' : ''}`}
-                      >
-                        <div className="flex-1">
-                          <div className={`text-sm font-bold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'} flex items-center gap-2`}>
-                            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>
-                              {collapsedSections.has(cat.title) ? <ChevronRightIcon /> : <ChevronDownIcon />}
-                            </span>
-                            {cat.title}
-                            <span className={`text-xs font-normal px-1.5 py-0.5 rounded ${isDarkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'}`}>
-                              {cat.args.length}
-                            </span>
-                          </div>
-                          {cat.subtitle && !collapsedSections.has(cat.title) && (
-                            <div className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{cat.subtitle}</div>
-                          )}
-                        </div>
-                      </button>
-                      {!collapsedSections.has(cat.title) && (
-                        <div className={`px-3 pb-3 pt-2 ${isDarkMode ? 'border-t border-gray-700' : 'border-t border-gray-200'}`}>
-                          <div className="grid grid-cols-1 gap-2">
-                            {cat.args.map((a) => (
-                              <div
-                                key={a.label}
-                                className={`w-full p-2 rounded-lg border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <button
-                                    onClick={() => addArgument(a.label)}
-                                    disabled={isExecuting}
-                                    className={`px-3 py-1.5 text-sm font-mono rounded-md border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white hover:bg-purple-600 hover:text-white' : 'bg-white border-gray-200 text-gray-800 hover:bg-purple-600 hover:text-white'} transition-colors`}
-                                  >
-                                    {a.label}
-                                  </button>
-                                  <div className="flex-1 text-right">
-                                    {a.placeholder && (
-                                      <div className={`text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-500'} font-mono`}>{a.placeholder}</div>
-                                    )}
-                                  </div>
-                                </div>
-                                {a.description && (
-                                  <div className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{a.description}</div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-            )
-          )}
+            ))}
 
           {/* Progress Panel */}
-          {activePanel === 'progress' && (
-            renderMobileProgressPanel()
-          )}
+          {activePanel === "progress" && renderMobileProgressPanel()}
         </div>
 
         {/* Bottom Nav */}
-        <div className={`flex border-t flex-shrink-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-          {navButton('files', <FolderIcon />, 'Files')}
-          {navButton('main', isAwaitingTerminalInput ? <TerminalIcon /> : <UploadIcon />, isAwaitingTerminalInput ? 'Input Required' : 'Upload')}
-          {navButton('args', isExecuting ? <UploadIcon /> : <TerminalIcon />, isExecuting ? 'Processing' : 'Arguments')}
-          {visibleProgressItems.length > 0 && navButton('progress', <TerminalIcon />, 'Progress')}
+        <div
+          className={`flex border-t flex-shrink-0 ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+        >
+          {navButton("files", <FolderIcon />, "Files")}
+          {navButton(
+            "main",
+            isAwaitingTerminalInput ? <TerminalIcon /> : <UploadIcon />,
+            isAwaitingTerminalInput ? "Input Required" : "Upload",
+          )}
+          {navButton(
+            "args",
+            isExecuting ? <UploadIcon /> : <TerminalIcon />,
+            isExecuting ? "Processing" : "Arguments",
+          )}
+          {visibleProgressItems.length > 0 &&
+            navButton("progress", <TerminalIcon />, "Progress")}
         </div>
       </div>
     );
@@ -2341,14 +3386,24 @@ function AudionutsUAGUI() {
 
   // Desktop Layout
   return (
-    <div className={`flex h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} overflow-hidden`}>
+    <div
+      className={`flex h-screen ${isDarkMode ? "bg-gray-900" : "bg-gray-50"} overflow-hidden`}
+    >
       {/* Left Sidebar - Resizable */}
       <div
-        className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-r flex flex-col`}
-        style={{ width: `${sidebarWidth}px`, minWidth: '200px', maxWidth: '600px' }}
+        className={`${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-r flex flex-col`}
+        style={{
+          width: `${sidebarWidth}px`,
+          minWidth: "200px",
+          maxWidth: "600px",
+        }}
       >
-        <div className={`p-4 border-b ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50'}`}>
-          <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
+        <div
+          className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50"}`}
+        >
+          <h2
+            className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+          >
             <FolderIcon />
             File Browser
           </h2>
@@ -2360,39 +3415,66 @@ function AudionutsUAGUI() {
               placeholder="Search files and folders..."
               className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
                 isDarkMode
-                  ? 'bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500 focus:border-purple-500'
-                  : 'bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500'
-              } focus:outline-none focus:ring-1 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-blue-500'}`}
+                  ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500 focus:border-purple-500"
+                  : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
+              } focus:outline-none focus:ring-1 ${isDarkMode ? "focus:ring-purple-500" : "focus:ring-blue-500"}`}
             />
-            <svg className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <svg
+              className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
             {fileBrowserSearch && (
               <button
-                onClick={() => handleFileBrowserSearch('')}
-                className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-500'}`}
+                onClick={() => handleFileBrowserSearch("")}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
               >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             )}
           </div>
         </div>
-        <div className={`${hasDescFile && !descBrowserCollapsed ? 'flex-1 max-h-[50%]' : 'flex-1'} overflow-y-auto`}>
+        <div
+          className={`${hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} overflow-y-auto`}
+        >
           {fileBrowserSearch ? (
             fileBrowserSearchLoading ? (
-              <div className={`p-4 text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              <div
+                className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+              >
                 <SpinnerIcon />
                 <p className="text-sm mt-2">Searching...</p>
               </div>
             ) : (
               <>
-                {fileBrowserSearchResults && fileBrowserSearchResults.truncated && (
-                  <div className={`px-3 py-1.5 text-xs ${isDarkMode ? 'text-yellow-400 bg-gray-900' : 'text-yellow-700 bg-yellow-50'} border-b ${isDarkMode ? 'border-gray-700' : 'border-yellow-200'}`}>
-                    Results limited to {fileBrowserSearchResults.count} items
-                  </div>
-                )}
+                {fileBrowserSearchResults &&
+                  fileBrowserSearchResults.truncated && (
+                    <div
+                      className={`px-3 py-1.5 text-xs ${isDarkMode ? "text-yellow-400 bg-gray-900" : "text-yellow-700 bg-yellow-50"} border-b ${isDarkMode ? "border-gray-700" : "border-yellow-200"}`}
+                    >
+                      Results limited to {fileBrowserSearchResults.count} items
+                    </div>
+                  )}
                 {renderSearchResults(fileBrowserSearchResults)}
               </>
             )
@@ -2405,56 +3487,100 @@ function AudionutsUAGUI() {
         {hasDescFile && (
           <>
             <div
-              className={`p-4 border-t ${!descBrowserCollapsed ? 'border-b' : ''} ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50'} ${descBrowserCollapsed ? 'cursor-pointer' : ''}`}
-              onClick={descBrowserCollapsed ? () => setDescBrowserCollapsed(false) : undefined}
+              className={`p-4 border-t ${!descBrowserCollapsed ? "border-b" : ""} ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50"} ${descBrowserCollapsed ? "cursor-pointer" : ""}`}
+              onClick={
+                descBrowserCollapsed
+                  ? () => setDescBrowserCollapsed(false)
+                  : undefined
+              }
             >
               <div className="flex items-center justify-between">
-                <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
+                <h2
+                  className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+                >
                   <FileIcon />
                   Description File
                   {descBrowserCollapsed && descFilePath && !descFileError && (
                     <span className="text-green-500 ml-1">
-                      <svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <svg
+                        className="w-4 h-4 inline"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                     </span>
                   )}
                 </h2>
                 {descBrowserCollapsed ? (
                   <button
-                    onClick={(e) => { e.stopPropagation(); setDescBrowserCollapsed(false); }}
-                    className={`p-1 rounded ${isDarkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-500'}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDescBrowserCollapsed(false);
+                    }}
+                    className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                     title="Expand browser"
                   >
                     <ChevronDownIcon />
                   </button>
-                ) : descFilePath && !descFileError && (
-                  <button
-                    onClick={() => setDescBrowserCollapsed(true)}
-                    className={`p-1 rounded ${isDarkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-500'}`}
-                    title="Collapse browser"
-                  >
-                    <ChevronRightIcon />
-                  </button>
+                ) : (
+                  descFilePath &&
+                  !descFileError && (
+                    <button
+                      onClick={() => setDescBrowserCollapsed(true)}
+                      className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+                      title="Collapse browser"
+                    >
+                      <ChevronRightIcon />
+                    </button>
+                  )
                 )}
               </div>
               {descBrowserCollapsed && descFilePath ? (
                 <div className="flex items-center gap-2 mt-2">
-                  <p className={`text-xs ${descFileError ? (isDarkMode ? 'text-red-400' : 'text-red-600') : (isDarkMode ? 'text-green-400' : 'text-green-700')} break-all font-mono flex-1`}>{descFilePath}</p>
+                  <p
+                    className={`text-xs ${descFileError ? (isDarkMode ? "text-red-400" : "text-red-600") : isDarkMode ? "text-green-400" : "text-green-700"} break-all font-mono flex-1`}
+                  >
+                    {descFilePath}
+                  </p>
                   <button
-                    onClick={(e) => { e.stopPropagation(); updateDescFile(''); setDescBrowserCollapsed(false); }}
-                    className={`p-1 rounded ${isDarkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-500'}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      updateDescFile("");
+                      setDescBrowserCollapsed(false);
+                    }}
+                    className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                     title="Clear selection"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
-              ) : !descBrowserCollapsed && (
-                <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Select a .txt, .nfo, or .md file
-                </p>
+              ) : (
+                !descBrowserCollapsed && (
+                  <p
+                    className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                  >
+                    Select a .txt, .nfo, or .md file
+                  </p>
+                )
               )}
             </div>
             {!descBrowserCollapsed && (
@@ -2463,23 +3589,45 @@ function AudionutsUAGUI() {
                   {descDirectories.length > 0 ? (
                     renderDescFileTree(descDirectories)
                   ) : (
-                    <div className={`p-4 text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <div
+                      className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                    >
                       <p className="text-sm">Loading description files...</p>
                     </div>
                   )}
                 </div>
                 {descFilePath && (
-                  <div className={`p-3 border-t ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-green-50'}`}>
-                    <p className={`text-xs font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Selected Description:</p>
+                  <div
+                    className={`p-3 border-t ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-green-50"}`}
+                  >
+                    <p
+                      className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-600"} mb-1`}
+                    >
+                      Selected Description:
+                    </p>
                     <div className="flex items-center gap-2">
-                      <p className={`text-xs ${isDarkMode ? 'text-green-400' : 'text-green-700'} break-all font-mono flex-1`}>{descFilePath}</p>
+                      <p
+                        className={`text-xs ${isDarkMode ? "text-green-400" : "text-green-700"} break-all font-mono flex-1`}
+                      >
+                        {descFilePath}
+                      </p>
                       <button
-                        onClick={() => updateDescFile('')}
-                        className={`p-1 rounded ${isDarkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-200 text-gray-500'}`}
+                        onClick={() => updateDescFile("")}
+                        className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                         title="Clear selection"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
                         </svg>
                       </button>
                     </div>
@@ -2493,30 +3641,38 @@ function AudionutsUAGUI() {
 
       {/* Resize Handle */}
       <div
-        className={`w-1 ${isDarkMode ? 'bg-gray-700 hover:bg-purple-500' : 'bg-gray-300 hover:bg-purple-500'} cursor-col-resize transition-colors`}
+        className={`w-1 ${isDarkMode ? "bg-gray-700 hover:bg-purple-500" : "bg-gray-300 hover:bg-purple-500"} cursor-col-resize transition-colors`}
         onMouseDown={startResizing}
-        style={{ userSelect: 'none' }}
+        style={{ userSelect: "none" }}
       />
 
       {/* Main Content */}
       <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Panel */}
-        <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b ${isExecuting ? 'p-3' : 'p-4'} flex-shrink-0`}>
-          <div className={`max-w-6xl mx-auto ${isExecuting ? '' : 'space-y-4'}`}>
+        <div
+          className={`${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b ${isExecuting ? "p-3" : "p-4"} flex-shrink-0`}
+        >
+          <div
+            className={`max-w-6xl mx-auto ${isExecuting ? "" : "space-y-4"}`}
+          >
             {isExecuting ? (
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-green-400 animate-pulse">● Running</span>
+                    <span className="text-sm text-green-400 animate-pulse">
+                      ● Running
+                    </span>
                     {selectedPath && (
-                      <span className={`text-xs uppercase tracking-wide ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <span
+                        className={`text-xs uppercase tracking-wide ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                      >
                         Selected path
                       </span>
                     )}
                   </div>
                   {selectedPath && (
                     <p
-                      className={`mt-1 truncate font-mono text-sm ${isDarkMode ? 'text-white' : 'text-gray-800'}`}
+                      className={`mt-1 truncate font-mono text-sm ${isDarkMode ? "text-white" : "text-gray-800"}`}
                       title={selectedPath}
                     >
                       {selectedPath}
@@ -2536,7 +3692,9 @@ function AudionutsUAGUI() {
               <>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
+                    <h1
+                      className={`text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+                    >
                       <UploadIcon />
                       Upload-Assistant Web UI
                     </h1>
@@ -2556,18 +3714,20 @@ function AudionutsUAGUI() {
                     >
                       View Config
                     </a>
-                    <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                      {isDarkMode ? '🌙 Dark' : '☀️ Light'}
+                    <span
+                      className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+                    >
+                      {isDarkMode ? "🌙 Dark" : "☀️ Light"}
                     </span>
                     <button
                       onClick={() => setIsDarkMode(!isDarkMode)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        isDarkMode ? 'bg-purple-600' : 'bg-gray-300'
+                        isDarkMode ? "bg-purple-600" : "bg-gray-300"
                       }`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          isDarkMode ? 'translate-x-6' : 'translate-x-1'
+                          isDarkMode ? "translate-x-6" : "translate-x-1"
                         }`}
                       />
                     </button>
@@ -2576,15 +3736,29 @@ function AudionutsUAGUI() {
 
                 {/* Selected Path Display */}
                 {selectedPath && (
-                  <div className={`p-3 ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-200'} border rounded-lg`}>
-                    <p className={`text-xs font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>Selected Path:</p>
-                    <p className={`text-sm ${isDarkMode ? 'text-white' : 'text-gray-800'} break-all font-mono`}>{selectedPath}</p>
+                  <div
+                    className={`p-3 ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-blue-50 border-blue-200"} border rounded-lg`}
+                  >
+                    <p
+                      className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-600"} mb-1`}
+                    >
+                      Selected Path:
+                    </p>
+                    <p
+                      className={`text-sm ${isDarkMode ? "text-white" : "text-gray-800"} break-all font-mono`}
+                    >
+                      {selectedPath}
+                    </p>
                   </div>
                 )}
 
                 {/* Arguments */}
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Additional Arguments:</label>
+                  <label
+                    className={`text-sm font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+                  >
+                    Additional Arguments:
+                  </label>
                   <input
                     type="text"
                     value={customArgs}
@@ -2592,8 +3766,8 @@ function AudionutsUAGUI() {
                     placeholder="--tmdb movie/12345 --trackers passthepopcorn,aither,ulcx --no-edition --no-tag"
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                       isDarkMode
-                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                        : 'bg-white border-gray-300 text-gray-900'
+                        ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                        : "bg-white border-gray-300 text-gray-900"
                     }`}
                     disabled={isExecuting}
                   />
@@ -2601,73 +3775,121 @@ function AudionutsUAGUI() {
 
                 {/* Description Link URL Input - shown when --desclink is in args */}
                 {/* Hide when valid URL and not focused; show when empty, focused, or invalid */}
-                {hasDescLink && (!descLinkUrl || descLinkFocused || descLinkError) && (
-                  <div className="space-y-2">
-                    <label className={`text-sm font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} flex items-center gap-2`}>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                      </svg>
-                      Description Link URL (pastebin, hastebin, etc.):
-                    </label>
-                    <input
-                      type="url"
-                      value={descLinkUrl}
-                      onChange={(e) => updateDescLink(e.target.value)}
-                      onFocus={() => setDescLinkFocused(true)}
-                      onBlur={() => setDescLinkFocused(false)}
-                      placeholder="https://pastebin.com/abc123"
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                        descLinkError
-                          ? 'border-red-500 focus:ring-red-500'
-                          : isDarkMode
-                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                            : 'bg-white border-gray-300 text-gray-900'
-                      }`}
-                      disabled={isExecuting}
-                    />
-                    {descLinkError && (
-                      <p className="text-xs text-red-500 mt-1">{descLinkError}</p>
-                    )}
-                    {descLinkUrl && !descLinkError && (
-                      <p className="text-xs text-green-500 mt-1">Valid paste URL</p>
-                    )}
-                  </div>
-                )}
+                {hasDescLink &&
+                  (!descLinkUrl || descLinkFocused || descLinkError) && (
+                    <div className="space-y-2">
+                      <label
+                        className={`text-sm font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-700"} flex items-center gap-2`}
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                          />
+                        </svg>
+                        Description Link URL (pastebin, hastebin, etc.):
+                      </label>
+                      <input
+                        type="url"
+                        value={descLinkUrl}
+                        onChange={(e) => updateDescLink(e.target.value)}
+                        onFocus={() => setDescLinkFocused(true)}
+                        onBlur={() => setDescLinkFocused(false)}
+                        placeholder="https://pastebin.com/abc123"
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                          descLinkError
+                            ? "border-red-500 focus:ring-red-500"
+                            : isDarkMode
+                              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                              : "bg-white border-gray-300 text-gray-900"
+                        }`}
+                        disabled={isExecuting}
+                      />
+                      {descLinkError && (
+                        <p className="text-xs text-red-500 mt-1">
+                          {descLinkError}
+                        </p>
+                      )}
+                      {descLinkUrl && !descLinkError && (
+                        <p className="text-xs text-green-500 mt-1">
+                          Valid paste URL
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                 {/* Description File Status - only show on error or when no file selected */}
                 {hasDescFile && (descFileError || !descFilePath) && (
-                  <div className={`p-3 rounded-lg ${
-                    descFileError
-                      ? isDarkMode ? 'bg-red-900 border border-red-700' : 'bg-red-50 border border-red-200'
-                      : isDarkMode ? 'bg-yellow-900 border border-yellow-700' : 'bg-yellow-50 border border-yellow-200'
-                  }`}>
+                  <div
+                    className={`p-3 rounded-lg ${
+                      descFileError
+                        ? isDarkMode
+                          ? "bg-red-900 border border-red-700"
+                          : "bg-red-50 border border-red-200"
+                        : isDarkMode
+                          ? "bg-yellow-900 border border-yellow-700"
+                          : "bg-yellow-50 border border-yellow-200"
+                    }`}
+                  >
                     <div className="flex items-center gap-2">
-                      <svg className={`w-4 h-4 ${
-                        descFileError ? 'text-red-500' : 'text-yellow-500'
-                      }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg
+                        className={`w-4 h-4 ${
+                          descFileError ? "text-red-500" : "text-yellow-500"
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
                         {descFileError ? (
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
                         ) : (
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                          />
                         )}
                       </svg>
-                      <span className={`text-sm font-medium ${
-                        descFileError
-                          ? isDarkMode ? 'text-red-300' : 'text-red-700'
-                          : isDarkMode ? 'text-yellow-300' : 'text-yellow-700'
-                      }`}>
+                      <span
+                        className={`text-sm font-medium ${
+                          descFileError
+                            ? isDarkMode
+                              ? "text-red-300"
+                              : "text-red-700"
+                            : isDarkMode
+                              ? "text-yellow-300"
+                              : "text-yellow-700"
+                        }`}
+                      >
                         {descFileError
-                          ? 'Invalid description file path'
-                          : 'Select a description file from the left panel or enter a path'}
+                          ? "Invalid description file path"
+                          : "Select a description file from the left panel or enter a path"}
                       </span>
                     </div>
                     {descFilePath && descFileError && (
-                      <p className={`text-xs mt-1 break-all font-mono ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
+                      <p
+                        className={`text-xs mt-1 break-all font-mono ${isDarkMode ? "text-red-400" : "text-red-600"}`}
+                      >
                         {descFilePath}
                       </p>
                     )}
                     {descFileError && (
-                      <p className={`text-xs mt-1 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
+                      <p
+                        className={`text-xs mt-1 ${isDarkMode ? "text-red-400" : "text-red-600"}`}
+                      >
                         {descFileError}
                       </p>
                     )}
@@ -2682,19 +3904,23 @@ function AudionutsUAGUI() {
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium text-lg"
                   >
                     <PlayIcon />
-                    {isExecuting ? 'Executing...' : 'Execute Upload'}
+                    {isExecuting ? "Executing..." : "Execute Upload"}
                   </button>
                   <button
                     onClick={clearTerminal}
                     className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${
                       isExecuting
-                        ? 'bg-red-600 hover:bg-red-700 text-white'
-                        : 'bg-gray-600 hover:bg-gray-700 text-white'
+                        ? "bg-red-600 hover:bg-red-700 text-white"
+                        : "bg-gray-600 hover:bg-gray-700 text-white"
                     }`}
-                    title={isExecuting ? 'Kill process and clear terminal' : 'Clear terminal'}
+                    title={
+                      isExecuting
+                        ? "Kill process and clear terminal"
+                        : "Clear terminal"
+                    }
                   >
                     <TrashIcon />
-                    {isExecuting ? 'Kill & Clear' : 'Clear'}
+                    {isExecuting ? "Kill & Clear" : "Clear"}
                   </button>
                 </div>
               </>
@@ -2703,35 +3929,52 @@ function AudionutsUAGUI() {
         </div>
 
         {/* Execution Output */}
-        <div className={`flex-1 ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} p-4 flex flex-col min-h-0 overflow-hidden`}>
+        <div
+          className={`flex-1 ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} p-4 flex flex-col min-h-0 overflow-hidden`}
+        >
           <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col min-h-0">
             <div className="flex items-center gap-2 mb-3 flex-shrink-0">
-              <span className={isDarkMode ? 'text-white' : 'text-gray-800'}><TerminalIcon /></span>
-              <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Execution Output</h3>
+              <span className={isDarkMode ? "text-white" : "text-gray-800"}>
+                <TerminalIcon />
+              </span>
+              <h3
+                className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}
+              >
+                Execution Output
+              </h3>
               {isExecuting && (
-                <span className="ml-auto text-sm text-green-400 animate-pulse">● Running</span>
+                <span className="ml-auto text-sm text-green-400 animate-pulse">
+                  ● Running
+                </span>
               )}
             </div>
             {/* Rich HTML output (rendered from Rich export_html fragments) */}
             <div
               ref={richOutputRef}
               id="rich-output"
-              className={`flex-1 rounded-lg overflow-auto p-3 border ${isDarkMode ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+              className={`flex-1 rounded-lg overflow-auto p-3 border ${isDarkMode ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
             ></div>
             {isExecuting && (
-              <div className={`mt-2 flex gap-2 ${isAwaitingTerminalInput ? 'animate-pulse' : ''}`}>
+              <div
+                className={`mt-2 flex gap-2 ${isAwaitingTerminalInput ? "animate-pulse" : ""}`}
+              >
                 <input
                   ref={inputRef}
                   value={userInput}
                   onChange={(e) => setUserInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendInput(sessionId, userInput); } }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      sendInput(sessionId, userInput);
+                    }
+                  }}
                   placeholder="Type input and press Enter"
-                  className={`flex-1 px-3 py-2 rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'} ${isAwaitingTerminalInput ? (isDarkMode ? 'border-amber-400 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]' : 'border-amber-500 shadow-[0_0_0_2px_rgba(245,158,11,0.18)]') : (isDarkMode ? 'border-gray-600' : 'border-gray-300')}`}
+                  className={`flex-1 px-3 py-2 rounded-lg border focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow ${isDarkMode ? "bg-gray-700 text-white" : "bg-white text-gray-900"} ${isAwaitingTerminalInput ? (isDarkMode ? "border-amber-400 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]" : "border-amber-500 shadow-[0_0_0_2px_rgba(245,158,11,0.18)]") : isDarkMode ? "border-gray-600" : "border-gray-300"}`}
                 />
                 <button
                   onClick={() => sendInput(sessionId, userInput)}
                   disabled={!sessionId || !userInput}
-                  className={`px-4 py-2 rounded-lg text-white disabled:opacity-50 ${isAwaitingTerminalInput ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}
+                  className={`px-4 py-2 rounded-lg text-white disabled:opacity-50 ${isAwaitingTerminalInput ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"}`}
                 >
                   Send
                 </button>
@@ -2743,151 +3986,206 @@ function AudionutsUAGUI() {
       </div>
       {/* Right Resize Handle */}
       <div
-        className={`w-1 ${isDarkMode ? 'bg-gray-700 hover:bg-purple-500' : 'bg-gray-300 hover:bg-purple-500'} cursor-col-resize transition-colors`}
+        className={`w-1 ${isDarkMode ? "bg-gray-700 hover:bg-purple-500" : "bg-gray-300 hover:bg-purple-500"} cursor-col-resize transition-colors`}
         onMouseDown={startResizingRight}
-        style={{ userSelect: 'none' }}
+        style={{ userSelect: "none" }}
       />
 
       {/* Right Sidebar - Arguments / Execution Preview */}
       <div
-        className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-l flex flex-col`}
-        style={{ width: `${rightSidebarWidth}px`, minWidth: '200px', maxWidth: '800px' }}
+        className={`${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-l flex flex-col`}
+        style={{
+          width: `${rightSidebarWidth}px`,
+          minWidth: "200px",
+          maxWidth: "800px",
+        }}
       >
-        {isExecuting ? renderExecutionPreviewPanel() : (
-        <>
-        <div className={`p-4 border-b ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gradient-to-l from-purple-50 to-blue-50'}`}>
-          <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
-            <TerminalIcon />
-            Arguments
-          </h2>
-        </div>
-
-        {/* Search and Collapse Controls */}
-        <div className={`p-3 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} space-y-2`}>
-          {/* Search Input */}
-          <div className="relative">
-            <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              <SearchIcon />
-            </div>
-            <input
-              type="text"
-              value={argSearchFilter}
-              onChange={(e) => setArgSearchFilter(e.target.value)}
-              placeholder="Search arguments..."
-              className={`w-full pl-10 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                isDarkMode
-                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
-                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-              }`}
-            />
-            {argSearchFilter && (
-              <button
-                onClick={() => setArgSearchFilter('')}
-                className={`absolute inset-y-0 right-0 pr-3 flex items-center ${isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
+        {isExecuting ? (
+          renderExecutionPreviewPanel()
+        ) : (
+          <>
+            <div
+              className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-purple-50 to-blue-50"}`}
+            >
+              <h2
+                className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {/* Collapse/Expand All Buttons */}
-          <div className="flex gap-2">
-            <button
-              onClick={collapseAllSections}
-              className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                isDarkMode
-                  ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
-                  : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <CollapseAllIcon />
-              Collapse All
-            </button>
-            <button
-              onClick={expandAllSections}
-              className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                isDarkMode
-                  ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
-                  : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <ExpandAllIcon />
-              Expand All
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {filteredCategories.length === 0 ? (
-            <div className={`text-center py-8 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              <p className="text-sm">No arguments found matching "{argSearchFilter}"</p>
+                <TerminalIcon />
+                Arguments
+              </h2>
             </div>
-          ) : (
-            filteredCategories.map((cat) => (
-              <div key={cat.title} className={`rounded-lg border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                {/* Collapsible Section Header */}
-                <button
-                  onClick={() => toggleSectionCollapse(cat.title)}
-                  className={`w-full flex items-center justify-between p-3 text-left transition-colors rounded-t-lg ${
-                    isDarkMode
-                      ? 'hover:bg-gray-700'
-                      : 'hover:bg-gray-50'
-                  } ${collapsedSections.has(cat.title) ? 'rounded-b-lg' : ''}`}
-                >
-                  <div className="flex-1">
-                    <div className={`text-sm font-bold ${isDarkMode ? 'text-gray-100' : 'text-gray-900'} flex items-center gap-2`}>
-                      <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>
-                        {collapsedSections.has(cat.title) ? <ChevronRightIcon /> : <ChevronDownIcon />}
-                      </span>
-                      {cat.title}
-                      <span className={`text-xs font-normal px-1.5 py-0.5 rounded ${isDarkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'}`}>
-                        {cat.args.length}
-                      </span>
-                    </div>
-                    {cat.subtitle && !collapsedSections.has(cat.title) && (
-                      <div className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{cat.subtitle}</div>
-                    )}
-                  </div>
-                </button>
 
-                {/* Collapsible Section Content */}
-                {!collapsedSections.has(cat.title) && (
-                  <div className={`px-3 pb-3 pt-2 ${isDarkMode ? 'border-t border-gray-700' : 'border-t border-gray-200'}`}>
-                    <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-2">
-                      {cat.args.map((a) => (
-                        <div
-                          key={a.label}
-                          className={`w-full p-2 rounded-lg border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <button
-                              onClick={() => addArgument(a.label)}
-                              disabled={isExecuting}
-                              className={`px-3 py-1 text-sm font-mono rounded-md border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white hover:bg-purple-600 hover:text-white' : 'bg-white border-gray-200 text-gray-800 hover:bg-purple-600 hover:text-white'} transition-colors`}
-                            >
-                              {a.label}
-                            </button>
-                            <div className="flex-1 text-right">
-                              {a.placeholder && (
-                                <div className={`text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-500'} font-mono`}>{a.placeholder}</div>
-                              )}
-                            </div>
-                          </div>
-                          {a.description && (
-                            <div className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>{a.description}</div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+            {/* Search and Collapse Controls */}
+            <div
+              className={`p-3 border-b ${isDarkMode ? "border-gray-700" : "border-gray-200"} space-y-2`}
+            >
+              {/* Search Input */}
+              <div className="relative">
+                <div
+                  className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                >
+                  <SearchIcon />
+                </div>
+                <input
+                  type="text"
+                  value={argSearchFilter}
+                  onChange={(e) => setArgSearchFilter(e.target.value)}
+                  placeholder="Search arguments..."
+                  className={`w-full pl-10 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    isDarkMode
+                      ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                      : "bg-white border-gray-300 text-gray-900 placeholder-gray-500"
+                  }`}
+                />
+                {argSearchFilter && (
+                  <button
+                    onClick={() => setArgSearchFilter("")}
+                    className={`absolute inset-y-0 right-0 pr-3 flex items-center ${isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
                 )}
               </div>
-            ))
-          )}
-        </div>
-        </>
+
+              {/* Collapse/Expand All Buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={collapseAllSections}
+                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                    isDarkMode
+                      ? "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
+                      : "bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <CollapseAllIcon />
+                  Collapse All
+                </button>
+                <button
+                  onClick={expandAllSections}
+                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                    isDarkMode
+                      ? "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
+                      : "bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <ExpandAllIcon />
+                  Expand All
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {filteredCategories.length === 0 ? (
+                <div
+                  className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                >
+                  <p className="text-sm">
+                    No arguments found matching "{argSearchFilter}"
+                  </p>
+                </div>
+              ) : (
+                filteredCategories.map((cat) => (
+                  <div
+                    key={cat.title}
+                    className={`rounded-lg border ${isDarkMode ? "border-gray-700" : "border-gray-200"}`}
+                  >
+                    {/* Collapsible Section Header */}
+                    <button
+                      onClick={() => toggleSectionCollapse(cat.title)}
+                      className={`w-full flex items-center justify-between p-3 text-left transition-colors rounded-t-lg ${
+                        isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                      } ${collapsedSections.has(cat.title) ? "rounded-b-lg" : ""}`}
+                    >
+                      <div className="flex-1">
+                        <div
+                          className={`text-sm font-bold ${isDarkMode ? "text-gray-100" : "text-gray-900"} flex items-center gap-2`}
+                        >
+                          <span
+                            className={
+                              isDarkMode ? "text-gray-400" : "text-gray-500"
+                            }
+                          >
+                            {collapsedSections.has(cat.title) ? (
+                              <ChevronRightIcon />
+                            ) : (
+                              <ChevronDownIcon />
+                            )}
+                          </span>
+                          {cat.title}
+                          <span
+                            className={`text-xs font-normal px-1.5 py-0.5 rounded ${isDarkMode ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-500"}`}
+                          >
+                            {cat.args.length}
+                          </span>
+                        </div>
+                        {cat.subtitle && !collapsedSections.has(cat.title) && (
+                          <div
+                            className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                          >
+                            {cat.subtitle}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Collapsible Section Content */}
+                    {!collapsedSections.has(cat.title) && (
+                      <div
+                        className={`px-3 pb-3 pt-2 ${isDarkMode ? "border-t border-gray-700" : "border-t border-gray-200"}`}
+                      >
+                        <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-2">
+                          {cat.args.map((a) => (
+                            <div
+                              key={a.label}
+                              className={`w-full p-2 rounded-lg border ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <button
+                                  onClick={() => addArgument(a.label)}
+                                  disabled={isExecuting}
+                                  className={`px-3 py-1 text-sm font-mono rounded-md border ${isDarkMode ? "bg-gray-700 border-gray-600 text-white hover:bg-purple-600 hover:text-white" : "bg-white border-gray-200 text-gray-800 hover:bg-purple-600 hover:text-white"} transition-colors`}
+                                >
+                                  {a.label}
+                                </button>
+                                <div className="flex-1 text-right">
+                                  {a.placeholder && (
+                                    <div
+                                      className={`text-xs ${isDarkMode ? "text-gray-300" : "text-gray-500"} font-mono`}
+                                    >
+                                      {a.placeholder}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              {a.description && (
+                                <div
+                                  className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                                >
+                                  {a.description}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -2895,5 +4193,5 @@ function AudionutsUAGUI() {
 }
 
 // Render the app
-const root = ReactDOM.createRoot(document.getElementById('root'));
+const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<AudionutsUAGUI />);

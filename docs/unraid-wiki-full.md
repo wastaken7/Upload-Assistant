@@ -2,32 +2,37 @@ CREDITS: To the author/s at Aither.
 
 ## How to install Upload Assistant natively on Unraid
 
- Disclaimer: This guide comes as is, and i do not claim to be someone who knows how to fix things if you break it
+Disclaimer: This guide comes as is, and i do not claim to be someone who knows how to fix things if you break it
 
 As unraid is completely focused on docker, i was having issues installing Upload Assistant to work on unraid, i also didn't find using the docker image to be easy.
 
 So here are the steps you will need to take to get Upload Assistant to work directly on unraid.
+
 ```
-1. You will need the nerd tools package, this can be installed from CA app. 
+1. You will need the nerd tools package, this can be installed from CA app.
 After that enable this packages
 ```
+
 ![](https://images2.imgbox.com/3f/d2/vPw50sqv_o.png?)
 
-*Not sure which ones are absolutely essential but i got it working with the ones shown in screenshot, you can probably check by uninstalling some and see if it still works.
+\*Not sure which ones are absolutely essential but i got it working with the ones shown in screenshot, you can probably check by uninstalling some and see if it still works.
+
 ```
 2. open a terminal on unraid, cd to the directory you want to install Upload Assistant or make a directory.
 "git clone https://github.com/Audionut/Upload-Assistant.git" run the command,
 the other stuff is standard steps you have to follow as per audionuts guide that can be found
 here https://github.com/Audionut/Upload-Assistant
 ```
+
 ```
 3. you will need some missing packages that are not included with nerdtools.
 First is grabbing libffi and the steps you have to follow are here
 https://forums.unraid.net/topic/129200-plug-in-nerdtools/page/7/#comment-1192737
 ```
+
 ```
 4. Youre almost there, the final thing you need is ffmpeg and the steps to install are
-as follows make a directory you want to download ffmpeg to then 
+as follows make a directory you want to download ffmpeg to then
 "wget https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz" this
 will download the tar.xz file to the location you are in currently.
 ```
@@ -38,9 +43,10 @@ this unpackes ffmpeg folder for you. Now cd to the newly unpacked folder, and ru
 
 you now are done, and Upload Assistant should work natively.
 
-Thank you to noraa for all your help, shoutout to deeznuts and ringbear 
+Thank you to noraa for all your help, shoutout to deeznuts and ringbear
 
 ## Since people were asking how to do it in Unraid when still wanting CLI options, here goes:
+
     * create /mnt/user/appdata/upload-assistant
     * cd into folder, nano run-cli.sh, paste contents
     * adjust contents to match your setup
@@ -68,6 +74,7 @@ docker exec -it upload-assistant-cli /bin/sh
 ```
 
 DO:
+
 ```
 ./run-cli.sh
 ```
@@ -84,9 +91,10 @@ On the homepage, you'll see a massive + button to add a compose file.
 
 You will see a screen like this https://ibb.co/r0g07Zs
 
-You want to name this container "upload-assistant-cli" without the "" and remove the sample text that exists here  https://ibb.co/dfMWq7n
+You want to name this container "upload-assistant-cli" without the "" and remove the sample text that exists here https://ibb.co/dfMWq7n
 
 Next replace it with
+
 ```
 services:
   upload-assistant-cli:
@@ -128,7 +136,7 @@ Leftclick on your newly created upload-assistant container and go to console.
 Here you can type the same exact commands you used for native install but with one change. You'll want to start with how your container side of qbit is mounted.
 For example. Since my container side is "/data/torrents/"
 My example command would be: python3 upload.py "/data/torrents/movies/nicemovieiupload.mkv".
-This will run exactly how a native install runs where you can supply with extra arguments. 
+This will run exactly how a native install runs where you can supply with extra arguments.
 
 ## For anyone not wanting to run dockge, the compose plugin or Portainer.
 

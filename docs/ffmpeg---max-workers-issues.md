@@ -1,6 +1,7 @@
 Some users, particularly on seedboxes, may have an outdated/limited ffmpeg installed that will not function correctly with UA.
 
 One method to check is below:
+
 ```bash
 `which ffmpeg` -v quiet -hide_banner -version | grep -q -- --enable-libzimg && echo "FFmpeg compiled with libzimg" || echo "FFmpeg not compiled with libzimg"
 ```
@@ -22,6 +23,7 @@ The `ffmpeg-n7.1.1-57-g1b48158a23` type.
 There were issues in builds after this date, they may have been resolved since last checked.
 
 ppkhoa says:
+
 > Another way to do this is adding to the start of PATH environment variable the extracted `ffmpeg<version>/bin` path from the release bundles linked above and UA will use that instead.
 >
 > Example, in my own environment, added this line in `~/.profile`

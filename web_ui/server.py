@@ -23,7 +23,7 @@ from types import ModuleType
 from pathlib import Path
 from typing import Any, Literal, Protocol, TypedDict, cast
 from collections.abc import Callable
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 
 import web_ui.auth as auth_mod
 from src.webui_progress import ProgressEvent, clear_progress_callback, reset_progress, set_progress_callback
@@ -4403,8 +4403,7 @@ def execute_command():
                         last_body = ""
                         try:
 
-                            def _drain_progress_events() -> bool:
-                                emitted = False
+                            def _drain_progress_events() -> Iterator[str]:
                                 while True:
                                     try:
                                         progress_event_queue.get_nowait()
@@ -4414,7 +4413,6 @@ def execute_command():
                                     pending_events = list(queued_progress_events.values())
                                     queued_progress_events.clear()
                                 for progress_event in pending_events:
-                                    emitted = True
                                     yield f"data: {json.dumps({'type': 'progress', 'data': progress_event})}\n\n"
 
                             while worker.is_alive():
