@@ -47,16 +47,45 @@ function Invoke-WingetInstall {
     ) + $ExtraArgs
 
     Write-Step "Installing $Label with winget"
-    $stdoutPath = [System.IO.Path]::GetTempFileName()
-    $stderrPath = [System.IO.Path]::GetTempFileName()
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = "winget.exe"
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+
+    foreach ($argument in $arguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+
+    $wingetProcess = $null
+    $stdoutHandler = $null
+    $stderrHandler = $null
 
     try {
-        $wingetProcess = Start-Process -FilePath "winget.exe" `
-            -ArgumentList $arguments `
-            -NoNewWindow `
-            -PassThru `
-            -RedirectStandardOutput $stdoutPath `
-            -RedirectStandardError $stderrPath
+        $stdoutBuilder = [System.Text.StringBuilder]::new()
+        $stderrBuilder = [System.Text.StringBuilder]::new()
+        $wingetProcess = [System.Diagnostics.Process]::new()
+        $wingetProcess.StartInfo = $startInfo
+
+        $stdoutHandler = [System.Diagnostics.DataReceivedEventHandler]{
+            param($sender, $eventArgs)
+            if ($null -ne $eventArgs.Data) {
+                [void]$stdoutBuilder.AppendLine($eventArgs.Data)
+            }
+        }
+        $stderrHandler = [System.Diagnostics.DataReceivedEventHandler]{
+            param($sender, $eventArgs)
+            if ($null -ne $eventArgs.Data) {
+                [void]$stderrBuilder.AppendLine($eventArgs.Data)
+            }
+        }
+
+        $wingetProcess.add_OutputDataReceived($stdoutHandler)
+        $wingetProcess.add_ErrorDataReceived($stderrHandler)
+        [void]$wingetProcess.Start()
+        $wingetProcess.BeginOutputReadLine()
+        $wingetProcess.BeginErrorReadLine()
 
         if (-not $wingetProcess.WaitForExit($TimeoutSeconds * 1000)) {
             try {
@@ -69,12 +98,14 @@ function Invoke-WingetInstall {
             Fail "winget timed out while installing $Label after $TimeoutSeconds seconds (package: $PackageId)"
         }
 
-        if (Test-Path -LiteralPath $stdoutPath) {
-            Get-Content -LiteralPath $stdoutPath | Write-Host
+        $wingetProcess.WaitForExit()
+
+        if ($stdoutBuilder.Length -gt 0) {
+            $stdoutBuilder.ToString().TrimEnd("`r", "`n") | Write-Host
         }
 
-        if (Test-Path -LiteralPath $stderrPath) {
-            Get-Content -LiteralPath $stderrPath | Write-Host
+        if ($stderrBuilder.Length -gt 0) {
+            $stderrBuilder.ToString().TrimEnd("`r", "`n") | Write-Host
         }
 
         if ($wingetProcess.ExitCode -ne 0) {
@@ -82,7 +113,17 @@ function Invoke-WingetInstall {
         }
     }
     finally {
-        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+        if ($null -ne $wingetProcess) {
+            if ($null -ne $stdoutHandler) {
+                $wingetProcess.remove_OutputDataReceived($stdoutHandler)
+            }
+
+            if ($null -ne $stderrHandler) {
+                $wingetProcess.remove_ErrorDataReceived($stderrHandler)
+            }
+
+            $wingetProcess.Dispose()
+        }
     }
 }
 
