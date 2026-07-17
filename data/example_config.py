@@ -228,7 +228,7 @@ config: dict[str, Any] = {
         # 6 is a good balance between compression and speed
         "ffmpeg_compression": "6",
 
-        # Optional path to the unRAR executable for CAPYBARABR/CBZ extraction.
+        # Optional path to the unRAR executable for CBR/CBZ extraction.
         # Leave blank to use the system PATH.
         # Example: "C:\\Program Files\\WinRAR\\UnRAR.exe"
         "unrar_path": "",
