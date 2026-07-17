@@ -6,7 +6,8 @@ param(
     [string]$LauncherDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\bin"),
     [string]$FfmpegInstallDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\ffmpeg"),
     [string]$PythonDownloadBaseUrl = "https://www.python.org/ftp/python",
-    [string]$GitReleaseApiUrl = "https://api.github.com/repos/git-for-windows/git/releases/latest",
+    [string]$RepositoryZipUrl = "https://github.com/wastaken7/Upload-Assistant/archive/refs/heads/development.zip",
+    [string]$InstallerUrl = "https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/scripts/install-windows.ps1",
     [string]$FfmpegDownloadUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
     [switch]$ForceUpdate,
     [switch]$SkipFfmpegInstall
@@ -25,17 +26,7 @@ function Fail {
 }
 
 $resolvedUaDir = [System.IO.Path]::GetFullPath($UaDir)
-$gitDir = Join-Path $resolvedUaDir ".git"
-$installScript = Join-Path $resolvedUaDir "scripts\install-windows.ps1"
 $venvPython = Join-Path $resolvedUaDir ".venv\Scripts\python.exe"
-
-if (-not (Test-Path -LiteralPath $installScript)) {
-    Fail "install-windows.ps1 was not found in $resolvedUaDir. Point -UaDir to a valid Upload Assistant checkout."
-}
-
-if (-not (Test-Path -LiteralPath $gitDir)) {
-    Fail "This Upload Assistant directory is not a git checkout. ZIP-based installs cannot use 'ua-update'; download a fresh ZIP and rerun the installer instead."
-}
 
 $installArguments = @{
     UaDir = $resolvedUaDir
@@ -44,7 +35,7 @@ $installArguments = @{
     LauncherDir = $LauncherDir
     FfmpegInstallDir = $FfmpegInstallDir
     PythonDownloadBaseUrl = $PythonDownloadBaseUrl
-    GitReleaseApiUrl = $GitReleaseApiUrl
+    RepositoryZipUrl = $RepositoryZipUrl
     FfmpegDownloadUrl = $FfmpegDownloadUrl
 }
 
@@ -63,5 +54,12 @@ if (Test-Path -LiteralPath $venvPython) {
     }
 }
 
-& $installScript @installArguments
-exit $LASTEXITCODE
+$installerPath = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantInstaller-" + [guid]::NewGuid().ToString("N") + ".ps1")
+try {
+    Invoke-WebRequest -UseBasicParsing -Uri $InstallerUrl -OutFile $installerPath
+    & $installerPath @installArguments
+    exit $LASTEXITCODE
+}
+finally {
+    Remove-Item -LiteralPath $installerPath -Force -ErrorAction SilentlyContinue
+}

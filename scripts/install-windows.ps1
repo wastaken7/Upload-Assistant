@@ -6,7 +6,7 @@ param(
     [string]$LauncherDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\bin"),
     [string]$FfmpegInstallDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\ffmpeg"),
     [string]$PythonDownloadBaseUrl = "https://www.python.org/ftp/python",
-    [string]$GitReleaseApiUrl = "https://api.github.com/repos/git-for-windows/git/releases/latest",
+    [string]$RepositoryZipUrl = "https://github.com/wastaken7/Upload-Assistant/archive/refs/heads/development.zip",
     [string]$FfmpegDownloadUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
     [switch]$WithDiscord,
     [switch]$ForceUpdate,
@@ -255,21 +255,6 @@ function Test-PythonVersionMatch {
     return [System.StringComparer]::Ordinal.Equals($InstalledVersion, $RequestedVersion)
 }
 
-function Get-GitInstallerUrl {
-    $response = Invoke-RestMethod -Uri $GitReleaseApiUrl -Headers @{ "User-Agent" = "Upload-Assistant" }
-    $assetPattern = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) {
-        ([System.Runtime.InteropServices.Architecture]::Arm64) { '^Git-.*-arm64\.exe$' }
-        default { '^Git-.*-64-bit\.exe$' }
-    }
-
-    $asset = $response.assets | Where-Object { $_.name -match $assetPattern } | Select-Object -First 1
-    if (-not $asset) {
-        Fail "Could not find a matching Git for Windows installer in the latest release."
-    }
-
-    return $asset.browser_download_url
-}
-
 function Resolve-CommandPath {
     param(
         [Parameter(Mandatory)]
@@ -290,45 +275,6 @@ function Resolve-CommandPath {
     }
 
     return $null
-}
-
-function Ensure-Git {
-    $gitCandidates = @(
-        (Join-Path $env:ProgramFiles "Git\cmd\git.exe"),
-        (Join-Path ${env:ProgramFiles(x86)} "Git\cmd\git.exe"),
-        (Join-Path $env:LOCALAPPDATA "Programs\Git\cmd\git.exe")
-    )
-
-    $gitExe = Resolve-CommandPath -CommandName "git.exe" -CandidatePaths $gitCandidates
-    if ($gitExe) {
-        return $gitExe
-    }
-
-    $gitInstallerUrl = Get-GitInstallerUrl
-    $gitInstallerPath = New-TemporaryDownloadPath -FileName ([System.IO.Path]::GetFileName(([System.Uri]$gitInstallerUrl).AbsolutePath))
-    Invoke-DownloadFile -Url $gitInstallerUrl -DestinationPath $gitInstallerPath -Label "Git for Windows"
-    Write-Step "Installing Git for Windows"
-    Invoke-ExternalProcess `
-        -FilePath $gitInstallerPath `
-        -Label "Git for Windows installer" `
-        -Arguments @(
-            "/VERYSILENT",
-            "/NORESTART",
-            "/NOCANCEL",
-            "/SP-",
-            "/CURRENTUSER",
-            "/SUPPRESSMSGBOXES",
-            "/CLOSEAPPLICATIONS",
-            "/RESTARTAPPLICATIONS",
-            "/o:PathOption=Cmd"
-        )
-
-    $gitExe = Resolve-CommandPath -CommandName "git.exe" -CandidatePaths $gitCandidates
-    if (-not $gitExe) {
-        Fail "Git was installed but git.exe could not be located. Reopen PowerShell or install Git manually."
-    }
-
-    return $gitExe
 }
 
 function Ensure-IsolatedPython {
@@ -420,43 +366,42 @@ function Ensure-Ffmpeg {
     Add-DirectoryToUserPath -DirectoryPath (Join-Path $FfmpegInstallDir "bin")
 }
 
-function Clone-OrUpdateRepo {
-    param([Parameter(Mandatory)][string]$GitExe)
-
+function Install-RepositoryFromZip {
     $parentDir = Split-Path -Parent $UaDir
     if (-not [string]::IsNullOrWhiteSpace($parentDir)) {
         New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
     }
 
-    $gitDir = Join-Path $UaDir ".git"
-    if (Test-Path -LiteralPath $gitDir) {
-        Write-Step "Updating existing Upload Assistant checkout"
-        & $GitExe -C $UaDir pull --ff-only
-        if ($LASTEXITCODE -ne 0) {
-            Fail "git pull failed"
+    $resolvedUaDir = [System.IO.Path]::GetFullPath($UaDir)
+    $rootDir = [System.IO.Path]::GetPathRoot($resolvedUaDir)
+    if ([System.StringComparer]::OrdinalIgnoreCase.Equals($resolvedUaDir, $rootDir)) {
+        Fail "UaDir cannot be a drive root. Choose a dedicated Upload Assistant directory."
+    }
+
+    $zipPath = New-TemporaryDownloadPath -FileName ("UploadAssistant-" + [guid]::NewGuid().ToString("N") + ".zip")
+    $extractRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantRepo-" + [guid]::NewGuid().ToString("N"))
+
+    try {
+        Invoke-DownloadFile -Url $RepositoryZipUrl -DestinationPath $zipPath -Label "Upload Assistant"
+        Write-Step "Extracting Upload Assistant"
+        Expand-Archive -LiteralPath $zipPath -DestinationPath $extractRoot -Force
+
+        $sourceDir = Get-ChildItem -Path $extractRoot -Directory | Select-Object -First 1 -ExpandProperty FullName
+        if (-not $sourceDir -or -not (Test-Path -LiteralPath (Join-Path $sourceDir "upload.py"))) {
+            Fail "Downloaded Upload Assistant ZIP has an unexpected layout."
         }
-        return
-    }
 
-    $looksLikeCheckout = (Test-Path -LiteralPath (Join-Path $UaDir "upload.py")) -and
-        (Test-Path -LiteralPath (Join-Path $UaDir "requirements.txt")) -and
-        (Test-Path -LiteralPath (Join-Path $UaDir "scripts\install-windows.ps1"))
-
-    if ($looksLikeCheckout) {
-        Write-Step "Using existing Upload Assistant files in $UaDir"
-        return
-    }
-
-    if (-not (Test-Path -LiteralPath $UaDir)) {
-        Write-Step "Cloning Upload Assistant into $UaDir"
-        & $GitExe clone https://github.com/wastaken7/Upload-Assistant.git $UaDir
-        if ($LASTEXITCODE -ne 0) {
-            Fail "git clone failed"
+        if (Test-Path -LiteralPath $resolvedUaDir) {
+            Write-Step "Replacing existing Upload Assistant files"
+            Remove-Item -LiteralPath $resolvedUaDir -Recurse -Force
         }
-        return
-    }
 
-    Fail "$UaDir already exists but is neither a git checkout nor a recognizable Upload Assistant checkout. Choose a different -UaDir or use an extracted Upload Assistant ZIP."
+        Move-Item -LiteralPath $sourceDir -Destination $resolvedUaDir
+    }
+    finally {
+        Remove-Item -LiteralPath $extractRoot -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Install-Dependencies {
@@ -597,60 +542,35 @@ exit $LASTEXITCODE
 function Write-GlobalLauncher {
     New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
 
-    $launcherPs1Path = Join-Path $LauncherDir "ua.ps1"
     $launcherCmdPath = Join-Path $LauncherDir "ua.cmd"
-    $updatePs1Path = Join-Path $LauncherDir "ua-update.ps1"
     $updateCmdPath = Join-Path $LauncherDir "ua-update.cmd"
-    $launcherPs1Contents = @"
-[CmdletBinding()]
-param(
-    [Parameter(ValueFromRemainingArguments = `$true)]
-    [string[]]`$UploadArgs
-)
-
-& (Join-Path "$UaDir" "run-ua.ps1") @UploadArgs
-exit `$LASTEXITCODE
-"@
     $launcherCmdContents = @"
 @echo off
-powershell -ExecutionPolicy Bypass -File "%~dp0ua.ps1" %*
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$UaDir\run-ua.ps1" %*
 exit /b %errorlevel%
-"@
-    $updatePs1Contents = @"
-[CmdletBinding()]
-param(
-    [Parameter(ValueFromRemainingArguments = `$true)]
-    [string[]]`$UpdateArgs
-)
-
-& (Join-Path "$UaDir" "scripts\update-windows.ps1") @UpdateArgs
-exit `$LASTEXITCODE
 "@
     $updateCmdContents = @"
 @echo off
-powershell -ExecutionPolicy Bypass -File "%~dp0ua-update.ps1" %*
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$UaDir\scripts\update-windows.ps1" %*
 exit /b %errorlevel%
 "@
 
-    Set-Content -LiteralPath $launcherPs1Path -Value $launcherPs1Contents -Encoding UTF8
+    Remove-Item -LiteralPath (Join-Path $LauncherDir "ua.ps1") -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $LauncherDir "ua-update.ps1") -Force -ErrorAction SilentlyContinue
     Set-Content -LiteralPath $launcherCmdPath -Value $launcherCmdContents -Encoding ASCII
-    Set-Content -LiteralPath $updatePs1Path -Value $updatePs1Contents -Encoding UTF8
     Set-Content -LiteralPath $updateCmdPath -Value $updateCmdContents -Encoding ASCII
     Add-DirectoryToUserPath -DirectoryPath $LauncherDir
 }
 
-$GitExe = Ensure-Git
 $PythonExe = Ensure-IsolatedPython
 Ensure-Ffmpeg
-Clone-OrUpdateRepo -GitExe $GitExe
+Install-RepositoryFromZip
 Install-Dependencies -PythonExe $PythonExe
 Write-Runner
 Write-GlobalLauncher
 
 $venvPythonPath = Join-Path $UaDir ".venv\Scripts\python.exe"
-$launcherPs1Path = Join-Path $LauncherDir "ua.ps1"
 $launcherCmdPath = Join-Path $LauncherDir "ua.cmd"
-$updatePs1Path = Join-Path $LauncherDir "ua-update.ps1"
 $updateCmdPath = Join-Path $LauncherDir "ua-update.cmd"
 
 Write-Host ""
@@ -668,9 +588,7 @@ Write-Host "  ua `"/path/to/content`" --trackers yourtracker"
 Write-Host "  ua-update"
 Write-Host ""
 Write-Host "Global launcher:"
-Write-Host "  $launcherPs1Path"
 Write-Host "  $launcherCmdPath"
-Write-Host "  $updatePs1Path"
 Write-Host "  $updateCmdPath"
 Write-Host ""
 Write-Host "PATH note:"

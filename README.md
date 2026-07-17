@@ -203,8 +203,7 @@ Choose **one** of the two options below to get the files onto your computer:
 Using Git is the recommended method because it makes updating the assistant in the future extremely easy.
 
 1. **Install Git** (if you don't already have it):
-   - **Windows:** Use the bootstrap flow in `docs/windows-install.md` if you want the installer to fetch Git automatically.
-     _(That Windows flow can download Git for Windows directly if it is missing.)_
+   - **Windows:** Use the installer in [`docs/windows-install.md`](docs/windows-install.md), which downloads the codebase as a ZIP and does not require Git.
    - **Linux:** Install via your package manager (e.g., `sudo apt install git` or `sudo pacman -S git`).
    - **macOS:** Install via Homebrew (`brew install git`) or Xcode Command Line Tools.
 2. **Clone the project**:
@@ -226,27 +225,22 @@ If you do not want to install Git, you can download a copy of the files directly
 
 ### Step 3: Install Python Packages
 
-Open your terminal (Command Prompt/PowerShell on Windows, Terminal on Mac/Linux), navigate to the folder where you downloaded Upload Assistant, and run the command for your operating system:
+On Linux/macOS, open a terminal, navigate to the folder where you downloaded Upload Assistant, and run:
 
-- **Windows:**
-  ```cmd
-  pip install -U -r requirements.txt
-  ```
-- **Linux / macOS:**
-  ```bash
-  pip3 install --user -U -r requirements.txt
-  ```
+```bash
+pip3 install --user -U -r requirements.txt
+```
+
+On Windows, use the [Windows installer](docs/windows-install.md), which creates its own Python environment and installs these packages automatically.
 
 Discord notifications are optional and are no longer part of the default install. If you want Discord bot support, install the extra package set after the base dependencies:
 
-- **Windows:**
-  ```cmd
-  pip install -U -r requirements-discord.txt
-  ```
 - **Linux / macOS:**
   ```bash
   pip3 install --user -U -r requirements-discord.txt
   ```
+
+On Windows, pass `-WithDiscord` to the Windows installer.
 
 > [!TIP]
 > **Getting an "externally managed environment" error?**
@@ -309,12 +303,13 @@ In your terminal, run the command for your operating system and follow the on-sc
 
 ## **Updating:**
 
-- To update, navigate into the Upload-Assistant directory and pull the latest changes:
+- To update a Git installation, navigate into the Upload-Assistant directory and pull the latest changes:
   ```bash
   cd Upload-Assistant
   git pull
   ```
 - Or, if you downloaded the ZIP file, download a fresh ZIP from GitHub and overwrite your existing files.
+- For the managed Windows installation, run `ua-update`; it downloads a fresh ZIP and replaces the installed files.
 - Run the command to update dependencies:
   - **Windows:** `pip install -U -r requirements.txt`
   - **Linux / macOS:** `python3 -m pip install --user -U -r requirements.txt`
