@@ -36,6 +36,7 @@ Expand-Archive -LiteralPath $zipPath -DestinationPath $targetRoot -Force
 $repoDir = Get-ChildItem -Path $targetRoot -Directory | Where-Object { $_.Name -like "Upload-Assistant-*" } | Select-Object -First 1 -ExpandProperty FullName
 Set-Location $repoDir
 .\scripts\install-windows.ps1
+
 ```
 
 This flow downloads the repository ZIP first, extracts it, and runs the installer from those extracted files, but lets the installer clone the managed Git checkout into its default location (`~/tools/ua`). That keeps `ua-update` working later.

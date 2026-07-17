@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$UaDir = (Split-Path -Parent $PSScriptRoot),
+    [string]$UaDir,
     [string]$PythonVersion = "3.14",
     [string]$PythonInstallDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\python\3.14"),
     [string]$LauncherDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\bin"),
@@ -14,6 +14,10 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($UaDir)) {
+    $UaDir = Split-Path -Parent $PSScriptRoot
+}
 
 function Fail {
     param([string]$Message)
