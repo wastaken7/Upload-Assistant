@@ -35,7 +35,7 @@ Expand-Archive -LiteralPath $zipPath -DestinationPath $targetRoot -Force
 
 $repoDir = Get-ChildItem -Path $targetRoot -Directory | Where-Object { $_.Name -like "Upload-Assistant-*" } | Select-Object -First 1 -ExpandProperty FullName
 Set-Location $repoDir
-powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
+.\scripts\install-windows.ps1
 ```
 
 This flow downloads the repository ZIP first, extracts it, and runs the installer from those extracted files, but lets the installer clone the managed Git checkout into its default location (`~/tools/ua`). That keeps `ua-update` working later.
@@ -47,7 +47,7 @@ If you already have a repo checkout, open PowerShell and run:
 ```powershell
 git clone https://github.com/wastaken7/Upload-Assistant.git
 cd Upload-Assistant
-powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1 -UaDir $PWD
+.\scripts\install-windows.ps1 -UaDir $PWD
 ```
 
 If you want the installer to manage a separate checkout in `~/tools/ua`, omit `-UaDir $PWD`.
@@ -60,7 +60,7 @@ If Git is not installed yet, use a ZIP checkout first:
 4. Run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
+.\scripts\install-windows.ps1
 ```
 
 That first run can install Git and then clone a proper checkout for future `ua-update` runs. Pass `-UaDir $PWD` only if you intentionally want to keep using the extracted ZIP directory itself, which is not an updatable Git checkout.
@@ -68,7 +68,7 @@ That first run can install Git and then clone a proper checkout for future `ua-u
 With optional Discord support:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1 -WithDiscord
+.\scripts\install-windows.ps1 -WithDiscord
 ```
 
 ## Options

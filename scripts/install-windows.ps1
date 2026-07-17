@@ -24,6 +24,28 @@ function Fail {
     throw $Message
 }
 
+function ConvertTo-ProcessArgumentString {
+    param([string[]]$Arguments)
+
+    [string[]]$escapedArguments = @(
+        foreach ($argument in $Arguments) {
+            if ($null -eq $argument) {
+                '""'
+                continue
+            }
+
+            if ($argument -notmatch '[\s"]') {
+                $argument
+                continue
+            }
+
+            '"' + (($argument -replace '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"'
+        }
+    )
+
+    return [string]::Join(' ', $escapedArguments)
+}
+
 function Invoke-WingetInstall {
     param(
         [Parameter(Mandatory)]
@@ -54,8 +76,13 @@ function Invoke-WingetInstall {
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
 
-    foreach ($argument in $arguments) {
-        [void]$startInfo.ArgumentList.Add($argument)
+    if ($startInfo.PSObject.Properties.Name -contains "ArgumentList") {
+        foreach ($argument in $arguments) {
+            [void]$startInfo.ArgumentList.Add($argument)
+        }
+    }
+    else {
+        $startInfo.Arguments = ConvertTo-ProcessArgumentString -Arguments $arguments
     }
 
     $wingetProcess = $null
