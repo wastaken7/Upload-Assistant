@@ -1178,14 +1178,14 @@ def _set_process_progress_if_current(session_id: str, process_state: Mapping[str
 
 
 def _progress_items_for_process(process_info: Mapping[str, object]) -> list[dict[str, object]]:
-    progress_map_obj = process_info.get("progress")
-    if not isinstance(progress_map_obj, dict):
-        return []
-
     items: list[dict[str, object]] = []
-    for value in progress_map_obj.values():
-        if isinstance(value, dict):
-            items.append(dict(value))
+    with active_processes_lock:
+        progress_map_obj = process_info.get("progress")
+        if not isinstance(progress_map_obj, dict):
+            return []
+        for value in progress_map_obj.values():
+            if isinstance(value, dict):
+                items.append(dict(value))
     items.sort(key=lambda item: (0 if str(item.get("status", "")) == "running" else 1, str(item.get("id", ""))))
     return items
 
@@ -1202,16 +1202,19 @@ def _make_process_state(path: str, args: str) -> dict[str, object]:
     }
 
 
-def set_execution_preview_target(session_id: str, path: str, meta_uuid: str | None = None) -> None:
+def set_execution_preview_target(session_id: str, expected_run_token: str, path: str, meta_uuid: str | None = None) -> None:
     """Update the active preview target for an in-process Web UI execution."""
     cleaned_session_id = str(session_id or "").strip()
+    cleaned_run_token = str(expected_run_token or "").strip()
     cleaned_path = str(path or "").strip()
-    if not cleaned_session_id or not cleaned_path:
+    if not cleaned_session_id or not cleaned_run_token or not cleaned_path:
         return
 
     with active_processes_lock:
         process_info = active_processes.get(cleaned_session_id)
         if process_info is None:
+            return
+        if str(process_info.get("run_token") or "").strip() != cleaned_run_token:
             return
         process_info["path"] = cleaned_path
         if meta_uuid:
@@ -4052,7 +4055,9 @@ def execute_command():
 
                     # Queue to serialize print actions from the worker thread
                     render_queue: queue.Queue[tuple[Any, dict[str, Any]]] = queue.Queue()
-                    progress_event_queue: queue.Queue[dict[str, object]] = queue.Queue()
+                    progress_event_queue: queue.Queue[None] = queue.Queue(maxsize=64)
+                    queued_progress_events: dict[str, dict[str, object]] = {}
+                    progress_queue_lock = threading.Lock()
 
                     # Cancellation event for cooperative shutdown
                     cancel_event = threading.Event()
@@ -4294,9 +4299,21 @@ def execute_command():
                         def run_upload():
                             def emit_progress(event: ProgressEvent) -> None:
                                 event_copy = dict(event)
+                                if not _session_state_is_current(session_id, process_state):
+                                    return
                                 _set_process_progress_if_current(session_id, process_state, event_copy)
                                 with contextlib.suppress(Exception):
-                                    progress_event_queue.put(event_copy)
+                                    progress_id = str(event_copy.get("id", "")).strip()
+                                    queue_key = progress_id or f"__event__:{event_copy.get('op', 'upsert')}"
+                                    with progress_queue_lock:
+                                        queued_progress_events[queue_key] = event_copy
+                                        while len(queued_progress_events) > 64:
+                                            oldest_key = next(iter(queued_progress_events))
+                                            queued_progress_events.pop(oldest_key, None)
+                                        try:
+                                            progress_event_queue.put_nowait(None)
+                                        except queue.Full:
+                                            pass
 
                             try:
                                 # Run the async main() entry point of upload.py
@@ -4324,7 +4341,7 @@ def execute_command():
                                 set_webui_session_id = getattr(sys.modules.get("upload"), "set_webui_session_id", None)
                                 if callable(set_webui_session_id):
                                     with contextlib.suppress(Exception):
-                                        set_webui_session_id(session_id)
+                                        set_webui_session_id(session_id, str(process_state.get("run_token") or ""))
                                 set_progress_callback(emit_progress)
                                 reset_progress()
                                 asyncio.run(nonlocal_upload())
@@ -4388,11 +4405,15 @@ def execute_command():
 
                             def _drain_progress_events() -> bool:
                                 emitted = False
-                                while not progress_event_queue.empty():
+                                while True:
                                     try:
-                                        progress_event = progress_event_queue.get_nowait()
+                                        progress_event_queue.get_nowait()
                                     except queue.Empty:
                                         break
+                                with progress_queue_lock:
+                                    pending_events = list(queued_progress_events.values())
+                                    queued_progress_events.clear()
+                                for progress_event in pending_events:
                                     emitted = True
                                     yield f"data: {json.dumps({'type': 'progress', 'data': progress_event})}\n\n"
 

@@ -894,7 +894,7 @@ async def extract_embedded_cover_from_audiobook(meta: Meta, dest_path: str, conf
         return False
 
 
-async def download_poster_from_meta(meta: Meta, cover_path: str) -> bool:
+async def download_poster_from_meta(meta: Meta, cover_path: str, *, force: bool = False) -> bool:
     poster_url = meta.poster
     if not poster_url:
         return False
@@ -902,7 +902,7 @@ async def download_poster_from_meta(meta: Meta, cover_path: str) -> bool:
     min_size = 20480
     if poster_url.startswith("http://books.google.com/") or poster_url.startswith("https://covers.openlibrary.org/b/id/"):
         min_size = 10240
-    if Path(cover_path).exists() and Path(cover_path).stat().st_size >= min_size:
+    if not force and Path(cover_path).exists() and Path(cover_path).stat().st_size >= min_size:
         meta.cover_path = cover_path
         return True
     try:
@@ -1217,7 +1217,7 @@ async def prepare_book_cover(path: str, folder_id: str, base_dir: str, meta: Met
             logger.debug("[green]Audiobook confirmed cover extracted. Skipping API download.[/green]")
             return str(cover_path)
 
-        downloaded_poster = await download_poster_from_meta(meta, str(cover_path))
+        downloaded_poster = await download_poster_from_meta(meta, str(cover_path), force=meta.retake)
         if downloaded_poster:
             meta.cover_path = str(cover_path)
             return str(cover_path)
@@ -1236,7 +1236,7 @@ async def prepare_book_cover(path: str, folder_id: str, base_dir: str, meta: Met
             logger.debug("[green]EPUB confirmed cover extracted. Skipping API download.[/green]")
             return str(cover_path)
 
-    downloaded_poster = await download_poster_from_meta(meta, str(cover_path))
+    downloaded_poster = await download_poster_from_meta(meta, str(cover_path), force=meta.retake)
     if downloaded_poster:
         meta.cover_path = str(cover_path)
         return str(cover_path)

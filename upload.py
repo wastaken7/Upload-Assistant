@@ -117,33 +117,37 @@ _is_webui_mode = False
 _webui_server: WebUIServer | None = None  # Reference to waitress server for graceful shutdown
 _shutdown_event = threading.Event()  # Event for coordinating graceful shutdown
 _webui_session_id: str | None = None
+_webui_run_token: str | None = None
 
 
 def _reset_shutdown_state() -> None:
     """Reset global shutdown state for clean in-process runs from web UI."""
-    global _shutdown_requested, _is_webui_mode, _webui_server, _webui_session_id
+    global _shutdown_requested, _is_webui_mode, _webui_server, _webui_session_id, _webui_run_token
     _shutdown_requested = False
     _is_webui_mode = False
     _webui_server = None
     _webui_session_id = None
+    _webui_run_token = None
     _shutdown_event.clear()
 
 
-def set_webui_session_id(session_id: str | None) -> None:
+def set_webui_session_id(session_id: str | None, run_token: str | None = None) -> None:
     """Store the active Web UI execution session for in-process preview updates."""
-    global _webui_session_id
+    global _webui_session_id, _webui_run_token
     cleaned = (session_id or "").strip()
     _webui_session_id = cleaned or None
+    cleaned_run_token = (run_token or "").strip()
+    _webui_run_token = cleaned_run_token or None
 
 
 def _publish_webui_preview_target(path: str, meta_uuid: str | None = None) -> None:
     """Push the current queue item to the Web UI execution preview, when active."""
-    if not _is_webui_mode or not _webui_session_id or not path:
+    if not _is_webui_mode or not _webui_session_id or not _webui_run_token or not path:
         return
     try:
         from web_ui.server import set_execution_preview_target
 
-        set_execution_preview_target(_webui_session_id, path, meta_uuid)
+        set_execution_preview_target(_webui_session_id, _webui_run_token, path, meta_uuid)
     except Exception:
         return
 
@@ -2631,11 +2635,12 @@ def check_python_version() -> None:
 async def main() -> None:
     # Reset global state for clean in-process runs (when called from web UI)
     pending_webui_session_id = _webui_session_id
+    pending_webui_run_token = _webui_run_token
     _reset_shutdown_state()
-    if pending_webui_session_id:
+    if pending_webui_session_id and pending_webui_run_token:
         global _is_webui_mode
         _is_webui_mode = True
-        set_webui_session_id(pending_webui_session_id)
+        set_webui_session_id(pending_webui_session_id, pending_webui_run_token)
 
     try:
         await do_the_thing(base_dir)

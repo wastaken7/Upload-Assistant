@@ -378,16 +378,21 @@ class TorrentCreator:
                                         logger.info(f"[bold cyan]{line}")  # Print the final torrent file creation message
 
                                 result = process.wait()
-                                if result == 0:
+                                if result == 0 and Path(output_path).exists():
                                     progress.update(task, completed=total_pieces)
                                     complete_progress("mkbrr-hash", "mkbrr hashing...", current=total_pieces, total=total_pieces)
                                 else:
+                                    failure_detail = (
+                                        f"Expected torrent file {output_path} was not created"
+                                        if result == 0
+                                        else f"mkbrr exited with status code {result}"
+                                    )
                                     publish_progress(
                                         "mkbrr-hash",
                                         "mkbrr hashing...",
                                         current=pieces_done,
                                         total=total_pieces,
-                                        detail=f"mkbrr exited with status code {result}",
+                                        detail=failure_detail,
                                         status="failed",
                                     )
                                 return result

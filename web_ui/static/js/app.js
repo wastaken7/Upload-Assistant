@@ -535,6 +535,18 @@ function AudionutsUAGUI() {
     });
   };
 
+  const mergeProgressItemsById = (existingItems, incomingItems) => {
+    const itemsById = new Map(existingItems.map((item) => [item.id, item]));
+    incomingItems.forEach((item) => {
+      if (!item || !item.id) return;
+      const existing = itemsById.get(item.id);
+      if (!existing || Number(item.updated_at || 0) >= Number(existing.updated_at || 0)) {
+        itemsById.set(item.id, existing ? { ...existing, ...item } : item);
+      }
+    });
+    return sortProgressItems([...itemsById.values()]);
+  };
+
   const applyProgressEvent = (event) => {
     if (!event || typeof event !== 'object') return;
     if (event.op === 'reset') {
@@ -603,8 +615,8 @@ function AudionutsUAGUI() {
                 </div>
                 <div className={`mt-2 h-2.5 overflow-hidden rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
                   <div
-                    className={`h-full rounded-full transition-[width] duration-300 ${progressTone}`}
-                    style={{ width: `${hasTotal ? clampedPercent : 100}%` }}
+                    className={`h-full rounded-full transition-[width] duration-300 ${progressTone} ${!hasTotal && !isFailed ? 'animate-pulse' : ''}`}
+                    style={{ width: `${hasTotal ? clampedPercent : isFailed ? 100 : 35}%` }}
                   />
                 </div>
               </div>
@@ -830,7 +842,7 @@ function AudionutsUAGUI() {
         if (!cancelled && data && data.success && data.media) {
           setExecutionPreview(data.media);
           if (Array.isArray(data.media.progress)) {
-            setProgressItems(sortProgressItems(data.media.progress));
+            setProgressItems((prev) => mergeProgressItemsById(prev, data.media.progress));
           }
         }
       } catch (_error) {
@@ -2487,7 +2499,7 @@ function AudionutsUAGUI() {
       />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Panel */}
         <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b ${isExecuting ? 'p-3' : 'p-4'} flex-shrink-0`}>
           <div className={`max-w-6xl mx-auto ${isExecuting ? '' : 'space-y-4'}`}>
