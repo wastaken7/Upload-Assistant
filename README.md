@@ -180,12 +180,13 @@ Upload Assistant needs a few tools installed on your computer to process media a
 1. **Python (version 3.14 or newer)**:
    - Download and install it from the [official Python website](https://www.python.org/downloads/).
    - **Important (standard Windows setup):** During installation, make sure to check the box that says **"Add python.exe to PATH"** so the `python` and `pip` commands below work in a normal terminal.
-   - **Windows users who want to keep their existing Python setup untouched:** use the isolated installer in [Windows Install](docs/windows-install.md), which installs a dedicated Python runtime for Upload Assistant without changing your global `PATH`.
+   - **Windows users who want a managed installation:** skip the manual Python setup and use the isolated installer in [Windows Install](docs/windows-install.md). It installs its own Python runtime without changing the Python versions already on `PATH`.
 2. **MediaInfo & FFmpeg**:
    - These are helper tools used to scan files and generate screenshots/spectrograms.
-   - **Windows:**
+   - **Windows manual setup:**
      - Install [MediaInfo](https://mediaarea.net/en/MediaInfo/Download/Windows).
      - Install [FFmpeg](https://ffmpeg.org/download.html). For a step-by-step guide on how to add FFmpeg to your system's search path, see [this Windows guide](https://windowsloop.com/install-ffmpeg-windows-10/).
+     - The managed [Windows installer](docs/windows-install.md) supplies the Windows MediaInfo binary and can install FFmpeg automatically, so these packages are not required for that flow.
    - **Linux:** Install them using your system's software manager:
      - Debian/Ubuntu: `sudo apt install mediainfo ffmpeg`
      - Arch Linux: `sudo pacman -S mediainfo ffmpeg`
@@ -203,7 +204,7 @@ Choose **one** of the two options below to get the files onto your computer:
 Using Git is the recommended method because it makes updating the assistant in the future extremely easy.
 
 1. **Install Git** (if you don't already have it):
-   - **Windows:** Use the installer in [`docs/windows-install.md`](docs/windows-install.md), which downloads the codebase as a ZIP and does not require Git.
+   - **Windows:** Install [Git for Windows](https://git-scm.com/download/win).
    - **Linux:** Install via your package manager (e.g., `sudo apt install git` or `sudo pacman -S git`).
    - **macOS:** Install via Homebrew (`brew install git`) or Xcode Command Line Tools.
 2. **Clone the project**:
@@ -231,7 +232,7 @@ On Linux/macOS, open a terminal, navigate to the folder where you downloaded Upl
 pip3 install --user -U -r requirements.txt
 ```
 
-On Windows, use the [Windows installer](docs/windows-install.md), which creates its own Python environment and installs these packages automatically.
+On Windows, the managed [Windows installer](docs/windows-install.md) creates its own Python environment and installs these packages automatically. For a manual checkout, create and use a virtual environment as shown below.
 
 Discord notifications are optional and are no longer part of the default install. If you want Discord bot support, install the extra package set after the base dependencies:
 
@@ -311,13 +312,18 @@ In your terminal, run the command for your operating system and follow the on-sc
 - Or, if you downloaded the ZIP file, download a fresh ZIP from GitHub and overwrite your existing files.
 - For the managed Windows installation, run `ua-update`; it downloads a fresh ZIP and replaces the installed files.
 - Run the command to update dependencies:
-  - **Windows:** `pip install -U -r requirements.txt`
+  - **Managed Windows installation:** run `ua-update`.
   - **Linux / macOS:** `python3 -m pip install --user -U -r requirements.txt`
 - If you use the optional Discord bot integration, update that extra package set too:
-  - **Windows:** `pip install -U -r requirements-discord.txt`
+  - **Managed Windows installation:** `ua-update` preserves the optional Discord dependency when it is already installed.
   - **Linux / macOS:** `python3 -m pip install --user -U -r requirements-discord.txt`
 - Run the configuration generator to fetch any new settings:
-  - **Windows:** `python config-generator.py`
+  - **Managed Windows installation:** run the generator with the installed environment, for example:
+    ```powershell
+    cd "$HOME\tools\ua"
+    & .\.venv\Scripts\python.exe .\config-generator.py
+    ```
+    Or run `ua-config` from any folder.
   - **Linux / macOS:** `python3 config-generator.py`
 
 ## **CLI Usage:**

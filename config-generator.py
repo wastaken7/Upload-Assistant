@@ -7,11 +7,57 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
+from rich.console import Console
+from rich.text import Text
+
 from src.check_requirements import check_dependencies
 
 check_dependencies()
 
+
 from src.console import console  # noqa: E402
+
+
+class _StyledConsole:
+    """Add consistent, readable styling to this script's status messages."""
+
+    _STATUS_STYLES = {  # noqa: RUF012
+        "[OK]": ("OK", "bold green"),
+        "[i]": ("INFO", "bold cyan"),
+    }
+
+    def __init__(self, base_console: Console) -> None:
+        self._console = base_console
+
+    def print(self, message: object = "", *args: object, **kwargs: object) -> None:
+        if not isinstance(message, str):
+            self._console.print(message, *args, **kwargs)
+            return
+
+        is_heading = "====" in message and "====" in message[::-1]
+        text = Text(message.replace("[!]", "WARN").replace("[✓]", "[OK]"))
+
+        if is_heading:
+            text.stylize("bold cyan")
+
+        for marker, (label, style) in self._STATUS_STYLES.items():
+            start = 0
+            while True:
+                position = text.plain.find(marker, start)
+                if position < 0:
+                    break
+                text.plain = text.plain[:position] + label + text.plain[position + len(marker) :]
+                text.stylize(style, position, position + len(label))
+                start = position + len(label)
+
+        warning_position = text.plain.find("WARN")
+        if warning_position >= 0 and not is_heading:
+            text.stylize("bold yellow", warning_position, warning_position + 4)
+
+        self._console.print(text, *args, **kwargs)
+
+
+console = _StyledConsole(console)
 
 
 class LinkedSetting(TypedDict):
@@ -986,7 +1032,7 @@ def generate_config_file(
         if existing_path.exists():
             with Path(existing_path).open(encoding="utf-8") as src, Path(backup_path).open("w", encoding="utf-8") as dst:
                 dst.write(src.read())
-            console.print(f"\n[✓] Created backup of existing config at {backup_path}", markup=False)
+            console.print(f"\n[OK] Created backup of existing config at {backup_path}", markup=False)
     else:
         config_path = Path("data/config.py")
         backup_path = Path("data/config.py.bak")
@@ -995,7 +1041,7 @@ def generate_config_file(
             if overwrite == "y":
                 with Path(config_path).open(encoding="utf-8") as src, Path(backup_path).open("w", encoding="utf-8") as dst:
                     dst.write(src.read())
-                console.print(f"\n[✓] Created backup of existing config at {backup_path}", markup=False)
+                console.print(f"\n[OK] Created backup of existing config at {backup_path}", markup=False)
             else:
                 return False
 
@@ -1056,7 +1102,7 @@ def generate_config_file(
         write_dict(formatted_config)
         file.write("}\n")
 
-    console.print(f"\n[✓] Configuration file created at {config_path}", markup=False)
+    console.print(f"\n[OK] Configuration file created at {config_path}", markup=False)
     return True
 
 
@@ -1075,7 +1121,7 @@ if __name__ == "__main__":
     existing_config, existing_path = load_existing_config()
 
     if existing_config and example_config:
-        just_updating = input("\nExisting config found. Are you just updating to grab any new UA config options? (Y/n): ").lower()
+        just_updating = input("\nExisting config found.\n\nAre you just updating to grab any new UA config options? (Y/n): ").lower()
         if just_updating == "n":
             use_existing = input("\nWould you like to edit existing instead of starting fresh? (Y/n): ").lower()
             if use_existing == "n":

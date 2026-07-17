@@ -367,6 +367,8 @@ function Ensure-Ffmpeg {
 }
 
 function Install-RepositoryFromZip {
+    param([string[]]$PreserveDirectories = @())
+
     $parentDir = Split-Path -Parent $UaDir
     if (-not [string]::IsNullOrWhiteSpace($parentDir)) {
         New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
@@ -381,6 +383,9 @@ function Install-RepositoryFromZip {
     $zipPath = New-TemporaryDownloadPath -FileName ("UploadAssistant-" + [guid]::NewGuid().ToString("N") + ".zip")
     $extractRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantRepo-" + [guid]::NewGuid().ToString("N"))
 
+    $preserveRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantPreserve-" + [guid]::NewGuid().ToString("N"))
+    $preservedDirectories = @()
+
     try {
         Invoke-DownloadFile -Url $RepositoryZipUrl -DestinationPath $zipPath -Label "Upload Assistant"
         Write-Step "Extracting Upload Assistant"
@@ -391,14 +396,49 @@ function Install-RepositoryFromZip {
             Fail "Downloaded Upload Assistant ZIP has an unexpected layout."
         }
 
+        foreach ($directory in $PreserveDirectories) {
+            if ([string]::IsNullOrWhiteSpace($directory)) {
+                continue
+            }
+
+            $resolvedDirectory = [System.IO.Path]::GetFullPath($directory)
+            $appPrefix = $resolvedUaDir.TrimEnd('\\') + '\\'
+            if (-not $resolvedDirectory.StartsWith($appPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                continue
+            }
+
+            if (-not (Test-Path -LiteralPath $resolvedDirectory)) {
+                continue
+            }
+
+            $relativeDirectory = $resolvedDirectory.Substring($appPrefix.Length)
+            $preservedPath = Join-Path $preserveRoot $relativeDirectory
+            New-Item -ItemType Directory -Path (Split-Path -Parent $preservedPath) -Force | Out-Null
+            Move-Item -LiteralPath $resolvedDirectory -Destination $preservedPath
+            $preservedDirectories += [pscustomobject]@{
+                RelativePath = $relativeDirectory
+                PreservedPath = $preservedPath
+            }
+        }
+
         if (Test-Path -LiteralPath $resolvedUaDir) {
             Write-Step "Replacing existing Upload Assistant files"
             Remove-Item -LiteralPath $resolvedUaDir -Recurse -Force
         }
 
         Move-Item -LiteralPath $sourceDir -Destination $resolvedUaDir
+
+        foreach ($preservedDirectory in $preservedDirectories) {
+            $restorePath = Join-Path $resolvedUaDir $preservedDirectory.RelativePath
+            New-Item -ItemType Directory -Path (Split-Path -Parent $restorePath) -Force | Out-Null
+            if (Test-Path -LiteralPath $restorePath) {
+                Remove-Item -LiteralPath $restorePath -Recurse -Force
+            }
+            Move-Item -LiteralPath $preservedDirectory.PreservedPath -Destination $restorePath
+        }
     }
     finally {
+        Remove-Item -LiteralPath $preserveRoot -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $extractRoot -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
     }
@@ -544,27 +584,38 @@ function Write-GlobalLauncher {
 
     $launcherCmdPath = Join-Path $LauncherDir "ua.cmd"
     $updateCmdPath = Join-Path $LauncherDir "ua-update.cmd"
+    $configCmdPath = Join-Path $LauncherDir "ua-config.cmd"
     $launcherCmdContents = @"
 @echo off
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$UaDir\run-ua.ps1" %*
 exit /b %errorlevel%
 "@
-    $updateCmdContents = @"
+$updateCmdContents = @"
 @echo off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$UaDir\scripts\update-windows.ps1" %*
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$UaDir\scripts\update-windows.ps1" -UaDir "$UaDir" -PythonInstallDir "$PythonInstallDir" -LauncherDir "$LauncherDir" -FfmpegInstallDir "$FfmpegInstallDir" %*
 exit /b %errorlevel%
+"@
+    $configCmdContents = @"
+@echo off
+pushd "$UaDir"
+"$UaDir\.venv\Scripts\python.exe" "$UaDir\config-generator.py" %*
+set "exit_code=%errorlevel%"
+popd
+exit /b %exit_code%
 "@
 
     Remove-Item -LiteralPath (Join-Path $LauncherDir "ua.ps1") -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath (Join-Path $LauncherDir "ua-update.ps1") -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $LauncherDir "ua-config.ps1") -Force -ErrorAction SilentlyContinue
     Set-Content -LiteralPath $launcherCmdPath -Value $launcherCmdContents -Encoding ASCII
     Set-Content -LiteralPath $updateCmdPath -Value $updateCmdContents -Encoding ASCII
+    Set-Content -LiteralPath $configCmdPath -Value $configCmdContents -Encoding ASCII
     Add-DirectoryToUserPath -DirectoryPath $LauncherDir
 }
 
 $PythonExe = Ensure-IsolatedPython
 Ensure-Ffmpeg
-Install-RepositoryFromZip
+Install-RepositoryFromZip -PreserveDirectories @($PythonInstallDir, $FfmpegInstallDir)
 Install-Dependencies -PythonExe $PythonExe
 Write-Runner
 Write-GlobalLauncher
@@ -572,6 +623,7 @@ Write-GlobalLauncher
 $venvPythonPath = Join-Path $UaDir ".venv\Scripts\python.exe"
 $launcherCmdPath = Join-Path $LauncherDir "ua.cmd"
 $updateCmdPath = Join-Path $LauncherDir "ua-update.cmd"
+$configCmdPath = Join-Path $LauncherDir "ua-config.cmd"
 
 Write-Host ""
 Write-Host "Installation complete."
@@ -582,20 +634,24 @@ Write-Host ""
 Write-Host "Isolated Python:"
 Write-Host "  $PythonExe"
 Write-Host ""
+Write-Host "First step:"
+Write-Host "  Configure UA with: ua-config"
+Write-Host "  (Run this before the first upload.)"
+Write-Host ""
 Write-Host "Run:"
-Write-Host "  powershell -ExecutionPolicy Bypass -File `"$UaDir\run-ua.ps1`" `"/path/to/content`" --trackers yourtracker"
 Write-Host "  ua `"/path/to/content`" --trackers yourtracker"
 Write-Host "  ua-update"
 Write-Host ""
 Write-Host "Global launcher:"
 Write-Host "  $launcherCmdPath"
 Write-Host "  $updateCmdPath"
+Write-Host "  $configCmdPath"
 Write-Host ""
 Write-Host "PATH note:"
-Write-Host "  A new PowerShell or Command Prompt window may be required before 'ua' and 'ua-update' are available everywhere."
+Write-Host "  A new PowerShell or Command Prompt window may be required before 'ua', 'ua-update', and 'ua-config' are available everywhere."
 Write-Host ""
-Write-Host "Optional next steps:"
-Write-Host "  - Configure UA with: & `"$venvPythonPath`" `"$UaDir\config-generator.py`""
+Write-Host "Configuration command (equivalent):"
+Write-Host "  & `"$venvPythonPath`" `"$UaDir\config-generator.py`""
 if (-not $WithDiscord) {
     Write-Host "  - Enable Discord later with: & `"$venvPythonPath`" -m pip install -r `"$UaDir\requirements-discord.txt`""
 }

@@ -1,0 +1,96 @@
+name: Build Windows installer
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Tag, branch, or commit to package"
+        required: true
+        default: "development"
+        type: string
+      version:
+        description: "Version shown by the installer"
+        required: true
+        default: "development"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2025
+    env:
+      PYTHON_MINOR: "3.14"
+      FFMPEG_URL: "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.ref }}
+          fetch-depth: 0
+
+      - name: Set up Python for the Windows wheelhouse
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Prepare installer payload
+        shell: pwsh
+        env:
+          UA_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path build/payload/source | Out-Null
+          git archive --format=zip --output build/payload/source.zip HEAD
+          Expand-Archive -LiteralPath build/payload/source.zip -DestinationPath build/payload/source -Force
+
+          $index = Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/' -UseBasicParsing
+          $versions = [regex]::Matches($index.Content, "$env:PYTHON_MINOR\.\d+/") |
+            ForEach-Object { $_.Value.TrimEnd('/') } |
+            Select-Object -Unique |
+            Sort-Object { [version]$_ } -Descending
+          if (-not $versions) { throw "No Python $env:PYTHON_MINOR release was found." }
+          $pythonVersion = $versions[0]
+          Invoke-WebRequest -Uri "https://www.python.org/ftp/python/$pythonVersion/python-$pythonVersion-amd64.exe" -OutFile build/payload/python-installer.exe -UseBasicParsing
+          Invoke-WebRequest -Uri $env:FFMPEG_URL -OutFile build/payload/ffmpeg.zip -UseBasicParsing
+          python -m pip wheel --wheel-dir build/payload/wheels pip -r requirements-discord.txt
+          "UA_VERSION=$env:UA_VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          Push-Location scripts
+          try {
+            $compiler = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+            if (-not $compiler) {
+              $compiler = Get-ChildItem -Path 'C:\Program Files\Inno Setup *\ISCC.exe', 'C:\Program Files (x86)\Inno Setup *\ISCC.exe' -ErrorAction Stop |
+                Sort-Object FullName -Descending |
+                Select-Object -First 1
+            }
+            if (-not $compiler) { throw 'ISCC.exe was not found after installing Inno Setup.' }
+            & $compiler.Source windows-installer.iss
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          finally {
+            Pop-Location
+          }
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Upload-Assistant-Windows-Setup-${{ env.UA_VERSION }}
+          path: build/output/*.exe
+          if-no-files-found: error
+
+      - name: Attach installer to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/output/*.exe

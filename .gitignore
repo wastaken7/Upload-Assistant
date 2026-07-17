@@ -18,6 +18,7 @@ bin/7z/*
 bin/nyuu/*
 bin/par2/*
 bin/pesto/*
+build/
 *.mkv
 .vscode/
 __pycache__/
