@@ -217,6 +217,28 @@ function Get-PythonInstallerUrl {
     return "$PythonDownloadBaseUrl/$fullVersion/python-$fullVersion-$archName.exe"
 }
 
+function Find-InstalledPython {
+    $pythonDirectoryName = "Python" + ($PythonVersion -replace '\.', '')
+    $candidates = @(
+        (Join-Path $env:LOCALAPPDATA "Programs\Python\$pythonDirectoryName\python.exe"),
+        (Join-Path $env:ProgramFiles "Python$($PythonVersion -replace '\.', '')\python.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "Python$($PythonVersion -replace '\.', '')\python.exe")
+    )
+
+    foreach ($candidate in $candidates) {
+        if (-not (Test-Path -LiteralPath $candidate)) {
+            continue
+        }
+
+        $installedVersion = (& $candidate -c "import platform; print(platform.python_version())").Trim()
+        if (Test-PythonVersionMatch -InstalledVersion $installedVersion -RequestedVersion $PythonVersion) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
 function Test-PythonVersionMatch {
     param(
         [Parameter(Mandatory)]
@@ -348,7 +370,13 @@ function Ensure-IsolatedPython {
         )
 
     if (-not (Test-Path -LiteralPath $pythonExe)) {
-        Fail "Python installation completed, but python.exe was not created at $PythonInstallDir."
+        $existingPython = Find-InstalledPython
+        if ($existingPython) {
+            Write-Host "Python $PythonVersion is already installed at $existingPython; using it for the Upload Assistant virtual environment."
+            return $existingPython
+        }
+
+        Fail "Python installation completed, but python.exe was not created at $PythonInstallDir. The installer may have reused an existing Python installation; install Python $PythonVersion manually or remove that installation and rerun this script."
     }
 
     return $pythonExe
