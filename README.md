@@ -179,7 +179,8 @@ Upload Assistant needs a few tools installed on your computer to process media a
 
 1. **Python (version 3.14 or newer)**:
    - Download and install it from the [official Python website](https://www.python.org/downloads/).
-   - **Important (Windows users):** During installation, make sure to check the box that says **"Add python.exe to PATH"**.
+   - **Important (standard Windows setup):** During installation, make sure to check the box that says **"Add python.exe to PATH"** so the `python` and `pip` commands below work in a normal terminal.
+   - **Windows users who want to keep their existing Python setup untouched:** use the isolated installer in [Windows Install](docs/windows-install.md), which installs a dedicated Python runtime for Upload Assistant without changing your global `PATH`.
 2. **MediaInfo & FFmpeg**:
    - These are helper tools used to scan files and generate screenshots/spectrograms.
    - **Windows:**
@@ -305,6 +306,7 @@ In your terminal, run the command for your operating system and follow the on-sc
 **Additional Resources:**
 
 - Check out our [Wiki Help Page](docs/Home.md).
+- Need an isolated Windows setup that does not touch your existing Python on `PATH`? See [Windows Install](docs/windows-install.md).
 - Need a no-root Linux or seedbox setup? See [Seedbox / Linux Install](docs/seedbox.md).
 - Feel free to contact me if you need help, I'm not that hard to find.
 

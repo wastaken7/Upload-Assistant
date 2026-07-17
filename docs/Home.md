@@ -5,6 +5,7 @@
 [Install tips for Unraid](Install-and-tips-for-Unraid.md)
 
 [Seedbox / Linux Install](seedbox.md)
+[Windows Install](windows-install.md)
 
 [Discord Bot](Discord-Bot.md)
 
