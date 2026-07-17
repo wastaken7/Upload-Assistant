@@ -286,6 +286,13 @@ class Args:
             dest="game_version",
         )
         parser.add_argument(
+            "--multi",
+            dest="manual_multi",
+            action="store_true",
+            required=False,
+            help="Force a MULTI language tag for GAME releases",
+        )
+        parser.add_argument(
             "-gsc",
             "--game-subcategory",
             nargs=1,

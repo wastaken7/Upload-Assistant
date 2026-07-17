@@ -298,6 +298,7 @@ class NameManager:
         platform = str(meta.manual_platform or meta.platform or "").strip().upper()
         game_version = meta.game_version or "".strip()
         repack = meta.repack or "".strip().upper()
+        force_multi = bool(meta.manual_multi)
 
         #  language / MULTI tag
         languages: dict[str, Any] | list[Any] = meta.languages or {}
@@ -310,9 +311,11 @@ class NameManager:
         source_has_multi = "multi" in source_basename
 
         lang_tag = ""
-        if lang_count > 1 and source_has_multi:
+        if lang_count > 1 and (source_has_multi or force_multi):
             # MULTI<N> — only when the source name explicitly declares MULTI
             lang_tag = f"MULTI{lang_count}"
+        elif force_multi:
+            lang_tag = "MULTI"
         elif lang_count == 1:
             single = lang_names[0].upper()
             # Scene only tags non-English single-language releases
