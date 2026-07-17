@@ -915,6 +915,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     skip_archive = usenet_cfg.get("skip_archive", False)
     volume_size = usenet_cfg.get("rar_volume_size")
     total_size = await asyncio.to_thread(get_path_size, input_path)
+    upload_root = usenet_dir
+    cleanup_upload_root = True
+    upload_files: list[Path] = []
 
     if skip_archive:
         if archive_password:
@@ -923,25 +926,25 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 "will be created, so this upload will proceed as if no password were configured (the "
                 "password is only meaningful when compressing into a 7z/rar).[/yellow]"
             )
-        # Skip 7z entirely — copy files/dir contents straight to usenet_dir
-        logger.info("[cyan]Skipping archive step; copying files directly for upload...[/cyan]")
+        # Skip 7z entirely — upload straight from the source path to avoid
+        # duplicating large full-disc trees into the temp staging area.
+        logger.info("[cyan]Skipping archive step; uploading directly from source files...[/cyan]")
         if await aiofiles.ospath.isdir(input_path):
-            for entry in await aiofiles.os.listdir(input_path):
-                src = Path(input_path) / entry
-                dst = Path(usenet_dir) / entry
-                if src.is_file():
-                    if is_debug and not await aiofiles.ospath.exists(src):
-                        async with aiofiles.open(dst, "wb") as f:
-                            await f.write(b"mock file content")
-                    else:
-                        await asyncio.to_thread(shutil.copy2, src, dst)
+            upload_root = Path(input_path)
+            cleanup_upload_root = False
+            upload_files = [file_path for file_path in sorted(upload_root.rglob("*")) if file_path.is_file()]
         else:
-            dest_file = Path(usenet_dir) / Path(input_path).name
+            source_file = Path(input_path)
             if is_debug and not await aiofiles.ospath.exists(input_path):
+                dest_file = Path(usenet_dir) / source_file.name
                 async with aiofiles.open(dest_file, "wb") as f:
                     await f.write(b"mock single file content")
+                upload_root = usenet_dir
+                upload_files = [dest_file]
             else:
-                await asyncio.to_thread(shutil.copy2, input_path, dest_file)
+                upload_root = source_file.parent
+                cleanup_upload_root = False
+                upload_files = [source_file]
     else:
         if volume_size and volume_size.lower() == "auto":
             volume_size = get_dynamic_volume_size(total_size)
@@ -963,6 +966,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 mock_7z = f"{archive_out}.001" if volume_size else archive_out
                 async with aiofiles.open(mock_7z, "wb") as f:
                     await f.write(b"mock 7z volume content")
+                upload_files = [Path(mock_7z)]
             else:
                 await run_7z_with_progress(cmd_7z, usenet_dir, archive_name, volume_size, total_size)
         else:
@@ -975,31 +979,41 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             else:
                 await asyncio.to_thread(shutil.copy, input_path, dest_file)
 
+    if not upload_files:
+        upload_files = [file_path for file_path in sorted(Path(upload_root).rglob("*")) if file_path.is_file()]
+
     par2_percentage = usenet_cfg.get("par2_percentage", "10")
 
     # 3. PAR2 — only when using nyuu (pesto handles PAR2 internally)
     if not use_pesto:
         target_files = []
-        for f in await aiofiles.os.listdir(usenet_dir):
-            file_path = Path(usenet_dir) / f
-            if await aiofiles.ospath.isfile(file_path) and not f.endswith(".par2"):
+        for file_path in upload_files:
+            if file_path.is_file() and not file_path.name.endswith(".par2"):
                 target_files.append(file_path)
 
         if target_files:
             logger.info("[cyan]Generating PAR2 parity files...[/cyan]")
-            par2_file = f"{archive_name}.par2"
-            relative_target_files = [Path(f).name for f in target_files]
+            par2_output_dir = usenet_dir if skip_archive else upload_root
+            par2_file = str(Path(par2_output_dir) / f"{archive_name}.par2")
+            relative_target_files = [str(Path(f).relative_to(upload_root)) for f in target_files]
             # No -n/-u/-l flag: par2cmdline falls back to its default scheme of
             # exponentially-sized recovery volumes, matching standard Usenet posts
             # and letting repair tools fetch only as much recovery data as needed.
             cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", par2_file, *[str(f) for f in relative_target_files]]
             if is_debug and not path_par2:
                 logger.info(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_par2)}[/yellow]")
-                mock_par2 = os.path.normpath(Path(usenet_dir) / par2_file)
+                mock_par2 = os.path.normpath(par2_file)
                 async with aiofiles.open(mock_par2, "wb") as f:
                     await f.write(b"mock par2 content")
             else:
-                await run_par2_with_progress(cmd_par2, cwd=usenet_dir)
+                await run_par2_with_progress(cmd_par2, cwd=str(upload_root))
+
+            generated_par2_files = [
+                file_path
+                for file_path in sorted(Path(par2_output_dir).glob(f"{archive_name}.par2*"))
+                if file_path.is_file()
+            ]
+            upload_files.extend(file_path for file_path in generated_par2_files if file_path not in upload_files)
 
     # 4. Poster / From header
     random_poster = usenet_cfg.get("random_poster", True)
@@ -1027,10 +1041,13 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     nzb_file = Path(tmp_base) / uuid / f"{safe_nzb_name}.nzb"
 
     all_upload_files = []
-    for f in await aiofiles.os.listdir(usenet_dir):
-        file_path = Path(usenet_dir) / f
-        if await aiofiles.ospath.isfile(file_path):
-            all_upload_files.append(f)
+    for file_path in upload_files:
+        if not file_path.is_file():
+            continue
+        with contextlib.suppress(ValueError):
+            all_upload_files.append(str(file_path.relative_to(upload_root)))
+            continue
+        all_upload_files.append(str(file_path))
 
     logger.info(f"[yellow]Posting {len(all_upload_files)} files to Usenet via NNTP ({uploader})...[/yellow]")
 
@@ -1134,7 +1151,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 await f.write(mock_nzb_content)
         else:
             try:
-                await run_pesto_with_progress(cmd_pesto, cwd=usenet_dir)
+                await run_pesto_with_progress(cmd_pesto, cwd=str(upload_root))
             except Exception:
                 # pesto writes the NZB to --out before it knows the post-check
                 # verification failed, so a failed run can still leave a
@@ -1211,7 +1228,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 await f.write(mock_nzb_content)
         else:
             try:
-                await run_nyuu_with_progress(cmd_nyuu, cwd=usenet_dir)
+                await run_nyuu_with_progress(cmd_nyuu, cwd=str(upload_root))
             except Exception:
                 # nyuu writes the NZB progressively as files are posted, before
                 # the post-check verification (if enabled) confirms every article
@@ -1238,14 +1255,14 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
 
     # 7. Cleanup compressed volumes after successful upload
     try:
-        if await aiofiles.ospath.exists(usenet_dir):
+        if cleanup_upload_root and await aiofiles.ospath.exists(upload_root):
             if is_debug:
-                logger.info(f"[cyan][DEBUG SIMULATION] Would delete temporary Usenet folder: {usenet_dir}[/cyan]")
+                logger.info(f"[cyan][DEBUG SIMULATION] Would delete temporary Usenet folder: {upload_root}[/cyan]")
             else:
-                await asyncio.to_thread(shutil.rmtree, usenet_dir)
+                await asyncio.to_thread(shutil.rmtree, upload_root)
                 logger.info("[green]Cleaned up temporary compressed Usenet files.[/green]")
     except Exception as e:
-        logger.warning(f"[yellow]Warning: Could not clean up temporary Usenet folder '{usenet_dir}' ({e})[/yellow]")
+        logger.warning(f"[yellow]Warning: Could not clean up temporary Usenet folder '{upload_root}' ({e})[/yellow]")
 
     # 8. Relocate NZB output
     if await aiofiles.ospath.exists(nzb_file):
