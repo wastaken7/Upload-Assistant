@@ -154,6 +154,7 @@ These will parse the torrent descriptions from supported sites, and grab metadat
 - `-ulcx`, `--ulcx ID_OR_URL`: ULCX torrent id/link. (Extracts last path segment.)
 
 Thise will use the specified hash to get tracker ids from qBitTorrent or rTorrent.
+
 - `-th`, `--torrenthash HASH`: Torrent hash containing the torrent id in the comment field of the torrent.
 
 ## Upload selection / dupe / requests

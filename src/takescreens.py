@@ -894,7 +894,7 @@ async def extract_embedded_cover_from_audiobook(meta: Meta, dest_path: str, conf
         return False
 
 
-async def download_poster_from_meta(meta: Meta, cover_path: str) -> bool:
+async def download_poster_from_meta(meta: Meta, cover_path: str, *, force: bool = False) -> bool:
     poster_url = meta.poster
     if not poster_url:
         return False
@@ -902,7 +902,7 @@ async def download_poster_from_meta(meta: Meta, cover_path: str) -> bool:
     min_size = 20480
     if poster_url.startswith("http://books.google.com/") or poster_url.startswith("https://covers.openlibrary.org/b/id/"):
         min_size = 10240
-    if Path(cover_path).exists() and Path(cover_path).stat().st_size >= min_size:
+    if not force and Path(cover_path).exists() and Path(cover_path).stat().st_size >= min_size:
         meta.cover_path = cover_path
         return True
     try:
@@ -1106,6 +1106,155 @@ async def extract_epub_cover(epub_path: str, dest_path: str, confirmed_only: boo
     return await asyncio.to_thread(_extract)
 
 
+async def extract_document_cover(path: str, dest_path: str) -> bool:
+    extension = Path(path).suffix.lower().lstrip(".")
+    if extension not in {"pdf", "cbr", "cbz"}:
+        return False
+
+    output_path = Path(dest_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if extension == "pdf":
+        import fitz  # PyMuPDF
+
+        def _render_pdf_cover() -> bool:
+            with fitz.open(path) as doc:
+                if len(doc) == 0:
+                    return False
+                page = doc[0]
+                pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+                pix.save(output_path)
+                return True
+
+        try:
+            return await asyncio.to_thread(_render_pdf_cover)
+        except Exception as e:
+            logger.debug(f"[yellow]Warning: PDF cover extraction failed: {e}[/yellow]")
+            return False
+
+    import shutil
+    import zipfile
+
+    from PIL import Image
+
+    unrar_path = str(data_config.config.get("DEFAULT", {}).get("unrar_path", "") or "").strip()
+    if unrar_path:
+        import rarfile as _rarfile
+
+        os.environ["UNRAR_TOOL"] = unrar_path
+        _rarfile.CURRENT_SETUP = None
+        from rarfile import RarFile
+    else:
+        from rarfile import RarFile
+
+    temp_extract = output_path.parent / "temp_cover_extract"
+
+    def natural_sort_key(s: str) -> list[int | str]:
+        return [int(text) if text.isdigit() else text.lower() for text in re.split(r"(\d+)", s)]
+
+    def _extract_comic_cover() -> bool:
+        temp_extract.mkdir(parents=True, exist_ok=True)
+        compressed_file = None
+        try:
+            if extension == "cbz":
+                try:
+                    compressed_file = zipfile.ZipFile(path, "r")
+                except Exception:
+                    compressed_file = RarFile(path, "r")
+            else:
+                try:
+                    compressed_file = RarFile(path, "r")
+                except Exception:
+                    compressed_file = zipfile.ZipFile(path, "r")
+
+            if not compressed_file:
+                return False
+
+            image_files = [f for f in compressed_file.namelist() if f.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"))]
+            if not image_files:
+                return False
+
+            image_files.sort(key=natural_sort_key)
+            cover_name = image_files[0]
+            compressed_file.extract(cover_name, temp_extract)
+            extracted_path = temp_extract / cover_name
+
+            if extracted_path.suffix.lower() == ".png":
+                shutil.copy2(extracted_path, output_path)
+            else:
+                with Image.open(extracted_path) as img:
+                    img.save(output_path, "PNG")
+            return True
+        finally:
+            if compressed_file is not None:
+                compressed_file.close()
+            shutil.rmtree(temp_extract, ignore_errors=True)
+
+    try:
+        return await asyncio.to_thread(_extract_comic_cover)
+    except Exception as e:
+        logger.debug(f"[yellow]Warning: Comic cover extraction failed: {e}[/yellow]")
+        return False
+
+
+async def prepare_book_cover(path: str, folder_id: str, base_dir: str, meta: Meta) -> str | None:
+    output_dir = Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}").resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    cover_path = output_dir / "POSTER.png"
+
+    if Path(cover_path).exists() and Path(cover_path).stat().st_size >= 20480 and not meta.retake:
+        meta.cover_path = str(cover_path)
+        return str(cover_path)
+
+    if await load_local_cover_if_exists(path, str(cover_path)):
+        meta.cover_path = str(cover_path)
+        return str(cover_path)
+
+    if meta.audiobook:
+        extracted_confirmed = await extract_embedded_cover_from_audiobook(meta, str(cover_path), confirmed_only=True)
+        if extracted_confirmed:
+            meta.cover_path = str(cover_path)
+            logger.debug("[green]Audiobook confirmed cover extracted. Skipping API download.[/green]")
+            return str(cover_path)
+
+        downloaded_poster = await download_poster_from_meta(meta, str(cover_path), force=meta.retake)
+        if downloaded_poster:
+            meta.cover_path = str(cover_path)
+            return str(cover_path)
+
+        extracted_unconfirmed = await extract_embedded_cover_from_audiobook(meta, str(cover_path), confirmed_only=False)
+        if extracted_unconfirmed:
+            meta.cover_path = str(cover_path)
+            return str(cover_path)
+        return None
+
+    extension = Path(path).suffix.lower().lstrip(".")
+    if extension == "epub":
+        extracted_confirmed = await extract_epub_cover(path, str(cover_path), confirmed_only=True)
+        if extracted_confirmed:
+            meta.cover_path = str(cover_path)
+            logger.debug("[green]EPUB confirmed cover extracted. Skipping API download.[/green]")
+            return str(cover_path)
+
+    downloaded_poster = await download_poster_from_meta(meta, str(cover_path), force=meta.retake)
+    if downloaded_poster:
+        meta.cover_path = str(cover_path)
+        return str(cover_path)
+
+    if extension == "epub":
+        extracted_unconfirmed = await extract_epub_cover(path, str(cover_path), confirmed_only=False)
+        if extracted_unconfirmed:
+            meta.cover_path = str(cover_path)
+            return str(cover_path)
+    elif extension in {"pdf", "cbr", "cbz"}:
+        extracted_document_cover = await extract_document_cover(path, str(cover_path))
+        if extracted_document_cover:
+            meta.cover_path = str(cover_path)
+            return str(cover_path)
+
+    return None
+
+
 async def generate_ebook_screenshots(
     path: str,
     filename: str,
@@ -1147,30 +1296,9 @@ async def generate_ebook_screenshots(
     cover_cached = Path(cover_path).exists() and Path(cover_path).stat().st_size >= 20480 and not meta.retake
     banner_cached = Path(banner_path).exists() and Path(banner_path).stat().st_size > 0 and not meta.retake
 
-    if cover_cached:
-        meta.cover_path = cover_path
-        local_found = True
-        downloaded_poster = True
-    else:
-        local_found = await load_local_cover_if_exists(path, cover_path)
-        downloaded_poster = False
-        if local_found:
-            meta.cover_path = cover_path
-        else:
-            # Try confirmed extraction first for epub to skip API download
-            extracted_confirmed = False
-            if extension == "epub":
-                try:
-                    extracted_confirmed = await extract_epub_cover(path, cover_path, confirmed_only=True)
-                    if extracted_confirmed:
-                        meta.cover_path = cover_path
-                        downloaded_poster = True
-                        logger.debug("[green]EPUB confirmed cover extracted. Skipping API download.[/green]")
-                except Exception as e:
-                    logger.debug(f"[yellow]Warning: EPUB confirmed cover extraction failed: {e}[/yellow]")
-
-            if not extracted_confirmed:
-                downloaded_poster = await download_poster_from_meta(meta, cover_path)
+    prepared_cover = await prepare_book_cover(path, folder_id, base_dir, meta)
+    local_found = bool(prepared_cover)
+    downloaded_poster = bool(prepared_cover)
 
     if extension in ["cbr", "cbz"]:
         temp_extract = Path(output_dir) / "temp_compressed_extract"
@@ -1316,29 +1444,7 @@ async def screenshots(
 
     if meta.category == "BOOK":
         if meta.audiobook:
-            output_dir = str(Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}").resolve())
-            Path(output_dir).mkdir(parents=True, exist_ok=True)
-            cover_path = Path(output_dir) / "POSTER.png"
-            if Path(cover_path).exists() and Path(cover_path).stat().st_size >= 20480 and not meta.retake:
-                meta.cover_path = cover_path
-                return []
-            local_found = await load_local_cover_if_exists(path, cover_path)
-            if local_found:
-                meta.cover_path = cover_path
-            else:
-                # 1. Try to extract confirmed cover
-                extracted_confirmed = await extract_embedded_cover_from_audiobook(meta, cover_path, confirmed_only=True)
-                if extracted_confirmed:
-                    meta.cover_path = cover_path
-                    logger.debug("[green]Audiobook confirmed cover extracted. Skipping API download.[/green]")
-                else:
-                    # 2. Try download via API
-                    downloaded_poster = await download_poster_from_meta(meta, cover_path)
-                    if not downloaded_poster:
-                        # 3. Fallback to any unconfirmed embedded cover
-                        extracted_unconfirmed = await extract_embedded_cover_from_audiobook(meta, cover_path, confirmed_only=False)
-                        if extracted_unconfirmed:
-                            meta.cover_path = cover_path
+            await prepare_book_cover(path, folder_id, base_dir, meta)
             return []
         return await generate_ebook_screenshots(path, filename, folder_id, base_dir, meta, num_screens if num_screens > 0 else meta.screens)
 
@@ -2290,6 +2396,9 @@ class TakeScreensManager:
         manual_frames: str | list[int] | list[str] = "",
     ) -> list[str] | None:
         return await screenshots(path, filename, folder_id, base_dir, meta, num_screens, force_screenshots, manual_frames)
+
+    async def prepare_book_cover(self, path: str, folder_id: str, base_dir: str, meta: Meta) -> str | None:
+        return await prepare_book_cover(path, folder_id, base_dir, meta)
 
     async def capture_screenshot(self, args: tuple[int, str, float, str, float, float, float, float, str, bool, Meta]) -> tuple[int, str | None] | None:
         return await capture_screenshot(args)

@@ -1,8 +1,10 @@
+import json
 from pathlib import Path
 
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, cast
 
+from cogs.redaction import PathAwareEncoder
 from src.meta import Meta
 
 console: Any = None
@@ -130,6 +132,13 @@ class Prep:
 
         # 8. Set Final Metadata and tags
         await prep_helpers.finalize_metadata(self, meta, videopath, bdinfo, mi, filename, untouched_filename, video)
+
+        if meta.category == "BOOK":
+            await self.rehost_images_manager.takescreens_manager.prepare_book_cover(videopath, meta.uuid, meta.base_dir, meta)
+            meta_path = Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json")
+            meta_path.parent.mkdir(parents=True, exist_ok=True)
+            async with aiofiles.open(meta_path, "w", encoding="utf-8") as meta_file:
+                await meta_file.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
 
         logger.debug(f"Metadata processed in {time.time() - meta_start_time:.2f} seconds")
 

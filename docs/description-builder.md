@@ -13,37 +13,42 @@ All variables can be configured globally under the `DEFAULT` section of your con
 Below is the detailed list of configuration variables that affect description building:
 
 ### Identity & Logo Settings
-*   `add_logo` (Boolean): If set to `True`, prepends the media's logo to the description.
-    *   For `BJSHARE`, `ANTHELION`, `GREATPOSTERWALL`, `BRASILTRACKER`, `FUNFILE`, `HDSPACE`, `HDTORRENTS`, and `SPEEDAPP` trackers, the builder fetches the official TMDB logo resized to a width of 300px.
-    *   For other trackers, it uses the logo URL parsed during scraping (`meta.get("logo")`).
-*   `logo_size` (Integer/String): Target width (in pixels) for custom logo rendering. Defaults to `300`.
+
+- `add_logo` (Boolean): If set to `True`, prepends the media's logo to the description.
+  - For `BJSHARE`, `ANTHELION`, `GREATPOSTERWALL`, `BRASILTRACKER`, `FUNFILE`, `HDSPACE`, `HDTORRENTS`, and `SPEEDAPP` trackers, the builder fetches the official TMDB logo resized to a width of 300px.
+  - For other trackers, it uses the logo URL parsed during scraping (`meta.get("logo")`).
+- `logo_size` (Integer/String): Target width (in pixels) for custom logo rendering. Defaults to `300`.
 
 ### Screenshots & Media Layout
-*   `thumbnail_size` (Integer/String): Default width (in pixels) of screenshot thumbnails in the grid. Defaults to `350`.
-*   `screens_per_row` (Integer): Number of screenshots to lay out horizontally in each row of the grid. Defaults to `2`.
-    *   *Note:* For the `HAWKEUNO` tracker, the code dynamically reduces this value if the total width exceeds 1100px to maintain layout responsiveness.
-*   `multiScreens` (Integer): Number of screenshots generated per file/disc for pack uploads (multiple discs or files). Setting this to `0` disables screenshot generation for subsequent files in a pack. Defaults to `2`.
-*   `pack_thumb_size` (Integer): Thumbnail width (in pixels) for pack screenshots. Defaults to `300`.
-*   `processLimit` (Integer): The maximum number of files/discs in a pack that will be processed individually (meaning they will have screenshots generated and MediaInfo extracted). Prevents excessive resource consumption. Defaults to `10`.
-*   `fileLimit` (Integer): For multi-file torrents, specifies how many files will be listed directly in the description before nesting the remaining files under a collapsible `[spoiler=Other files]` block. Defaults to `5`.
-*   `charLimit` (Integer): Maximum string length allowed for the generated description. Used to prevent upload errors due to API character limitations. Defaults to `14000`.
+
+- `thumbnail_size` (Integer/String): Default width (in pixels) of screenshot thumbnails in the grid. Defaults to `350`.
+- `screens_per_row` (Integer): Number of screenshots to lay out horizontally in each row of the grid. Defaults to `2`.
+  - _Note:_ For the `HAWKEUNO` tracker, the code dynamically reduces this value if the total width exceeds 1100px to maintain layout responsiveness.
+- `multiScreens` (Integer): Number of screenshots generated per file/disc for pack uploads (multiple discs or files). Setting this to `0` disables screenshot generation for subsequent files in a pack. Defaults to `2`.
+- `pack_thumb_size` (Integer): Thumbnail width (in pixels) for pack screenshots. Defaults to `300`.
+- `processLimit` (Integer): The maximum number of files/discs in a pack that will be processed individually (meaning they will have screenshots generated and MediaInfo extracted). Prevents excessive resource consumption. Defaults to `10`.
+- `fileLimit` (Integer): For multi-file torrents, specifies how many files will be listed directly in the description before nesting the remaining files under a collapsible `[spoiler=Other files]` block. Defaults to `5`.
+- `charLimit` (Integer): Maximum string length allowed for the generated description. Used to prevent upload errors due to API character limitations. Defaults to `14000`.
 
 ### Custom BBCode Headers & Signatures
-*   `custom_description_header` (String): A custom BBCode block to prepend to the absolute top of any generated description.
-*   `screenshot_header` (String): Custom BBCode prepended above the screenshot section (e.g., `[center][b]Screenshots:[/b][/center]`).
-*   `disc_menu_header` (String): Custom BBCode header for disc menu screenshots.
-*   `audio_spectrogram_header` (String): Custom BBCode header for audio spectrograms (defaults to `[center][b]Audio Spectrogram[/b][/center]`).
-*   `custom_signature` (String): Custom signature appended at the absolute bottom of the description.
-*   `tonemapped_header` (String): A custom header inserted if the video is tone-mapped (`meta.get("tonemapped") == True`).
+
+- `custom_description_header` (String): A custom BBCode block to prepend to the absolute top of any generated description.
+- `screenshot_header` (String): Custom BBCode prepended above the screenshot section (e.g., `[center][b]Screenshots:[/b][/center]`).
+- `disc_menu_header` (String): Custom BBCode header for disc menu screenshots.
+- `audio_spectrogram_header` (String): Custom BBCode header for audio spectrograms (defaults to `[center][b]Audio Spectrogram[/b][/center]`).
+- `custom_signature` (String): Custom signature appended at the absolute bottom of the description.
+- `tonemapped_header` (String): A custom header inserted if the video is tone-mapped (`meta.get("tonemapped") == True`).
 
 ### Blu-ray & Physical Media Features
-*   `add_bluray_link` (Boolean): Adds a search/information URL link for physical Blu-ray releases when the media category is `BDMV` or `DVD`.
-*   `use_bluray_images` (Boolean): Includes Blu-ray/DVD retail cover images from the temporary `covers.json` file.
-*   `bluray_image_size` (Integer): Width (in pixels) of the cover images. Defaults to `250`.
+
+- `add_bluray_link` (Boolean): Adds a search/information URL link for physical Blu-ray releases when the media category is `BDMV` or `DVD`.
+- `use_bluray_images` (Boolean): Includes Blu-ray/DVD retail cover images from the temporary `covers.json` file.
+- `bluray_image_size` (Integer): Width (in pixels) of the cover images. Defaults to `250`.
 
 ### Technical Elements
-*   `episode_overview` (Boolean): If `True` and category is `TV`, retrieves the specific episode's name and overview text from API databases.
-*   `add_audio_spectrogram` (Boolean): If `True`, attaches audio spectrogram analysis images to the description.
+
+- `episode_overview` (Boolean): If `True` and category is `TV`, retrieves the specific episode's name and overview text from API databases.
+- `add_audio_spectrogram` (Boolean): If `True`, attaches audio spectrogram analysis images to the description.
 
 ---
 
@@ -75,71 +80,94 @@ graph TD
 ### Detailed Block Descriptions
 
 #### 1. Custom Header
+
 Appends the contents of the `custom_description_header` config option, if set. Useful for re-encoder group logos, warning notes, or general announcements.
 
 #### 2. Language Info
+
 Processes audio and subtitle streams. It formats these tracks inside `[code]` blocks if flags like `write_audio_languages`, `write_subtitle_languages`, or `write_hc_languages` are enabled:
+
 ```bbcode
 [code]Audio Language/s: Japanese, English[/code]
 [code]Subtitle Language/s: English[/code]
 ```
 
 #### 3. Logo Segment
+
 If `add_logo` is enabled, the logo URL is placed inside a central tag:
+
 ```bbcode
 [center][img=300]https://image.tmdb.org/t/p/w300/example_logo.png[/img][/center]
 ```
 
 #### 4. MediaInfo / BDInfo
+
 Extracts and includes technical files:
-*   Reads either a short template-based `MEDIAINFO_SHORT.txt` or a full dump `MEDIAINFO_CLEANPATH.txt`.
-*   Includes `bdinfo` summary details for BDMV inputs.
-*   Depending on the tracker, these sections are wrapped in `[pre]`, `[font]`, or `[hide]` blocks.
+
+- Reads either a short template-based `MEDIAINFO_SHORT.txt` or a full dump `MEDIAINFO_CLEANPATH.txt`.
+- Includes `bdinfo` summary details for BDMV inputs.
+- Depending on the tracker, these sections are wrapped in `[pre]`, `[font]`, or `[hide]` blocks.
 
 #### 5. Blu-ray Links & Covers
+
 If uploading a physical disc copy (`BDMV` or `DVD`) and `add_bluray_link` is active, it appends the database URL (`meta.get("release_url")`). If `use_bluray_images` is active, it formats cover images into a responsive grid with links.
 
 #### 6. TV Episode Info
+
 For `TV` category items, if `episode_overview` is enabled, it structures and formats TVMaze or TMDb season and episode synopsis texts, translating HTML formatting to BBCode.
 
 #### 7. Book/Audiobook Details
+
 Processes uploads in the `BOOK` category. It compiles fields such as Author, Translator, Narrator, Publisher, ISBN, ASIN, Edition, and Year into a clean list or `[table]`, including audiobook duration and bitrates if applicable.
 
 #### 8. Game Specifications
+
 For the `GAME` category, it renders:
+
 1.  **Technical Specs:** Platform, Game Version, Genres, Developer, Publisher, Steam link.
 2.  **Overview:** The game's description from the Steam API.
 3.  **System Requirements:** Minimum and Recommended requirements placed side by side in a `[table]` layout.
 4.  **Languages:** A detailed table of supported interface, full audio, and subtitle configurations.
 
 #### 9. API Overview / Synopsis
+
 Insert the main synopsis (description) retrieved via external APIs (TMDb, IMDb, etc.).
-*   *Aither Specifics:* If the upload is a `FraMeSToR` release, formatting is customized to clean and style the scene group's information.
-*   *MORETHANTV Specifics:* Wraps the description in `[spoiler=Notes]...[/spoiler]`.
+
+- _Aither Specifics:_ If the upload is a `FraMeSToR` release, formatting is customized to clean and style the scene group's information.
+- _MORETHANTV Specifics:_ Wraps the description in `[spoiler=Notes]...[/spoiler]`.
 
 #### 10. NFO Content
+
 Appends scene group release `.nfo` content wrapped in raw formatting blocks (like `[pre]` or `[nfo]`).
 
 #### 11. User-provided Description
+
 Inserts plain text or links supplied manually by the user via file inputs (`description_file_content`) or custom links (`description_link_content`).
 
 #### 12. Disc Menu Screenshots
+
 If the media contains screenshots taken of DVD or BDMV menus (`-menus` / `--disc-menus`), they are placed in a grid using the config's `screens_per_row` settings.
 
 #### 13. Tone-mapped Header
+
 Inserts `tonemapped_header` if the source is tone-mapped from HDR to SDR.
 
 #### 14. Screenshot Grid & Multi-file Info
+
 Handles screenshots for various content layouts:
-*   **Comparison Uploads:** Employs comparison tags `[comparison=SourceA, SourceB]` with lists of matching URLs.
-*   **Single File / Disc:** Formats a simple grid of thumbnails matching the specified parameters.
-*   **Multiple Discs / Files (Packs):** Generates layouts iteratively. Files below `fileLimit` are listed with individual spoiler tags containing their MediaInfo and respective screenshots. Files above `fileLimit` are wrapped together under `[spoiler=Other files]`.
+
+- **Comparison Uploads:** Employs comparison tags `[comparison=SourceA, SourceB]` with lists of matching URLs.
+- **Single File / Disc:** Formats a simple grid of thumbnails matching the specified parameters.
+- **Multiple Discs / Files (Packs):** Generates layouts iteratively. Files below `fileLimit` are listed with individual spoiler tags containing their MediaInfo and respective screenshots. Files above `fileLimit` are wrapped together under `[spoiler=Other files]`.
 
 #### 15. Audio Spectrograms
+
 Appends audio spectrogram analyses images in a grid format.
 
 #### 16. Signatures
+
 Appends `custom_signature` and the automated tool signature link:
+
 ```bbcode
 [center]This is my signature, it will be displayed at the bottom of every description.[/center]
 ```
@@ -150,18 +178,18 @@ Appends `custom_signature` and the automated tool signature link:
 
 Before returning the compiled string, the builder executes `tracker_specific_formats()` to scrub, replace, or convert BBCode tags that are unsupported by the destination tracker.
 
-| Tracker | Transformations Performed |
-| :--- | :--- |
-| **BRASILTRACKER** | Removes image resizing attributes (`[img=size]`) and `[list]` structures. |
-| **BJSHARE** | Converts `[spoiler]` tags to `[hide]`, removes image resize attributes, removes list tags, and formats alignments. |
-| **ANTHELION** | Removes image resizing, `[sup]`, `[sub]`, and `[list]` tags. Normalizes special typographic characters (e.g., smart quotes and dashes). |
-| **DIGITALCORE** | Removes `[user]`, `[align]`, `[alert]`, `[note]`, `[hr]`, `[ul]`, and `[ol]`. Converts headers (`[h1]`, `[h2]`, `[h3]`) to bold-underline (`[u][b]`), and converts named spoilers to standard ones. |
-| **FUNFILE** | Replaces all BBCode images and grids with raw HTML markup (`<a href="..." target="_blank"><img src="..." width="..."></a>`), centering elements, and removing spoilers/hide blocks. |
-| **GREATPOSTERWALL** | Strips hyperlink wrappers around screenshots, converting them to plain `[img]URL[/img]` images. Removes sub, sup, and list tags. |
-| **HDSPACE** | Strips colors, hides, and spoilers. If an image is hosted on a host other than Imgbox, it is forced to reside on a separate line (`\n`) to prevent broken forum grids. |
-| **HDTORRENTS** | Converts standard spoilers to `[hide]`, strips image resizing, and limits cover heights to a rigid `137px` via HTML elements. |
-| **TORRENTLEECH** | Converts BBCode centralizing to HTML `<center>`. Converts `[hr]` to `---`. Replaces screenshot blocks with pure HTML links utilizing inline CSS `style="max-width: XXXpx;"` formatting. Removes lists and spoilers. |
-| **UNIT3D (Generic)** | Converts all legacy `[hide]` blocks to `[spoiler]` for visual consistency across modern UNIT3D tracker layouts. Converts image comparisons to collapsible details tags (`[collapse]`). |
+| Tracker              | Transformations Performed                                                                                                                                                                                           |
+| :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **BRASILTRACKER**    | Removes image resizing attributes (`[img=size]`) and `[list]` structures.                                                                                                                                           |
+| **BJSHARE**          | Converts `[spoiler]` tags to `[hide]`, removes image resize attributes, removes list tags, and formats alignments.                                                                                                  |
+| **ANTHELION**        | Removes image resizing, `[sup]`, `[sub]`, and `[list]` tags. Normalizes special typographic characters (e.g., smart quotes and dashes).                                                                             |
+| **DIGITALCORE**      | Removes `[user]`, `[align]`, `[alert]`, `[note]`, `[hr]`, `[ul]`, and `[ol]`. Converts headers (`[h1]`, `[h2]`, `[h3]`) to bold-underline (`[u][b]`), and converts named spoilers to standard ones.                 |
+| **FUNFILE**          | Replaces all BBCode images and grids with raw HTML markup (`<a href="..." target="_blank"><img src="..." width="..."></a>`), centering elements, and removing spoilers/hide blocks.                                 |
+| **GREATPOSTERWALL**  | Strips hyperlink wrappers around screenshots, converting them to plain `[img]URL[/img]` images. Removes sub, sup, and list tags.                                                                                    |
+| **HDSPACE**          | Strips colors, hides, and spoilers. If an image is hosted on a host other than Imgbox, it is forced to reside on a separate line (`\n`) to prevent broken forum grids.                                              |
+| **HDTORRENTS**       | Converts standard spoilers to `[hide]`, strips image resizing, and limits cover heights to a rigid `137px` via HTML elements.                                                                                       |
+| **TORRENTLEECH**     | Converts BBCode centralizing to HTML `<center>`. Converts `[hr]` to `---`. Replaces screenshot blocks with pure HTML links utilizing inline CSS `style="max-width: XXXpx;"` formatting. Removes lists and spoilers. |
+| **UNIT3D (Generic)** | Converts all legacy `[hide]` blocks to `[spoiler]` for visual consistency across modern UNIT3D tracker layouts. Converts image comparisons to collapsible details tags (`[collapse]`).                              |
 
 ---
 
@@ -170,6 +198,7 @@ Before returning the compiled string, the builder executes `tracker_specific_for
 Here are examples of how raw description payloads generated by `DescriptionBuilder` will look before final submission.
 
 ### Example 1: Standard Movie (Movie Category)
+
 ```bbcode
 [center][img=300]https://image.tmdb.org/t/p/w300/example_logo.png[/img][/center]
 
@@ -198,6 +227,7 @@ Frame rate                     : 23.976 (24000/1001) FPS
 ```
 
 ### Example 2: TV Episode (TV Category)
+
 ```bbcode
 [center][img=300]https://image.tmdb.org/t/p/w300/series_logo.png[/img][/center]
 
@@ -215,6 +245,7 @@ Frame rate                     : 23.976 (24000/1001) FPS
 ```
 
 ### Example 3: Game Release (GAME Category)
+
 ```bbcode
 [size=3][b]Technical Details[/b][/size]
 [b]Platform[/b] PC
@@ -251,6 +282,7 @@ Storage: 15 GB available space (SSD Recommended)[/td][/tr]
 ```
 
 ### Example 4: Book/Audiobook Release (BOOK Category)
+
 ```bbcode
 [size=3][b]Technical Details[/b][/size]
 [table]

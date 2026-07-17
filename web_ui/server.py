@@ -23,9 +23,10 @@ from types import ModuleType
 from pathlib import Path
 from typing import Any, Literal, Protocol, TypedDict, cast
 from collections.abc import Callable
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 
 import web_ui.auth as auth_mod
+from src.webui_progress import ProgressEvent, clear_progress_callback, reset_progress, set_progress_callback
 
 
 def _module_name(*parts: str) -> str:
@@ -668,9 +669,6 @@ def _cleanup_duplicate_sessions(username: str) -> None:
                         p.unlink()
 
 
-# Supported video file extensions for WebUI file browser
-SUPPORTED_VIDEO_EXTS = {".mkv", ".mp4", ".ts"}
-
 # Supported description file extensions for WebUI description file browser
 SUPPORTED_DESC_EXTS = {".txt", ".nfo", ".md"}
 
@@ -1141,6 +1139,57 @@ def _set_process_awaiting_input_if_current(session_id: str, process_state: Mappi
             current_state["awaiting_input"] = waiting
 
 
+def _apply_progress_event(process_info: ProcessInfo, event: Mapping[str, object]) -> None:
+    operation = str(event.get("op", "upsert")).strip().lower()
+    if operation == "reset":
+        process_info["progress"] = {}
+        return
+
+    progress_id = str(event.get("id", "")).strip()
+    if not progress_id:
+        return
+
+    progress_map_obj = process_info.get("progress")
+    if not isinstance(progress_map_obj, dict):
+        progress_map_obj = {}
+        process_info["progress"] = progress_map_obj
+    progress_map = cast(dict[str, dict[str, object]], progress_map_obj)
+
+    current_item = dict(progress_map.get(progress_id, {}))
+    for key in ("id", "label", "detail", "status", "group", "unit", "updated_at"):
+        if key in event:
+            current_item[key] = event[key]
+    for key in ("current", "total"):
+        value = event.get(key)
+        if isinstance(value, (int, float)):
+            current_item[key] = float(value)
+    progress_map[progress_id] = current_item
+
+
+def _set_process_progress_if_current(session_id: str, process_state: Mapping[str, object], event: Mapping[str, object]) -> None:
+    with active_processes_lock:
+        current_state = active_processes.get(session_id)
+        if current_state is not process_state:
+            return
+        run_token = process_state.get("run_token")
+        if not (run_token and current_state.get("run_token") == run_token):
+            return
+        _apply_progress_event(current_state, event)
+
+
+def _progress_items_for_process(process_info: Mapping[str, object]) -> list[dict[str, object]]:
+    items: list[dict[str, object]] = []
+    with active_processes_lock:
+        progress_map_obj = process_info.get("progress")
+        if not isinstance(progress_map_obj, dict):
+            return []
+        for value in progress_map_obj.values():
+            if isinstance(value, dict):
+                items.append(dict(value))
+    items.sort(key=lambda item: (0 if str(item.get("status", "")) == "running" else 1, str(item.get("id", ""))))
+    return items
+
+
 def _make_process_state(path: str, args: str) -> dict[str, object]:
     return {
         "run_token": secrets.token_hex(8),
@@ -1149,7 +1198,29 @@ def _make_process_state(path: str, args: str) -> dict[str, object]:
         "args": args,
         "started_at": time.time(),
         "awaiting_input": False,
+        "progress": {},
     }
+
+
+def set_execution_preview_target(session_id: str, expected_run_token: str, path: str, meta_uuid: str | None = None) -> None:
+    """Update the active preview target for an in-process Web UI execution."""
+    cleaned_session_id = str(session_id or "").strip()
+    cleaned_run_token = str(expected_run_token or "").strip()
+    cleaned_path = str(path or "").strip()
+    if not cleaned_session_id or not cleaned_run_token or not cleaned_path:
+        return
+
+    with active_processes_lock:
+        process_info = active_processes.get(cleaned_session_id)
+        if process_info is None:
+            return
+        if str(process_info.get("run_token") or "").strip() != cleaned_run_token:
+            return
+        process_info["path"] = cleaned_path
+        if meta_uuid:
+            process_info["meta_uuid"] = str(meta_uuid).strip()
+        else:
+            process_info.pop("meta_uuid", None)
 
 
 def _session_state_is_current(session_id: str, process_state: Mapping[str, object]) -> bool:
@@ -1503,6 +1574,7 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
                         console.print(f"Execution preview cover enrichment failed for session {session_id}: {err}", markup=False)
             preview = _extract_execution_preview(meta_data, execution_path)
             preview["awaiting_input"] = bool(process_info.get("awaiting_input"))
+            preview["progress"] = _progress_items_for_process(process_info)
             return preview
         except Exception:  # noqa: S110
             pass
@@ -1550,6 +1622,7 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
         "game_system": "",
         "developer": "",
         "awaiting_input": bool(process_info.get("awaiting_input")),
+        "progress": _progress_items_for_process(process_info),
     }
 
 
@@ -1594,6 +1667,18 @@ class MetadataSource(TypedDict, total=False):
     label: str
     value: str
     url: str
+
+
+class ProgressItem(TypedDict, total=False):
+    id: str
+    label: str
+    current: float
+    total: float
+    detail: str
+    status: str
+    group: str
+    unit: str
+    updated_at: float
 
 
 class ExecutionPreview(TypedDict, total=False):
@@ -1641,6 +1726,7 @@ class ExecutionPreview(TypedDict, total=False):
     game_system: str
     developer: str
     awaiting_input: bool
+    progress: list[ProgressItem]
 
 
 class ConfigItem(TypedDict, total=False):
@@ -3603,15 +3689,13 @@ def browse_path():
                     # codeql[py/path-injection]
                     is_dir = Path(full_path).is_dir()
 
-                    # Skip files based on filter type
+                    # Keep description browsing limited to known text-ish files.
+                    # Default browsing should expose any file inside allowed roots
+                    # so books, games, ISOs, and other upload types are visible.
                     if not is_dir:
-                        ext = Path(item.lower()).suffix
                         if file_filter == "desc":
+                            ext = Path(item.lower()).suffix
                             if ext not in SUPPORTED_DESC_EXTS:
-                                continue
-                        else:
-                            # Default to video filter
-                            if ext not in SUPPORTED_VIDEO_EXTS:
                                 continue
 
                     items.append({"name": item, "path": str(full_path), "type": "folder" if is_dir else "file", "children": [] if is_dir else None})
@@ -3696,7 +3780,6 @@ def browse_search():
                 return False
         return True
 
-    allowed_exts = SUPPORTED_DESC_EXTS if file_filter == "desc" else SUPPORTED_VIDEO_EXTS
     items: list[BrowseItem] = []
 
     try:
@@ -3730,9 +3813,10 @@ def browse_search():
                             continue
                         if not name_matches(filename):
                             continue
-                        ext = Path(filename.lower()).suffix
-                        if ext not in allowed_exts:
-                            continue
+                        if file_filter == "desc":
+                            ext = Path(filename.lower()).suffix
+                            if ext not in SUPPORTED_DESC_EXTS:
+                                continue
                         full_path = Path(dirpath) / filename
                         try:
                             _assert_safe_resolved_path(full_path)
@@ -3971,6 +4055,9 @@ def execute_command():
 
                     # Queue to serialize print actions from the worker thread
                     render_queue: queue.Queue[tuple[Any, dict[str, Any]]] = queue.Queue()
+                    progress_event_queue: queue.Queue[None] = queue.Queue(maxsize=64)
+                    queued_progress_events: dict[str, dict[str, object]] = {}
+                    progress_queue_lock = threading.Lock()
 
                     # Cancellation event for cooperative shutdown
                     cancel_event = threading.Event()
@@ -4202,6 +4289,7 @@ def execute_command():
                                 "input_queue": input_queue,
                                 "record_console": record_console,
                                 "cancel_event": cancel_event,
+                                "progress_event_queue": progress_event_queue,
                             }
                         )
                         if not _session_state_is_current(session_id, process_state):
@@ -4209,6 +4297,24 @@ def execute_command():
 
                         # Run the upload main loop in a separate thread to avoid blocking SSE generator
                         def run_upload():
+                            def emit_progress(event: ProgressEvent) -> None:
+                                event_copy = dict(event)
+                                if not _session_state_is_current(session_id, process_state):
+                                    return
+                                _set_process_progress_if_current(session_id, process_state, event_copy)
+                                with contextlib.suppress(Exception):
+                                    progress_id = str(event_copy.get("id", "")).strip()
+                                    queue_key = progress_id or f"__event__:{event_copy.get('op', 'upsert')}"
+                                    with progress_queue_lock:
+                                        queued_progress_events[queue_key] = event_copy
+                                        while len(queued_progress_events) > 64:
+                                            oldest_key = next(iter(queued_progress_events))
+                                            queued_progress_events.pop(oldest_key, None)
+                                        try:
+                                            progress_event_queue.put_nowait(None)
+                                        except queue.Full:
+                                            pass
+
                             try:
                                 # Run the async main() entry point of upload.py
                                 import asyncio
@@ -4232,6 +4338,12 @@ def execute_command():
                                             asyncio.set_event_loop_policy(policy_class())
                                 if nonlocal_upload is None:
                                     raise RuntimeError("upload.main not available for in-process execution")
+                                set_webui_session_id = getattr(sys.modules.get("upload"), "set_webui_session_id", None)
+                                if callable(set_webui_session_id):
+                                    with contextlib.suppress(Exception):
+                                        set_webui_session_id(session_id, str(process_state.get("run_token") or ""))
+                                set_progress_callback(emit_progress)
+                                reset_progress()
                                 asyncio.run(nonlocal_upload())
                             except Exception as e:
                                 # If the exception is the cooperative cancellation marker,
@@ -4247,6 +4359,7 @@ def execute_command():
                                     with contextlib.suppress(Exception):
                                         console.print("In-process run ended", markup=False)
                             finally:
+                                clear_progress_callback()
                                 # Restore sys.argv in finally block
                                 # Restore patched console
                                 console_key = id(src_console.console)
@@ -4265,6 +4378,10 @@ def execute_command():
                                         if "orig_ask_choice" in origs and origs["orig_ask_choice"] is not None:
                                             _cli_ui.ask_choice = origs["orig_ask_choice"]
                                     del _ua_console_store[console_key]
+                                with contextlib.suppress(Exception):
+                                    set_webui_session_id = getattr(sys.modules.get("upload"), "set_webui_session_id", None)
+                                    if callable(set_webui_session_id):
+                                        set_webui_session_id(None)
                                 # Release lock to allow next inproc run
                                 inproc_lock.release()
 
@@ -4285,7 +4402,24 @@ def execute_command():
                         # single exported snapshot.
                         last_body = ""
                         try:
+
+                            def _drain_progress_events() -> Iterator[str]:
+                                while True:
+                                    try:
+                                        progress_event_queue.get_nowait()
+                                    except queue.Empty:
+                                        break
+                                with progress_queue_lock:
+                                    pending_events = list(queued_progress_events.values())
+                                    queued_progress_events.clear()
+                                for progress_event in pending_events:
+                                    yield f"data: {json.dumps({'type': 'progress', 'data': progress_event})}\n\n"
+
                             while worker.is_alive():
+                                sent_progress = False
+                                for progress_sse in _drain_progress_events():
+                                    sent_progress = True
+                                    yield progress_sse
                                 try:
                                     # Wait for the next print event (blocks briefly). This
                                     # prevents the generator from busy-waiting and tying up
@@ -4313,6 +4447,8 @@ def execute_command():
                                         last_body = body
                                         yield f"data: {json.dumps({'type': 'html_full', 'data': body})}\n\n"
                                 except queue.Empty:
+                                    if sent_progress:
+                                        continue
                                     # No print activity within the timeout — send a keepalive
                                     # to keep the SSE connection alive without busy-waiting.
                                     yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
@@ -4328,6 +4464,9 @@ def execute_command():
                                     break
                                 with contextlib.suppress(Exception):
                                     record_console.print(*r_args, **r_kwargs)
+
+                            for progress_sse in _drain_progress_events():
+                                yield progress_sse
 
                             with contextlib.suppress(Exception):
                                 html_doc = record_console.export_html(inline_styles=True)

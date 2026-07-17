@@ -14,19 +14,20 @@ This guide explains how to run the Upload Assistant WebUI inside Docker (includi
 
 ## Recommended environment variables (WebUI)
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PUID` | No | UID to run the app as (e.g. `1000`). The entrypoint starts as root, fixes directory ownership, then drops to this UID. If omitted the app runs as root. |
-| `PGID` | No | GID to run the app as (e.g. `1000`). Used together with `PUID`. |
-| `UA_BROWSE_ROOTS` | **Yes** (Docker) | Comma-separated list of allowed container-side browse roots. **Required in Docker** because the command uses `--webui` only (no paths); without it the app would use a dummy path and the file browser would not work. When running as a script, you can instead pass paths on the command line. Use the **right side** (container path) of each `volumes:` entry (`host:container`). Enables granular access: mount a volume but only expose selected paths to the WebUI (e.g. omit `/torrent_storage_dir`). |
-| `SESSION_SECRET` | No | Raw session secret string (minimum 32 bytes). Keeps encrypted WebUI credentials valid across container recreates. |
-| `SESSION_SECRET_FILE` | No | Path to a file containing the session secret (minimum 32 bytes, hex-encoded or plain text). Example: `/Upload-Assistant/data/session_secret`. The file must be readable by the container. |
-| `IN_DOCKER` | No | Force container detection (`1`, `true`, or `yes`). Auto-detected in most cases via `/.dockerenv` and cgroup inspection. `RUNNING_IN_CONTAINER` is accepted as an alias. |
-| `UA_WEBUI_CORS_ORIGINS` | No | Comma-separated CORS origins. Only needed if you serve the UI from a different origin than the API. |
-| `XDG_CONFIG_HOME` | No | Override the XDG config directory. Default inside the container is `/root/.config`. The app stores `session_secret` and `webui_auth.json` under `$XDG_CONFIG_HOME/upload-assistant/`. |
-| `UA_WEBUI_USE_SUBPROCESS` | No | When set (any non-empty value), forces the WebUI to run upload jobs as subprocesses instead of in-process. |
+| Variable                  | Required         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PUID`                    | No               | UID to run the app as (e.g. `1000`). The entrypoint starts as root, fixes directory ownership, then drops to this UID. If omitted the app runs as root.                                                                                                                                                                                                                                                                                                                                                       |
+| `PGID`                    | No               | GID to run the app as (e.g. `1000`). Used together with `PUID`.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `UA_BROWSE_ROOTS`         | **Yes** (Docker) | Comma-separated list of allowed container-side browse roots. **Required in Docker** because the command uses `--webui` only (no paths); without it the app would use a dummy path and the file browser would not work. When running as a script, you can instead pass paths on the command line. Use the **right side** (container path) of each `volumes:` entry (`host:container`). Enables granular access: mount a volume but only expose selected paths to the WebUI (e.g. omit `/torrent_storage_dir`). |
+| `SESSION_SECRET`          | No               | Raw session secret string (minimum 32 bytes). Keeps encrypted WebUI credentials valid across container recreates.                                                                                                                                                                                                                                                                                                                                                                                             |
+| `SESSION_SECRET_FILE`     | No               | Path to a file containing the session secret (minimum 32 bytes, hex-encoded or plain text). Example: `/Upload-Assistant/data/session_secret`. The file must be readable by the container.                                                                                                                                                                                                                                                                                                                     |
+| `IN_DOCKER`               | No               | Force container detection (`1`, `true`, or `yes`). Auto-detected in most cases via `/.dockerenv` and cgroup inspection. `RUNNING_IN_CONTAINER` is accepted as an alias.                                                                                                                                                                                                                                                                                                                                       |
+| `UA_WEBUI_CORS_ORIGINS`   | No               | Comma-separated CORS origins. Only needed if you serve the UI from a different origin than the API.                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `XDG_CONFIG_HOME`         | No               | Override the XDG config directory. Default inside the container is `/root/.config`. The app stores `session_secret` and `webui_auth.json` under `$XDG_CONFIG_HOME/upload-assistant/`.                                                                                                                                                                                                                                                                                                                         |
+| `UA_WEBUI_USE_SUBPROCESS` | No               | When set (any non-empty value), forces the WebUI to run upload jobs as subprocesses instead of in-process.                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 Notes:
+
 - **PUID/PGID** are the recommended way to run as non-root. Do **not** use Docker's `user:` directive — it starts the process directly as that UID without root access, so the entrypoint cannot fix ownership of freshly-created mount directories.
 - Provide **either** `SESSION_SECRET` or `SESSION_SECRET_FILE`, not both. If neither is set the app auto-generates a secret on first run and persists it to the config directory.
 - When running inside a container the WebUI prefers the per-user XDG config directory for storing `session_secret` and `webui_auth.json`. By default that will be `/root/.config/upload-assistant` inside the container. If you prefer the repository `data/` path, set `SESSION_SECRET_FILE` to a path you mount into the container (for example `/Upload-Assistant/data/session_secret`).
@@ -40,7 +41,7 @@ Mount a host directory for the app `data` (recommended). On the first WebUI star
 
 - `/host/path/Upload-Assistant/data:/Upload-Assistant/data:rw`
 
-> **Tip:** Mounting the whole `data/` directory is preferred over mounting a single `config.py` file. If you mount a single file and it doesn't exist on the host, Docker silently creates an empty *directory* at the mount point, which breaks the application.
+> **Tip:** Mounting the whole `data/` directory is preferred over mounting a single `config.py` file. If you mount a single file and it doesn't exist on the host, Docker silently creates an empty _directory_ at the mount point, which breaks the application.
 
 Optional mounts (recommended for persistence and predictable behavior):
 
@@ -92,16 +93,17 @@ services:
       start_period: 10s
       retries: 3
     networks:
-      - yournetwork  # change to the network with your torrent client
+      - yournetwork # change to the network with your torrent client
 
 networks:
-  yournetwork:  # change to your network
+  yournetwork: # change to your network
     external: true
 ```
 
 Notes:
+
 - **Mounting the data directory** (recommended): mount the whole `data/` folder. On the first WebUI start, the app automatically creates a default `config.py` from the built-in example. You can then edit it via the WebUI config editor.
-- **Mounting a single file**: if you prefer to mount just `config.py`, the file **must exist** on the host first. If the host file is missing, Docker creates an empty *directory* at that path instead of a file, which breaks the application.
+- **Mounting a single file**: if you prefer to mount just `config.py`, the file **must exist** on the host first. If the host file is missing, Docker creates an empty _directory_ at that path instead of a file, which breaks the application.
 - If you want LAN access, change `127.0.0.1:5000:5000` to `0.0.0.0:5000:5000` in `ports` (or simply `"5000:5000"`). Consider running behind a reverse proxy with TLS when exposed.
 - For Unraid users who prefer `br0` or a custom network, set `networks` accordingly.
 - The network must be `external: true` if it already exists (e.g. shared with your torrent client). Use `driver: bridge` if you want Compose to create a new one.
@@ -196,6 +198,7 @@ python upload.py --webui 0.0.0.0:5000
 The CLI starts the same WebUI the packaged container uses (it runs the server via `waitress`).
 
 Notes:
+
 - The WebUI will use `UA_BROWSE_ROOTS` (environment) if set; otherwise it will derive browse roots from command-line paths you pass to `upload.py`. When running in Docker with `--webui` only and no paths, the app would otherwise use a dummy path — the file browser would not work, so `UA_BROWSE_ROOTS` is required.
 - Use the `--webui=HOST:PORT` form when you want the WebUI to run exclusively (the process will not continue with uploads).
 

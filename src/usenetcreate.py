@@ -18,6 +18,7 @@ from rich.progress import BarColumn, Progress, TaskID, TaskProgressColumn, TextC
 
 from src.console import console, logger
 from src.meta import Meta
+from src.webui_progress import complete_progress, publish_progress
 
 
 def generate_random_poster() -> str:
@@ -373,6 +374,7 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None) -> None
     progress_re = re.compile(r"Article posting progress: \d+ read, (\d+) posted(?:, (\d+) checked)?")
 
     try:
+        publish_progress("nyuu-upload", "Posting to Usenet", current=0, total=100, detail="Starting nyuu upload")
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, cwd=cwd)
 
         stdout_accum = []
@@ -409,24 +411,39 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None) -> None
                         checked = int(checked)
                         pct = ((checked + posted) / 2) / total_articles * 100
                         description = "Verifying articles on server" if posted >= total_articles else "Posting & verifying to Usenet"
+                        detail = f"{posted}/{total_articles} posted, {checked}/{total_articles} checked"
                     else:
                         pct = posted / total_articles * 100
                         description = "Posting to Usenet"
+                        detail = f"{posted}/{total_articles} posted"
                     if "upload" not in tasks:
                         tasks["upload"] = progress.add_task(description, total=100)
                     progress.update(tasks["upload"], description=description, completed=pct)
+                    publish_progress("nyuu-upload", description, current=pct, total=100, detail=detail)
 
-            if "upload" in tasks:
-                progress.update(tasks["upload"], completed=100)
+        result = await process.wait()
 
-        await process.wait()
+        if result == 0 and "upload" in tasks:
+            progress.update(tasks["upload"], completed=100)
+            complete_progress(
+                "nyuu-upload", "Posting to Usenet", current=100, total=100, detail=f"{total_articles}/{total_articles} articles processed" if total_articles else ""
+            )
+        elif "upload" in tasks:
+            publish_progress(
+                "nyuu-upload",
+                "Posting to Usenet",
+                current=0,
+                total=100,
+                detail=f"Nyuu exited with status code {result}",
+                status="failed",
+            )
 
-        if process.returncode != 0:
+        if result != 0:
             logger.error(f"[red]Error running Nyuu Uploader (exit code {process.returncode}):[/red]")
             stdout_str = "".join(stdout_accum)
             if stdout_str:
                 logger.info(f"[red]OUTPUT:[/red]\n{stdout_str}")
-            raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
+            raise RuntimeError(f"Command '{redacted_str}' failed with exit code {result}")
 
     except Exception as e:
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
@@ -452,6 +469,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
     logger.debug(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
 
     try:
+        publish_progress("pesto-upload", "Posting to Usenet", current=0, total=100, detail="Starting pesto upload")
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -486,6 +504,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
         # gets its own persistent Progress row instead of sharing one
         # overwritten line, so they don't stomp on each other visually.
         tasks: dict[str, TaskID] = {}
+        check_done_seen = False
         with Progress(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
@@ -509,6 +528,10 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                             tasks["upload"] = progress.add_task("Posting to Usenet", total=100)
                         progress.update(tasks["upload"], completed=pct)
                         check_expected_total = event.get("total_segments", check_expected_total)
+                        total_segments = int(event.get("total_segments", 0) or 0)
+                        done_segments = int(event.get("segment_done", 0) or 0)
+                        detail = f"{done_segments}/{total_segments} segments posted" if total_segments else ""
+                        publish_progress("pesto-upload", "Posting to Usenet", current=pct, total=100, detail=detail)
                     elif etype == "status":
                         text = event.get("text", "").strip()
                         if text:
@@ -522,22 +545,34 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                             tasks["par2_encode"] = progress.add_task("Calculating PAR2 parity", total=total or 1)
                         else:
                             progress.update(tasks["par2_encode"], total=total or 1, completed=0)
+                        publish_progress("pesto-par2-encode", "Calculating PAR2 parity", current=0, total=total or 1, unit="steps")
                     elif etype == "par2_encode_progress":
                         done = event.get("done", 0)
                         total = event.get("total", 0) or 1
                         if "par2_encode" not in tasks:
                             tasks["par2_encode"] = progress.add_task("Calculating PAR2 parity", total=total)
                         progress.update(tasks["par2_encode"], total=total, completed=done)
+                        publish_progress("pesto-par2-encode", "Calculating PAR2 parity", current=done, total=total, detail=f"{done}/{total} slices", unit="steps")
                     elif etype == "par2_write_started":
                         total = event.get("total", 0)
                         if "par2_write" not in tasks:
                             tasks["par2_write"] = progress.add_task("Writing PAR2 recovery files", total=total or 1)
                         else:
                             progress.update(tasks["par2_write"], total=total or 1, completed=0)
+                        publish_progress("pesto-par2-write", "Writing PAR2 recovery files", current=0, total=total or 1, unit="steps")
                     elif etype == "par2_slice_written":
                         if "par2_write" not in tasks:
                             tasks["par2_write"] = progress.add_task("Writing PAR2 recovery files", total=1)
                         progress.advance(tasks["par2_write"])
+                        task_data = progress.tasks[tasks["par2_write"]]
+                        publish_progress(
+                            "pesto-par2-write",
+                            "Writing PAR2 recovery files",
+                            current=task_data.completed,
+                            total=task_data.total or 1,
+                            detail=f"{int(task_data.completed)}/{int(task_data.total or 1)} slices",
+                            unit="steps",
+                        )
                     elif etype == "check_progress":
                         # pesto >=0.3.51 streams the STAT check concurrently
                         # with the upload instead of running it as its own
@@ -559,7 +594,16 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                         if check_missing_count:
                             description += f" ({check_missing_count} failed so far)"
                         progress.update(tasks["check"], description=description, completed=checked)
+                        publish_progress(
+                            "pesto-check",
+                            description,
+                            current=checked,
+                            total=check_expected_total or checked or 1,
+                            detail=f"{checked}/{check_expected_total or checked or 1} checked",
+                            unit="steps",
+                        )
                     elif etype == "check_done":
+                        check_done_seen = True
                         failed = event.get("failed", 0)
                         check_missing_count = failed
                         if "check" in tasks:
@@ -577,20 +621,86 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                 except json.JSONDecodeError:
                     pass
 
+        await stderr_task
+        result = await process.wait()
+
+        if result == 0:
             if "upload" in tasks:
                 progress.update(tasks["upload"], completed=100)
+                complete_progress("pesto-upload", "Posting to Usenet", current=100, total=100)
+            if "par2_encode" in tasks:
+                task_data = progress.tasks[tasks["par2_encode"]]
+                complete_progress(
+                    "pesto-par2-encode",
+                    "Calculating PAR2 parity",
+                    current=task_data.completed,
+                    total=task_data.total or task_data.completed or 1,
+                    detail=f"{int(task_data.completed)}/{int(task_data.total or task_data.completed or 1)} slices",
+                    unit="steps",
+                )
+            if "par2_write" in tasks:
+                task_data = progress.tasks[tasks["par2_write"]]
+                complete_progress(
+                    "pesto-par2-write",
+                    "Writing PAR2 recovery files",
+                    current=task_data.completed,
+                    total=task_data.total or task_data.completed or 1,
+                    detail=f"{int(task_data.completed)}/{int(task_data.total or task_data.completed or 1)} slices",
+                    unit="steps",
+                )
+            if check_done_seen:
+                complete_progress(
+                    "pesto-check",
+                    "Verifying articles on server",
+                    current=check_expected_total or check_checked_total or 1,
+                    total=check_expected_total or check_checked_total or 1,
+                    detail="All articles verified" if not check_missing_count else f"{check_missing_count} article(s) still missing",
+                    unit="steps",
+                )
+        else:
+            if "upload" in tasks:
+                publish_progress("pesto-upload", "Posting to Usenet", current=0, total=100, detail=f"Pesto exited with status code {result}", status="failed")
+            if "par2_encode" in tasks:
+                task_data = progress.tasks[tasks["par2_encode"]]
+                publish_progress(
+                    "pesto-par2-encode",
+                    "Calculating PAR2 parity",
+                    current=task_data.completed,
+                    total=task_data.total or task_data.completed or 1,
+                    detail=f"Pesto exited with status code {result}",
+                    status="failed",
+                    unit="steps",
+                )
+            if "par2_write" in tasks:
+                task_data = progress.tasks[tasks["par2_write"]]
+                publish_progress(
+                    "pesto-par2-write",
+                    "Writing PAR2 recovery files",
+                    current=task_data.completed,
+                    total=task_data.total or task_data.completed or 1,
+                    detail=f"Pesto exited with status code {result}",
+                    status="failed",
+                    unit="steps",
+                )
+            if "check" in tasks or check_done_seen:
+                publish_progress(
+                    "pesto-check",
+                    "Verifying articles on server",
+                    current=check_checked_total,
+                    total=check_expected_total or check_checked_total or 1,
+                    detail=f"Pesto exited with status code {result}",
+                    status="failed",
+                    unit="steps",
+                )
 
-        await stderr_task
-        await process.wait()
-
-        if process.returncode != 0:
+        if result != 0:
             if check_missing_count > 0:
                 logger.info(f"[red]Pesto could not confirm {check_missing_count} article(s) on the server after reposting — the NZB is incomplete and will be discarded.[/red]")
-            logger.error(f"[red]Error running Pesto Uploader (exit code {process.returncode}):[/red]")
+            logger.error(f"[red]Error running Pesto Uploader (exit code {result}):[/red]")
             stderr_str = "".join(stderr_accum)
             if stderr_str:
                 logger.info(f"[red]STDERR:[/red]\n{stderr_str}")
-            raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
+            raise RuntimeError(f"Command '{redacted_str}' failed with exit code {result}")
 
     except Exception as e:
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e

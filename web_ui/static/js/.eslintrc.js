@@ -4,23 +4,22 @@ module.exports = {
   parserOptions: {
     ecmaVersion: 2022,
     sourceType: "module",
-    ecmaFeatures: { jsx: true }
+    ecmaFeatures: { jsx: true },
   },
   plugins: ["react", "react-hooks"],
-  extends: ["eslint:recommended", "plugin:react/recommended"],
+  extends: ["eslint:recommended", "plugin:react/recommended", "prettier"],
   rules: {
     // project-specific overrides
-    'react/prop-types': 'off'
-    ,
+    "react/prop-types": "off",
     // New JSX transform doesn't require React in scope
-    'react/react-in-jsx-scope': 'off'
+    "react/react-in-jsx-scope": "off",
   },
   settings: { react: { version: "detect" } },
   globals: {
-    React: 'readonly',
-    ReactDOM: 'readonly',
-    DOMPurify: 'readonly',
-    QRCode: 'readonly',
-    API_BASE: 'readonly'
-  }
+    React: "readonly",
+    ReactDOM: "readonly",
+    DOMPurify: "readonly",
+    QRCode: "readonly",
+    API_BASE: "readonly",
+  },
 };
