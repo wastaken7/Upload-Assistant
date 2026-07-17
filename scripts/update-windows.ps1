@@ -2,10 +2,12 @@
 param(
     [string]$UaDir = (Split-Path -Parent $PSScriptRoot),
     [string]$PythonVersion = "3.14",
-    [string]$PythonPackageId = "Python.Python.3.14",
     [string]$PythonInstallDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\python\3.14"),
     [string]$LauncherDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\bin"),
-    [string]$FfmpegPackageId = "Gyan.FFmpeg",
+    [string]$FfmpegInstallDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\ffmpeg"),
+    [string]$PythonDownloadBaseUrl = "https://www.python.org/ftp/python",
+    [string]$GitReleaseApiUrl = "https://api.github.com/repos/git-for-windows/git/releases/latest",
+    [string]$FfmpegDownloadUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
     [switch]$ForceUpdate,
     [switch]$SkipFfmpegInstall
 )
@@ -34,10 +36,12 @@ if (-not (Test-Path -LiteralPath $gitDir)) {
 $installArguments = @{
     UaDir = $resolvedUaDir
     PythonVersion = $PythonVersion
-    PythonPackageId = $PythonPackageId
     PythonInstallDir = $PythonInstallDir
     LauncherDir = $LauncherDir
-    FfmpegPackageId = $FfmpegPackageId
+    FfmpegInstallDir = $FfmpegInstallDir
+    PythonDownloadBaseUrl = $PythonDownloadBaseUrl
+    GitReleaseApiUrl = $GitReleaseApiUrl
+    FfmpegDownloadUrl = $FfmpegDownloadUrl
 }
 
 if ($ForceUpdate) {

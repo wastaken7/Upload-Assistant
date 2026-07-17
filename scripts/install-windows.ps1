@@ -2,10 +2,12 @@
 param(
     [string]$UaDir = (Join-Path $HOME "tools\ua"),
     [string]$PythonVersion = "3.14",
-    [string]$PythonPackageId = "Python.Python.3.14",
     [string]$PythonInstallDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\python\3.14"),
     [string]$LauncherDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\bin"),
-    [string]$FfmpegPackageId = "Gyan.FFmpeg",
+    [string]$FfmpegInstallDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\ffmpeg"),
+    [string]$PythonDownloadBaseUrl = "https://www.python.org/ftp/python",
+    [string]$GitReleaseApiUrl = "https://api.github.com/repos/git-for-windows/git/releases/latest",
+    [string]$FfmpegDownloadUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
     [switch]$WithDiscord,
     [switch]$ForceUpdate,
     [switch]$SkipFfmpegInstall
@@ -46,31 +48,21 @@ function ConvertTo-ProcessArgumentString {
     return [string]::Join(' ', $escapedArguments)
 }
 
-function Invoke-WingetInstall {
+function Invoke-ExternalProcess {
     param(
         [Parameter(Mandatory)]
-        [string]$PackageId,
+        [string]$FilePath,
 
         [Parameter(Mandatory)]
         [string]$Label,
 
-        [string[]]$ExtraArgs = @(),
+        [string[]]$Arguments = @(),
 
         [int]$TimeoutSeconds = 1800
     )
 
-    $arguments = @(
-        "install",
-        "--id", $PackageId,
-        "--exact",
-        "--silent",
-        "--accept-source-agreements",
-        "--accept-package-agreements"
-    ) + $ExtraArgs
-
-    Write-Step "Installing $Label with winget"
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $startInfo.FileName = "winget.exe"
+    $startInfo.FileName = $FilePath
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
@@ -85,15 +77,15 @@ function Invoke-WingetInstall {
         $startInfo.Arguments = ConvertTo-ProcessArgumentString -Arguments $arguments
     }
 
-    $wingetProcess = $null
+    $process = $null
     $stdoutHandler = $null
     $stderrHandler = $null
 
     try {
         $stdoutBuilder = [System.Text.StringBuilder]::new()
         $stderrBuilder = [System.Text.StringBuilder]::new()
-        $wingetProcess = [System.Diagnostics.Process]::new()
-        $wingetProcess.StartInfo = $startInfo
+        $process = [System.Diagnostics.Process]::new()
+        $process.StartInfo = $startInfo
 
         $stdoutHandler = [System.Diagnostics.DataReceivedEventHandler]{
             param($sender, $eventArgs)
@@ -108,24 +100,24 @@ function Invoke-WingetInstall {
             }
         }
 
-        $wingetProcess.add_OutputDataReceived($stdoutHandler)
-        $wingetProcess.add_ErrorDataReceived($stderrHandler)
-        [void]$wingetProcess.Start()
-        $wingetProcess.BeginOutputReadLine()
-        $wingetProcess.BeginErrorReadLine()
+        $process.add_OutputDataReceived($stdoutHandler)
+        $process.add_ErrorDataReceived($stderrHandler)
+        [void]$process.Start()
+        $process.BeginOutputReadLine()
+        $process.BeginErrorReadLine()
 
-        if (-not $wingetProcess.WaitForExit($TimeoutSeconds * 1000)) {
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
             try {
-                $wingetProcess.Kill()
-                $wingetProcess.WaitForExit()
+                $process.Kill()
+                $process.WaitForExit()
             }
             catch {
             }
 
-            Fail "winget timed out while installing $Label after $TimeoutSeconds seconds (package: $PackageId)"
+            Fail "$Label timed out after $TimeoutSeconds seconds"
         }
 
-        $wingetProcess.WaitForExit()
+        $process.WaitForExit()
 
         if ($stdoutBuilder.Length -gt 0) {
             $stdoutBuilder.ToString().TrimEnd("`r", "`n") | Write-Host
@@ -135,23 +127,132 @@ function Invoke-WingetInstall {
             $stderrBuilder.ToString().TrimEnd("`r", "`n") | Write-Host
         }
 
-        if ($wingetProcess.ExitCode -ne 0) {
-            Fail "winget failed while installing $Label (package: $PackageId)"
+        if ($process.ExitCode -ne 0) {
+            Fail "$Label failed with exit code $($process.ExitCode)"
         }
     }
     finally {
-        if ($null -ne $wingetProcess) {
+        if ($null -ne $process) {
             if ($null -ne $stdoutHandler) {
-                $wingetProcess.remove_OutputDataReceived($stdoutHandler)
+                $process.remove_OutputDataReceived($stdoutHandler)
             }
 
             if ($null -ne $stderrHandler) {
-                $wingetProcess.remove_ErrorDataReceived($stderrHandler)
+                $process.remove_ErrorDataReceived($stderrHandler)
             }
 
-            $wingetProcess.Dispose()
+            $process.Dispose()
         }
     }
+}
+
+function New-TemporaryDownloadPath {
+    param(
+        [Parameter(Mandatory)]
+        [string]$FileName
+    )
+
+    $downloadDir = Join-Path ([System.IO.Path]::GetTempPath()) "UploadAssistantDownloads"
+    New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
+    return Join-Path $downloadDir $FileName
+}
+
+function Invoke-CompatibleWebRequest {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Url,
+
+        [string]$DestinationPath
+    )
+
+    $requestParams = @{
+        Uri = $Url
+    }
+
+    if ($PSVersionTable.PSVersion.Major -lt 6) {
+        $requestParams.UseBasicParsing = $true
+    }
+
+    if ($DestinationPath) {
+        $requestParams.OutFile = $DestinationPath
+    }
+
+    return Invoke-WebRequest @requestParams
+}
+
+function Invoke-DownloadFile {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Url,
+
+        [Parameter(Mandatory)]
+        [string]$DestinationPath,
+
+        [Parameter(Mandatory)]
+        [string]$Label
+    )
+
+    Write-Step "Downloading $Label"
+    Invoke-CompatibleWebRequest -Url $Url -DestinationPath $DestinationPath | Out-Null
+}
+
+function Get-OsArchitectureName {
+    $osArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+    switch ($osArchitecture) {
+        ([System.Runtime.InteropServices.Architecture]::X64) { return "amd64" }
+        ([System.Runtime.InteropServices.Architecture]::Arm64) { return "arm64" }
+        default { Fail "Unsupported Windows architecture: $osArchitecture" }
+    }
+}
+
+function Resolve-LatestPythonPatchVersion {
+    param([Parameter(Mandatory)][string]$MinorVersion)
+
+    if ($MinorVersion -match '^\d+\.\d+\.\d+$') {
+        return $MinorVersion
+    }
+
+    if ($MinorVersion -notmatch '^\d+\.\d+$') {
+        Fail "PythonVersion must use major.minor or major.minor.patch format."
+    }
+
+    $indexUrl = "$PythonDownloadBaseUrl/"
+    $response = Invoke-CompatibleWebRequest -Url $indexUrl
+    $versionPattern = [regex]::Escape($MinorVersion) + '\.\d+/'
+    $matches = [regex]::Matches($response.Content, $versionPattern)
+
+    if ($matches.Count -eq 0) {
+        Fail "Could not find a Python $MinorVersion release in $indexUrl"
+    }
+
+    $versions = @(
+        foreach ($match in $matches) {
+            $match.Value.TrimEnd('/')
+        }
+    ) | Select-Object -Unique
+
+    return ($versions | Sort-Object { [version]$_ } -Descending | Select-Object -First 1)
+}
+
+function Get-PythonInstallerUrl {
+    $fullVersion = Resolve-LatestPythonPatchVersion -MinorVersion $PythonVersion
+    $archName = Get-OsArchitectureName
+    return "$PythonDownloadBaseUrl/$fullVersion/python-$fullVersion-$archName.exe"
+}
+
+function Get-GitInstallerUrl {
+    $response = Invoke-RestMethod -Uri $GitReleaseApiUrl -Headers @{ "User-Agent" = "Upload-Assistant" }
+    $assetPattern = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture) {
+        ([System.Runtime.InteropServices.Architecture]::Arm64) { '^Git-.*-arm64\.exe$' }
+        default { '^Git-.*-64-bit\.exe$' }
+    }
+
+    $asset = $response.assets | Where-Object { $_.name -match $assetPattern } | Select-Object -First 1
+    if (-not $asset) {
+        Fail "Could not find a matching Git for Windows installer in the latest release."
+    }
+
+    return $asset.browser_download_url
 }
 
 function Resolve-CommandPath {
@@ -188,7 +289,24 @@ function Ensure-Git {
         return $gitExe
     }
 
-    Invoke-WingetInstall -PackageId "Git.Git" -Label "Git"
+    $gitInstallerUrl = Get-GitInstallerUrl
+    $gitInstallerPath = New-TemporaryDownloadPath -FileName ([System.IO.Path]::GetFileName(([System.Uri]$gitInstallerUrl).AbsolutePath))
+    Invoke-DownloadFile -Url $gitInstallerUrl -DestinationPath $gitInstallerPath -Label "Git for Windows"
+    Write-Step "Installing Git for Windows"
+    Invoke-ExternalProcess `
+        -FilePath $gitInstallerPath `
+        -Label "Git for Windows installer" `
+        -Arguments @(
+            "/VERYSILENT",
+            "/NORESTART",
+            "/NOCANCEL",
+            "/SP-",
+            "/CURRENTUSER",
+            "/SUPPRESSMSGBOXES",
+            "/CLOSEAPPLICATIONS",
+            "/RESTARTAPPLICATIONS",
+            "/o:PathOption=Cmd"
+        )
 
     $gitExe = Resolve-CommandPath -CommandName "git.exe" -CandidatePaths $gitCandidates
     if (-not $gitExe) {
@@ -217,28 +335,27 @@ function Ensure-IsolatedPython {
     $pythonParent = Split-Path -Parent $PythonInstallDir
     New-Item -ItemType Directory -Path $pythonParent -Force | Out-Null
 
-    $overrideArgs = @(
-        "InstallAllUsers=0",
-        "PrependPath=0",
-        "AssociateFiles=0",
-        "Shortcuts=0",
-        "Include_launcher=0",
-        "Include_test=0",
-        "SimpleInstall=1",
-        "TargetDir=`"$PythonInstallDir`""
-    )
-
-    Invoke-WingetInstall `
-        -PackageId $PythonPackageId `
-        -Label "Python $PythonVersion" `
-        -ExtraArgs @(
-            "--scope", "user",
-            "--location", $PythonInstallDir,
-            "--override", ($overrideArgs -join " ")
+    $pythonInstallerUrl = Get-PythonInstallerUrl
+    $pythonInstallerPath = New-TemporaryDownloadPath -FileName ([System.IO.Path]::GetFileName(([System.Uri]$pythonInstallerUrl).AbsolutePath))
+    Invoke-DownloadFile -Url $pythonInstallerUrl -DestinationPath $pythonInstallerPath -Label "Python $PythonVersion"
+    Write-Step "Installing Python $PythonVersion"
+    Invoke-ExternalProcess `
+        -FilePath $pythonInstallerPath `
+        -Label "Python installer" `
+        -Arguments @(
+            "/quiet",
+            "InstallAllUsers=0",
+            "PrependPath=0",
+            "AssociateFiles=0",
+            "Shortcuts=0",
+            "Include_launcher=0",
+            "Include_test=0",
+            "SimpleInstall=1",
+            "TargetDir=$PythonInstallDir"
         )
 
     if (-not (Test-Path -LiteralPath $pythonExe)) {
-        Fail "winget completed, but the isolated Python install was not created at $PythonInstallDir. This usually means an existing managed Python install intercepted the package request."
+        Fail "Python installation completed, but python.exe was not created at $PythonInstallDir."
     }
 
     return $pythonExe
@@ -249,12 +366,37 @@ function Ensure-Ffmpeg {
         return
     }
 
+    $managedFfmpegExe = Join-Path $FfmpegInstallDir "bin\ffmpeg.exe"
+    if (Test-Path -LiteralPath $managedFfmpegExe) {
+        Add-DirectoryToUserPath -DirectoryPath (Split-Path -Parent $managedFfmpegExe)
+        return
+    }
+
     $ffmpegCommand = Resolve-CommandPath -CommandName "ffmpeg.exe"
     if ($ffmpegCommand) {
         return
     }
 
-    Invoke-WingetInstall -PackageId $FfmpegPackageId -Label "FFmpeg"
+    $ffmpegArchivePath = New-TemporaryDownloadPath -FileName ([System.IO.Path]::GetFileName(([System.Uri]$FfmpegDownloadUrl).AbsolutePath))
+    $extractRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantFfmpeg-" + [guid]::NewGuid().ToString("N"))
+
+    Invoke-DownloadFile -Url $FfmpegDownloadUrl -DestinationPath $ffmpegArchivePath -Label "FFmpeg"
+    Write-Step "Installing FFmpeg"
+    Expand-Archive -LiteralPath $ffmpegArchivePath -DestinationPath $extractRoot -Force
+
+    $ffmpegExe = Get-ChildItem -Path $extractRoot -Filter ffmpeg.exe -Recurse | Select-Object -First 1 -ExpandProperty FullName
+    if (-not $ffmpegExe) {
+        Fail "Downloaded FFmpeg archive did not contain ffmpeg.exe."
+    }
+
+    $ffmpegRoot = Split-Path -Parent (Split-Path -Parent $ffmpegExe)
+    if (Test-Path -LiteralPath $FfmpegInstallDir) {
+        Remove-Item -LiteralPath $FfmpegInstallDir -Recurse -Force
+    }
+
+    New-Item -ItemType Directory -Path (Split-Path -Parent $FfmpegInstallDir) -Force | Out-Null
+    Move-Item -LiteralPath $ffmpegRoot -Destination $FfmpegInstallDir
+    Add-DirectoryToUserPath -DirectoryPath (Join-Path $FfmpegInstallDir "bin")
 }
 
 function Clone-OrUpdateRepo {
@@ -474,10 +616,6 @@ exit /b %errorlevel%
     Set-Content -LiteralPath $updatePs1Path -Value $updatePs1Contents -Encoding UTF8
     Set-Content -LiteralPath $updateCmdPath -Value $updateCmdContents -Encoding ASCII
     Add-DirectoryToUserPath -DirectoryPath $LauncherDir
-}
-
-if (-not (Get-Command winget.exe -ErrorAction SilentlyContinue)) {
-    Fail "winget is required for this installer. Install Windows Package Manager first."
 }
 
 $GitExe = Ensure-Git

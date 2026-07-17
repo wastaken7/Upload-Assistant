@@ -6,10 +6,10 @@ This guide is for Windows users who want Upload Assistant to use its own Python 
 
 The bundled PowerShell installer:
 
-1. Installs Git with `winget` if needed.
-2. Installs an isolated Python `3.14` copy with `winget` into a dedicated Upload Assistant directory.
+1. Downloads and installs Git for Windows from the official release if needed.
+2. Downloads and installs an isolated Python `3.14` copy from `python.org` into a dedicated Upload Assistant directory.
 3. Does **not** add that Python to the global `PATH`.
-4. Optionally installs FFmpeg with `winget`.
+4. Optionally downloads and installs FFmpeg into a dedicated Upload Assistant directory.
 5. Clones or updates Upload Assistant.
 6. Creates `.venv`.
 7. Installs the base dependencies from `requirements.txt`.
@@ -19,7 +19,7 @@ The bundled PowerShell installer:
 
 ## Bootstrap from a GitHub URL
 
-This is the recommended first-time setup on Windows because it works even before Git is installed and does not depend on any existing Python already on `PATH`.
+This is the recommended first-time setup on Windows because it works even before Git is installed and does not depend on `winget` or any existing Python already on `PATH`.
 
 Copy and paste this into PowerShell:
 
@@ -76,9 +76,11 @@ With optional Discord support:
 ```text
 -UaDir PATH             Installation directory (default: ~/tools/ua)
 -PythonVersion VERSION  Python minor version to enforce in .venv (default: 3.14)
--PythonPackageId ID     winget package id for Python (default: Python.Python.3.14)
 -PythonInstallDir PATH  Dedicated Python install directory
--FfmpegPackageId ID     winget package id for FFmpeg (default: Gyan.FFmpeg)
+-FfmpegInstallDir PATH  Dedicated FFmpeg install directory
+-PythonDownloadBaseUrl  Base URL for Python downloads (default: python.org FTP)
+-GitReleaseApiUrl URL   Latest-release API URL for Git for Windows
+-FfmpegDownloadUrl URL  FFmpeg archive URL (default: gyan.dev essentials ZIP)
 -WithDiscord            Install optional Discord dependencies
 -ForceUpdate            Recreate .venv and reinstall packages
 -SkipFfmpegInstall      Skip FFmpeg bootstrap
@@ -88,7 +90,9 @@ With optional Discord support:
 
 - The script keeps Upload Assistant on its own Python runtime and calls that interpreter directly.
 - It does not depend on `python.exe` from your existing `PATH`.
+- It downloads Python from `python.org`, Git from the official Git for Windows release feed, and FFmpeg from the configured archive URL.
 - It adds a dedicated Upload Assistant launcher directory to the user `PATH`, not the isolated Python itself.
+- If the script installs FFmpeg itself, it also adds the managed FFmpeg `bin` directory to the user `PATH`.
 - On Windows, Upload Assistant already ships with `bin/MI/windows/MediaInfo.exe`, so this installer does not require a separate MediaInfo package to finish setup.
 
 ## Running Upload Assistant

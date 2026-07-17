@@ -203,11 +203,8 @@ Choose **one** of the two options below to get the files onto your computer:
 Using Git is the recommended method because it makes updating the assistant in the future extremely easy.
 
 1. **Install Git** (if you don't already have it):
-   - **Windows:** Open Command Prompt or PowerShell and run:
-     ```cmd
-     winget install Git.Git
-     ```
-     _(Close and reopen your command prompt/terminal after installation)._
+   - **Windows:** Use the bootstrap flow in `docs/windows-install.md` if you want the installer to fetch Git automatically.
+     _(That Windows flow can download Git for Windows directly if it is missing.)_
    - **Linux:** Install via your package manager (e.g., `sudo apt install git` or `sudo pacman -S git`).
    - **macOS:** Install via Homebrew (`brew install git`) or Xcode Command Line Tools.
 2. **Clone the project**:
