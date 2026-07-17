@@ -2168,7 +2168,9 @@ async def do_the_thing(base_dir: str) -> None:
                             continue
                         torrent_trackers.append(tracker)
 
-                    need_usenet_post = "USENET" in trackers_upper or len(usenet_trackers) > 0 or meta.usenet
+                    explicit_usenet_post = "USENET" in trackers_upper or meta.usenet
+                    eligible_usenet_trackers = [tracker for tracker in usenet_trackers if cast(Mapping[str, Any], meta.tracker_status.get(tracker, {})).get("upload", False)]
+                    need_usenet_post = explicit_usenet_post or len(eligible_usenet_trackers) > 0
 
                     async def upload_usenet_flow(meta: Meta, usenet_trackers: list[str], need_usenet_post: bool) -> None:
                         if need_usenet_post:
@@ -2207,6 +2209,8 @@ async def do_the_thing(base_dir: str) -> None:
                                 for t in usenet_trackers:
                                     status_map.setdefault(t, {})["status_message"] = f"data error: Usenet upload failed: {e}"
                                     status_map[t]["upload"] = False
+                        elif usenet_trackers:
+                            logger.info("[yellow]Skipping NNTP Usenet post because no Usenet indexers passed the upload checks.[/yellow]")
 
                     async def upload_torrent_flow(meta: Meta, torrent_trackers: list[str]) -> None:
                         if torrent_trackers:
@@ -2226,7 +2230,7 @@ async def do_the_thing(base_dir: str) -> None:
                     upload_order = upload_order.strip().lower() if isinstance(upload_order, str) else "concurrent"
 
                     if upload_order == "usenet":
-                        await upload_usenet_flow(meta, usenet_trackers, need_usenet_post)
+                        await upload_usenet_flow(meta, eligible_usenet_trackers, need_usenet_post)
                         await upload_torrent_flow(meta, torrent_trackers)
                     elif upload_order == "tracker":
                         await upload_torrent_flow(meta, torrent_trackers)
@@ -2253,10 +2257,10 @@ async def do_the_thing(base_dir: str) -> None:
                             except Exception as e:
                                 logger.info(f"[red]Error initializing bandwidth check: {e}, skipping bandwidth wait before Usenet upload.[/red]")
 
-                        await upload_usenet_flow(meta, usenet_trackers, need_usenet_post)
+                        await upload_usenet_flow(meta, eligible_usenet_trackers, need_usenet_post)
                     else:
                         await asyncio.gather(
-                            upload_usenet_flow(meta, usenet_trackers, need_usenet_post),
+                            upload_usenet_flow(meta, eligible_usenet_trackers, need_usenet_post),
                             upload_torrent_flow(meta, torrent_trackers),
                         )
                     if use_discord and bot and discord_notifier is not None:
