@@ -21,6 +21,7 @@ class BitHDTV:
     auth_type = "other_api"
     tracker = "BITHDTV"
     display_name = "BitHDTV"
+    allows_bloated_audio = True
     source_flag = "BIT-HDTV"
     banned_groups = ()
     upload_url = "https://www.bit-hdtv.com/takeupload.php"

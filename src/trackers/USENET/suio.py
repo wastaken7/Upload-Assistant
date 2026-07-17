@@ -37,6 +37,7 @@ class Suio:
     auth_type = "other_api"
     tracker = "SUIO"
     display_name = "Suio"
+    allows_bloated_audio = True
     banned_groups: tuple[str, ...] = ()
     upload_url: str | None = None
     torrent_url: str | None = None

@@ -32,6 +32,7 @@ class TVChaosUK:
     auth_type = "other_api"
     tracker = "TVCHAOSUK"
     display_name = "TVChaosUK"
+    allows_bloated_audio = True
     source_flag = "TVCHAOS"
     signature = ""
     banned_groups = ()

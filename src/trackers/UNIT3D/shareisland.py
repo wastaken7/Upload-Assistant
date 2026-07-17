@@ -38,6 +38,7 @@ class ShareIsland(UNIT3D):
     search_url = f"{base_url}/api/torrents/filter"
     requests_url = f"{base_url}/api/requests/filter"
     torrent_url = f"{base_url}/torrents/"
+    allows_bloated_audio = True
     supported_categories = ("TV", "MOVIE")
 
     # Pre-compile regex patterns for performance

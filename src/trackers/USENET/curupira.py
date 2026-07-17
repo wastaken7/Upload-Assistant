@@ -31,6 +31,7 @@ class Curupira:
     torrent_url = "https://curupira.cc/releases/"
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")
     is_usenet = True
+    allows_bloated_audio = True
 
     def __init__(self, config: Config) -> None:
         self.config = config

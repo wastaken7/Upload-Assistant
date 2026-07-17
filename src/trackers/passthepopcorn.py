@@ -36,6 +36,7 @@ class PassThePopcorn:
 
     tracker = "PASSTHEPOPCORN"
     display_name = "PassThePopcorn"
+    allows_bloated_audio = True
     source_flag = "PTP"
     banned_groups = (
         "aXXo",

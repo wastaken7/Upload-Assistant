@@ -24,6 +24,7 @@ class IPTorrents:
     auth_type = "cookies"
     tracker = "IPTORRENTS"
     display_name = "IPTorrents"
+    allows_bloated_audio = True
     source_flag = "IPTorrents"
     base_url = "https://iptorrents.com"
     banned_groups = (

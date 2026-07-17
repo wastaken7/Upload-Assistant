@@ -25,6 +25,7 @@ class HDTorrents:
     auth_type = "cookies"
     tracker = "HDTORRENTS"
     display_name = "HDTorrents"
+    allows_bloated_audio = True
     source_flag = "hd-torrents.org"
     auth_token: str | None = None
     banned_groups = ()

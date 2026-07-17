@@ -22,6 +22,7 @@ class RetroFlix:
     auth_type = "other_api"
     tracker = "RETROFLIX"
     display_name = "RetroFlix"
+    allows_bloated_audio = True
     source_flag = "sunshine"
     banned_groups: tuple[str, ...] = ()
     upload_url = "https://retroflix.club/api/upload"

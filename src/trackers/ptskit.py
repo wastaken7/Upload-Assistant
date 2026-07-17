@@ -23,6 +23,7 @@ class Ptskit:
     auth_type = "cookies"
     tracker = "PTSKIT"
     display_name = "Ptskit"
+    allows_bloated_audio = True
     banned_groups = ()
     source_flag = "[www.ptskit.org] PTSKIT"
     base_url = "https://www.ptskit.org"

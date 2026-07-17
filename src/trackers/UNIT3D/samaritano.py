@@ -26,6 +26,7 @@ class Samaritano(UNIT3D):
     requests_url = f"{base_url}/api/requests/filter"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     tracker_urls = ("https://samaritano.cc",)
+    allows_bloated_audio = True
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="SAMARITANO")

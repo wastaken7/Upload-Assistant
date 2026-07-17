@@ -28,6 +28,7 @@ class FileList:
     auth_type = "cookies"
     tracker = "FILELIST"
     display_name = "FileList"
+    allows_bloated_audio = True
     source_flag = "FL"
     signature: str | None = None
     banned_groups = ("",)

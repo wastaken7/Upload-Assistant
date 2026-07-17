@@ -24,6 +24,7 @@ class HDSpace:
     auth_type = "cookies"
     tracker = "HDSPACE"
     display_name = "HDSpace"
+    allows_bloated_audio = True
     source_flag = "HD-Space"
     banned_groups = ("",)
     base_url = "https://hd-space.org"

@@ -17,6 +17,7 @@ class CapybaraBR(UNIT3D):
     tracker = "CAPYBARABR"
     display_name = "CapybaraBR"
     base_url = "https://capybarabr.com"
+    allows_bloated_audio = True
     banned_groups = (
         "4K4U",
         "afm72",

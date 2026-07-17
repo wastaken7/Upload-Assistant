@@ -1008,11 +1008,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             else:
                 await run_par2_with_progress(cmd_par2, cwd=str(upload_root))
 
-            generated_par2_files = [
-                file_path
-                for file_path in sorted(Path(par2_output_dir).glob(f"{archive_name}.par2*"))
-                if file_path.is_file()
-            ]
+            generated_par2_files = [file_path for file_path in sorted(Path(par2_output_dir).glob(f"{archive_name}.par2*")) if file_path.is_file()]
             upload_files.extend(file_path for file_path in generated_par2_files if file_path not in upload_files)
 
     # 4. Poster / From header

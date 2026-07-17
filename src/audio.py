@@ -539,39 +539,24 @@ def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_origi
     if isinstance(audio_languages, str):
         audio_languages = [audio_languages]
 
-    bloat_is_allowed = [
-        "AMIGOSSHARE",
-        "BJSHARE",
-        "BRASILTRACKER",
-        "CAPYBARABR",
-        "DIGITALCORE",
-        "FUNFILE",
-        "LAJIDUI",
-        "LOCADORA",
-        "LONGPT",
-        "MAKINGOFF",
-        "PTCAFE",
-        "PTFANS",
-        "PTGTK",
-        "RAILGUNPT",
-        "SAMARITANO",
-        "SHAREISLAND",
-        "SEEDPOOL",
-        "TORRENTLEECH",
-        "THEOLDSCHOOL",
-    ]
-    # Trackers that allow specific languages (list of allowed language codes per tracker)
-    tracker_allowed_bloat_languages = {
-        "AITHER": ["en"],
-        "ANTHELION": ["en"],
-        "BLUTOPIA": ["en"],
-        "ITATORRENTS": ["it"],
-        "LATTEAM": ["es"],
-        "PORTUGAS": ["pt"],
-        "SPEEDAPP": ["ro"],
-        "TORRENTEROS": ["es"],
-        "UTOPIA": ["uk", "en"],
-    }
+    def get_tracker_bloat_rules(tracker_name: str) -> tuple[bool, tuple[str, ...], bool]:
+        try:
+            from src.trackersetup import tracker_class_map
+
+            tracker_class = tracker_class_map.get(tracker_name.upper())
+        except Exception:
+            tracker_class = None
+
+        if tracker_class is None:
+            return False, (), False
+
+        allows_bloated_audio = bool(getattr(tracker_class, "allows_bloated_audio", False))
+        allowed_languages = getattr(tracker_class, "allowed_bloated_audio_languages", ()) or ()
+        reject_english_original_bloat = bool(getattr(tracker_class, "reject_english_original_bloat", False))
+        if isinstance(allowed_languages, str):
+            allowed_languages = (allowed_languages,)
+
+        return allows_bloated_audio, tuple(str(lang).lower() for lang in allowed_languages), reject_english_original_bloat
 
     # Track whether we've already printed messages
     printed_not_allowed = False
@@ -582,12 +567,10 @@ def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_origi
         trackers_to_warn: list[str] = []
 
         for tracker in cast(list[str], meta.trackers):
-            # Check if this language is in the tracker's allowed languages list
-            if tracker in tracker_allowed_bloat_languages:
-                allowed_langs = tracker_allowed_bloat_languages[tracker]
-                if any(audio_language.lower().startswith(lang.lower()) for lang in allowed_langs):
-                    continue
-            if tracker not in bloat_is_allowed:
+            allows_bloated_audio, allowed_langs, _reject_english_original_bloat = get_tracker_bloat_rules(tracker)
+            if any(audio_language.lower().startswith(lang) for lang in allowed_langs):
+                continue
+            if not allows_bloated_audio:
                 trackers_to_warn.append(tracker)
 
         # If no trackers to warn about for this language, continue to next
@@ -612,8 +595,12 @@ def bloated_check(meta: Meta, audio_languages: Sequence[str] | str, is_eng_origi
         warning_trackers = []
 
         if is_eng_original_with_non_eng:
-            not_allowed_trackers = [t for t in trackers_to_warn if t in ["ANTHELION", "BEYONDHD", "ULCX", "MORETHANTV"]]
-            warning_trackers = [t for t in trackers_to_warn if t not in ["ANTHELION", "BEYONDHD", "ULCX", "MORETHANTV"]]
+            for tracker in trackers_to_warn:
+                _, _, reject_english_original_bloat = get_tracker_bloat_rules(tracker)
+                if reject_english_original_bloat:
+                    not_allowed_trackers.append(tracker)
+                else:
+                    warning_trackers.append(tracker)
         else:
             warning_trackers = trackers_to_warn
 

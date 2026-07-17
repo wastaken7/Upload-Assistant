@@ -29,6 +29,7 @@ class DrunkenSlug:
     auth_type = "other_api"
     tracker = "DRUNKENSLUG"
     display_name = "DrunkenSlug"
+    allows_bloated_audio = True
     banned_groups = ()
     search_url = "https://drunkenslug.com/api"
     torrent_url = "https://drunkenslug.com/search/"

@@ -29,6 +29,7 @@ class HDBits:
     auth_type = "cookies"
     tracker = "HDBITS"
     display_name = "HDBits"
+    allows_bloated_audio = True
     source_flag = "HDBits"
     signature: str | None = None
     banned_groups: tuple[str, ...] = ("",)

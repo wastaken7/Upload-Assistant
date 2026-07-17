@@ -11,6 +11,7 @@ class DesiTorrents(UNIT3D):
 
     tracker = "DESITORRENTS"
     display_name = "DesiTorrents"
+    allows_bloated_audio = True
     base_url = "https://torrent.desi"
     banned_groups = ("DusIcTv", "PDHM", "Ranvijay", "BWT", "DDH", "Telly", "YTS", "RARBG", "BonsaiHD", "GalaxyRG", "-=!DrSTAR!=-")
     upload_url = f"{base_url}/api/v1/torrents/upload"

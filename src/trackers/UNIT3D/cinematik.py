@@ -25,6 +25,7 @@ class Cinematik(UNIT3D):
 
     tracker = "CINEMATIK"
     display_name = "Cinematik"
+    allows_bloated_audio = True
     base_url = "https://cinematik.net"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"

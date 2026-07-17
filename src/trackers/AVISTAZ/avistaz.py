@@ -13,6 +13,7 @@ class AvistaZ(AZTrackerBase):
 
     tracker = "AVISTAZ"
     display_name = "AvistaZ"
+    allows_bloated_audio = True
     source_flag = "AvistaZ"
     banned_groups = ("",)
     base_url = "https://avistaz.to"

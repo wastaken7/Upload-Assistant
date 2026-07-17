@@ -23,6 +23,7 @@ class ImmortalSeed:
     auth_type = "cookies"
     tracker = "IMMORTALSEED"
     display_name = "ImmortalSeed"
+    allows_bloated_audio = True
     source_flag = "https://immortalseed.me"
     banned_groups = ("",)
     base_url = "https://immortalseed.me"

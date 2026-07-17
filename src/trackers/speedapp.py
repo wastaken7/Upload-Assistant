@@ -33,6 +33,7 @@ class SpeedApp:
     banned_url = "https://speedapp.io/api/torrent/release-group/blacklist"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     tracker_urls = ("ramjet.speedapp.io", "ramjet.speedapp.to", "ramjet.speedappio.org")
+    allowed_bloated_audio_languages = ("ro",)
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config

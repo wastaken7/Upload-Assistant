@@ -14,6 +14,7 @@ class CinemaZ(AZTrackerBase):
 
     tracker = "CINEMAZ"
     display_name = "CinemaZ"
+    allows_bloated_audio = True
     source_flag = "CinemaZ"
     banned_groups = ("",)
     base_url = "https://cinemaz.to"

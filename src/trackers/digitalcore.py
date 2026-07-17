@@ -30,6 +30,7 @@ class DigitalCore:
     torrent_url = f"{base_url}/torrent/"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     tracker_urls = ("tracker.digitalcore.club", "trackerprxy.digitalcore.club")
+    allows_bloated_audio = True
 
     def __init__(self, config: Config):
         self.config = config

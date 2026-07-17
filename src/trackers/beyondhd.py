@@ -23,6 +23,7 @@ class BEYONDHD:
     auth_type = "unit3d_api"
     tracker = "BEYONDHD"
     display_name = "BEYONDHD"
+    reject_english_original_bloat = True
     source_flag = "BHD"
     banned_groups = (
         "4K4U",

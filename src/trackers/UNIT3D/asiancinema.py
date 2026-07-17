@@ -14,6 +14,7 @@ class AsianCinema(UNIT3D):
 
     tracker = "ASIANCINEMA"
     display_name = "AsianCinema"
+    allows_bloated_audio = True
     source_flag = "AsianCinema"
     base_url = "https://eiga.moi"
     banned_groups: tuple[str, ...] = ()

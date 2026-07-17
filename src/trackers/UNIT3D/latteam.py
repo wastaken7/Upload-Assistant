@@ -24,6 +24,7 @@ class LatTeam(UNIT3D):
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK")
     tracker_urls = ("https://lat-team.com",)
+    allowed_bloated_audio_languages = ("es",)
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="LATTEAM")

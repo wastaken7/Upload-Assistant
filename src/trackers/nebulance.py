@@ -24,6 +24,7 @@ class Nebulance:
     auth_type = "other_api"
     tracker = "NEBULANCE"
     display_name = "Nebulance"
+    allows_bloated_audio = True
     source_flag = "NBL"
     banned_groups = (
         "[Oj]",

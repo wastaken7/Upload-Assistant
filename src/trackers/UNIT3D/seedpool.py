@@ -28,6 +28,7 @@ class Seedpool(UNIT3D):
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://seedpool.org",)
+    allows_bloated_audio = True
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="SEEDPOOL")

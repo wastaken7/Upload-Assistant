@@ -19,6 +19,7 @@ class InfinityHD(UNIT3D):
 
     tracker = "INFINITYHD"
     display_name = "InfinityHD"
+    allows_bloated_audio = True
     base_url = "https://infinityhd.net"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"

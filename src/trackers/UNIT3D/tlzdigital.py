@@ -15,6 +15,7 @@ class TheLeachZone(UNIT3D):
 
     tracker = "THELEACHZONE"
     display_name = "TheLeachZone"
+    allows_bloated_audio = True
     base_url = "https://tlzdigital.com"
     banned_groups = ("",)
     id_url = f"{base_url}/api/torrents/"

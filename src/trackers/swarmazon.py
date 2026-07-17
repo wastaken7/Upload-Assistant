@@ -20,6 +20,7 @@ class Swarmazon:
     auth_type = "other_api"
     tracker = "SWARMAZON"
     display_name = "Swarmazon"
+    allows_bloated_audio = True
     source_flag = "Swarmazon"
     banned_groups = ("",)
     upload_url = "https://swarmazon.club/api/upload.php"

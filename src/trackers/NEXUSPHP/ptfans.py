@@ -20,6 +20,7 @@ class PTFans(NEXUSPHP):
     torrent_url = f"{base_url}/details.php?id="
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://ptfans.cc",)
+    allows_bloated_audio = True
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, "PTFANS")

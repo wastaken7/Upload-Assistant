@@ -29,6 +29,7 @@ class ToTheGlory:
     auth_type = "cookies"
     tracker = "TOTHEGLORY"
     display_name = "ToTheGlory"
+    allows_bloated_audio = True
     source_flag = "TTG"
     signature = None
     banned_groups = ("",)

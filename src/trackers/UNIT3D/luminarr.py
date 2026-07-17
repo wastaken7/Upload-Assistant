@@ -16,6 +16,7 @@ class Luminarr(UNIT3D):
 
     tracker = "LUMINARR"
     display_name = "Luminarr"
+    allows_bloated_audio = True
     base_url = "https://luminarr.me"
     banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"

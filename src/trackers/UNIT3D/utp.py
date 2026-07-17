@@ -22,6 +22,7 @@ class Utopia(UNIT3D):
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
+    allowed_bloated_audio_languages = ("uk", "en")
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="UTOPIA")

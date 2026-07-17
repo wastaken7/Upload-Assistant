@@ -69,6 +69,7 @@ class AmigosShare:
     }
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     tracker_urls = ("amigos-share.club",)
+    allows_bloated_audio = True
     tmdb_localization_requirements: ClassVar[dict[str, dict[str, str]]] = {
         "pt-BR": {
             "main": "credits,videos,content_ratings",

@@ -16,6 +16,7 @@ class PrivateHD(AZTrackerBase):
 
     tracker = "PRIVATEHD"
     display_name = "PrivateHD"
+    allows_bloated_audio = True
     source_flag = "PrivateHD"
     banned_groups = (
         "4K4U",

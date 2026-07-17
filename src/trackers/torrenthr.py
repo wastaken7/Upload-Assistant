@@ -30,6 +30,7 @@ class TorrentHR:
 
     tracker = "TORRENTHR"
     display_name = "TorrentHR"
+    allows_bloated_audio = True
     source_flag = "[https://www.torrenthr.org] TorrentHR.org"
     banned_groups = ("",)
     supported_categories = ("TV", "MOVIE")

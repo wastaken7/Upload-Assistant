@@ -16,6 +16,7 @@ class MidnightScene(UNIT3D):
 
     tracker = "MIDNIGHTSCENE"
     display_name = "MidnightScene"
+    allows_bloated_audio = True
     base_url = "https://midnightscene.cc"
     banned_groups = (
         "4K4U",

@@ -16,6 +16,7 @@ class HomieHelpDesk(UNIT3D):
 
     tracker = "HOMIEHELPDESK"
     display_name = "HomieHelpDesk"
+    allows_bloated_audio = True
     base_url = "https://homiehelpdesk.net"
     banned_groups = (
         "aXXo",

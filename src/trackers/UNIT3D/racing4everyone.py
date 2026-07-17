@@ -18,6 +18,7 @@ class Racing4Everyone(UNIT3D):
 
     tracker = "RACING4EVERYONE"
     display_name = "Racing4Everyone"
+    allows_bloated_audio = True
     base_url = "https://racing4everyone.eu"
     banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"

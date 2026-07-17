@@ -29,6 +29,7 @@ class PTerClub:
     auth_type = "cookies"
     tracker = "PTERCLUB"
     display_name = "PTerClub"
+    allows_bloated_audio = True
     source_flag = "PTER"
     ptgen_retry = 3
     signature: str | None = None

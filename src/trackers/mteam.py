@@ -25,6 +25,7 @@ class MTeam:
     auth_type = "other_api"
     tracker = "MTEAM"
     display_name = "MTeam"
+    allows_bloated_audio = True
     api_base_url = "https://api.m-team.cc/api"
     banned_groups = ("FGT",)
     requests_url = f"{api_base_url}/seek/search"

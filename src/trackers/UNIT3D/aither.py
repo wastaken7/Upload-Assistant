@@ -27,6 +27,7 @@ class Aither(UNIT3D):
     trumping_url = f"{base_url}/api/trumping-reports/filter"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://aither.cc",)
+    allowed_bloated_audio_languages = ("en",)
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config, tracker_name="AITHER")

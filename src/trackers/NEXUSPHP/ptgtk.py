@@ -20,6 +20,7 @@ class PTGTK(NEXUSPHP):
     torrent_url = f"{base_url}/details.php?id="
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://t.myaltbox.com",)
+    allows_bloated_audio = True
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, "PTGTK")

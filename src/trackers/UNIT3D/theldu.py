@@ -20,6 +20,7 @@ class LastDigitalUnderground(UNIT3D):
 
     tracker = "LASTDIGITALUNDERGROUND"
     display_name = "LastDigitalUnderground"
+    allows_bloated_audio = True
     base_url = "https://theldu.to"
     banned_groups = ()
     id_url = f"{base_url}/api/torrents/"

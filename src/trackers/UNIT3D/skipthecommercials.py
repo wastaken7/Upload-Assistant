@@ -21,6 +21,7 @@ class SkipTheCommercials(UNIT3D):
 
     tracker = "SKIPTHECOMMERCIALS"
     display_name = "SkipTheCommercials"
+    allows_bloated_audio = True
     base_url = "https://skipthecommercials.xyz"
     banned_groups = ("",)
     approved_image_hosts = ("imgbox", "imgbb")

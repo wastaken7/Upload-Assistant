@@ -12,6 +12,7 @@ class FrikiBar(UNIT3D):
 
     tracker = "FRIKIBAR"
     display_name = "FrikiBar"
+    allows_bloated_audio = True
     base_url = "https://frikibar.com"
     banned_groups = ("",)
     id_url = f"{base_url}/api/torrents/"

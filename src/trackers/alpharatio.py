@@ -28,6 +28,7 @@ class AlphaRatio:
     auth_type = "cookies"
     tracker = "ALPHARATIO"
     display_name = "AlphaRatio"
+    allows_bloated_audio = True
     source_flag = "AlphaRatio"
     base_url = "https://alpharatio.cc"
     banned_groups = ()

@@ -32,6 +32,7 @@ class MoreThanTV:
     auth_type = "cookies"
     tracker = "MORETHANTV"
     display_name = "MoreThanTV"
+    reject_english_original_bloat = True
     source_flag = "MTV"
     approved_image_hosts = ("ptpimg", "imgbox", "imgbb")
     banned_groups = (

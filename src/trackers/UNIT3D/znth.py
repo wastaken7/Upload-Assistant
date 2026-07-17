@@ -37,6 +37,7 @@ class Zenith(UNIT3D):
 
     tracker = "ZENITH"
     display_name = "Zenith"
+    allows_bloated_audio = True
     base_url = "https://znth.cx"
     banned_groups: tuple[str, ...] = ()
     id_url = f"{base_url}/api/torrents/"

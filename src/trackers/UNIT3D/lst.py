@@ -16,6 +16,7 @@ class LST(UNIT3D):
 
     tracker = "LST"
     display_name = "LST"
+    allows_bloated_audio = True
     base_url = "https://lst.gg"
     banned_groups = ()
     banned_url = f"{base_url}/api/bannedReleaseGroups"

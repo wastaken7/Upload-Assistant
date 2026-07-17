@@ -14,6 +14,7 @@ class Yoinked(UNIT3D):
 
     tracker = "YOINKED"
     display_name = "Yoinked"
+    allows_bloated_audio = True
     base_url = "https://yoinked.org"
     banned_groups = ("YTS", "YiFY", "LAMA", "MeGUSTA", "NAHOM", "GalaxyRG", "RARBG", "INFINITY")
     id_url = f"{base_url}/api/torrents/"

@@ -45,6 +45,7 @@ class BJShare:
     requests_url = f"{base_url}/requests.php?"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     tracker_urls = ("tracker.bj-share.info",)
+    allows_bloated_audio = True
     secret_token: str = ""
     already_has_the_info: bool = False
     database_title: str = ""

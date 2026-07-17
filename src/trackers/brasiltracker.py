@@ -42,6 +42,7 @@ class BrasilTracker:
     ultimate_lang_map: ClassVar[dict[str, str]] = {}
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     tracker_urls = ("t.brasiltracker.org",)
+    allows_bloated_audio = True
     secret_token: str = ""
     tmdb_localization_requirements: ClassVar = {
         "pt-BR": {

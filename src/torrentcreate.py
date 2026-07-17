@@ -382,11 +382,7 @@ class TorrentCreator:
                                     progress.update(task, completed=total_pieces)
                                     complete_progress("mkbrr-hash", "mkbrr hashing...", current=total_pieces, total=total_pieces)
                                 else:
-                                    failure_detail = (
-                                        f"Expected torrent file {output_path} was not created"
-                                        if result == 0
-                                        else f"mkbrr exited with status code {result}"
-                                    )
+                                    failure_detail = f"Expected torrent file {output_path} was not created" if result == 0 else f"mkbrr exited with status code {result}"
                                     publish_progress(
                                         "mkbrr-hash",
                                         "mkbrr hashing...",

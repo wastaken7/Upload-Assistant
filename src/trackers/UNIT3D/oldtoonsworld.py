@@ -19,6 +19,7 @@ class OldToonsWorld(UNIT3D):
 
     tracker = "OLDTOONSWORLD"
     display_name = "OldToonsWorld"
+    allows_bloated_audio = True
     base_url = "https://oldtoons.world"
     banned_groups = (
         "[Oj]",

@@ -19,6 +19,7 @@ class YUSCENE(UNIT3D):
 
     tracker = "YUSCENE"
     display_name = "YUSCENE"
+    allows_bloated_audio = True
     base_url = "https://yu-scene.net"
     banned_groups = (
         "ADDICTION",

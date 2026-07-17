@@ -39,6 +39,7 @@ class MakingOff:
     index_url = "https://indice.makingoff.org/"
     torrent_url = ""
     supported_categories = ("MOVIE",)
+    allows_bloated_audio = True
     tmdb_localization_requirements: ClassVar = {
         "pt-BR": {
             "main": "credits,translations",

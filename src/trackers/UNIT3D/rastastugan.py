@@ -16,6 +16,7 @@ class Rastastugan(UNIT3D):
 
     tracker = "RASTASTUGAN"
     display_name = "Rastastugan"
+    allows_bloated_audio = True
     base_url = "https://rastastugan.org"
     banned_groups = (
         "GalaxyRG",

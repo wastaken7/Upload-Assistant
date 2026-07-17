@@ -28,6 +28,8 @@ class Anthelion:
     tracker = "ANTHELION"
     display_name = "Anthelion"
     source_flag = "ANT"
+    allowed_bloated_audio_languages = ("en",)
+    reject_english_original_bloat = True
     banned_groups = (
         "3LTON",
         "4yEo",

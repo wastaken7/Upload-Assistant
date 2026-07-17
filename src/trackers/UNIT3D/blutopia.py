@@ -113,6 +113,7 @@ class Blutopia(UNIT3D):
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://blutopia.cc",)
+    allowed_bloated_audio_languages = ("en",)
 
     def __init__(self, config: dict[str, Any]) -> None:
         super().__init__(config, tracker_name="BLUTOPIA")

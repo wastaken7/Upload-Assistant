@@ -32,6 +32,7 @@ class TorrentLeech:
     torrent_url = f"{base_url}/torrent/"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     tracker_urls = ("tracker.tleechreload", "tracker.torrentleech")
+    allows_bloated_audio = True
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config

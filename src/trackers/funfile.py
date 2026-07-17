@@ -31,6 +31,7 @@ class FunFile:
     requests_url = f"{base_url}/requests.php"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("tracker.funfile.org",)
+    allows_bloated_audio = True
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config

@@ -20,6 +20,7 @@ class Aura4K(UNIT3D):
 
     tracker = "AURA4K"
     display_name = "Aura4K"
+    allows_bloated_audio = True
     base_url = "https://aura4k.net"
     approved_image_hosts = ("ptpimg", "onlyimage", "imgbox", "ptscreens", "imgbb", "imgur", "postimg")
     banned_groups = ("BiTOR", "DepraveD", "Flights", "SasukeducK", "SPDVD", "TEKNO3D")

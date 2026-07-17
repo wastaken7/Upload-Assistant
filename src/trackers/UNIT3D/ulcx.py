@@ -20,6 +20,7 @@ class ULCX(UNIT3D):
 
     tracker = "ULCX"
     display_name = "ULCX"
+    reject_english_original_bloat = True
     base_url = "https://upload.cx"
     banned_groups = (
         "4K4U",
