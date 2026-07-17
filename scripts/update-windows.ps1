@@ -48,8 +48,11 @@ if ($SkipFfmpegInstall) {
     $installArguments.SkipFfmpegInstall = $true
 }
 
-if ((Test-Path -LiteralPath $venvPython) -and (& $venvPython -m pip show discord.py *> $null; $LASTEXITCODE -eq 0)) {
-    $installArguments.WithDiscord = $true
+if (Test-Path -LiteralPath $venvPython) {
+    & $venvPython -m pip show discord.py *> $null
+    if ($LASTEXITCODE -eq 0) {
+        $installArguments.WithDiscord = $true
+    }
 }
 
 & $installScript @installArguments

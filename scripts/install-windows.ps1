@@ -32,7 +32,9 @@ function Invoke-WingetInstall {
         [Parameter(Mandatory)]
         [string]$Label,
 
-        [string[]]$ExtraArgs = @()
+        [string[]]$ExtraArgs = @(),
+
+        [int]$TimeoutSeconds = 1800
     )
 
     $arguments = @(
@@ -45,9 +47,42 @@ function Invoke-WingetInstall {
     ) + $ExtraArgs
 
     Write-Step "Installing $Label with winget"
-    & winget @arguments
-    if ($LASTEXITCODE -ne 0) {
-        Fail "winget failed while installing $Label (package: $PackageId)"
+    $stdoutPath = [System.IO.Path]::GetTempFileName()
+    $stderrPath = [System.IO.Path]::GetTempFileName()
+
+    try {
+        $wingetProcess = Start-Process -FilePath "winget.exe" `
+            -ArgumentList $arguments `
+            -NoNewWindow `
+            -PassThru `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath
+
+        if (-not $wingetProcess.WaitForExit($TimeoutSeconds * 1000)) {
+            try {
+                $wingetProcess.Kill()
+                $wingetProcess.WaitForExit()
+            }
+            catch {
+            }
+
+            Fail "winget timed out while installing $Label after $TimeoutSeconds seconds (package: $PackageId)"
+        }
+
+        if (Test-Path -LiteralPath $stdoutPath) {
+            Get-Content -LiteralPath $stdoutPath | Write-Host
+        }
+
+        if (Test-Path -LiteralPath $stderrPath) {
+            Get-Content -LiteralPath $stderrPath | Write-Host
+        }
+
+        if ($wingetProcess.ExitCode -ne 0) {
+            Fail "winget failed while installing $Label (package: $PackageId)"
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -347,7 +382,7 @@ exit `$LASTEXITCODE
 "@
     $launcherCmdContents = @"
 @echo off
-powershell -ExecutionPolicy Bypass -File "$launcherPs1Path" %*
+powershell -ExecutionPolicy Bypass -File "%~dp0ua.ps1" %*
 exit /b %errorlevel%
 "@
     $updatePs1Contents = @"
@@ -362,13 +397,13 @@ exit `$LASTEXITCODE
 "@
     $updateCmdContents = @"
 @echo off
-powershell -ExecutionPolicy Bypass -File "$updatePs1Path" %*
+powershell -ExecutionPolicy Bypass -File "%~dp0ua-update.ps1" %*
 exit /b %errorlevel%
 "@
 
-    Set-Content -LiteralPath $launcherPs1Path -Value $launcherPs1Contents -Encoding ASCII
+    Set-Content -LiteralPath $launcherPs1Path -Value $launcherPs1Contents -Encoding UTF8
     Set-Content -LiteralPath $launcherCmdPath -Value $launcherCmdContents -Encoding ASCII
-    Set-Content -LiteralPath $updatePs1Path -Value $updatePs1Contents -Encoding ASCII
+    Set-Content -LiteralPath $updatePs1Path -Value $updatePs1Contents -Encoding UTF8
     Set-Content -LiteralPath $updateCmdPath -Value $updateCmdContents -Encoding ASCII
     Add-DirectoryToUserPath -DirectoryPath $LauncherDir
 }

@@ -25,12 +25,12 @@ Copy and paste this into PowerShell:
 
 ```powershell
 $repoUrl = "https://github.com/wastaken7/Upload-Assistant"
-$zipUrl = "$repoUrl/archive/refs/heads/master.zip"
+$zipUrl = "$repoUrl/archive/refs/heads/development.zip"
 $targetRoot = Join-Path $HOME "Upload-Assistant-bootstrap"
 $zipPath = Join-Path $targetRoot "Upload-Assistant.zip"
 
 New-Item -ItemType Directory -Path $targetRoot -Force | Out-Null
-Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
+Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing
 Expand-Archive -LiteralPath $zipPath -DestinationPath $targetRoot -Force
 
 $repoDir = Get-ChildItem -Path $targetRoot -Directory | Where-Object { $_.Name -like "Upload-Assistant-*" } | Select-Object -First 1 -ExpandProperty FullName
