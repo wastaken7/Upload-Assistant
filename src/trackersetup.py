@@ -63,7 +63,6 @@ from src.trackers.UNIT3D.capybarabr import CapybaraBR
 from src.trackers.UNIT3D.cinematik import Cinematik
 from src.trackers.UNIT3D.darkpeers import DarkPeers
 from src.trackers.UNIT3D.emuwarez import Emuwarez
-from src.trackers.UNIT3D.frikibar import FrikiBar
 from src.trackers.UNIT3D.hawkeuno import HawkeUno
 from src.trackers.UNIT3D.homiehelpdesk import HomieHelpDesk
 from src.trackers.UNIT3D.infinityhd import InfinityHD
@@ -91,7 +90,6 @@ from src.trackers.UNIT3D.torrentdesi import DesiTorrents
 from src.trackers.UNIT3D.torrenteros import Torrenteros
 from src.trackers.UNIT3D.ulcx import ULCX
 from src.trackers.UNIT3D.utp import Utopia
-from src.trackers.UNIT3D.yoinked import Yoinked
 from src.trackers.UNIT3D.yuscene import YUSCENE
 from src.trackers.UNIT3D.znth import Zenith
 from src.trackers.USENET.curupira import Curupira
@@ -1350,7 +1348,6 @@ tracker_class_map: dict[str, Any] = {
     "EMUWAREZ": Emuwarez,
     "FUNFILE": FunFile,
     "FILELIST": FileList,
-    "FRIKIBAR": FrikiBar,
     "GREATPOSTERWALL": GreatPosterWall,
     "HDBITS": HDBits,
     "HDSPACE": HDSpace,
@@ -1406,7 +1403,6 @@ tracker_class_map: dict[str, Any] = {
     "TVCHAOSUK": TVChaosUK,
     "ULCX": ULCX,
     "UTOPIA": Utopia,
-    "YOINKED": Yoinked,
     "YUSCENE": YUSCENE,
     "ZENITH": Zenith,
 }

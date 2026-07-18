@@ -29,6 +29,8 @@ class TVChaosUK:
     TVC Private Torrent Tracker
     """
 
+    base_url = "https://tvchaosuk.com"
+
     auth_type = "other_api"
     tracker = "TVCHAOSUK"
     display_name = "TVChaosUK"
@@ -37,9 +39,9 @@ class TVChaosUK:
     signature = ""
     banned_groups = ()
     approved_image_hosts = ("imgbb", "ptpimg", "imgbox", "pixhost", "bam", "onlyimage")
-    upload_url = "https://tvchaosuk.com/api/torrents/upload"
-    search_url = "https://tvchaosuk.com/api/torrents/filter"
-    torrent_url = "https://tvchaosuk.com/torrents/"
+    upload_url = f"{base_url}/api/torrents/upload"
+    search_url = f"{base_url}/api/torrents/filter"
+    torrent_url = f"{base_url}/torrents/"
     tv_type_map: ClassVar = {
         "comedy": "29",
         "current affairs": "45",
@@ -631,7 +633,7 @@ class TVChaosUK:
                 meta.tracker_status[self.tracker]["torrent_id"] = t_id
 
                 await common.create_torrent_ready_to_seed(
-                    meta, self.tracker, self.source_flag, self.config["TRACKERS"][self.tracker].get("announce_url"), f"https://tvchaosuk.com/torrents/{t_id}"
+                    meta, self.tracker, self.source_flag, self.config["TRACKERS"][self.tracker].get("announce_url"), f"{self.base_url}/torrents/{t_id}"
                 )
                 return True
 

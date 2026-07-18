@@ -28,10 +28,12 @@ class TorrentHR:
     TORRENTHR is a ratioless CROATIAN Private Torrent Tracker for 0DAY / GENERAL
     """
 
+    base_url = "https://www.torrenthr.org"
+
     tracker = "TORRENTHR"
     display_name = "TorrentHR"
     allows_bloated_audio = True
-    source_flag = "[https://www.torrenthr.org] TorrentHR.org"
+    source_flag = f"[{base_url}] TorrentHR.org"
     banned_groups = ("",)
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("torrenthr",)
@@ -84,7 +86,7 @@ class TorrentHR:
             tfile = await f.read()
 
         # Upload Form
-        url = "https://www.torrenthr.org/takeupload.php"
+        url = f"{self.base_url}/takeupload.php"
         files: dict[str, tuple[str, Any]] = {"tfile": (f"{torrent_name}.torrent", tfile)}
         imdb_info = meta.imdb_info
         payload: dict[str, Any] = {
@@ -360,7 +362,7 @@ class TorrentHR:
         #         full_mi = mi_file.read()
         #         desc.write(f"[/align]\n[hide=FULL MEDIAINFO]{full_mi}[/hide][align=center]")
         #         mi_file.close()
-        desc_parts.append(f"\n\n[size=2][url=https://www.torrenthr.org/forums.php?action=viewtopic&topicid=8977]{meta.ua_signature}[/url][/size][/align]")
+        desc_parts.append(f"\n\n[size=2][url={self.base_url}/forums.php?action=viewtopic&topicid=8977]{meta.ua_signature}[/url][/size][/align]")
         async with aiofiles.open(
             f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[TORRENTHR]DESCRIPTION.txt",
             "w",
@@ -371,7 +373,7 @@ class TorrentHR:
 
     async def search_existing(self, meta: Meta) -> list[str]:
         imdb_id = str(meta.imdb)
-        base_search_url = f"https://www.torrenthr.org/browse.php?search={imdb_id}&blah=2&incldead=1"
+        base_search_url = f"{self.base_url}/browse.php?search={imdb_id}&blah=2&incldead=1"
         dupes: list[str] = []
 
         if not imdb_id:
@@ -503,7 +505,7 @@ class TorrentHR:
 
     async def login(self, meta) -> dict[str, Any] | None:
         logger.info("[yellow]Logging in to TORRENTHR...")
-        url = "https://www.torrenthr.org/takelogin.php"
+        url = f"{self.base_url}/takelogin.php"
 
         if not self.username or not self.password:
             logger.info("[red]Missing TORRENTHR credentials in config.py")
@@ -512,12 +514,12 @@ class TorrentHR:
         payload: dict[str, Any] = {"username": self.username, "password": self.password, "ssl": "yes"}
         headers = {
             "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})",
-            "Referer": "https://www.torrenthr.org/login.php",
+            "Referer": f"{self.base_url}/login.php",
         }
 
         async with httpx.AsyncClient(follow_redirects=True) as session:
             try:
-                login_page = await session.get("https://www.torrenthr.org/login.php")
+                login_page = await session.get(f"{self.base_url}/login.php")
                 login_soup = BeautifulSoup(login_page.text, "html.parser")
 
                 for input_tag in login_soup.find_all("input", type="hidden"):

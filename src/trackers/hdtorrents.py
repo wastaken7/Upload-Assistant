@@ -29,6 +29,7 @@ class HDTorrents:
     source_flag = "hd-torrents.org"
     auth_token: str | None = None
     banned_groups = ()
+    base_url = "https://hd-torrents.org"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://hdts-announce.ru",)
     secret_token: str = ""

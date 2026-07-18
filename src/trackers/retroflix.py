@@ -19,16 +19,18 @@ class RetroFlix:
     RTF Private Torrent Tracker
     """
 
+    base_url = "https://retroflix.club"
+
     auth_type = "other_api"
     tracker = "RETROFLIX"
     display_name = "RetroFlix"
     allows_bloated_audio = True
     source_flag = "sunshine"
     banned_groups: tuple[str, ...] = ()
-    upload_url = "https://retroflix.club/api/upload"
-    search_url = "https://retroflix.club/api/torrent"
-    torrent_url = "https://retroflix.club/browse/t/"
-    forum_link = "https://retroflix.club/forums.php?action=viewtopic&topicid=3619"
+    upload_url = f"{base_url}/api/upload"
+    search_url = f"{base_url}/api/torrent"
+    torrent_url = f"{base_url}/browse/t/"
+    forum_link = f"{base_url}/forums.php?action=viewtopic&topicid=3619"
     tracker_urls = ("peer.retroflix",)
     supported_categories = ("TV", "MOVIE")
 
@@ -109,7 +111,7 @@ class RetroFlix:
                             t_id = response_json["torrent"]["id"]
                             meta.tracker_status[self.tracker]["torrent_id"] = t_id
                             await common.create_torrent_ready_to_seed(
-                                meta, self.tracker, self.source_flag, self.config["TRACKERS"][self.tracker].get("announce_url"), "https://retroflix.club/browse/t/" + str(t_id)
+                                meta, self.tracker, self.source_flag, self.config["TRACKERS"][self.tracker].get("announce_url"), f"{self.base_url}/browse/t/" + str(t_id)
                             )
                             return True
                         except KeyError as e:
@@ -301,7 +303,7 @@ class RetroFlix:
                     torrent_id = match.group(1)
 
             if torrent_id:
-                return f"https://retroflix.club/api/torrent/{torrent_id}/download"
+                return f"{self.base_url}/api/torrent/{torrent_id}/download"
 
             return torrent_url
 
@@ -343,7 +345,7 @@ class RetroFlix:
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get("https://retroflix.club/api/test", headers=headers)
+                response = await client.get(f"{self.base_url}/api/test", headers=headers)
 
                 if response.status_code != 200:
                     logger.info("[bold red]Your API key is incorrect SO generating a new one")
@@ -385,7 +387,7 @@ class RetroFlix:
 
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post("https://retroflix.club/api/login", headers=headers, json=json_data)
+                response = await client.post(f"{self.base_url}/api/login", headers=headers, json=json_data)
 
             if response.status_code == 201:
                 token = response.json().get("token")

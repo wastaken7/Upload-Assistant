@@ -26,6 +26,8 @@ class PTerClub:
     PTERCLUB (PT之友俱乐部) is a CHINESE Private Torrent Tracker for HD MUSIC VIDEOS / MOVIES / TV / ANIME
     """
 
+    base_url = "https://pterclub.net"
+
     auth_type = "cookies"
     tracker = "PTERCLUB"
     display_name = "PTerClub"
@@ -60,7 +62,7 @@ class PTerClub:
 
     async def validate_cookies(self, meta: Meta) -> bool:
         common = Common(config=self.config)
-        url = "https://pterclub.com"
+        url = f"{self.base_url}"
         from src.cookie_auth import find_cookie_file
 
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
@@ -87,7 +89,7 @@ class PTerClub:
         imdb_id = meta.imdb_id or 0
         imdb = f"tt{meta.imdb}" if imdb_id != 0 else ""
         source = await self.get_type_medium_id(meta)
-        search_url = f"https://pterclub.com/torrents.php?search={imdb}&incldead=0&search_mode=0&source{source}=1"
+        search_url = f"{self.base_url}/torrents.php?search={imdb}&incldead=0&search_mode=0&source{source}=1"
 
         async with httpx.AsyncClient(cookies=cookies, timeout=10.0, follow_redirects=True) as client:
             response = await client.get(search_url)
@@ -432,7 +434,7 @@ class PTerClub:
         if meta.personalrelease is True:
             data["pr"] = "yes"
 
-        url = "https://pterclub.com/takeupload.php"
+        url = f"{self.base_url}/takeupload.php"
 
         # Submit
         if meta.debug:
@@ -449,7 +451,7 @@ class PTerClub:
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
                 up = await client.post(url=url, data=data, files=files)
 
-                if str(up.url).startswith("https://pterclub.com/details.php?id="):
+                if str(up.url).startswith(f"{self.base_url}/details.php?id="):
                     logger.info(f"[green]Uploaded to: [yellow]{str(up.url).replace('&uploaded=1', '')}[/yellow][/green]")
                     id_match = re.search(r"(id=)(\d+)", urlparse(str(up.url)).query)
                     if id_match is None:
@@ -465,7 +467,7 @@ class PTerClub:
         return False
 
     async def download_new_torrent(self, id: str, torrent_path: str) -> None:
-        download_url = f"https://pterclub.com/download.php?id={id}&passkey={self.passkey}"
+        download_url = f"{self.base_url}/download.php?id={id}&passkey={self.passkey}"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             r = await client.get(url=download_url)
         if r.status_code == 200:

@@ -24,7 +24,8 @@ class BitHDTV:
     allows_bloated_audio = True
     source_flag = "BIT-HDTV"
     banned_groups = ()
-    upload_url = "https://www.bit-hdtv.com/takeupload.php"
+    base_url = "https://www.bit-hdtv.com"
+    upload_url = f"{base_url}/takeupload.php"
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:

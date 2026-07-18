@@ -103,7 +103,6 @@ This branch introduces new media categories and automation features not present 
 | DigitalCore            | DIGITALCORE            | MOVIE, TV, BOOK, GAME |
 | Emuwarez               | EMUWAREZ               | MOVIE, TV             |
 | FileList               | FILELIST               | MOVIE, TV             |
-| Friki                  | FRIKIBAR               | MOVIE, TV             |
 | FunFile                | FUNFILE                | MOVIE, TV             |
 | GreatPosterWall        | GREATPOSTERWALL        | MOVIE                 |
 | hawke-uno              | HAWKEUNO               | MOVIE, TV             |
@@ -157,7 +156,6 @@ This branch introduces new media categories and automation features not present 
 | TVChaosUK              | TVCHAOSUK              | MOVIE, TV             |
 | ULCX                   | ULCX                   | MOVIE, TV             |
 | UTOPIA                 | UTOPIA                 | MOVIE, TV             |
-| YOiNKED                | YOINKED                | MOVIE, TV             |
 | YUSCENE                | YUSCENE                | MOVIE, TV, BOOK, GAME |
 | Zenith                 | ZENITH                 | MOVIE, TV, BOOK, GAME |
 

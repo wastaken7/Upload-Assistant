@@ -23,12 +23,14 @@ class Curupira:
     CRP Private Torrent Tracker
     """
 
+    base_url = "https://curupira.cc"
+
     auth_type = "other_api"
     tracker = "CURUPIRA"
     display_name = "Curupira"
     banned_groups = ()
-    upload_url = "https://curupira.cc/v1/releases"
-    torrent_url = "https://curupira.cc/releases/"
+    upload_url = f"{base_url}/v1/releases"
+    torrent_url = f"{base_url}/releases/"
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")
     is_usenet = True
     allows_bloated_audio = True
@@ -111,7 +113,7 @@ class Curupira:
                         "limit": "100",
                         **query_params,
                     }
-                    response = await client.get("https://curupira.cc/api", params=request_params)
+                    response = await client.get(f"{self.base_url}/api", params=request_params)
 
                     if response.status_code != 200 or not response.text.strip():
                         logger.info(f"{self.tracker}: [yellow]Duplicate search failed with HTTP {response.status_code}.[/yellow]")

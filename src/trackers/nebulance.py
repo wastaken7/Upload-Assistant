@@ -95,9 +95,10 @@ class Nebulance:
         "ZmN",
         "ZMNT",
     )
-    upload_url = "https://nebulance.io/api.php"
-    search_url = "https://nebulance.io/api.php"
-    torrent_url = "https://nebulance.io/torrents.php?id="
+    base_url = "https://nebulance.io"
+    upload_url = f"{base_url}/api.php"
+    search_url = f"{base_url}/api.php"
+    torrent_url = f"{base_url}/torrents.php?id="
     supported_categories = ("TV",)
     tracker_urls = ("tracker.nebulance",)
 
@@ -143,7 +144,7 @@ class Nebulance:
                         try:
                             response_data = response.json()
                             meta.tracker_status[self.tracker]["status_message"] = response_data
-                            match = re.search(r"https://nebulance\.io/torrents\.php\?id=(\d+)", response_data.get("link", ""))
+                            match = re.search(rf"{re.escape(self.base_url)}/torrents\.php\?id=(\d+)", response_data.get("link", ""))
                             if match:
                                 torrent_id = match.group(1)
                                 meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
@@ -275,7 +276,7 @@ class Nebulance:
                             "name": str(each.get("rls_name", "")),
                             "files": files_str,
                             "size": int(each.get("size", 0)),
-                            "link": f"https://nebulance.io/torrents.php?id={each.get('group_id', '')}",
+                            "link": f"{self.base_url}/torrents.php?id={each.get('group_id', '')}",
                             "file_count": len(file_list) if file_list else 1,
                             "download": str(each.get("download", "")),
                         }

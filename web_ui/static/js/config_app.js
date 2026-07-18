@@ -290,7 +290,6 @@ const trackerNameMap = {
   DRUNKENSLUG: "DrunkenSlug",
   EMUWAREZ: "Emuwarez",
   FILELIST: "FileList",
-  FRIKIBAR: "Friki",
   FUNFILE: "FunFile",
   GREATPOSTERWALL: "GreatPosterWall",
   HAWKEUNO: "hawke-uno",
@@ -346,7 +345,6 @@ const trackerNameMap = {
   ULCX: "ULCX",
   SUIO: "Suio",
   UTOPIA: "UTOPIA",
-  YOINKED: "YOiNKED",
   YUSCENE: "YUSCENE",
   ZENITH: "Zenith",
 };

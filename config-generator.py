@@ -228,8 +228,6 @@ def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
         "UTP": "UTOPIA",
         "YUS": "YUSCENE",
         "ZNTH": "ZENITH",
-        "FRIKI": "FRIKIBAR",
-        "YOINK": "YOINKED",
         "SUIO": "SUIO",
         "UNIT3D_TEMPLATE": "UNIT3DTEMPLATE",
     }

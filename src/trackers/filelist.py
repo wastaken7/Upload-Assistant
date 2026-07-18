@@ -32,6 +32,7 @@ class FileList:
     source_flag = "FL"
     signature: str | None = None
     banned_groups = ("",)
+    base_url = "https://filelist.io"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("reactor.filelist", "reactor.thefl.org")
 
@@ -239,7 +240,7 @@ class FileList:
         if int(meta.freeleech if meta.freeleech is not None else "0") != 0:
             data["freeleech"] = "on"
 
-        url = "https://filelist.io/takeupload.php"
+        url = f"{self.base_url}/takeupload.php"
         # Submit
         if meta.debug:
             logger.debug(url)
@@ -255,7 +256,7 @@ class FileList:
             up = await client.post(url=url, data=data, files=files)
 
         # Match url to verify successful upload
-        match = re.match(r".*?filelist\.io/details\.php\?id=(\d+)&uploaded=(\d+)", str(up.url))
+        match = re.match(rf".*?{re.escape(self.base_url.replace('https://', ''))}/details\.php\?id=(\d+)&uploaded=(\d+)", str(up.url))
         if match:
             meta.tracker_status[self.tracker]["status_message"] = match.group(0)
             torrent_id = match.group(1)
@@ -273,7 +274,7 @@ class FileList:
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         cookies = self._load_cookie_dict(cookiefile)
 
-        search_url = "https://filelist.io/browse.php"
+        search_url = f"{self.base_url}/browse.php"
 
         imdb_id_value = str(meta.imdb_id if meta.imdb_id is not None else "0")
         if imdb_id_value.isdigit() and int(imdb_id_value) != 0:
@@ -317,7 +318,7 @@ class FileList:
         return True
 
     async def validate_cookies(self, meta: Meta, _cookiefile: str) -> bool:
-        url = "https://filelist.io/index.php"
+        url = f"{self.base_url}/index.php"
         from src.cookie_auth import find_cookie_file
 
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
@@ -331,7 +332,7 @@ class FileList:
 
     async def login(self, cookiefile: str) -> None:
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            r = await client.get("https://filelist.io/login.php")
+            r = await client.get(f"{self.base_url}/login.php")
             await asyncio.sleep(0.5)
             soup = BeautifulSoup(r.text, "html.parser")
             validator_input = soup.find("input", {"name": "validator"})
@@ -347,8 +348,8 @@ class FileList:
                 "password": self.password,
                 "unlock": "1",
             }
-            await client.post("https://filelist.io/takelogin.php", data=data)
-            index = "https://filelist.io/index.php"
+            await client.post(f"{self.base_url}/takelogin.php", data=data)
+            index = f"{self.base_url}/index.php"
             response = await client.get(index)
             if response.text.find("Logout") != -1:
                 logger.info("[green]Successfully logged into FILELIST")
@@ -359,7 +360,7 @@ class FileList:
         return
 
     async def download_new_torrent(self, cookies: dict[str, str], id: str, torrent_path: str) -> None:
-        download_url = f"https://filelist.io/download.php?id={id}"
+        download_url = f"{self.base_url}/download.php?id={id}"
         async with httpx.AsyncClient(cookies=cookies, timeout=30.0) as client:
             r = await client.get(url=download_url)
         if r.status_code == 200:

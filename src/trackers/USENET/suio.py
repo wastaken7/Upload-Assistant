@@ -42,6 +42,7 @@ class Suio:
     upload_url: str | None = None
     torrent_url: str | None = None
     search_url: str | None = None
+    base_url = "https://suio.cc"
     supported_categories = ("MOVIE", "TV", "GAME", "BOOK")
     is_usenet = True
 
