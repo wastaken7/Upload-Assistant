@@ -4,6 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Upload-Assistant Web UI - Login</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="{{ url_for('static', filename='img/logo.svg') }}"
+    />
+    <link
+      rel="alternate icon"
+      type="image/png"
+      href="{{ url_for('static', filename='img/logo.png') }}"
+    />
+    <link
+      rel="shortcut icon"
+      href="{{ url_for('static', filename='favicon.ico') }}"
+    />
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       @keyframes shine {
@@ -73,20 +87,11 @@
             class="grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] text-center"
           >
             <div class="flex items-center justify-center mb-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                class="flex-shrink-0 h-12 w-12"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                ></path>
-              </svg>
+              <img
+                src="{{ url_for('static', filename='img/logo.svg') }}"
+                alt="Upload-Assistant Logo"
+                class="flex-shrink-0 h-16 w-16 select-none pointer-events-none"
+              />
             </div>
             <div
               class="text-3xl font-bold pointer-events-none select-none text-white"

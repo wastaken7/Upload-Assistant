@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070814" />
+      <stop offset="50%" stop-color="#0f1123" />
+      <stop offset="100%" stop-color="#1a1435" />
+    </linearGradient>
+
+    <!-- Glowing Border Gradient -->
+    <linearGradient id="border-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="35%" stop-color="#3b82f6" />
+      <stop offset="70%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#ec4899" />
+    </linearGradient>
+
+    <!-- Code Brackets Gradient -->
+    <linearGradient id="bracket-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#22d3ee" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+
+    <!-- Upload Rocket Arrow Gradient -->
+    <linearGradient id="rocket-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff007a" />
+      <stop offset="50%" stop-color="#d946ef" />
+      <stop offset="100%" stop-color="#8b5cf6" />
+    </linearGradient>
+
+    <!-- Rising Data Packets Gradient -->
+    <linearGradient id="packet-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="1" />
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.3" />
+    </linearGradient>
+
+    <!-- Terminal Cursor Gradient -->
+    <linearGradient id="cursor-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#14b8a6" />
+      <stop offset="100%" stop-color="#2dd4bf" />
+    </linearGradient>
+
+    <!-- Glow Filters -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="intense-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14" result="blur1" />
+      <feGaussianBlur stdDeviation="4" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur1" />
+        <feMergeNode in="blur2" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Card Background with Sleek Border -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg-gradient)" stroke="url(#border-gradient)" stroke-width="8" />
+
+  <!-- Subtle Inner Shadow/Glow -->
+  <rect x="24" y="24" width="464" height="464" rx="104" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.08" />
+
+  <!-- Code Brackets (Left & Right) -->
+  <!-- Left Bracket `<` -->
+  <path d="M 155 176 L 95 256 L 155 336" fill="none" stroke="url(#bracket-gradient)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)" />
+  
+  <!-- Right Bracket `>` -->
+  <path d="M 357 176 L 417 256 L 357 336" fill="none" stroke="url(#bracket-gradient)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)" />
+
+  <!-- Rocket/Upload Arrow in the Center -->
+  <path d="M 256 101 L 322 196 L 276 186 V 256 H 236 V 186 L 190 196 Z" fill="url(#rocket-gradient)" filter="url(#intense-glow)" />
+
+  <!-- Rising Data Packets / Exhaust Trail -->
+  <!-- Packet 1 (top) -->
+  <rect x="236" y="281" width="40" height="15" rx="7.5" fill="url(#packet-gradient)" />
+  <!-- Packet 2 (middle) -->
+  <rect x="236" y="321" width="40" height="15" rx="7.5" fill="url(#packet-gradient)" opacity="0.7" />
+  <!-- Packet 3 (bottom, tapered) -->
+  <rect x="241" y="361" width="30" height="12" rx="6" fill="url(#packet-gradient)" opacity="0.4" />
+
+  <!-- Glowing CLI Terminal Cursor `_` at the Base -->
+  <rect x="216" y="396" width="80" height="14" rx="7" fill="url(#cursor-gradient)" filter="url(#glow)" />
+</svg>

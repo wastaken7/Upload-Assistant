@@ -12,6 +12,7 @@ AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}/issues
+UninstallDisplayName={#AppName} {#AppVersion}
 DefaultDirName={localappdata}\Programs\Upload Assistant
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
@@ -23,7 +24,8 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-UninstallDisplayIcon={app}\upload.py
+SetupIconFile=logo.ico
+UninstallDisplayIcon={app}\logo.ico
 
 [Tasks]
 Name: "discord"; Description: "Install optional Discord notification support"; Flags: unchecked
@@ -31,6 +33,7 @@ Name: "configure"; Description: "Open the configuration wizard after installatio
 
 [Files]
 Source: "..\build\payload\source\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
+Source: "logo.ico"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\build\payload\python-installer.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "..\build\payload\ffmpeg.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "..\build\payload\wheels\*"; DestDir: "{tmp}\wheels"; Flags: recursesubdirs deleteafterinstall

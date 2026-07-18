@@ -715,17 +715,81 @@ const TrashIcon = () => (
 );
 
 const UploadIcon = () => (
-  <svg
-    className="w-6 h-6"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
+  <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 512 512">
+    <defs>
+      <linearGradient
+        id="app-rocket-gradient"
+        x1="0%"
+        y1="0%"
+        x2="0%"
+        y2="100%"
+      >
+        <stop offset="0%" stopColor="#ff007a" />
+        <stop offset="50%" stopColor="#d946ef" />
+        <stop offset="100%" stopColor="#8b5cf6" />
+      </linearGradient>
+      <linearGradient
+        id="app-bracket-gradient"
+        x1="0%"
+        y1="0%"
+        x2="0%"
+        y2="100%"
+      >
+        <stop offset="0%" stopColor="#22d3ee" />
+        <stop offset="100%" stopColor="#06b6d4" />
+      </linearGradient>
+      <linearGradient
+        id="app-cursor-gradient"
+        x1="0%"
+        y1="0%"
+        x2="100%"
+        y2="0%"
+      >
+        <stop offset="0%" stopColor="#14b8a6" />
+        <stop offset="100%" stopColor="#2dd4bf" />
+      </linearGradient>
+    </defs>
+    {/* Code Brackets */}
     <path
+      d="M 155 176 L 95 256 L 155 336"
+      fill="none"
+      stroke="url(#app-bracket-gradient)"
+      strokeWidth="32"
       strokeLinecap="round"
       strokeLinejoin="round"
-      strokeWidth={2}
-      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+    />
+    <path
+      d="M 357 176 L 417 256 L 357 336"
+      fill="none"
+      stroke="url(#app-bracket-gradient)"
+      strokeWidth="32"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* Rocket / Arrow */}
+    <path
+      d="M 256 101 L 322 196 L 276 186 V 256 H 236 V 186 L 190 196 Z"
+      fill="url(#app-rocket-gradient)"
+    />
+    {/* Rising Packets */}
+    <rect x="236" y="281" width="40" height="15" rx="7.5" fill="#8b5cf6" />
+    <rect
+      x="236"
+      y="321"
+      width="40"
+      height="15"
+      rx="7.5"
+      fill="#3b82f6"
+      opacity="0.7"
+    />
+    {/* Terminal Cursor */}
+    <rect
+      x="216"
+      y="396"
+      width="80"
+      height="14"
+      rx="7"
+      fill="url(#app-cursor-gradient)"
     />
   </svg>
 );

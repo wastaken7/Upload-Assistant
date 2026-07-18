@@ -4,6 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Upload-Assistant Web UI - Recovery Login</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="{{ url_for('static', filename='img/logo.svg') }}"
+    />
+    <link
+      rel="alternate icon"
+      type="image/png"
+      href="{{ url_for('static', filename='img/logo.png') }}"
+    />
+    <link
+      rel="shortcut icon"
+      href="{{ url_for('static', filename='favicon.ico') }}"
+    />
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body style="background-color: oklch(0.145 0 0)">
@@ -18,7 +32,12 @@
             border-color: rgba(255, 255, 255, 0.1);
           "
         >
-          <div class="px-6 pt-6">
+          <div class="px-6 pt-6 flex flex-col items-center text-center">
+            <img
+              src="{{ url_for('static', filename='img/logo.svg') }}"
+              alt="Upload-Assistant Logo"
+              class="h-12 w-12 mb-3 select-none pointer-events-none"
+            />
             <h2 class="text-xl font-semibold text-white">Recovery login</h2>
             <p class="text-sm text-gray-300">
               Use a one-time recovery code to sign in.
