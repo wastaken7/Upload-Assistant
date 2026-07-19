@@ -724,9 +724,9 @@ class QbittorrentClientMixin:
         if use_symlink or use_hardlink:
             if tracker_dir is None:
                 raise ValueError("Linking enabled but tracker_dir was not set")
-            save_path = tracker_dir  # Default to linked directory
+            save_path = str(tracker_dir)  # Default to linked directory
         else:
-            save_path = path  # Default to the original path
+            save_path = str(path)  # Default to the original path
 
         # Handle remote path mapping
         if local_path and remote_path and local_path.lower() != remote_path.lower():

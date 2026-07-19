@@ -595,7 +595,7 @@ class TorrentCreator:
         if not Path(binary_path).exists():
             raise FileNotFoundError(f"mkbrr binary not found: {binary_path}")
 
-        return binary_path
+        return str(binary_path)
 
 
 def build_mkbrr_exclude_string(root_folder: str, filelist: Sequence[str], allow_subs: bool = False) -> str:
