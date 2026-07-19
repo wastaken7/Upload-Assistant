@@ -714,86 +714,6 @@ const TrashIcon = () => (
   </svg>
 );
 
-const UploadIcon = () => (
-  <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 512 512">
-    <defs>
-      <linearGradient
-        id="app-rocket-gradient"
-        x1="0%"
-        y1="0%"
-        x2="0%"
-        y2="100%"
-      >
-        <stop offset="0%" stopColor="#ff007a" />
-        <stop offset="50%" stopColor="#d946ef" />
-        <stop offset="100%" stopColor="#8b5cf6" />
-      </linearGradient>
-      <linearGradient
-        id="app-bracket-gradient"
-        x1="0%"
-        y1="0%"
-        x2="0%"
-        y2="100%"
-      >
-        <stop offset="0%" stopColor="#22d3ee" />
-        <stop offset="100%" stopColor="#06b6d4" />
-      </linearGradient>
-      <linearGradient
-        id="app-cursor-gradient"
-        x1="0%"
-        y1="0%"
-        x2="100%"
-        y2="0%"
-      >
-        <stop offset="0%" stopColor="#14b8a6" />
-        <stop offset="100%" stopColor="#2dd4bf" />
-      </linearGradient>
-    </defs>
-    {/* Code Brackets */}
-    <path
-      d="M 155 176 L 95 256 L 155 336"
-      fill="none"
-      stroke="url(#app-bracket-gradient)"
-      strokeWidth="32"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M 357 176 L 417 256 L 357 336"
-      fill="none"
-      stroke="url(#app-bracket-gradient)"
-      strokeWidth="32"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    {/* Rocket / Arrow */}
-    <path
-      d="M 256 101 L 322 196 L 276 186 V 256 H 236 V 186 L 190 196 Z"
-      fill="url(#app-rocket-gradient)"
-    />
-    {/* Rising Packets */}
-    <rect x="236" y="281" width="40" height="15" rx="7.5" fill="#8b5cf6" />
-    <rect
-      x="236"
-      y="321"
-      width="40"
-      height="15"
-      rx="7.5"
-      fill="#3b82f6"
-      opacity="0.7"
-    />
-    {/* Terminal Cursor */}
-    <rect
-      x="216"
-      y="396"
-      width="80"
-      height="14"
-      rx="7"
-      fill="url(#app-cursor-gradient)"
-    />
-  </svg>
-);
-
 const LogoIcon = ({ src, className = "w-6 h-6" }) => (
   <img
     src={src}
@@ -1086,6 +1006,7 @@ function AudionutsUAGUI() {
   const [rightSidebarWidth, setRightSidebarWidth] = useState(320);
   const [isResizingRight, setIsResizingRight] = useState(false);
   const [userInput, setUserInput] = useState("");
+  const [isSendingInput, setIsSendingInput] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(getStoredTheme);
   const [argSearchFilter, setArgSearchFilter] = useState("");
   const [collapsedSections, setCollapsedSections] = useState(new Set());
@@ -1123,6 +1044,7 @@ function AudionutsUAGUI() {
   const richOutputRef = useRef(null);
   const lastFullHashRef = useRef("");
   const inputRef = useRef(null);
+  const isSendingInputRef = useRef(false);
   const sseAbortControllerRef = useRef(null);
   const visibleProgressItems = progressItems.filter(
     (item) => item.status !== "completed",
@@ -1838,6 +1760,9 @@ function AudionutsUAGUI() {
   };
 
   const sendInput = async (session_id, input) => {
+    if (isSendingInputRef.current || !session_id) return;
+    isSendingInputRef.current = true;
+    setIsSendingInput(true);
     // Optimistically echo the user's input locally so it appears before
     // any subsequent server-generated prompt / output.
     appendSystemMessage("> " + input, "user-input");
@@ -1851,6 +1776,9 @@ function AudionutsUAGUI() {
     } catch (err) {
       console.error("Failed to send input:", err);
       appendSystemMessage("Failed to send input", "error");
+    } finally {
+      isSendingInputRef.current = false;
+      setIsSendingInput(false);
     }
   };
 
@@ -3313,7 +3241,6 @@ function AudionutsUAGUI() {
           <h2
             className={`${titleSize} font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
           >
-            <UploadIcon />
             Now Processing
           </h2>
           <p
@@ -3341,7 +3268,6 @@ function AudionutsUAGUI() {
               <div
                 className={`w-full ${posterHeight} flex flex-col items-center justify-center gap-2 ${isDarkMode ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-500"}`}
               >
-                <UploadIcon />
                 <span className="text-sm">Poster not available yet</span>
               </div>
             )}
@@ -3482,6 +3408,9 @@ function AudionutsUAGUI() {
 
   const isAwaitingTerminalInput = Boolean(
     isExecuting && executionPreview?.awaiting_input,
+  );
+  const isYesNoPrompt = Boolean(
+    isAwaitingTerminalInput && executionPreview?.input_type === "yes_no",
   );
 
   // Mobile Layout
@@ -3887,6 +3816,24 @@ function AudionutsUAGUI() {
                 <div
                   className={`mt-2 flex gap-2 ${isAwaitingTerminalInput ? "animate-pulse" : ""}`}
                 >
+                  {isYesNoPrompt && (
+                    <>
+                      <button
+                        onClick={() => sendInput(sessionId, "yes")}
+                        disabled={!sessionId || isSendingInput}
+                        className="px-3 py-2 rounded-lg text-sm text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => sendInput(sessionId, "no")}
+                        disabled={!sessionId || isSendingInput}
+                        className="px-3 py-2 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                      >
+                        No
+                      </button>
+                    </>
+                  )}
                   <input
                     ref={inputRef}
                     value={userInput}
@@ -3902,7 +3849,7 @@ function AudionutsUAGUI() {
                   />
                   <button
                     onClick={() => sendInput(sessionId, userInput)}
-                    disabled={!sessionId || !userInput}
+                    disabled={!sessionId || !userInput || isSendingInput}
                     className={`px-3 py-2 rounded-lg text-white disabled:opacity-50 text-sm ${isAwaitingTerminalInput ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"}`}
                   >
                     Send
@@ -4111,12 +4058,12 @@ function AudionutsUAGUI() {
           {navButton("files", <FolderIcon />, "Files")}
           {navButton(
             "main",
-            isAwaitingTerminalInput ? <TerminalIcon /> : <UploadIcon />,
+            isAwaitingTerminalInput ? <TerminalIcon /> : null,
             isAwaitingTerminalInput ? "Input Required" : "Upload",
           )}
           {navButton(
             "args",
-            isExecuting ? <UploadIcon /> : <TerminalIcon />,
+            isExecuting ? null : <TerminalIcon />,
             isExecuting ? "Processing" : "Arguments",
           )}
           {visibleProgressItems.length > 0 &&
@@ -4697,6 +4644,24 @@ function AudionutsUAGUI() {
               <div
                 className={`mt-2 flex gap-2 ${isAwaitingTerminalInput ? "animate-pulse" : ""}`}
               >
+                {isYesNoPrompt && (
+                  <>
+                    <button
+                      onClick={() => sendInput(sessionId, "yes")}
+                      disabled={!sessionId || isSendingInput}
+                      className="px-4 py-2 rounded-lg text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => sendInput(sessionId, "no")}
+                      disabled={!sessionId || isSendingInput}
+                      className="px-4 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                    >
+                      No
+                    </button>
+                  </>
+                )}
                 <input
                   ref={inputRef}
                   value={userInput}
@@ -4712,7 +4677,7 @@ function AudionutsUAGUI() {
                 />
                 <button
                   onClick={() => sendInput(sessionId, userInput)}
-                  disabled={!sessionId || !userInput}
+                  disabled={!sessionId || !userInput || isSendingInput}
                   className={`px-4 py-2 rounded-lg text-white disabled:opacity-50 ${isAwaitingTerminalInput ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"}`}
                 >
                   Send

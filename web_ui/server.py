@@ -1135,14 +1135,15 @@ def _stringify_optional_id(value: object) -> str:
     return "" if text in {"", "0"} else text
 
 
-def _set_process_awaiting_input(session_id: str, waiting: bool) -> None:
+def _set_process_awaiting_input(session_id: str, waiting: bool, input_type: str = "text") -> None:
     with active_processes_lock:
         process_info = active_processes.get(session_id)
         if process_info is not None:
             process_info["awaiting_input"] = waiting
+            process_info["input_type"] = input_type if waiting else None
 
 
-def _set_process_awaiting_input_if_current(session_id: str, process_state: Mapping[str, object], waiting: bool) -> None:
+def _set_process_awaiting_input_if_current(session_id: str, process_state: Mapping[str, object], waiting: bool, input_type: str = "text") -> None:
     with active_processes_lock:
         current_state = active_processes.get(session_id)
         if current_state is not process_state:
@@ -1150,6 +1151,7 @@ def _set_process_awaiting_input_if_current(session_id: str, process_state: Mappi
         run_token = process_state.get("run_token")
         if run_token and current_state.get("run_token") == run_token:
             current_state["awaiting_input"] = waiting
+            current_state["input_type"] = input_type if waiting else None
 
 
 def _apply_progress_event(process_info: ProcessInfo, event: Mapping[str, object]) -> None:
@@ -1209,6 +1211,7 @@ def _make_process_state(path: str, args: str) -> dict[str, object]:
         "args": args,
         "started_at": time.time(),
         "awaiting_input": False,
+        "input_type": None,
         "progress": {},
     }
 
@@ -1561,6 +1564,7 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
         "game_system": _stringify_preview_value(meta_data.get("game_system")),
         "developer": _stringify_preview_value(meta_data.get("developer")),
         "awaiting_input": False,
+        "input_type": None,
     }
 
 
@@ -1585,6 +1589,7 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
                         console.print(f"Execution preview cover enrichment failed for session {session_id}: {err}", markup=False)
             preview = _extract_execution_preview(meta_data, execution_path)
             preview["awaiting_input"] = bool(process_info.get("awaiting_input"))
+            preview["input_type"] = process_info.get("input_type")
             preview["progress"] = _progress_items_for_process(process_info)
             return preview
         except Exception:  # noqa: S110
@@ -1633,6 +1638,7 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
         "game_system": "",
         "developer": "",
         "awaiting_input": bool(process_info.get("awaiting_input")),
+        "input_type": process_info.get("input_type"),
         "progress": _progress_items_for_process(process_info),
     }
 
@@ -1739,6 +1745,7 @@ class ExecutionPreview(TypedDict, total=False):
     game_system: str
     developer: str
     awaiting_input: bool
+    input_type: str | None
     progress: list[ProgressItem]
 
 
@@ -4353,7 +4360,7 @@ def execute_command():
                             with contextlib.suppress(Exception):
                                 wrapped_print(str(question))
                             # Wait for a response or cancellation
-                            _set_process_awaiting_input_if_current(session_id, process_state, True)
+                            _set_process_awaiting_input_if_current(session_id, process_state, True, "yes_no")
                             while True:
                                 if cancel_event.is_set():
                                     _set_process_awaiting_input_if_current(session_id, process_state, False)
@@ -4377,6 +4384,7 @@ def execute_command():
                                     return False
                                 with contextlib.suppress(Exception):
                                     wrapped_print("Please answer y or n.")
+                                _set_process_awaiting_input_if_current(session_id, process_state, True, "yes_no")
 
                         _cli_ui.ask_yes_no = wrapped_ask_yes_no
                         # Save original ask_yes_no so external cleaners (eg. /api/kill)
