@@ -90,7 +90,7 @@ class ULCX(UNIT3D):
             else:
                 return False
 
-        if meta.type == "ENCODE" and meta.tag and meta.tag[1:] in ("EDGE2020", "NuBz", "Ralphy"):
+        if meta.type == "ENCODE" and meta.tag and meta.tag[1:].lower() in ("edge2020", "nubz", "ralphy"):
             logger.info(f"{self.tracker}: [bold red]Encodes from {meta.tag} are not allowed.[/bold red]")
             return False
 
