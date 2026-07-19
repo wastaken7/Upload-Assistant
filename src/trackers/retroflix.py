@@ -309,20 +309,18 @@ class RetroFlix:
 
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(self.search_url, params=params, headers=headers)
-            if response.status_code == 200:
-                data = cast(list[dict[str, Any]], response.json())
-                for each in data:
-                    download_url = build_download_url(each)
-                    result = {
-                        "name": str(each.get("name", "")),
-                        "size": each.get("size", 0),
-                        "files": str(each.get("name", "")),
-                        "link": str(each.get("url", "")),
-                        "download": download_url,
-                    }
-                    dupes.append(result)
-            else:
-                logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
+            response.raise_for_status()
+            data = cast(list[dict[str, Any]], response.json())
+            for each in data:
+                download_url = build_download_url(each)
+                result = {
+                    "name": str(each.get("name", "")),
+                    "size": each.get("size", 0),
+                    "files": str(each.get("name", "")),
+                    "link": str(each.get("url", "")),
+                    "download": download_url,
+                }
+                dupes.append(result)
 
         return dupes
 

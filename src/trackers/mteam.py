@@ -382,11 +382,11 @@ class MTeam:
         }
 
         response = await self.session.post(api_url, json=payload, timeout=15)
+        response.raise_for_status()
         res_json = response.json()
 
         if res_json.get("code") != "0":
-            logger.info(f"[bold red]API Error: {res_json.get('message')}[/bold red]")
-            return dupes
+            raise RuntimeError(f"MTEAM API Error: {res_json.get('message')}")
 
         torrents = res_json.get("data", {}).get("data", [])
 

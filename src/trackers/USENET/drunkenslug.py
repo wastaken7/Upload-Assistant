@@ -2,7 +2,6 @@
 import json
 from pathlib import Path
 from typing import Any
-from xml.etree import ElementTree
 
 import aiofiles
 import httpx
@@ -90,42 +89,34 @@ class DrunkenSlug:
             params["t"] = "search"
             params["q"] = self.get_search_query(meta)
 
-        try:
-            dupes: list[dict[str, Any]] = []
-            seen_keys: set[str] = set()
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                allowed, used_hits = await reserve_daily_api_hit(meta.base_dir, self.tracker, self.daily_api_hit_limit)
-                if not allowed:
-                    logger.info(f"{self.tracker}: [yellow]Duplicate search skipped because the 24-hour API hit limit ({self.daily_api_hit_limit}) has been reached.[/yellow]")
-                    return []
-                request_params = {
-                    "apikey": self.api_key,
-                    "limit": "100",
-                    "extended": "1",
-                    **params,
-                }
-                response = await client.get(self.search_url, params=request_params)
-                logger.debug(f"{self.tracker}: Duplicate search used API hit {used_hits}/{self.daily_api_hit_limit} in the last 24 hours.")
-                if response.status_code != 200 or not response.text.strip():
-                    logger.info(f"{self.tracker}: [yellow]Duplicate search failed with HTTP {response.status_code}.[/yellow]")
-                    return []
+        dupes: list[dict[str, Any]] = []
+        seen_keys: set[str] = set()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            allowed, used_hits = await reserve_daily_api_hit(meta.base_dir, self.tracker, self.daily_api_hit_limit)
+            if not allowed:
+                logger.info(f"{self.tracker}: [yellow]Duplicate search skipped because the 24-hour API hit limit ({self.daily_api_hit_limit}) has been reached.[/yellow]")
+                return []
+            request_params = {
+                "apikey": self.api_key,
+                "limit": "100",
+                "extended": "1",
+                **params,
+            }
+            response = await client.get(self.search_url, params=request_params)
+            logger.debug(f"{self.tracker}: Duplicate search used API hit {used_hits}/{self.daily_api_hit_limit} in the last 24 hours.")
+            response.raise_for_status()
 
-                for dupe in self._parse_dupes_from_response(response.text):
-                    key = str(dupe.get("link") or dupe.get("name") or "")
-                    if key in seen_keys:
-                        continue
-                    seen_keys.add(key)
-                    dupes.append(dupe)
+            if not response.text.strip():
+                return []
 
-            return dupes
-        except ElementTree.ParseError:
-            logger.info(f"{self.tracker}: [yellow]Failed to parse duplicate search response.[/yellow]")
-        except httpx.TimeoutException:
-            logger.info(f"{self.tracker}: [yellow]Duplicate search timed out.[/yellow]")
-        except httpx.RequestError as e:
-            logger.info(f"{self.tracker}: [yellow]Duplicate search request failed: {e}[/yellow]")
+            for dupe in self._parse_dupes_from_response(response.text):
+                key = str(dupe.get("link") or dupe.get("name") or "")
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                dupes.append(dupe)
 
-        return []
+        return dupes
 
     async def get_name(self, meta: Meta) -> str:
         return meta.scene_name or meta.basename_no_ext

@@ -404,6 +404,7 @@ class TorrentHR:
                 page_count += 1
                 logger.debug(f"[dim]Searching page {page_count}...")
                 response = await client.get(page_url)
+                response.raise_for_status()
 
                 page_dupes, has_next_page, next_page_number = await self._process_search_response(response, current_page)
 

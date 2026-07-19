@@ -1293,7 +1293,6 @@ async def generate_ebook_screenshots(
     cover_path = Path(output_dir) / "POSTER.png"
     banner_path = Path(output_dir) / "POSTER_BANNER.png"
 
-    cover_cached = Path(cover_path).exists() and Path(cover_path).stat().st_size >= 20480 and not meta.retake
     banner_cached = Path(banner_path).exists() and Path(banner_path).stat().st_size > 0 and not meta.retake
 
     prepared_cover = await prepare_book_cover(path, folder_id, base_dir, meta)

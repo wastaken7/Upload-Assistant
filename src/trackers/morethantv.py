@@ -754,32 +754,20 @@ class MoreThanTV:
 
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(url=self.search_url, params=params)
+            response.raise_for_status()
 
-            if response.status_code == 200 and response.text:
-                # Parse XML response
-                try:
-                    loop = asyncio.get_running_loop()
-                    response_xml = await loop.run_in_executor(None, lambda: ElementTree.fromstring(response.text))
-                    channel = cast(Any | None, response_xml.find("channel"))
-                    if channel is None:
-                        return dupes
-                    for each in channel.findall("item"):
-                        title = str(each.findtext("title") or "")
-                        files_text = str(each.findtext("files") or "0")
-                        size_text = str(each.findtext("size") or "0")
-                        guid = str(each.findtext("guid") or "")
-                        link = str(each.findtext("link") or "")
-                        result = {"name": title, "files": title, "file_count": int(files_text), "size": int(size_text), "link": guid, "download": link}
-                        dupes.append(result)
-                except ElementTree.ParseError:
-                    logger.error("[red]Failed to parse XML response from MORETHANTV API")
-            else:
-                # Handle potential error messages
-                if response.status_code != 200:
-                    logger.info(f"[red]HTTP request failed. Status: {response.status_code}")
-                elif "status_message" in response.json():
-                    logger.info(f"[yellow]{response.json().get('status_message')}")
-                else:
-                    logger.info("[red]Site Seems to be down or not responding to API")
+            # Parse XML response
+            loop = asyncio.get_running_loop()
+            response_xml = await loop.run_in_executor(None, lambda: ElementTree.fromstring(response.text))
+            channel = cast(Any | None, response_xml.find("channel"))
+            if channel is not None:
+                for each in channel.findall("item"):
+                    title = str(each.findtext("title") or "")
+                    files_text = str(each.findtext("files") or "0")
+                    size_text = str(each.findtext("size") or "0")
+                    guid = str(each.findtext("guid") or "")
+                    link = str(each.findtext("link") or "")
+                    result = {"name": title, "files": title, "file_count": int(files_text), "size": int(size_text), "link": guid, "download": link}
+                    dupes.append(result)
 
         return dupes

@@ -271,16 +271,16 @@ class AlphaRatio:
 
         async with httpx.AsyncClient(headers=headers, timeout=30.0, cookies=cookie_jar) as client:
             response = await client.get(search_url)
+            response.raise_for_status()
 
-            if "login.php" in str(response.url) or "login.php" in response.text or response.status_code != 200:
+            if "login.php" in str(response.url) or "login.php" in response.text:
                 await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
                 meta.skipping = f"{self.tracker}"
                 return dupes
 
             json_response = response.json()
             if json_response.get("status") != "success":
-                logger.info("[red]Invalid response status.")
-                return dupes
+                raise RuntimeError(f"{self.tracker}: API returned unsuccessful status: {json_response.get('error', 'unknown error')}")
 
             results = json_response.get("response", {}).get("results", [])
             if not results:

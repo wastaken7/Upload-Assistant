@@ -221,7 +221,7 @@ class TorrentLeech:
         images = cast(list[dict[str, Any]], meta.menu_images) + meta.image_list + meta.spectrograms_images
         return [image["raw_url"] for image in images if image.get("raw_url")]
 
-    async def get_name(self, meta):
+    async def get_name(self, meta: Meta) -> str:
         tl_name = meta.name.replace(meta.aka, "")
         return re.sub(r"\s{2,}", " ", tl_name)
 
@@ -283,22 +283,18 @@ class TorrentLeech:
 
     async def _search_url(self, url: str, forbidden_keywords: list[str]) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
-        try:
-            response = await self.session.get(url, timeout=20)
-            response.raise_for_status()
+        response = await self.session.get(url, timeout=20)
+        response.raise_for_status()
 
-            data = cast(dict[str, Any], response.json())
-            torrents = cast(list[dict[str, Any]], data.get("torrentList", []))
+        data = cast(dict[str, Any], response.json())
+        torrents = cast(list[dict[str, Any]], data.get("torrentList", []))
 
-            for torrent in torrents:
-                name = str(torrent.get("name", ""))
-                link = f"{self.torrent_url}{torrent.get('fid')}"
-                size = torrent.get("size")
-                if not any(keyword in name.lower() for keyword in forbidden_keywords):
-                    results.append({"name": name, "size": size, "link": link})
-
-        except Exception as e:
-            logger.info(f"[bold red]Error searching for duplicates on {self.tracker} ({url}): {e}[/bold red]")
+        for torrent in torrents:
+            name = str(torrent.get("name", ""))
+            link = f"{self.torrent_url}{torrent.get('fid')}"
+            size = torrent.get("size")
+            if not any(keyword in name.lower() for keyword in forbidden_keywords):
+                results.append({"name": name, "size": size, "link": link})
 
         return results
 
@@ -418,7 +414,7 @@ class TorrentLeech:
         try:
             async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent", "rb") as f:
                 torrent_bytes = await f.read()
-            files = {
+            files: dict[str, tuple[str, bytes | str, str]] = {
                 "torrent": ("torrent.torrent", torrent_bytes, "application/x-bittorrent"),
                 "nfo": ("description.txt", description_content, "text/plain"),
             }

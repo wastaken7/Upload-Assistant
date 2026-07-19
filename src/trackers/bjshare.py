@@ -744,6 +744,7 @@ class BJShare:
         BJShare.database_title = ""
 
         response = await self.session.get(search_url, params=params, follow_redirects=True)
+        response.raise_for_status()
         if "login.php" in str(response.url) or "login.php" in response.text:
             await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
             meta.skipping = f"{self.tracker}"

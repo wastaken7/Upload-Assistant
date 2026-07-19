@@ -432,31 +432,29 @@ class BEYONDHD:
         url = f"{self.base_url}/api/torrents/{str(self.tracker_config.get('api_key', '')).strip()}"
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.post(url, params=data)
-            if response.status_code == 200:
-                response_data = cast(dict[str, Any], response.json())
-                if response_data.get("status_code") == 1:
-                    results = cast(list[dict[str, Any]], response_data.get("results", []))
-                    for each in results:
-                        # Extract HDR flags from BEYONDHD data
-                        flags: list[str] = []
-                        if each.get("dv") == 1:
-                            flags.append("DV")
-                        if each.get("hdr10") == 1 or each.get("hdr10+") == 1:
-                            flags.append("HDR")
+            response.raise_for_status()
+            response_data = cast(dict[str, Any], response.json())
+            if response_data.get("status_code") != 1:
+                raise RuntimeError(f"BEYONDHD API Error: {response_data.get('message', 'Unknown Error')}")
 
-                        result = {
-                            "name": each["name"],
-                            "link": each["url"],
-                            "size": each["size"],
-                            "flags": flags,
-                        }
-                        if rss_key:
-                            result["download"] = each.get("download_url", None)
-                        dupes.append(result)
-                else:
-                    logger.info(f"[bold red]BEYONDHD failed to search torrents. API Error: {response_data.get('message', 'Unknown Error')}")
-            else:
-                logger.info(f"[bold red]BEYONDHD HTTP request failed. Status: {response.status_code}")
+            results = cast(list[dict[str, Any]], response_data.get("results", []))
+            for each in results:
+                # Extract HDR flags from BEYONDHD data
+                flags: list[str] = []
+                if each.get("dv") == 1:
+                    flags.append("DV")
+                if each.get("hdr10") == 1 or each.get("hdr10+") == 1:
+                    flags.append("HDR")
+
+                result = {
+                    "name": each["name"],
+                    "link": each["url"],
+                    "size": each["size"],
+                    "flags": flags,
+                }
+                if rss_key:
+                    result["download"] = each.get("download_url", None)
+                dupes.append(result)
 
         return dupes
 

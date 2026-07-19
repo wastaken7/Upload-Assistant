@@ -206,15 +206,15 @@ class RtorrentClientMixin:
 
                 # Use the linked path for rTorrent if linking was successful
                 if (use_symlink or use_hardlink) and Path(dst).exists():
-                    path = dst
+                    path = str(dst)
 
         # Apply remote pathing to `tracker_dir` before assigning `save_path`
         if use_symlink or use_hardlink:
             if tracker_dir is None:
                 raise ValueError("Linking enabled but tracker_dir was not set")
-            save_path = tracker_dir  # Default to linked directory
+            save_path = str(tracker_dir)  # Default to linked directory
         else:
-            save_path = path  # Default to the original path
+            save_path = str(path)  # Default to the original path
 
         # Handle remote path mapping
         if local_path and remote_path and local_path.lower() != remote_path.lower():

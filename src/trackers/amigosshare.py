@@ -959,14 +959,14 @@ class AmigosShare:
                 return {}
 
         # Primary attempt
-        primary_payload = {"imdb": meta.imdb_info.get("imdbID") or f"tt{str(meta.imdb_id).zfill(7)}", "layout": self.layout}
+        primary_payload: dict[str, Any] = {"imdb": meta.imdb_info.get("imdbID") or f"tt{str(meta.imdb_id).zfill(7)}", "layout": self.layout}
         layout_data = await _fetch(primary_payload)
 
         if layout_data:
             return layout_data
 
         # Fallback attempt
-        fallback_payload = {"imdb": "tt0013442", "layout": self.layout}
+        fallback_payload: dict[str, Any] = {"imdb": "tt0013442", "layout": self.layout}
         return await _fetch(fallback_payload)
 
     async def build_ratings_bbcode(self, meta: Meta, ratings_list: list[dict[str, Any]]) -> str:
@@ -1276,7 +1276,7 @@ class AmigosShare:
         if meta.debug:
             logger.debug(f"{self.tracker}: [bold yellow]Debug mode, skipping setting internal flag.[/bold yellow]")
         else:
-            data = {"id": meta.tracker_status[self.tracker]["torrent_id"], "internal": "yes"}
+            data: dict[str, str] = {"id": meta.tracker_status[self.tracker]["torrent_id"], "internal": "yes"}
 
             try:
                 response = await self.session.post(f"{self.base_url}/torrents-edit.php?action=doedit", data=data)

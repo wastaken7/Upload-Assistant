@@ -190,6 +190,7 @@ class HDTorrents:
         results: list[dict[str, str | None]] = []
 
         response = await self.session.get(search_url, params=params)
+        response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
         rows = soup.find_all("tr")
 

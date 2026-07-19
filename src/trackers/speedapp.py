@@ -143,19 +143,16 @@ class SpeedApp:
             params["search"] = search_title
 
         response = await self.session.get(url=search_url, params=params, headers=self.session.headers)
+        response.raise_for_status()
 
-        if response.status_code == 200:
-            data = cast(list[dict[str, Any]], response.json())
-            for each in data:
-                name = each.get("name")
-                size = each.get("size")
-                link = f"{self.torrent_url}{each.get('id')}/"
+        data = cast(list[dict[str, Any]], response.json())
+        for each in data:
+            name = each.get("name")
+            size = each.get("size")
+            link = f"{self.torrent_url}{each.get('id')}/"
 
-                if name:
-                    results.append({"name": str(name), "size": size, "link": link})
-            return results
-        logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
-
+            if name:
+                results.append({"name": str(name), "size": size, "link": link})
         return results
 
     async def search_channel(self, meta: Meta) -> int | None:

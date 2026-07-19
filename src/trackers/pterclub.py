@@ -93,19 +93,16 @@ class PTerClub:
 
         async with httpx.AsyncClient(cookies=cookies, timeout=10.0, follow_redirects=True) as client:
             response = await client.get(search_url)
-
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, "lxml")
-                rows = soup.select("table.torrents > tr:has(table.torrentname)")
-                for row in rows:
-                    text = row.select_one('a[href^="details.php?id="]')
-                    if text is not None:
-                        release_value = text.attrs.get("title", "")
-                        release = str(release_value)
-                        if release:
-                            dupes.append(release)
-            else:
-                logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "lxml")
+            rows = soup.select("table.torrents > tr:has(table.torrentname)")
+            for row in rows:
+                text = row.select_one('a[href^="details.php?id="]')
+                if text is not None:
+                    release_value = text.attrs.get("title", "")
+                    release = str(release_value)
+                    if release:
+                        dupes.append(release)
 
         return dupes
 
