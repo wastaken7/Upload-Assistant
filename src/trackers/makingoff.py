@@ -1,13 +1,14 @@
 import asyncio
 import contextlib
 import gettext
+import json
+import mimetypes
+import platform
 import re
-import secrets
 import shutil
-import urllib.parse
-from html.entities import codepoint2name
+import zipfile
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import aiofiles
 import httpx
@@ -17,6 +18,7 @@ from bs4 import BeautifulSoup
 
 from cogs.redaction import Redaction
 from src.console import logger
+from src.cookie_auth import CookieValidator
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.languages import languages_manager
 from src.meta import Meta
@@ -34,9 +36,9 @@ class MakingOff:
     tracker = "MAKINGOFF"
     display_name = "MakingOff"
     source_flag = ""
-    base_url = "https://makingoff.org/forum"
+    base_url = "https://www.makingoff.org"
     banned_groups: tuple[str, ...] = ()
-    index_url = "https://indice.makingoff.org/"
+    index_url = "https://www.makingoff.org/"
     torrent_url = ""
     supported_categories = ("MOVIE",)
     allows_bloated_audio = True
@@ -75,9 +77,11 @@ class MakingOff:
     def __init__(self, config: Config):
         self.config = config
         self.common = Common(config)
+        self.cookie_validator = CookieValidator(config)
 
         # Cache for the resolved PT-BR display title, keyed by meta.uuid.
         self._display_title_cache: dict[str, str] = {}
+        self._csrf_token: str = ""
 
         tracker_config = dict(dict(config.get("TRACKERS", {})).get("MAKINGOFF", {}))
         public_trackers_raw = tracker_config.get("trackers", [])
@@ -102,6 +106,7 @@ class MakingOff:
                 "Upgrade-Insecure-Requests": "1",
             },
             timeout=60.0,
+            follow_redirects=True,
         )
 
     def _normalize_codec(self, fmt: str, mapping: list[tuple[list[str], str]]) -> str:
@@ -155,39 +160,175 @@ class MakingOff:
             return ""
 
     def _aspect_ratio(self, width: Any, height: Any) -> str:
-        """Return an aspect ratio category from video dimensions."""
+        """Return an aspect ratio category from video dimensions matching MakingOff options."""
         try:
             r = int(width) / int(height)
-            if r < 1.4:
+            if r < 1.45:
                 return "Tela Cheia (4x3)"
-            if r < 1.8:
+            if r < 1.85:
                 return "Widescreen (16x9)"
-            if r < 2.3:
-                return "Widescreen (2.35:1)"
-            return "Widescreen (2.39:1)"
+            return "Scope (2.35:1)"
         except TypeError, ValueError, ZeroDivisionError:
             return "Widescreen (16x9)"
 
     def _html_encode(self, text: str) -> str:
-        """Replace non-ASCII codepoints with named HTML entities where possible."""
-        result = []
-        for ch in text:
-            cp = ord(ch)
-            if cp > 127 and cp in codepoint2name:
-                result.append(f"&{codepoint2name[cp]};")
-            else:
-                result.append(ch)
-        return "".join(result)
+        """Return the text unchanged (XenForo supports native UTF-8)."""
+        return text
 
     def _screen_rows(self, image_urls: list[str]) -> str:
-        """Pair screenshot URLs into two-column BBCode rows."""
-        rows = ""
-        for i in range(0, len(image_urls), 2):
-            left = image_urls[i]
-            right = image_urls[i + 1] if i + 1 < len(image_urls) else ""
-            cells = f"[screenLeft][screenIma]{left}[/screenIma][/screenLeft][screenRight][screenIma]{right}[/screenIma][/screenRight][/tr]"
-            rows += cells if i == 0 else f"[tr]{cells}"
-        return rows
+        """Pair screenshot URLs into two-column BBCode rows matching makingoff structure."""
+        scr = [image_urls[i] if i < len(image_urls) else "" for i in range(max(4, len(image_urls)))]
+
+        # Row 4 already opened in _build_bbcode with [tr][poster]...[tableScreen]Screenshots[/tableScreen]
+        cg = f"[screenLeft][screenIma]{scr[0]}[/screenIma][/screenLeft][screenRight][screenIma]{scr[1]}[/screenIma][/screenRight][/tr]"
+        cg += f"[tr][screenLeft][screenIma]{scr[2]}[/screenIma][/screenLeft][screenRight][screenIma]{scr[3]}[/screenIma][/screenRight]"
+
+        # Check if we have additional screens (5 & 6)
+        if len(scr) >= 5 and scr[4]:
+            scr5 = scr[4]
+            scr6 = scr[5] if len(scr) > 5 else ""
+            cg += f"[/tr][tr][screenLeft][screenIma]{scr5}[/screenIma][/screenLeft][screenRight][screenIma]{scr6}[/screenIma][/screenRight]"
+            # Check if we have 7 & 8
+            if len(scr) >= 7 and scr[6]:
+                scr7 = scr[6]
+                scr8 = scr[7] if len(scr) > 7 else ""
+                cg += f"[/tr][tr][screenLeft][screenIma]{scr7}[/screenIma][/screenLeft][screenRight][screenIma]{scr8}[/screenIma][/screenRight]"
+
+        cg += "[closeTab][/closeTab][/tr]"
+        return cg
+
+    def _get_ffmpeg_path(self, meta: Meta) -> str:
+
+        base_dir = getattr(meta, "base_dir", "") or str(Path(__file__).parent.parent.parent)
+
+        if platform.system() == "Linux":
+            ff_bin_dir = Path(base_dir) / "bin" / "ffmpeg"
+            machine = platform.machine().lower()
+            if machine in ("x86_64", "amd64"):
+                arch = "amd"
+            elif machine in ("aarch64", "arm64"):
+                arch = "arm"
+            else:
+                arch = None
+            if arch:
+                candidate = Path(ff_bin_dir) / arch / "ffmpeg"
+                if candidate.exists():
+                    return str(candidate)
+        elif platform.system() == "Windows":
+            candidate = Path(base_dir) / "bin" / "ffmpeg.exe"
+            if candidate.exists():
+                return str(candidate)
+
+        return "ffmpeg"
+
+    def _is_subtitle_in_portuguese(self, file_path: str) -> bool:
+        # Common Portuguese words
+        pt_words = {"que", "não", "uma", "com", "mais", "para", "está", "estou", "você", "como", "mas", "bem", "ele", "ela", "vocês", "estavam", "fazer"}
+        # Common English words
+        en_words = {"the", "and", "you", "that", "was", "for", "are", "with", "have", "this", "what", "they", "here", "know"}
+
+        encodings = ["utf-8", "latin-1", "cp1252", "utf-16"]
+        content = ""
+        for enc in encodings:
+            try:
+                with Path(file_path).open(encoding=enc, errors="ignore") as f:
+                    content = f.read(4096).lower()
+                if content:
+                    break
+            except Exception as e:
+                logger.debug(f"Failed to read file {file_path} with encoding {enc}: {e}")
+                continue
+
+        if not content:
+            return False
+
+        words = re.findall(r"\b\w+\b", content)
+        pt_count = sum(1 for w in words if w in pt_words)
+        en_count = sum(1 for w in words if w in en_words)
+        return pt_count > en_count
+
+    async def _get_portuguese_subtitles(self, meta: Meta) -> list[str]:
+        """
+        Find and extract Portuguese subtitles for this release.
+
+        1. Checks external files (meta.subtitle_files) and matches files that contain
+           Portuguese keywords in filename or content.
+        2. Checks embedded tracks in the video and extracts them if they are Portuguese.
+
+        Returns:
+            list[str]: Paths to Portuguese subtitle files to upload.
+        """
+        pt_subs: list[str] = []
+
+        # 1. Check external subtitle files
+        for sub_file in getattr(meta, "subtitle_files", []):
+            if not Path(sub_file).exists():
+                continue
+            name_lower = Path(sub_file).name.lower()
+            if any(term in name_lower for term in (".pt", ".pt-br", ".por", "portuguese", "ptbr", "pt_br")):
+                pt_subs.append(sub_file)
+                logger.info(f"[cyan]{self.tracker}:[/cyan] [green]Found external Portuguese subtitle:[/green] {Path(sub_file).name}")
+            elif self._is_subtitle_in_portuguese(sub_file):
+                pt_subs.append(sub_file)
+                logger.info(f"[cyan]{self.tracker}:[/cyan] [green]Found external Portuguese subtitle (content-matched):[/green] {Path(sub_file).name}")
+
+        # 2. Check embedded subtitle tracks (if it is a file upload, not a BD/DVD folder/disc structure)
+        if not meta.is_disc and meta.filelist and len(meta.filelist) > 0:
+            video_file = meta.filelist[0]
+            if Path(video_file).is_file() and video_file.lower().endswith((".mkv", ".mp4", ".m4v")):
+                tracks = meta.mediainfo.get("media", {}).get("track", [])
+                text_tracks = [t for t in tracks if t.get("@type") == "Text"]
+
+                for idx, track in enumerate(text_tracks):
+                    lang = str(track.get("Language", "")).lower()
+                    title = str(track.get("Title", "")).lower()
+
+                    is_pt = any(term in lang for term in ("portuguese", "pt", "por")) or any(
+                        term in title for term in ("portuguese", "português", "pt-br", "ptbr", "pt_br", "pt-pt", "ptpt")
+                    )
+
+                    if is_pt:
+                        # Extract it
+                        fmt = str(track.get("Format", "")).upper()
+                        ext = ".srt"
+                        if "ASS" in fmt or "SSA" in fmt:
+                            ext = ".ass"
+                        elif "VTT" in fmt:
+                            ext = ".vtt"
+                        elif "PGS" in fmt or "SUP" in fmt:
+                            ext = ".sup"
+
+                        temp_dir = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}"
+                        Path(temp_dir).mkdir(parents=True, exist_ok=True)
+                        release_name = meta.basename_no_ext or meta.name or meta.uuid
+                        release_filename = release_name.replace(" ", ".")
+
+                        title_slug = ""
+                        if track.get("Title"):
+                            title_clean = re.sub(r"[^a-zA-Z0-9_-]", "_", str(track.get("Title")))
+                            title_slug = f"-{title_clean}"
+
+                        output_name = f"{release_filename}.pt-{idx}{title_slug}{ext}"
+                        output_path = str(Path(temp_dir) / output_name)
+
+                        ffmpeg_path = self._get_ffmpeg_path(meta)
+                        cmd: list[str] = [ffmpeg_path, "-y", "-i", video_file, "-map", f"0:s:{idx}", output_path]
+
+                        logger.info(f"[cyan]{self.tracker}:[/cyan] Extracting embedded Portuguese subtitle (stream {idx}) to {output_name}...")
+                        try:
+                            process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                            _, stderr = await process.communicate()
+                            if process.returncode == 0 and Path(output_path).exists() and Path(output_path).stat().st_size > 0:
+                                pt_subs.append(output_path)
+                                logger.info(f"[cyan]{self.tracker}:[/cyan] [green]Successfully extracted embedded Portuguese subtitle.[/green]")
+                            else:
+                                logger.warning(f"[cyan]{self.tracker}:[/cyan] [yellow]Failed to extract subtitle stream {idx}. ffmpeg exit code: {process.returncode}[/yellow]")
+                                if stderr:
+                                    logger.debug(f"[cyan]{self.tracker}:[/cyan] ffmpeg stderr: {stderr.decode('utf-8', errors='ignore')}")
+                        except Exception as e:
+                            logger.error(f"[cyan]{self.tracker}:[/cyan] [red]Error running ffmpeg to extract subtitle: {e}[/red]")
+
+        return sorted(set(pt_subs))
 
     def _build_bbcode(
         self,
@@ -207,6 +348,7 @@ class MakingOff:
         audio: str,
         subs: str,
         imdb_url: str,
+        homepage_url: str,
         quality: str,
         container: str,
         video_codec: str,
@@ -217,51 +359,71 @@ class MakingOff:
         aspect: str,
         fps_str: str,
         filesize: str,
+        awards: str = "",
+        trivia: str = "",
+        critic: str = "",
     ) -> str:
-        """Render and return the complete BBCode post body."""
+        """Render and return the complete BBCode post body matching MakingOff's JavaScript generator."""
         s_rows = self._screen_rows(image_urls)
 
-        if imdb_url:
-            imdb_line = f'<div><strong class="bbc">IMDB: </strong><a class="bbc_url" href="{imdb_url}" title="Link externo">{imdb_url}</a>[/info]</div>\n'
+        bbcode = "[tablePrinc][tr][titMasc]Título do Filme[/titMasc][/tr]"
+        bbcode += f"[tr][titTrad]{title_br}[/titTrad][titOri]{title_orig}[/titOri]"
+        if release:
+            bbcode += f"[release]{release}[/release][/tr]"
         else:
-            imdb_line = "<div>[/info]</div>\n"
+            bbcode += "[release]Release não informado[/release][/tr]"
 
-        bbcode = (
-            f"<div>[tablePrinc][tr][titMasc]Título do Filme[/titMasc][/tr]</div>\n"
-            f"<div>[tr][titTrad]{title_br}[/titTrad][titOri]{title_orig}[/titOri]"
-            f"[release]{release}[/release][/tr]</div>\n"
-            f"<div>[tr][posterMasc]Poster[/posterMasc]</div>\n"
-            f"<div>[sinopseMasc]Sinopse[/sinopseMasc][/tr]</div>\n"
-            f"<div>[tr][poster][posterIma]{poster_url}[/posterIma][/poster]</div>\n"
-            f"<div>[sinopse]{overview}[/sinopse]</div>\n"
-            f"<div>[tableScreen]Screenshots[/tableScreen]</div>\n"
-            f"<div>{s_rows}"
-            f"[closeTab][/closeTab][/tablePrinc]</div>\n"
-            f"<div>[tablePrinc][tr][posterMasc]Elenco[/posterMasc]</div>\n"
-            f"<div>[infoMasc]Informações sobre o filme[/infoMasc]</div>\n"
-            f"<div>[infoMasc]Informações sobre o release[/infoMasc]</div>\n"
-            f"<div>[/tr][tr][elenco]\n{cast_text}\n[/elenco]</div>\n"
-            f'<div>[info]<strong class="bbc">Gênero: </strong>{genres}</div>\n'
-            f'<div><strong class="bbc">Diretor: </strong>{directors}</div>\n'
-            f'<div><strong class="bbc">Duração: </strong>{duration} minutos</div>\n'
-            f'<div><strong class="bbc">Ano de Lançamento: </strong>{year}</div>\n'
-            f'<div><strong class="bbc">País de Origem: </strong>{countries}</div>\n'
-            f'<div><strong class="bbc">Idioma do Áudio: </strong>{audio}</div>\n'
-            f"{imdb_line}"
-            f'<div>[info]<strong class="bbc">Qualidade de Vídeo: </strong>{quality}</div>\n'
-            f'<div><strong class="bbc">Container: </strong>{container}</div>\n'
-            f'<div><strong class="bbc">Vídeo Codec: </strong>{video_codec}</div>\n'
-            f'<div><strong class="bbc">Vídeo Bitrate: </strong>{video_brate} Kbps</div>\n'
-            f'<div><strong class="bbc">Áudio Codec: </strong>{audio_codec}</div>\n'
-            f'<div><strong class="bbc">Áudio Bitrate: </strong>{audio_brate} Kbps</div>\n'
-            f'<div><strong class="bbc">Resolução: </strong>{res_str}</div>\n'
-            f'<div><strong class="bbc">Formato de Tela: </strong>{aspect}</div>\n'
-            f'<div><strong class="bbc">Frame Rate: </strong>{fps_str}</div>\n'
-            f'<div><strong class="bbc">Tamanho: </strong>{filesize}</div>\n'
-            f'<div><strong class="bbc">Legendas: </strong>{subs}[/info]</div>\n'
-            f"<div>[/tr][tr][rodape]Coopere, deixe semeando ao menos duas vezes o tamanho do arquivo que baixar.[/rodape]"
-            f"[/tr][/tablePrinc]</div>"
-        )
+        bbcode += "[tr][posterMasc]Poster[/posterMasc][sinopseMasc]Sinopse[/sinopseMasc][/tr]"
+        bbcode += f"[tr][poster][posterIma]{poster_url}[/posterIma][/poster][sinopse]{overview}[/sinopse]"
+        bbcode += "[tableScreen]Screenshots[/tableScreen]"
+        bbcode += f"{s_rows}[/tablePrinc]"
+
+        bbcode += "[tablePrinc][tr][posterMasc]Elenco[/posterMasc]"
+        bbcode += "[infoMasc]Informações sobre o filme[/infoMasc]"
+        bbcode += "[infoMasc]Informações sobre o release[/infoMasc][/tr]"
+        bbcode += f"[tr][elenco]{cast_text}[/elenco]"
+
+        bbcode += f"[info][b]Gênero: [/b]{genres}\n"
+        bbcode += f"[b]Diretor: [/b]{directors}\n"
+        if duration:
+            bbcode += f"[b]Duração: [/b]{duration} minutos\n"
+        bbcode += f"[b]Ano de Lançamento: [/b]{year}\n"
+        bbcode += f"[b]País de Origem: [/b]{countries}\n"
+        bbcode += f"[b]Idioma do Áudio: [/b]{audio}\n"
+        if imdb_url:
+            bbcode += f"[b]IMDB: [/b][url={imdb_url}]{imdb_url}[/url]\n"
+        if homepage_url:
+            bbcode += f"[b]Site Oficial: [/b][url={homepage_url}]{homepage_url}[/url]\n"
+        bbcode += "[/info]"
+
+        bbcode += f"[info][b]Qualidade de Vídeo: [/b]{quality}\n"
+        if container:
+            bbcode += f"[b]Container: [/b]{container}\n"
+        if video_codec:
+            bbcode += f"[b]Vídeo Codec: [/b]{video_codec}\n"
+        if video_brate and video_brate != "None":
+            bbcode += f"[b]Vídeo Bitrate: [/b]{video_brate} Kbps\n"
+        if audio_codec:
+            bbcode += f"[b]Áudio Codec: [/b]{audio_codec}\n"
+        if audio_brate and audio_brate != "None":
+            bbcode += f"[b]Áudio Bitrate: [/b]{audio_brate} Kbps\n"
+        if res_str and "x0" not in res_str and "0x" not in res_str:
+            bbcode += f"[b]Resolução: [/b]{res_str}\n"
+        if aspect:
+            bbcode += f"[b]Formato de Tela: [/b]{aspect}\n"
+        if fps_str:
+            bbcode += f"[b]Frame Rate: [/b]{fps_str}\n"
+        bbcode += f"[b]Tamanho: [/b]{filesize}\n"
+        bbcode += f"[b]Legendas: [/b]{subs}[/info]"
+
+        if awards:
+            bbcode += f"[/tr][tr][infoExtraMasc]Premiações[/infoExtraMasc][/tr][tr][infoExtra]{awards}[/infoExtra]"
+        if trivia:
+            bbcode += f"[/tr][tr][infoExtraMasc]Curiosidades[/infoExtraMasc][/tr][tr][infoExtra]{trivia}[/infoExtra]"
+        if critic:
+            bbcode += f"[/tr][tr][infoExtraMasc]Crítica[/infoExtraMasc][/tr][tr][infoExtra]{critic}[/infoExtra]"
+
+        bbcode += "[/tr][tr][rodape]Coopere, deixe semeando ao menos duas vezes o tamanho do arquivo que baixar.[/rodape][/tr][/tablePrinc]"
 
         return self._html_encode(bbcode)
 
@@ -273,7 +435,7 @@ class MakingOff:
         return lang_string.capitalize()
 
     def _localizer_countries(self, meta: Meta) -> str:
-        """Convert production country codes to PT-BR names."""
+        """Convert the first production country code to PT-BR name, matching the JS generator."""
         try:
             pt_normal = gettext.translation("iso3166-1", pycountry.LOCALES_DIR, languages=["pt_BR"])
             pt_historic = gettext.translation("iso3166-3", pycountry.LOCALES_DIR, languages=["pt_BR"])
@@ -290,30 +452,24 @@ class MakingOff:
 
         codes = [c.get("iso_3166_1", "") for c in prod_countries if c.get("iso_3166_1")] if prod_countries else [c for c in origin_countries if c]
 
-        names = []
-        for code in codes:
-            if not code:
-                continue
-            code_upper = code.upper()
-            if code_upper in custom_country_mapping:
-                names.append(custom_country_mapping[code_upper])
-                continue
+        if not codes or not codes[0]:
+            return "Desconhecido"
 
-            # Tenta encontrar no pycountry (países ativos)
-            country = pycountry.countries.get(alpha_2=code_upper)
-            if country:
-                names.append(pt_normal.gettext(country.name) if pt_normal else country.name)
-                continue
+        code_upper = codes[0].upper()
+        if code_upper in custom_country_mapping:
+            return custom_country_mapping[code_upper]
 
-            # Tenta encontrar no pycountry (países históricos, ex: SU)
-            historic_country = pycountry.historic_countries.get(alpha_2=code_upper)
-            if historic_country:
-                names.append(pt_historic.gettext(historic_country.name) if pt_historic else historic_country.name)
-                continue
+        # Tenta encontrar no pycountry (países ativos)
+        country = pycountry.countries.get(alpha_2=code_upper)
+        if country:
+            return pt_normal.gettext(country.name) if pt_normal else country.name
 
-            names.append(code)
+        # Tenta encontrar no pycountry (países históricos, ex: SU)
+        historic_country = pycountry.historic_countries.get(alpha_2=code_upper)
+        if historic_country:
+            return pt_historic.gettext(historic_country.name) if pt_historic else historic_country.name
 
-        return ", ".join(names) if names else "Desconhecido"
+        return codes[0]
 
     def _localizer_genres(self, meta: Meta) -> str:
         """Convert genre names to PT-BR.
@@ -328,7 +484,7 @@ class MakingOff:
         if not genre_list:
             return "Desconhecido"
 
-        translated_genres = []
+        translated_genres: list[str] = []
         for g in genre_list:
             translated = ENG_TO_PTBR_GENRE_MAP.get(g.lower(), g)
             if translated is not None and translated != g:
@@ -346,62 +502,73 @@ class MakingOff:
         return "Desconhecido" if not meta.audio_languages else ", ".join(self._get_lang_name(lang.strip()) for lang in meta.audio_languages)
 
     def _localizer_video_quality(self, meta: Meta) -> str:
-        """Convert release type to a localised video quality label."""
-        type_raw = meta.type or ""
+        """Convert release type to a localised video quality label matching MakingOff options."""
+        type_raw = (meta.type or "").upper()
 
         video_quality_ptbr: dict[str, str] = {
-            "WEBDL": "WEB-DL",
-            "WEBRIP": "WEB-Rip",
-            "BLURAY": "BluRay",
-            "REMUX": "BluRay Remux",
-            "ENCODE": "BluRay",
+            "WEBDL": "Web DL",
+            "WEBRIP": "Web DL",
+            "BLURAY": "BDRip",
+            "REMUX": "BR Remux",
+            "ENCODE": "BDRip",
             "DISC": "Blu-Ray Full",
-            "DVDRIP": "DVDRip",
-            "HDTV": "HDTV",
-            "CAM": "CAM",
+            "DVDRIP": "DVD Rip",
+            "HDTV": "HDTV Rip",
+            "TVRIP": "TV Rip",
+            "VHSRIP": "VHS Rip",
+            "CAM": "Outro",
         }
 
-        return video_quality_ptbr.get(type_raw.upper(), type_raw)
+        return video_quality_ptbr.get(type_raw, "Outro")
 
     # -- IPB client methods
 
-    def live_session_id(self) -> str:
-        """Return the most recent session_id cookie value."""
-        values = [c.value for c in self.session.cookies.jar if c.name == "session_id" and c.value]
-        return values[-1] if values else ""
+    def _get_csrf_token(self, html: str) -> str:
+        soup = BeautifulSoup(html, "html.parser")
+        html_tag = soup.find("html")
+        if html_tag and html_tag.has_attr("data-csrf"):
+            token = html_tag["data-csrf"]
+            if token:
+                return str(token).strip()
+
+        token_input = soup.find("input", {"name": "_xfToken"})
+        if token_input and token_input.has_attr("value"):
+            token = token_input["value"]
+            if token:
+                return str(token).strip()
+
+        match = re.search(r'csrf:\s*["\']([^"\']+)["\']', html)
+        if match:
+            return match.group(1).strip()
+
+        return ""
 
     async def refresh_session(self) -> bool:
-        """
-        Refresh the IPB session token.
-
-        IPB rotates the 's' token on each authenticated request. Sends a
-        lightweight GET and verifies the response is not an anonymous session.
-
-        Returns:
-            bool: True if an authenticated session_id was obtained.
-        """
         try:
-            resp = await self.session.get(f"{self.base_url}/index.php?")
-            resp.raise_for_status()
+            resp = await self.session.get(f"{self.base_url}/")
+            if resp.status_code == 403:
+                html = resp.text
+            else:
+                resp.raise_for_status()
+                html = resp.text
         except httpx.HTTPError as e:
-            logger.error(f"[cyan]{self.tracker}:[/cyan] Error validating session: {e}")
+            response = getattr(e, "response", None)
+            if response is not None:
+                html = cast(httpx.Response, response).text
+            else:
+                logger.error(f"[cyan]{self.tracker}:[/cyan] Error validating session: {e}")
+                return False
+
+        soup = BeautifulSoup(html, "html.parser")
+        html_tag = soup.find("html")
+        logged_in = html_tag.get("data-logged-in") == "true" if html_tag else False
+
+        if not logged_in:
+            logger.warning(f"[cyan]{self.tracker}:[/cyan] The session is unauthenticated. Check the cookie file.")
             return False
 
-        live = self.live_session_id()
-        if not live:
-            match = re.search(r"[?&]s=([a-f0-9]{32})", resp.text)
-            if match:
-                live = match.group(1)
-                self.session.cookies.set("session_id", live, domain="makingoff.org")
-                self.session.cookies.set("session_id", live, domain="indice.makingoff.org")
-
-        if not live:
-            return False
-
-        if "id='login_form'" in resp.text or 'id="login_form"' in resp.text:
-            logger.warning(f"[cyan]{self.tracker}:[/cyan] The session is unauthenticated. Check member_id and pass_hash on the configuration.")
-            return False
-
+        self._csrf_token = self._get_csrf_token(html)
+        await self.cookie_validator.save_session_cookies(self.tracker, cast(Any, self.session.cookies.jar))
         return True
 
     async def get_new_post_tokens(self, forum_id: int) -> tuple[str, str, str]:
@@ -412,9 +579,9 @@ class MakingOff:
             forum_id (int): Target forum ID.
 
         Returns:
-            tuple[str, str, str]: Session ID, auth key, attachment post key.
+            tuple[str, str, str]: csrf_token, attachment_hash, attachment_hash_combined.
         """
-        url = f"{self.base_url}/index.php?app=forums&module=post&section=post&do=new_post&f={forum_id}"
+        url = f"{self.base_url}/forums/{forum_id}/post-thread"
         try:
             resp = await self.session.get(url)
             resp.raise_for_status()
@@ -424,22 +591,28 @@ class MakingOff:
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        def _val(name: str) -> str:
-            tag = soup.find("input", {"name": name})
-            return str(tag.get("value", "")) if tag and hasattr(tag, "get") else ""  # type: ignore[union-attr]
-
-        session_id = self.live_session_id() or _val("s")
-        auth_key = _val("auth_key")
-        attach_post_key = _val("attach_post_key")
-
-        if "id='sign_in'" in resp.text or 'id="sign_in"' in resp.text:
-            logger.warning(f"[cyan]{self.tracker}:[/cyan] Unauthenticated session detected on this page. Copy new headers from the browser.")
+        html_tag = soup.find("html")
+        logged_in = html_tag.get("data-logged-in") == "true" if html_tag else False
+        if not logged_in:
+            logger.warning(f"[cyan]{self.tracker}:[/cyan] Unauthenticated session detected on this page.")
             return "", "", ""
 
-        if not auth_key or not attach_post_key:
-            logger.warning(f"[cyan]{self.tracker}:[/cyan] It wasn't possible to extract auth_key or attach_post_key. Check if the session is valid.")
+        csrf_token = self._get_csrf_token(resp.text)
 
-        return session_id, auth_key, attach_post_key
+        attachment_hash = ""
+        hash_tag = soup.find("input", {"name": "attachment_hash"})
+        if hash_tag:
+            attachment_hash = str(hash_tag.get("value", "")).strip()
+
+        attachment_hash_combined = ""
+        combined_tag = soup.find("input", {"name": "attachment_hash_combined"})
+        if combined_tag:
+            attachment_hash_combined = str(combined_tag.get("value", "")).strip()
+
+        if not csrf_token:
+            logger.warning(f"[cyan]{self.tracker}:[/cyan] It wasn't possible to extract xfToken. Check if the session is valid.")
+
+        return csrf_token, attachment_hash, attachment_hash_combined
 
     async def get_post_resolution(self, topic_url: str) -> int:
         """
@@ -456,10 +629,10 @@ class MakingOff:
         except httpx.HTTPError:
             return 0
 
-        soup = BeautifulSoup(resp.content, "html.parser", from_encoding="iso-8859-1")
+        soup = BeautifulSoup(resp.content, "html.parser")
 
         resolution = ""
-        first_post = soup.find("div", attrs={"itemprop": "commentText"})
+        first_post = soup.find(class_="bbWrapper") or soup.find("div", attrs={"itemprop": "commentText"})
         if first_post:
             text = first_post.get_text(" ", strip=True)
             m = re.search(r"Resolu[^\s:]*[:\s]+(\d{3,4})\s*[xX×]\s*(\d{3,4})", text)  # noqa: RUF001
@@ -470,224 +643,270 @@ class MakingOff:
 
     async def upload_attachment(
         self,
-        torrent_path: str,
-        session_id: str,
-        attach_post_key: str,
+        file_path: str,
+        csrf_token: str,
+        attachment_hash: str,
+        attachment_hash_combined: str,
         forum_id: int,
     ) -> bool:
         """
-        Upload a torrent file as a forum attachment.
+        Upload a file (torrent, subtitle, etc.) as a forum attachment.
 
         Args:
-            torrent_path (str): Path to the torrent file.
-            session_id (str): Active forum session ID.
-            attach_post_key (str): Attachment post key.
+            file_path (str): Path to the file.
+            csrf_token (str): Active CSRF token.
+            attachment_hash (str): Attachment hash.
+            attachment_hash_combined (str): JSON string containing type, context, and hash.
             forum_id (int): Target forum ID.
 
         Returns:
             bool: True if the upload succeeded.
         """
-        url = (
-            f"{self.base_url}/index.php?"
-            f"s={session_id}"
-            f"&app=core&module=attach&section=attach"
-            f"&do=attachUploadiFrame"
-            f"&attach_rel_module=post&attach_rel_id=0"
-            f"&attach_post_key={attach_post_key}"
-            f"&forum_id={forum_id}"
-            f"&fetch_all=1"
-        )
+        url = f"{self.base_url}/attachments/upload"
+
+        attachment_type = "post"
+        context = {"node_id": forum_id}
+        if attachment_hash_combined:
+            try:
+                combined_data = json.loads(attachment_hash_combined)
+                attachment_type = combined_data.get("type", "post")
+                context = combined_data.get("context", {})
+            except Exception as e:
+                logger.debug(f"Failed to parse attachment_hash_combined: {e}")
+
+        payload: dict[str, str] = {
+            "_xfToken": csrf_token,
+            "_xfResponseType": "json",
+            "hash": attachment_hash,
+            "type": attachment_type,
+        }
+        for k, v in context.items():
+            payload[f"context[{k}]"] = str(v)
+
         try:
-            async with aiofiles.open(torrent_path, "rb") as f:
+            async with aiofiles.open(file_path, "rb") as f:
                 data = await f.read()
-            filename = Path(torrent_path).name
+            filename = Path(file_path).name
+
+            mime_type, _ = mimetypes.guess_type(file_path)
+            if not mime_type:
+                mime_type = "application/x-bittorrent" if filename.endswith(".torrent") else "application/octet-stream"
+
             resp = await self.session.post(
                 url,
-                files={"FILE_UPLOAD": (filename, data, "application/x-bittorrent")},
+                data=payload,
+                files={"upload": (filename, data, mime_type)},
+                headers={"X-Requested-With": "XMLHttpRequest"},
             )
             resp.raise_for_status()
+            res_data = resp.json()
         except FileNotFoundError:
-            logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Torrent file not found[/bold red]: {torrent_path}")
+            logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]File not found[/bold red]: {file_path}")
             return False
         except httpx.HTTPError as e:
             logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Failed uploading attachment:[/bold red] {e}")
+            response = getattr(e, "response", None)
+            if response is not None:
+                logger.debug(f"[cyan]{self.tracker}:[/cyan] Response: {cast(httpx.Response, response).text}")
+            return False
+        except Exception as e:
+            logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Failed to process upload response:[/bold red] {e}")
             return False
 
-        if '"is_error":0' in resp.text or '"msg":"upload_ok"' in resp.text:
-            logger.info(f"[cyan]{self.tracker}:[/cyan] [green]Attachment sent successfully.[/green]")
+        if res_data.get("status") == "ok" or "attachment" in res_data:
+            logger.info(f"[cyan]{self.tracker}:[/cyan] [green]Attachment sent successfully: {filename}[/green]")
             return True
 
-        logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Unwanted response while uploading attachment:[/bold red]\n{resp.text[:500]}")
+        errors = res_data.get("errors", {})
+        error_msg = res_data.get("errorHtml", {}).get("content", "") or str(errors)
+        logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Unwanted response while uploading attachment {filename}:[/bold red]\n{error_msg}")
         return False
 
-    async def search(self, index_url: str, phrase: str) -> dict[str, str] | None:
+    async def search_candidate(
+        self,
+        phrase: str,
+        forum_id: int | None = None,
+        title_only: bool = True,
+    ) -> dict[str, str] | None:
         """
-        Performs a search on the given index url
+        Performs a search on the forum.
 
         Args:
-            index_url (str): The index url (e.g. "https://indice.makingoff.org").
             phrase (str): The text to be searched.
+            forum_id (int | None): Optional forum node ID to restrict search.
+            title_only (bool): If True, search only in thread titles. Default is True.
 
         Returns:
             dict[str, str]: A dictionary mapping title -> topic URL.
             None: if the search results nothing.
         """
-        # do the search operation
-        response_url = index_url.rstrip("/") + "/response.php"
+        if not self._csrf_token:
+            await self.refresh_session()
+            if not self._csrf_token:
+                logger.error(f"[cyan]{self.tracker}:[/cyan] Cannot search, no CSRF token available.")
+                return None
+
+        search_url = f"{self.base_url}/search/search"
         payload = {
-            "current": "1",
-            "rowCount": "50",
-            "sort[tid]": "desc",
-            "searchPhrase": phrase,
-            "id": "b0df282a-0d67-40e5-8558-c9e93b7befed",
+            "keywords": phrase,
+            "_xfToken": self._csrf_token,
+            "_xfResponseType": "json",
         }
+        if title_only:
+            payload["c[title_only]"] = "1"
+        if forum_id is not None:
+            payload["c[nodes][0]"] = str(forum_id)
+            payload["c[child_nodes]"] = "1"
+
         try:
             resp = await self.session.post(
-                response_url,
+                search_url,
                 data=payload,
-                headers={
-                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                    "X-Requested-With": "XMLHttpRequest",
-                    "Referer": index_url,
-                    "Origin": index_url,
-                },
+                headers={"X-Requested-With": "XMLHttpRequest"},
             )
             resp.raise_for_status()
-            data = resp.json()
+            res_data = resp.json()
         except httpx.HTTPError as e:
-            logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Error on the search:[/bold red] {e}")
+            logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Error on the search POST:[/bold red] {e}")
             return None
         except Exception as e:
-            logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Unwanted response while searching:[/bold red] {e}")
+            logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Unwanted response while searching POST:[/bold red] {e}")
             return None
 
-        rows = data.get("rows") or []
-        if not rows:
+        redirect_url = res_data.get("redirect")
+        if not redirect_url:
+            errors = res_data.get("errors", {})
+            if errors:
+                logger.debug(f"[cyan]{self.tracker}:[/cyan] Search errors: {errors}")
             return None
 
-        # parse the dict from the response
-        # title -> url
+        if redirect_url.startswith("/"):
+            redirect_url = f"{self.base_url.rstrip('/')}/{redirect_url.lstrip('/')}"
+
+        try:
+            resp = await self.session.get(redirect_url)
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Error fetching search results page:[/bold red] {e}")
+            return None
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        items = soup.find_all(class_="contentRow-title")
+
         results: dict[str, str] = {}
-        for row in rows:
-            title = row.get("title", "").strip()
-            link_html = row.get("link", "")
-            url_match = re.search(r'href=["\']([^"\']+)["\']', link_html)
-            if title and url_match:
-                results[title] = url_match.group(1)
+        for item in items:
+            a_tag = item.find("a")
+            if not a_tag:
+                continue
+            title = a_tag.get_text(" ", strip=True)
+            href_val = a_tag.get("href", "")
+            href = " ".join(href_val) if isinstance(href_val, list) else str(href_val)
+            href = href.strip()
+            if href:
+                if href.startswith("/"):
+                    href = f"{self.base_url.rstrip('/')}/{href.lstrip('/')}"
+                if title in results:
+                    # Append topic ID from URL to avoid title duplication conflicts
+                    topic_id = href.rstrip("/").split(".")[-1]
+                    title = f"{title} ({topic_id})"
+                results[title] = href
 
         return results or None
 
     def get_topic_fields(
         self,
         forum_id: int,
-        session_id: str,
-        auth_key: str,
-        attach_post_key: str,
+        csrf_token: str,
+        attachment_hash: str,
+        attachment_hash_combined: str,
         topic_title: str,
         post_body: str,
     ) -> dict[str, str]:
         """
-        Build the dictionary of form fields for creating a new topic.
+        Build the dictionary of form fields for creating a new XenForo topic.
         """
         return {
-            "enableemo": "yes",
-            "enablesig": "yes",
-            "TopicTitle": topic_title,
-            "isRte": "1",
-            "noSmilies": "0",
-            "noCKEditor": "0",
-            "Post": post_body,
-            "st": "0",
-            "app": "forums",
-            "module": "post",
-            "section": "post",
-            "do": "new_post_do",
-            "s": session_id,
-            "p": "0",
-            "t": "",
-            "f": str(forum_id),
-            "parent_id": "0",
-            "attach_post_key": attach_post_key,
-            "auth_key": auth_key,
-            "removeattachid": "0",
-            "return": "",
-            "_from": "",
-            "dosubmit": "Criar novo tópico",
+            "_xfToken": csrf_token,
+            "prefix_id": "0",
+            "title": topic_title,
+            "discussion_type": "discussion",
+            "message": post_body,
+            "attachment_hash": attachment_hash,
+            "attachment_hash_combined": attachment_hash_combined,
+            "_xfSet[watch_thread]": "1",
+            "_xfResponseType": "json",
+            "_xfWithData": "1",
+            "_xfRequestUri": f"/forums/{forum_id}/post-thread",
         }
 
     async def create_topic(
         self,
         forum_id: int,
-        session_id: str,
-        auth_key: str,
-        attach_post_key: str,
+        csrf_token: str,
+        attachment_hash: str,
+        attachment_hash_combined: str,
         topic_title: str,
         post_body: str,
     ) -> str:
         """
         Create a new forum topic and return its URL.
 
-        The forum uses ISO-8859-1. Form fields are encoded as Latin-1 with
-        HTML numeric entities for out-of-range characters, matching what a
-        browser would submit.
-
         Args:
             forum_id (int): Target forum ID.
-            session_id (str): Active forum session ID.
-            auth_key (str): Forum authentication key.
-            attach_post_key (str): Attachment post key.
+            csrf_token (str): XenForo CSRF token.
+            attachment_hash (str): Attachment hash.
+            attachment_hash_combined (str): Attachment hash combined.
             topic_title (str): Topic title.
-            post_body (str): Topic content.
+            post_body (str): Topic content (BBCode).
 
         Returns:
             str: Topic URL, or an empty string if creation failed.
         """
         fields = self.get_topic_fields(
             forum_id=forum_id,
-            session_id=session_id,
-            auth_key=auth_key,
-            attach_post_key=attach_post_key,
+            csrf_token=csrf_token,
+            attachment_hash=attachment_hash,
+            attachment_hash_combined=attachment_hash_combined,
             topic_title=topic_title,
             post_body=post_body,
         )
 
-        body = "&".join(
-            f"{urllib.parse.quote_plus(k)}={urllib.parse.quote_plus((v).encode('latin-1', errors='xmlcharrefreplace').decode('latin-1'), encoding='latin-1')}"
-            for k, v in fields.items()
-        )
+        url = f"{self.base_url}/forums/{forum_id}/post-thread"
 
         try:
             resp = await self.session.post(
-                f"{self.base_url}/index.php?",
-                content=body.encode("latin-1"),
-                headers={"Content-Type": "application/x-www-form-urlencoded; charset=ISO-8859-1"},
-                follow_redirects=True,
+                url,
+                data=fields,
+                headers={"X-Requested-With": "XMLHttpRequest"},
             )
             resp.raise_for_status()
+            res_data = resp.json()
         except httpx.HTTPError as e:
             logger.error(f"[cyan]{self.tracker}:[/cyan] Failed creating topic: {e}")
+            response = getattr(e, "response", None)
+            if response is not None:
+                logger.debug(f"[cyan]{self.tracker}:[/cyan] Response: {cast(httpx.Response, response).text}")
+            return ""
+        except Exception as e:
+            logger.error(f"[cyan]{self.tracker}:[/cyan] Failed to parse response: {e}")
             return ""
 
-        topic_url = str(resp.url)
-        if "showtopic=" in topic_url or "topic/" in topic_url:
+        if res_data.get("status") == "ok" and "redirect" in res_data:
+            topic_url = res_data["redirect"]
+            if topic_url.startswith("/"):
+                topic_url = f"{self.base_url.rstrip('/')}/{topic_url.lstrip('/')}"
             return topic_url
 
-        match = re.search(r"showtopic=(\d+)", resp.text)
-        if match:
-            return f"{self.base_url}/index.php?showtopic={match.group(1)}"
+        errors = res_data.get("errors", {})
+        error_msg = res_data.get("errorHtml", {}).get("content", "") or str(errors)
+        logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Failed creating topic:[/bold red]\n{error_msg}")
+        return ""
 
-        logger.warning(f"[yellow]{self.tracker}:[/yellow] Topic possibly created, but it wasn't possible to get the url.")
-        return topic_url
-
-    async def validate_credentials(self, _meta: Meta) -> bool:
+    async def validate_credentials(self, meta: Meta) -> bool:
         """
         Validate tracker credentials and configure the authenticated session.
 
-        Accepts either a full ``cookie_header`` string (recommended, copied
-        directly from the browser) or individual ``member_id`` / ``pass_hash``
-        fields.  The ``session_id`` cookie is always generated automatically
-        as a random 32-character hex token — IPB rotates it on every
-        authenticated response, so the first value just needs to exist.
+        Loads session cookies using CookieValidator.
 
         Args:
             meta: Release metadata.
@@ -695,37 +914,11 @@ class MakingOff:
         Returns:
             bool: True if the credentials are valid.
         """
-        tracker_config = dict(dict(self.config.get("TRACKERS", {})).get(self.tracker, {}))
+        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if not cookie_jar:
+            return False
 
-        raw_cookie_header = tracker_config.get("cookie_header", "").strip()
-        if raw_cookie_header:
-            for part in raw_cookie_header.split(";"):
-                if "=" not in part:
-                    continue
-                name, _, value = part.strip().partition("=")
-                if name:
-                    self.session.cookies.set(name, value, domain="makingoff.org")
-                    self.session.cookies.set(name, value, domain="indice.makingoff.org")
-        else:
-            member_id = tracker_config.get("member_id", "").strip()
-            pass_hash = tracker_config.get("pass_hash", "").strip()
-
-            if not member_id or not pass_hash:
-                logger.error(
-                    f"[cyan]{self.tracker}:[/cyan] [bold red]Incomplete credentials on configuration "
-                    f"Fill 'cookie_header' (recommended) or 'member_id' and 'pass_hash' "
-                    f"in config['TRACKERS']['{self.tracker}'].[/bold red]"
-                )
-                return False
-
-            # Generate a fresh random session_id; IPB replaces it after the
-            # first authenticated request, so the exact value does not matter.
-            session_id = secrets.token_hex(16)
-
-            for domain in ("makingoff.org", "indice.makingoff.org"):
-                self.session.cookies.set("session_id", session_id, domain=domain)
-                self.session.cookies.set("member_id", member_id, domain=domain)
-                self.session.cookies.set("pass_hash", pass_hash, domain=domain)
+        self.session.cookies = cast(Any, cookie_jar)
 
         if not await self.refresh_session():
             logger.error(f"[cyan]{self.tracker}:[/cyan] [bold red]Session couldn't be validated.[/bold red] Cookies may be expired.")
@@ -757,22 +950,31 @@ class MakingOff:
         title_orig = meta.original_title
         title_en = meta.title
 
+        candidates: list[str] = []
         if self._is_brazilian(meta):
             candidates = [title_ptbr]
         else:
-            candidates = []
             for t in [title_ptbr, title_en, title_orig]:
                 if t and t not in candidates:
                     candidates.append(t)
 
+        forum_id = await self.get_forum_id(meta)
         results: dict[str, str] = {}
-        for candidate in candidates:
-            term = candidate.strip()
-            logger.info(f"[cyan]{self.tracker}:[/cyan] [yellow]Searching for:[/yellow] {term}")
-            found = await self.search(self.index_url, term)
+
+        # 1. Search by IMDB ID (without title_only, as it is in the post description)
+        if meta.imdb_tt:
+            logger.info(f"[cyan]{self.tracker}:[/cyan] [yellow]Searching by IMDB ID:[/yellow] {meta.imdb_tt}")
+            found = await self.search_candidate(meta.imdb_tt, forum_id=forum_id, title_only=False)
             if found:
-                results = found
-                break
+                results.update(found)
+
+        # 2. Search by title candidates (with title_only=True)
+        for candidate in candidates:
+            phrase = candidate.strip()
+            logger.info(f"[cyan]{self.tracker}:[/cyan] [yellow]Searching for title:[/yellow] {phrase}")
+            found = await self.search_candidate(phrase, forum_id=forum_id, title_only=True)
+            if found:
+                results.update(found)
 
         if not results:
             return duplicates
@@ -812,8 +1014,6 @@ class MakingOff:
                 continue
 
         return duplicates
-
-    # -- forum routing
 
     async def get_forum_id(self, meta: Meta) -> int:
         """
@@ -1062,7 +1262,7 @@ class MakingOff:
 
     def _find_translation_title(self, ptbr_main_or_en_main: dict[str, Any], iso_639_1: str, iso_3166_1: str | None = None) -> str:
         translations = ptbr_main_or_en_main.get("translations", {}).get("translations", [])
-        primary = next(
+        primary: dict[str, Any] | None = next(
             (t for t in translations if t.get("iso_639_1") == iso_639_1 and (iso_3166_1 is None or t.get("iso_3166_1") == iso_3166_1)),
             None,
         )
@@ -1190,16 +1390,36 @@ class MakingOff:
         meta_subtitle_languages = meta.subtitle_languages if meta.subtitle_languages else []
         found_languages = {lang.lower() for lang in meta_subtitle_languages}
 
+        # Check if we have external Portuguese subtitles or embedded ones.
+        # If we have external Portuguese subtitle files, they will be uploaded as attachments ("Anexas").
+        has_external_pt_sub = False
+        for sub_file in getattr(meta, "subtitle_files", []):
+            if not Path(sub_file).exists():
+                continue
+            name_lower = Path(sub_file).name.lower()
+            if any(term in name_lower for term in (".pt", ".pt-br", ".por", "portuguese", "ptbr", "pt_br")) or self._is_subtitle_in_portuguese(sub_file):
+                has_external_pt_sub = True
+                break
+
+        if has_external_pt_sub:
+            return "Anexas"
+
         if any(lang in portuguese_languages for lang in found_languages):
             return "Embutidas"
 
         # Fallback to asking
-        options = {"1": "Anexas", "2": "Embutidas", "3": "Fixas", "4": "Sem Legenda"}
+        options = {
+            "1": "No torrent",
+            "2": "Anexas",
+            "3": "Embutidas",
+            "4": "Fixas",
+            "5": "Sem Legenda",
+        }
         logger.info(f"[cyan]{self.tracker}:[/cyan] [yellow]Any subtitles?[/yellow]")
         for k, v in options.items():
             logger.info(f"  {k}) {v}")
         selection = (await asyncio.to_thread(input, "Choose: ")).strip()
-        return options.get(selection, "")
+        return options.get(selection, "Sem Legenda")
 
     async def generate_description(self, meta: Meta) -> str:
         """
@@ -1219,7 +1439,8 @@ class MakingOff:
 
         # Prefer TMDB PT-BR overview already cached by the UA; fall back to
         # translation details from the pre-fetched translations list.
-        ptbr_main = meta.tmdb_localized_data.get("pt-BR", {}).get("main", {})
+        ptbr_main = dict(meta.tmdb_localized_data.get("pt-BR", {})).get("main", {})
+        en_main = dict(meta.tmdb_localized_data.get("en-US", {})).get("main", {})
 
         poster_raw = ptbr_main.get("poster_path") or meta.tmdb_poster
         poster_url = poster_raw if poster_raw.startswith("http") else f"https://image.tmdb.org/t/p/original{poster_raw}" if poster_raw else ""
@@ -1239,25 +1460,42 @@ class MakingOff:
 
         overview = ptbr_main.get("overview") or pt_overview or meta.overview
 
-        cast_list = ptbr_main.get("credits", {}).get("cast", [])[:15] if ptbr_main else []
-        cast_names = [m["name"] for m in cast_list if m.get("name")]
-        cast_text = "".join(f"<div>{name.strip()}</div>\n" for name in cast_names if name.strip())
+        # Romanize cast names by pulling from en-US main data, slice to 10 and join with comma, matching the JS generator
+        cast_list: list[dict[str, Any]] = cast(list[dict[str, Any]], en_main.get("credits", {}).get("cast", [])[:10]) if en_main else []
+        cast_names: list[str] = [cast(str, member.get("name")) for member in cast_list if member.get("name")]
+        cast_text = ", ".join(cast_names)
 
-        tmdb_dirs = [m["name"] for m in ptbr_main.get("credits", {}).get("crew", []) if m.get("job") == "Director"] if ptbr_main else []
-        imdb_dirs = meta.imdb_info.get("directors", []) or []
+        # Romanize director name
+        tmdb_dirs: list[str] = (
+            [
+                cast(str, member.get("name"))
+                for member in cast(list[dict[str, Any]], en_main.get("credits", {}).get("crew", []))
+                if member.get("job") == "Director" and member.get("name")
+            ]
+            if en_main
+            else []
+        )
+        imdb_dirs: list[str] = [name for name in cast(list[Any], meta.imdb_info.get("directors", []) or []) if isinstance(name, str)]
         directors = ", ".join(tmdb_dirs if tmdb_dirs else imdb_dirs)
 
         imdb_url = ""
         if meta.imdb_id or meta.imdb_info.get("imdb_url"):
             imdb_url = meta.imdb_info.get("imdb_url") or f"https://www.imdb.com/title/tt{str(meta.imdb_id).zfill(7)}/"
 
+        homepage_url = ptbr_main.get("homepage") or en_main.get("homepage") or ""
+
         # Extract tracks from meta.mediainfo
-        tracks = meta.mediainfo.get("media", {}).get("track", [])
-        video_track = next((t for t in tracks if t.get("@type") == "Video"), {})
-        audio_track = next((t for t in tracks if t.get("@type") == "Audio"), {})
-        general_track = next((t for t in tracks if t.get("@type") == "General"), {})
+        tracks: list[dict[str, Any]] = cast(list[dict[str, Any]], meta.mediainfo.get("media", {}).get("track", []))
+        video_track: dict[str, Any] = next((track for track in tracks if track.get("@type") == "Video"), {})
+        audio_track: dict[str, Any] = next((track for track in tracks if track.get("@type") == "Audio"), {})
+        general_track: dict[str, Any] = next((track for track in tracks if track.get("@type") == "General"), {})
 
         width, height = meta.video_width or 0, meta.video_height or 0
+
+        # Optional fields from meta
+        awards = getattr(meta, "awards", "") or getattr(meta, "premiacoes", "") or ""
+        trivia = getattr(meta, "trivia", "") or getattr(meta, "curiosidades", "") or ""
+        critic = getattr(meta, "critic", "") or getattr(meta, "critica", "") or ""
 
         return self._build_bbcode(
             title_br=title_br,
@@ -1275,6 +1513,7 @@ class MakingOff:
             audio=self._localizer_audio_language(meta),
             subs=await self._subtitles_ptbr(meta),
             imdb_url=imdb_url,
+            homepage_url=homepage_url,
             quality=self._localizer_video_quality(meta),
             container=self._mediainfo_container(general_track, fallback=(getattr(meta, "container", "") or "").upper()),
             video_codec=self._mediainfo_video_codec(meta, video_track),
@@ -1285,6 +1524,9 @@ class MakingOff:
             aspect=self._aspect_ratio(width, height),
             fps_str=f"{meta.frame_rate:.3f} FPS" if meta.frame_rate else "23.976 FPS",
             filesize=self._mediainfo_filesize(meta),
+            awards=awards,
+            trivia=trivia,
+            critic=critic,
         )
 
     async def get_additional_checks(self, meta: Meta) -> bool:
@@ -1340,15 +1582,32 @@ class MakingOff:
         named_torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{release_filename}.torrent"
         shutil.copy2(torrent_path, named_torrent_path)
 
+        # Get Portuguese subtitles (external or extracted)
+        sub_files = await self._get_portuguese_subtitles(meta)
+
+        # Zip subtitles to comply with MakingOff allowed formats (.torrent, .rar, .zip)
+        if sub_files:
+            temp_dir = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}"
+            zip_path = str(Path(temp_dir) / f"{release_filename}.legendas.zip")
+            try:
+                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+                    for sub_file in sub_files:
+                        zipf.write(sub_file, arcname=Path(sub_file).name)
+                logger.info(f"[cyan]{self.tracker}:[/cyan] [green]Zipped {len(sub_files)} subtitles to {Path(zip_path).name}[/green]")
+                sub_files = [zip_path]
+            except Exception as e:
+                logger.error(f"[cyan]{self.tracker}:[/cyan] [red]Failed to create zip file for subtitles: {e}[/red]")
+                sub_files = []
+
         if meta.debug:
             topic_title = await self.get_topic_title(meta)
             post_body = await self.generate_description(meta)
 
             fields = self.get_topic_fields(
                 forum_id=forum_id,
-                session_id="DEBUG_SESSION",
-                auth_key="DEBUG_AUTH",
-                attach_post_key="DEBUG_ATTACH",
+                csrf_token="DEBUG_CSRF",  # noqa: S106
+                attachment_hash="DEBUG_HASH",
+                attachment_hash_combined="DEBUG_COMBINED",
                 topic_title=topic_title,
                 post_body=post_body,
             )
@@ -1356,7 +1615,10 @@ class MakingOff:
             logger.info(f"[cyan]{self.tracker} Request Data:[/cyan]")
             logger.info(Redaction.redact_private_info(fields))
 
-            txt_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MKO_bbcode.txt"
+            if sub_files:
+                logger.info(f"[cyan]{self.tracker} Debug Subtitles to upload:[/cyan] {sub_files}")
+
+            txt_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
             async with aiofiles.open(txt_path, "w", encoding="utf-8") as f:
                 await f.write(f"TITULO: {topic_title}\n\n")
                 await f.write(post_body)
@@ -1370,23 +1632,28 @@ class MakingOff:
             meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to validate credentials before upload."
             return False
 
-        session_id, auth_key, attach_post_key = await self.get_new_post_tokens(forum_id)
-        if not auth_key or not attach_post_key:
-            meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to retrieve IPB session tokens."
+        csrf_token, attachment_hash, attachment_hash_combined = await self.get_new_post_tokens(forum_id)
+        if not csrf_token or not attachment_hash:
+            meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to retrieve XenForo tokens."
             return False
 
-        if not await self.upload_attachment(named_torrent_path, session_id, attach_post_key, forum_id):
+        if not await self.upload_attachment(named_torrent_path, csrf_token, attachment_hash, attachment_hash_combined, forum_id):
             meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to upload .torrent attachment."
             return False
+
+        # Upload Portuguese subtitles if any
+        for sub_file in sub_files:
+            logger.info(f"[cyan]{self.tracker}:[/cyan] [yellow]Uploading Portuguese subtitle as attachment:[/yellow] {Path(sub_file).name}")
+            await self.upload_attachment(sub_file, csrf_token, attachment_hash, attachment_hash_combined, forum_id)
 
         topic_title = await self.get_topic_title(meta)
         post_body = await self.generate_description(meta)
 
         topic_url = await self.create_topic(
             forum_id=forum_id,
-            session_id=session_id,
-            auth_key=auth_key,
-            attach_post_key=attach_post_key,
+            csrf_token=csrf_token,
+            attachment_hash=attachment_hash,
+            attachment_hash_combined=attachment_hash_combined,
             topic_title=topic_title,
             post_body=post_body,
         )

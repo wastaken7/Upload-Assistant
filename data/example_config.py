@@ -1552,13 +1552,13 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "MAKINGOFF":{
+            # for MAKINGOFF to work you need to export cookies from https://www.makingoff.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
+            # cookies need to be in netscape format and need to be in data/cookies/MAKINGOFF.txt
             # trackers to be added on the torrents
             # one per line
             "trackers":
                 """
                 """,
-            "member_id": "",
-            "pass_hash": "",
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
         },
