@@ -53,15 +53,7 @@ def draw_social_preview():
 
     # Left Column dimensions
     left_column_w = max(title_w, sub_w)
-    left_column_h = (
-        title_h
-        + gap_title_sub
-        + sub_h
-        + gap_sub_div
-        + divider_h
-        + gap_div_badges
-        + badges_h
-    )
+    left_column_h = title_h + gap_title_sub + sub_h + gap_sub_div + divider_h + gap_div_badges + badges_h
 
     # Horizontal centering
     gap_left_logo = 100
@@ -94,10 +86,7 @@ def draw_social_preview():
     glow_draw = ImageDraw.Draw(glow_layer)
     for r in range(500, 0, -10):
         alpha = int(20 * (1.0 - r / 500.0))  # Max alpha ~8%
-        glow_draw.ellipse(
-            [glow_center_x - r, glow_center_y - r, glow_center_x + r, glow_center_y + r],
-            fill=(180, 83, 9, alpha)
-        )
+        glow_draw.ellipse([glow_center_x - r, glow_center_y - r, glow_center_x + r, glow_center_y + r], fill=(180, 83, 9, alpha))
     img = Image.alpha_composite(img, glow_layer)
     draw = ImageDraw.Draw(img)
 
@@ -118,11 +107,7 @@ def draw_social_preview():
     draw.text((sub_x, sub_y), sub_text, fill=(168, 162, 158, 255), font=sub_font)
 
     # Divider
-    draw.line(
-        [(x_start, divider_y), (x_start + left_column_w, divider_y)],
-        fill=(41, 37, 36, 255),
-        width=divider_h
-    )
+    draw.line([(x_start, divider_y), (x_start + left_column_w, divider_y)], fill=(41, 37, 36, 255), width=divider_h)
 
     # 8. Badges (Left Column)
     def draw_badge(x, y, w, h, bg_color, border_color, text, text_color):
@@ -147,38 +132,11 @@ def draw_social_preview():
     badge_w = 165
     badge_gap = 20
     # Badge 1: P2P
-    draw_badge(
-        x_start,
-        badges_y,
-        badge_w,
-        badges_h,
-        (120, 53, 15, 38),
-        (180, 83, 9, 255),
-        "P2P / Torrents",
-        (245, 158, 11, 255)
-    )
+    draw_badge(x_start, badges_y, badge_w, badges_h, (120, 53, 15, 38), (180, 83, 9, 255), "P2P / Torrents", (245, 158, 11, 255))
     # Badge 2: Usenet
-    draw_badge(
-        x_start + badge_w + badge_gap,
-        badges_y,
-        badge_w,
-        badges_h,
-        (113, 63, 18, 38),
-        (161, 98, 7, 255),
-        "Usenet / NZB",
-        (250, 204, 21, 255)
-    )
+    draw_badge(x_start + badge_w + badge_gap, badges_y, badge_w, badges_h, (113, 63, 18, 38), (161, 98, 7, 255), "Usenet / NZB", (250, 204, 21, 255))
     # Badge 3: CLI
-    draw_badge(
-        x_start + (badge_w + badge_gap) * 2,
-        badges_y,
-        badge_w,
-        badges_h,
-        (41, 37, 36, 102),
-        (87, 83, 78, 255),
-        "CLI & Automation",
-        (231, 229, 228, 255)
-    )
+    draw_badge(x_start + (badge_w + badge_gap) * 2, badges_y, badge_w, badges_h, (41, 37, 36, 102), (87, 83, 78, 255), "CLI & Automation", (231, 229, 228, 255))
 
     # 9. Render and Paste Logo
     logo_img = draw_logo(logo_size)
