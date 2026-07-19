@@ -47,7 +47,7 @@ class MakingOff:
             "main": "credits,translations",
         },
         "en-US": {
-            "main": "translations",
+            "main": "credits,translations",
         },
     }
 
@@ -1367,7 +1367,8 @@ class MakingOff:
             list[str]: Resolved image URLs.
         """
         urls: list[str] = []
-        for img in meta.image_list:
+        image_list = cast(list[dict[str, Any]], meta.menu_images) + meta.image_list + meta.spectrograms_images
+        for img in image_list:
             if isinstance(img, str):
                 urls.append(img)
             elif isinstance(img, dict):
