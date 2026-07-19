@@ -41,10 +41,10 @@ class HDTorrents:
 
         tracker_config = self.config.get("TRACKERS", {}).get(self.tracker, {})
         tracker_config_dict = cast(dict[str, Any], tracker_config) if isinstance(tracker_config, dict) else {}
-        url_from_config = str(tracker_config_dict.get("url", ""))
+        url_from_config = str(tracker_config_dict.get("url", "")).strip()
         parsed_url = urlparse(url_from_config)
-        self.config_url = parsed_url.netloc
-        self.base_url = f"https://{self.config_url}"
+        self.config_url = parsed_url.netloc or parsed_url.path.strip("/")
+        self.base_url = f"https://{self.config_url}" if self.config_url else type(self).base_url
 
         self.torrent_url = f"{self.base_url}/details.php?id="
         self.announce_url = str(tracker_config_dict.get("announce_url", ""))

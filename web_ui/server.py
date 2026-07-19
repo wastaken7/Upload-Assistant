@@ -13,6 +13,7 @@ import os
 import queue
 import re
 import secrets
+import shlex
 import subprocess
 import sys
 import threading
@@ -2554,7 +2555,7 @@ def _resolve_user_path(
         if path_obj.name.startswith("webui_queue_") and path_obj.suffix == ".txt":
             repo_tmp_dir = Path(__file__).resolve().parent.parent / "tmp"
             if repo_tmp_dir.resolve().exists():
-                roots = roots + [str(repo_tmp_dir.resolve())]
+                roots = [*roots, str(repo_tmp_dir.resolve())]
     if not roots:
         raise ValueError("Browsing is not configured")
 
@@ -3790,7 +3791,7 @@ def browse_path():
                             "size": size,
                         }
                     )
-                except PermissionError, OSError:
+                except (PermissionError, OSError):
                     continue
 
             console.print(f"Found {len(items)} items in {path}", markup=False)
@@ -3830,7 +3831,7 @@ def browse_search():
         max_results = min(int(request.args.get("max_results", "100")), 500)
         if max_results < 1:
             max_results = 100
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         max_results = 100
 
     if not query:
@@ -4032,21 +4033,33 @@ def save_queue():
         tmp_dir = base_dir / "tmp"
         tmp_dir.mkdir(parents=True, exist_ok=True)
 
-        filename = f"webui_queue_{int(time.time())}.txt"
+        filename = f"webui_queue_{int(time.time() * 1000)}_{secrets.token_hex(4)}.txt"
         file_path = tmp_dir / filename
 
-        with open(file_path, "w", encoding="utf-8") as f:
-            for item in items:
-                if not isinstance(item, dict):
-                    continue
-                path = str(item.get("path", "")).strip()
-                args = str(item.get("args", "")).strip()
-                if not path:
-                    continue
+        validated_items: list[tuple[str, list[str]]] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            path = str(item.get("path", "")).strip()
+            args = str(item.get("args", "")).strip()
+            if not path:
+                continue
 
-                line = f'"{path}"'
-                if args:
-                    line += f" {args}"
+            try:
+                validated_path = _resolve_user_path(path, require_exists=True, require_dir=False)
+                validated_args = _validate_upload_assistant_args(shlex.split(args) if args else [])
+            except (ValueError, TypeError) as err:
+                return jsonify({"error": f"Invalid queue item: {err}", "success": False}), 400
+            validated_items.append((validated_path, validated_args))
+
+        if not validated_items:
+            return jsonify({"error": "No valid items provided", "success": False}), 400
+
+        with file_path.open("w", encoding="utf-8") as f:
+            for validated_path, validated_args in validated_items:
+                line = f'"{validated_path}"'
+                if validated_args:
+                    line += f" {shlex.join(validated_args)}"
                 f.write(line + "\n")
 
         return jsonify({"success": True, "path": str(file_path)})

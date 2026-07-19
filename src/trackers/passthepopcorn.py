@@ -1690,7 +1690,8 @@ class PassThePopcorn:
             meta.tracker_status[self.tracker]["status_message"] = f"data error: see {failure_path} | {error_message}"
 
         # URL format in case of successful upload: https://passthepopcorn.me/torrents.php?id=9329&torrentid=91868
-        match = re.match(r".*?passthepopcorn\.me/torrents\.php\?id=(\d+)&torrentid=(\d+)", str(response.url))
+        expected_host = urlparse(self.base_url).netloc
+        match = re.match(rf".*?{re.escape(expected_host)}/torrents\.php\?id=(\d+)&torrentid=(\d+)", str(response.url))
         if match is None:
             async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
                 await f.write(responsetext)
