@@ -23,14 +23,16 @@ class SpeedApp:
     SPD Private Torrent Tracker
     """
 
+    base_url = "https://speedapp.io"
+
     auth_type = "other_api"
-    url = "https://speedapp.io"
+    url = f"{base_url}"
     tracker = "SPEEDAPP"
     display_name = "SpeedApp"
     banned_groups = ()
-    upload_url = "https://speedapp.io/api/upload"
-    torrent_url = "https://speedapp.io/browse/"
-    banned_url = "https://speedapp.io/api/torrent/release-group/blacklist"
+    upload_url = f"{base_url}/api/upload"
+    torrent_url = f"{base_url}/browse/"
+    banned_url = f"{base_url}/api/torrent/release-group/blacklist"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
     tracker_urls = ("ramjet.speedapp.io", "ramjet.speedapp.to", "ramjet.speedappio.org")
     allowed_bloated_audio_languages = ("ro",)
@@ -130,7 +132,7 @@ class SpeedApp:
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
-        search_url = "https://speedapp.io/api/torrent"
+        search_url = f"{self.base_url}/api/torrent"
 
         params: dict[str, str] = {}
         if meta.imdb_id or 0 != 0:

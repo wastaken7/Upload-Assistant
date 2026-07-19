@@ -35,6 +35,8 @@ class PassThePopcorn:
     PTP Private Torrent Tracker
     """
 
+    base_url = "https://passthepopcorn.me"
+
     tracker = "PASSTHEPOPCORN"
     display_name = "PassThePopcorn"
     allows_bloated_audio = True
@@ -181,7 +183,7 @@ class PassThePopcorn:
             "api_key": self.api_key,
             "User-Agent": self.user_agent,
         }
-        url = "https://passthepopcorn.me/torrents.php"
+        url = f"{self.base_url}/torrents.php"
         search_value = search_term or _search_file_folder
         params = {
             "searchstr": search_value,
@@ -234,7 +236,7 @@ class PassThePopcorn:
     async def get_imdb_from_torrent_id(self, ptp_torrent_id: int | str) -> tuple[int | None, str | None]:
         params = {"torrentid": ptp_torrent_id}
         headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
-        url = "https://passthepopcorn.me/torrents.php"
+        url = f"{self.base_url}/torrents.php"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url, params=params, headers=headers)
         await asyncio.sleep(1)
@@ -260,7 +262,7 @@ class PassThePopcorn:
     async def get_ptp_description(self, ptp_torrent_id: int | str, meta: Meta, is_disc: str) -> list[Any]:
         params = {"id": ptp_torrent_id, "action": "get_description"}
         headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
-        url = "https://passthepopcorn.me/torrents.php"
+        url = f"{self.base_url}/torrents.php"
         logger.info(f"[yellow]Requesting description from {url} with ID {ptp_torrent_id}")
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url, params=params, headers=headers)
@@ -306,7 +308,7 @@ class PassThePopcorn:
             "imdb": imdb,
         }
         headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
-        url = "https://passthepopcorn.me/torrents.php"
+        url = f"{self.base_url}/torrents.php"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url=url, headers=headers, params=params)
         await asyncio.sleep(1)
@@ -392,7 +394,7 @@ class PassThePopcorn:
     async def get_torrent_info(self, imdb: int | str, meta: Meta) -> dict[str, Any]:
         params = {"imdb": imdb, "action": "torrent_info", "fast": 1}
         headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
-        url = "https://passthepopcorn.me/ajax.php"
+        url = f"{self.base_url}/ajax.php"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url=url, params=params, headers=headers)
         await asyncio.sleep(1)
@@ -485,7 +487,7 @@ class PassThePopcorn:
             "id": group_id,
         }
         headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
-        url = "https://passthepopcorn.me/torrents.php"
+        url = f"{self.base_url}/torrents.php"
 
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             response = await client.get(url, headers=headers, params=params)
@@ -1386,7 +1388,7 @@ class PassThePopcorn:
             raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # pyright: ignore[reportPrivateUsage]
             cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
-                uploadresponse = await client.get("https://passthepopcorn.me/upload.php")
+                uploadresponse = await client.get(f"{self.base_url}/upload.php")
                 logged_in = await self.validate_login(uploadresponse)
                 if logged_in is True:
                     token_match = re.search(r'data-AntiCsrfToken="(.*)"', uploadresponse.text)
@@ -1412,14 +1414,14 @@ class PassThePopcorn:
         }
         headers = {"User-Agent": self.user_agent}
         async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
-            loginresponse = await client.post("https://passthepopcorn.me/ajax.php?action=login", data=data, headers=headers)
+            loginresponse = await client.post(f"{self.base_url}/ajax.php?action=login", data=data, headers=headers)
             await asyncio.sleep(2)
             try:
                 resp = loginresponse.json()
                 if resp["Result"] == "TfaRequired":
                     data["TfaType"] = "normal"
                     data["TfaCode"] = cli_ui.ask_string("2FA Required: Please enter PassThePopcorn 2FA code")
-                    loginresponse = await client.post("https://passthepopcorn.me/ajax.php?action=login", data=data, headers=headers)
+                    loginresponse = await client.post(f"{self.base_url}/ajax.php?action=login", data=data, headers=headers)
                     await asyncio.sleep(2)
                     resp = loginresponse.json()
                 try:
@@ -1561,7 +1563,7 @@ class PassThePopcorn:
         else:
             data["imdb"] = str(imdb_id_int).zfill(7)
         if group_id is None:  # If need to make new group
-            url = "https://passthepopcorn.me/upload.php"
+            url = f"{self.base_url}/upload.php"
             if data["imdb"] == "0":
                 tinfo = await self.get_torrent_info_tmdb(meta)
             else:
@@ -1618,7 +1620,7 @@ class PassThePopcorn:
                 data["artist[]"] = directors
                 data["importance[]"] = "1"
         else:  # Upload on existing group
-            url = f"https://passthepopcorn.me/upload.php?groupid={group_id}"
+            url = f"{self.base_url}/upload.php?groupid={group_id}"
             data["groupid"] = group_id
 
         return url, data
@@ -1688,7 +1690,8 @@ class PassThePopcorn:
             meta.tracker_status[self.tracker]["status_message"] = f"data error: see {failure_path} | {error_message}"
 
         # URL format in case of successful upload: https://passthepopcorn.me/torrents.php?id=9329&torrentid=91868
-        match = re.match(r".*?passthepopcorn\.me/torrents\.php\?id=(\d+)&torrentid=(\d+)", str(response.url))
+        expected_host = urlparse(self.base_url).netloc
+        match = re.match(rf".*?{re.escape(expected_host)}/torrents\.php\?id=(\d+)&torrentid=(\d+)", str(response.url))
         if match is None:
             async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
                 await f.write(responsetext)

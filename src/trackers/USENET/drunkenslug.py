@@ -25,13 +25,15 @@ class DrunkenSlug:
     DS Private Torrent Tracker
     """
 
+    base_url = "https://drunkenslug.com"
+
     auth_type = "other_api"
     tracker = "DRUNKENSLUG"
     display_name = "DrunkenSlug"
     allows_bloated_audio = True
     banned_groups = ()
-    search_url = "https://drunkenslug.com/api"
-    torrent_url = "https://drunkenslug.com/search/"
+    search_url = f"{base_url}/api"
+    torrent_url = f"{base_url}/search/"
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")
     is_usenet = True
 

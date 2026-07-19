@@ -17,15 +17,17 @@ class Swarmazon:
     SWARMAZON is a Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
+    base_url = "https://swarmazon.club"
+
     auth_type = "other_api"
     tracker = "SWARMAZON"
     display_name = "Swarmazon"
     allows_bloated_audio = True
     source_flag = "Swarmazon"
     banned_groups = ("",)
-    upload_url = "https://swarmazon.club/api/upload.php"
-    forum_link = "https://swarmazon.club/php/forum.php?forum_page=2-swarmazon-rules"
-    search_url = "https://swarmazon.club/api/search.php"
+    upload_url = f"{base_url}/api/upload.php"
+    forum_link = f"{base_url}/php/forum.php?forum_page=2-swarmazon-rules"
+    search_url = f"{base_url}/api/search.php"
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: Config) -> None:

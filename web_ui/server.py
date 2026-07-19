@@ -13,6 +13,7 @@ import os
 import queue
 import re
 import secrets
+import shlex
 import subprocess
 import sys
 import threading
@@ -256,6 +257,18 @@ def _assert_safe_resolved_path(path: str | Path) -> None:
     # Ensure absolute and normalized
     abs_path = str(Path(path_str).resolve())
     real_path = os.path.realpath(abs_path)
+
+    # Check for webui_queue file
+    path_obj = Path(real_path)
+    if path_obj.name.startswith("webui_queue_") and path_obj.suffix == ".txt":
+        repo_tmp_dir = Path(__file__).resolve().parent.parent / "tmp"
+        if repo_tmp_dir.resolve().exists():
+            # Ensure it is actually inside repo_tmp_dir
+            try:
+                if os.path.commonpath([real_path, os.path.realpath(str(repo_tmp_dir.resolve()))]) == os.path.realpath(str(repo_tmp_dir.resolve())):
+                    return
+            except ValueError:
+                pass
 
     roots = _get_browse_roots()
     if not roots:
@@ -1656,6 +1669,8 @@ class BrowseItem(TypedDict, total=False):
     type: Literal["folder", "file"]
     children: list[BrowseItem] | None
     subtitle: str  # Optional hint  (eg, when parent path when names collide)
+    mtime: float
+    size: int
 
 
 class MetadataSource(TypedDict, total=False):
@@ -2534,6 +2549,13 @@ def _resolve_user_path(
     require_dir: bool = False,
 ) -> str:
     roots = _get_browse_roots()
+    # Allow webui_queue files under tmp directory
+    if isinstance(user_path, str):
+        path_obj = Path(user_path)
+        if path_obj.name.startswith("webui_queue_") and path_obj.suffix == ".txt":
+            repo_tmp_dir = Path(__file__).resolve().parent.parent / "tmp"
+            if repo_tmp_dir.resolve().exists():
+                roots = [*roots, str(repo_tmp_dir.resolve())]
     if not roots:
         raise ValueError("Browsing is not configured")
 
@@ -3267,7 +3289,21 @@ def browse_roots():
     items: list[BrowseItem] = []
     for root in roots:
         display_name = Path(root.rstrip(os.sep)).name or root
-        item: BrowseItem = {"name": display_name, "path": root, "type": "folder", "children": []}
+        try:
+            stat_res = Path(root).stat()
+            mtime = stat_res.st_mtime
+            size = 0
+        except Exception:
+            mtime = 0.0
+            size = 0
+        item: BrowseItem = {
+            "name": display_name,
+            "path": root,
+            "type": "folder",
+            "children": [],
+            "mtime": mtime,
+            "size": size,
+        }
 
         # Add subtitle if multiple roots share the same folder name
         if len(name_to_roots.get(display_name, [])) > 1:
@@ -3411,6 +3447,52 @@ def torrent_clients():
     client_names: list[str] = [str(key) for key in user_clients]
 
     return jsonify({"success": True, "clients": sorted(client_names)})
+
+
+@app.route("/api/trackers")
+def get_trackers():
+    """Return a list of available trackers and the configured default trackers"""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    base_dir = Path(__file__).parent.parent
+    config_path = base_dir / "data" / "config.py"
+    user_config = _load_config_from_file(config_path) or {}
+
+    trackers_section = user_config.get("TRACKERS", {})
+    default_trackers_val = trackers_section.get("default_trackers", "")
+    default_trackers_list = []
+    if isinstance(default_trackers_val, str):
+        default_trackers_list = [t.strip().upper() for t in default_trackers_val.split(",") if t.strip()]
+    elif isinstance(default_trackers_val, list):
+        default_trackers_list = [str(t).strip().upper() for t in default_trackers_val if str(t).strip()]
+
+    # Load tracker_class_map from src.trackersetup
+    try:
+        from src.trackersetup import tracker_class_map
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Failed to load trackers: {e}"}), 500
+
+    trackers_data = []
+    for tracker_name, tracker_class in tracker_class_map.items():
+        display_name = getattr(tracker_class, "display_name", tracker_name)
+        base_url = getattr(tracker_class, "base_url", "")
+        favicon_url = ""
+        static_dir = Path(__file__).parent / "static"
+        for ext in ["png", "svg", "ico"]:
+            local_path = static_dir / "img" / "trackers" / f"{tracker_name.lower()}.{ext}"
+            if local_path.is_file():
+                favicon_url = f"/static/img/trackers/{tracker_name.lower()}.{ext}"
+                break
+
+        trackers_data.append({"name": tracker_name, "display_name": display_name, "base_url": base_url, "favicon": favicon_url})
+
+    trackers_data.sort(key=lambda x: x["display_name"].lower())
+
+    return jsonify({"success": True, "default_trackers": default_trackers_list, "trackers": trackers_data})
 
 
 @app.route("/api/config_update", methods=["POST"])
@@ -3691,8 +3773,25 @@ def browse_path():
                         if ext not in SUPPORTED_DESC_EXTS:
                             continue
 
-                    items.append({"name": item, "path": str(full_path), "type": "folder" if is_dir else "file", "children": [] if is_dir else None})
-                except PermissionError, OSError:
+                    try:
+                        stat_res = Path(full_path).stat()
+                        mtime = stat_res.st_mtime
+                        size = stat_res.st_size if not is_dir else 0
+                    except Exception:
+                        mtime = 0.0
+                        size = 0
+
+                    items.append(
+                        {
+                            "name": item,
+                            "path": str(full_path),
+                            "type": "folder" if is_dir else "file",
+                            "children": [] if is_dir else None,
+                            "mtime": mtime,
+                            "size": size,
+                        }
+                    )
+                except (PermissionError, OSError):
                     continue
 
             console.print(f"Found {len(items)} items in {path}", markup=False)
@@ -3732,7 +3831,7 @@ def browse_search():
         max_results = min(int(request.args.get("max_results", "100")), 500)
         if max_results < 1:
             max_results = 100
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         max_results = 100
 
     if not query:
@@ -3793,7 +3892,23 @@ def browse_search():
                                 _assert_safe_resolved_path(full_path)
                             except ValueError:
                                 continue
-                            items.append({"name": dirname, "path": str(full_path), "type": "folder", "children": []})
+                            try:
+                                stat_res = Path(full_path).stat()
+                                mtime = stat_res.st_mtime
+                                size = 0
+                            except Exception:
+                                mtime = 0.0
+                                size = 0
+                            items.append(
+                                {
+                                    "name": dirname,
+                                    "path": str(full_path),
+                                    "type": "folder",
+                                    "children": [],
+                                    "mtime": mtime,
+                                    "size": size,
+                                }
+                            )
                             if len(items) >= max_results:
                                 break
 
@@ -3815,7 +3930,23 @@ def browse_search():
                             _assert_safe_resolved_path(full_path)
                         except ValueError:
                             continue
-                        items.append({"name": filename, "path": str(full_path), "type": "file", "children": None})
+                        try:
+                            stat_res = Path(full_path).stat()
+                            mtime = stat_res.st_mtime
+                            size = stat_res.st_size
+                        except Exception:
+                            mtime = 0.0
+                            size = 0
+                        items.append(
+                            {
+                                "name": filename,
+                                "path": str(full_path),
+                                "type": "file",
+                                "children": None,
+                                "mtime": mtime,
+                                "size": size,
+                            }
+                        )
                         if len(items) >= max_results:
                             break
 
@@ -3868,6 +3999,75 @@ def execution_preview_cover():
 
     mimetype = mimetypes.guess_type(str(cover_file))[0] or "application/octet-stream"
     return send_file(cover_file, mimetype=mimetype, conditional=True, max_age=30)
+
+
+@app.route("/api/save_queue", methods=["POST"])
+@limiter.limit("100 per hour", key_func=_rate_limit_key_func)
+def save_queue():
+    """Save selected items to a temporary queue text file on the server"""
+    # CSRF check
+    if not _verify_csrf_header():
+        return jsonify({"error": "CSRF token missing or invalid", "success": False}), 403
+
+    # Auth check
+    bearer = _get_bearer_from_header()
+    if bearer:
+        if not _token_is_valid(bearer):
+            return jsonify({"success": False, "error": "Forbidden (invalid token)"}), 403
+    else:
+        if not _is_authenticated():
+            return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+        if not _verify_same_origin():
+            return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    try:
+        data = _as_dict(request.get_json(silent=True)) or {}
+        items = data.get("items")
+        if not isinstance(items, list):
+            return jsonify({"error": "Items must be a list", "success": False}), 400
+
+        if not items:
+            return jsonify({"error": "No items provided", "success": False}), 400
+
+        base_dir = Path(__file__).parent.parent
+        tmp_dir = base_dir / "tmp"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"webui_queue_{int(time.time() * 1000)}_{secrets.token_hex(4)}.txt"
+        file_path = tmp_dir / filename
+
+        validated_items: list[tuple[str, list[str]]] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            path = str(item.get("path", "")).strip()
+            args = str(item.get("args", "")).strip()
+            if not path:
+                continue
+
+            try:
+                validated_path = _resolve_user_path(path, require_exists=True, require_dir=False)
+                validated_args = _validate_upload_assistant_args(shlex.split(args) if args else [])
+            except (ValueError, TypeError) as err:
+                return jsonify({"error": f"Invalid queue item: {err}", "success": False}), 400
+            validated_items.append((validated_path, validated_args))
+
+        if not validated_items:
+            return jsonify({"error": "No valid items provided", "success": False}), 400
+
+        with file_path.open("w", encoding="utf-8") as f:
+            for validated_path, validated_args in validated_items:
+                line = f'"{validated_path}"'
+                if validated_args:
+                    line += f" {shlex.join(validated_args)}"
+                f.write(line + "\n")
+
+        return jsonify({"success": True, "path": str(file_path)})
+
+    except Exception as e:
+        console.print(f"Error saving queue: {e}", markup=False)
+        console.print(traceback.format_exc(), markup=False)
+        return jsonify({"error": "Error saving queue file", "success": False}), 500
 
 
 @app.route("/api/execute", methods=["POST", "OPTIONS"])
@@ -4732,6 +4932,17 @@ def execute_command():
                 with contextlib.suppress(Exception):
                     if "process_state" in locals():
                         _discard_session_state(session_id, cast(Mapping[str, object], process_state))
+            finally:
+                try:
+                    if "validated_path" in locals() and validated_path:
+                        p_obj = Path(validated_path)
+                        if p_obj.name.startswith("webui_queue_") and p_obj.suffix == ".txt":
+                            repo_tmp_dir = Path(__file__).resolve().parent.parent / "tmp"
+                            if p_obj.parent.resolve() == repo_tmp_dir.resolve() and p_obj.exists():
+                                p_obj.unlink()
+                                console.print(f"Cleaned up queue file: {p_obj.name}", markup=False)
+                except Exception as cleanup_err:
+                    console.print(f"Failed to cleanup queue file: {cleanup_err}", markup=False)
 
         return Response(generate(), mimetype="text/event-stream")
 
