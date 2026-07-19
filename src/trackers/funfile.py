@@ -112,7 +112,8 @@ class FunFile:
             # Try to login and retry
             await self.login(meta)
             response = await self.session.get(search_url)
-            if response.status_code != 200 or "login" in str(response.url) or "login" in response.text:
+            response.raise_for_status()
+            if "login" in str(response.url) or "login" in response.text:
                 await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
                 meta.skipping = self.tracker
                 return []

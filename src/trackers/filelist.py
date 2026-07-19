@@ -283,16 +283,14 @@ class FileList:
 
         async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
             response = await client.get(search_url, params=params)
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, "html.parser")
-                find = soup.find_all("a", href=True)
-                for each in find:
-                    href_attr = each.get("href")
-                    title_attr = each.get("title")
-                    if isinstance(href_attr, str) and href_attr.startswith("details.php?id=") and "&" not in href_attr and isinstance(title_attr, str):
-                        dupes.append(title_attr)
-            else:
-                logger.info(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            find = soup.find_all("a", href=True)
+            for each in find:
+                href_attr = each.get("href")
+                title_attr = each.get("title")
+                if isinstance(href_attr, str) and href_attr.startswith("details.php?id=") and "&" not in href_attr and isinstance(title_attr, str):
+                    dupes.append(title_attr)
             await asyncio.sleep(0.5)
 
         return dupes

@@ -198,14 +198,12 @@ class Swarmazon:
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(self.search_url, params=params)
-            if response.status_code == 200:
-                data = cast(dict[str, Any], response.json())
-                items = cast(list[dict[str, Any]], data.get("data", []))
-                for item in items:
-                    result = item.get("name")
-                    if result:
-                        dupes.append(str(result))
-            else:
-                logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
+            response.raise_for_status()
+            data = cast(dict[str, Any], response.json())
+            items = cast(list[dict[str, Any]], data.get("data", []))
+            for item in items:
+                result = item.get("name")
+                if result:
+                    dupes.append(str(result))
 
         return dupes

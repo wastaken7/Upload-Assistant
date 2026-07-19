@@ -3,7 +3,6 @@ import contextlib
 import json
 from pathlib import Path
 from typing import Any, cast
-from xml.etree import ElementTree
 
 import aiofiles
 import httpx
@@ -105,30 +104,23 @@ class Curupira:
         seen_keys: set[str] = set()
         async with httpx.AsyncClient(timeout=10.0) as client:
             for query_params in params_list:
-                try:
-                    request_params = {
-                        "apikey": str(self.api_key),
-                        "limit": "100",
-                        **query_params,
-                    }
-                    response = await client.get("https://curupira.cc/api", params=request_params)
+                request_params = {
+                    "apikey": str(self.api_key),
+                    "limit": "100",
+                    **query_params,
+                }
+                response = await client.get("https://curupira.cc/api", params=request_params)
+                response.raise_for_status()
 
-                    if response.status_code != 200 or not response.text.strip():
-                        logger.info(f"{self.tracker}: [yellow]Duplicate search failed with HTTP {response.status_code}.[/yellow]")
+                if not response.text.strip():
+                    continue
+
+                for dupe in self._parse_dupes_from_response(response.text):
+                    key = str(dupe.get("link") or dupe.get("name") or "")
+                    if key in seen_keys:
                         continue
-
-                    for dupe in self._parse_dupes_from_response(response.text):
-                        key = str(dupe.get("link") or dupe.get("name") or "")
-                        if key in seen_keys:
-                            continue
-                        seen_keys.add(key)
-                        dupes.append(dupe)
-                except ElementTree.ParseError:
-                    logger.info(f"{self.tracker}: [yellow]Failed to parse duplicate search response.[/yellow]")
-                except httpx.TimeoutException:
-                    logger.info(f"{self.tracker}: [yellow]Duplicate search timed out.[/yellow]")
-                except httpx.RequestError as e:
-                    logger.info(f"{self.tracker}: [yellow]Duplicate search request failed: {e}[/yellow]")
+                    seen_keys.add(key)
+                    dupes.append(dupe)
 
         return dupes
 

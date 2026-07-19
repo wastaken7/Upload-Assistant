@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 
 from PIL import Image, ImageDraw
 
@@ -106,36 +106,34 @@ def main():
     print("Generating assets for Upload-Assistant...")
 
     # Base directory paths
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    web_static_img = os.path.join(base_dir, "web_ui", "static", "img")
-    web_static = os.path.join(base_dir, "web_ui", "static")
-    scripts_dir = os.path.join(base_dir, "scripts")
+    base_dir = Path(__file__).resolve().parent.parent
+    web_static_img = base_dir / "web_ui" / "static" / "img"
+    web_static = base_dir / "web_ui" / "static"
+    scripts_dir = base_dir / "scripts"
 
-    os.makedirs(web_static_img, exist_ok=True)
-    os.makedirs(scripts_dir, exist_ok=True)
+    web_static_img.mkdir(parents=True, exist_ok=True)
+    scripts_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate 512x512 master logo
     master_logo = draw_logo(512)
 
     # Save PNG versions
-    master_logo.save(os.path.join(web_static_img, "logo.png"), "PNG")
-    master_logo.save(os.path.join(base_dir, "logo.png"), "PNG")
+    master_logo.save(web_static_img / "logo.png", "PNG")
+    master_logo.save(base_dir / "logo.png", "PNG")
     print("Saved logo.png (512x512) to web_ui/static/img/ and root.")
 
     # Generate and save multi-resolution ICO files
     # Windows installers and browser favicons benefit from standard sizes: 16, 32, 48, 64, 128, 256
     sizes = [16, 32, 48, 64, 128, 256]
-    ico_images = []
-    for s in sizes:
-        ico_images.append(draw_logo(s))
+    ico_images = [draw_logo(s) for s in sizes]
 
     # Save favicon.ico to web_ui/static/
-    favicon_path = os.path.join(web_static, "favicon.ico")
+    favicon_path = web_static / "favicon.ico"
     ico_images[0].save(favicon_path, format="ICO", sizes=[(s, s) for s in sizes], append_images=ico_images[1:])
     print(f"Saved multi-resolution favicon.ico to {favicon_path}")
 
     # Save logo.ico to scripts/ for the Windows Installer
-    installer_ico_path = os.path.join(scripts_dir, "logo.ico")
+    installer_ico_path = scripts_dir / "logo.ico"
     ico_images[0].save(installer_ico_path, format="ICO", sizes=[(s, s) for s in sizes], append_images=ico_images[1:])
     print(f"Saved installer logo.ico to {installer_ico_path}")
 

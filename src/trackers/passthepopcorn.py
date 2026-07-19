@@ -21,6 +21,7 @@ from src.bbcode import BBCODE
 from src.console import console, logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
+from src.exceptions import UploadError
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.takescreens import TakeScreensManager
@@ -459,13 +460,9 @@ class PassThePopcorn:
         normalized_check_against: list[str] = []
         for item in check_against_list:
             if isinstance(item, list):
-                for x in item:
-                    if isinstance(x, str) and x.strip():
-                        normalized_check_against.append(x.lower().replace(" ", "").replace("-", ""))
+                normalized_check_against.extend(x.lower().replace(" ", "").replace("-", "") for x in item if isinstance(x, str) and x.strip())
             elif isinstance(item, str) and item.strip():
-                for x in item.split(","):
-                    if x.strip():
-                        normalized_check_against.append(x.strip().lower().replace(" ", "").replace("-", ""))
+                normalized_check_against.extend(x.strip().lower().replace(" ", "").replace("-", "") for x in item.split(",") if x.strip())
         for each in ptp_tags:
             clean_tag = each.replace(".", "")
             if any(clean_tag in item for item in normalized_check_against):
@@ -493,22 +490,16 @@ class PassThePopcorn:
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
             response = await client.get(url, headers=headers, params=params)
             await asyncio.sleep(1)  # Mimic server-friendly delay
-            if response.status_code == 200:
-                existing: list[str] = []
-                try:
-                    data = response.json()
-                    torrents = cast(list[dict[str, Any]], data.get("Torrents", []))
-                    existing.extend(
-                        f"[{torrent.get('Resolution')}] {torrent.get('ReleaseName', 'RELEASE NAME NOT FOUND')}"
-                        for torrent in torrents
-                        if torrent.get("Quality") == quality and quality is not None
-                    )
-                except ValueError:
-                    logger.error("[red]Failed to parse JSON response from API.")
-                return existing
-            logger.info(f"[bold red]HTTP request failed with status code {response.status_code}")
-
-        return []
+            response.raise_for_status()
+            existing: list[str] = []
+            data = response.json()
+            torrents = cast(list[dict[str, Any]], data.get("Torrents", []))
+            existing.extend(
+                f"[{torrent.get('Resolution')}] {torrent.get('ReleaseName', 'RELEASE NAME NOT FOUND')}"
+                for torrent in torrents
+                if torrent.get("Quality") == quality and quality is not None
+            )
+            return existing
 
     async def ptpimg_url_rehost(self, image_url: str) -> str:
         payload = {"format": "json", "api_key": self.config["DEFAULT"]["ptpimg_api"], "link-upload": image_url}

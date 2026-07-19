@@ -48,6 +48,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "upload.py" = ["E402"]
+"src/trackers/UNIT3D/UNIT3D_TEMPLATE.py" = ["N999"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["cogs", "data", "src", "web_ui"]

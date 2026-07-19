@@ -3,7 +3,6 @@ from typing import Any, cast
 
 import httpx
 
-from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
@@ -127,14 +126,12 @@ class Racing4Everyone(UNIT3D):
             params["name"] = str(params["name"]) + meta.edition
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(url=url, params=params)
-            if response.status_code == 200:
-                data = cast(dict[str, Any], response.json())
-                items = cast(list[dict[str, Any]], data.get("data", []))
-                for each in items:
-                    attributes = cast(dict[str, Any], each.get("attributes", {}))
-                    result_name = str(attributes.get("name", ""))
-                    dupes.append({"name": result_name, "files": result_name, "size": 0, "link": "", "file_count": 0, "download": ""})
-            else:
-                logger.info(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+            response.raise_for_status()
+            data = cast(dict[str, Any], response.json())
+            items = cast(list[dict[str, Any]], data.get("data", []))
+            for each in items:
+                attributes = cast(dict[str, Any], each.get("attributes", {}))
+                result_name = str(attributes.get("name", ""))
+                dupes.append({"name": result_name, "files": result_name, "size": 0, "link": "", "file_count": 0, "download": ""})
 
         return dupes

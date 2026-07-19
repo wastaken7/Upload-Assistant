@@ -986,10 +986,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
 
     # 3. PAR2 — only when using nyuu (pesto handles PAR2 internally)
     if not use_pesto:
-        target_files = []
-        for file_path in upload_files:
-            if file_path.is_file() and not file_path.name.endswith(".par2"):
-                target_files.append(file_path)
+        target_files = [file_path for file_path in upload_files if file_path.is_file() and not file_path.name.endswith(".par2")]
 
         if target_files:
             logger.info("[cyan]Generating PAR2 parity files...[/cyan]")

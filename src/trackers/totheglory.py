@@ -216,17 +216,15 @@ class ToTheGlory:
 
         async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
             response = await client.get(search_url)
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, "html.parser")
-                find = soup.find_all("a", href=True)
-                for each in find:
-                    href_value = each.get("href")
-                    if isinstance(href_value, str) and href_value.startswith("/t/"):
-                        release = re.search(r"(<b>)(<font.*>)?(.*)<br", str(each))
-                        if release:
-                            dupes.append(release.group(3))
-            else:
-                logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            find = soup.find_all("a", href=True)
+            for each in find:
+                href_value = each.get("href")
+                if isinstance(href_value, str) and href_value.startswith("/t/"):
+                    release = re.search(r"(<b>)(<font.*>)?(.*)<br", str(each))
+                    if release:
+                        dupes.append(release.group(3))
 
             await asyncio.sleep(0.5)
 
