@@ -3791,7 +3791,7 @@ def browse_path():
                             "size": size,
                         }
                     )
-                except (PermissionError, OSError):
+                except PermissionError, OSError:
                     continue
 
             console.print(f"Found {len(items)} items in {path}", markup=False)
@@ -3831,7 +3831,7 @@ def browse_search():
         max_results = min(int(request.args.get("max_results", "100")), 500)
         if max_results < 1:
             max_results = 100
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         max_results = 100
 
     if not query:
