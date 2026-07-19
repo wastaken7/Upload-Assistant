@@ -4384,6 +4384,7 @@ def execute_command():
                                     return False
                                 with contextlib.suppress(Exception):
                                     wrapped_print("Please answer y or n.")
+                                _set_process_awaiting_input_if_current(session_id, process_state, True, "yes_no")
 
                         _cli_ui.ask_yes_no = wrapped_ask_yes_no
                         # Save original ask_yes_no so external cleaners (eg. /api/kill)
