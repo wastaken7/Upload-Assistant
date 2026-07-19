@@ -360,7 +360,6 @@ class GreatPosterWall:
                         dupes.append({"name": formatted})
                     return dupes
                 return []
-            return []
 
         imdb_value = str(imdb or "")
         search_url = f"{self.base_url}/torrents.php?groupname={imdb_value.upper()}"  # using TT in imdb returns the search page instead of redirecting to the group page

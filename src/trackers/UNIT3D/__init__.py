@@ -66,12 +66,6 @@ class UNIT3D:
         meta.tracker_status.setdefault(self.tracker, {})
         category_id = (await self.get_category_id(meta))["category_id"]
 
-        if not self.api_key:
-            if not meta.debug:
-                logger.info(f"[bold red]{self.tracker}: Missing API key in config file. Skipping upload...[/bold red]")
-            meta.skipping = f"{self.tracker}"
-            return dupes
-
         headers = {
             "authorization": f"Bearer {self.api_key}",
             "accept": "application/json",

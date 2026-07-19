@@ -156,7 +156,7 @@ ansi_to_html: Callable[[str], str] | None = None
 
 
 class _NullConsole:
-    def print(self, *args: object, **kwargs: object) -> None:
+    def print(self, *_args: object, **_kwargs: object) -> None:
         return None
 
     def input(self, prompt: str = "") -> str:
@@ -1183,9 +1183,7 @@ def _progress_items_for_process(process_info: Mapping[str, object]) -> list[dict
         progress_map_obj = process_info.get("progress")
         if not isinstance(progress_map_obj, dict):
             return []
-        for value in progress_map_obj.values():
-            if isinstance(value, dict):
-                items.append(dict(value))
+        items.extend(dict(value) for value in progress_map_obj.values() if isinstance(value, dict))
     items.sort(key=lambda item: (0 if str(item.get("status", "")) == "running" else 1, str(item.get("id", ""))))
     return items
 
@@ -3429,9 +3427,7 @@ def config_update():
     path: list[str] = []
     if isinstance(path_raw, Sequence) and not isinstance(path_raw, (str, bytes, bytearray)):
         path_items: Sequence[Any] = cast(Sequence[Any], path_raw)
-        for p in path_items:
-            if isinstance(p, str) and p:
-                path.append(p)
+        path.extend(p for p in path_items if isinstance(p, str) and p)
     raw_value = data.get("value")
 
     if not path:
@@ -3517,9 +3513,7 @@ def config_remove_subsection():
     path: list[str] = []
     if isinstance(path_raw, Sequence) and not isinstance(path_raw, (str, bytes, bytearray)):
         path_items: Sequence[Any] = cast(Sequence[Any], path_raw)
-        for p in path_items:
-            if isinstance(p, str) and p:
-                path.append(p)
+        path.extend(p for p in path_items if isinstance(p, str) and p)
 
     if not path:
         return jsonify({"success": False, "error": "Invalid path"}), 400
@@ -3560,7 +3554,7 @@ def api_tokens():
         store = _list_api_tokens()
         # Return metadata only (do not leak token values)
         tokens: list[dict[str, Any]] = []
-        for tid, info in store.items():
+        for info in store.values():
             info_dict = _as_dict(info) or {}
             tokens.append(
                 {
@@ -3692,11 +3686,10 @@ def browse_path():
                     # Keep description browsing limited to known text-ish files.
                     # Default browsing should expose any file inside allowed roots
                     # so books, games, ISOs, and other upload types are visible.
-                    if not is_dir:
-                        if file_filter == "desc":
-                            ext = Path(item.lower()).suffix
-                            if ext not in SUPPORTED_DESC_EXTS:
-                                continue
+                    if not is_dir and file_filter == "desc":
+                        ext = Path(item.lower()).suffix
+                        if ext not in SUPPORTED_DESC_EXTS:
+                            continue
 
                     items.append({"name": item, "path": str(full_path), "type": "folder" if is_dir else "file", "children": [] if is_dir else None})
                 except PermissionError, OSError:
@@ -4047,11 +4040,11 @@ def execute_command():
                     import io
 
                     rich_console_mod: Any = importlib.import_module("rich.console")
-                    RichConsole = rich_console_mod.Console
+                    rich_console_class = rich_console_mod.Console
 
                     # Use an in-memory file for the recorder to avoid duplicating
                     # output to the real stdout. record=True still records renderables.
-                    record_console = RichConsole(record=True, force_terminal=True, width=120, file=io.StringIO())
+                    record_console = rich_console_class(record=True, force_terminal=True, width=120, file=io.StringIO())
 
                     # Queue to serialize print actions from the worker thread
                     render_queue: queue.Queue[tuple[Any, dict[str, Any]]] = queue.Queue()
@@ -4310,10 +4303,8 @@ def execute_command():
                                         while len(queued_progress_events) > 64:
                                             oldest_key = next(iter(queued_progress_events))
                                             queued_progress_events.pop(oldest_key, None)
-                                        try:
+                                        with contextlib.suppress(queue.Full):
                                             progress_event_queue.put_nowait(None)
-                                        except queue.Full:
-                                            pass
 
                             try:
                                 # Run the async main() entry point of upload.py

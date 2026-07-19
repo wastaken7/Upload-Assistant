@@ -3259,7 +3259,7 @@ class Common:
 
         return f"{resolution} @ {video_bitrate} kbps - {audio} @ {audio_bitrate} kbps"
 
-    def check_and_confirm_adult_media_upload(self, meta: Meta, tracker) -> bool:
+    def check_and_confirm_adult_media_upload(self, meta: Meta, tracker: str) -> bool:
         """
         Check if the media is categorized as adult/pornographic and prompt the user for confirmation before uploading to a non-adult tracker.
 

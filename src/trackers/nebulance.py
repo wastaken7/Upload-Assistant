@@ -244,17 +244,9 @@ class Nebulance:
                         message = str(error.get("message", "")) if isinstance(error, dict) else ""
                         if "out of range" in message.lower() and "valid pages" in message.lower():
                             break
-                    logger.info(f"[bold red]NEBULANCE HTTP request failed. Status: {response.status_code}")
-                    logger.info(f"[bold red]NEBULANCE Search Response Content (page {page}): {response.text}")
-                    meta.skipping = "NEBULANCE"
-                    break
+                    response.raise_for_status()
 
-                try:
-                    data = cast(dict[str, Any], response.json())
-                except json.JSONDecodeError:
-                    logger.info("[bold yellow]NEBULANCE response content is not valid JSON. Skipping this API call.")
-                    meta.skipping = "NEBULANCE"
-                    break
+                data = cast(dict[str, Any], response.json())
 
                 items_value = data.get("items")
                 if not isinstance(items_value, list):

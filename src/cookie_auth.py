@@ -478,7 +478,7 @@ class CookieValidator:
             logger.error(f"[red]Error encoding cookies to JSON: {e}[/red]")
             raise
 
-    def _load_cookies_secure(self, session: Any, cookiefile: str, tracker: str) -> None:
+    def _load_cookies_secure(self, session: Any, cookiefile: str, _tracker: str) -> None:
         """Securely load session cookies from JSON instead of pickle"""
 
         # Load cookies from JSON file only. Legacy pickle migration is intentionally not automatic

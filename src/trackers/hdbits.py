@@ -377,22 +377,20 @@ class HDBits:
         if not search_terms:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.post(url, json=data)
-                if response.status_code == 200:
-                    response_data = response.json()
-                    results = response_data.get("data", [])
-                    if results:
-                        for each in results:
-                            result = {
-                                "name": each["name"],
-                                "size": each["size"],
-                                "files": each["filename"][:-8] if each["filename"].endswith(".torrent") else each["filename"],
-                                "filecount": each["numfiles"],
-                                "link": f"https://hdbits.org/details.php?id={each['id']}",
-                                "download": f"https://hdbits.org/download.php/{quote(each['filename'])}?id={each['id']}&passkey={self.passkey}",
-                            }
-                            dupes.append(result)
-                else:
-                    logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
+                response.raise_for_status()
+                response_data = response.json()
+                results = response_data.get("data", [])
+                if results:
+                    for each in results:
+                        result = {
+                            "name": each["name"],
+                            "size": each["size"],
+                            "files": each["filename"][:-8] if each["filename"].endswith(".torrent") else each["filename"],
+                            "filecount": each["numfiles"],
+                            "link": f"https://hdbits.org/details.php?id={each['id']}",
+                            "download": f"https://hdbits.org/download.php/{quote(each['filename'])}?id={each['id']}&passkey={self.passkey}",
+                        }
+                        dupes.append(result)
             return dupes
 
         # Otherwise, search for each term
@@ -402,22 +400,20 @@ class HDBits:
 
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.post(url, json=data)
-                if response.status_code == 200:
-                    response_data = response.json()
-                    results = response_data.get("data", [])
-                    if results:
-                        for each in results:
-                            result = {
-                                "name": each["name"],
-                                "size": each["size"],
-                                "files": each["filename"][:-8] if each["filename"].endswith(".torrent") else each["filename"],
-                                "filecount": each["numfiles"],
-                                "link": f"https://hdbits.org/details.php?id={each['id']}",
-                                "download": f"https://hdbits.org/download.php/{quote(each['filename'])}?id={each['id']}&passkey={self.passkey}",
-                            }
-                            dupes.append(result)
-                else:
-                    logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
+                response.raise_for_status()
+                response_data = response.json()
+                results = response_data.get("data", [])
+                if results:
+                    for each in results:
+                        result = {
+                            "name": each["name"],
+                            "size": each["size"],
+                            "files": each["filename"][:-8] if each["filename"].endswith(".torrent") else each["filename"],
+                            "filecount": each["numfiles"],
+                            "link": f"https://hdbits.org/details.php?id={each['id']}",
+                            "download": f"https://hdbits.org/download.php/{quote(each['filename'])}?id={each['id']}&passkey={self.passkey}",
+                        }
+                        dupes.append(result)
 
         return dupes
 
