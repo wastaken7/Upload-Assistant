@@ -597,7 +597,7 @@ config: dict[str, Any] = {
             "custom_layout": '2',
             # anon is not an option when uploading to AMIGOSSHARE
             # Cookies required (export from https://cliente.amigos-share.club/ to data/cookies/AMIGOSSHARE.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
@@ -627,7 +627,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://avistaz.to to data/cookies/AVISTAZ.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
@@ -686,7 +686,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://bj-share.info to data/cookies/BJSHARE.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             # Two-factor authentication (2FA) must be enabled in your profile settings; otherwise, your session cookies will expire fairly quickly.
             "announce_url": "",
             "anon": True,
@@ -748,7 +748,7 @@ config: dict[str, Any] = {
         "BRASILTRACKER": {
             "link_dir_name": "",
             # Cookies required (export from https://brasiltracker.org/ to data/cookies/BRASILTRACKER.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # Set this to True if you want to allow external subtitles to be included in the upload
@@ -821,7 +821,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://cinemaz.to to data/cookies/CINEMAZ.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
@@ -1041,7 +1041,7 @@ config: dict[str, Any] = {
             # You can find your API key in Profile Settings -> Access Settings -> API Key. If there is no API, click "Reset your api key" and Save Profile.
             "api_key": "",
             # Optionally, export cookies from https://greatposterwall.com to data/cookies/GREATPOSTERWALL.txt to improve duplicate searches.
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             # You can find your announce URL at https://greatposterwall.com/upload.php
             "announce_url": "",
             # Upload with Exclusive flag
@@ -1074,7 +1074,7 @@ config: dict[str, Any] = {
             "use_for_search": False,
             # for HDBITS you **MUST** have been granted uploading approval via Offers, you've been warned
             # Cookies required (export from https://hdbits.org/ to data/cookies/HDBITS.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "username": "",
             "passkey": "",
             "announce_url": "",
@@ -1085,7 +1085,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://hd-space.org/ to data/cookies/HDSPACE.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
@@ -1115,7 +1115,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export to data/cookies/HDTORRENTS.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             # You can change the URL if the main site is down or if you encounter upload issues.
             # Keep in mind that changing the URL requires exporting the cookies again from the new domain.
             # Alternative domains:
@@ -1212,7 +1212,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export to data/cookies/IPTORRENTS.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             # By default, IPTORRENTS removes all dots from the upload name, causing audio codecs to be named incorrectly, for example, "DTS 5 1" instead of "DTS 5.1".
             # It also does not have the option to set the IMDb during upload.
@@ -1273,7 +1273,7 @@ config: dict[str, Any] = {
         },
         "IMMORTALSEED": {
             # Cookies required (export from https://immortalseed.me/ to data/cookies/IMMORTALSEED.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "announce_url": "",
@@ -1334,7 +1334,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://pt.lajidui.top/ to data/cookies/LAJIDUI.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1425,7 +1425,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://longpt.org/ to data/cookies/LONGPT.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1550,7 +1550,7 @@ config: dict[str, Any] = {
         },
         "MAKINGOFF":{
             # Cookies required (export from https://www.makingoff.org/ to data/cookies/MAKINGOFF.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             # trackers to be added on the torrents
             # one per line
             "trackers":
@@ -1756,7 +1756,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://privatehd.to/ to data/cookies/PRIVATEHD.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
@@ -1801,7 +1801,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://ptcafe.club/ to data/cookies/PTCAFE.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1841,7 +1841,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://ptfans.cc/ to data/cookies/PTFANS.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1870,7 +1870,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://pt.gtkpw.xyz to data/cookies/PTGTK.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1912,7 +1912,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://www.ptskit.org to data/cookies/PTSKIT.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -2061,7 +2061,7 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Cookies required (export from https://bilibili.download to data/cookies/RAILGUNPT.txt).
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -2330,7 +2330,7 @@ config: dict[str, Any] = {
             "link_dir_name": "",
             # Set to False if you don't have access to the API (e.g., if you're a trial uploader). Note: this may not work sometimes due to Cloudflare restrictions.
             # If you are not going to use the API, you will need to export cookies from https://www.torrentleech.org/ to data/cookies/TORRENTLEECH.txt.
-            # See: https://github.com/Audionut/Upload-Assistant/blob/master/docs/example-config.md#how-to-export-cookies
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "api_upload": True,
             # You can find your passkey at your profile (https://www.torrentleech.org/profile/[YourUserName]/view) -> Torrent Passkey
             "passkey": "",
