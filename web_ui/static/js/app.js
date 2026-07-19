@@ -3856,7 +3856,7 @@ function AudionutsUAGUI() {
                   <TrashIcon />
                 </button>
               </div>
-              {renderTrackerSelector()}
+              {!isExecuting && renderTrackerSelector()}
             </div>
 
             {/* Terminal output */}
