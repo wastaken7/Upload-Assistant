@@ -1,6 +1,6 @@
 <div align="center">
   <img src="logo.svg" alt="Upload Assistant Logo" width="160" height="160" />
-  <h1>Upload Assistant</h1>
+  <h1>Upload-Assistant</h1>
   <p>Automated media uploader and tracker posting assistant</p>
 </div>
 
