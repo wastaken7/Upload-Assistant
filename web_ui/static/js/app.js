@@ -794,6 +794,14 @@ const UploadIcon = () => (
   </svg>
 );
 
+const LogoIcon = ({ src, className = "w-6 h-6" }) => (
+  <img
+    src={src}
+    alt="Upload-Assistant logo"
+    className={`${className} flex-shrink-0`}
+  />
+);
+
 const ChevronDownIcon = () => (
   <svg
     className="w-4 h-4"
@@ -3506,7 +3514,7 @@ function AudionutsUAGUI() {
           <h1
             className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
           >
-            <UploadIcon />
+            <LogoIcon src={`${APP_BASE}/static/img/logo.svg`} />
             Upload-Assistant
           </h1>
           <div className="flex items-center gap-2">
@@ -4430,7 +4438,10 @@ function AudionutsUAGUI() {
                     <h1
                       className={`text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
                     >
-                      <UploadIcon />
+                      <LogoIcon
+                        src={`${APP_BASE}/static/img/logo.svg`}
+                        className="w-8 h-8"
+                      />
                       Upload-Assistant Web UI
                     </h1>
                     <a
