@@ -298,9 +298,31 @@ Implementation notes:
 - If the exmaple-config does not contain the option for a tracker, then the tracker does not support that specific config option.
 
 Some trackers authenticate via cookies instead of an API key.
-If comments in `example_config.py` mention cookies, they are typically expected as a Netscape cookie file in:
+If comments in `example_config.py` mention cookies, they are typically expected as a Netscape cookie file.
 
-- `data/cookies/<TRACKER>.txt`
+### How to Export Cookies
+
+If the tracker configuration in `example_config.py` mentions cookies, they must be exported in Netscape format and placed in:
+
+- `data/cookies/<TRACKER>.txt` (e.g., `data/cookies/MAKINGOFF.txt` or `data/cookies/AVISTAZ.txt`)
+
+#### Step-by-Step Guide:
+
+1. **Install a Cookie Export Extension:**
+   - **Firefox:** Use [Export Cookies](https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/).
+   - **Chrome / Chromium-based browsers:** Use an extension like [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/cclelndahbckbenkjhflpdbgdldlbecc) or similar.
+2. **Log in to the Tracker:**
+   - Open your browser, navigate to the tracker's website, and log in to your account.
+3. **Export the Cookies:**
+   - Click the extension icon.
+   - Choose to export cookies for the active tab/domain in **Netscape** format.
+4. **Save the File:**
+   - Save or move the exported text file into the `data/cookies/` folder inside your Upload-Assistant directory.
+   - By default, name the file after the tracker (e.g., `MAKINGOFF.txt` or `AVISTAZ.txt`).
+
+> [!NOTE]
+> - **BJ-Share:** Two-factor authentication (2FA) must be enabled in your profile settings; otherwise, your session cookies will expire fairly quickly.
+> - **HDTorrents:** Keep in mind that changing the site domain requires exporting the cookies again from the new domain.
 
 ### `MANUAL`
 

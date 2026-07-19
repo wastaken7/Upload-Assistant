@@ -51,11 +51,11 @@ class TorrentLeech:
         if self.api_upload and not force:
             return True
 
-        cookies_file = str(Path(f"{meta.base_dir}/data/cookies/TORRENTLEECH.txt").resolve())
+        from src.cookie_auth import find_cookie_file
+        cookies_file = find_cookie_file(meta.base_dir, self.tracker, self.config)
 
-        cookie_path = str(Path(cookies_file).resolve())
-        if not Path(cookie_path).exists():
-            logger.info(f"[bold red]'{self.tracker}' Cookies not found at: {cookie_path}[/bold red]")
+        if not Path(cookies_file).exists():
+            logger.info(f"[bold red]'{self.tracker}' Cookies not found at: {cookies_file}[/bold red]")
             return False
 
         self.session.cookies.update(await self.common.parse_cookie_file(cookies_file))
