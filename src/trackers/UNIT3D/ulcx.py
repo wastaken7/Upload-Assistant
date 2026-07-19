@@ -27,7 +27,6 @@ class ULCX(UNIT3D):
         "Alcaide_Kira",
         "AROMA",
         "d3g",
-        "EDGE2020",
         "EMBER",
         "FGT",
         "FnP",
@@ -45,11 +44,11 @@ class ULCX(UNIT3D):
         "NAHOM",
         "Niblets",
         "nikt0",
-        "NuBz",
         "OFT",
         "PHOCiS",
+        "PiRaTeS",
         "QxR",
-        "Ralphy",
+        "R&H",
         "RARBG",
         "seedpool",
         "Sicario",
@@ -83,16 +82,21 @@ class ULCX(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         if "concert" in meta.keywords:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"[bold red]Concerts not allowed at {self.tracker}.[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Concerts not allowed.[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
                     return False
             else:
                 return False
-        if meta.video_codec == "HEVC" and meta.resolution != "2160p" and "animation" not in meta.keywords and meta.anime is not True:
+
+        if meta.type == "ENCODE" and meta.tag and meta.tag[1:] in ("EDGE2020", "NuBz", "Ralphy"):
+            logger.info(f"{self.tracker}: [bold red]Encodes from {meta.tag} are not allowed.[/bold red]")
+            return False
+
+        if meta.video_codec == "HEVC" and meta.resolution != "2160p" and "animation" not in meta.keywords and meta.anime is not True and not meta.uhd:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"[bold red]This content might not fit HEVC rules for {self.tracker}.[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]This content might not fit HEVC rules.[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -101,12 +105,12 @@ class ULCX(UNIT3D):
                 return False
         if meta.type in ["ENCODE", "HDTV"] and meta.resolution not in ["8640p", "4320p", "2160p", "1440p", "1080p", "1080i", "720p"]:
             if not meta.unattended:
-                logger.info(f"[bold red]Encodes must be at least 720p resolution for {self.tracker}.[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Encodes must be at least 720p resolution.[/bold red]")
             return False
 
         if meta.type in ["DVDRIP"]:
             if not meta.unattended:
-                logger.info(f"[bold red]DVDRIPs are not allowed for {self.tracker}.[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]DVDRIPs are not allowed.[/bold red]")
             return False
 
         if meta.is_disc != "BDMV" and not await self.common.check_language_requirements(
@@ -115,24 +119,24 @@ class ULCX(UNIT3D):
             return False
 
         if not meta.valid_mi_settings:
-            logger.info(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]No encoding settings in mediainfo, skipping upload.[/bold red]")
             return False
 
         if meta.personalrelease:
             if meta.has_multiple_default_audio_tracks:
-                logger.info(f"[bold red]Multiple default audio tracks detected, skipping {self.tracker} upload.[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Multiple default audio tracks detected, skipping upload.[/bold red]")
                 return False
 
             if meta.has_multiple_default_subtitle_tracks:
-                logger.info(f"[bold red]Multiple default subtitle tracks detected, skipping {self.tracker} upload.[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Multiple default subtitle tracks detected, skipping upload.[/bold red]")
                 return False
 
         if meta.non_disc_has_pcm_audio_tracks:
-            logger.info(f"[bold red]Non-disc source with PCM audio tracks detected, skipping {self.tracker} upload.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Non-disc source with PCM audio tracks detected, skipping upload.[/bold red]")
             return False
 
         if meta.discs_missing_certificate:
-            logger.info(f"[bold red]Disc source(s) missing BD certificate, skipping {self.tracker} upload.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Disc source(s) missing BD certificate, skipping upload.[/bold red]")
             return False
 
         return True
