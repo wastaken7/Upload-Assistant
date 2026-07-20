@@ -1,16 +1,16 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
-__version__ = "v2.5"
+__version__ = "v2.6"
 
 """
-Changelog for version v2.5 (2026-07-19):
-
 ## What's Changed
-* fix: upload skip_archive directly from source by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/72
-* feat(windows): add isolated Windows installer flow by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/73
-* refactor: centralize `search_existing()` error handling and project updates by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/76
-* fix: resolve Path AttributeError in torrent clients & adjust social preview alignment by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/79
+* fix: improve BrasilTracker typing and audio formats by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/83
+* feat(web): add path queueing and tracker selector by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/82
+* fix(ulcx): update upload validation rules by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/84
+* feat(web): use project logo in UI by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/85
+* fix(webui): hide trackers while running by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/86
+* fix(webui): add yes/no prompt actions by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/87
+* fix: correct tracker names and QUI bandwidth by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/88
 
-
-**Full Changelog**: https://github.com/wastaken7/Upload-Assistant/compare/v2.4...v2.5
+**Full Changelog**: https://github.com/wastaken7/Upload-Assistant/compare/v2.5...v2.6
 """
