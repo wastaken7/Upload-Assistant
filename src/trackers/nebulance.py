@@ -275,3 +275,6 @@ class Nebulance:
                         dupes.append(result)
 
         return dupes
+
+    async def get_name(self, meta: Meta) -> str:
+        return meta.title

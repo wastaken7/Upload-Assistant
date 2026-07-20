@@ -63,8 +63,8 @@ class RetroFlix:
 
         imdb_url_value = meta.imdb_info.get("imdb_url", "")
         imdb_url = str(imdb_url_value) if imdb_url_value else ""
-        json_data = {
-            "name": meta.name,
+        json_data: dict[str, Any] = {
+            "name": await self.get_name(meta),
             # description does not work for some reason
             "description": "",
             # editing mediainfo so that instead of 1 080p its 1,080p as site mediainfo parser wont work other wise.
@@ -85,7 +85,7 @@ class RetroFlix:
             base64_message = base64_encoded_data.decode("utf-8")
             json_data["file"] = base64_message
 
-        headers = {
+        headers: dict[str, Any] = {
             "accept": "application/json",
             "Content-Type": "application/json",
             "Authorization": self.config["TRACKERS"][self.tracker]["api_key"].strip(),
@@ -281,7 +281,7 @@ class RetroFlix:
             Returns empty list if search fails.
         """
         dupes: list[dict[str, Any]] = []
-        headers = {
+        headers: dict[str, Any] = {
             "accept": "application/json",
             "Authorization": self.config["TRACKERS"][self.tracker]["api_key"].strip(),
         }
@@ -313,7 +313,7 @@ class RetroFlix:
             data = cast(list[dict[str, Any]], response.json())
             for each in data:
                 download_url = build_download_url(each)
-                result = {
+                result: dict[str, Any] = {
                     "name": str(each.get("name", "")),
                     "size": each.get("size", 0),
                     "files": str(each.get("name", "")),
@@ -336,7 +336,7 @@ class RetroFlix:
         Returns:
             True if API key is valid, None if key generation was attempted.
         """
-        headers = {
+        headers: dict[str, Any] = {
             "accept": "application/json",
             "Authorization": self.config["TRACKERS"][self.tracker]["api_key"].strip(),
         }
@@ -434,3 +434,6 @@ class RetroFlix:
         except Exception as e:
             logger.info(f"[bold red]An unexpected error occurred: {e!s}")
             return None
+
+    async def get_name(self, meta: Meta) -> str:
+        return meta.name

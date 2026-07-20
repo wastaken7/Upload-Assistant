@@ -162,7 +162,7 @@ async def gen_desc(
                 meta.description_link_content = cleaned_content
                 content_written = True
             elif cleaned_content and "Not Found" in cleaned_content:
-                raise ValueError("Description link returned 'Not Found'")
+                logger.error("Description link returned 'Not Found'")
         except Exception as e:
             logger.info(f"[ERROR] Failed to fetch description from link: {e}")
             raise e

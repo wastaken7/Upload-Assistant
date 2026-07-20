@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import platform
 import re
-from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
@@ -9,6 +8,7 @@ import httpx
 
 from cogs.redaction import Redaction
 from src.console import logger
+from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.common import Common
@@ -37,6 +37,7 @@ class TorrentLeech:
     def __init__(self, config: Config) -> None:
         self.config: Config = config
         self.common = Common(config)
+        self.cookie_validator = CookieValidator(config)
         self.session = httpx.AsyncClient(timeout=60.0)
         self.tracker_config: dict[str, Any] = self.config["TRACKERS"][self.tracker]
         self.api_upload: bool = bool(self.tracker_config.get("api_upload", False))
@@ -51,30 +52,25 @@ class TorrentLeech:
         if self.api_upload and not force:
             return True
 
-        cookies_file = str(Path(f"{meta.base_dir}/data/cookies/TORRENTLEECH.txt").resolve())
-
-        cookie_path = str(Path(cookies_file).resolve())
-        if not Path(cookie_path).exists():
-            logger.info(f"[bold red]'{self.tracker}' Cookies not found at: {cookie_path}[/bold red]")
+        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if cookie_jar is None:
             return False
 
-        self.session.cookies.update(await self.common.parse_cookie_file(cookies_file))
-
+        self.session.cookies = cast(Any, cookie_jar)
         try:
             if force:
-                response = await self.session.get("https://www.torrentleech.org/torrents/browse/index", timeout=10)
-                if response.status_code == 301 and "torrents/browse" in str(response.url):
-                    logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
-                    return True
+                response = await self.session.get(f"{self.base_url}/torrents/browse/index", timeout=10)
+                logged_in = response.status_code == 301 and "torrents/browse" in str(response.url)
             else:
                 response = await self.session.get(self.http_upload_url, timeout=10)
-                if response.status_code == 200 and "torrents/upload" in str(response.url):
-                    logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
-                    return True
+                logged_in = response.status_code == 200 and "torrents/upload" in str(response.url)
+
+            if logged_in:
+                logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
+                return True
 
             logger.info(f"[bold red]Login to '{self.tracker}' with cookies failed. Please check your cookies.[/bold red]")
             return False
-
         except httpx.RequestError as e:
             logger.info(f"[bold red]Error while validating credentials for '{self.tracker}': {e}[/bold red]")
             return False

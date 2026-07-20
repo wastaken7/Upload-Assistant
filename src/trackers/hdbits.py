@@ -200,7 +200,7 @@ class HDBits:
 
         return tags
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         hdb_name = meta.name
         audio = meta.audio
         hdb_name = hdb_name.replace("H.265", "HEVC")
@@ -235,7 +235,7 @@ class HDBits:
     async def upload(self, meta: Meta) -> bool | None:
         common = Common(config=self.config)
         await self.edit_desc(meta)
-        hdb_name = await self.edit_name(meta)
+        hdb_name = await self.get_name(meta)
         cat_id = await self.get_type_category_id(meta)
         codec_id = await self.get_type_codec_id(meta)
         medium_id = await self.get_type_medium_id(meta)

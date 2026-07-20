@@ -49,19 +49,7 @@ class TorrentHR:
         cat_id = await self.get_cat_id(meta)
         subs = self.get_subtitles(meta)
         await self.edit_desc(meta)
-        thr_name = unidecode(meta.name.replace("DD+", "DDP"))
-
-        # Confirm the correct naming order for TORRENTHR
-        cli_ui.info(f"TORRENTHR name: {thr_name}")
-        if not meta.unattended:
-            thr_confirm = cli_ui.ask_yes_no("Correct?", default=False)
-            if thr_confirm is not True:
-                thr_name_manually = cli_ui.ask_string("Please enter a proper name", default="") or ""
-                if thr_name_manually == "":
-                    logger.info("No proper name given")
-                    logger.info("Aborting...")
-                    return None
-                thr_name = thr_name_manually
+        thr_name = await self.get_name(meta)
         torrent_name = re.sub(r"[^0-9a-zA-Z. '\-\[\]]+", " ", thr_name)
 
         mi_file: bytes = b""
@@ -504,7 +492,7 @@ class TorrentHR:
 
         return page_dupes, has_next_page, next_page_number
 
-    async def login(self, meta) -> dict[str, Any] | None:
+    async def login(self, meta: Meta) -> dict[str, Any] | None:
         logger.info("[yellow]Logging in to TORRENTHR...")
         url = f"{self.base_url}/takelogin.php"
 
@@ -545,3 +533,6 @@ class TorrentHR:
                 logger.error(f"[red]Error during TORRENTHR login: {e!s}")
                 console.print_exception()
                 return None
+
+    async def get_name(self, meta: Meta) -> str:
+        return unidecode(meta.name.replace("DD+", "DDP"))

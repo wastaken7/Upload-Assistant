@@ -116,7 +116,7 @@ class Ptskit:
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
-            "name": meta.name,
+            "name": await self.get_name(meta),
             "url": str(meta.imdb_info.get("imdb_url", "")),
             "descr": await self.generate_description(meta),
             "type": await self.get_type(meta),
@@ -141,3 +141,6 @@ class Ptskit:
             id_pattern=r"download\.php\?id=([^&]+)",
             success_status_code="302, 303",
         )
+
+    async def get_name(self, meta: Meta) -> str:
+        return meta.name

@@ -184,7 +184,7 @@ class Blutopia(UNIT3D):
         if webdv:
             blu_name = blu_name.replace("HYBRID ", "", 1)
 
-        if meta.tracker_status[self.tracker].get("other", False):
+        if meta.tracker_status.get(self.tracker, {}).get("other", False):
             blu_name = blu_name.replace(f"{meta.resolution}", f"{meta.resolution} DVP5/DVP8", 1)
 
         return {"name": blu_name}

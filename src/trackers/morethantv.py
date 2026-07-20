@@ -161,7 +161,7 @@ class MoreThanTV:
         des_tags = await self.get_tags(meta)
         await self.edit_desc(meta)
         group_desc = await self.edit_group_desc(meta)
-        mtv_name = await self.edit_name(meta)
+        mtv_name = await self.get_name(meta)
 
         anon = 0 if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else 1
 
@@ -298,7 +298,7 @@ class MoreThanTV:
 
         return description
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         prefix_index = -1
         if meta.scene is True:
             scene_name = meta.scene_name

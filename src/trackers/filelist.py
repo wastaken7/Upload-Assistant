@@ -93,7 +93,7 @@ class FileList:
             cat_id = 24
         return cat_id
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         fl_name = meta.name
         hdr = meta.hdr
         audio = meta.audio
@@ -187,7 +187,7 @@ class FileList:
         common = Common(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
-        fl_name = await self.edit_name(meta)
+        fl_name = await self.get_name(meta)
         cat_id = await self.get_category_id(meta)
         has_ro_audio, _has_ro_sub = await self.get_ro_tracks(meta)
 

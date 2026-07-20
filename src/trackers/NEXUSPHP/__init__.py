@@ -375,7 +375,7 @@ class NEXUSPHP:
             "descr": await self.get_description(meta),
             "font": 0,
             "medium_sel[4]": self.get_type(meta),
-            "name": meta.name,
+            "name": await self.get_name(meta),
             "size": 0,
             "small_descr": self.common.get_small_description(meta),
             "standard_sel[4]": self.get_resolution(meta),
@@ -436,3 +436,6 @@ class NEXUSPHP:
             upload_url=f"{self.base_url}/takeupload.php",
             success_text="download.php?id=",
         )
+
+    async def get_name(self, meta: Meta) -> str:
+        return meta.name

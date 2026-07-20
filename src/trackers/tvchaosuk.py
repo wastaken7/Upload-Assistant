@@ -100,7 +100,7 @@ class TVChaosUK:
         """Create description directory and return file path."""
         desc_dir = Path(meta.base_dir) / "tmp" / meta.uuid
         Path(desc_dir).mkdir(parents=True, exist_ok=True)
-        return Path(desc_dir) / f"[{tracker}]DESCRIPTION.txt"
+        return str(Path(desc_dir) / f"[{tracker}]DESCRIPTION.txt")
 
     def _build_disc_info(self, discs: list[dict[str, Any]]) -> str:
         """
@@ -110,7 +110,7 @@ class TVChaosUK:
         This method exists for code compatibility/future use and will not be called during
         normal TVCHAOSUK uploads due to the disc blocking in search_existing().
         """
-        parts = []
+        parts: list[str] = []
 
         # Process all discs uniformly
         for disc in discs:
@@ -134,7 +134,7 @@ class TVChaosUK:
 
     def _build_movie_desc(self, meta: Meta, image_list: list[dict[str, Any]]) -> str:
         """Build description for movie releases (multi-block, no pre tags)."""
-        parts = []
+        parts: list[str] = []
 
         # Release date info in its own center block
         rd_info = self._get_movie_release_info(meta)
@@ -173,7 +173,7 @@ class TVChaosUK:
 
     def _build_tv_pack_desc(self, meta: Meta, image_list: list[dict[str, Any]]) -> str:
         """Build description for TV pack releases (multi-block, no pre tags)."""
-        parts = []
+        parts: list[str] = []
 
         # Logo in its own center block
         if meta.logo:
@@ -208,7 +208,7 @@ class TVChaosUK:
 
     def _build_episode_desc(self, meta: Meta, image_list: list[dict[str, Any]]) -> str:
         """Build description for single episode releases (multi-block, no pre tags)."""
-        parts = []
+        parts: list[str] = []
 
         # Logo in its own center block
         if meta.logo:
@@ -255,7 +255,7 @@ class TVChaosUK:
         if not meta.release_dates:
             return meta.release_date
 
-        parts = []
+        parts: list[str] = []
         for cc in meta.release_dates["results"]:
             for rd in cc["release_dates"]:
                 if rd["type"] == 6:  # TV release
@@ -266,7 +266,7 @@ class TVChaosUK:
 
     def _build_episode_list(self, episodes: list[dict[str, Any]]) -> str:
         """Build formatted episode list."""
-        parts = []
+        parts: list[str] = []
 
         for ep in episodes:
             ep_num = ep.get("code", "")
@@ -559,21 +559,21 @@ class TVChaosUK:
                 tvc_name = cli_ui.ask_string("Please enter New Name:") or tvc_name
                 upload_to_tvc = cli_ui.ask_yes_no(f"Upload to {self.tracker} with the name {tvc_name}?", default=False)
 
-        data = {
+        data: dict[str, str | int] = {
             "name": tvc_name,
             "description": desc,
-            "mediainfo": mi_dump,
-            "bdinfo": bd_dump,
+            "mediainfo": mi_dump if mi_dump else "",
+            "bdinfo": bd_dump if bd_dump else "",
             "category_id": cat_id,
             "type": resolution_id,
-            "tmdb": meta.tmdb,
-            "imdb": meta.imdb,
-            "tvdb": meta.tvdb_id,
-            "mal": meta.mal_id,
+            "tmdb": meta.tmdb or 0,
+            "imdb": meta.imdb or 0,
+            "tvdb": meta.tvdb_id or 0,
+            "mal": meta.mal_id or 0,
             "igdb": 0,
             "anonymous": anon,
-            "stream": meta.stream,
-            "sd": meta.sd,
+            "stream": int(meta.stream),
+            "sd": int(meta.sd),
             "keywords": ", ".join(meta.keywords),
             "personal_release": int(meta.personalrelease),
             "internal": 0,
@@ -826,7 +826,7 @@ class TVChaosUK:
         descfile_path = self._ensure_desc_directory(meta, tracker)
 
         # Build description content
-        desc_parts = []
+        desc_parts: list[str] = []
 
         # Add disc information
         if meta.discs:
