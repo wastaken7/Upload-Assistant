@@ -57,7 +57,23 @@ class TorrentLeech:
             return False
 
         self.session.cookies = cast(Any, cookie_jar)
-        return True
+        try:
+            if force:
+                response = await self.session.get(f"{self.base_url}/torrents/browse/index", timeout=10)
+                logged_in = response.status_code == 301 and "torrents/browse" in str(response.url)
+            else:
+                response = await self.session.get(self.http_upload_url, timeout=10)
+                logged_in = response.status_code == 200 and "torrents/upload" in str(response.url)
+
+            if logged_in:
+                logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
+                return True
+
+            logger.info(f"[bold red]Login to '{self.tracker}' with cookies failed. Please check your cookies.[/bold red]")
+            return False
+        except httpx.RequestError as e:
+            logger.info(f"[bold red]Error while validating credentials for '{self.tracker}': {e}[/bold red]")
+            return False
 
     async def generate_description(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)

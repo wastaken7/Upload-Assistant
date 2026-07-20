@@ -448,9 +448,10 @@ class AmigosShare:
         description_parts.append(f"\n[size=3]{await self.get_name(meta)}[/size]\n")
 
         # Poster
-        season_tmdb = self.season_tmdb_data
-        main_tmdb = meta.tmdb_localized_data.get("pt-BR", {}).get("main", {})
-        episode_tmdb = meta.tmdb_localized_data.get("pt-BR", {}).get("episode", {})
+        localized_tmdb = dict(meta.tmdb_localized_data.get("pt-BR", {}))
+        season_tmdb = dict(localized_tmdb.get("season", {})) or {}
+        main_tmdb = dict(localized_tmdb.get("main", {})) or {}
+        episode_tmdb = dict(localized_tmdb.get("episode", {})) or {}
         poster_path = season_tmdb.get("poster_path") or main_tmdb.get("poster_path") or meta.tmdb_poster
         poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ""
         await append_section("BARRINHA_CAPA", await self.format_image(poster))
