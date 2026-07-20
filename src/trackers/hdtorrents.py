@@ -121,7 +121,7 @@ class HDTorrents:
 
         return cat_id
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         hdt_name = meta.name
         audio = meta.audio
         hdr = meta.hdr
@@ -218,7 +218,7 @@ class HDTorrents:
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
-            "filename": await self.edit_name(meta),
+            "filename": await self.get_name(meta),
             "category": await self.get_category_id(meta),
             "info": await self.edit_desc(meta),
             "csrfToken": self.secret_token,

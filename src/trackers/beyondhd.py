@@ -101,7 +101,7 @@ class BEYONDHD:
         await self.edit_desc(meta)
         tags = await self.get_tags(meta)
         custom, edition = await self.get_edition(meta, tags)
-        bhd_name = await self.edit_name(meta)
+        bhd_name = await self.get_name(meta)
         anon = 0 if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else 1
 
         mi_dump = None
@@ -352,7 +352,7 @@ class BEYONDHD:
             return
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        bhd_name = await self.edit_name(meta)
+        bhd_name = await self.get_name(meta)
         if any(
             phrase in bhd_name.lower()
             for phrase in (
@@ -518,7 +518,7 @@ class BEYONDHD:
             tags.append("HLG")
         return tags
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         name = meta.name or ""
         if meta.source in ("PAL DVD", "NTSC DVD", "DVD", "NTSC", "PAL"):
             audio = meta.audio

@@ -223,7 +223,7 @@ class SpeedApp:
             signature=f"[url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/url]",
         )
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         tracker_name = meta.basename_no_ext
         scene_name = meta.scene_name or ""
 
@@ -272,7 +272,7 @@ class SpeedApp:
         data: dict[str, Any] = {
             "coverPhotoUrl": meta.backdrop,
             "description": str(meta.genres),
-            "name": await self.edit_name(meta),
+            "name": await self.get_name(meta),
             "nfo": await self.get_nfo(meta),
             "poster": meta.poster,
             "technicalDetails": await self.edit_desc(meta),

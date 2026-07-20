@@ -517,7 +517,7 @@ class MTeam:
         return {
             # "torrent": 0,
             # "offer": 0,
-            "name": meta.name,
+            "name": await self.get_name(meta),
             "smallDescr": self.common.get_small_description(meta),
             "descr": await self.generate_description(meta),
             "category": self.get_category_id(meta),
@@ -607,3 +607,6 @@ class MTeam:
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading"
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
+
+    async def get_name(self, meta: Meta) -> str:
+        return meta.name

@@ -47,7 +47,7 @@ class ToTheGlory:
         self.passkey = str(config["TRACKERS"][self.tracker].get("announce_url", "")).strip().split("/")[-1]
         self.cookie_validator = CookieValidator(config)
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         ttg_name = meta.name
 
         remove_list = ["Dubbed", "Dual-Audio"]
@@ -123,7 +123,7 @@ class ToTheGlory:
         common = Common(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
-        ttg_name = await self.edit_name(meta)
+        ttg_name = await self.get_name(meta)
 
         # FORM
         # type = category dropdown

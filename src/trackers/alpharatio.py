@@ -397,6 +397,43 @@ class AlphaRatio:
             meta.tracker_status[self.tracker]["status_message"] = "data error: Failed to extract auth key"
             return False
 
+        # Prepare upload data
+        data: dict[str, Any] = {
+            "submit": "true",
+            "auth": auth_key,
+            "type": type_id,
+            "title": await self.get_name(meta),
+            "tags": tags,
+            "image": cover,
+            "desc": desc,
+        }
+
+        # Load cookies for upload
+        upload_cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if not upload_cookies:
+            meta.tracker_status[self.tracker]["status_message"] = "data error: Failed to load cookies for upload"
+            return False
+
+        # Use centralized handle_upload from CookieAuthUploader
+        return await self.cookie_uploader.handle_upload(
+            meta=meta,
+            tracker=self.tracker,
+            data=data,
+            upload_cookies=upload_cookies,
+            upload_url=self.upload_url,
+            torrent_field_name="file_input",
+            source_flag=self.source_flag,
+            torrent_url=self.torrent_url,
+            id_pattern=r"torrents\.php\?id=(\d+)",
+            success_status_code="200",
+        )
+
+    async def parse_mediainfo_async(self, video_path: str, template_path: str) -> str:
+        """Parse MediaInfo asynchronously using thread executor"""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, lambda: MediaInfo.parse(video_path, output="STRING", full=False, mediainfo_options={"inform": f"file://{template_path}"}))
+
+    async def get_name(self, meta: Meta) -> str:
         # must use scene name if scene release
         known_extensions = {".mkv", ".mp4", ".avi", ".ts"}
         if meta.scene:
@@ -427,38 +464,4 @@ class AlphaRatio:
                 ar_name = re.sub(f"-{invalid_tag}", "", ar_name, flags=re.IGNORECASE)
             ar_name = f"{ar_name}-NoGRP"
 
-        # Prepare upload data
-        data: dict[str, Any] = {
-            "submit": "true",
-            "auth": auth_key,
-            "type": type_id,
-            "title": ar_name,
-            "tags": tags,
-            "image": cover,
-            "desc": desc,
-        }
-
-        # Load cookies for upload
-        upload_cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
-        if not upload_cookies:
-            meta.tracker_status[self.tracker]["status_message"] = "data error: Failed to load cookies for upload"
-            return False
-
-        # Use centralized handle_upload from CookieAuthUploader
-        return await self.cookie_uploader.handle_upload(
-            meta=meta,
-            tracker=self.tracker,
-            data=data,
-            upload_cookies=upload_cookies,
-            upload_url=self.upload_url,
-            torrent_field_name="file_input",
-            source_flag=self.source_flag,
-            torrent_url=self.torrent_url,
-            id_pattern=r"torrents\.php\?id=(\d+)",
-            success_status_code="200",
-        )
-
-    async def parse_mediainfo_async(self, video_path: str, template_path: str) -> str:
-        """Parse MediaInfo asynchronously using thread executor"""
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, lambda: MediaInfo.parse(video_path, output="STRING", full=False, mediainfo_options={"inform": f"file://{template_path}"}))
+        return ar_name

@@ -572,3 +572,6 @@ class Anthelion:
             imdb_tmdb_list = []
 
         return imdb_tmdb_list
+
+    async def get_name(self, meta: Meta) -> str:
+        return meta.title

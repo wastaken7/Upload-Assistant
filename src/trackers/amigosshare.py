@@ -80,7 +80,6 @@ class AmigosShare:
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
-        self.main_tmdb_data: dict[str, Any] = {}
         self.season_tmdb_data: dict[str, Any] = {}
         self.episode_tmdb_data: dict[str, Any] = {}
         self.tmdb_manager = TmdbManager(config)
@@ -102,10 +101,6 @@ class AmigosShare:
             ptbr_data = meta.tmdb_localized_data.get("pt-BR")
             if not ptbr_data or not ptbr_data.get("main"):
                 raise RuntimeError(f"{self.tracker}: Missing TMDB localized data (pt-BR).")
-
-            self.main_tmdb_data = ptbr_data["main"]
-            self.episode_tmdb_data = ptbr_data.get("episode") or {}
-            meta.episode_tmdb_data = self.episode_tmdb_data
 
     async def get_container(self, meta: Meta) -> str | None:
         if meta.category == "BOOK":
@@ -323,7 +318,7 @@ class AmigosShare:
 
         return "20"
 
-    async def get_title(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         if meta.category == "BOOK":
             author = meta.author.strip()
             title = self.common.portuguese_title_capitalization(meta.title)
@@ -334,16 +329,20 @@ class AmigosShare:
 
         name = meta.title
         base_name = name
-        original_name_title = self.main_tmdb_data.get("original_name") or self.main_tmdb_data.get("original_title") or ""
+        original_name_title = (
+            meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get("original_name")
+            or meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get("original_title")
+            or ""
+        )
 
         if meta.category == "TV":
-            tv_title_ptbr = self.main_tmdb_data.get("name")
+            tv_title_ptbr = meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get("name")
             if tv_title_ptbr and tv_title_ptbr.lower() != name.lower() and (not original_name_title or tv_title_ptbr.lower() != original_name_title.lower()):
                 base_name = f"{tv_title_ptbr} ({name})"
 
             return f"{base_name} - {meta.season}{meta.episode}"
 
-        movie_title_ptbr = self.main_tmdb_data.get("title")
+        movie_title_ptbr = meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get("title")
         if movie_title_ptbr and movie_title_ptbr.lower() != name.lower() and (not original_name_title or movie_title_ptbr.lower() != original_name_title.lower()):
             base_name = f"{movie_title_ptbr} ({name})"
 
@@ -446,12 +445,12 @@ class AmigosShare:
         # Title
         description_parts.extend([await self.format_image(layout_image.get(f"BARRINHA_CUSTOM_T_{i}")) for i in range(1, 4)])
         description_parts.append(f"\n{await self.format_image(layout_image.get('BARRINHA_APRESENTA'))}\n")
-        description_parts.append(f"\n[size=3]{await self.get_title(meta)}[/size]\n")
+        description_parts.append(f"\n[size=3]{await self.get_name(meta)}[/size]\n")
 
         # Poster
         season_tmdb = self.season_tmdb_data
-        main_tmdb = self.main_tmdb_data
-        episode_tmdb = self.episode_tmdb_data
+        main_tmdb = meta.tmdb_localized_data.get("pt-BR", {}).get("main", {})
+        episode_tmdb = meta.tmdb_localized_data.get("pt-BR", {}).get("episode", {})
         poster_path = season_tmdb.get("poster_path") or main_tmdb.get("poster_path") or meta.tmdb_poster
         poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ""
         await append_section("BARRINHA_CAPA", await self.format_image(poster))
@@ -589,12 +588,14 @@ class AmigosShare:
         return final_description
 
     async def get_trailer(self, meta: Meta) -> str:
-        video_results = self.main_tmdb_data.get("videos", {}).get("results", [])
+        video_results = meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get("videos", {}).get("results", [])
         youtube_code = video_results[-1].get("key", "") if video_results else ""
         return f"http://www.youtube.com/watch?v={youtube_code}" if youtube_code else meta.youtube or ""
 
     async def get_tags(self, meta: Meta) -> str:
-        tags = ", ".join(g.get("name", "") for g in self.main_tmdb_data.get("genres", []) if isinstance(g.get("name"), str) and g.get("name").strip())
+        tags = ", ".join(
+            g.get("name", "") for g in meta.tmdb_localized_data.get("pt-BR", {}).get("main", {}).get("genres", []) if isinstance(g.get("name"), str) and g.get("name").strip()
+        )
 
         if not tags:
             tags_raw = meta.genre or await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
@@ -778,7 +779,7 @@ class AmigosShare:
 
         elif meta.anime:
             await self.load_localized_data(meta)
-            search_name = await self.get_title(meta)
+            search_name = await self.get_name(meta)
             search_query = search_name.replace(" ", "+")
             search_url = f"{self.base_url}/torrents-search.php?search={search_query}"
 
@@ -1095,7 +1096,7 @@ class AmigosShare:
 
         data: dict[str, Any] = {
             "takeupload": "yes",
-            "name": await self.get_title(meta),
+            "name": await self.get_name(meta),
             "descr": description,
             "ano": str(meta.year) if meta.year is not None else "",
         }
@@ -1177,7 +1178,7 @@ class AmigosShare:
             {
                 "altura": resolution["height"],
                 "audio": await self.get_audio(meta),
-                "capa": f"https://image.tmdb.org/t/p/w500{self.main_tmdb_data.get('poster_path') or meta.tmdb_poster}",
+                "capa": f"https://image.tmdb.org/t/p/w500{meta.tmdb_localized_data.get('pt-BR', {}).get('main', {}).get('poster_path') or meta.tmdb_poster}",
                 "codecaudio": await self.get_audio_codec(meta),
                 "codecvideo": await self.get_video_codec(meta),
                 "extencao": await self.get_container(meta),

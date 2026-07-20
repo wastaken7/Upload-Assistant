@@ -47,8 +47,6 @@ config: dict[str, Any] = {
         "console_show_path": False,
         # Enable rich markup parsing in console logs
         "console_markup": True,
-        # Enable colored/formatted tracker names in console logs
-        "console_tracker_name_markup": True,
 
         # File logging configuration
         # Set true to save a plain text log file of the upload flow in each release's tmp folder
@@ -1674,8 +1672,6 @@ config: dict[str, Any] = {
             # Paste the indexer's base url below (e.g., https://indexer.com)
             # Upload will only proceed if the domain matches the allowed one, protecting your credentials.
             "base_url": "",
-            # Edit name of the tracker to appear in the console and logs
-            "display_name": "Suio",
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Your Username
@@ -2595,7 +2591,7 @@ config: dict[str, Any] = {
             "torrent_client": "qbit",
             # QUI reverse proxy: https://getqui.com/docs/features/reverse-proxy
             # Create a Client Proxy API Key in QUI (Settings → Client Proxy Keys), pick the instance, paste the full proxy URL here.
-            # Example: "http://localhost:7476/proxy/<your-client-api-key>". No other qbit auth needed when set.
+            # Example: "http://localhost:7476/proxy/<your-client-api-key>". Bandwidth Control still requires qbit_url/qbit_port and qbit_api_key or qbit_user/qbit_pass.
             "qui_proxy_url": "",
             # enable_search to True will automatically try and find a suitable hash to save having to rehash when creating torrents
             "enable_search": True,
@@ -2647,7 +2643,7 @@ config: dict[str, Any] = {
             "torrent_client": "qbit",
             # QUI reverse proxy: https://getqui.com/docs/features/reverse-proxy
             # Create a Client Proxy API Key in QUI (Settings → Client Proxy Keys), pick the instance, paste the full proxy URL here.
-            # Example: "http://localhost:7476/proxy/<your-client-api-key>". No other qbit auth needed when set.
+            # Example: "http://localhost:7476/proxy/<your-client-api-key>". Bandwidth Control still requires qbit_url/qbit_port and qbit_api_key or qbit_user/qbit_pass.
             "qui_proxy_url": "",
             # enable_search to True will automatically try and find a suitable hash to save having to rehash when creating torrents
             "enable_search": True,

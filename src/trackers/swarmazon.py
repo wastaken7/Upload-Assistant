@@ -99,7 +99,7 @@ class Swarmazon:
         api_key = str(self.config["TRACKERS"][self.tracker]["api_key"]).strip()
         data: dict[str, Any] = {
             "api_key": api_key,
-            "name": meta.name,
+            "name": await self.get_name(meta),
             "category_id": cat_id,
             "type_id": sub_cat_id,
             "media_ref": f"tt{meta.imdb}",
@@ -209,3 +209,6 @@ class Swarmazon:
                     dupes.append(str(result))
 
         return dupes
+
+    async def get_name(self, meta: Meta) -> str:
+        return meta.name

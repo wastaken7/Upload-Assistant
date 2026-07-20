@@ -344,7 +344,7 @@ class PTerClub:
                     image_list.append(image_dict)
         return image_list
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         pter_name = meta.name
 
         remove_list = ["Dubbed", "Dual-Audio"]
@@ -388,7 +388,7 @@ class PTerClub:
 
         anon = "no" if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else "yes"
 
-        pter_name = await self.edit_name(meta)
+        pter_name = await self.get_name(meta)
 
         mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BD_SUMMARY_00.txt" if meta.bdinfo else f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt"
         async with aiofiles.open(mi_path, encoding="utf-8") as mi_dump:
