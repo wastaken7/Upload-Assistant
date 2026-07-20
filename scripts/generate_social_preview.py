@@ -39,7 +39,7 @@ def draw_social_preview():
     title_w = title_bbox[2] - title_bbox[0]
     title_h = title_bbox[3] - title_bbox[1]
 
-    sub_text = "Automated media uploader & tracker posting assistant"
+    sub_text = "Streamline media preparation and uploads\nacross private trackers & usenet indexers."
     sub_bbox = draw.textbbox((0, 0), sub_text, font=sub_font)
     sub_w = sub_bbox[2] - sub_bbox[0]
     sub_h = sub_bbox[3] - sub_bbox[1]
