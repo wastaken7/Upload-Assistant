@@ -28,7 +28,13 @@ jobs:
       - name: Validate version
         env:
           NEW_VERSION: ${{ inputs.version }}
+          REF_TYPE: ${{ github.ref_type }}
         run: |
+          if [[ "$REF_TYPE" != "branch" ]]; then
+            echo "Create release must be run from a branch, not a tag." >&2
+            exit 1
+          fi
+
           if [[ ! "$NEW_VERSION" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
             echo "Version must match vMAJOR.MINOR or vMAJOR.MINOR.PATCH (for example: v2.8)." >&2
             exit 1
