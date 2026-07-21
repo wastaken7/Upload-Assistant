@@ -15,6 +15,10 @@ on:
         required: true
         default: "development"
         type: string
+      release_tag:
+        description: "Existing release tag to receive the installer (optional)"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -90,7 +94,8 @@ jobs:
           if-no-files-found: error
 
       - name: Attach installer to release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
           files: build/output/*.exe
