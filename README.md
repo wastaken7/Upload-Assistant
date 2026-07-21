@@ -1,10 +1,10 @@
 <div align="center">
   <img src="logo.svg" alt="Upload Assistant Logo" width="160" height="160" />
   <h1>Upload-Assistant</h1>
-  <p>Automated media uploader and tracker posting assistant</p>
-
+  <p>Streamline media preparation and uploads across private trackers & usenet indexers.</p>
 
 [![Python Version](https://img.shields.io/badge/Python-3.14%2B-blue?logo=python&logoColor=white)](https://www.python.org/) [![License](https://img.shields.io/badge/License-UAPL%20v1.0-orange)](LICENSE) [![Ruff](https://img.shields.io/badge/Ruff-000000?logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff) [![Pyright](https://img.shields.io/badge/Pyright-strict-brightgreen)](https://github.com/microsoft/pyright) [![code style: prettier](https://img.shields.io/badge/code%20style-prettier-ff69b4.svg)](https://prettier.io) [![Docker Image CI](https://github.com/wastaken7/Upload-Assistant/actions/workflows/docker-image.yml/badge.svg)](https://github.com/wastaken7/Upload-Assistant/actions/workflows/docker-image.yml)
+
 </div>
 
 > [!IMPORTANT]
@@ -104,7 +104,6 @@ This branch introduces new media categories and automation features not present 
 | DigitalCore            | DIGITALCORE            | MOVIE, TV, BOOK, GAME |
 | Emuwarez               | EMUWAREZ               | MOVIE, TV             |
 | FileList               | FILELIST               | MOVIE, TV             |
-| Friki                  | FRIKIBAR               | MOVIE, TV             |
 | FunFile                | FUNFILE                | MOVIE, TV             |
 | GreatPosterWall        | GREATPOSTERWALL        | MOVIE                 |
 | hawke-uno              | HAWKEUNO               | MOVIE, TV             |
@@ -158,7 +157,6 @@ This branch introduces new media categories and automation features not present 
 | TVChaosUK              | TVCHAOSUK              | MOVIE, TV             |
 | ULCX                   | ULCX                   | MOVIE, TV             |
 | UTOPIA                 | UTOPIA                 | MOVIE, TV             |
-| YOiNKED                | YOINKED                | MOVIE, TV             |
 | YUSCENE                | YUSCENE                | MOVIE, TV, BOOK, GAME |
 | Zenith                 | ZENITH                 | MOVIE, TV, BOOK, GAME |
 
@@ -180,19 +178,15 @@ Setting up Upload Assistant is straightforward, even if you are not a developer.
 
 ### Step 1: Install Required Tools
 
-Upload Assistant needs a few tools installed on your computer to process media and run:
+Windows users should install Upload Assistant with the [Windows `.exe` installer](docs/windows-install.md). It includes everything needed to run the assistant.
+
+For a manual Linux/macOS/Windows installation, Upload Assistant needs a few tools to process media and run:
 
 1. **Python (version 3.14 or newer)**:
    - Download and install it from the [official Python website](https://www.python.org/downloads/).
-   - **Important (standard Windows setup):** During installation, make sure to check the box that says **"Add python.exe to PATH"** so the `python` and `pip` commands below work in a normal terminal.
-   - **Windows users who want a managed installation:** skip the manual Python setup and use the isolated installer in [Windows Install](docs/windows-install.md). It installs its own Python runtime without changing the Python versions already on `PATH`.
 2. **MediaInfo & FFmpeg**:
    - These are helper tools used to scan files and generate screenshots/spectrograms.
-   - **Windows manual setup:**
-     - Install [MediaInfo](https://mediaarea.net/en/MediaInfo/Download/Windows).
-     - Install [FFmpeg](https://ffmpeg.org/download.html). For a step-by-step guide on how to add FFmpeg to your system's search path, see [this Windows guide](https://windowsloop.com/install-ffmpeg-windows-10/).
-     - The managed [Windows installer](docs/windows-install.md) supplies the Windows MediaInfo binary and can install FFmpeg automatically, so these packages are not required for that flow.
-   - **Linux:** Install them using your system's software manager:
+   - Install them using your system's software manager:
      - Debian/Ubuntu: `sudo apt install mediainfo ffmpeg`
      - Arch Linux: `sudo pacman -S mediainfo ffmpeg`
      - RedHat/Fedora: `sudo dnf install mediainfo ffmpeg`
@@ -200,7 +194,7 @@ Upload Assistant needs a few tools installed on your computer to process media a
 
 ---
 
-### Step 2: Download Upload Assistant
+### Step 2: Download Upload Assistant (Linux/macOS)
 
 Choose **one** of the two options below to get the files onto your computer:
 
@@ -209,9 +203,8 @@ Choose **one** of the two options below to get the files onto your computer:
 Using Git is the recommended method because it makes updating the assistant in the future extremely easy.
 
 1. **Install Git** (if you don't already have it):
-   - **Windows:** Install [Git for Windows](https://git-scm.com/download/win).
-   - **Linux:** Install via your package manager (e.g., `sudo apt install git` or `sudo pacman -S git`).
-   - **macOS:** Install via Homebrew (`brew install git`) or Xcode Command Line Tools.
+   - **Linux:** Install it via your package manager.
+   - **macOS:** Install it via Homebrew or Xcode Command Line Tools.
 2. **Clone the project**:
    Open your command prompt or terminal, navigate to the folder where you want to keep the assistant, and run:
    ```bash
@@ -229,15 +222,13 @@ If you do not want to install Git, you can download a copy of the files directly
 
 ---
 
-### Step 3: Install Python Packages
+### Step 3: Install Python Packages (Linux/macOS)
 
 On Linux/macOS, open a terminal, navigate to the folder where you downloaded Upload Assistant, and run:
 
 ```bash
 pip3 install --user -U -r requirements.txt
 ```
-
-On Windows, the managed [Windows installer](docs/windows-install.md) creates its own Python environment and installs these packages automatically. For a manual checkout, create and use a virtual environment as shown below.
 
 Discord notifications are optional and are no longer part of the default install. If you want Discord bot support, install the extra package set after the base dependencies:
 
@@ -246,18 +237,10 @@ Discord notifications are optional and are no longer part of the default install
   pip3 install --user -U -r requirements-discord.txt
   ```
 
-On Windows, pass `-WithDiscord` to the Windows installer.
-
 > [!TIP]
 > **Getting an "externally managed environment" error?**
 > This means your system prefers keeping Python packages separated. You can set up a "Virtual Environment" (a private workspace for this tool) by running:
 >
-> - **Windows:**
->   ```cmd
->   python -m venv venv
->   venv\Scripts\activate
->   pip install -r requirements.txt
->   ```
 > - **Linux / macOS:**
 >   ```bash
 >   python3 -m venv venv
@@ -281,10 +264,7 @@ If you plan to use the Web UI, **your configuration file will be generated autom
 
 In your terminal, run the command for your operating system and follow the on-screen prompts:
 
-- **Windows:**
-  ```cmd
-  python config-generator.py
-  ```
+- **Windows:** Install with the [`.exe` installer](docs/windows-install.md), then run `ua-config` in a new terminal.
 - **Linux / macOS:**
   ```bash
   python3 config-generator.py
@@ -303,7 +283,7 @@ In your terminal, run the command for your operating system and follow the on-sc
 **Additional Resources:**
 
 - Check out our [Wiki Help Page](docs/Home.md).
-- Need an isolated Windows setup that does not touch your existing Python on `PATH`? See [Windows Install](docs/windows-install.md).
+- Windows installation and basic commands: see [Windows Install](docs/windows-install.md).
 - Need a no-root Linux or seedbox setup? See [Seedbox / Linux Install](docs/seedbox.md).
 - Feel free to contact me if you need help, I'm not that hard to find.
 
@@ -315,20 +295,13 @@ In your terminal, run the command for your operating system and follow the on-sc
   git pull
   ```
 - Or, if you downloaded the ZIP file, download a fresh ZIP from GitHub and overwrite your existing files.
-- For the managed Windows installation, run `ua-update`; it downloads a fresh ZIP and replaces the installed files.
+- For the Windows installation, run `ua-update`.
 - Run the command to update dependencies:
-  - **Managed Windows installation:** run `ua-update`.
   - **Linux / macOS:** `python3 -m pip install --user -U -r requirements.txt`
 - If you use the optional Discord bot integration, update that extra package set too:
-  - **Managed Windows installation:** `ua-update` preserves the optional Discord dependency when it is already installed.
   - **Linux / macOS:** `python3 -m pip install --user -U -r requirements-discord.txt`
 - Run the configuration generator to fetch any new settings:
-  - **Managed Windows installation:** run the generator with the installed environment, for example:
-    ```powershell
-    cd "$HOME\tools\ua"
-    & .\.venv\Scripts\python.exe .\config-generator.py
-    ```
-    Or run `ua-config` from any folder.
+  - **Windows:** run `ua-config` from any folder.
   - **Linux / macOS:** `python3 config-generator.py`
 
 ## **CLI Usage:**
@@ -337,7 +310,7 @@ To run the assistant, use the command for your system:
 
 - **Windows:**
   ```cmd
-  python upload.py "/path/to/content" --args
+  ua "C:\path\to\content" --args
   ```
 - **Linux / macOS:**
   ```bash

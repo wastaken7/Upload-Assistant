@@ -252,7 +252,7 @@ class HDSpace:
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         data: dict[str, Any] = {
             "category": await self.get_category_id(meta),
-            "filename": meta.name,
+            "filename": await self.get_name(meta),
             "genre": str(meta.genres),
             "imdb": str(meta.imdb),
             "info": await self.generate_description(meta),
@@ -306,3 +306,6 @@ class HDSpace:
             success_text="download.php?id=",
             additional_files=files,
         )
+
+    async def get_name(self, meta: Meta) -> str:
+        return meta.name

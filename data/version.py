@@ -1,16 +1,14 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
-__version__ = "v2.5"
+__version__ = "v2.7"
 
 """
-Changelog for version v2.5 (2026-07-19):
-
 ## What's Changed
-* fix: upload skip_archive directly from source by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/72
-* feat(windows): add isolated Windows installer flow by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/73
-* refactor: centralize `search_existing()` error handling and project updates by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/76
-* fix: resolve Path AttributeError in torrent clients & adjust social preview alignment by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/79
+* fix: improve M-Team metadata handling by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/92
+* fix(mteam): normalize torrent names according to wiki guidelines by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/93
+* fix: continue image host fallback chain by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/95
+* fix(usenet): bump pesto to v0.3.61, add precise missing-article error by @franzopl in https://github.com/wastaken7/Upload-Assistant/pull/94
 
 
-**Full Changelog**: https://github.com/wastaken7/Upload-Assistant/compare/v2.4...v2.5
+**Full Changelog**: https://github.com/wastaken7/Upload-Assistant/compare/v2.6...v2.7
 """

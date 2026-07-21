@@ -24,7 +24,8 @@ class BitHDTV:
     allows_bloated_audio = True
     source_flag = "BIT-HDTV"
     banned_groups = ()
-    upload_url = "https://www.bit-hdtv.com/takeupload.php"
+    base_url = "https://www.bit-hdtv.com"
+    upload_url = f"{base_url}/takeupload.php"
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:
@@ -69,7 +70,7 @@ class BitHDTV:
 
         data: dict[str, Any] = {
             "api_key": str(self.config["TRACKERS"][self.tracker]["api_key"]).strip(),
-            "name": meta.name.replace(" ", ".").replace(":.", ".").replace(":", ".").replace("DD+", "DDP"),
+            "name": await self.get_name(meta),
             "mediainfo": mi_dump if bd_dump is None else bd_dump,
             "cat": cat_id,
             "subcat": sub_cat_id,
@@ -196,3 +197,6 @@ class BitHDTV:
     async def search_existing(self, _meta: dict[str, Any]) -> list[str]:
         logger.info(f"{self.tracker}: [red]Dupes must be checked Manually")
         return []
+
+    async def get_name(self, meta: Meta) -> str:
+        return meta.name.replace(" ", ".").replace(":.", ".").replace(":", ".").replace("DD+", "DDP")

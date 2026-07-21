@@ -26,6 +26,8 @@ class ToTheGlory:
     TTG Private Torrent Tracker
     """
 
+    base_url = "https://totheglory.im"
+
     auth_type = "cookies"
     tracker = "TOTHEGLORY"
     display_name = "ToTheGlory"
@@ -45,7 +47,7 @@ class ToTheGlory:
         self.passkey = str(config["TRACKERS"][self.tracker].get("announce_url", "")).strip().split("/")[-1]
         self.cookie_validator = CookieValidator(config)
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         ttg_name = meta.name
 
         remove_list = ["Dubbed", "Dual-Audio"]
@@ -121,7 +123,7 @@ class ToTheGlory:
         common = Common(config=self.config)
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await self.edit_desc(meta)
-        ttg_name = await self.edit_name(meta)
+        ttg_name = await self.get_name(meta)
 
         # FORM
         # type = category dropdown
@@ -160,7 +162,7 @@ class ToTheGlory:
             "anonymity": anon,
             "nodistr": "no",
         }
-        url = "https://totheglory.im/takeupload.php"
+        url = f"{self.base_url}/takeupload.php"
         if meta.imdb_id or 0 != 0:
             data["imdb_c"] = f"tt{meta.imdb}"
 
@@ -179,7 +181,7 @@ class ToTheGlory:
         async with httpx.AsyncClient(cookies=cookies, follow_redirects=True, timeout=60.0) as client:
             up = await client.post(url=url, data=data, files=files)
 
-        if str(up.url).startswith("https://totheglory.im/details.php?id="):
+        if str(up.url).startswith(f"{self.base_url}/details.php?id="):
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
             tracker_status[self.tracker]["status_message"] = str(up.url)
@@ -212,7 +214,7 @@ class ToTheGlory:
         else:
             res_type = meta.resolution
 
-        search_url = f"https://totheglory.im/browse.php?search_field= {imdb} {res_type}"
+        search_url = f"{self.base_url}/browse.php?search_field= {imdb} {res_type}"
 
         async with httpx.AsyncClient(cookies=cookies, timeout=10.0) as client:
             response = await client.get(search_url)
@@ -247,7 +249,7 @@ class ToTheGlory:
         return True
 
     async def validate_cookies(self, meta: Meta, cookiefile: str) -> bool:  # noqa: ARG002
-        url = "https://totheglory.im"
+        url = f"{self.base_url}"
         if Path(cookiefile).exists():
             raw_cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
             cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
@@ -260,7 +262,7 @@ class ToTheGlory:
             return False
 
     async def login(self, cookiefile: str) -> None:
-        url = "https://totheglory.im/takelogin.php"
+        url = f"{self.base_url}/takelogin.php"
         data: dict[str, Any] = {"username": self.username, "password": self.password, "passid": self.passid, "passan": self.passan}
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.post(url, data=data)
@@ -272,7 +274,7 @@ class ToTheGlory:
                 if not auth_token:
                     raise UploadError(f"Missing authenticity token during {self.tracker} login", "red")  # noqa #F405
                 two_factor_data = {"otp": console.input(f"[yellow]{self.tracker} 2FA Code: "), "authenticity_token": auth_token, "uid": self.uid}
-                two_factor_url = "https://totheglory.im/take2fa.php"
+                two_factor_url = f"{self.base_url}/take2fa.php"
                 response = await client.post(two_factor_url, data=two_factor_data)
                 await asyncio.sleep(0.5)
             if str(response.url).endswith("my.php"):
@@ -360,7 +362,7 @@ class ToTheGlory:
             await descfile.write("".join(parts))
 
     async def download_new_torrent(self, id: str, torrent_path: str) -> None:
-        download_url = f"https://totheglory.im/dl/{id}/{self.passkey}"
+        download_url = f"{self.base_url}/dl/{id}/{self.passkey}"
         async with httpx.AsyncClient(timeout=30.0) as client:
             r = await client.get(url=download_url)
         if r.status_code == 200:

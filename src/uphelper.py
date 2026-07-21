@@ -13,7 +13,6 @@ import cli_ui
 from rich.markup import escape
 
 from cogs.redaction import Redaction
-from data.config import config
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
 from src.console import console, logger
@@ -152,7 +151,7 @@ class UploadHelper:
             return entry
 
         def _format_dupes_list(entries: list[Any]) -> str:
-            seen = set()
+            seen: set[str] = set()
             formatted = []
             for entry in entries:
                 if isinstance(entry, dict) and entry.get("link"):
@@ -174,10 +173,7 @@ class UploadHelper:
         try:
             tracker_rename = await tracker_class.get_name(meta)
         except Exception:
-            try:
-                tracker_rename = await tracker_class.edit_name(meta)
-            except Exception:
-                tracker_rename = None
+            tracker_rename = None
         display_name: str | None = None
         if tracker_rename is not None:
             if isinstance(tracker_rename, dict) and "name" in tracker_rename:
@@ -584,7 +580,7 @@ class UploadHelper:
             if kf_confirm != "y":
                 logger.info("[bold red]Aborting...[/bold red]")
                 exit()
-        different_names = {}
+        tracker_release_names: dict[str, str] = {}
         for tracker_name in meta.trackers:
             if tracker_name in ("MANUAL", "USENET"):
                 continue
@@ -595,11 +591,11 @@ class UploadHelper:
                 tracker_class = tracker_class_factory(config=self.config)
                 try:
                     tracker_rename = await tracker_class.get_name(meta)
-                except Exception:
-                    try:
-                        tracker_rename = await tracker_class.edit_name(meta)
-                    except Exception:
-                        tracker_rename = None
+                    if isinstance(tracker_rename, dict) and len(tracker_rename) == 1:
+                        tracker_rename = str(next(iter(tracker_rename.values())))
+                except Exception as e:
+                    logger.error(f"Error: {e}")
+                    tracker_rename = None
 
                 display_name = None
                 if tracker_rename is not None:
@@ -610,17 +606,12 @@ class UploadHelper:
                         display_name = tracker_rename
 
                 if display_name:
-                    if tracker_name.lower() == "suio":
-                        suio_display_name = config.get("TRACKERS", {}).get("Suio", {}).get("display_name", "Suio")
-                        if display_name != meta.name and suio_display_name != "Suio":
-                            different_names[suio_display_name] = display_name
-                    elif display_name != meta.name:
-                        different_names[tracker_name] = display_name
+                    tracker_release_names[tracker_name] = display_name
 
-        if different_names:
+        if tracker_release_names:
             logger.info(f"[bold]Base Name:[/bold] {meta.name}\n", extra={"highlighter": None})
-            max_t_len = max(len(t) for t in different_names)
-            for t_name, d_name in different_names.items():
+            max_t_len = max(len(t) for t in tracker_release_names)
+            for t_name, d_name in sorted(tracker_release_names.items()):
                 prefix = f"{t_name}:".ljust(max_t_len + 1)
                 logger.info(f"{prefix} {d_name}", extra={"highlighter": None})
             logger.info("")
@@ -660,7 +651,7 @@ class UploadHelper:
             def mal_url(mal_id: Any) -> str | None:
                 return f"https://myanimelist.net/anime/{mal_id}" if mal_id else None
 
-            db_check_entry = {
+            db_check_entry: dict[str, Any] = {
                 "path": meta.path,
                 "original": {
                     "imdb_id": (meta.original_imdb if meta.original_imdb is not None else "N/A"),

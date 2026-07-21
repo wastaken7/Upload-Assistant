@@ -714,84 +714,12 @@ const TrashIcon = () => (
   </svg>
 );
 
-const UploadIcon = () => (
-  <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 512 512">
-    <defs>
-      <linearGradient
-        id="app-rocket-gradient"
-        x1="0%"
-        y1="0%"
-        x2="0%"
-        y2="100%"
-      >
-        <stop offset="0%" stopColor="#ff007a" />
-        <stop offset="50%" stopColor="#d946ef" />
-        <stop offset="100%" stopColor="#8b5cf6" />
-      </linearGradient>
-      <linearGradient
-        id="app-bracket-gradient"
-        x1="0%"
-        y1="0%"
-        x2="0%"
-        y2="100%"
-      >
-        <stop offset="0%" stopColor="#22d3ee" />
-        <stop offset="100%" stopColor="#06b6d4" />
-      </linearGradient>
-      <linearGradient
-        id="app-cursor-gradient"
-        x1="0%"
-        y1="0%"
-        x2="100%"
-        y2="0%"
-      >
-        <stop offset="0%" stopColor="#14b8a6" />
-        <stop offset="100%" stopColor="#2dd4bf" />
-      </linearGradient>
-    </defs>
-    {/* Code Brackets */}
-    <path
-      d="M 155 176 L 95 256 L 155 336"
-      fill="none"
-      stroke="url(#app-bracket-gradient)"
-      strokeWidth="32"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M 357 176 L 417 256 L 357 336"
-      fill="none"
-      stroke="url(#app-bracket-gradient)"
-      strokeWidth="32"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    {/* Rocket / Arrow */}
-    <path
-      d="M 256 101 L 322 196 L 276 186 V 256 H 236 V 186 L 190 196 Z"
-      fill="url(#app-rocket-gradient)"
-    />
-    {/* Rising Packets */}
-    <rect x="236" y="281" width="40" height="15" rx="7.5" fill="#8b5cf6" />
-    <rect
-      x="236"
-      y="321"
-      width="40"
-      height="15"
-      rx="7.5"
-      fill="#3b82f6"
-      opacity="0.7"
-    />
-    {/* Terminal Cursor */}
-    <rect
-      x="216"
-      y="396"
-      width="80"
-      height="14"
-      rx="7"
-      fill="url(#app-cursor-gradient)"
-    />
-  </svg>
+const LogoIcon = ({ src, className = "w-6 h-6" }) => (
+  <img
+    src={src}
+    alt="Upload-Assistant logo"
+    className={`${className} flex-shrink-0`}
+  />
 );
 
 const ChevronDownIcon = () => (
@@ -1064,6 +992,10 @@ function AudionutsUAGUI() {
   const [selectedPath, setSelectedPath] = useState("");
   const [, setSelectedName] = useState("");
   const [customArgs, setCustomArgs] = useState("");
+  const [trackers, setTrackers] = useState([]);
+  const [defaultTrackers, setDefaultTrackers] = useState(new Set());
+  const [selectedTrackers, setSelectedTrackers] = useState(new Set());
+  const [failedFavicons, setFailedFavicons] = useState(new Set());
   const [isExecuting, setIsExecuting] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState(
     new Set(["/data", "/torrent_storage_dir"]),
@@ -1074,11 +1006,15 @@ function AudionutsUAGUI() {
   const [rightSidebarWidth, setRightSidebarWidth] = useState(320);
   const [isResizingRight, setIsResizingRight] = useState(false);
   const [userInput, setUserInput] = useState("");
+  const [isSendingInput, setIsSendingInput] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(getStoredTheme);
   const [argSearchFilter, setArgSearchFilter] = useState("");
   const [collapsedSections, setCollapsedSections] = useState(new Set());
   const [executionPreview, setExecutionPreview] = useState(null);
   const [progressItems, setProgressItems] = useState([]);
+  const [selectedPaths, setSelectedPaths] = useState([]);
+  const [sortBy, setSortBy] = useState("name");
+  const [sortOrder, setSortOrder] = useState("asc");
 
   // Mobile state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -1108,6 +1044,7 @@ function AudionutsUAGUI() {
   const richOutputRef = useRef(null);
   const lastFullHashRef = useRef("");
   const inputRef = useRef(null);
+  const isSendingInputRef = useRef(false);
   const sseAbortControllerRef = useRef(null);
   const visibleProgressItems = progressItems.filter(
     (item) => item.status !== "completed",
@@ -1358,12 +1295,17 @@ function AudionutsUAGUI() {
   const extractArgValue = (args, argName) => {
     // First try equals-separated format: --argname="value" or --argname='value' or --argname=value
     const equalsRegex = new RegExp(
-      `${argName}=(?:"([^"]+)"|'([^']+)'|([^\\s]+))`,
+      `(?:^|\\s)${argName}=(?:"([^\\"]*)"|'([^\\']*)'|([^\\s]+))`,
       "i",
     );
     const equalsMatch = args.match(equalsRegex);
     if (equalsMatch) {
-      const val = equalsMatch[1] || equalsMatch[2] || equalsMatch[3] || "";
+      const val =
+        equalsMatch[1] !== undefined
+          ? equalsMatch[1]
+          : equalsMatch[2] !== undefined
+            ? equalsMatch[2]
+            : equalsMatch[3] || "";
       // Double-check: don't return values that look like arguments
       if (val.startsWith("--")) return "";
       return val.trim();
@@ -1371,12 +1313,17 @@ function AudionutsUAGUI() {
 
     // Then try space-separated format: --argname "value" or --argname 'value' or --argname value
     const spaceRegex = new RegExp(
-      `${argName}\\s+(?:"([^"]+)"|'([^']+)'|([^\\s-][^\\s]*|(?!--)[^\\s]+))`,
+      `(?:^|\\s)${argName}\\s+(?:"([^\\"]*)"|'([^\\']*)'|([^\\s-][^\\s]*|(?!--)[^\\s]+))`,
       "i",
     );
     const spaceMatch = args.match(spaceRegex);
     if (spaceMatch) {
-      const val = spaceMatch[1] || spaceMatch[2] || spaceMatch[3] || "";
+      const val =
+        spaceMatch[1] !== undefined
+          ? spaceMatch[1]
+          : spaceMatch[2] !== undefined
+            ? spaceMatch[2]
+            : spaceMatch[3] || "";
       // Double-check: don't return values that look like arguments
       if (val.startsWith("--")) return "";
       return val.trim();
@@ -1440,6 +1387,232 @@ function AudionutsUAGUI() {
       );
     }
   };
+
+  const parseTrackersFromArgs = (argsString, defaultTrackersSet) => {
+    const hasTk = /(?:^|\s)(-tk|--trackers)(?=$|=|\s)/i.test(argsString);
+    if (!hasTk) {
+      return new Set(defaultTrackersSet);
+    }
+
+    let val = extractArgValue(argsString, "-tk");
+    if (!val) {
+      val = extractArgValue(argsString, "--trackers");
+    }
+
+    if (val) {
+      const list = val
+        .split(",")
+        .map((t) => t.trim().toUpperCase())
+        .filter(Boolean);
+      return new Set(list);
+    }
+    return new Set();
+  };
+
+  const syncTrackersToArgs = (
+    argsString,
+    selectedTrackersSet,
+    defaultTrackersSet,
+  ) => {
+    const selectedList = Array.from(selectedTrackersSet).sort();
+    const defaultList = Array.from(defaultTrackersSet).sort();
+    const isDefault =
+      selectedList.length === defaultList.length &&
+      selectedList.every((val, index) => val === defaultList[index]);
+    const trackersVal = selectedList.join(",");
+    const hasTk = /(?:^|\s)(-tk|--trackers)(?=$|=|\s)/i.test(argsString);
+
+    if (isDefault) {
+      if (hasTk) {
+        let cleaned = argsString.replace(
+          /((?:^|\s)(?:-tk|--trackers))\s*=\s*(?:"[^"]*"|'[^']*'|[^\s]*)/gi,
+          "",
+        );
+        cleaned = cleaned.replace(
+          /((?:^|\s)(?:-tk|--trackers))\s+(?:"[^"]*"|'[^']*'|(?!--)[^\s]+)/gi,
+          "",
+        );
+        cleaned = cleaned.replace(
+          /((?:^|\s)(?:-tk|--trackers))(?=$|=|\s)/gi,
+          "",
+        );
+        return cleaned.replace(/\s+/g, " ").trim();
+      }
+      return argsString;
+    } else {
+      if (hasTk) {
+        const match = argsString.match(/(?:^|\s)(-tk|--trackers)(?=$|=|\s)/i);
+        const flagUsed = match ? match[1] : "-tk";
+        const equalsRegex = new RegExp(
+          `((?:^|\\s)${flagUsed})\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s]*)`,
+          "i",
+        );
+        const spaceRegex = new RegExp(
+          `((?:^|\\s)${flagUsed})\\s+(?:"[^"]*"|'[^']*'|(?!--)[^\\s]+)`,
+          "i",
+        );
+        const quotedVal = `"${trackersVal}"`;
+        if (equalsRegex.test(argsString)) {
+          return argsString.replace(equalsRegex, `$1=${quotedVal}`);
+        } else if (spaceRegex.test(argsString)) {
+          return argsString.replace(spaceRegex, `$1 ${quotedVal}`);
+        } else {
+          return argsString.replace(
+            new RegExp(`((?:^|\\s)${flagUsed})(?=$|\\s)`, "i"),
+            `$1 ${quotedVal}`,
+          );
+        }
+      } else {
+        const suffix = `-tk "${trackersVal}"`;
+        return argsString.trim() ? `${argsString.trim()} ${suffix}` : suffix;
+      }
+    }
+  };
+
+  const handleTrackerToggle = (trackerName) => {
+    const nextSet = new Set(selectedTrackers);
+    if (nextSet.has(trackerName)) {
+      nextSet.delete(trackerName);
+    } else {
+      nextSet.add(trackerName);
+    }
+    setSelectedTrackers(nextSet);
+    setCustomArgs((prev) => syncTrackersToArgs(prev, nextSet, defaultTrackers));
+  };
+
+  const renderTrackerSelector = () => {
+    if (!trackers || trackers.length === 0) return null;
+
+    const getInitialsColor = (name) => {
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const colors = [
+        "#ef4444",
+        "#f97316",
+        "#f59e0b",
+        "#10b981",
+        "#06b6d4",
+        "#3b82f6",
+        "#6366f1",
+        "#8b5cf6",
+        "#ec4899",
+        "#14b8a6",
+      ];
+      const index = Math.abs(hash) % colors.length;
+      return colors[index];
+    };
+
+    return (
+      <div
+        className={`mt-3 space-y-2 p-3 rounded-lg border ${isDarkMode ? "bg-gray-900 border-gray-700 text-white" : "bg-gray-50 border-gray-200 text-gray-800"}`}
+      >
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-wider opacity-75">
+            Select Trackers (-tk):
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setSelectedTrackers(new Set(defaultTrackers));
+                setCustomArgs(
+                  syncTrackersToArgs(
+                    customArgs,
+                    defaultTrackers,
+                    defaultTrackers,
+                  ),
+                );
+              }}
+              className="text-[10px] text-purple-500 hover:text-purple-400 underline font-medium"
+              disabled={isExecuting}
+            >
+              Reset to Defaults
+            </button>
+            <button
+              onClick={() => {
+                const nextSet = new Set();
+                setSelectedTrackers(nextSet);
+                setCustomArgs(
+                  syncTrackersToArgs(customArgs, nextSet, defaultTrackers),
+                );
+              }}
+              className="text-[10px] text-purple-500 hover:text-purple-400 underline font-medium"
+              disabled={isExecuting}
+            >
+              Clear All
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto pr-1">
+          {trackers.map((tracker) => {
+            const isSelected = selectedTrackers.has(tracker.name);
+            const isDefault = defaultTrackers.has(tracker.name);
+            const hasFavicon =
+              tracker.favicon && !failedFavicons.has(tracker.name);
+
+            return (
+              <button
+                key={tracker.name}
+                onClick={() => handleTrackerToggle(tracker.name)}
+                disabled={isExecuting}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition-all ${
+                  isSelected
+                    ? isDarkMode
+                      ? "bg-purple-900/60 border-purple-500 text-purple-200 hover:bg-purple-900/80"
+                      : "bg-purple-100 border-purple-300 text-purple-800 hover:bg-purple-200"
+                    : isDarkMode
+                      ? "bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+                      : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                }`}
+                title={`${tracker.display_name}${isDefault ? " (Default)" : ""}`}
+              >
+                {hasFavicon ? (
+                  <img
+                    src={tracker.favicon}
+                    alt=""
+                    onError={() => {
+                      setFailedFavicons((prev) => {
+                        const next = new Set(prev);
+                        next.add(tracker.name);
+                        return next;
+                      });
+                    }}
+                    className="w-3.5 h-3.5 rounded-sm object-contain"
+                  />
+                ) : (
+                  <span
+                    className="w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[9px] font-bold text-white uppercase select-none"
+                    style={{
+                      backgroundColor: getInitialsColor(tracker.display_name),
+                      minWidth: "14px",
+                      height: "14px",
+                      lineHeight: "14px",
+                    }}
+                  >
+                    {tracker.display_name.charAt(0)}
+                  </span>
+                )}
+                <span>{tracker.display_name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // Update selected trackers when customArgs changes
+  useEffect(() => {
+    const newSet = parseTrackersFromArgs(customArgs, defaultTrackers);
+    const listA = Array.from(newSet).sort();
+    const listB = Array.from(selectedTrackers).sort();
+    const isDifferent =
+      listA.length !== listB.length || listA.some((v, i) => v !== listB[i]);
+    if (isDifferent) {
+      setSelectedTrackers(newSet);
+    }
+  }, [customArgs, defaultTrackers]);
 
   // Get current values from args
   const descFilePath = extractArgValue(customArgs, "--descfile");
@@ -1587,6 +1760,9 @@ function AudionutsUAGUI() {
   };
 
   const sendInput = async (session_id, input) => {
+    if (isSendingInputRef.current || !session_id) return;
+    isSendingInputRef.current = true;
+    setIsSendingInput(true);
     // Optimistically echo the user's input locally so it appears before
     // any subsequent server-generated prompt / output.
     appendSystemMessage("> " + input, "user-input");
@@ -1600,6 +1776,9 @@ function AudionutsUAGUI() {
     } catch (err) {
       console.error("Failed to send input:", err);
       appendSystemMessage("Failed to send input", "error");
+    } finally {
+      isSendingInputRef.current = false;
+      setIsSendingInput(false);
     }
   };
 
@@ -1737,6 +1916,25 @@ function AudionutsUAGUI() {
 
   useEffect(() => {
     loadBrowseRoots();
+
+    const loadTrackersData = async () => {
+      try {
+        const response = await apiFetch(`${API_BASE}/trackers`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data.success && data.trackers) {
+          setTrackers(data.trackers);
+          const defaultSet = new Set(data.default_trackers || []);
+          setDefaultTrackers(defaultSet);
+
+          const initialSet = parseTrackersFromArgs(customArgs, defaultSet);
+          setSelectedTrackers(initialSet);
+        }
+      } catch (err) {
+        console.error("Failed to load trackers:", err);
+      }
+    };
+    loadTrackersData();
   }, []);
 
   // Cleanup file browser search debounce timer on unmount
@@ -1770,6 +1968,355 @@ function AudionutsUAGUI() {
       setActivePanel("main");
     }
   }, [activePanel, isMobile, visibleProgressItems.length]);
+
+  const getVisiblePaths = () => {
+    if (fileBrowserSearch) {
+      if (!fileBrowserSearchResults || !fileBrowserSearchResults.items)
+        return [];
+      return fileBrowserSearchResults.items.map((item) => item.path);
+    }
+
+    const traverse = (nodes) => {
+      let paths = [];
+      for (const node of nodes) {
+        paths.push(node.path);
+        if (
+          node.type === "folder" &&
+          expandedFolders.has(node.path) &&
+          node.children
+        ) {
+          paths = paths.concat(traverse(node.children));
+        }
+      }
+      return paths;
+    };
+    return traverse(directories);
+  };
+
+  const handleToggleSelectAll = () => {
+    const visible = getVisiblePaths();
+    if (visible.length === 0) return;
+
+    const allSelected = visible.every((p) =>
+      selectedPaths.some((x) => x.path === p),
+    );
+    if (allSelected) {
+      setSelectedPaths((prev) => prev.filter((p) => !visible.includes(p.path)));
+    } else {
+      setSelectedPaths((prev) => {
+        const next = [...prev];
+        visible.forEach((p) => {
+          if (!next.some((x) => x.path === p)) next.push({ path: p, args: "" });
+        });
+        return next;
+      });
+    }
+  };
+
+  const handleTogglePathSelect = (path) => {
+    setSelectedPaths((prev) => {
+      const isSelected = prev.some((x) => x.path === path);
+      let next;
+      if (isSelected) {
+        next = prev.filter((p) => p.path !== path);
+      } else {
+        next = [...prev, { path, args: "" }];
+      }
+      if (next.length === 1) {
+        setSelectedPath(next[0].path);
+        const findName = (nodes) => {
+          for (const node of nodes) {
+            if (node.path === next[0].path) return node.name;
+            if (node.children) {
+              const res = findName(node.children);
+              if (res) return res;
+            }
+          }
+          return "";
+        };
+        const name = findName(directories) || next[0].path.split(/[/\\]/).pop();
+        setSelectedName(name);
+      }
+      return next;
+    });
+  };
+
+  const handleUpdateItemArgs = (path, newArgs) => {
+    setSelectedPaths((prev) =>
+      prev.map((item) =>
+        item.path === path ? { ...item, args: newArgs } : item,
+      ),
+    );
+  };
+
+  const formatMtime = (mtime) => {
+    if (!mtime) return "";
+    const d = new Date(mtime * 1000);
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+
+  const formatSize = (bytes) => {
+    if (!bytes) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  };
+
+  const sortItems = (items) => {
+    if (!items) return [];
+    return [...items].sort((a, b) => {
+      const aIsDir = a.type === "folder" ? 0 : 1;
+      const bIsDir = b.type === "folder" ? 0 : 1;
+      if (aIsDir !== bIsDir) return aIsDir - bIsDir;
+
+      let valA, valB;
+      if (sortBy === "name") {
+        valA = (a.name || "").toLowerCase();
+        valB = (b.name || "").toLowerCase();
+        return sortOrder === "asc"
+          ? valA.localeCompare(valB)
+          : valB.localeCompare(valA);
+      } else if (sortBy === "date") {
+        valA = a.mtime || 0;
+        valB = b.mtime || 0;
+        return sortOrder === "asc" ? valA - valB : valB - valA;
+      } else if (sortBy === "size") {
+        valA = a.size || 0;
+        valB = b.size || 0;
+        return sortOrder === "asc" ? valA - valB : valB - valA;
+      }
+      return 0;
+    });
+  };
+
+  const renderSelectAllBar = () => {
+    const visible = getVisiblePaths();
+    const selectedVisible = visible.filter((p) =>
+      selectedPaths.some((x) => x.path === p),
+    );
+    const allSelected =
+      visible.length > 0 && selectedVisible.length === visible.length;
+    const someSelected =
+      selectedVisible.length > 0 && selectedVisible.length < visible.length;
+
+    return (
+      <div
+        className={`flex flex-col gap-2 p-3 border-b text-xs flex-shrink-0 ${
+          isDarkMode
+            ? "border-gray-700 bg-gray-800/30"
+            : "border-gray-200 bg-gray-50"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 cursor-pointer font-medium select-none">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = someSelected;
+              }}
+              onChange={handleToggleSelectAll}
+              className={`w-3.5 h-3.5 rounded text-purple-600 focus:ring-purple-500 cursor-pointer ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+              }`}
+            />
+            <span className={isDarkMode ? "text-gray-300" : "text-gray-600"}>
+              {allSelected ? "Deselect All" : "Select All"} (
+              {selectedPaths.length})
+            </span>
+          </label>
+          {selectedPaths.length > 0 && (
+            <button
+              onClick={() => setSelectedPaths([])}
+              className="text-purple-600 hover:text-purple-500 font-semibold transition-colors"
+            >
+              Clear Selection
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className={isDarkMode ? "text-gray-400" : "text-gray-500"}>
+            Sort by:
+          </span>
+          <select
+            value={`${sortBy}-${sortOrder}`}
+            onChange={(e) => {
+              const [by, order] = e.target.value.split("-");
+              setSortBy(by);
+              setSortOrder(order);
+            }}
+            className={`flex-1 px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-purple-500 focus:border-transparent ${
+              isDarkMode
+                ? "bg-gray-800 border-gray-700 text-gray-200"
+                : "bg-white border-gray-300 text-gray-700"
+            }`}
+          >
+            <option value="name-asc">Name (A-Z)</option>
+            <option value="name-desc">Name (Z-A)</option>
+            <option value="date-desc">Date Modified (Newest)</option>
+            <option value="date-asc">Date Modified (Oldest)</option>
+            <option value="size-desc">Size (Largest)</option>
+            <option value="size-asc">Size (Smallest)</option>
+          </select>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSelectedPathOrQueue = (isMobileView = false) => {
+    if (selectedPaths.length > 1) {
+      return (
+        <div
+          className={`p-4 rounded-lg border ${
+            isDarkMode
+              ? "bg-gray-800 border-gray-700"
+              : "bg-white border-gray-200 shadow-sm"
+          } space-y-3`}
+        >
+          <div className="flex items-center justify-between border-b pb-2 border-gray-700">
+            <h3
+              className={`${isMobileView ? "text-xs" : "text-sm"} font-bold ${
+                isDarkMode ? "text-white" : "text-gray-800"
+              } flex items-center gap-2`}
+            >
+              <span className="flex h-2 w-2 relative">
+                {isExecuting && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                )}
+                <span
+                  className={`relative inline-flex rounded-full h-2 w-2 ${isExecuting ? "bg-purple-500" : "bg-gray-400"}`}
+                ></span>
+              </span>
+              Execution Queue ({selectedPaths.length} items)
+            </h3>
+          </div>
+          <div className="max-h-60 overflow-y-auto space-y-3 pr-1 font-mono text-[11px]">
+            {selectedPaths.map((item, idx) => {
+              const name = item.path.split(/[/\\]/).pop() || item.path;
+
+              return (
+                <div
+                  key={item.path}
+                  className={`flex flex-col gap-1.5 p-2 rounded border ${
+                    isDarkMode
+                      ? "bg-gray-900 border-gray-800"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-center justify-between min-w-0">
+                    <span
+                      className={`truncate font-semibold ${
+                        isDarkMode ? "text-gray-200" : "text-gray-800"
+                      }`}
+                      title={item.path}
+                    >
+                      {idx + 1}. {name}
+                    </span>
+                    <button
+                      onClick={() => handleTogglePathSelect(item.path)}
+                      className="text-red-500 hover:text-red-400 font-bold ml-2 text-xs font-sans"
+                      title="Remove from queue"
+                      disabled={isExecuting}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label
+                      className={`text-[10px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      Line Arguments:
+                    </label>
+                    <input
+                      type="text"
+                      value={item.args}
+                      onChange={(e) =>
+                        handleUpdateItemArgs(item.path, e.target.value)
+                      }
+                      placeholder="e.g. --tmdb audiobook/12345 --anon"
+                      className={`w-full px-2 py-1 text-xs border rounded-lg focus:ring-1 focus:ring-purple-500 focus:border-transparent ${
+                        isDarkMode
+                          ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500"
+                          : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+                      }`}
+                      disabled={isExecuting}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    if (isMobileView) {
+      return selectedPath ? (
+        <div
+          className={`p-2 rounded-lg ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-blue-50 border-blue-200"} border`}
+        >
+          <div className="flex items-center justify-between">
+            <p
+              className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+            >
+              Selected:
+            </p>
+            <button
+              onClick={() => setActivePanel("files")}
+              className={`text-xs px-2 py-0.5 rounded ${isDarkMode ? "bg-gray-600 text-gray-200 hover:bg-gray-500" : "bg-blue-100 text-blue-700 hover:bg-blue-200"}`}
+            >
+              Browse
+            </button>
+          </div>
+          <p
+            className={`text-xs ${isDarkMode ? "text-white" : "text-gray-800"} break-all font-mono mt-1`}
+          >
+            {selectedPath}
+          </p>
+        </div>
+      ) : (
+        <button
+          onClick={() => setActivePanel("files")}
+          className={`w-full p-3 rounded-lg border-2 border-dashed text-center inline-flex items-center justify-center ${isDarkMode ? "border-gray-600 text-gray-400 hover:border-purple-500 hover:text-purple-400" : "border-gray-300 text-gray-500 hover:border-purple-500 hover:text-purple-600"}`}
+        >
+          <FolderIcon />
+          <span className="text-sm ml-2">Tap to select a file or folder</span>
+        </button>
+      );
+    }
+
+    return (
+      selectedPath && (
+        <div
+          className={`p-3 ${
+            isDarkMode
+              ? "bg-gray-700 border-gray-600"
+              : "bg-blue-50 border-blue-200"
+          } border rounded-lg`}
+        >
+          <p
+            className={`text-xs font-semibold ${
+              isDarkMode ? "text-gray-300" : "text-gray-600"
+            } mb-1`}
+          >
+            Selected Path:
+          </p>
+          <p
+            className={`text-sm ${
+              isDarkMode ? "text-white" : "text-gray-800"
+            } break-all font-mono`}
+          >
+            {selectedPath}
+          </p>
+        </div>
+      )
+    );
+  };
 
   const toggleFolder = async (path) => {
     const newExpanded = new Set(expandedFolders);
@@ -1887,7 +2434,8 @@ function AudionutsUAGUI() {
         </div>
       );
     }
-    return results.items.map((item, idx) => {
+    const sorted = sortItems(results.items);
+    return sorted.map((item, idx) => {
       const separatorIdx = Math.max(
         item.path.lastIndexOf("/"),
         item.path.lastIndexOf("\\"),
@@ -1913,22 +2461,39 @@ function AudionutsUAGUI() {
               if (isMobile) setActivePanel("main");
             }}
           >
+            <input
+              type="checkbox"
+              checked={selectedPaths.some((x) => x.path === item.path)}
+              onChange={(e) => {
+                e.stopPropagation();
+                handleTogglePathSelect(item.path);
+              }}
+              className={`w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+              }`}
+            />
             <span
               className={`flex-shrink-0 ${item.type === "folder" ? "text-yellow-600" : "text-blue-600"}`}
             >
               {item.type === "folder" ? <FolderIcon /> : <FileIcon />}
             </span>
-            <div className="flex flex-col min-w-0">
+            <div className="flex flex-col min-w-0 flex-1">
               <span
                 className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"} truncate`}
               >
                 {item.name}
               </span>
               <span
-                className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"} truncate`}
+                className={`text-[10px] ${isDarkMode ? "text-gray-500" : "text-gray-400"} flex items-center gap-1.5 truncate`}
                 title={parentPath}
               >
-                {parentPath}
+                {item.mtime ? <span>{formatMtime(item.mtime)}</span> : null}
+                {item.type === "file" && item.size ? (
+                  <span>• {formatSize(item.size)}</span>
+                ) : null}
+                <span>• {parentPath}</span>
               </span>
             </div>
           </div>
@@ -1938,7 +2503,8 @@ function AudionutsUAGUI() {
   };
 
   const renderFileTree = (items, level = 0) => {
-    return items.map((item, idx) => {
+    const sorted = sortItems(items);
+    return sorted.map((item, idx) => {
       const isLoading = item.type === "folder" && loadingFolders.has(item.path);
       return (
         <div key={idx}>
@@ -1962,6 +2528,19 @@ function AudionutsUAGUI() {
               if (isMobile && item.type !== "folder") setActivePanel("main");
             }}
           >
+            <input
+              type="checkbox"
+              checked={selectedPaths.some((x) => x.path === item.path)}
+              onChange={(e) => {
+                e.stopPropagation();
+                handleTogglePathSelect(item.path);
+              }}
+              className={`w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer ${
+                isDarkMode
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+              }`}
+            />
             <span
               className={`flex-shrink-0 ${isLoading ? "text-purple-500" : "text-yellow-600"}`}
             >
@@ -1979,7 +2558,7 @@ function AudionutsUAGUI() {
                 </span>
               )}
             </span>
-            <div className="flex flex-col min-w-0">
+            <div className="flex flex-col min-w-0 flex-1">
               <span
                 className={`text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-700"} truncate`}
               >
@@ -1992,14 +2571,17 @@ function AudionutsUAGUI() {
                   </span>
                 )}
               </span>
-              {item.subtitle && (
-                <span
-                  className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"} truncate`}
-                  title={item.subtitle}
-                >
-                  {item.subtitle}
-                </span>
-              )}
+              <span
+                className={`text-[10px] ${isDarkMode ? "text-gray-500" : "text-gray-400"} flex items-center gap-1.5 truncate`}
+              >
+                {item.mtime ? <span>{formatMtime(item.mtime)}</span> : null}
+                {item.type === "file" && item.size ? (
+                  <span>• {formatSize(item.size)}</span>
+                ) : null}
+                {item.subtitle ? (
+                  <span title={item.subtitle}>• {item.subtitle}</span>
+                ) : null}
+              </span>
             </div>
           </div>
           {item.type === "folder" &&
@@ -2091,12 +2673,7 @@ function AudionutsUAGUI() {
     });
   };
 
-  const executeCommand = async () => {
-    if (!selectedPath) {
-      appendSystemMessage("✗ Please select a file or folder first", "error");
-      return;
-    }
-
+  const executeSinglePath = async (path, newSessionId) => {
     // Validate --descfile: must have a valid description file path
     if (hasDescFile) {
       if (!descFilePath) {
@@ -2104,7 +2681,7 @@ function AudionutsUAGUI() {
           "✗ Please select or enter a description file path when using --descfile",
           "error",
         );
-        return;
+        return false;
       }
       const pathValidation = isValidDescFilePath(descFilePath);
       if (!pathValidation.valid) {
@@ -2112,7 +2689,7 @@ function AudionutsUAGUI() {
           `✗ Invalid description file: ${pathValidation.error}`,
           "error",
         );
-        return;
+        return false;
       }
     }
 
@@ -2123,52 +2700,37 @@ function AudionutsUAGUI() {
           "✗ Please enter a description URL when using --desclink",
           "error",
         );
-        return;
+        return false;
       }
       if (!isValidUrl(descLinkUrl)) {
         appendSystemMessage(
           "✗ Please enter a valid paste URL for --desclink (pastebin, hastebin, etc.)",
           "error",
         );
-        return;
+        return false;
       }
     }
 
-    const rootContainer = richOutputRef.current;
-    if (!rootContainer) return;
-
-    const newSessionId = "session_" + Date.now();
     setSessionId(newSessionId);
-    setIsExecuting(true);
     setProgressItems([]);
-    // Clear the initial welcome text so execution output appears immediately
-    if (rootContainer) {
-      rootContainer.innerHTML = "";
-    }
-    // Reset last-full snapshot key to allow appending fresh full snapshots
     if (lastFullHashRef) lastFullHashRef.current = "";
 
     appendSystemMessage("");
-    appendSystemMessage(`$ python upload.py "${selectedPath}" ${customArgs}`);
+    appendSystemMessage(`$ python upload.py "${path}" ${customArgs}`);
     appendSystemMessage("→ Starting execution...");
 
-    // Local controller binding for this run. Declare here so it's visible
-    // to `catch`/`finally` blocks and inner callbacks.
     let localController = null;
 
     try {
-      // Replace any existing controller to avoid reusing an aborted signal.
       const controller = new AbortController();
       sseAbortControllerRef.current = controller;
-      // Bind a local controller reference for this execution run to avoid
-      // races if another run replaces the shared ref concurrently.
       localController = controller;
 
       const response = await apiFetch(`${API_BASE}/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          path: selectedPath,
+          path: path,
           args: customArgs,
           session_id: newSessionId,
         }),
@@ -2181,15 +2743,16 @@ function AudionutsUAGUI() {
           `✗ Execute failed (${response.status}): ${errText || "Request failed"}`,
           "error",
         );
-        return;
+        return false;
       }
       if (!response.body) {
         appendSystemMessage("✗ Execute failed: empty response body", "error");
-        return;
+        return false;
       }
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let exitCode = null;
 
       const processSSELine = (line) => {
         if (localController && localController.signal.aborted) return;
@@ -2200,6 +2763,7 @@ function AudionutsUAGUI() {
             try {
               const rawHtml = data.data || "";
               const clean = sanitizeHtml(rawHtml);
+              const rootContainer = richOutputRef.current;
               if (data.type === "html_full") {
                 const shortSample = clean.slice(0, 200);
                 const key = `${clean.length}:${shortSample}`;
@@ -2219,7 +2783,6 @@ function AudionutsUAGUI() {
                 }
                 return;
               }
-              // delegate to shared helper for fragments
               appendHtmlFragment(clean);
             } catch (e) {
               console.error("Failed to render HTML fragment:", e);
@@ -2230,6 +2793,7 @@ function AudionutsUAGUI() {
             if (!(localController && localController.signal.aborted)) {
               appendSystemMessage("");
               appendSystemMessage(`✓ Process exited with code ${data.code}`);
+              exitCode = data.code;
             }
           }
         } catch (e) {
@@ -2241,7 +2805,6 @@ function AudionutsUAGUI() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          // process any remaining buffered content
           if (buffer) {
             const finalLines = buffer.split("\n");
             for (const line of finalLines) {
@@ -2253,29 +2816,27 @@ function AudionutsUAGUI() {
 
         buffer += decoder.decode(value, { stream: true });
         const parts = buffer.split("\n");
-        buffer = parts.pop(); // last item may be incomplete
+        buffer = parts.pop();
 
         for (const line of parts) {
           processSSELine(line);
         }
       }
       /* eslint-enable no-constant-condition */
-      // Only append the final completion message when not aborted.
+
       if (!(localController && localController.signal.aborted)) {
         appendSystemMessage("✓ Execution completed");
         appendSystemMessage("");
+        return exitCode === 0 || exitCode === null;
       }
+      return false;
     } catch (error) {
-      // Suppress abort errors as they are expected when a user cancels.
       if (!(localController && localController.signal.aborted)) {
         appendSystemMessage("✗ Execution error: " + error.message, "error");
       }
+      return false;
     } finally {
-      setIsExecuting(false);
-      setSessionId("");
       setProgressItems([]);
-      // Clear controller reference when finished, but only if it hasn't been
-      // replaced by another concurrent run.
       try {
         if (sseAbortControllerRef.current === localController) {
           sseAbortControllerRef.current = null;
@@ -2284,6 +2845,75 @@ function AudionutsUAGUI() {
         /* ignore */
       }
     }
+  };
+
+  const executeCommand = async () => {
+    if (selectedPaths.length > 1) {
+      setIsExecuting(true);
+      const rootContainer = richOutputRef.current;
+      if (rootContainer) {
+        rootContainer.innerHTML = "";
+      }
+
+      try {
+        const response = await apiFetch(`${API_BASE}/save_queue`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: selectedPaths }),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          appendSystemMessage(
+            `✗ Failed to generate queue file: ${errText}`,
+            "error",
+          );
+          setIsExecuting(false);
+          return;
+        }
+
+        const data = await response.json();
+        if (!data.success || !data.path) {
+          appendSystemMessage(
+            `✗ Failed to generate queue file: ${data.error || "Unknown error"}`,
+            "error",
+          );
+          setIsExecuting(false);
+          return;
+        }
+
+        const newSessionId = "session_" + Date.now();
+        await executeSinglePath(data.path, newSessionId);
+      } catch (error) {
+        appendSystemMessage(
+          `✗ Error generating queue: ${error.message}`,
+          "error",
+        );
+      } finally {
+        setIsExecuting(false);
+        setSessionId("");
+      }
+      return;
+    }
+
+    const path =
+      selectedPaths.length === 1 ? selectedPaths[0].path : selectedPath;
+    if (!path) {
+      appendSystemMessage("✗ Please select a file or folder first", "error");
+      return;
+    }
+
+    const rootContainer = richOutputRef.current;
+    setIsExecuting(true);
+    if (rootContainer) {
+      rootContainer.innerHTML = "";
+    }
+
+    const newSessionId = "session_" + Date.now();
+    await executeSinglePath(path, newSessionId);
+
+    setIsExecuting(false);
+    setSessionId("");
   };
 
   const clearTerminal = async () => {
@@ -2611,7 +3241,6 @@ function AudionutsUAGUI() {
           <h2
             className={`${titleSize} font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
           >
-            <UploadIcon />
             Now Processing
           </h2>
           <p
@@ -2639,7 +3268,6 @@ function AudionutsUAGUI() {
               <div
                 className={`w-full ${posterHeight} flex flex-col items-center justify-center gap-2 ${isDarkMode ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-500"}`}
               >
-                <UploadIcon />
                 <span className="text-sm">Poster not available yet</span>
               </div>
             )}
@@ -2781,6 +3409,9 @@ function AudionutsUAGUI() {
   const isAwaitingTerminalInput = Boolean(
     isExecuting && executionPreview?.awaiting_input,
   );
+  const isYesNoPrompt = Boolean(
+    isAwaitingTerminalInput && executionPreview?.input_type === "yes_no",
+  );
 
   // Mobile Layout
   if (isMobile) {
@@ -2812,7 +3443,7 @@ function AudionutsUAGUI() {
           <h1
             className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
           >
-            <UploadIcon />
+            <LogoIcon src={`${APP_BASE}/static/img/logo.svg`} />
             Upload-Assistant
           </h1>
           <div className="flex items-center gap-2">
@@ -2900,6 +3531,7 @@ function AudionutsUAGUI() {
                   )}
                 </div>
               </div>
+              {renderSelectAllBar()}
               <div
                 className={`flex-1 overflow-y-auto ${hasDescFile && !descBrowserCollapsed ? "max-h-[50%]" : ""}`}
               >
@@ -3057,40 +3689,7 @@ function AudionutsUAGUI() {
             <div
               className={`p-3 space-y-3 border-b flex-shrink-0 ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
             >
-              {selectedPath ? (
-                <div
-                  className={`p-2 rounded-lg ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-blue-50 border-blue-200"} border`}
-                >
-                  <div className="flex items-center justify-between">
-                    <p
-                      className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
-                    >
-                      Selected:
-                    </p>
-                    <button
-                      onClick={() => setActivePanel("files")}
-                      className={`text-xs px-2 py-0.5 rounded ${isDarkMode ? "bg-gray-600 text-gray-200 hover:bg-gray-500" : "bg-blue-100 text-blue-700 hover:bg-blue-200"}`}
-                    >
-                      Browse
-                    </button>
-                  </div>
-                  <p
-                    className={`text-xs ${isDarkMode ? "text-white" : "text-gray-800"} break-all font-mono mt-1`}
-                  >
-                    {selectedPath}
-                  </p>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setActivePanel("files")}
-                  className={`w-full p-3 rounded-lg border-2 border-dashed text-center inline-flex items-center justify-center ${isDarkMode ? "border-gray-600 text-gray-400 hover:border-purple-500 hover:text-purple-400" : "border-gray-300 text-gray-500 hover:border-purple-500 hover:text-purple-600"}`}
-                >
-                  <FolderIcon />
-                  <span className="text-sm ml-2">
-                    Tap to select a file or folder
-                  </span>
-                </button>
-              )}
+              {renderSelectedPathOrQueue(true)}
 
               {/* Args input */}
               <input
@@ -3158,11 +3757,17 @@ function AudionutsUAGUI() {
               <div className="flex gap-2">
                 <button
                   onClick={executeCommand}
-                  disabled={!selectedPath || isExecuting}
+                  disabled={
+                    (!selectedPath && selectedPaths.length === 0) || isExecuting
+                  }
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
                 >
                   <PlayIcon />
-                  {isExecuting ? "Executing..." : "Execute Upload"}
+                  {isExecuting
+                    ? "Executing..."
+                    : selectedPaths.length > 1
+                      ? "Execute Queue"
+                      : "Execute Upload"}
                 </button>
                 <button
                   onClick={clearTerminal}
@@ -3180,6 +3785,7 @@ function AudionutsUAGUI() {
                   <TrashIcon />
                 </button>
               </div>
+              {!isExecuting && renderTrackerSelector()}
             </div>
 
             {/* Terminal output */}
@@ -3210,6 +3816,24 @@ function AudionutsUAGUI() {
                 <div
                   className={`mt-2 flex gap-2 ${isAwaitingTerminalInput ? "animate-pulse" : ""}`}
                 >
+                  {isYesNoPrompt && (
+                    <>
+                      <button
+                        onClick={() => sendInput(sessionId, "yes")}
+                        disabled={!sessionId || isSendingInput}
+                        className="px-3 py-2 rounded-lg text-sm text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => sendInput(sessionId, "no")}
+                        disabled={!sessionId || isSendingInput}
+                        className="px-3 py-2 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                      >
+                        No
+                      </button>
+                    </>
+                  )}
                   <input
                     ref={inputRef}
                     value={userInput}
@@ -3225,7 +3849,7 @@ function AudionutsUAGUI() {
                   />
                   <button
                     onClick={() => sendInput(sessionId, userInput)}
-                    disabled={!sessionId || !userInput}
+                    disabled={!sessionId || !userInput || isSendingInput}
                     className={`px-3 py-2 rounded-lg text-white disabled:opacity-50 text-sm ${isAwaitingTerminalInput ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"}`}
                   >
                     Send
@@ -3326,7 +3950,8 @@ function AudionutsUAGUI() {
                       className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
                     >
                       <p className="text-sm">
-                        No arguments found matching "{argSearchFilter}"
+                        No arguments found matching &quot;{argSearchFilter}
+                        &quot;
                       </p>
                     </div>
                   ) : (
@@ -3433,12 +4058,12 @@ function AudionutsUAGUI() {
           {navButton("files", <FolderIcon />, "Files")}
           {navButton(
             "main",
-            isAwaitingTerminalInput ? <TerminalIcon /> : <UploadIcon />,
+            isAwaitingTerminalInput ? <TerminalIcon /> : null,
             isAwaitingTerminalInput ? "Input Required" : "Upload",
           )}
           {navButton(
             "args",
-            isExecuting ? <UploadIcon /> : <TerminalIcon />,
+            isExecuting ? null : <TerminalIcon />,
             isExecuting ? "Processing" : "Arguments",
           )}
           {visibleProgressItems.length > 0 &&
@@ -3518,6 +4143,7 @@ function AudionutsUAGUI() {
             )}
           </div>
         </div>
+        {renderSelectAllBar()}
         <div
           className={`${hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} overflow-y-auto`}
         >
@@ -3759,7 +4385,10 @@ function AudionutsUAGUI() {
                     <h1
                       className={`text-2xl font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
                     >
-                      <UploadIcon />
+                      <LogoIcon
+                        src={`${APP_BASE}/static/img/logo.svg`}
+                        className="w-8 h-8"
+                      />
                       Upload-Assistant Web UI
                     </h1>
                     <a
@@ -3798,23 +4427,8 @@ function AudionutsUAGUI() {
                   </div>
                 </div>
 
-                {/* Selected Path Display */}
-                {selectedPath && (
-                  <div
-                    className={`p-3 ${isDarkMode ? "bg-gray-700 border-gray-600" : "bg-blue-50 border-blue-200"} border rounded-lg`}
-                  >
-                    <p
-                      className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-600"} mb-1`}
-                    >
-                      Selected Path:
-                    </p>
-                    <p
-                      className={`text-sm ${isDarkMode ? "text-white" : "text-gray-800"} break-all font-mono`}
-                    >
-                      {selectedPath}
-                    </p>
-                  </div>
-                )}
+                {/* Selected Path Display / Queue */}
+                {renderSelectedPathOrQueue(false)}
 
                 {/* Arguments */}
                 <div className="space-y-2">
@@ -3964,11 +4578,18 @@ function AudionutsUAGUI() {
                 <div className="flex gap-2">
                   <button
                     onClick={executeCommand}
-                    disabled={!selectedPath || isExecuting}
+                    disabled={
+                      (!selectedPath && selectedPaths.length === 0) ||
+                      isExecuting
+                    }
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium text-lg"
                   >
                     <PlayIcon />
-                    {isExecuting ? "Executing..." : "Execute Upload"}
+                    {isExecuting
+                      ? "Executing..."
+                      : selectedPaths.length > 1
+                        ? "Execute Queue"
+                        : "Execute Upload"}
                   </button>
                   <button
                     onClick={clearTerminal}
@@ -3987,6 +4608,7 @@ function AudionutsUAGUI() {
                     {isExecuting ? "Kill & Clear" : "Clear"}
                   </button>
                 </div>
+                {renderTrackerSelector()}
               </>
             )}
           </div>
@@ -4022,6 +4644,24 @@ function AudionutsUAGUI() {
               <div
                 className={`mt-2 flex gap-2 ${isAwaitingTerminalInput ? "animate-pulse" : ""}`}
               >
+                {isYesNoPrompt && (
+                  <>
+                    <button
+                      onClick={() => sendInput(sessionId, "yes")}
+                      disabled={!sessionId || isSendingInput}
+                      className="px-4 py-2 rounded-lg text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => sendInput(sessionId, "no")}
+                      disabled={!sessionId || isSendingInput}
+                      className="px-4 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                    >
+                      No
+                    </button>
+                  </>
+                )}
                 <input
                   ref={inputRef}
                   value={userInput}
@@ -4037,7 +4677,7 @@ function AudionutsUAGUI() {
                 />
                 <button
                   onClick={() => sendInput(sessionId, userInput)}
-                  disabled={!sessionId || !userInput}
+                  disabled={!sessionId || !userInput || isSendingInput}
                   className={`px-4 py-2 rounded-lg text-white disabled:opacity-50 ${isAwaitingTerminalInput ? "bg-amber-600 hover:bg-amber-700" : "bg-green-600 hover:bg-green-700"}`}
                 >
                   Send
@@ -4156,7 +4796,7 @@ function AudionutsUAGUI() {
                   className={`text-center py-8 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
                 >
                   <p className="text-sm">
-                    No arguments found matching "{argSearchFilter}"
+                    No arguments found matching &quot;{argSearchFilter}&quot;
                   </p>
                 </div>
               ) : (

@@ -66,7 +66,7 @@ class FunFile:
 
         cookie_file = find_cookie_file(meta.base_dir, self.tracker, self.config)
 
-        payload = {
+        payload: dict[str, Any] = {
             "returnto": "/index.php",
             "username": self.config["TRACKERS"][self.tracker]["username"],
             "password": self.config["TRACKERS"][self.tracker]["password"],
@@ -350,7 +350,7 @@ class FunFile:
             return "h264"
         return "x264"
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         return (meta.scene_name if meta.scene_name else meta.basename_no_ext.replace(" ", ".")) if meta.scene else meta.clean_name.replace(" ", ".")
 
     async def languages(self, meta: Meta) -> dict[str, list[str]]:
@@ -511,7 +511,7 @@ class FunFile:
             return False
         self.session.cookies = cookie_jar
         data = await self.get_data(meta)
-        torrent_name = await self.edit_name(meta)
+        torrent_name = await self.get_name(meta)
         files: dict[str, Any] = {}
         poster = await self.get_poster(meta)
         if poster:

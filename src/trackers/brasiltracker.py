@@ -103,7 +103,7 @@ class BrasilTracker:
             "vietnamese": "25",
         }
 
-        source_alias_map = {
+        source_alias_map: dict[tuple[str, ...], str] = {
             ("Arabic", "ara", "ar"): "arabic",
             ("Brazilian Portuguese", "Brazilian", "Portuguese-BR", "pt-br", "pt-BR", "Portuguese", "por", "pt", "pt-PT", "Português Brasileiro", "Português"): "português",
             ("Bulgarian", "bul", "bg"): "bulgarian",
@@ -184,6 +184,7 @@ class BrasilTracker:
                     "dsf": "DSF",
                     "flac": "FLAC",
                     "m4a": "M4A",
+                    "m4b": "M4B",
                     "mp3": "MP3",
                     "ogg": "OGG",
                     "wav": "WAV",
@@ -591,7 +592,8 @@ class BrasilTracker:
             original_title = meta.title
             brazilian_title = ""
 
-            main_tmdb_data = meta.tmdb_localized_data.get("pt-BR", {}).get("main") or {}
+            localized_data = cast(dict[str, Any], meta.tmdb_localized_data.get("pt-BR") or {})
+            main_tmdb_data = cast(dict[str, Any], localized_data.get("main") or {})
             original_name_title = main_tmdb_data.get("original_name") or main_tmdb_data.get("original_title")
             tmdb_title = main_tmdb_data.get("name") or main_tmdb_data.get("title")
             if tmdb_title and tmdb_title != meta.title and (not original_name_title or original_name_title != tmdb_title):
@@ -635,8 +637,8 @@ class BrasilTracker:
             videos_dict = cast(dict[str, Any], videos)
             results = videos_dict.get("results")
             if isinstance(results, list):
-                results_list = results
-                video_results.extend([cast(dict[str, Any], result) for result in results_list if isinstance(result, dict)])
+                results_list = cast(list[Any], results)
+                video_results.extend(cast(dict[str, Any], result) for result in results_list if isinstance(result, dict))
 
         youtube = ""
 
@@ -759,7 +761,7 @@ class BrasilTracker:
                     continue
 
                 # Parse all files
-                files = []
+                files: list[str] = []
                 file_table = file_div.find("table", class_="filelist_table")
                 if file_table:
                     for r in file_table.find_all("tr"):
@@ -801,7 +803,7 @@ class BrasilTracker:
                 link = f"{self.base_url}/torrents.php?torrentid={torrent_id}"
                 download = f"{self.base_url}/torrents.php?action=download&id={torrent_id}"
 
-                dupe_entry = {
+                dupe_entry: dict[str, Any] = {
                     "name": name,
                     "size": size,
                     "link": link,
@@ -947,16 +949,12 @@ class BrasilTracker:
         director_entries: list[str] = []
 
         imdb_directors = meta.imdb_info.get("directors")
-        imdb_directors_list: list[Any] = []
         if isinstance(imdb_directors, list):
-            imdb_directors_list = imdb_directors
-        director_entries.extend([name for name in imdb_directors_list if isinstance(name, str)])
+            director_entries.extend(name for name in cast(list[Any], imdb_directors) if isinstance(name, str))
 
         tmdb_directors = meta.tmdb_directors
-        tmdb_directors_list: list[Any] = []
         if isinstance(tmdb_directors, list):
-            tmdb_directors_list = tmdb_directors
-        director_entries.extend([name for name in tmdb_directors_list if isinstance(name, str)])
+            director_entries.extend(name for name in cast(list[Any], tmdb_directors) if isinstance(name, str))
 
         if director_entries:
             unique_names = list(dict.fromkeys(director_entries))[:5]
@@ -1259,7 +1257,8 @@ class BrasilTracker:
                         return str(len([f for f in z.namelist() if f.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))]))
                 else:
                     with rarfile.RarFile(file_path) as r:
-                        return str(len([f for f in r.namelist() if f.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))]))
+                        names = cast(list[str], r.namelist())
+                        return str(len([name for name in names if name.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))]))
         return ""
 
     async def upload(self, meta: Meta) -> bool:

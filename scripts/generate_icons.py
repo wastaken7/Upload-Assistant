@@ -172,16 +172,14 @@ def main():
 
     # Generate and save multi-resolution ICO files
     sizes = [16, 32, 48, 64, 128, 256]
-    ico_images = [draw_logo(s) for s in sizes]
-
     # Save favicon.ico to web_ui/static/
     favicon_path = web_static / "favicon.ico"
-    ico_images[0].save(favicon_path, format="ICO", sizes=[(s, s) for s in sizes], append_images=ico_images[1:])
+    master_logo.save(favicon_path, format="ICO", sizes=[(s, s) for s in sizes])
     print(f"Saved multi-resolution favicon.ico to {favicon_path}")
 
     # Save logo.ico to scripts/ for the Windows Installer
     installer_ico_path = scripts_dir / "logo.ico"
-    ico_images[0].save(installer_ico_path, format="ICO", sizes=[(s, s) for s in sizes], append_images=ico_images[1:])
+    master_logo.save(installer_ico_path, format="ICO", sizes=[(s, s) for s in sizes])
     print(f"Saved installer logo.ico to {installer_ico_path}")
 
     print("Asset generation complete!")

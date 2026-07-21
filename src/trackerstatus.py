@@ -295,10 +295,7 @@ class TrackerStatusManager:
                     try:
                         tracker_rename = await tracker_class.get_name(local_meta)
                     except Exception:
-                        try:
-                            tracker_rename = await tracker_class.edit_name(local_meta)
-                        except Exception:
-                            tracker_rename = None
+                        tracker_rename = None
 
                     if tracker_rename is not None:
                         if isinstance(tracker_rename, dict) and "name" in tracker_rename:
@@ -337,7 +334,7 @@ class TrackerStatusManager:
 
         # Now handle the confirmation/upload decisions
         if meta.unattended:
-            passed_names = []
+            passed_names: list[str] = []
             for tracker_name, _display_name, _tracker_class in passed_trackers:
                 tracker_status[tracker_name]["upload"] = True
                 successful_trackers += 1

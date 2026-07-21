@@ -165,7 +165,7 @@ class DigitalCore:
 
         return []
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         """
         Edits the name according to DIGITALCORE's naming conventions.
         Scene uploads should use the scene name.
@@ -248,7 +248,7 @@ class DigitalCore:
 
     async def upload(self, meta: Meta) -> bool:
         data = await self.fetch_data(meta)
-        torrent_title = await self.edit_name(meta)
+        torrent_title = await self.get_name(meta)
         response = None
 
         if not meta.debug:

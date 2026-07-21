@@ -106,8 +106,9 @@ class Anthelion:
         "ZmN",
         "ZMNT",
     )
-    search_url = "https://anthelion.me/api.php"
-    upload_url = "https://anthelion.me/api.php"
+    base_url = "https://anthelion.me"
+    search_url = f"{base_url}/api.php"
+    upload_url = f"{base_url}/api.php"
     supported_categories = ("MOVIE",)
     tracker_urls = ("tracker.anthelion.me",)
 
@@ -571,3 +572,6 @@ class Anthelion:
             imdb_tmdb_list = []
 
         return imdb_tmdb_list
+
+    async def get_name(self, meta: Meta) -> str:
+        return meta.title

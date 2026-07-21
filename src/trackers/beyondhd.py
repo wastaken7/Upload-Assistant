@@ -22,7 +22,7 @@ class BEYONDHD:
 
     auth_type = "unit3d_api"
     tracker = "BEYONDHD"
-    display_name = "BEYONDHD"
+    display_name = "BeyondHD"
     reject_english_original_bloat = True
     source_flag = "BHD"
     banned_groups = (
@@ -58,9 +58,10 @@ class BEYONDHD:
         "YIFY",
     )
     approved_image_hosts = ("ptpimg", "imgbox", "imgbb", "pixhost", "bhd", "bam")
-    upload_url = "https://beyond-hd.me/api/upload/"
-    torrent_url = "https://beyond-hd.me/details/"
-    tracker_urls = ("https://beyond-hd.me", "tracker.beyond-hd.me")
+    base_url = "https://beyond-hd.me"
+    upload_url = f"{base_url}/api/upload/"
+    torrent_url = f"{base_url}/details/"
+    tracker_urls = (base_url, "tracker.beyond-hd.me")
     supported_categories = ("TV", "MOVIE")
 
     def __init__(self, config: dict[str, Any]) -> None:
@@ -69,7 +70,7 @@ class BEYONDHD:
         trackers_cfg = cast(dict[str, Any], self.config.get("TRACKERS", {}))
         self.tracker_config = cast(dict[str, Any], trackers_cfg.get("BEYONDHD", {}))
         api_key = str(self.tracker_config.get("api_key", "")).strip()
-        self.requests_url = f"https://beyond-hd.me/api/requests/{api_key}"
+        self.requests_url = f"{self.base_url}/api/requests/{api_key}"
 
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {
@@ -100,7 +101,7 @@ class BEYONDHD:
         await self.edit_desc(meta)
         tags = await self.get_tags(meta)
         custom, edition = await self.get_edition(meta, tags)
-        bhd_name = await self.edit_name(meta)
+        bhd_name = await self.get_name(meta)
         anon = 0 if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else 1
 
         mi_dump = None
@@ -180,11 +181,11 @@ class BEYONDHD:
                             logger.info(f"[bold yellow]Submitted Name: {bhd_name}")
 
                     if "status_message" in response_json:
-                        match = re.search(r"https://beyond-hd\.me/torrent/download/.*\.(\d+)\.", response_json["status_message"])
+                        match = re.search(rf"{re.escape(self.base_url)}/torrent/download/.*\.(\d+)\.", response_json["status_message"])
                         if match:
                             torrent_id = match.group(1)
                             meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
-                            details_link = f"https://beyond-hd.me/details/{torrent_id}"
+                            details_link = f"{self.base_url}/details/{torrent_id}"
                             meta.tracker_status[self.tracker]["status_message"] = response_json
                         else:
                             meta.tracker_status[self.tracker]["status_message"] = "No valid details link found in status_message."
@@ -351,7 +352,7 @@ class BEYONDHD:
             return
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        bhd_name = await self.edit_name(meta)
+        bhd_name = await self.get_name(meta)
         if any(
             phrase in bhd_name.lower()
             for phrase in (
@@ -428,7 +429,7 @@ class BEYONDHD:
         if rss_key:
             data["rsskey"] = str(self.tracker_config.get("bhd_rss_key", "")).strip()
 
-        url = f"https://beyond-hd.me/api/torrents/{str(self.tracker_config.get('api_key', '')).strip()}"
+        url = f"{self.base_url}/api/torrents/{str(self.tracker_config.get('api_key', '')).strip()}"
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.post(url, params=data)
             response.raise_for_status()
@@ -517,7 +518,7 @@ class BEYONDHD:
             tags.append("HLG")
         return tags
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         name = meta.name or ""
         if meta.source in ("PAL DVD", "NTSC DVD", "DVD", "NTSC", "PAL"):
             audio = meta.audio

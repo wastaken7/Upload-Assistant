@@ -33,6 +33,7 @@ class HDBits:
     source_flag = "HDBits"
     signature: str | None = None
     banned_groups: tuple[str, ...] = ("",)
+    base_url = "https://hdbits.org"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://tracker.hdbits.org",)
 
@@ -199,7 +200,7 @@ class HDBits:
 
         return tags
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         hdb_name = meta.name
         audio = meta.audio
         hdb_name = hdb_name.replace("H.265", "HEVC")
@@ -234,7 +235,7 @@ class HDBits:
     async def upload(self, meta: Meta) -> bool | None:
         common = Common(config=self.config)
         await self.edit_desc(meta)
-        hdb_name = await self.edit_name(meta)
+        hdb_name = await self.get_name(meta)
         cat_id = await self.get_type_category_id(meta)
         codec_id = await self.get_type_codec_id(meta)
         medium_id = await self.get_type_medium_id(meta)
@@ -312,7 +313,7 @@ class HDBits:
             data["tvdb_episode"] = meta.episode_int
         # aniDB
 
-        url = "https://hdbits.org/upload/upload"
+        url = f"{self.base_url}/upload/upload"
         # Submit
         if meta.debug:
             logger.debug(url)
@@ -328,7 +329,7 @@ class HDBits:
             up = await client.post(url=url, data=data, files=files)
 
         # Match url to verify successful upload
-        match = re.match(r".*?hdbits\.org/details\.php\?id=(\d+)&uploaded=(\d+)", str(up.url))
+        match = re.match(rf".*?{re.escape(self.base_url.replace('https://', ''))}/details\.php\?id=(\d+)&uploaded=(\d+)", str(up.url))
         if match:
             meta.tracker_status[self.tracker]["status_message"] = match.group(0)
             if id_match := re.search(r"(id=)(\d+)", urlparse(str(up.url)).query):
@@ -343,7 +344,7 @@ class HDBits:
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
 
-        url = "https://hdbits.org/api/torrents"
+        url = f"{self.base_url}/api/torrents"
         data: dict[str, Any] = {
             "username": self.username,
             "passkey": self.passkey,
@@ -377,20 +378,22 @@ class HDBits:
         if not search_terms:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.post(url, json=data)
-                response.raise_for_status()
-                response_data = response.json()
-                results = response_data.get("data", [])
-                if results:
-                    for each in results:
-                        result = {
-                            "name": each["name"],
-                            "size": each["size"],
-                            "files": each["filename"][:-8] if each["filename"].endswith(".torrent") else each["filename"],
-                            "filecount": each["numfiles"],
-                            "link": f"https://hdbits.org/details.php?id={each['id']}",
-                            "download": f"https://hdbits.org/download.php/{quote(each['filename'])}?id={each['id']}&passkey={self.passkey}",
-                        }
-                        dupes.append(result)
+                if response.status_code == 200:
+                    response_data = response.json()
+                    results = response_data.get("data", [])
+                    if results:
+                        for each in results:
+                            result = {
+                                "name": each["name"],
+                                "size": each["size"],
+                                "files": each["filename"][:-8] if each["filename"].endswith(".torrent") else each["filename"],
+                                "filecount": each["numfiles"],
+                                "link": f"{self.base_url}/details.php?id={each['id']}",
+                                "download": f"{self.base_url}/download.php/{quote(each['filename'])}?id={each['id']}&passkey={self.passkey}",
+                            }
+                            dupes.append(result)
+                else:
+                    logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
             return dupes
 
         # Otherwise, search for each term
@@ -400,20 +403,22 @@ class HDBits:
 
             async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.post(url, json=data)
-                response.raise_for_status()
-                response_data = response.json()
-                results = response_data.get("data", [])
-                if results:
-                    for each in results:
-                        result = {
-                            "name": each["name"],
-                            "size": each["size"],
-                            "files": each["filename"][:-8] if each["filename"].endswith(".torrent") else each["filename"],
-                            "filecount": each["numfiles"],
-                            "link": f"https://hdbits.org/details.php?id={each['id']}",
-                            "download": f"https://hdbits.org/download.php/{quote(each['filename'])}?id={each['id']}&passkey={self.passkey}",
-                        }
-                        dupes.append(result)
+                if response.status_code == 200:
+                    response_data = response.json()
+                    results = response_data.get("data", [])
+                    if results:
+                        for each in results:
+                            result = {
+                                "name": each["name"],
+                                "size": each["size"],
+                                "files": each["filename"][:-8] if each["filename"].endswith(".torrent") else each["filename"],
+                                "filecount": each["numfiles"],
+                                "link": f"{self.base_url}/details.php?id={each['id']}",
+                                "download": f"{self.base_url}/download.php/{quote(each['filename'])}?id={each['id']}&passkey={self.passkey}",
+                            }
+                            dupes.append(result)
+                else:
+                    logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
 
         return dupes
 
@@ -426,7 +431,7 @@ class HDBits:
 
     async def validate_cookies(self, meta: Meta) -> bool:
         common = Common(config=self.config)
-        url = "https://hdbits.org"
+        url = self.base_url
         from src.cookie_auth import find_cookie_file
 
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
@@ -440,7 +445,7 @@ class HDBits:
 
     async def download_new_torrent(self, id: str, torrent_path: str) -> None:
         # Get HDBITS .torrent filename
-        api_url = "https://hdbits.org/api/torrents"
+        api_url = f"{self.base_url}/api/torrents"
         data = {"username": self.username, "passkey": self.passkey, "id": id}
         async with httpx.AsyncClient(timeout=30.0) as client:
             r = await client.post(url=api_url, json=data)
@@ -459,7 +464,7 @@ class HDBits:
             raise Exception(f"Failed to access filename in response from {api_url}. Response: {r_json}. Data: {data}. Error: {e}") from e
 
         # Download new .torrent
-        download_url = f"https://hdbits.org/download.php/{quote(filename)}"
+        download_url = f"{self.base_url}/download.php/{quote(filename)}"
         params = {"passkey": self.passkey, "id": id}
 
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -802,7 +807,7 @@ class HDBits:
 
     async def get_info_from_torrent_id(self, hdb_id: int) -> tuple[int | None, int | None, str | None, str | None, str | None]:
         hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = hdb_description = None
-        url = "https://hdbits.org/api/torrents"
+        url = f"{self.base_url}/api/torrents"
         data = {"username": self.username, "passkey": self.passkey, "id": hdb_id}
 
         try:
@@ -835,7 +840,7 @@ class HDBits:
 
     async def search_filename(self, search_term: str, search_file_folder: str, meta: Meta):
         hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = hdb_description = hdb_id = None
-        url = "https://hdbits.org/api/torrents"
+        url = f"{self.base_url}/api/torrents"
 
         # Handle disc case
         if search_file_folder == "folder" and meta.is_disc:
@@ -894,7 +899,7 @@ class HDBits:
                         hdb_id = each.get("id", None)
                         hdb_description = each.get("descr")
 
-                        logger.info(f"[bold green]Matched release with HDBITS ID: [yellow]https://hdbits.org/details.php?id={hdb_id}[/yellow][/bold green]")
+                        logger.info(f"[bold green]Matched release with HDBITS ID: [yellow]{self.base_url}/details.php?id={hdb_id}[/yellow][/bold green]")
 
                         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 

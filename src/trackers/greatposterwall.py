@@ -1175,3 +1175,6 @@ class GreatPosterWall:
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True
+
+    async def get_name(self, meta: Meta) -> str:
+        return meta.title

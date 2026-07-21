@@ -26,6 +26,7 @@ class MTeam:
     tracker = "MTEAM"
     display_name = "MTeam"
     allows_bloated_audio = True
+    base_url = "https://kp.m-team.cc"
     api_base_url = "https://api.m-team.cc/api"
     banned_groups = ("FGT",)
     requests_url = f"{api_base_url}/seek/search"
@@ -36,7 +37,7 @@ class MTeam:
         self.config = config
         self.common = Common(config)
         self.tmdb_manager = TmdbManager(config)
-        raw_url = self.config["TRACKERS"][self.tracker].get("base_url", "kp.m-team.cc").strip()
+        raw_url = str(self.config["TRACKERS"][self.tracker].get("base_url", "kp.m-team.cc")).strip()
         parsed_raw = urlparse(raw_url)
         clean_netloc = parsed_raw.netloc if parsed_raw.netloc else parsed_raw.path
         self.base_url = urlunparse(("https", clean_netloc, "", "", "", ""))
@@ -55,7 +56,7 @@ class MTeam:
 
         category = self.get_category_id(meta)
 
-        payload = {
+        payload: dict[str, int | bool | str] = {
             "pageNumber": 1,
             "pageSize": 10,
             "keyword": meta.title,
@@ -107,7 +108,7 @@ class MTeam:
             disc_folder = Path(meta.base_dir) / "tmp" / meta.uuid
             for filename in (p.name for p in Path(disc_folder).iterdir()):
                 if filename.endswith("_FULL.txt"):
-                    mi_path = Path(disc_folder) / filename
+                    mi_path = str(Path(disc_folder) / filename)
         else:
             mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
 
@@ -117,7 +118,7 @@ class MTeam:
 
         return mediainfo
 
-    def bbcode_to_markdown(self, text):
+    def bbcode_to_markdown(self, text: str) -> str:
         specific_img_pattern = r"\[url=[^\]]*\]\[img(?:=[^\]]*)?\](.*?)\[/img\]\[/url\]"
         text = re.sub(specific_img_pattern, r"![](\1)", text, flags=re.IGNORECASE)
 
@@ -144,12 +145,12 @@ class MTeam:
 
         api_url = f"{self.api_base_url}/media/douban/infoV2"
 
-        params = {
+        params: dict[str, bool | int] = {
             "code": douban_id,
             "refresh": False,
         }
 
-        headers = {
+        headers: dict[str, str] = {
             "x-api-key": self.api_key,
             "Accept": "*/*",
         }
@@ -282,7 +283,7 @@ class MTeam:
 
         return description
 
-    def get_category_id(self, meta: Meta) -> int | None:
+    def get_category_id(self, meta: Meta) -> int:
         movie_sd = 401  # Movie/SD
         movie_hd = 419  # Movie/HD
         movie_dvdiso = 420  # Movie/DVDiSo
@@ -321,8 +322,7 @@ class MTeam:
     async def get_additional_checks(self, meta: Meta):
         should_continue = True
 
-        imdb_id = meta.imdb_info.get("imdbID")
-        if not imdb_id:
+        if not meta.imdb_tt:
             logger.info(f"{self.tracker}: [bold yellow]IMDb ID not found in metadata, skipping upload.[/bold yellow]")
             return False
 
@@ -363,7 +363,7 @@ class MTeam:
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
 
-        imdb_id = meta.imdb_info.get("imdbID")
+        imdb_id = meta.imdb_tt
         category = self.get_category_id(meta)
         standard = self.get_standard(meta)
 
@@ -373,7 +373,7 @@ class MTeam:
 
         api_url = f"{self.api_base_url}/torrent/search"
 
-        payload = {
+        payload: dict[str, str | list[str | int]] = {
             "mode": "normal",
             "imdb": imdb_id,
             "categories": [category],
@@ -394,7 +394,7 @@ class MTeam:
             if not t_id:
                 continue
 
-            dupe_entry = {
+            dupe_entry: dict[str, str | int] = {
                 "name": torrent.get("name"),
                 "size": int(torrent.get("size", 0)),
                 "link": f"{self.base_url}/detail/{t_id}",
@@ -516,7 +516,7 @@ class MTeam:
         return {
             # "torrent": 0,
             # "offer": 0,
-            "name": meta.name,
+            "name": await self.get_name(meta),
             "smallDescr": self.common.get_small_description(meta),
             "descr": await self.generate_description(meta),
             "category": self.get_category_id(meta),
@@ -606,3 +606,40 @@ class MTeam:
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading"
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
+
+    async def get_name(self, meta: Meta) -> str:
+        """https://wiki.m-team.cc/zh-tw/upload-title-rules"""
+        name = meta.name
+
+        # 1. Normalize Blu-ray / BLURAY / Blu-Ray to BluRay (incorporates UHD Blu-ray -> UHD BluRay)
+        name = re.sub(r"\bblu[-_]?ray\b", "BluRay", name, flags=re.IGNORECASE)
+
+        # 2. Normalize WEBDL / Web-DL to WEB-DL
+        name = re.sub(r"\bweb[-_]?dl\b", "WEB-DL", name, flags=re.IGNORECASE)
+
+        # 3. Normalize Dolby Vision: DoVi / Dovi / DOVI to DV
+        name = re.sub(r"\bdovi\b", "DV", name, flags=re.IGNORECASE)
+
+        # 4. Normalize HDR / Hdr / hdr / HLG case (e.g. Hdr10 -> HDR10, hdr10+ -> HDR10+)
+        name = re.sub(r"\b(hdr|hlg)(10)?(\+)?\b", lambda m: f"{m.group(1).upper()}{m.group(2) or ''}{m.group(3) or ''}", name, flags=re.IGNORECASE)
+
+        # 5. Dolby Digital Plus: EAC3 / EAC-3 / DD+ / DDPlus to DDP
+        name = re.sub(r"\b(eac[-_]?3|dd\+)(?![a-zA-Z0-9])", "DDP", name, flags=re.IGNORECASE)
+
+        # 6. Dolby Digital: AC3 / AC-3 to DD
+        name = re.sub(r"\bac[-_]?3(?![a-zA-Z0-9])", "DD", name, flags=re.IGNORECASE)
+
+        # 7. DTS:X: DTS-X / DTS_X / DTSX / DTS X to DTS:X
+        name = re.sub(r"\bdts[-_\s]?x\b", "DTS:X", name, flags=re.IGNORECASE)
+
+        # 8. TrueHD: True-HD to TrueHD
+        name = re.sub(r"\btrue[-_]?hd\b", "TrueHD", name, flags=re.IGNORECASE)
+
+        # 9. High Frame Rate: 50fps / 60fps / 120fps to HFR
+        name = re.sub(r"\b(50|60|120)fps\b", "HFR", name, flags=re.IGNORECASE)
+
+        # Clean up duplicate HFR words (e.g. "HFR HFR" or "HFR.HFR" or "HFR-HFR" -> "HFR")
+        name = re.sub(r"\bHFR\b([-.\s_]+HFR)+", "HFR", name, flags=re.IGNORECASE)
+
+        # 10. Strip video file extension suffixes if they are present in the name
+        return re.sub(r"\.(mkv|mp4|avi|ts)$", "", name, flags=re.IGNORECASE)

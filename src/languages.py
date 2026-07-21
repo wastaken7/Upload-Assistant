@@ -373,11 +373,12 @@ class LanguagesManager:
                     if track_language and track_language not in audio_language_set:
                         audio_languages_ordered.append(track_language)
                         audio_language_set.add(track_language)
+                """
                 for track in audio_tracks:
                     bitrate_str = track.get("bitrate", "")
                     bitrate_num = None
                     if bitrate_str:
-                        match = re.search(r"([\d.]+)\s*([kM]?b(?:ps|/s))", bitrate_str.replace(",", ""), re.IGNORECASE)
+                        match = re.search(r"([\\d.]+)\\s*([kM]?b(?:ps|/s))", bitrate_str.replace(",", ""), re.IGNORECASE)
                         if match:
                             value = float(match.group(1))
                             unit = match.group(2).lower()
@@ -389,6 +390,7 @@ class LanguagesManager:
                                 bitrate_num = int(value)
 
                     lang = track.get("language", "")
+
                     if bitrate_num is not None and bitrate_num < 258 and lang and lang in audio_language_set and len(lang) > 1 and not meta.bluray_audio_skip:
                         if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                             logger.info(f"Audio track '{lang}' has a bitrate of {bitrate_num} kbps. Probably commentary and should be removed.")
@@ -405,7 +407,7 @@ class LanguagesManager:
                             audio_language_set.discard(lang)
                             audio_languages_ordered = [item for item in audio_languages_ordered if item != lang]
                         meta.bluray_audio_skip = True
-
+                    """
                 subtitle_tracks = bluray.get("subtitles", [])
                 sub_commentary_tracks = [track for track in subtitle_tracks if track.get("is_commentary")]
                 if sub_commentary_tracks:

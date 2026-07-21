@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import ast
 import asyncio
 import contextlib
 import filecmp
@@ -1669,6 +1670,24 @@ def get_remote_version(url: str) -> tuple[str | None, str | None]:
 
 def extract_changelog(content: str, to_version: str) -> str | None:
     """Extracts the changelog entries between the specified versions."""
+    try:
+        module = ast.parse(content)
+        for index, node in enumerate(module.body[:-1]):
+            if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+                continue
+            target = node.targets[0]
+            if not isinstance(target, ast.Name) or target.id != "__version__":
+                continue
+            if not isinstance(node.value, ast.Constant) or node.value.value not in (to_version, to_version.lstrip("v")):
+                continue
+            notes_node = module.body[index + 1]
+            if isinstance(notes_node, ast.Expr) and isinstance(notes_node.value, ast.Constant) and isinstance(notes_node.value.value, str):
+                changelog = notes_node.value.value.strip()
+                return re.sub(r"^# ", "", changelog, flags=re.MULTILINE)
+    except SyntaxError:
+        # Keep compatibility with malformed legacy version files handled below.
+        pass
+
     # Try to find the to_version with 'v' prefix first (current format)
     patterns_to_try = [
         rf'__version__\s*=\s*"{re.escape(to_version)}"\s*\n\s*"""\s*(.*?)\s*"""',  # Try with 'v' prefix

@@ -21,7 +21,7 @@ class Wait:
         self.qbt_client: qbittorrentapi.Client | None = None
         self.qbt_client = self._connect_qbittorrent()
 
-    def _connect_qbittorrent(self) -> qbittorrentapi.Client | None:
+    def _connect_qbittorrent(self, *, use_proxy: bool = True) -> qbittorrentapi.Client | None:
         config_map = self.config
         default_section = cast(dict[str, Any], config_map.get("DEFAULT", {}))
         clients_section = cast(dict[str, Any], config_map.get("TORRENT_CLIENTS", {}))
@@ -40,7 +40,7 @@ class Wait:
         self.qbt_session = None
         self.qbt_client = None
 
-        if self.proxy_url:
+        if self.proxy_url and use_proxy:
             # Use qui proxy URL format
             self.qbt_proxy_url = self.proxy_url.rstrip("/")
             return None  # No traditional client needed for proxy
@@ -149,30 +149,22 @@ class Wait:
         max_samples = max(1, wait_time // check_interval)
         speeds: deque[int] = deque(maxlen=max_samples)
 
-        if self.proxy_url:
-            self.qbt_session = httpx.AsyncClient()
-
         try:
+            # Bandwidth checks need a stable, authenticated qBittorrent API connection.
+            # QUI proxy remains available for the other waiting/recheck operations, but
+            # must not be used for this feature.
+            bandwidth_client = self.qbt_client
+            if self.proxy_url:
+                bandwidth_client = self._connect_qbittorrent(use_proxy=False)
+
+            if bandwidth_client is None:
+                raise RuntimeError("Bandwidth control requires qbit_url/qbit_port and qBittorrent credentials")
+
             while True:
                 up_speed = 0
-                if self.proxy_url:
-                    if self.qbt_session is None:
-                        raise RuntimeError("qbt_session is not initialized")
-                    response = await self.qbt_session.get(f"{self.qbt_proxy_url}/api/v2/transfer/info")
-                    if response.status_code == 200:
-                        data = response.json()
-                        up_speed = int(data.get("up_info_speed", 0))
-                    else:
-                        logger.info(f"[ERROR] Failed to get transfer info via proxy: {response.status_code}", extra={"markup": False})
-                        logger.info("[yellow]Retrying in 10 seconds...[/yellow]", extra={"markup": False})
-                        await asyncio.sleep(10)
-                        continue
-                else:
-                    if self.qbt_client is None:
-                        raise RuntimeError("qbt_client is not initialized")
-                    data = self.qbt_client.transfer_info()
-                    up_speed_raw = data.get("up_info_speed", 0) if hasattr(data, "get") else getattr(data, "up_info_speed", 0)
-                    up_speed = int(cast(int | str | float, up_speed_raw))
+                data = bandwidth_client.transfer_info()
+                up_speed_raw = data.get("up_info_speed", 0) if hasattr(data, "get") else getattr(data, "up_info_speed", 0)
+                up_speed = int(cast(int | str | float, up_speed_raw))
 
                 speeds.append(up_speed)
                 avg_speed = sum(speeds) / len(speeds)
@@ -195,10 +187,6 @@ class Wait:
         except Exception as e:
             logger.error(f"\n[red]Error checking bandwidth: {e}[/red]")
             return False
-        finally:
-            if self.proxy_url and self.qbt_session:
-                await self.qbt_session.aclose()
-                self.qbt_session = None
 
     async def select_and_recheck_best_torrent(self, meta: Meta, path: str, check_interval: int = 5) -> bool:
         if not self.proxy_url and not self.qbt_client:

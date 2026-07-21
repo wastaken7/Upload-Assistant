@@ -86,9 +86,10 @@ class MoreThanTV:
         "ZmN",
         "ZMNT",
     )
-    upload_url = "https://www.morethantv.me/upload.php"
-    forum_link = "https://www.morethantv.me/wiki.php?action=article&id=73"
-    search_url = "https://www.morethantv.me/api/torznab"
+    base_url = "https://www.morethantv.me"
+    upload_url = f"{base_url}/upload.php"
+    forum_link = f"{base_url}/wiki.php?action=article&id=73"
+    search_url = f"{base_url}/api/torznab"
     tracker_urls = ("tracker.morethantv",)
     supported_categories = ("TV", "MOVIE")
 
@@ -160,7 +161,7 @@ class MoreThanTV:
         des_tags = await self.get_tags(meta)
         await self.edit_desc(meta)
         group_desc = await self.edit_group_desc(meta)
-        mtv_name = await self.edit_name(meta)
+        mtv_name = await self.get_name(meta)
 
         anon = 0 if meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False) else 1
 
@@ -216,16 +217,16 @@ class MoreThanTV:
                                 meta, self.tracker, self.source_flag, self.config["TRACKERS"][self.tracker].get("announce_url"), str(response.url)
                             )
                             return True
-                        if "https://www.morethantv.me/upload.php" in str(response.url):
+                        if f"{self.base_url}/upload.php" in str(response.url):
                             meta.tracker_status[self.tracker]["status_message"] = "data error - Still on upload page - upload may have failed"
                             if "error" in response.text.lower() or "failed" in response.text.lower():
                                 meta.tracker_status[self.tracker]["status_message"] = "data error - Upload failed - check form data"
                             return False
-                        if str(response.url) == "https://www.morethantv.me/" or str(response.url) == "https://www.morethantv.me/index.php":
+                        if str(response.url) == f"{self.base_url}/" or str(response.url) == f"{self.base_url}/index.php":
                             if "Project Luminance" in response.text:
                                 meta.tracker_status[self.tracker]["status_message"] = "data error - Not logged in - session may have expired"
                             if "'GroupID' cannot be null" in response.text:
-                                meta.tracker_status[self.tracker]["status_message"] = "data error - You are hitting this site bug: https://www.morethantv.me/forum/thread/3338?"
+                                meta.tracker_status[self.tracker]["status_message"] = f"data error - You are hitting this site bug: {self.base_url}/forum/thread/3338?"
                             elif "Integrity constraint violation" in response.text:
                                 meta.tracker_status[self.tracker]["status_message"] = "data error - Proper site bug"
                             return False
@@ -297,7 +298,7 @@ class MoreThanTV:
 
         return description
 
-    async def edit_name(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         prefix_index = -1
         if meta.scene is True:
             scene_name = meta.scene_name
@@ -519,7 +520,7 @@ class MoreThanTV:
         return True
 
     async def validate_cookies(self, meta: Meta, cookiefile: str) -> bool:
-        url = "https://www.morethantv.me/index.php"
+        url = f"{self.base_url}/index.php"
         if await aiofiles.os.path.exists(cookiefile):
             try:
                 async with aiofiles.open(cookiefile, encoding="utf-8") as cf:
@@ -555,7 +556,7 @@ class MoreThanTV:
             return False
 
     async def get_auth(self, cookiefile: str) -> str:
-        url = "https://www.morethantv.me/index.php"
+        url = f"{self.base_url}/index.php"
         try:
             if await aiofiles.os.path.exists(cookiefile):
                 async with aiofiles.open(cookiefile, encoding="utf-8") as cf:
@@ -582,7 +583,7 @@ class MoreThanTV:
     async def login(self, cookiefile: str) -> bool:
         try:
             async with httpx.AsyncClient(timeout=25, follow_redirects=True) as client:
-                url = "https://www.morethantv.me/login"
+                url = f"{self.base_url}/login"
                 payload = {
                     "username": self.config["TRACKERS"][self.tracker].get("username"),
                     "password": self.config["TRACKERS"][self.tracker].get("password"),
@@ -593,7 +594,7 @@ class MoreThanTV:
                 }
 
                 try:
-                    res = await client.get(url="https://www.morethantv.me/login")
+                    res = await client.get(url=f"{self.base_url}/login")
 
                     if 'name="token" value="' not in res.text:
                         logger.info("[red]Unable to find token in login page")
@@ -617,7 +618,7 @@ class MoreThanTV:
 
                         two_factor_token = resp.text.rsplit('name="token" value="', 1)[1][:48]
                         two_factor_payload = {"token": two_factor_token, "code": mfa_code, "submit": "login"}
-                        resp = await client.post(url="https://www.morethantv.me/twofactor/login", data=two_factor_payload)
+                        resp = await client.post(url=f"{self.base_url}/twofactor/login", data=two_factor_payload)
 
                     await asyncio.sleep(1)
                     if "authkey=" in resp.text:
