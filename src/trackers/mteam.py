@@ -37,7 +37,7 @@ class MTeam:
         self.config = config
         self.common = Common(config)
         self.tmdb_manager = TmdbManager(config)
-        raw_url = self.config["TRACKERS"][self.tracker].get("base_url", "kp.m-team.cc").strip()
+        raw_url = str(self.config["TRACKERS"][self.tracker].get("base_url", "kp.m-team.cc")).strip()
         parsed_raw = urlparse(raw_url)
         clean_netloc = parsed_raw.netloc if parsed_raw.netloc else parsed_raw.path
         self.base_url = urlunparse(("https", clean_netloc, "", "", "", ""))
@@ -56,7 +56,7 @@ class MTeam:
 
         category = self.get_category_id(meta)
 
-        payload = {
+        payload: dict[str, int | bool | str] = {
             "pageNumber": 1,
             "pageSize": 10,
             "keyword": meta.title,
@@ -608,4 +608,37 @@ class MTeam:
             return True  # Debug mode - simulated success
 
     async def get_name(self, meta: Meta) -> str:
-        return meta.name
+        name = meta.name
+
+        # 1. Normalize Blu-ray / BLURAY / Blu-Ray to BluRay (incorporates UHD Blu-ray -> UHD BluRay)
+        name = re.sub(r"\bblu[-_]?ray\b", "BluRay", name, flags=re.IGNORECASE)
+
+        # 2. Normalize WEBDL / Web-DL to WEB-DL
+        name = re.sub(r"\bweb[-_]?dl\b", "WEB-DL", name, flags=re.IGNORECASE)
+
+        # 3. Normalize Dolby Vision: DoVi / Dovi / DOVI to DV
+        name = re.sub(r"\bdovi\b", "DV", name, flags=re.IGNORECASE)
+
+        # 4. Normalize HDR / Hdr / hdr / HLG case (e.g. Hdr10 -> HDR10, hdr10+ -> HDR10+)
+        name = re.sub(r"\b(hdr|hlg)(10)?(\+)?\b", lambda m: f"{m.group(1).upper()}{m.group(2) or ''}{m.group(3) or ''}", name, flags=re.IGNORECASE)
+
+        # 5. Dolby Digital Plus: EAC3 / EAC-3 / DD+ / DDPlus to DDP
+        name = re.sub(r"\b(eac[-_]?3|dd\+)(?![a-zA-Z0-9])", "DDP", name, flags=re.IGNORECASE)
+
+        # 6. Dolby Digital: AC3 / AC-3 to DD
+        name = re.sub(r"\bac[-_]?3(?![a-zA-Z0-9])", "DD", name, flags=re.IGNORECASE)
+
+        # 7. DTS:X: DTS-X / DTS_X / DTSX / DTS X to DTS:X
+        name = re.sub(r"\bdts[-_\s]?x\b", "DTS:X", name, flags=re.IGNORECASE)
+
+        # 8. TrueHD: True-HD to TrueHD
+        name = re.sub(r"\btrue[-_]?hd\b", "TrueHD", name, flags=re.IGNORECASE)
+
+        # 9. High Frame Rate: 50fps / 60fps / 120fps to HFR
+        name = re.sub(r"\b(50|60|120)fps\b", "HFR", name, flags=re.IGNORECASE)
+
+        # Clean up duplicate HFR words (e.g. "HFR HFR" or "HFR.HFR" or "HFR-HFR" -> "HFR")
+        name = re.sub(r"\bHFR\b([-.\s_]+HFR)+", "HFR", name, flags=re.IGNORECASE)
+
+        # 10. Strip video file extension suffixes if they are present in the name
+        return re.sub(r"\.(mkv|mp4|avi|ts)$", "", name, flags=re.IGNORECASE)
