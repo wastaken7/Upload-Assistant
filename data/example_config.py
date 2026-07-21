@@ -595,8 +595,8 @@ config: dict[str, Any] = {
             # Don't change it unless you know what you're doing
             "custom_layout": '2',
             # anon is not an option when uploading to AMIGOSSHARE
-            # for AMIGOSSHARE to work you need to export cookies from https://cliente.amigos-share.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # cookies need to be in netscape format and need to be in data/cookies/AMIGOSSHARE.txt
+            # Cookies required (export from https://cliente.amigos-share.club/ to data/cookies/AMIGOSSHARE.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
@@ -625,8 +625,8 @@ config: dict[str, Any] = {
         "AVISTAZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for AVISTAZ to work you need to export cookies from https://avistaz.to using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # cookies need to be in netscape format and need to be in data/cookies/AVISTAZ.txt
+            # Cookies required (export from https://avistaz.to to data/cookies/AVISTAZ.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
@@ -684,9 +684,9 @@ config: dict[str, Any] = {
         "BJSHARE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for BJSHARE to work you need to export cookies from https://bj-share.info using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/BJSHARE.txt
-            # Two-factor authentication must be enabled in your profile settings; otherwise, your cookies will expire fairly quickly
+            # Cookies required (export from https://bj-share.info to data/cookies/BJSHARE.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
+            # Two-factor authentication (2FA) must be enabled in your profile settings; otherwise, your session cookies will expire fairly quickly.
             "announce_url": "",
             "anon": True,
             # Set to False if during an anonymous upload you want your release group to be hidden
@@ -746,8 +746,8 @@ config: dict[str, Any] = {
         },
         "BRASILTRACKER": {
             "link_dir_name": "",
-            # for BRASILTRACKER to work you need to export cookies from https://brasiltracker.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/BRASILTRACKER.txt
+            # Cookies required (export from https://brasiltracker.org/ to data/cookies/BRASILTRACKER.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # Set this to True if you want to allow external subtitles to be included in the upload
@@ -819,8 +819,8 @@ config: dict[str, Any] = {
         "CINEMAZ": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for CINEMAZ to work you need to export cookies from https://cinemaz.to using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # cookies need to be in netscape format and need to be in data/cookies/CINEMAZ.txt
+            # Cookies required (export from https://cinemaz.to to data/cookies/CINEMAZ.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
@@ -1010,9 +1010,8 @@ config: dict[str, Any] = {
             "link_dir_name": "",
             # You can find your API key in Profile Settings -> Access Settings -> API Key. If there is no API, click "Reset your api key" and Save Profile.
             "api_key": "",
-            # Optionally, you can export cookies from GREATPOSTERWALL to improve duplicate searches.
-            # If you do this, you must export cookies from https://greatposterwall.com using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # Cookies must be in Netscape format and must be located in data/cookies/GREATPOSTERWALL.txt
+            # Optionally, export cookies from https://greatposterwall.com to data/cookies/GREATPOSTERWALL.txt to improve duplicate searches.
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             # You can find your announce URL at https://greatposterwall.com/upload.php
             "announce_url": "",
             # Upload with Exclusive flag
@@ -1044,8 +1043,8 @@ config: dict[str, Any] = {
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "use_for_search": False,
             # for HDBITS you **MUST** have been granted uploading approval via Offers, you've been warned
-            # for HDBITS to work you need to export cookies from https://hdbits.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/HDBITS.txt
+            # Cookies required (export from https://hdbits.org/ to data/cookies/HDBITS.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "username": "",
             "passkey": "",
             "announce_url": "",
@@ -1055,8 +1054,8 @@ config: dict[str, Any] = {
         "HDSPACE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for HDSPACE to work you need to export cookies from https://hd-space.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/HDSPACE.txt
+            # Cookies required (export from https://hd-space.org/ to data/cookies/HDSPACE.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
@@ -1085,9 +1084,8 @@ config: dict[str, Any] = {
         "HDTORRENTS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # For HDTORRENTS to work, you need to export cookies from the site using:
-            # https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # Cookies must be in Netscape format and saved in: data/cookies/HDTORRENTS.txt
+            # Cookies required (export to data/cookies/HDTORRENTS.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             # You can change the URL if the main site is down or if you encounter upload issues.
             # Keep in mind that changing the URL requires exporting the cookies again from the new domain.
             # Alternative domains:
@@ -1183,9 +1181,8 @@ config: dict[str, Any] = {
         "IPTORRENTS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # For IPTORRENTS to work, you need to export cookies from the site using:
-            # https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # Cookies must be in Netscape format and saved in: data/cookies/IPTORRENTS.txt
+            # Cookies required (export to data/cookies/IPTORRENTS.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             # By default, IPTORRENTS removes all dots from the upload name, causing audio codecs to be named incorrectly, for example, "DTS 5 1" instead of "DTS 5.1".
             # It also does not have the option to set the IMDb during upload.
@@ -1245,8 +1242,8 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "IMMORTALSEED": {
-            # for IMMORTALSEED to work you need to export cookies from https://immortalseed.me/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/IMMORTALSEED.txt
+            # Cookies required (export from https://immortalseed.me/ to data/cookies/IMMORTALSEED.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "announce_url": "",
@@ -1306,8 +1303,8 @@ config: dict[str, Any] = {
         "LAJIDUI": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for LAJIDUI to work you need to export cookies from https://pt.lajidui.top/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/LAJIDUI.txt
+            # Cookies required (export from https://pt.lajidui.top/ to data/cookies/LAJIDUI.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1397,8 +1394,8 @@ config: dict[str, Any] = {
         "LONGPT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for LONGPT to work you need to export cookies from https://longpt.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/LONGPT.txt
+            # Cookies required (export from https://longpt.org/ to data/cookies/LONGPT.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1522,13 +1519,13 @@ config: dict[str, Any] = {
             "inject_delay": 0,
         },
         "MAKINGOFF":{
+            # Cookies required (export from https://www.makingoff.org/ to data/cookies/MAKINGOFF.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             # trackers to be added on the torrents
             # one per line
             "trackers":
                 """
                 """,
-            "member_id": "",
-            "pass_hash": "",
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
         },
@@ -1726,8 +1723,8 @@ config: dict[str, Any] = {
         "PRIVATEHD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for PRIVATEHD to work you need to export cookies from https://privatehd.to/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/
-            # cookies need to be in netscape format and need to be in data/cookies/PRIVATEHD.txt
+            # Cookies required (export from https://privatehd.to/ to data/cookies/PRIVATEHD.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # If True, the script performs a basic rules compliance check (e.g., codecs, region).
@@ -1771,8 +1768,8 @@ config: dict[str, Any] = {
         "PTCAFE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for PTCAFE to work you need to export cookies from https://ptcafe.club/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/PTCAFE.txt
+            # Cookies required (export from https://ptcafe.club/ to data/cookies/PTCAFE.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1811,8 +1808,8 @@ config: dict[str, Any] = {
         "PTFANS": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for PTFANS to work you need to export cookies from https://ptfans.cc/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/PTFANS.txt
+            # Cookies required (export from https://ptfans.cc/ to data/cookies/PTFANS.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1840,8 +1837,8 @@ config: dict[str, Any] = {
         "PTGTK": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for PTGTK to work you need to export cookies from https://pt.gtkpw.xyz using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/PTGTK.txt
+            # Cookies required (export from https://pt.gtkpw.xyz to data/cookies/PTGTK.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -1882,8 +1879,8 @@ config: dict[str, Any] = {
         "PTSKIT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for PTSKIT to work you need to export cookies from https://www.ptskit.org using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/PTSKIT.txt
+            # Cookies required (export from https://www.ptskit.org to data/cookies/PTSKIT.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
@@ -2031,8 +2028,8 @@ config: dict[str, Any] = {
         "RAILGUNPT": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
-            # for RAILGUNPT to work you need to export cookies from https://bilibili.download using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/RAILGUNPT.txt
+            # Cookies required (export from https://bilibili.download to data/cookies/RAILGUNPT.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
             "anon": True,
             # The configurations below override the DEFAULT configuration
@@ -2300,8 +2297,8 @@ config: dict[str, Any] = {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             # Set to False if you don't have access to the API (e.g., if you're a trial uploader). Note: this may not work sometimes due to Cloudflare restrictions.
-            # If you are not going to use the API, you will need to export cookies from https://www.torrentleech.org/ using https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/.
-            # cookies need to be in netscape format and need to be in data/cookies/TORRENTLEECH.txt
+            # If you are not going to use the API, you will need to export cookies from https://www.torrentleech.org/ to data/cookies/TORRENTLEECH.txt.
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "api_upload": True,
             # You can find your passkey at your profile (https://www.torrentleech.org/profile/[YourUserName]/view) -> Torrent Passkey
             "passkey": "",
