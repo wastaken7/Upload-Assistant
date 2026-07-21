@@ -954,9 +954,17 @@ async def get_douban_id(meta: Meta) -> int:
                     response = await client.get(search_url)
                     response.raise_for_status()
                     break
-                except httpx.HTTPError:
+                except httpx.RequestError:
                     if attempt == 3:
                         raise
+                except httpx.HTTPStatusError as error:
+                    status_code = error.response.status_code
+                    if status_code not in (408, 429) and not 500 <= status_code < 600:
+                        raise
+                    if attempt == 3:
+                        raise
+
+                if attempt < 3:
                     logger.info(f"[yellow]Douban request failed (attempt {attempt}/3). Retrying in 5 seconds...[/yellow]")
                     await asyncio.sleep(5)
 

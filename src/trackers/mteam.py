@@ -322,7 +322,7 @@ class MTeam:
     async def get_additional_checks(self, meta: Meta):
         should_continue = True
 
-        if not meta.imdb:
+        if not meta.imdb_tt:
             logger.info(f"{self.tracker}: [bold yellow]IMDb ID not found in metadata, skipping upload.[/bold yellow]")
             return False
 
