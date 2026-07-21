@@ -77,6 +77,9 @@ class Samaritano(UNIT3D):
             return {v: k for k, v in cat_map.items()}
 
         resolved_category = category if category is not None and category != "" else meta.category
+        if meta.anime is True and resolved_category == "TV":
+            resolved_category = "ANIME"
+
         if resolved_category == "BOOK":
             if meta.audiobook:
                 resolved_category = "AUDIOBOOK"
