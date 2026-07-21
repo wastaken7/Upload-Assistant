@@ -725,6 +725,13 @@ async def _upload_screens(
     images_needed = total_screens - existing_count if not retry_mode else total_screens
     logger.debug(f"[blue]Existing images: {existing_count}, Images needed: {images_needed}, Total screens: {total_screens}[/blue]")
 
+    # Some upload types (notably BOOK) legitimately have no screenshots.  The
+    # selected host can differ from img_host_1 when supplied via --imghost, so
+    # do not make this no-op conditional on the configured initial host.
+    if total_screens <= 0:
+        logger.debug("[yellow]Skipping upload: no screenshots required.[/yellow]")
+        return image_list, 0
+
     if existing_count >= total_screens and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
         logger.debug(f"[yellow]Skipping upload: {existing_count} existing, {total_screens} required.")
         return image_list, total_screens
