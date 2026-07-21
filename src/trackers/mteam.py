@@ -108,7 +108,7 @@ class MTeam:
             disc_folder = Path(meta.base_dir) / "tmp" / meta.uuid
             for filename in (p.name for p in Path(disc_folder).iterdir()):
                 if filename.endswith("_FULL.txt"):
-                    mi_path = Path(disc_folder) / filename
+                    mi_path = str(Path(disc_folder) / filename)
         else:
             mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
 
@@ -118,7 +118,7 @@ class MTeam:
 
         return mediainfo
 
-    def bbcode_to_markdown(self, text):
+    def bbcode_to_markdown(self, text: str) -> str:
         specific_img_pattern = r"\[url=[^\]]*\]\[img(?:=[^\]]*)?\](.*?)\[/img\]\[/url\]"
         text = re.sub(specific_img_pattern, r"![](\1)", text, flags=re.IGNORECASE)
 
@@ -145,12 +145,12 @@ class MTeam:
 
         api_url = f"{self.api_base_url}/media/douban/infoV2"
 
-        params = {
+        params: dict[str, bool | int] = {
             "code": douban_id,
             "refresh": False,
         }
 
-        headers = {
+        headers: dict[str, str] = {
             "x-api-key": self.api_key,
             "Accept": "*/*",
         }
@@ -283,7 +283,7 @@ class MTeam:
 
         return description
 
-    def get_category_id(self, meta: Meta) -> int | None:
+    def get_category_id(self, meta: Meta) -> int:
         movie_sd = 401  # Movie/SD
         movie_hd = 419  # Movie/HD
         movie_dvdiso = 420  # Movie/DVDiSo
@@ -322,8 +322,7 @@ class MTeam:
     async def get_additional_checks(self, meta: Meta):
         should_continue = True
 
-        imdb_id = meta.imdb_info.get("imdbID")
-        if not imdb_id:
+        if not meta.imdb:
             logger.info(f"{self.tracker}: [bold yellow]IMDb ID not found in metadata, skipping upload.[/bold yellow]")
             return False
 
@@ -364,7 +363,7 @@ class MTeam:
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
 
-        imdb_id = meta.imdb_info.get("imdbID")
+        imdb_id = meta.imdb_tt
         category = self.get_category_id(meta)
         standard = self.get_standard(meta)
 
@@ -374,7 +373,7 @@ class MTeam:
 
         api_url = f"{self.api_base_url}/torrent/search"
 
-        payload = {
+        payload: dict[str, str | list[str | int]] = {
             "mode": "normal",
             "imdb": imdb_id,
             "categories": [category],
@@ -395,7 +394,7 @@ class MTeam:
             if not t_id:
                 continue
 
-            dupe_entry = {
+            dupe_entry: dict[str, str | int] = {
                 "name": torrent.get("name"),
                 "size": int(torrent.get("size", 0)),
                 "link": f"{self.base_url}/detail/{t_id}",
