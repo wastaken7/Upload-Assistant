@@ -939,7 +939,7 @@ async def get_douban_id(meta: Meta) -> int:
         logger.info(f"Using manual Douban ID: {douban_manual}")
         return douban_manual
 
-    imdb_id = meta.imdb_info.get("imdbID")
+    imdb_id = meta.imdb_tt
     if not imdb_id:
         return douban_id
 
@@ -947,9 +947,29 @@ async def get_douban_id(meta: Meta) -> int:
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
 
     try:
+        response: httpx.Response | None = None
         async with httpx.AsyncClient(headers=headers, follow_redirects=True) as client:
-            response = await client.get(search_url)
-            response.raise_for_status()
+            for attempt in range(1, 4):
+                try:
+                    response = await client.get(search_url)
+                    response.raise_for_status()
+                    break
+                except httpx.RequestError:
+                    if attempt == 3:
+                        raise
+                except httpx.HTTPStatusError as error:
+                    status_code = error.response.status_code
+                    if status_code not in (408, 429) and not 500 <= status_code < 600:
+                        raise
+                    if attempt == 3:
+                        raise
+
+                if attempt < 3:
+                    logger.info(f"[yellow]Douban request failed (attempt {attempt}/3). Retrying in 5 seconds...[/yellow]")
+                    await asyncio.sleep(5)
+
+        if response is None:
+            raise RuntimeError("Douban request completed without a response")
 
         soup = BeautifulSoup(response.text, "html.parser")
         result = soup.find("ul", class_="search_results_subjects")
