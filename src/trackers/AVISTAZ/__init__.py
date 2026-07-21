@@ -236,6 +236,9 @@ class AZTrackerBase:
 
         rip_type = self.get_rip_type(meta, display_name=True)
 
+        if not self.media_code:
+            await self.get_media_code(meta)
+
         page_url: str = f"{self.base_url}/movies/torrents/{self.media_code}?quality={resolution}"
 
         visited_urls: set[str] = set()
@@ -445,7 +448,7 @@ class AZTrackerBase:
                 json_data = response.json()
                 if json_data.get("success"):
                     image_id = json_data.get("imageId")
-                    return str(image_id)
+                    return str(image_id) if image_id is not None else None
                 error_message = json_data.get("error", "Unknown image host error.")
                 logger.info(f"{self.tracker}: Error uploading {filename}: {error_message}", extra={"markup": False})
                 return None
@@ -457,10 +460,10 @@ class AZTrackerBase:
 
     async def get_screenshots(self, meta: Meta) -> list[str] | None:
         screenshot_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-        local_files = sorted(screenshot_dir.glob("*.png"))
+        local_files = sorted(path for path in screenshot_dir.glob("*.png") if path.is_file() and not path.stem.upper().startswith(("POSTER", "COVER")))
         results: list[str] = []
 
-        limit = 3 if meta.tv_pack == 0 else 15
+        limit = 3 if (meta.category == "TV" and meta.tv_pack == 0) else 15
 
         disc_menu_links = [img.get("raw_url") for img in meta.menu_images if img.get("raw_url")][
             :12
@@ -473,9 +476,13 @@ class AZTrackerBase:
         upload_referer = f"{self.base_url}/upload/{meta.category.lower()}"
 
         async def upload_local_file(path: Path):
-            async with aiofiles.open(path, "rb") as f:
-                image_bytes = await f.read()
-            return await self.img_host(meta, upload_referer, image_bytes, path.name)
+            try:
+                async with aiofiles.open(path, "rb") as f:
+                    image_bytes = await f.read()
+                return await self.img_host(meta, upload_referer, image_bytes, path.name)
+            except Exception as e:
+                logger.info(f"Failed to process local screenshot {path}: {e}", extra={"markup": False})
+                return None
 
         async def upload_remote_file(url: str):
             try:
@@ -483,6 +490,8 @@ class AZTrackerBase:
                 response.raise_for_status()
                 image_bytes = response.content
                 filename = Path(urlparse(url).path).name or "screenshot.png"
+                if not Path(filename).suffix:
+                    filename = f"{filename}.png"
                 return await self.img_host(meta, upload_referer, image_bytes, filename)
             except Exception as e:
                 logger.info(f"Failed to process screenshot from URL {url}: {e}", extra={"markup": False})
@@ -490,29 +499,28 @@ class AZTrackerBase:
 
         # Upload menu images
         for url in disc_menu_links:
-            if not url.lower().endswith(".png"):
-                logger.info(f"{self.tracker}: Skipping non-PNG menu image: {url}")
-            else:
-                result = await upload_remote_file(url)
-                if result:
-                    results.append(result)
+            if len(results) >= limit:
+                break
+            result = await upload_remote_file(url)
+            if result:
+                results.append(result)
 
         remaining_slots = max(0, limit - len(results) - len(audio_spectrogram_links))
 
         if local_files and remaining_slots > 0:
-            paths = local_files[:remaining_slots]
-
-            for path in paths:
+            for path in local_files:
+                if len(results) >= limit - len(audio_spectrogram_links):
+                    break
                 result = await upload_local_file(path)
                 if result:
                     results.append(result)
 
         # Always fill remaining slots from remote image_list after processing local files
         image_links = [str(img.get("raw_url")) for img in meta.image_list if img.get("raw_url")]
-        remaining_slots = max(0, limit - len(results) - len(audio_spectrogram_links))
-        links = image_links[:remaining_slots]
 
-        for url in links:
+        for url in image_links:
+            if len(results) >= limit - len(audio_spectrogram_links):
+                break
             result = await upload_remote_file(url)
             if result:
                 results.append(result)
@@ -520,13 +528,12 @@ class AZTrackerBase:
         # Upload audio spectrogram images
         remaining_slots = max(0, limit - len(results))
         if remaining_slots > 0 and audio_spectrogram_links:
-            for url in audio_spectrogram_links[:remaining_slots]:
-                if not url.lower().endswith(".png"):
-                    logger.info(f"{self.tracker}: Skipping non-PNG audio spectrogram image: {url}")
-                else:
-                    result = await upload_remote_file(url)
-                    if result:
-                        results.append(result)
+            for url in audio_spectrogram_links:
+                if len(results) >= limit:
+                    break
+                result = await upload_remote_file(url)
+                if result:
+                    results.append(result)
 
         return results
 
@@ -1021,7 +1028,7 @@ class AZTrackerBase:
         await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
         return True
 
-    def language_map(self, meta) -> None:
+    def language_map(self, meta: Meta) -> None:
         all_lang_map = {
             ("Abkhazian", "abk", "ab"): "1",
             ("Afar", "aar", "aa"): "2",
