@@ -1,0 +1,119 @@
+name: Create release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "New version (for example: v2.8 or v2.8.1)"
+        required: true
+        type: string
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: create-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the selected branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version
+        env:
+          NEW_VERSION: ${{ inputs.version }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          if [[ "$REF_TYPE" != "branch" ]]; then
+            echo "Create release must be run from a branch, not a tag." >&2
+            exit 1
+          fi
+
+          if [[ ! "$NEW_VERSION" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "Version must match vMAJOR.MINOR or vMAJOR.MINOR.PATCH (for example: v2.8)." >&2
+            exit 1
+          fi
+
+          if git rev-parse --verify --quiet "refs/tags/$NEW_VERSION"; then
+            echo "Tag $NEW_VERSION already exists." >&2
+            exit 1
+          fi
+
+      - name: Generate release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_VERSION: ${{ inputs.version }}
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$NEW_VERSION" \
+            -f target_commitish="$GITHUB_SHA" \
+            --jq .body > "$RUNNER_TEMP/release-notes.md"
+
+      - name: Update data/version.py
+        env:
+          NEW_VERSION: ${{ inputs.version }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          path = Path("data/version.py")
+          content = path.read_text(encoding="utf-8")
+          notes = Path(os.environ["RUNNER_TEMP"], "release-notes.md").read_text(encoding="utf-8").strip()
+          serialized_notes = json.dumps(notes, ensure_ascii=False)
+          replacement = f'__version__ = "{os.environ["NEW_VERSION"]}"\n\n{serialized_notes}'
+          updated, count = re.subn(
+              r'__version__\s*=\s*"[^"]+"\s*\n\s*(?:""".*?"""|"(?:\\.|[^"\\])*")',
+              lambda _match: replacement,
+              content,
+              count=1,
+              flags=re.DOTALL,
+          )
+          if count != 1:
+              raise SystemExit("Could not find the version and release-notes block in data/version.py")
+          path.write_text(updated, encoding="utf-8")
+          PY
+
+      - name: Commit the version bump
+        env:
+          NEW_VERSION: ${{ inputs.version }}
+          TARGET_BRANCH: ${{ github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/version.py
+          git diff --cached --check
+          git commit -m "bump: version to ${NEW_VERSION#v}"
+          git push origin "HEAD:$TARGET_BRANCH"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_VERSION: ${{ inputs.version }}
+        run: |
+          gh release create "$NEW_VERSION" \
+            --target "$(git rev-parse HEAD)" \
+            --title "$NEW_VERSION" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --verify-tag=false
+
+      # Releases created by GITHUB_TOKEN do not emit new workflow runs, so
+      # dispatch the existing packaging workflows explicitly.
+      - name: Start release builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_VERSION: ${{ inputs.version }}
+        run: |
+          gh workflow run docker-image.yml --ref "$NEW_VERSION" -f use_latest_tag=true
+          gh workflow run windows-installer.yml --ref "$NEW_VERSION" \
+            -f ref="$NEW_VERSION" \
+            -f version="$NEW_VERSION" \
+            -f release_tag="$NEW_VERSION"

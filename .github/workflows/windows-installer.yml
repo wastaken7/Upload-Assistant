@@ -15,6 +15,10 @@ on:
         required: true
         default: "development"
         type: string
+      release_tag:
+        description: "Existing release tag to receive the installer (optional)"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -26,6 +30,18 @@ jobs:
       PYTHON_MINOR: "3.14"
       FFMPEG_URL: "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
     steps:
+      - name: Validate manual release attachment
+        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+        shell: pwsh
+        env:
+          SOURCE_REF: ${{ inputs.ref }}
+          INSTALLER_VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if ($env:SOURCE_REF -ne $env:RELEASE_TAG -or $env:INSTALLER_VERSION -ne $env:RELEASE_TAG) {
+            throw 'ref, version, and release_tag must match when attaching an installer to a release.'
+          }
+
       - name: Checkout release source
         uses: actions/checkout@v4
         with:
@@ -90,7 +106,8 @@ jobs:
           if-no-files-found: error
 
       - name: Attach installer to release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
           files: build/output/*.exe
