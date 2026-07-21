@@ -826,7 +826,7 @@ async def _upload_screens(
         logger.debug(f"[blue]Double checking current image host: {img_host}, Initial image host: {initial_img_host}[/blue]")
         logger.debug(f"[blue]retry_mode: {retry_mode}, using_custom_img_list: {using_custom_img_list}[/blue]")
         logger.debug(f"[blue]successfully_uploaded={len(successfully_uploaded)}, meta.image_list={len(image_list)}, cutoff={meta.cutoff}[/blue]")
-        if len(successfully_uploaded) < len(upload_tasks) and img_host == initial_img_host:
+        if len(successfully_uploaded) < len(upload_tasks):
             # Keep walking the configured hosts after a fallback also fails. The
             # previous retry_mode guard stopped the chain at img_host_2.
             next_host_num = img_host_num + 1
