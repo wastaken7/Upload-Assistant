@@ -826,15 +826,37 @@ async def _upload_screens(
         logger.debug(f"[blue]Double checking current image host: {img_host}, Initial image host: {initial_img_host}[/blue]")
         logger.debug(f"[blue]retry_mode: {retry_mode}, using_custom_img_list: {using_custom_img_list}[/blue]")
         logger.debug(f"[blue]successfully_uploaded={len(successfully_uploaded)}, meta.image_list={len(image_list)}, cutoff={meta.cutoff}[/blue]")
-        if len(successfully_uploaded) < len(upload_tasks) and not retry_mode and img_host == initial_img_host:
-            img_host_num += 1
-            next_host_key = f"img_host_{img_host_num}"
-            if next_host_key in default_config:
-                meta.imghost = default_config[next_host_key]
+        if len(successfully_uploaded) < len(upload_tasks) and img_host == initial_img_host:
+            # Keep walking the configured hosts after a fallback also fails. The
+            # previous retry_mode guard stopped the chain at img_host_2.
+            next_host_num = img_host_num + 1
+            while next_host_num <= 9:
+                next_host_key = f"img_host_{next_host_num}"
+                if next_host_key not in default_config:
+                    next_host_num += 1
+                    continue
+
+                next_host = str(default_config.get(next_host_key) or "").strip().lower()
+                if not next_host or (allowed_hosts is not None and next_host not in allowed_hosts):
+                    next_host_num += 1
+                    continue
+
+                meta.imghost = next_host
                 logger.info(f"[cyan]Switching to the next image host: {meta.imghost}[/cyan]")
 
                 gc.collect()
-                return await _upload_screens(config, meta, screens, img_host_num, i, total_screens, custom_img_list, return_dict, retry_mode=True)
+                return await _upload_screens(
+                    config,
+                    meta,
+                    screens,
+                    next_host_num,
+                    i,
+                    total_screens,
+                    custom_img_list,
+                    return_dict,
+                    retry_mode=True,
+                    allowed_hosts=allowed_hosts,
+                )
             logger.info("[red]No more image hosts available. Aborting upload process.")
             return image_list, len(image_list)
 
