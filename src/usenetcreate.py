@@ -480,6 +480,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
         stderr_accum = []
         check_missing_count = 0
         check_checked_total = 0
+        check_reposted_total = 0
         # Every posted article also gets checked (see pesto's check.rs), so
         # the running total_segments count pesto already reports on each
         # segment_done doubles as the check phase's expected total.
@@ -617,7 +618,12 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                         attempt = event.get("attempt", 0)
                         max_attempts = event.get("max_attempts", 0)
                         delay = event.get("delay_secs", 0)
-                        logger.debug(f"[cyan]Article check: retry {attempt}/{max_attempts} in {delay}s...[/cyan]")
+                        reason = event.get("reason", "article not found")
+                        logger.debug(f"[cyan]Article check: retry {attempt}/{max_attempts} in {delay}s ({reason})...[/cyan]")
+                    elif etype == "check_reposted":
+                        reposted = event.get("reposted", 0)
+                        check_reposted_total = reposted
+                        logger.debug(f"[yellow]Article check: {reposted} article(s) reposted so far.[/yellow]")
                 except json.JSONDecodeError:
                     pass
 
@@ -694,10 +700,21 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
                 )
 
         if result != 0:
-            if check_missing_count > 0:
-                logger.info(f"[red]Pesto could not confirm {check_missing_count} article(s) on the server after reposting — the NZB is incomplete and will be discarded.[/red]")
-            logger.error(f"[red]Error running Pesto Uploader (exit code {result}):[/red]")
             stderr_str = "".join(stderr_accum)
+            if check_missing_count > 0:
+                total_checked = check_expected_total or check_checked_total or check_missing_count
+                repost_note = f" despite {check_reposted_total} repost attempt(s)" if check_reposted_total else ""
+                logger.error(
+                    f"[red]Pesto could not confirm {check_missing_count}/{total_checked} article(s) on the server{repost_note} "
+                    "— the NZB is incomplete and will be discarded. Pesto already reposted and reverified these under "
+                    "fresh Message-IDs before giving up, so this usually means the provider itself is rejecting or "
+                    "dropping these specific articles (check account status, retention, or group access) rather than "
+                    "a one-off network blip.[/red]"
+                )
+                if stderr_str:
+                    logger.info(f"[red]STDERR:[/red]\n{stderr_str}")
+                raise RuntimeError(f"Pesto upload failed: {check_missing_count}/{total_checked} article(s) could not be confirmed on the server after every repost attempt.")
+            logger.error(f"[red]Error running Pesto Uploader (exit code {result}):[/red]")
             if stderr_str:
                 logger.info(f"[red]STDERR:[/red]\n{stderr_str}")
             raise RuntimeError(f"Command '{redacted_str}' failed with exit code {result}")
