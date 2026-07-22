@@ -26,6 +26,60 @@ def _attr_to_string(value: str | AttributeValueList | None) -> str:
     return ""
 
 
+def extract_upload_error(html: str) -> str:
+    """Extract the useful error message from common tracker upload pages."""
+    soup = BeautifulSoup(html, "html.parser")
+
+    def clean(value: str) -> str:
+        return " ".join(value.split()).strip(" :-")
+
+    # Modern tracker themes usually put all upload errors in this notification.
+    for element in soup.select(".notification-border-e .notification-body"):
+        message = clean(element.get_text(" ", strip=True))
+        if message:
+            return message
+
+    # Older themes mark the error heading, while the actual message is in its
+    # next sibling or in the nearest small container.
+    for element in soup.select("[class*='error']"):
+        for parent in [element, *element.parents]:
+            message = clean(parent.get_text(" ", strip=True))
+            if len(message) > len(clean(element.get_text(" ", strip=True))) and len(message) < 500:
+                message = re.sub(r"^(?:erro|error)\b", "", message, flags=re.IGNORECASE)
+                if message := clean(message):
+                    return message
+
+    for heading in soup.select("h1, h2, h3, h4"):
+        if not re.search(r"error|failed", heading.get_text(" ", strip=True), re.IGNORECASE):
+            continue
+        sibling = heading.find_next_sibling(["p", "div"])
+        message = clean(sibling.get_text(" ", strip=True)) if sibling else ""
+        if message:
+            return message
+
+    # A few trackers only return their upload-blocking notice.
+    for heading in soup.select("h1.dnu_header, h2.dnu_header, h3.dnu_header, #dnu_header"):
+        message = clean(heading.get_text(" ", strip=True))
+        if re.search(r"proib|permitid|not allowed|forbidden", message, re.IGNORECASE):
+            return message
+
+    # Some legacy pages render the complete error as one text node.
+    for text_parent in soup.select("td, div, p, h1, h2, h3, h4, b, span, font"):
+        raw_message = clean(text_parent.get_text(" ", strip=True))
+        if not re.match(r"^(?:error\s*:|upload failed!)", raw_message, re.IGNORECASE):
+            continue
+        for parent in [text_parent, *text_parent.parents]:
+            message = clean(parent.get_text(" ", strip=True))
+            if len(message) > 500 or not re.match(r"^(?:error\s*:|upload failed!)", message, re.IGNORECASE):
+                continue
+            message = re.sub(r"^(?:error\s*:|upload failed!?)\s*", "", message, flags=re.IGNORECASE)
+            message = re.sub(r"\s+Back$", "", message, flags=re.IGNORECASE)
+            if message := clean(message):
+                return message
+
+    return ""
+
+
 def get_tracker_domain(tracker: str, config: dict[str, Any] | None = None) -> str:
     """Extract or map a tracker name to its primary domain name."""
     try:
@@ -51,7 +105,8 @@ def get_tracker_domain(tracker: str, config: dict[str, Any] | None = None) -> st
             try:
                 from urllib.parse import urlparse
 
-                netloc = urlparse(announce_url).netloc
+                parsed_url = cast(Any, urlparse(announce_url))
+                netloc = str(parsed_url.netloc)
                 if netloc:
                     domain = netloc.lower().lstrip(".")
                     if domain.startswith("www."):
@@ -109,7 +164,7 @@ def find_cookie_file(base_dir: str, tracker: str, config: dict[str, Any] | None 
         cookies_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Check if tracker config has 'cookie_file' or 'cookies'
-    tracker_config = config.get("TRACKERS", {}).get(tracker, {}) if config else {}
+    tracker_config = cast(dict[str, Any], config.get("TRACKERS", {}).get(tracker, {})) if config else {}
     custom_cookie_file = tracker_config.get("cookie_file", "").strip() or tracker_config.get("cookies", "").strip()
     if custom_cookie_file:
         custom_path = Path(custom_cookie_file)
@@ -119,11 +174,11 @@ def find_cookie_file(base_dir: str, tracker: str, config: dict[str, Any] | None 
             return str((Path(base_dir) / custom_cookie_file).resolve())
         return str((cookies_dir / custom_cookie_file).resolve())
 
-    matching_files = []
+    matching_files: list[Path] = []
 
     # 2. Try to find by filename match in data/cookies/
     if cookies_dir.exists():
-        files = sorted(cookies_dir.glob("*"), key=lambda p: p.name)
+        files: list[Path] = sorted(cookies_dir.glob("*"), key=lambda p: p.name)
 
         # Check for exact name match (with any extension)
         matching_files.extend(file_path for file_path in files if file_path.is_file() and file_path.stem.lower() == tracker.lower())
@@ -251,7 +306,7 @@ class CookieValidator:
         try:
             async with httpx.AsyncClient(headers=headers, timeout=30.0, follow_redirects=True) as client:
                 # Perform login
-                login_data = {
+                login_data: dict[str, str] = {
                     "username": username,
                     "password": password,
                     "keeplogged": "1",
@@ -558,7 +613,7 @@ class CookieAuthUploader:
         A failed upload will save the response HTML for analysis and also create a torrent entry with the announce URL,
         as the upload may have partially succeeded.
         """
-        values = [success_status_code, error_text, success_text, success_list]
+        values: list[str | list[str] | None] = [success_status_code, error_text, success_text, success_list]
         count = sum(bool(v) for v in values)
 
         if count == 0 or count > 1:
@@ -746,6 +801,9 @@ class CookieAuthUploader:
             message.append(f"Expected status code '{success_status_code}', got '{response.status_code}'.")
         else:
             message.append("Unknown upload error.")
+
+        if error_message := extract_upload_error(response.text):
+            message.append(f"Tracker error: {error_message}")
 
         failure_path = await self.common.save_html_file(meta, tracker, response.text, "Failed_Upload")
         message.append(
