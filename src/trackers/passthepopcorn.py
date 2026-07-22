@@ -623,7 +623,7 @@ class PassThePopcorn:
                 ptp_type = "Stand-up Comedy"
             elif "concert" in keywords:
                 ptp_type = "Live Performance"
-        if ptp_type is None and (meta.mode if meta.mode is not None else "discord") == "cli":
+        if ptp_type is None and (meta.mode if meta.mode is not None else "non_cli") == "cli":
             ptp_type_list = ["Feature Film", "Short Film", "Miniseries", "Stand-up Comedy", "Concert", "Movie Collection"]
             ptp_type = cli_ui.ask_choice("Select the proper type", choices=ptp_type_list)
             if ptp_type == "Concert":
@@ -1602,7 +1602,7 @@ class PassThePopcorn:
             if new_data["year"] in ["", "0", 0, None] and meta.manual_year not in [0, "", None]:
                 new_data["year"] = meta.manual_year
             if not new_data["tags"]:
-                if (meta.mode if meta.mode is not None else "discord") == "cli":
+                if (meta.mode if meta.mode is not None else "non_cli") == "cli":
                     while not new_data["tags"]:
                         logger.info("[yellow]Unable to match any tags")
                         logger.info("Valid tags can be found on the PassThePopcorn upload form")

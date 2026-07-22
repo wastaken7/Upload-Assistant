@@ -10,7 +10,7 @@ from typing import Any, cast
 REQUIRED_SECTIONS = ["DEFAULT", "TRACKERS"]
 
 # Optional top-level sections
-OPTIONAL_SECTIONS = ["IMAGES", "TORRENT_CLIENTS", "DISCORD", "USENET"]
+OPTIONAL_SECTIONS = ["IMAGES", "TORRENT_CLIENTS", "USENET"]
 
 # Required keys in DEFAULT section (critical for operation)
 REQUIRED_DEFAULT_KEYS: dict[str, type] = {
@@ -290,12 +290,6 @@ def validate_config(config: Any, active_trackers: list[str] | None = None, activ
         client_errors, client_warnings = _validate_torrent_clients_section(_as_dict(config_dict.get("TORRENT_CLIENTS")))
         errors.extend(client_errors)
         warnings.extend(client_warnings)
-
-    # Validate DISCORD section if present
-    if "DISCORD" in config_dict:
-        discord_errors, discord_warnings = _validate_discord_section(_as_dict(config_dict.get("DISCORD")))
-        errors.extend(discord_errors)
-        warnings.extend(discord_warnings)
 
     # Determine if Usenet is active (either because USENET is a target tracker, a Usenet tracker class is active, or enabled in config)
     trackers_upper = [t.upper() for t in active_trackers] if active_trackers else []
@@ -620,22 +614,6 @@ def _validate_torrent_clients_section(clients: dict[str, Any]) -> tuple[list[str
                         section="TORRENT_CLIENTS",
                     )
                 )
-
-    return errors, warnings
-
-
-def _validate_discord_section(discord: dict[str, Any]) -> tuple[list[str], list[ConfigValidationWarning]]:
-    """Validate the DISCORD config section."""
-    errors: list[str] = []
-    warnings: list[ConfigValidationWarning] = []
-
-    use_discord = discord.get("use_discord", False)
-    if use_discord:
-        # If Discord is enabled, check for required fields
-        if not discord.get("discord_bot_token"):
-            warnings.append(ConfigValidationWarning("Discord is enabled but 'discord_bot_token' is empty", key="discord_bot_token", section="DISCORD"))
-        if not discord.get("discord_channel_id"):
-            warnings.append(ConfigValidationWarning("Discord is enabled but 'discord_channel_id' is empty", key="discord_channel_id", section="DISCORD"))
 
     return errors, warnings
 

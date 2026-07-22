@@ -2799,16 +2799,4 @@ config: dict[str, Any] = {
         # Temporary directory for Usenet uploads where compressed volumes are stored (if empty, saves to tmp directory)
         "usenet_tmp_dir": "",
     },
-    "DISCORD": {
-        # Optional: install requirements-discord.txt before enabling Discord bot functionality
-        "use_discord": False,
-        # Set to True to only run the bot in unattended mode
-        "only_unattended": True,
-        # Set to True to send the tracker torrent urls
-        "send_upload_links": True,
-        "discord_bot_token": "",
-        "discord_channel_id": "",
-        "discord_bot_description": "",
-        "command_prefix": "!"
-    },
 }

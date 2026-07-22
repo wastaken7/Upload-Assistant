@@ -405,7 +405,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             videopath, filelist, search_term, search_file_folder = prep_instance._resolve_game_filelist(meta, videoloc)
             video = videopath
         else:
-            videopath, meta.filelist = await video_manager.get_video(videoloc, (meta.mode if meta.mode is not None else "discord"), meta.sorted_filelist)
+            videopath, meta.filelist = await video_manager.get_video(videoloc, (meta.mode if meta.mode is not None else "non_cli"), meta.sorted_filelist)
             filelist = meta.filelist
             meta.filelist = filelist
             search_term = Path(filelist[0]).name if filelist else ""
@@ -944,7 +944,7 @@ async def search_metadata(
             search_year_value,
             filename,
             debug=meta.debug,
-            mode=(meta.mode if meta.mode is not None else "discord"),
+            mode=(meta.mode if meta.mode is not None else "non_cli"),
             category_preference=meta.category,
             imdb_info=meta.imdb_info,
         )
@@ -1021,7 +1021,7 @@ async def search_metadata(
             search_year_value,
             filename,
             debug=meta.debug,
-            mode=(meta.mode if meta.mode is not None else "discord"),
+            mode=(meta.mode if meta.mode is not None else "non_cli"),
             category_preference=meta.category,
             imdb_info=meta.imdb_info,
         )

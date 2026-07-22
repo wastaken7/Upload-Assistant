@@ -11,8 +11,7 @@ The bundled installer script:
 3. Uses the current checkout if you pass `--ua-dir`, or clones/updates Upload Assistant in `~/tools/ua` by default.
 4. Creates `.venv`.
 5. Installs the base dependencies from `requirements.txt`.
-6. Optionally installs Discord support from `requirements-discord.txt`.
-7. Creates `run-ua.sh` for easier execution.
+6. Creates `run-ua.sh` for easier execution.
 
 ## Quick start
 
@@ -27,18 +26,11 @@ chmod +x scripts/install-seedbox.sh
 
 If you just want the installer to create or update a separate checkout in `~/tools/ua`, omit `--ua-dir "$PWD"`.
 
-With optional Discord support:
-
-```bash
-./scripts/install-seedbox.sh --with-discord
-```
-
 ## Options
 
 ```text
 --ua-dir PATH           Installation directory (default: ~/tools/ua)
 --python VERSION        Python version for pyenv (default: 3.14.0)
---with-discord          Install optional Discord dependencies
 --skip-pyenv-install    Fail instead of installing pyenv automatically
 --force-update          Recreate .venv and reinstall packages
 -h, --help              Show this help
@@ -95,12 +87,6 @@ git pull --ff-only
 source .venv/bin/activate
 pip install -U pip
 pip install -r requirements.txt
-```
-
-If you use Discord notifications, also run:
-
-```bash
-pip install -r requirements-discord.txt
 ```
 
 ## Notes about `local_path` / `remote_path`

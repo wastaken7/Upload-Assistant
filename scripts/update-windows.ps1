@@ -47,13 +47,6 @@ if ($SkipFfmpegInstall) {
     $installArguments.SkipFfmpegInstall = $true
 }
 
-if (Test-Path -LiteralPath $venvPython) {
-    & $venvPython -m pip show discord.py *> $null
-    if ($LASTEXITCODE -eq 0) {
-        $installArguments.WithDiscord = $true
-    }
-}
-
 $installerPath = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantInstaller-" + [guid]::NewGuid().ToString("N") + ".ps1")
 try {
     Invoke-WebRequest -UseBasicParsing -Uri $InstallerUrl -OutFile $installerPath

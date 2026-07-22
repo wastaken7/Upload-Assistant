@@ -5,7 +5,6 @@ import asyncio
 import contextlib
 import filecmp
 import gc
-import importlib
 import json
 import os
 import platform
@@ -83,33 +82,6 @@ def _parse_version_tuple(value: str) -> tuple[int, ...]:
 class WebUIServer(Protocol):
     def run(self) -> None: ...
     def close(self) -> None: ...
-
-
-class DiscordRuntime(Protocol):
-    Intents: Any
-    Client: Any
-    LoginFailure: type[Exception]
-    ClientException: type[Exception]
-
-
-class DiscordNotifierProtocol(Protocol):
-    @staticmethod
-    async def send_discord_notification(config: Mapping[str, Any], bot: Any, message: str, meta: Any) -> bool: ...
-
-    @staticmethod
-    async def send_upload_status_notification(config: Mapping[str, Any], bot: Any, meta: Any) -> bool: ...
-
-
-def _load_discord_runtime() -> tuple[DiscordRuntime, DiscordNotifierProtocol] | tuple[None, None]:
-    """Load Discord integrations only when the feature is enabled."""
-    try:
-        discord_module = cast(DiscordRuntime, importlib.import_module("discord"))
-        discordbot_module = importlib.import_module("discordbot")
-    except Exception as exc:
-        logger.info(f"[yellow]Discord integration unavailable: {exc}[/yellow]")
-        return None, None
-    notifier = cast(DiscordNotifierProtocol, discordbot_module.DiscordNotifier)
-    return discord_module, notifier
 
 
 # Global state for shutdown handling (reset via _reset_shutdown_state() for in-process runs)
@@ -313,11 +285,6 @@ if Path(_config_path).exists():
         tracker_data_manager = TrackerDataManager(config)
         takescreens_manager = TakeScreensManager(config)
         uploadscreens_manager = UploadScreensManager(config)
-        use_discord = False
-        discord_cfg_obj = config.get("DISCORD")
-        discord_config: dict[str, Any] | None = cast(dict[str, Any], discord_cfg_obj) if isinstance(discord_cfg_obj, dict) else None
-        if discord_config is not None:
-            use_discord = bool(discord_config.get("use_discord", False))
     except SyntaxError as e:
         _print_config_error("Syntax error", e.msg if e.msg else "Invalid syntax", lineno=e.lineno, text=e.text, offset=e.offset)
         logger.info(f"\n{_RED}Common syntax issues:{_RESET}", extra={"markup": False})
@@ -800,11 +767,8 @@ def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
     return actual_screens, capped_min
 
 
-async def process_meta(meta: Meta, base_dir: str, bot: Any = None, discord_notifier: DiscordNotifierProtocol | None = None) -> bool:
+async def process_meta(meta: Meta, base_dir: str) -> bool:
     """Process the metadata for each queued path."""
-    if use_discord and bot and discord_notifier is not None:
-        await discord_notifier.send_discord_notification(config, bot, f"Starting upload process for: {meta.path}", meta=meta)
-
     if not meta.imghost:
         meta.imghost = config["DEFAULT"]["img_host_1"]
         try:
@@ -1782,9 +1746,6 @@ async def do_the_thing(base_dir: str) -> None:
             if os.name != "nt":
                 Path(subdir_path).chmod(0o700)
 
-    bot: Any = None
-    discord_notifier: DiscordNotifierProtocol | None = None
-    connect_task: asyncio.Task[None] | None = None
     meta = Meta()
     paths: list[str] = []
     for each in sys.argv[1:]:
@@ -1973,8 +1934,6 @@ async def do_the_thing(base_dir: str) -> None:
 
         for queue_item in queue_list:
             total_files = len(queue_list)
-            bot = None
-            discord_notifier = None
             current_item_path: str = ""
             tmp_path = ""
             current_release_log_path.set(None)
@@ -2070,50 +2029,11 @@ async def do_the_thing(base_dir: str) -> None:
                 logger.info(f"[red]Exception: '{path}': {e}")
                 cleanup_manager.reset_terminal()
 
-            discord_bot_token = discord_config.get("discord_bot_token") if discord_config is not None else None
-            only_unattended = bool(discord_config.get("only_unattended", False)) if discord_config is not None else False
-
-            if (
-                use_discord
-                and discord_config is not None
-                and isinstance(discord_bot_token, str)
-                and discord_bot_token
-                and not meta.debug
-                and ((only_unattended and meta.unattended) or not only_unattended)
-            ):
-                discord_runtime, discord_notifier = _load_discord_runtime()
-                if discord_runtime is None or discord_notifier is None:
-                    logger.info("[yellow]Continuing without Discord integration...[/yellow]")
-                else:
-                    try:
-                        logger.info("[cyan]Starting Discord bot initialization...")
-                        intents = discord_runtime.Intents.default()
-                        intents.message_content = True
-                        bot = discord_runtime.Client(intents=intents)
-                        token = discord_bot_token
-                        await asyncio.wait_for(bot.login(token), timeout=10)
-                        connect_task = asyncio.create_task(bot.connect())
-
-                        try:
-                            await asyncio.wait_for(bot.wait_until_ready(), timeout=20)
-                            logger.info("[green]Discord Bot is ready!")
-                        except TimeoutError:
-                            logger.info("[bold red]Bot failed to connect within timeout period.")
-                            logger.info("[yellow]Continuing without Discord integration...[/yellow]")
-                            if "connect_task" in locals():
-                                connect_task.cancel()
-                    except discord_runtime.LoginFailure:
-                        logger.info("[bold red]Discord bot token is invalid. Please check your configuration.")
-                    except discord_runtime.ClientException as e:
-                        logger.info(f"[bold red]Discord client exception: {e}")
-                    except Exception as e:
-                        logger.error(f"[bold red]Unexpected error during Discord bot initialization: {e}")
-
             start_time = time.time()
 
             logger.info(f"[green]Gathering info for {Path(path).name}")
 
-            meta_success = await process_meta(meta, base_dir, bot=bot, discord_notifier=discord_notifier)
+            meta_success = await process_meta(meta, base_dir)
             if not meta_success:
                 if "queue" in meta and meta.queue is not None:
                     processed_files_count += 1
@@ -2314,9 +2234,6 @@ async def do_the_thing(base_dir: str) -> None:
                             upload_usenet_flow(meta, eligible_usenet_trackers, need_usenet_post, bool(usenet_trackers)),
                             upload_torrent_flow(meta, torrent_trackers),
                         )
-                    if use_discord and bot and discord_notifier is not None:
-                        await discord_notifier.send_upload_status_notification(config, bot, meta)
-
                     if config["DEFAULT"].get("cross_seeding", True):
                         await process_cross_seeds(meta)
 
@@ -2334,50 +2251,6 @@ async def do_the_thing(base_dir: str) -> None:
 
             finish_time = time.time()
             logger.debug(f"Uploads processed in {finish_time - start_time:.4f} seconds")
-
-            def build_tracker_status_line(tracker: str, status: Any) -> str:
-                try:
-                    if not isinstance(status, dict):
-                        return f"Error printing {tracker} data: invalid status type\n"
-
-                    status_dict = cast(dict[str, Any], status)
-                    status_message = status_dict.get("status_message")
-
-                    if tracker == "MORETHANTV" and status_message is not None and "data error" not in str(status_message):
-                        return f"{status_message!s}\n"
-
-                    if "torrent_id" in status_dict:
-                        tracker_class = tracker_class_map[tracker](config=config)
-                        torrent_url = tracker_class.torrent_url
-                        return f"{tracker}: {torrent_url}{status_dict['torrent_id']}\n"
-
-                    if status_message is not None and "data error" not in str(status_message) and tracker != "MORETHANTV":
-                        return f"{tracker}: {Redaction.redact_private_info(status_message)}\n"
-
-                    if status_message is not None and "data error" in str(status_message):
-                        return f"{tracker}: {status_message!s}\n"
-
-                    if status_dict.get("skipped") is False:
-                        return f"{tracker} gave no useful message.\n"
-
-                    return ""
-                except Exception as exc:
-                    return f"Error printing {tracker} data: {exc}\n"
-
-            if use_discord and bot and discord_notifier is not None:
-                send_upload_links = bool(discord_config.get("send_upload_links", False)) if discord_config is not None else False
-                if send_upload_links:
-                    try:
-                        discord_message = ""
-                        tracker_status_dict = meta.tracker_status or {}
-                        for tracker, status in tracker_status_dict.items():
-                            discord_message += build_tracker_status_line(tracker, status)
-                        discord_message += "All tracker uploads processed.\n"
-                        await discord_notifier.send_discord_notification(config, bot, discord_message, meta=meta)
-                    except Exception as e:
-                        logger.error(f"[red]Error in tracker print loop: {e}[/red]")
-                else:
-                    await discord_notifier.send_discord_notification(config, bot, f"Finished uploading: {meta.path}\n", meta=meta)
 
             for tracker in meta.trumping_trackers:
                 logger.info(f"[yellow]Submitting trumpable report to {tracker}.....")
@@ -2436,12 +2309,6 @@ async def do_the_thing(base_dir: str) -> None:
 
     finally:
         current_release_log_path.set(None)
-        if bot is not None:
-            await bot.close()
-        if connect_task is not None:
-            connect_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await connect_task
         if not sys.stdin.closed:
             cleanup_manager.reset_terminal()
 

@@ -8,7 +8,6 @@ param(
     [string]$PythonDownloadBaseUrl = "https://www.python.org/ftp/python",
     [string]$RepositoryZipUrl = "https://github.com/wastaken7/Upload-Assistant/archive/refs/heads/development.zip",
     [string]$FfmpegDownloadUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
-    [switch]$WithDiscord,
     [switch]$ForceUpdate,
     [switch]$SkipFfmpegInstall
 )
@@ -490,13 +489,6 @@ function Install-Dependencies {
         Fail "Base dependency installation failed"
     }
 
-    if ($WithDiscord) {
-        Write-Step "Installing optional Discord dependencies"
-        & $venvPython -m pip install -r (Join-Path $UaDir "requirements-discord.txt")
-        if ($LASTEXITCODE -ne 0) {
-            Fail "Discord dependency installation failed"
-        }
-    }
 }
 
 function Add-DirectoryToUserPath {
@@ -652,6 +644,3 @@ Write-Host "  A new PowerShell or Command Prompt window may be required before '
 Write-Host ""
 Write-Host "Configuration command (equivalent):"
 Write-Host "  & `"$venvPythonPath`" `"$UaDir\config-generator.py`""
-if (-not $WithDiscord) {
-    Write-Host "  - Enable Discord later with: & `"$venvPythonPath`" -m pip install -r `"$UaDir\requirements-discord.txt`""
-}

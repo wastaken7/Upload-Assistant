@@ -12,7 +12,6 @@ param(
     [Parameter(Mandatory)]
     [string]$Wheelhouse,
 
-    [switch]$WithDiscord
 )
 
 Set-StrictMode -Version Latest
@@ -259,8 +258,4 @@ Add-DirectoryToUserPath -DirectoryPath (Join-Path $ffmpegDir "bin")
 Write-Step "Installing Upload Assistant dependencies"
 Invoke-Process -FilePath $venvPython -Description "Bundled pip upgrade" -ArgumentList @("-m", "pip", "install", "--no-index", "--find-links", $resolvedWheelhouse, "--upgrade", "pip")
 Invoke-Process -FilePath $venvPython -Description "Bundled base dependency installation" -ArgumentList @("-m", "pip", "install", "--no-index", "--find-links", $resolvedWheelhouse, "-r", (Join-Path $resolvedInstallDir "requirements.txt"))
-if ($WithDiscord) {
-    Invoke-Process -FilePath $venvPython -Description "Bundled Discord dependency installation" -ArgumentList @("-m", "pip", "install", "--no-index", "--find-links", $resolvedWheelhouse, "-r", (Join-Path $resolvedInstallDir "requirements-discord.txt"))
-}
-
 Write-Step "Installation complete. Run ua-config before the first upload."

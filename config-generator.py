@@ -436,7 +436,7 @@ def autofill_missing_keys(config_data: ConfigDict, example_config: ConfigDict) -
                                 console.print(f"[i] Added missing key '{key}' to torrent client '{client_name}' with default value", markup=False)
 
         else:
-            # Static sections like DEFAULT, DISCORD, USENET, IMAGES, etc.
+            # Static sections like DEFAULT, USENET, IMAGES, etc.
             if section not in config_data:
                 config_data[section] = example_section.copy()
                 console.print(f"[i] Added missing section '{section}' with default values", markup=False)
@@ -966,53 +966,6 @@ def configure_single_client(
     return config_clients
 
 
-def configure_discord(
-    existing_discord: ConfigDict,
-    example_discord: ConfigDict,
-    config_comments: ConfigComments,
-) -> ConfigDict:
-    """
-    Helper to configure the DISCORD section.
-    Returns a dict with the configured Discord settings.
-    """
-    console.print("\n====== DISCORD CONFIGURATION ======", markup=False)
-    console.print("[i] Configure Discord bot settings for upload notifications", markup=False)
-
-    discord_config: ConfigDict = {}
-    existing_use_discord = existing_discord.get("use_discord", False)
-    enable_discord = get_user_input("Enable Discord bot functionality? (True/False)", default="False", existing_value=str(existing_use_discord))
-    discord_config["use_discord"] = enable_discord
-
-    # If Discord is disabled, set defaults and return
-    if enable_discord.lower() != "true":
-        console.print("[i] Discord disabled. Setting default values for other Discord settings.", markup=False)
-        discord_config = example_discord.copy()
-        discord_config["use_discord"] = enable_discord
-        return discord_config
-
-    # Configure other Discord settings if enabled
-    for key, default_value in example_discord.items():
-        if key == "use_discord":
-            continue
-
-        comment_key = f"DISCORD.{key}"
-        if comment_key in config_comments:
-            console.print("\n[i] " + "\n[i] ".join(config_comments[comment_key]), markup=False)
-
-        if isinstance(default_value, bool):
-            default_str = str(default_value)
-            existing_value = str(existing_discord.get(key, default_value))
-            value = get_user_input(f"Discord setting '{key}'? (True/False)", default=default_str, existing_value=existing_value)
-            discord_config[key] = value
-        else:
-            is_password = key in ["discord_bot_token"]
-            discord_config[key] = get_user_input(
-                f"Discord setting '{key}'", default=str(default_value) if default_value else "", is_password=is_password, existing_value=existing_discord.get(key)
-            )
-
-    return discord_config
-
-
 def generate_config_file(
     config_data: ConfigDict,
     existing_path: Path | None = None,
@@ -1144,9 +1097,6 @@ if __name__ == "__main__":
                 config_data["TORRENT_CLIENTS"] = client_configs
                 config_data["DEFAULT"]["default_torrent_client"] = default_client
 
-                example_discord = example_config.get("DISCORD", {})
-                config_data["DISCORD"] = configure_discord({}, example_discord, config_comments)
-
                 generate_config_file(config_data, comments=config_comments)
             else:
                 console.print("\n[i] Using existing configuration as a template.", markup=False)
@@ -1206,16 +1156,6 @@ if __name__ == "__main__":
                     console.print("[i] Keeping existing TORRENT_CLIENTS section", markup=False)
                     console.print("", markup=False)
 
-                # DISCORD section update
-                update_discord = input("Do you want to update something in the DISCORD section? (y/n): ").lower() == "y"
-                if update_discord:
-                    existing_discord = config_data.get("DISCORD", {})
-                    example_discord = example_config.get("DISCORD", {})
-                    config_data["DISCORD"] = configure_discord(existing_discord, example_discord, config_comments)
-                else:
-                    console.print("[i] Keeping existing DISCORD section", markup=False)
-                    console.print("", markup=False)
-
                 # Generate the updated config file
                 generate_config_file(config_data, existing_path, comments=config_comments)
         else:
@@ -1250,9 +1190,5 @@ if __name__ == "__main__":
         client_configs, default_client = configure_torrent_clients({}, example_clients, default_client, config_comments)
         config_data["TORRENT_CLIENTS"] = client_configs
         config_data["DEFAULT"]["default_torrent_client"] = default_client
-
-        # DISCORD section
-        example_discord = example_config.get("DISCORD", {})
-        config_data["DISCORD"] = configure_discord({}, example_discord, config_comments)
 
         generate_config_file(config_data, comments=config_comments)
