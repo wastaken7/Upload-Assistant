@@ -34,7 +34,7 @@ class MoreThanTV:
     display_name = "MoreThanTV"
     reject_english_original_bloat = True
     source_flag = "MTV"
-    approved_image_hosts = ("ptpimg", "imgbox", "imgbb")
+    approved_image_hosts = ("imgbox", "imgbb")
     banned_groups = (
         "[Oj]",
         "3LTON",
@@ -110,7 +110,6 @@ class MoreThanTV:
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {
             "ibb.co": "imgbb",
-            "ptpimg.me": "ptpimg",
             "imgbox.com": "imgbox",
         }
 

@@ -71,7 +71,6 @@ class HawkeUno(UNIT3D):
         "YTS",
     )
     approved_image_hosts = (
-        "ptpimg",
         "imgbox",
         "imgbb",
         "pixhost",
@@ -155,7 +154,6 @@ class HawkeUno(UNIT3D):
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {
             "ibb.co": "imgbb",
-            "ptpimg.me": "ptpimg",
             "pixhost.to": "pixhost",
             "imgbox.com": "imgbox",
             "imagebam.com": "bam",

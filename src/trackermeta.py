@@ -140,11 +140,6 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
         if not img_url:
             return None
 
-        if "ptpimg.me" in img_url and img_url.startswith("http://"):
-            img_url = img_url.replace("http://", "https://")
-            image_dict["raw_url"] = img_url
-            image_dict["web_url"] = img_url
-
         # Handle when pixhost url points to web_url and convert to raw_url
         if img_url.startswith("https://pixhost.to/show/"):
             img_url = img_url.replace("https://pixhost.to/show/", "https://img1.pixhost.to/images/", 1)

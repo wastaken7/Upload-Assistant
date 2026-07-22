@@ -618,7 +618,6 @@ def get_img_host(
 ) -> None:
     img_host_api_map: dict[str, str | list[str] | None] = {
         "imgbb": "imgbb_api",
-        "ptpimg": "ptpimg_api",
         "lensdump": "lensdump_api",
         "ptscreens": "ptscreens_api",
         "onlyimage": "onlyimage_api",
@@ -663,7 +662,7 @@ def get_img_host(
 
         valid_host = False
         while not valid_host:
-            host_input = input(f"\n[i] Enter image host #{i}{existing_display} (e.g., ptpimg, imgbb, imgbox): ").strip().lower()
+            host_input = input(f"\n[i] Enter image host #{i}{existing_display} (e.g., imgbb, imgbox, pixhost): ").strip().lower()
 
             if host_input == "" and existing_host:
                 host_input = existing_host

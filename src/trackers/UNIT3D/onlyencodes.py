@@ -25,7 +25,7 @@ class OnlyEncodes(UNIT3D):
     display_name = "OnlyEncodes"
     allows_bloated_audio = True
     base_url = "https://onlyencodes.cc"
-    approved_image_hosts = ("ptpimg", "imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage")
+    approved_image_hosts = ("imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage")
     banned_groups = (
         "[Oj]",
         "$andra",
@@ -187,7 +187,6 @@ class OnlyEncodes(UNIT3D):
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {
             "ibb.co": "imgbb",
-            "ptpimg.me": "ptpimg",
             "imgbox.com": "imgbox",
             "onlyimage.org": "onlyimage",
             "imagebam.com": "bam",

@@ -22,7 +22,7 @@ class Aura4K(UNIT3D):
     display_name = "Aura4K"
     allows_bloated_audio = True
     base_url = "https://aura4k.net"
-    approved_image_hosts = ("ptpimg", "onlyimage", "imgbox", "ptscreens", "imgbb", "imgur", "postimg")
+    approved_image_hosts = ("onlyimage", "imgbox", "ptscreens", "imgbb", "imgur", "postimg")
     banned_groups = ("BiTOR", "DepraveD", "Flights", "SasukeducK", "SPDVD", "TEKNO3D")
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
@@ -157,7 +157,6 @@ class Aura4K(UNIT3D):
             "postimg.cc": "postimg",
             "ptscreens.com": "ptscreens",
             "onlyimage.org": "onlyimage",
-            "ptpimg.me": "ptpimg",
         }
         await self.rehost_images_manager.check_hosts(
             meta,
