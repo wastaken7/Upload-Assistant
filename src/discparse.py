@@ -14,11 +14,13 @@ import cli_ui
 import defusedxml.ElementTree as ElementTree
 from langcodes import Language
 from pymediainfo import MediaInfo
+from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn
 
 from bin.get_playlist import MplsParser
-from src.console import logger
+from src.console import console, logger
 from src.exportmi import setup_mediainfo_library
 from src.meta import Meta
+from src.webui_progress import complete_progress, publish_progress
 
 PlaylistItem = dict[str, Any]
 PlaylistInfo = dict[str, Any]
@@ -85,6 +87,58 @@ class DiscParse:
         if self.mediainfo_config and self.mediainfo_config["cli"]:
             return self.mediainfo_config["cli"]
         return None
+
+    async def _run_bdinfo_with_progress(self, command: list[str], progress_id: str) -> int:
+        """Run go-bdinfo and forward its stream-scan progress to CLI and Web UI."""
+        progress_pattern = re.compile(
+            r"Stream scan:\s+(?P<percent>\d+(?:\.\d+)?)%\s+\((?P<done>[^,]+)\s*/\s*(?P<total>[^,]+),\s*files\s*"
+            r"(?P<files_done>\d+)/(?P<files_total>\d+),\s*read\s*(?P<speed>[^,]+),\s*ETA\s*(?P<eta>[^)]+)\)"
+        )
+        command = [*command, "--progress"]
+        process = await asyncio.create_subprocess_exec(*command, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
+        if process.stderr is None:
+            raise RuntimeError("Unable to read go-bdinfo progress output")
+
+        current = 0.0
+        buffer = ""
+        publish_progress(progress_id, "Scanning Blu-ray", current=0, total=100, detail="Starting go-bdinfo scan")
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console,
+            transient=False,
+        ) as progress:
+            task = progress.add_task("Scanning Blu-ray...", total=100)
+            while chunk := await process.stderr.read(1024):
+                buffer += chunk.decode("utf-8", errors="replace")
+                updates = re.split(r"[\r\n]+", buffer)
+                buffer = updates.pop()
+                for update in updates:
+                    match = progress_pattern.search(update)
+                    if not match:
+                        continue
+                    current = float(match["percent"])
+                    detail = f"{match['done'].strip()} / {match['total'].strip()} | {match['speed'].strip()} | ETA {match['eta'].strip()}"
+                    progress.update(task, completed=current, description=f"Scanning Blu-ray... {detail}")
+                    publish_progress(progress_id, "Scanning Blu-ray", current=current, total=100, detail=detail)
+
+            if buffer:
+                match = progress_pattern.search(buffer)
+                if match:
+                    current = float(match["percent"])
+                    detail = f"{match['done'].strip()} / {match['total'].strip()} | {match['speed'].strip()} | ETA {match['eta'].strip()}"
+                    progress.update(task, completed=current, description=f"Scanning Blu-ray... {detail}")
+                    publish_progress(progress_id, "Scanning Blu-ray", current=current, total=100, detail=detail)
+
+            returncode = await process.wait()
+            if returncode == 0:
+                progress.update(task, completed=100, description="Scanning Blu-ray complete")
+                complete_progress(progress_id, "Scanning Blu-ray", current=100, total=100)
+            else:
+                publish_progress(progress_id, "Scanning Blu-ray", current=current, total=100, detail=f"go-bdinfo exited with status {returncode}", status="failed")
+
+        return returncode
 
     """
     Get and parse bdinfo
@@ -274,45 +328,38 @@ class DiscParse:
                                     folder = "linux/arm"
                                 bdinfo_path = f"{base_dir}/bin/bdinfo/{folder}/bdinfo"
                                 if Path(bdinfo_path).exists():
-                                    bdinfo_executable = [bdinfo_path, path, "-m", playlist["file"], save_dir]
+                                    bdinfo_executable = [bdinfo_path, path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
                             elif system == "darwin":
                                 folder = "macos/arm64" if machine in ("arm64",) else "macos/x86_64"
                                 bdinfo_path = f"{base_dir}/bin/bdinfo/{folder}/bdinfo"
                                 if Path(bdinfo_path).exists():
-                                    bdinfo_executable = [bdinfo_path, path, "-m", playlist["file"], save_dir]
+                                    bdinfo_executable = [bdinfo_path, path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
                             elif system == "windows":
                                 # Windows builds are provided as x64
                                 bdinfo_path = f"{base_dir}/bin/bdinfo/windows/x86_64/bdinfo.exe"
                                 if Path(bdinfo_path).exists():
-                                    bdinfo_executable = [bdinfo_path, "-m", playlist["file"], path, save_dir]
+                                    bdinfo_executable = [bdinfo_path, path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
 
                             # Fallback to system-installed commands if bundled binary not present
                             if bdinfo_executable is None:
                                 if shutil.which("bdinfo"):
-                                    bdinfo_executable = ["bdinfo", path, "-m", playlist["file"], save_dir]
-                                elif shutil.which("BDInfo"):
-                                    bdinfo_executable = ["BDInfo", path, "-m", playlist["file"], save_dir]
+                                    bdinfo_executable = ["bdinfo", path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
                                 else:
-                                    logger.info(
-                                        f"[bold red]BDInfo not found. Please download bdinfo and place it under {base_dir}/bin/bdinfo/ or install a system bdinfo/BDInfo binary[/bold red]"
-                                    )
+                                    logger.info(f"[bold red]go-bdinfo not found. Place it under {base_dir}/bin/bdinfo/ or install a system bdinfo binary[/bold red]")
                                     continue
 
                             if bdinfo_executable:
-                                proc = await asyncio.create_subprocess_exec(*bdinfo_executable)
-                                await proc.wait()
+                                returncode = await self._run_bdinfo_with_progress(bdinfo_executable, f"bdinfo-scan-{folder_id}")
 
-                                if proc.returncode != 0:
-                                    logger.info(f"[bold red]BDInfo failed with return code {proc.returncode}[/bold red]")
+                                if returncode != 0:
+                                    logger.info(f"[bold red]BDInfo failed with return code {returncode}[/bold red]")
                                     continue
 
-                                # Rename the output to playlist_report_path
-                                for file in (p.name for p in Path(save_dir).iterdir()):
-                                    if file.startswith("BDINFO") and file.endswith(".txt"):
-                                        bdinfo_text = Path(save_dir) / file
-                                        shutil.move(bdinfo_text, playlist_report_path)
-                                        bdinfo_text = playlist_report_path  # Update bdinfo_text to the renamed file
-                                        break
+                                if playlist_report_path.is_file():
+                                    bdinfo_text = playlist_report_path
+                                else:
+                                    logger.info(f"[bold red]go-bdinfo did not create report {playlist_report_path}[/bold red]")
+                                    continue
                         except Exception as e:
                             logger.info(f"[bold red]Error scanning playlist {playlist['file']}: {e}")
                             continue
