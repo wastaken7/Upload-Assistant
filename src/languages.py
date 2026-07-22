@@ -184,9 +184,7 @@ class LanguagesManager:
 
         if "language_checked" not in meta:
             meta.language_checked = False
-        if tracker not in meta.tracker_status:
-            meta.tracker_status[tracker] = {}
-        status_dict = meta.tracker_status[tracker]
+        status_dict = meta.tracker_status.setdefault(tracker, {}) if tracker else {}
         if "unattended_audio_skip" not in meta:
             meta.unattended_audio_skip = False
         if "unattended_subtitle_skip" not in meta:
