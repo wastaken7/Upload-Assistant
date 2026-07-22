@@ -334,7 +334,7 @@ Web UI docs: [docs/web-ui.md](docs/web-ui.md)
 
 ## **Attributions:**
 
-Built with updated BDInfoCLI from <https://github.com/rokibhasansagar/BDInfoCLI-ng>
+Built with [autobrr/go-bdinfo](https://github.com/autobrr/go-bdinfo)
 
 Features automated binary managers for:
 

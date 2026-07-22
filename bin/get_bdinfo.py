@@ -27,35 +27,35 @@ except ImportError:
 
 
 class BDInfoBinaryManager:
-    """Download BDInfoCLI-ng binaries for the host architecture.
+    """Download autobrr/go-bdinfo binaries for the host architecture.
 
-    Default version pinned (see https://github.com/Audionut/BDInfoCLI-ng/releases)
+    Default version pinned (see https://github.com/autobrr/go-bdinfo/releases).
     """
 
     @staticmethod
-    async def ensure_bdinfo_binary(base_dir: str | Path, version: str = "v1.0.8") -> str:
+    async def ensure_bdinfo_binary(base_dir: str | Path, version: str = "v0.3.1") -> str:
         system = platform.system().lower()
         machine = platform.machine().lower()
         logger.debug(f"[blue]Detected system: {system}, architecture: {machine}[/blue]")
 
         platform_map: dict[str, dict[str, dict[str, str]]] = {
             "windows": {
-                "x86_64": {"file": "bdinfo-win-x64.zip", "folder": "windows/x86_64"},
-                "amd64": {"file": "bdinfo-win-x64.zip", "folder": "windows/x86_64"},
+                "x86_64": {"asset": "windows_amd64.zip", "folder": "windows/x86_64"},
+                "amd64": {"asset": "windows_amd64.zip", "folder": "windows/x86_64"},
             },
             "darwin": {
-                "arm64": {"file": "bdinfo-osx-arm64.tar.gz", "folder": "macos/arm64"},
-                "x86_64": {"file": "bdinfo-osx-x64.tar.gz", "folder": "macos/x86_64"},
-                "amd64": {"file": "bdinfo-osx-x64.tar.gz", "folder": "macos/x86_64"},
+                "arm64": {"asset": "darwin_arm64.tar.gz", "folder": "macos/arm64"},
+                "x86_64": {"asset": "darwin_amd64.tar.gz", "folder": "macos/x86_64"},
+                "amd64": {"asset": "darwin_amd64.tar.gz", "folder": "macos/x86_64"},
             },
             "linux": {
-                "x86_64": {"file": "bdinfo-linux-x64.tar.gz", "folder": "linux/amd64"},
-                "amd64": {"file": "bdinfo-linux-x64.tar.gz", "folder": "linux/amd64"},
-                "arm64": {"file": "bdinfo-linux-arm64.tar.gz", "folder": "linux/arm64"},
-                "aarch64": {"file": "bdinfo-linux-arm64.tar.gz", "folder": "linux/arm64"},
-                "armv7l": {"file": "bdinfo-linux-arm.tar.gz", "folder": "linux/arm"},
-                "armv6l": {"file": "bdinfo-linux-arm.tar.gz", "folder": "linux/armv6"},
-                "arm": {"file": "bdinfo-linux-arm.tar.gz", "folder": "linux/arm"},
+                "x86_64": {"asset": "linux_amd64.tar.gz", "folder": "linux/amd64"},
+                "amd64": {"asset": "linux_amd64.tar.gz", "folder": "linux/amd64"},
+                "arm64": {"asset": "linux_arm64.tar.gz", "folder": "linux/arm64"},
+                "aarch64": {"asset": "linux_arm64.tar.gz", "folder": "linux/arm64"},
+                "armv7l": {"asset": "linux_arm.tar.gz", "folder": "linux/arm"},
+                "armv6l": {"asset": "linux_arm.tar.gz", "folder": "linux/armv6"},
+                "arm": {"asset": "linux_arm.tar.gz", "folder": "linux/arm"},
             },
         }
 
@@ -63,7 +63,8 @@ class BDInfoBinaryManager:
             raise Exception(f"Unsupported platform: {system} {machine}")
 
         platform_info = platform_map[system][machine]
-        file_pattern = platform_info["file"]
+        release_version = version.removeprefix("v")
+        file_pattern = f"bdinfo_{release_version}_{platform_info['asset']}"
         folder_path = platform_info["folder"]
         logger.debug(f"[blue]Using file pattern: {file_pattern}[/blue]")
         logger.debug(f"[blue]Target folder: {folder_path}[/blue]")
@@ -113,8 +114,8 @@ class BDInfoBinaryManager:
 
         cleanup_old_version_files()
 
-        # Construct download URL using release asset filename
-        download_url = f"https://github.com/Audionut/BDInfoCLI-ng/releases/download/{version}/{file_pattern}"
+        # Construct download URL using autobrr/go-bdinfo release asset filename.
+        download_url = f"https://github.com/autobrr/go-bdinfo/releases/download/{version}/{file_pattern}"
         logger.debug(f"[blue]Download URL: {download_url}[/blue]")
 
         try:
@@ -212,7 +213,7 @@ class BDInfoBinaryManager:
                     binary_path.chmod(binary_path.stat().st_mode | stat.S_IEXEC)
 
                 async with aiofiles.open(version_path, "w", encoding="utf-8") as version_file:
-                    await version_file.write(f"BDInfoCLI-ng version {version} installed successfully.")
+                    await version_file.write(f"autobrr/go-bdinfo version {version} installed successfully.")
                 return str(binary_path)
             finally:
                 try:

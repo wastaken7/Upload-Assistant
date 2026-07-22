@@ -321,6 +321,7 @@ If the tracker configuration in `example_config.py` mentions cookies, they must 
    - By default, name the file after the tracker (e.g., `MAKINGOFF.txt` or `AVISTAZ.txt`).
 
 > [!NOTE]
+>
 > - **BJ-Share:** Two-factor authentication (2FA) must be enabled in your profile settings; otherwise, your session cookies will expire fairly quickly.
 > - **HDTorrents:** Keep in mind that changing the site domain requires exporting the cookies again from the new domain.
 
