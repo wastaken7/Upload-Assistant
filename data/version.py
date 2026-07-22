@@ -1,14 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
-__version__ = "v2.7"
+__version__ = "v2.8"
 
-"""
-## What's Changed
-* fix: improve M-Team metadata handling by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/92
-* fix(mteam): normalize torrent names according to wiki guidelines by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/93
-* fix: continue image host fallback chain by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/95
-* fix(usenet): bump pesto to v0.3.61, add precise missing-article error by @franzopl in https://github.com/wastaken7/Upload-Assistant/pull/94
-
-
-**Full Changelog**: https://github.com/wastaken7/Upload-Assistant/compare/v2.6...v2.7
-"""
+"## What's Changed\n* ci: add manual release workflow by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/96\n* fix(curupira): add banned groups from CapybaraBR by @franzopl in https://github.com/wastaken7/Upload-Assistant/pull/97\n* feat(makingoff): update tracker for XenForo, add subtitle zipping & metadata enhancements by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/80\n* fix: zero-screenshot book uploads by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/98\n* feat: use go-bdinfo with scan progress by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/99\n* refactor!: remove Discord integration by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/100\n* fix(config): sort tracker sections by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/101\n* fix: remove PTPimg support by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/102\n* fix(usenet): pass tmdb/imdb/tvdb/mal ids to pesto and nyuu, bump pinned pesto to pesto-v0.3.62 by @franzopl in https://github.com/wastaken7/Upload-Assistant/pull/103\n* fix(usenet): always clean up temp 7z/PAR2 staging dir, even on failed uploads by @franzopl in https://github.com/wastaken7/Upload-Assistant/pull/104\n* chore(deps): bump setuptools from 80.9.0 to 83.0.0 in the pip group across 1 directory by @dependabot[bot] in https://github.com/wastaken7/Upload-Assistant/pull/105\n* feat(auth): parse upload errors by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/106\n* fix(capybarabr): preserve original release group by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/107\n* perf: render MediaInfo from metadata by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/108\n\n\n**Full Changelog**: https://github.com/wastaken7/Upload-Assistant/compare/v2.7...v2.8"
