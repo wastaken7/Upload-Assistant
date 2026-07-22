@@ -236,7 +236,7 @@ const loadCsrfToken =
   (typeof window !== "undefined" && window.loadCsrfToken) || (async () => {});
 
 const sensitiveKeyPattern =
-  /(api|username|password|announce_url|rss_key|passkey|discord_bot_token|discord_channel_id|qui_proxy_url)/i;
+  /(api|username|password|announce_url|rss_key|passkey|qui_proxy_url)/i;
 const isSensitiveKey = (key) => sensitiveKeyPattern.test(key || "");
 const isTorrentClientUserPass = (key, pathParts) =>
   pathParts.includes("TORRENT_CLIENTS") && /(user|pass)/i.test(key || "");

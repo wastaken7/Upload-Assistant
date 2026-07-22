@@ -20,7 +20,6 @@ The config is a Python dict named `config` with these top-level sections:
 - `IMAGES`: static icon URLs used in some descriptions.
 - `TRACKERS`: which trackers to upload to + per-tracker credentials/options.
 - `TORRENT_CLIENTS`: qBittorrent/ruTorrent/etc client configuration.
-- `DISCORD`: optional Discord bot integration.
 
 Notes:
 
@@ -387,21 +386,6 @@ Typical keys:
 - `watch_folder` (str): Path to a watch folder where `.torrent` files should be dropped.
 
 ---
-
-## `DISCORD` section
-
-Enables an optional Discord bot.
-
-Install `requirements-discord.txt` before enabling this section.
-
-- `use_discord` (bool): Enable Discord bot.
-- `only_unattended` (bool): Only run the bot in unattended mode.
-- `send_upload_links` (bool): Send tracker torrent URLs.
-- `discord_bot_token` (str): Bot token.
-- `discord_channel_id` (str): Target channel.
-- `discord_bot_description` (str): Bot description.
-- `command_prefix` (str): Command prefix (example `!`).
-- See https://github.com/Audionut/Upload-Assistant/wiki/Discord-Bot
 
 ### Tracker overridable settings
 

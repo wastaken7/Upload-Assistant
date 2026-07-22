@@ -396,7 +396,7 @@ async def imdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_manager: 
             meta.search_year,
             filename,
             debug=meta.debug,
-            mode=(meta.mode if meta.mode is not None else "discord"),
+            mode=(meta.mode if meta.mode is not None else "non_cli"),
             category_preference=meta.category,
         ),
         tvmaze_manager.search_tvmaze(

@@ -7,6 +7,4 @@
 [Seedbox / Linux Install](seedbox.md)
 [Windows Install](windows-install.md)
 
-[Discord Bot](Discord-Bot.md)
-
 [ffmpeg / max worker issues](ffmpeg---max-workers-issues.md)

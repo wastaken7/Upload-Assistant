@@ -127,9 +127,3 @@ NOTE: If using Windows paths, change `\` into `\\`. For example `C:\Downloads\TV
              "watch_folder" : "/Path/To/Watch/Folder"
          },
   ```
-
-## Discord
-
-**This is only REQUIRED if you plan to use the discord bot functionality**
-
-Visit the [Discord Bot Setup and Configuration](Discord-Bot.md) page for more details. Otherwise you can leave these values blank/whatever comes in them
