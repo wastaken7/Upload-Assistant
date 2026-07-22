@@ -46,7 +46,6 @@ from src.dupe_checking import DupeChecker
 from src.get_desc import gen_desc
 from src.get_name import NameManager
 from src.get_tracker_data import TrackerDataManager
-from src.languages import languages_manager
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
 from src.takescreens import TakeScreensManager
@@ -926,7 +925,6 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         # reset trackers after any removals
         trackers = meta.trackers
 
-        audio_prompted = False
         for tracker in [
             "ASIANCINEMA",
             "AITHER",
@@ -959,17 +957,8 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             "ULCX",
         ]:
             if tracker in trackers:
-                if not audio_prompted:
-                    await languages_manager.process_desc_language(meta, tracker=tracker)
-                    audio_prompted = True
-                else:
-                    status_dict = meta.tracker_status
-                    if tracker not in status_dict:
-                        status_dict[tracker] = {}
-                    if meta.unattended_audio_skip or meta.unattended_subtitle_skip:
-                        status_dict[tracker]["skip_upload"] = True
-                    else:
-                        status_dict[tracker]["skip_upload"] = False
+                status_dict = meta.tracker_status.setdefault(tracker, {})
+                status_dict["skip_upload"] = meta.unattended_audio_skip or meta.unattended_subtitle_skip
 
         await asyncio.sleep(0.2)
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:

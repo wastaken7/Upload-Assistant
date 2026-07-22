@@ -26,6 +26,7 @@ try:
     from src.get_tracker_data import TrackerDataManager
     from src.getseasonep import SeasonEpisodeManager
     from src.is_scene import SceneManager
+    from src.languages import languages_manager
     from src.metadata_searching import MetadataSearchingManager
     from src.prep_game import gather_game_prep as _gather_game_prep_fn
     from src.prep_game import resolve_game_filelist as _resolve_game_filelist_fn
@@ -132,6 +133,8 @@ class Prep:
 
         # 8. Set Final Metadata and tags
         await prep_helpers.finalize_metadata(self, meta, videopath, bdinfo, mi, filename, untouched_filename, video)
+
+        await languages_manager.process_desc_language(meta)
 
         if meta.category == "BOOK":
             await self.rehost_images_manager.takescreens_manager.prepare_book_cover(videopath, meta.uuid, meta.base_dir, meta)

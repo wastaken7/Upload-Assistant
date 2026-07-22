@@ -224,7 +224,6 @@ class CapybaraBR(UNIT3D):
     async def get_name(self, meta: Meta) -> dict[str, str]:
         category = meta.category
         cbr_name = meta.name
-        name = meta.name
 
         if category == "BOOK":
             book_title = self.common.portuguese_title_capitalization(meta.title)
@@ -297,22 +296,26 @@ class CapybaraBR(UNIT3D):
                         else:
                             audio_tag = ""
 
-                    if audio_tag:
-                        if "-" in cbr_name:
-                            parts = cbr_name.rsplit("-", 1)
+                if not audio_tag and (meta.dual_audio or "dual-audio" in (meta.audio or "").lower()):
+                    audio_tag = " DUAL"
 
-                            custom_tag = dict(dict(self.config.get("TRACKERS", {})).get(self.tracker, {})).get("tag_for_custom_release", "")
-                            if custom_tag and custom_tag in name:
-                                match = re.search(r"-([^.-]+)\.(?:DUAL|MULTI)", meta.uuid)
-                                if match and match.group(1) != meta.tag:
-                                    original_group_tag = match.group(1)
-                                    cbr_name = f"{parts[0]}-{original_group_tag}{audio_tag}-{parts[1]}"
-                                else:
-                                    cbr_name = f"{parts[0]}{audio_tag}-{parts[1]}"
-                            else:
-                                cbr_name = f"{parts[0]}{audio_tag}-{parts[1]}"
+                if audio_tag:
+                    if "-" in cbr_name:
+                        parts = cbr_name.rsplit("-", 1)
+
+                        match = None
+                        for source_name in (meta.path, meta.uuid):
+                            if source_name:
+                                match = re.search(r"-([^.-]+)\.(?:DUAL|MULTI)(?=-|\.|$)", str(source_name), re.IGNORECASE)
+                                if match:
+                                    break
+                        current_group_tag = (meta.tag or "").lstrip("-")
+                        if match and match.group(1).casefold() != current_group_tag.casefold():
+                            cbr_name = f"{parts[0]}-{match.group(1)}{audio_tag}-{parts[1]}"
                         else:
-                            cbr_name += audio_tag
+                            cbr_name = f"{parts[0]}{audio_tag}-{parts[1]}"
+                    else:
+                        cbr_name += audio_tag
 
             if not meta.tag or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
                 for invalid_tag in invalid_tags:

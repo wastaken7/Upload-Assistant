@@ -778,10 +778,6 @@ config: dict[str, Any] = {
             "anon": True,
             # Send uploads to CAPYBARABR modq for staff approval
             "modq": False,
-            # The tag that identifies you or your group when modifying an existing release.
-            # If set, the script will try to preserve the original group's name.
-            # Example: If set to "MyTag", a release might become: Movie 2003 1080p WEB-DL DDP5.1 H.264-OriginalGroup DUAL-MyTag
-            "tag_for_custom_release": "",
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
             # The configurations below override the DEFAULT configuration
@@ -2096,10 +2092,6 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
-            # The tag that identifies you or your group when modifying an existing release.
-            # If set, the script will try to preserve the original group's name.
-            # Example: If set to "MyTag", a release might become: Movie 2003 1080p WEB-DL DDP5.1 H.264-OriginalGroup DUAL-MyTag
-            "tag_for_custom_release": "",
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
             # The configurations below override the DEFAULT configuration
