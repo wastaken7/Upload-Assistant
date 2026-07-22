@@ -1087,15 +1087,16 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         # files behind. That's the actual bug behind reports of "files
         # aren't deleted after upload": the case people wouldn't call a
         # failure is exactly the intermittent-missing-article one.
+        cleanup_path = upload_root if cleanup_upload_root else usenet_dir
         try:
-            if cleanup_upload_root and await aiofiles.ospath.exists(upload_root):
+            if await aiofiles.ospath.exists(cleanup_path):
                 if is_debug:
-                    logger.info(f"[cyan][DEBUG SIMULATION] Would delete temporary Usenet folder: {upload_root}[/cyan]")
+                    logger.info(f"[cyan][DEBUG SIMULATION] Would delete temporary Usenet folder: {cleanup_path}[/cyan]")
                 else:
-                    await asyncio.to_thread(shutil.rmtree, upload_root)
+                    await asyncio.to_thread(shutil.rmtree, cleanup_path)
                     logger.info("[green]Cleaned up temporary compressed Usenet files.[/green]")
-        except Exception as e:
-            logger.warning(f"[yellow]Warning: Could not clean up temporary Usenet folder '{upload_root}' ({e})[/yellow]")
+        except OSError as e:
+            logger.warning(f"[yellow]Warning: Could not clean up temporary Usenet folder '{cleanup_path}' ({e})[/yellow]")
 
     if use_pesto:
         # 6a. Upload via pesto
