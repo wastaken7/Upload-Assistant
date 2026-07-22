@@ -919,7 +919,7 @@ class AmigosShare:
         if not meta.is_disc:
             filelist = cast(list[str], meta.filelist or [])
             video_file = filelist[0] if filelist else (meta.path or "")
-            return DescriptionBuilder._format_short_mediainfo_json(meta.mediainfo, video_file) or None
+            return DescriptionBuilder.format_short_mediainfo_json(meta.mediainfo, video_file) or None
 
         return None
 

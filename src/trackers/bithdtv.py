@@ -64,7 +64,7 @@ class BitHDTV:
         if meta.is_disc != "BDMV":
             filelist = cast(list[str], meta.filelist or [])
             video = filelist[0] if filelist else (meta.path or "")
-            media_info = DescriptionBuilder._format_short_mediainfo_json(meta.mediainfo, video)
+            media_info = DescriptionBuilder.format_short_mediainfo_json(meta.mediainfo, video)
 
         data: dict[str, Any] = {
             "api_key": str(self.config["TRACKERS"][self.tracker]["api_key"]).strip(),

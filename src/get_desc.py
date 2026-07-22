@@ -15,6 +15,7 @@ import aiofiles
 import httpx
 import langcodes
 from jinja2 import Template
+from langcodes.tag_parser import LanguageTagError
 from pymediainfo import MediaInfo
 
 from cogs.redaction import PathAwareEncoder
@@ -379,7 +380,7 @@ class DescriptionBuilder:
         video_file = meta.filelist[0]
 
         if meta.mediainfo:
-            media_info_content = self._format_short_mediainfo_json(meta.mediainfo, video_file)
+            media_info_content = self.format_short_mediainfo_json(meta.mediainfo, video_file)
             if media_info_content:
                 with contextlib.suppress(Exception):
                     await self.common.makedirs(str(cache_file_dir))
@@ -390,7 +391,7 @@ class DescriptionBuilder:
         return ""
 
     @staticmethod
-    def _format_short_mediainfo_json(mediainfo: dict[str, Any], video_file: str = "") -> str:
+    def format_short_mediainfo_json(mediainfo: dict[str, Any] | None, video_file: str = "") -> str:
         """Render the short MediaInfo section from meta.mediainfo."""
         if not mediainfo:
             return ""
@@ -443,7 +444,7 @@ class DescriptionBuilder:
                 parsed = langcodes.Language.get(language)
                 name = parsed.language_name("en")
                 return f"{name} ({parsed.territory})" if parsed.territory else name
-            except Exception:
+            except LanguageTagError:
                 return language
 
         general = next((track for track in tracks if value(track, "@type") == "General"), None)

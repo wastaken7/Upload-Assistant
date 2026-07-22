@@ -14,7 +14,7 @@ def test_format_short_mediainfo_json() -> None:
         }
     }
 
-    result = DescriptionBuilder._format_short_mediainfo_json(report, "Movie.mkv")
+    result = DescriptionBuilder.format_short_mediainfo_json(report, "Movie.mkv")
 
     assert "Movie" in result
     assert "Duration.......: 01:30:00.123" in result
@@ -22,3 +22,5 @@ def test_format_short_mediainfo_json() -> None:
     assert "Format.........: Dolby Digital" in result
     assert "Language.......: Portuguese (BR)" in result
     assert "Language.......: English (Forced), UTF-8" in result
+    assert DescriptionBuilder.format_short_mediainfo_json(None, "x.mkv") == ""
+    assert DescriptionBuilder.format_short_mediainfo_json({}, "x.mkv") == ""
