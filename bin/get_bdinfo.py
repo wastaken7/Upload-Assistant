@@ -54,7 +54,7 @@ class BDInfoBinaryManager:
                 "arm64": {"asset": "linux_arm64.tar.gz", "folder": "linux/arm64"},
                 "aarch64": {"asset": "linux_arm64.tar.gz", "folder": "linux/arm64"},
                 "armv7l": {"asset": "linux_arm.tar.gz", "folder": "linux/arm"},
-                "armv6l": {"asset": "linux_arm.tar.gz", "folder": "linux/armv6"},
+                "armv6l": {"asset": "linux_arm.tar.gz", "folder": "linux/arm"},
                 "arm": {"asset": "linux_arm.tar.gz", "folder": "linux/arm"},
             },
         }
