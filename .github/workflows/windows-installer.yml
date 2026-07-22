@@ -73,7 +73,7 @@ jobs:
           Invoke-WebRequest -Uri "https://www.python.org/ftp/python/$pythonVersion/python-$pythonVersion-amd64.exe" -OutFile build/payload/python-installer.exe -UseBasicParsing
           Invoke-WebRequest -Uri $env:FFMPEG_URL -OutFile build/payload/ffmpeg.zip -UseBasicParsing
           New-Item -ItemType Directory -Force -Path build/payload/wheels | Out-Null
-          python -m pip download --only-binary=:all: --dest build/payload/wheels pip -r requirements.txt
+          python -m pip wheel --wheel-dir build/payload/wheels pip -r requirements.txt
           "UA_VERSION=$env:UA_VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Install Inno Setup
