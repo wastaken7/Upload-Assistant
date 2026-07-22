@@ -1144,6 +1144,23 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         if archive_password and not skip_archive:
             cmd_pesto.extend(["--nzb-password", archive_password])
 
+        # External IDs (pesto >=0.3.62): written as structured <meta type=
+        # "tmdbid"/"imdbid"/"tvdbid"/"malid"> tags in the NZB itself, so any
+        # downstream tool reading the NZB directly (not just Curupira's own
+        # upload API, which UA already calls separately with this same
+        # metadata) sees them too — e.g. a re-index, or an automated import
+        # elsewhere. tmdb_type mirrors curupira.py's own mapping
+        # (meta.category.lower() gated to "movie"/"tv").
+        tmdb_type = meta.category.lower()
+        if meta.tmdb_id and str(meta.tmdb_id).isdigit() and int(meta.tmdb_id) > 0 and tmdb_type in ("movie", "tv"):
+            cmd_pesto.extend(["--tmdb", f"{tmdb_type}/{meta.tmdb_id}"])
+        if meta.imdb_tt:
+            cmd_pesto.extend(["--imdb-id", meta.imdb_tt])
+        if meta.tvdb_id and str(meta.tvdb_id).isdigit() and int(meta.tvdb_id) > 0:
+            cmd_pesto.extend(["--tvdb-id", str(meta.tvdb_id)])
+        if meta.mal_id and str(meta.mal_id).isdigit() and int(meta.mal_id) > 0:
+            cmd_pesto.extend(["--mal-id", str(meta.mal_id)])
+
         # --check: a streaming STAT check that runs concurrently with the
         # upload, confirming each article shortly after it posts. Missing
         # articles are reposted and reverified automatically, internally to
@@ -1254,6 +1271,23 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             check_retries = usenet_cfg.get("nyuu_check_retries")
             if check_retries is not None and str(check_retries).strip() != "":
                 cmd_nyuu.extend(["--check-tries", str(check_retries)])
+
+        # External IDs: nyuu's -M/--meta is a free-form key/value map (no
+        # fixed tag whitelist, unlike --nzb-title/-tag/-category/-password),
+        # written straight through as <meta type="{key}">{value}</meta> —
+        # same tags pesto writes for --tmdb/--imdb-id/--tvdb-id/--mal-id, so
+        # both uploaders produce an equivalent NZB. Same source/format as the
+        # pesto branch above (tmdb_type via meta.category.lower(), meta.imdb_tt
+        # already zero-padded "tt...").
+        tmdb_type = meta.category.lower()
+        if meta.tmdb_id and str(meta.tmdb_id).isdigit() and int(meta.tmdb_id) > 0 and tmdb_type in ("movie", "tv"):
+            cmd_nyuu.extend(["-M", f"tmdbid: {tmdb_type}/{meta.tmdb_id}"])
+        if meta.imdb_tt:
+            cmd_nyuu.extend(["-M", f"imdbid: {meta.imdb_tt}"])
+        if meta.tvdb_id and str(meta.tvdb_id).isdigit() and int(meta.tvdb_id) > 0:
+            cmd_nyuu.extend(["-M", f"tvdbid: {meta.tvdb_id}"])
+        if meta.mal_id and str(meta.mal_id).isdigit() and int(meta.mal_id) > 0:
+            cmd_nyuu.extend(["-M", f"malid: {meta.mal_id}"])
 
         cmd_nyuu.extend(all_upload_files)
 
