@@ -239,7 +239,7 @@ class DescriptionBuilder:
                 return False
         try:
             return bool(int(val))
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             return default
 
     def _get_int_config(self, key: str, default: Any = 0) -> int:
@@ -250,10 +250,10 @@ class DescriptionBuilder:
 
         try:
             return int(val)
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             try:
                 return int(default)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 return 0
 
     def _get_str_config(self, key: str, default: str = "") -> str:
@@ -392,6 +392,8 @@ class DescriptionBuilder:
     @staticmethod
     def _format_short_mediainfo_json(mediainfo: dict[str, Any], video_file: str = "") -> str:
         """Render the short MediaInfo section from meta.mediainfo."""
+        if not mediainfo:
+            return ""
         raw_tracks = mediainfo.get("media", {}).get("track", [])
         if not isinstance(raw_tracks, list):
             return ""
@@ -404,7 +406,7 @@ class DescriptionBuilder:
         def format_duration(seconds: str) -> str:
             try:
                 milliseconds = int((Decimal(seconds) * 1000).to_integral_value(rounding=ROUND_HALF_UP))
-            except InvalidOperation, ValueError:
+            except (InvalidOperation, ValueError):
                 return ""
             hours, milliseconds = divmod(milliseconds, 3_600_000)
             minutes, milliseconds = divmod(milliseconds, 60_000)
