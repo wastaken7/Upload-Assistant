@@ -1037,7 +1037,7 @@ def generate_config_file(
     # Generate the config file with properly formatted Python syntax
     with Path(config_path).open("w", encoding="utf-8") as file:
         file.write("# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0\n")
-        file.write("config = {\n")
+        file.write("from typing import Any\n\n\nconfig: dict[str, Any] = {\n")
 
         # Custom formatting function to create Python dict with trailing commas
         def write_dict(d: ConfigDict, indent_level: int = 1, key_stack: list[str] | None = None) -> None:
