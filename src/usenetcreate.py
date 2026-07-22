@@ -1073,6 +1073,30 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         "</nzb>\n"
     )
 
+    async def cleanup_temp_upload_dir() -> None:
+        # 7. Cleanup compressed volumes (7z parts + PAR2 recovery files) from
+        # the temp staging dir. Called both from each upload branch's failure
+        # path below (right before it re-raises) and, on success, from its
+        # original spot after the if/else — run_pesto_with_progress and
+        # run_nyuu_with_progress raise on failure (non-zero exit, or pesto's
+        # own post-check giving up on articles it couldn't confirm after
+        # every repost attempt), and upload.py's caller catches that
+        # exception and moves on to other trackers rather than crashing the
+        # whole run, so a run that hit this never looked like a failure
+        # overall — it just silently skipped this cleanup and left the temp
+        # files behind. That's the actual bug behind reports of "files
+        # aren't deleted after upload": the case people wouldn't call a
+        # failure is exactly the intermittent-missing-article one.
+        try:
+            if cleanup_upload_root and await aiofiles.ospath.exists(upload_root):
+                if is_debug:
+                    logger.info(f"[cyan][DEBUG SIMULATION] Would delete temporary Usenet folder: {upload_root}[/cyan]")
+                else:
+                    await asyncio.to_thread(shutil.rmtree, upload_root)
+                    logger.info("[green]Cleaned up temporary compressed Usenet files.[/green]")
+        except Exception as e:
+            logger.warning(f"[yellow]Warning: Could not clean up temporary Usenet folder '{upload_root}' ({e})[/yellow]")
+
     if use_pesto:
         # 6a. Upload via pesto
         cmd_pesto = [
@@ -1172,6 +1196,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 with contextlib.suppress(Exception):
                     if await aiofiles.ospath.exists(nzb_file):
                         await aiofiles.os.remove(nzb_file)
+                await cleanup_temp_upload_dir()
                 raise
     else:
         # 6b. Upload via nyuu
@@ -1251,6 +1276,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 with contextlib.suppress(Exception):
                     if await aiofiles.ospath.exists(nzb_file):
                         await aiofiles.os.remove(nzb_file)
+                await cleanup_temp_upload_dir()
                 raise
 
         # nyuu doesn't inject the password into the NZB — do it manually.
@@ -1263,16 +1289,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 logger.info("[cyan]Injecting password into NZB metadata...[/cyan]")
             await inject_nzb_password(nzb_file, archive_password)
 
-    # 7. Cleanup compressed volumes after successful upload
-    try:
-        if cleanup_upload_root and await aiofiles.ospath.exists(upload_root):
-            if is_debug:
-                logger.info(f"[cyan][DEBUG SIMULATION] Would delete temporary Usenet folder: {upload_root}[/cyan]")
-            else:
-                await asyncio.to_thread(shutil.rmtree, upload_root)
-                logger.info("[green]Cleaned up temporary compressed Usenet files.[/green]")
-    except Exception as e:
-        logger.warning(f"[yellow]Warning: Could not clean up temporary Usenet folder '{upload_root}' ({e})[/yellow]")
+    await cleanup_temp_upload_dir()
 
     # 8. Relocate NZB output
     if await aiofiles.ospath.exists(nzb_file):
