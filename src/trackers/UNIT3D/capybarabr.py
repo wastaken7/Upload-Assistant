@@ -303,8 +303,12 @@ class CapybaraBR(UNIT3D):
                     if "-" in cbr_name:
                         parts = cbr_name.rsplit("-", 1)
 
-                        source_name = str(meta.path or meta.uuid or "")
-                        match = re.search(r"-([^.-]+)\.(?:DUAL|MULTI)(?=-|\.|$)", source_name, re.IGNORECASE)
+                        match = None
+                        for source_name in (meta.path, meta.uuid):
+                            if source_name:
+                                match = re.search(r"-([^.-]+)\.(?:DUAL|MULTI)(?=-|\.|$)", str(source_name), re.IGNORECASE)
+                                if match:
+                                    break
                         current_group_tag = (meta.tag or "").lstrip("-")
                         if match and match.group(1).casefold() != current_group_tag.casefold():
                             cbr_name = f"{parts[0]}-{match.group(1)}{audio_tag}-{parts[1]}"
