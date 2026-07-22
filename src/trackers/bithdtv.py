@@ -5,10 +5,10 @@ from typing import Any, cast
 
 import aiofiles
 import httpx
-from pymediainfo import MediaInfo
 
 from cogs.redaction import Redaction
 from src.console import logger
+from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.common import Common
 
@@ -64,9 +64,7 @@ class BitHDTV:
         if meta.is_disc != "BDMV":
             filelist = cast(list[str], meta.filelist or [])
             video = filelist[0] if filelist else (meta.path or "")
-            mi_template = str(Path(f"{meta.base_dir}/data/templates/MEDIAINFO.txt").resolve())
-            if Path(mi_template).exists():
-                media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={"inform": f"file://{mi_template}"})
+            media_info = DescriptionBuilder._format_short_mediainfo_json(meta.mediainfo, video)
 
         data: dict[str, Any] = {
             "api_key": str(self.config["TRACKERS"][self.tracker]["api_key"]).strip(),

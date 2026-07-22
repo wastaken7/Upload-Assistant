@@ -11,7 +11,6 @@ import aiofiles
 import cli_ui
 import httpx
 from bs4 import BeautifulSoup
-from pymediainfo import MediaInfo
 
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
@@ -920,10 +919,7 @@ class AmigosShare:
         if not meta.is_disc:
             filelist = cast(list[str], meta.filelist or [])
             video_file = filelist[0] if filelist else (meta.path or "")
-            template_path = str(Path(f"{meta.base_dir}/data/templates/MEDIAINFO.txt").resolve())
-            if Path(template_path).exists():
-                mi_output = MediaInfo.parse(video_file, output="STRING", full=False, mediainfo_options={"inform": f"file://{template_path}"})
-                return mi_output.replace("\r", "")
+            return DescriptionBuilder._format_short_mediainfo_json(meta.mediainfo, video_file) or None
 
         return None
 

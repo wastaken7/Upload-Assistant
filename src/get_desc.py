@@ -6,12 +6,14 @@ import json
 import os
 import re
 import urllib.parse
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import ParseResult
 
 import aiofiles
 import httpx
+import langcodes
 from jinja2 import Template
 from pymediainfo import MediaInfo
 
@@ -375,43 +377,125 @@ class DescriptionBuilder:
                     return await f.read()
 
         video_file = meta.filelist[0]
-        mi_template = Path(meta.base_dir) / "data" / "templates" / "MEDIAINFO.txt"
-        mi_file_path = Path(cache_file_dir) / "MEDIAINFO_CLEANPATH.txt"
 
-        template_exists = await self.common.path_exists(mi_template)
-
-        if template_exists:
-            try:
-                media_info_result = MediaInfo.parse(
-                    video_file,
-                    output="STRING",
-                    full=False,
-                    mediainfo_options={"inform": f"file://{mi_template}"},
-                )
-                media_info_content = media_info_result
-
-                if media_info_content:
-                    media_info_content = media_info_content.replace("\r\n", "\n")
-                    with contextlib.suppress(Exception):
-                        await self.common.makedirs(cache_file_dir)
-                        async with aiofiles.open(cache_file_path, mode="w", encoding="utf-8") as f:
-                            await f.write(media_info_content)
-
-                    return media_info_content
-
-            except Exception:
-                cleanpath_exists = await self.common.path_exists(mi_file_path)
-                if cleanpath_exists:
-                    async with aiofiles.open(mi_file_path, encoding="utf-8") as f:
-                        return await f.read()
-
-        else:
-            cleanpath_exists = await self.common.path_exists(mi_file_path)
-            if cleanpath_exists:
-                async with aiofiles.open(mi_file_path, encoding="utf-8") as f:
-                    return await f.read()
+        if meta.mediainfo:
+            media_info_content = self._format_short_mediainfo_json(meta.mediainfo, video_file)
+            if media_info_content:
+                with contextlib.suppress(Exception):
+                    await self.common.makedirs(str(cache_file_dir))
+                    async with aiofiles.open(cache_file_path, mode="w", encoding="utf-8") as f:
+                        await f.write(media_info_content)
+                return media_info_content
 
         return ""
+
+    @staticmethod
+    def _format_short_mediainfo_json(mediainfo: dict[str, Any], video_file: str = "") -> str:
+        """Render the short MediaInfo section from meta.mediainfo."""
+        raw_tracks = mediainfo.get("media", {}).get("track", [])
+        if not isinstance(raw_tracks, list):
+            return ""
+        tracks = [track for track in raw_tracks if isinstance(track, dict)]
+
+        def value(track: dict[str, Any], key: str) -> str:
+            field = track.get(key, "")
+            return field.strip() if isinstance(field, str) else ""
+
+        def format_duration(seconds: str) -> str:
+            try:
+                milliseconds = int((Decimal(seconds) * 1000).to_integral_value(rounding=ROUND_HALF_UP))
+            except InvalidOperation, ValueError:
+                return ""
+            hours, milliseconds = divmod(milliseconds, 3_600_000)
+            minutes, milliseconds = divmod(milliseconds, 60_000)
+            seconds, milliseconds = divmod(milliseconds, 1000)
+            return f"{hours:02}:{minutes:02}:{seconds:02}.{milliseconds:03}"
+
+        def format_size(bytes_value: str) -> str:
+            try:
+                gibibytes = Decimal(bytes_value) / (1024**3)
+            except InvalidOperation:
+                return ""
+            precision = ".1f" if gibibytes >= 10 else ".2f"
+            return f"{gibibytes:{precision}} GiB"
+
+        def format_bitrate(bits_per_second: str) -> str:
+            try:
+                bitrate = Decimal(bits_per_second)
+            except InvalidOperation:
+                return ""
+            if bitrate >= 10_000_000:
+                return f"{bitrate / 1_000_000:.1f} Mb/s"
+            return f"{int((bitrate / 1000).to_integral_value(rounding=ROUND_HALF_UP)):,}".replace(",", " ") + " kb/s"
+
+        def format_sampling_rate(hertz: str) -> str:
+            try:
+                return f"{Decimal(hertz) / 1000:.1f} kHz"
+            except InvalidOperation:
+                return ""
+
+        def language_name(language: str) -> str:
+            if not language:
+                return ""
+            try:
+                parsed = langcodes.Language.get(language)
+                name = parsed.language_name("en")
+                return f"{name} ({parsed.territory})" if parsed.territory else name
+            except Exception:
+                return language
+
+        general = next((track for track in tracks if value(track, "@type") == "General"), None)
+        if general is None:
+            return ""
+
+        filename = Path(value(general, "CompleteName") or video_file).stem
+        output = [
+            filename,
+            "",
+            "---GENERAL----",
+            f"Size...........: {format_size(value(general, 'FileSize'))}",
+            f"Container......: {value(general, 'Format')}",
+            f"Duration.......: {format_duration(value(general, 'Duration'))}",
+            "",
+        ]
+
+        for video in (track for track in tracks if value(track, "@type") == "Video"):
+            codec = value(video, "Format")
+            codec += ", " + value(video, "Encoded_Library") if value(video, "Encoded_Library") else ""
+            codec += ", " + value(video, "HDR_Format_String") if value(video, "HDR_Format_String") else ""
+            codec += ", " + value(video, "transfer_characteristics") if value(video, "transfer_characteristics") else ""
+            output.extend(
+                [
+                    "---VIDEO----",
+                    f"Codec..........: {codec}",
+                    f"Resolution.....: {value(video, 'Width')}x{value(video, 'Height')}",
+                    f"Bit rate.......: {format_bitrate(value(video, 'BitRate'))}",
+                    f"Frame rate.....: {value(video, 'FrameRate')} fps",
+                    "",
+                ]
+            )
+
+        for audio in (track for track in tracks if value(track, "@type") == "Audio"):
+            title = value(audio, "Title")
+            output.extend(
+                [
+                    "---AUDIO----",
+                    f"Format.........: {value(audio, 'Format_Commercial_IfAny') or value(audio, 'Format')}",
+                    f"Channels.......: {value(audio, 'Channels')} channel{'s' if value(audio, 'Channels') != '1' else ''}",
+                    f"Sample rate....: {format_sampling_rate(value(audio, 'SamplingRate'))}",
+                    f"Bit rate.......: {format_bitrate(value(audio, 'BitRate'))}",
+                    f"Language.......: {language_name(value(audio, 'Language'))}{f' ({title})' if title else ''}",
+                    "",
+                ]
+            )
+
+        for index, text in enumerate(track for track in tracks if value(track, "@type") == "Text"):
+            if index == 0:
+                output.append("---SUBTITLES---")
+            title = value(text, "Title")
+            output.append(f"Language.......: {language_name(value(text, 'Language'))}{f' ({title})' if title else ''}, {value(text, 'Format')}")
+
+        return "\n".join(output).rstrip() + "\n"
 
     async def get_bdinfo_section(self, meta: Meta) -> str:
         """Returns the bdinfo section if applicable."""
