@@ -42,9 +42,12 @@ def extract_upload_error(html: str) -> str:
     # Older themes mark the error heading, while the actual message is in its
     # next sibling or in the nearest small container.
     for element in soup.select("[class*='error']"):
+        element_message = clean(element.get_text(" ", strip=True))
+        if element_message and element_message.lower() not in {"error", "erro"}:
+            return element_message
         for parent in [element, *element.parents]:
             message = clean(parent.get_text(" ", strip=True))
-            if len(message) > len(clean(element.get_text(" ", strip=True))) and len(message) < 500:
+            if len(message) > len(element_message) and len(message) < 500:
                 message = re.sub(r"^(?:erro|error)\b", "", message, flags=re.IGNORECASE)
                 if message := clean(message):
                     return message
