@@ -254,7 +254,6 @@ const formatDisplayLabel = (key) => {
 
 const imageHostApiKeys = {
   imgbb: ["imgbb_api"],
-  ptpimg: ["ptpimg_api"],
   lensdump: ["lensdump_api"],
   ptscreens: ["ptscreens_api"],
   onlyimage: ["onlyimage_api"],

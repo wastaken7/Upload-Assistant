@@ -57,7 +57,7 @@ class BEYONDHD:
         "x0r",
         "YIFY",
     )
-    approved_image_hosts = ("ptpimg", "imgbox", "imgbb", "pixhost", "bhd", "bam")
+    approved_image_hosts = ("imgbox", "imgbb", "pixhost", "bhd", "bam")
     base_url = "https://beyond-hd.me"
     upload_url = f"{base_url}/api/upload/"
     torrent_url = f"{base_url}/details/"
@@ -75,7 +75,6 @@ class BEYONDHD:
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {
             "ibb.co": "imgbb",
-            "ptpimg.me": "ptpimg",
             "pixhost.to": "pixhost",
             "imgbox.com": "imgbox",
             "beyondhd.co": "bhd",

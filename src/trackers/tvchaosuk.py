@@ -38,7 +38,7 @@ class TVChaosUK:
     source_flag = "TVCHAOS"
     signature = ""
     banned_groups = ()
-    approved_image_hosts = ("imgbb", "ptpimg", "imgbox", "pixhost", "bam", "onlyimage")
+    approved_image_hosts = ("imgbb", "imgbox", "pixhost", "bam", "onlyimage")
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
@@ -438,7 +438,6 @@ class TVChaosUK:
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {
             "ibb.co": "imgbb",
-            "ptpimg.me": "ptpimg",
             "imgbox.com": "imgbox",
             "pixhost.to": "pixhost",
             "imagebam.com": "bam",

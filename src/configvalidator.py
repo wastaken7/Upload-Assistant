@@ -29,7 +29,6 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "img_host_2": (str,),
     "img_host_3": (str,),
     "imgbb_api": (str,),
-    "ptpimg_api": (str,),
     "lostimg_api": (str,),
     "lensdump_api": (str,),
     "ptscreens_api": (str,),
@@ -108,7 +107,6 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
 # Valid image hosts
 VALID_IMAGE_HOSTS = [
     "imgbb",
-    "ptpimg",
     "imgbox",
     "pixhost",
     "lensdump",
@@ -127,7 +125,6 @@ VALID_IMAGE_HOSTS = [
 # Image hosts that require API keys and their corresponding config key names
 IMAGE_HOST_API_KEYS: dict[str, str] = {
     "imgbb": "imgbb_api",
-    "ptpimg": "ptpimg_api",
     "lostimg": "lostimg_api",
     "lensdump": "lensdump_api",
     "ptscreens": "ptscreens_api",

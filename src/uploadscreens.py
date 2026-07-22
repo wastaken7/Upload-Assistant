@@ -3,7 +3,6 @@ import asyncio
 import base64
 import contextlib
 import gc
-import json
 import os
 import re
 import time
@@ -70,46 +69,6 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     return {"status": "failed", "reason": "Imgbox upload failed. No valid URLs returned."}
             except Exception as e:
                 return {"status": "failed", "reason": f"Error during Imgbox upload: {e!s}"}
-
-        elif img_host == "ptpimg":
-            try:
-                payload = {"format": "json", "api_key": config["DEFAULT"]["ptpimg_api"].strip()}
-            except KeyError:
-                return {"status": "failed", "reason": "Missing ptpimg API key in config"}
-
-            try:
-                async with httpx.AsyncClient() as client:
-                    async with aiofiles.open(image, "rb") as file:
-                        files = {"file-upload[0]": (Path(image).name, await file.read())}
-                        headers = {"referer": "https://ptpimg.me/index.php"}
-
-                    try:
-                        response = await client.post("https://ptpimg.me/upload.php", headers=headers, data=payload, files=files, timeout=timeout)
-
-                        response.raise_for_status()
-                        response_data = cast(list[dict[str, Any]], response.json())
-
-                        if not response_data or "code" not in response_data[0]:
-                            return {"status": "failed", "reason": "Invalid JSON response from ptpimg"}
-
-                        code = str(response_data[0]["code"])
-                        ext = str(response_data[0]["ext"])
-                        img_url = f"https://ptpimg.me/{code}.{ext}"
-                        raw_url = img_url
-                        web_url = img_url
-
-                    except httpx.TimeoutException:
-                        logger.info("[red][ptpimg] Request timed out.")
-                        return {"status": "failed", "reason": "Request timed out"}
-                    except json.JSONDecodeError as e:
-                        logger.info(f"[red][ptpimg] JSONDecodeError: {e!s}")
-                        return {"status": "failed", "reason": "Invalid JSON response from ptpimg"}
-                    except ValueError as e:
-                        logger.info(f"[red][ptpimg] ValueError: {e!s}")
-                        return {"status": "failed", "reason": f"Request failed: {e!s}"}
-            except Exception as e:
-                logger.info(f"[red][ptpimg] Exception: {e!s}")
-                return {"status": "failed", "reason": f"Error during ptpimg upload: {e!s}"}
 
         elif img_host == "imgbb":
             url = "https://api.imgbb.com/1/upload"

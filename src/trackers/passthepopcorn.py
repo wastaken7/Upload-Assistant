@@ -76,7 +76,7 @@ class PassThePopcorn:
         "LAMA",
         "WORLD",
     )
-    approved_image_hosts = ("ptpimg", "pixhost")
+    approved_image_hosts = ("pixhost",)
     sub_lang_map: ClassVar[dict[tuple[str, ...], int]] = {
         ("Arabic", "ara", "ar"): 22,
         ("Brazilian Portuguese", "Brazilian", "Portuguese-BR", "pt-br", "pt-BR"): 49,
@@ -503,24 +503,6 @@ class PassThePopcorn:
             )
             return existing
 
-    async def ptpimg_url_rehost(self, image_url: str) -> str:
-        payload = {"format": "json", "api_key": self.config["DEFAULT"]["ptpimg_api"], "link-upload": image_url}
-        headers = {"referer": "https://ptpimg.me/index.php"}
-        url = "https://ptpimg.me/upload.php"
-
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            response = await client.post(url, headers=headers, data=payload)
-        try:
-            response = response.json()
-            ptpimg_code = response[0]["code"]
-            ptpimg_ext = response[0]["ext"]
-            img_url = f"https://ptpimg.me/{ptpimg_code}.{ptpimg_ext}"
-        except Exception:
-            logger.info("[red]PTPIMG image rehost failed")
-            img_url = image_url
-            # img_url = ptpimg_upload(image_url, ptpimg_api)
-        return img_url
-
     def _selected_poster_host(self, meta: Meta) -> str:
         default_config = cast(dict[str, Any], self.config.get("DEFAULT", {}))
         return str(meta.imghost or default_config.get("img_host_1") or "").strip()
@@ -535,7 +517,6 @@ class PassThePopcorn:
             "pixhost": ("pixhost.to",),
             "lensdump": ("lensdump.com",),
             "onlyimage": ("onlyimage.org",),
-            "ptpimg": ("ptpimg.me",),
             "ptscreens": ("ptscreens.com",),
             "passtheimage": ("passtheima.ge",),
             "seedpool_cdn": ("cdn.seedpool.org",),
@@ -840,7 +821,6 @@ class PassThePopcorn:
 
     async def check_image_hosts(self, meta: Meta) -> None:
         url_host_mapping = {
-            "ptpimg.me": "ptpimg",
             "pixhost.to": "pixhost",
         }
 
@@ -891,7 +871,7 @@ class PassThePopcorn:
                         images_to_keep: list[dict[str, Any]] = []
                         for img in cast(list[dict[str, Any]], key_data_dict.get("images", [])):
                             raw_url = str(img.get("raw_url", ""))
-                            # Extract hostname from URL (e.g., ptpimg.me -> ptpimg)
+                            # Extract hostname from URL (e.g., pixhost.to -> pixhost)
                             try:
                                 parsed_url = urlparse(raw_url)
                                 hostname = parsed_url.netloc

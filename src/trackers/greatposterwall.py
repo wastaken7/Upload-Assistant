@@ -89,13 +89,12 @@ class GreatPosterWall:
         "Xiaomi",
         "YIFY",
     )
-    approved_image_hosts = ("kshare", "pixhost", "ptpimg", "pterclub", "ilikeshots", "imgbox")
+    approved_image_hosts = ("kshare", "pixhost", "pterclub", "ilikeshots", "imgbox")
     torrent_url = f"{base_url}/torrents.php?torrentid="
     url_host_mapping: ClassVar = {
         "kshare.club": "kshare",
         "pixhost.to": "pixhost",
         "imgbox.com": "imgbox",
-        "ptpimg.me": "ptpimg",
         "img.pterclub.com": "pterclub",
         "yes.ilikeshots.club": "ilikeshots",
     }
@@ -235,7 +234,7 @@ class GreatPosterWall:
         return title if title and title != meta.title else ""
 
     async def check_image_hosts(self, meta: Meta) -> None:
-        # Rule: 2.2.1. Screenshots: They have to be saved at kshare.club, pixhost.to, ptpimg.me, img.pterclub.com, yes.ilikeshots.club, imgbox.com, s3.pterclub.com
+        # Rule: 2.2.1. Screenshots: They have to be saved at kshare.club, pixhost.to, img.pterclub.com, yes.ilikeshots.club, imgbox.com, s3.pterclub.com
         await self.rehost_images_manager.check_hosts(
             meta,
             self.tracker,

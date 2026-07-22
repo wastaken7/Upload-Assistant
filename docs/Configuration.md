@@ -12,8 +12,6 @@
       - Notes: 32MB Cap, easy to signup and get your api key. Kinda slowish
     - imgbox
       - Notes: 10MB Cap. No signup needed. Recommended.
-    - ptpimg
-      - Recommended if you have access. API Key can be found via inspect element on the upload page.
     - lostimg
       - Notes: JSON response API. API Key can be created/found in Settings.
 
