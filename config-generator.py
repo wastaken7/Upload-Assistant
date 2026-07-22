@@ -4,6 +4,7 @@ import ast
 import json
 import re
 from collections.abc import Callable
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
@@ -68,6 +69,11 @@ class LinkedSetting(TypedDict):
 ConfigDict = dict[str, Any]
 ConfigComments = dict[str, list[str]]
 UnexpectedKey = tuple[str, ConfigDict, str]
+
+
+def tracker_sort_key(name: str) -> tuple[bool, bool, str]:
+    """Keep default_trackers first, sort trackers alphabetically, and put MANUAL last."""
+    return name != "default_trackers", name == "MANUAL", name
 
 
 def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
@@ -398,6 +404,16 @@ def autofill_missing_keys(config_data: ConfigDict, example_config: ConfigDict) -
         if section == "TRACKERS":
             if "TRACKERS" not in config_data:
                 config_data["TRACKERS"] = {"default_trackers": ""}
+
+            # Trackers are independent configuration sections.  Unlike their
+            # individual settings, a newly supported tracker has no existing
+            # user section to iterate over, so add its template explicitly.
+            for tracker_name, tracker_settings in example_section.items():
+                if tracker_name == "default_trackers" or tracker_name in config_data["TRACKERS"]:
+                    continue
+                if isinstance(tracker_settings, dict):
+                    config_data["TRACKERS"][tracker_name] = deepcopy(tracker_settings)
+                    console.print(f"[i] Added new tracker '{tracker_name}' with default settings", markup=False)
 
             for tracker_name, tracker_settings in config_data["TRACKERS"].items():
                 if tracker_name == "default_trackers":
@@ -1028,7 +1044,9 @@ def generate_config_file(
             if key_stack is None:
                 key_stack = []
             indent = "    " * indent_level
-            for key, value in d.items():
+            keys = sorted(d, key=tracker_sort_key) if key_stack == ["TRACKERS"] else d
+            for key in keys:
+                value = d[key]
                 fq_key = ".".join([*key_stack, key]) if key_stack else key
                 if comments and fq_key in comments:
                     for comment in comments[fq_key]:
