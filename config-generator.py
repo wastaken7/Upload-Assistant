@@ -409,7 +409,7 @@ def autofill_missing_keys(config_data: ConfigDict, example_config: ConfigDict) -
             # individual settings, a newly supported tracker has no existing
             # user section to iterate over, so add its template explicitly.
             for tracker_name, tracker_settings in example_section.items():
-                if tracker_name == "default_trackers" or tracker_name in config_data["TRACKERS"]:
+                if tracker_name in {"default_trackers", "MANUAL"} or tracker_name in config_data["TRACKERS"]:
                     continue
                 if isinstance(tracker_settings, dict):
                     config_data["TRACKERS"][tracker_name] = deepcopy(tracker_settings)
