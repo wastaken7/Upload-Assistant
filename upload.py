@@ -855,7 +855,6 @@ async def _host_orpheus_music_cover(meta: Meta, uploadscreens_manager: UploadScr
             if _is_http_url(cached_url):
                 meta.cover = str(cached_url)
                 _set_music_field(meta, "cover_url", meta.cover, source="external")
-                logger.info("[cyan]Music: using cached hosted artwork URL.[/cyan]")
                 return
     except (OSError, ValueError, TypeError) as error:
         logger.debug(f"[yellow]MUSIC: ignored unusable artwork cache: {error}[/yellow]")
@@ -875,7 +874,6 @@ async def _host_orpheus_music_cover(meta: Meta, uploadscreens_manager: UploadScr
     async with aiofiles.open(cache_path, "w", encoding="utf-8") as file:
         await file.write(json.dumps(uploaded[0], indent=2))
     await _write_music_snapshot(meta)
-    logger.info("[green]Music: hosted album artwork for Orpheus.[/green]")
 
 
 async def _prompt_music_meta(meta: Meta) -> None:

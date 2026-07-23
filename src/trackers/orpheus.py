@@ -48,6 +48,29 @@ class Orpheus:
         "Unknown": 21,
     }
     banned_groups = ()
+    blocked_music_artists: ClassVar[dict[str, str]] = {
+        "vap0rwave": "Vap0rwave",
+        "pauldvr": "Paul_DVR",
+        "firmensprecher": "Firmensprecher",
+        "stretches": "stretches",
+        "phyllomedusa": "Phyllomedusa",
+    }
+    blocked_music_releases: ClassVar[tuple[tuple[str, str], ...]] = (
+        ("Bruce Springsteen", "Odds and Sods"),
+        ("Dr. Dre", "Detox"),
+        ("Green Day", "Cigarettes and Valentines"),
+        ("Jean-Michel Jarre", "Music for Supermarkets"),
+        ("Michael Jackson", "Super Mix"),
+        ("Pink Floyd", "Tree Full of Secrets"),
+        ("The Beatles", "Carnival of Light"),
+        ("The Upholsterers", "Your Furniture Was Always Dead… I Was Just Afraid To Tell You"),
+        ("Various Artists", "The Ultimate 500 CD Jazz Collection"),
+        ("Wu-Tang Clan", "Once Upon a Time in Shaolin"),
+    )
+    blocked_music_labels: ClassVar[tuple[str, ...]] = (
+        "Sandero Classic Sound",
+        "Sip It & Trip It Records",
+    )
     tracker_urls = ("home.opsfet.ch",)
 
     def __init__(self, config: dict[str, Any]) -> None:
@@ -68,6 +91,62 @@ class Orpheus:
         if not isinstance(meta.music_release, dict):
             raise ValueError("MUSIC analysis is missing; run preparation before using Orpheus.")
         return MusicRelease.from_dict(meta.music_release)
+
+    @staticmethod
+    def _normalise_artist_name(value: Any) -> str:
+        """Compare artist names independently of case, spaces and underscores."""
+        return re.sub(r"[^a-z0-9]+", "", str(value or "").casefold())
+
+    @classmethod
+    def _blocked_artists(cls, release: MusicRelease) -> list[str]:
+        values = cls._artists(release)
+        # A manually supplied credit can contain collaborators in a single
+        # value.  Split common credit separators while retaining exact-name
+        # matching so an unrelated longer artist name is never blocked.
+        candidates: list[str] = []
+        for value in values:
+            candidates.extend(part.strip() for part in re.split(r"\s*(?:,|&|;|\bfeat(?:uring)?\.?\b|\bwith\b)\s*", value, flags=re.I) if part.strip())
+        blocked: list[str] = []
+        for candidate in candidates:
+            name = cls.blocked_music_artists.get(cls._normalise_artist_name(candidate))
+            if name and name not in blocked:
+                blocked.append(name)
+        return blocked
+
+    @classmethod
+    def _blocked_releases(cls, release: MusicRelease) -> list[str]:
+        artists = {cls._normalise_artist_name(value) for value in cls._artists(release)}
+        title = cls._normalise_artist_name(release.get("album", ""))
+        matches: list[str] = []
+        for artist, album in cls.blocked_music_releases:
+            if cls._normalise_artist_name(artist) in artists and cls._normalise_artist_name(album) == title:
+                matches.append(f"{artist} - {album}")
+        return matches
+
+    @classmethod
+    def _blocked_labels(cls, release: MusicRelease) -> list[str]:
+        labels = {cls._normalise_artist_name(value) for value in (release.get("release_label", ""), release.get("label", "")) if str(value or "").strip()}
+        return [label for label in cls.blocked_music_labels if cls._normalise_artist_name(label) in labels]
+
+    async def get_additional_checks(self, meta: Meta) -> bool:
+        """Prevent uploads of artists explicitly prohibited by Orpheus."""
+        release = self._release(meta)
+        blocked_artists = self._blocked_artists(release)
+        blocked_releases = self._blocked_releases(release)
+        blocked_labels = self._blocked_labels(release)
+        if not (blocked_artists or blocked_releases or blocked_labels):
+            return True
+        reasons = [
+            *(f"artist {artist}" for artist in blocked_artists),
+            *(f"blacklisted release {release_name}" for release_name in blocked_releases),
+            *(f"blacklisted label {label}" for label in blocked_labels),
+        ]
+        message = f"Upload blocked: Orpheus blacklist matched {', '.join(reasons)}."
+        status = meta.tracker_status.setdefault(self.tracker, {})
+        status["status_message"] = message
+        status["blocked_reasons"] = reasons
+        logger.error(f"[red]ORPHEUS: {message}[/red]")
+        return False
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         """Perform one narrow, read-only Gazelle browse query for duplicate review."""
@@ -235,6 +314,8 @@ class Orpheus:
 
     async def upload(self, meta: Meta) -> bool:
         release = self._release(meta)
+        if not await self.get_additional_checks(meta):
+            return False
         issues = OrpheusMusicValidator().validate(release)
         errors = [issue.message for issue in issues if issue.level == ValidationLevel.ERROR]
         if errors:
@@ -444,15 +525,26 @@ class Orpheus:
     @staticmethod
     def _album_description(release: MusicRelease) -> str:
         lines = [f"[b]Tracklist[/b] ({release.disc_count} disc(s))\n"]
+        total_duration = 0.0
         for track in release.tracks:
             prefix = f"{track.disc_number}." if release.disc_count > 1 else ""
-            number = f"{track.track_number:02d}" if track.track_number else "--"
-            lines.append(f"{prefix}{number}. {track.title or Path(track.relative_path).stem}")
+            number = str(track.track_number) if track.track_number else "--"
+            duration = float(track.duration or 0)
+            total_duration += duration
+            lines.append(f"{prefix}{number}. {track.title or Path(track.relative_path).stem} ({Orpheus._format_duration(duration)})")
+        lines.append(f"\nTotal length: {Orpheus._format_duration(total_duration)}")
         return "\n".join(lines)
 
     @staticmethod
+    def _format_duration(seconds: float) -> str:
+        total_seconds = max(0, round(seconds))
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes:02d}:{seconds:02d}"
+
+    @staticmethod
     def _release_description(release: MusicRelease) -> str:
-        variants = sorted({f"{track.bit_depth or '?'}-bit/{(track.sample_rate or 0) / 1000:g} kHz/{track.channels or '?'}ch" for track in release.tracks})
+        variants = sorted({f"{track.bit_depth or '?'}-bit / {(track.sample_rate or 0) / 1000:g} kHz / {track.channels or '?'}ch" for track in release.tracks})
         parts = [f"Technical audio: {', '.join(variants)}."] if variants else []
         if release.get("retail_date"):
             parts.append(f"Retail date: {release.get('retail_date')}.")

@@ -13,7 +13,7 @@ from src.meta import Meta
 from src.music.analyzer import MusicReleaseAnalyzer, _clean, _format_for
 from src.music.models import AudioTrack, MetadataSource, MusicRelease
 from src.music.prep import _apply_music_cli_overrides, _discogs_ids, _music_override_year
-from src.music.sources import DiscogsEnricher
+from src.music.sources import DiscogsEnricher, MusicBrainzEnricher
 from src.prep import Prep
 from src.trackers.orpheus import Orpheus
 from src.uphelper import _music_confirmation_lines
@@ -156,6 +156,75 @@ def test_compilation_uses_multiple_artists_not_various_artists_literal():
     assert release.get("artist") != "Various Artists"
 
 
+def test_featured_track_artists_do_not_turn_a_stable_album_artist_into_a_compilation():
+    """Guest-heavy albums must retain the release's ALBUMARTIST credit.
+
+    This mirrors Bootsy Collins - Metal Health: all tracks are credited to
+    Bootsy at album level, while individual songs add different guests.
+    """
+    release = MusicRelease(root=".")
+    track_artists = (
+        "Bootsy Collins",
+        "Bootsy Collins, Manou Gallo, Buckethead",
+        "Bootsy Collins, Buckethead, Victor Wooten",
+        "Bootsy Collins, Ouiwey Collins",
+        "Bootsy Collins, Buckethead",
+        "Bootsy Collins, Buckethead, Robert Trujillo",
+        "Bootsy Collins, Nate Alien8, Buckethead, Barbie T",
+        "Bootsy Collins, Robert Trujillo",
+        "Bootsy Collins, Tobotius",
+        "Bootsy Collins, Billy Sheehan",
+        "Bootsy Collins, Buckethead, Jennifer Batten",
+        "Bootsy Collins, Buckethead, Tobotius",
+        "Bootsy Collins, Samuel L. Jackson",
+        "Bootsy Collins, Eric Gales",
+    )
+    for index, artist in enumerate(track_artists, start=1):
+        release.tracks.append(
+            AudioTrack(
+                path=f"{index}.flac",
+                relative_path=f"{index}.flac",
+                format="FLAC",
+                codec="FLAC",
+                artist=artist,
+                album_artist="Bootsy Collins",
+                album="Metal Health",
+                title=f"Track {index}",
+                track_number=index,
+                tags={"albumartist": ["Bootsy Collins"], "artist": [artist]},
+            )
+        )
+
+    MusicReleaseAnalyzer()._derive_release_fields(release, "Bootsy_Collins-Metal_Health-16BIT-WEB-FLAC-2026-ENViED")
+
+    assert release.get("release_type") == "Album"
+    assert release.get("artists") == ["Bootsy Collins"]
+    assert release.get("artist") == "Bootsy Collins"
+
+
+def test_album_title_containing_ost_letters_is_not_a_soundtrack():
+    release = MusicRelease(root=".")
+    for index in range(1, 8):
+        release.tracks.append(
+            AudioTrack(
+                path=f"{index}.flac",
+                relative_path=f"{index}.flac",
+                format="FLAC",
+                codec="FLAC",
+                artist="RiN",
+                album_artist="RiN",
+                album="NOSTALGIA",
+                title=f"Track {index}",
+                track_number=index,
+                tags={"albumartist": ["RiN"], "artist": ["RiN"]},
+            )
+        )
+
+    MusicReleaseAnalyzer()._derive_release_fields(release, "RiN-NOSTALGIA-DE-16BIT-WEB-FLAC-2026-ENRiCH")
+
+    assert release.get("release_type") == "Album"
+
+
 def test_orpheus_preserves_multiple_artists_and_release_namespace():
     release = MusicRelease(root=".")
     release.tracks.append(AudioTrack(path="track.flac", relative_path="track.flac", format="FLAC", codec="FLAC", bit_depth=16, sample_rate=44_100, title="No Church in the Wild", track_number=1))
@@ -181,6 +250,63 @@ def test_orpheus_preserves_multiple_artists_and_release_namespace():
     assert "remaster_record_label" not in payload
     assert "remaster_catalogue_number" not in payload
     assert [entry for entry in adapter._form_data(payload) if entry[0] == "artists[]"] == [("artists[]", "Jay-Z"), ("artists[]", "Kanye West")]
+
+
+def test_orpheus_additional_checks_block_prohibited_music_artists():
+    release = MusicRelease(root=".")
+    release.set_field("artists", ["Paul DVR & Allowed Guest"], MetadataSource.FILE_TAG, 1.0)
+    release.set_field("artist", "Paul DVR & Allowed Guest", MetadataSource.FILE_TAG, 1.0)
+    meta = Meta(category="MUSIC", debug=True, music_release=release.to_dict())
+    adapter = Orpheus({"TRACKERS": {"ORPHEUS": {}}})
+
+    assert not asyncio.run(adapter.get_additional_checks(meta))
+    assert "Paul_DVR" in meta.tracker_status["ORPHEUS"]["status_message"]
+    assert not asyncio.run(adapter.upload(meta))
+    assert "debug_payload" not in meta.tracker_status["ORPHEUS"]
+
+
+def test_orpheus_additional_checks_block_blacklisted_releases_and_labels():
+    adapter = Orpheus({"TRACKERS": {"ORPHEUS": {}}})
+    for artist, album in (
+        ("Bruce Springsteen", "Odds and Sods"),
+        ("Dr. Dre", "Detox"),
+        ("Green Day", "Cigarettes and Valentines"),
+        ("Jean-Michel Jarre", "Music for Supermarkets"),
+        ("Michael Jackson", "Super Mix"),
+        ("Pink Floyd", "Tree Full of Secrets"),
+        ("The Beatles", "Carnival of Light"),
+        ("The Upholsterers", "Your Furniture Was Always Dead... I Was Just Afraid To Tell You"),
+        ("Various Artists", "The Ultimate 500 CD Jazz Collection"),
+        ("Wu-Tang Clan", "Once Upon a Time in Shaolin"),
+    ):
+        release = MusicRelease(root=".")
+        release.set_field("artist", artist, MetadataSource.FILE_TAG, 1.0)
+        release.set_field("artists", [artist], MetadataSource.FILE_TAG, 1.0)
+        release.set_field("album", album, MetadataSource.FILE_TAG, 1.0)
+        meta = Meta(category="MUSIC", music_release=release.to_dict())
+
+        assert not asyncio.run(adapter.get_additional_checks(meta))
+        assert "blacklisted release" in meta.tracker_status["ORPHEUS"]["status_message"]
+
+    for label in ("Sandero Classic Sound", "Sip It & Trip It Records"):
+        release = MusicRelease(root=".")
+        release.set_field("release_label", label, MetadataSource.FILE_TAG, 1.0)
+        meta = Meta(category="MUSIC", music_release=release.to_dict())
+
+        assert not asyncio.run(adapter.get_additional_checks(meta))
+        assert f"blacklisted label {label}" in meta.tracker_status["ORPHEUS"]["status_message"]
+
+
+def test_orpheus_album_description_includes_track_and_total_durations():
+    release = MusicRelease(root=".")
+    release.tracks.extend(
+        [
+            AudioTrack(path="01.flac", relative_path="01.flac", format="FLAC", codec="FLAC", title="Never Said No", track_number=1, duration=213.4),
+            AudioTrack(path="02.flac", relative_path="02.flac", format="FLAC", codec="FLAC", title="All The Beauty", track_number=2, duration=237.0),
+        ]
+    )
+
+    assert Orpheus._album_description(release) == "[b]Tracklist[/b] (1 disc(s))\n\n1. Never Said No (03:33)\n2. All The Beauty (03:57)\n\nTotal length: 07:30"
 
 
 def test_orpheus_debug_renders_payload_without_public_cover_url():
@@ -365,6 +491,42 @@ def test_discogs_reference_and_release_metadata_preserve_stronger_file_tags():
     assert release.get("release_catalogue_number") == "ABC-123"
     assert release.get("release_label") == "Embedded Label"
     assert release.get("media") == "WEB"
+
+
+def test_musicbrainz_requires_an_exact_title_and_track_count_match():
+    result = MusicBrainzEnricher._select_release(
+        [
+            {
+                "id": "wrong-single",
+                "title": "nostalgia is killing me",
+                "score": "100",
+                "track-count": 2,
+                "release-group": {"primary-type": "Single"},
+            }
+        ],
+        "NOSTALGIA",
+        18,
+    )
+
+    assert result is None
+
+
+def test_external_single_cannot_override_an_album_length_local_release():
+    release = MusicRelease(root=".")
+    release.tracks = [
+        AudioTrack(path=f"{index}.flac", relative_path=f"{index}.flac", format="FLAC", codec="FLAC", duration=150)
+        for index in range(18)
+    ]
+    release.set_field("artist", "RiN", MetadataSource.FILE_TAG, 1.0)
+    release.set_field("album", "NOSTALGIA", MetadataSource.FILE_TAG, 1.0)
+    release.set_field("release_type", "Album", MetadataSource.INFERRED, 0.65)
+    external_single = {"id": "wrong-single", "release-group": {"primary-type": "Single"}}
+
+    with patch.object(MusicBrainzEnricher, "_find_release", new=AsyncMock(return_value=external_single)):
+        asyncio.run(MusicBrainzEnricher().enrich(release))
+
+    assert release.get("release_type") == "Album"
+    assert any("Ignored external MusicBrainz release type 'Single'" in warning for warning in release.warnings)
 
 
 def test_music_discogs_cli_ids_keep_user_requested_identifiers(tmp_path):

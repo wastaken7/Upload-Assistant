@@ -21,7 +21,7 @@ class MusicBrainzEnricher:
     observed across all instances in this process.
     """
 
-    _cache: ClassVar[dict[tuple[str, str], dict[str, Any] | None]] = {}
+    _cache: ClassVar[dict[tuple[str, str, int], dict[str, Any] | None]] = {}
     _lock: ClassVar[asyncio.Lock] = asyncio.Lock()
     _last_request: ClassVar[float] = 0.0
 
@@ -32,12 +32,12 @@ class MusicBrainzEnricher:
         artist, album = str(release.get("artist", "")), str(release.get("album", ""))
         if not artist or not album:
             return
-        result = await self._find_release(artist, album)
+        result = await self._find_release(artist, album, len(release.tracks))
         if not result:
             return
         release.external_ids["musicbrainz_release"] = str(result.get("id", ""))
         release.set_field("musicbrainz_release", result.get("id"), MetadataSource.EXTERNAL, 0.9)
-        release.set_field("release_type", self._release_type(result), MetadataSource.EXTERNAL, 0.72)
+        _set_external_release_type(release, self._release_type(result), 0.72, "MusicBrainz")
         # MusicBrainz's release ``date`` is a concrete release date.  Use the
         # release-group's first date for the album group year when available.
         release.set_field("year", str(result.get("release-group", {}).get("first-release-date", ""))[:4], MetadataSource.EXTERNAL, 0.7)
@@ -48,8 +48,8 @@ class MusicBrainzEnricher:
         release.set_field("artists", artists, MetadataSource.EXTERNAL, 0.8)
         release.set_field("artist", " & ".join(artists), MetadataSource.EXTERNAL, 0.8)
 
-    async def _find_release(self, artist: str, album: str) -> dict[str, Any] | None:
-        key = (artist.casefold(), album.casefold())
+    async def _find_release(self, artist: str, album: str, track_count: int = 0) -> dict[str, Any] | None:
+        key = (artist.casefold(), album.casefold(), track_count)
         if key in self._cache:
             return self._cache[key]
         async with self._lock:
@@ -65,12 +65,47 @@ class MusicBrainzEnricher:
                     )
                     response.raise_for_status()
                     releases = response.json().get("releases", [])
-                    result = next((item for item in releases if item.get("title", "").casefold() == album.casefold()), releases[0] if releases else None)
+                    result = self._select_release(releases, album, track_count)
             except httpx.HTTPError, ValueError:
                 result = None
             type(self)._last_request = time.monotonic()
             type(self)._cache[key] = result
             return result
+
+    @staticmethod
+    def _select_release(releases: Any, album: str, track_count: int) -> dict[str, Any] | None:
+        """Return only a MusicBrainz release that corroborates local evidence.
+
+        A title search can return related releases or partial word matches.  It
+        must never fall back to the first search result: that turns an
+        unrelated single into metadata for a local album.  When local tracks
+        are available, require the candidate's total track count too.
+        """
+        if not isinstance(releases, list):
+            return None
+        normalised_album = MusicBrainzEnricher._normalise_title(album)
+        candidates = [item for item in releases if isinstance(item, dict) and MusicBrainzEnricher._normalise_title(item.get("title", "")) == normalised_album]
+        if track_count:
+            candidates = [item for item in candidates if MusicBrainzEnricher._track_count(item) == track_count]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda item: int(item.get("score", 0) or 0))
+
+    @staticmethod
+    def _normalise_title(value: Any) -> str:
+        return re.sub(r"[\W_]+", "", str(value or "").casefold())
+
+    @staticmethod
+    def _track_count(result: dict[str, Any]) -> int:
+        media = result.get("media", [])
+        if isinstance(media, list):
+            counts = [int(item.get("track-count", 0) or 0) for item in media if isinstance(item, dict)]
+            if any(counts):
+                return sum(counts)
+        try:
+            return int(result.get("track-count", 0) or 0)
+        except TypeError, ValueError:
+            return 0
 
     @staticmethod
     def _release_type(result: dict[str, Any]) -> str:
@@ -219,7 +254,7 @@ class DiscogsEnricher:
             cls._set_external(release, "media", media, 0.7)
         release_type = cls._release_type(result.get("formats"))
         if release_type:
-            cls._set_external(release, "release_type", release_type, 0.76)
+            _set_external_release_type(release, release_type, 0.76, "Discogs")
 
     @classmethod
     def _apply_master(cls, release: MusicRelease, result: dict[str, Any]) -> None:
@@ -332,3 +367,21 @@ class DiscogsEnricher:
             if needle in descriptions:
                 return name
         return ""
+
+
+def _set_external_release_type(release: MusicRelease, value: str, confidence: float, provider: str) -> None:
+    """Apply an external type only when it fits the local release structure."""
+    release_type = str(value or "").strip()
+    if not release_type:
+        return
+    track_count = len(release.tracks)
+    duration = sum(track.duration or 0 for track in release.tracks)
+    # Singles can legitimately contain a B-side or a small remix bundle, but
+    # an album-length, many-track release is not corroborated by a conflicting
+    # remote search hit.  Keep locally derived Album/EP data in that case.
+    if release_type == "Single" and (track_count > 3 or duration > 20 * 60):
+        message = f"Ignored external {provider} release type 'Single': local release has {track_count} track(s) and lasts {duration / 60:.0f} minutes."
+        release.warnings.append(message)
+        logger.warning(f"[yellow]MUSIC: {message}[/yellow]")
+        return
+    release.set_field("release_type", release_type, MetadataSource.EXTERNAL, confidence)

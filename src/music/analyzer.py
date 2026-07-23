@@ -490,14 +490,39 @@ class MusicReleaseAnalyzer:
     def _derive_release_type(release: MusicRelease) -> None:
         album = str(release.get("album", "")).lower()
         count = len(release.tracks)
-        artists = {track.artist.casefold() for track in release.tracks if track.artist}
-        if "soundtrack" in album or "ost" in album:
+        # Track ARTIST tags credit performers on that specific song.  They are
+        # not reliable evidence that the *release* is a compilation: a normal
+        # artist album can feature a different guest on every track.  Prefer
+        # ALBUMARTIST (including its aliases) for the release-level decision.
+        album_artist_credits: set[tuple[str, ...]] = set()
+        track_artists: set[str] = set()
+        for track in release.tracks:
+            album_artists = _split_main_artists(_values(track.tags, "albumartist", "album artist") or [track.album_artist])
+            if album_artists:
+                album_artist_credits.add(tuple(artist.casefold() for artist in album_artists))
+            if track.artist:
+                track_artists.add(track.artist.casefold())
+
+        has_explicit_various_artists = any(credit in {"various artists", "various", "va", "v.a."} for artists in album_artist_credits for credit in artists)
+        has_stable_album_artist = len(album_artist_credits) == 1 and not has_explicit_various_artists
+        # Without ALBUMARTIST at all, many unrelated track artists are the
+        # best remaining signal.  Do not apply this fallback when an explicit,
+        # stable album artist exists.
+        inferred_from_tracks = not album_artist_credits and len(track_artists) > max(3, count // 2)
+        explicit_compilation = "compilation" in album
+        # ``OST`` and ``live`` are release-type markers only as standalone
+        # words.  A substring check would classify titles such as
+        # ``NOSTALGIA`` as a soundtrack or ``Olive`` as a live album.
+        if "soundtrack" in album or re.search(r"(?:^|[^\w])ost(?:$|[^\w])", album):
             value = "Soundtrack"
-        elif "live" in album:
+        elif re.search(r"\blive\b", album):
             value = "Live album"
-        elif "compilation" in album or len(artists) > max(3, count // 2):
+        elif explicit_compilation or has_explicit_various_artists or len(album_artist_credits) > 1 or inferred_from_tracks:
             value = "Compilation"
-            if len(artists) > 3:
+            # Orpheus uses the multiple-artist feature for actual Various
+            # Artists/VA compilations.  Do not overwrite a stable album-artist
+            # credit merely because its tracks have featured performers.
+            if has_explicit_various_artists or (not has_stable_album_artist and len(track_artists) > 3):
                 # The Orpheus form explicitly requires its multiple-artist
                 # feature instead of a literal "Various Artists" credit.
                 # Keep the track-tag order and never synthesize an artist.
