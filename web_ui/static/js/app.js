@@ -3916,7 +3916,7 @@ function AudionutsUAGUI() {
               <div
                 ref={richOutputRef}
                 id="rich-output"
-                className={`flex-1 rounded-lg overflow-auto p-2 border text-sm ${isDarkMode ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+                className="flex-1 rounded-lg overflow-auto p-2 border text-sm bg-black border-gray-700 text-white"
               ></div>
               {isExecuting && (
                 <div
@@ -4744,7 +4744,7 @@ function AudionutsUAGUI() {
             <div
               ref={richOutputRef}
               id="rich-output"
-              className={`flex-1 rounded-lg overflow-auto p-3 border ${isDarkMode ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+              className="flex-1 rounded-lg overflow-auto p-3 border bg-black border-gray-700 text-white"
             ></div>
             {isExecuting && (
               <div
