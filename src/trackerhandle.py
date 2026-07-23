@@ -309,11 +309,13 @@ async def process_trackers(
                     logger.info(traceback.format_exc())
                     return
                 if is_uploaded:
-                    await client.add_to_client(meta, "TORRENTHR")
                     status = meta.tracker_status.setdefault("TORRENTHR", {})
+                    status["upload_success"] = True
+                    await client.add_to_client(meta, "TORRENTHR")
                     print_tracker_result(tracker, thr, status, True)
                 else:
                     status = meta.tracker_status.setdefault("TORRENTHR", {})
+                    status["upload_success"] = False
                     print_tracker_result(tracker, thr, status, False)
                     logger.info(f"[red]{tracker} upload failed or returned data error.[/red]")
 
@@ -337,9 +339,11 @@ async def process_trackers(
                         return
                     status = meta.tracker_status.setdefault(ptp.tracker, {})
                     if is_uploaded and "data error" not in str(status.get("status_message", "")):
+                        status["upload_success"] = True
                         await client.add_to_client(meta, "PASSTHEPOPCORN")
                         print_tracker_result(tracker, ptp, status, True)
                     else:
+                        status["upload_success"] = False
                         print_tracker_result(tracker, ptp, status, False)
                         logger.info(f"[red]{tracker} upload failed or returned data error.[/red]")
                 except Exception:

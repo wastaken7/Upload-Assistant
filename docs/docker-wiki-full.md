@@ -69,7 +69,11 @@ Google is your friend
 
 ## How do I update the docker image?
 
-`docker pull ghcr.io/wastaken7/upload-assistant:latest`
+```bash
+docker pull ghcr.io/wastaken7/upload-assistant:latest
+# Recreate the container to run the pulled image.
+# Docker Compose: docker compose up -d
+```
 
 ## How do I use an image of a specific commit?
 

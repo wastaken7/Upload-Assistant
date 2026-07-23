@@ -177,7 +177,7 @@ class Prep:
             manual_category = meta.manual_category
             return manual_category.upper() if isinstance(manual_category, str) else None
 
-        music_extensions = {".flac", ".mp3", ".m4a", ".mp4", ".aac", ".ac3", ".dts", ".wav", ".aiff", ".alac", ".ogg", ".opus", ".ape", ".wv"}
+        music_extensions = {".flac", ".mp3", ".m4a", ".aac", ".ac3", ".dts", ".wav", ".aiff", ".alac", ".ogg", ".opus", ".ape", ".wv"}
         candidate = Path(meta.path or "")
         if candidate.suffix.lower() in music_extensions:
             return "MUSIC"

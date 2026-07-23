@@ -15,7 +15,7 @@ import mutagen
 
 from src.music.models import AudioTrack, MetadataSource, MusicRelease
 
-AUDIO_EXTENSIONS = {".flac", ".mp3", ".m4a", ".mp4", ".aac", ".ac3", ".dts", ".wav", ".aiff", ".alac", ".ogg", ".opus", ".ape", ".wv"}
+AUDIO_EXTENSIONS = {".flac", ".mp3", ".m4a", ".aac", ".ac3", ".dts", ".wav", ".aiff", ".alac", ".ogg", ".opus", ".ape", ".wv"}
 ARTWORK_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 LINEAGE_NAMES = ("lineage", "equipment", "transfer", "rip", "source")
 DISC_RE = re.compile(r"(?:^|[ _.-])(?:cd|disc|disk)[ _.-]?(\d{1,2})(?:$|[ _.-])", re.I)
@@ -24,7 +24,10 @@ LEADING_YEAR_RE = re.compile(r"^\s*[\[(]?\s*((?:19|20)\d{2})\b")
 EDITION_RE = re.compile(r"(?:\[|\()([^\]\)]*(?:deluxe|remaster|anniversary|reissue|expanded|edition)[^\]\)]*)(?:\]|\))", re.I)
 EDITION_WITH_YEAR_RE = re.compile(r"(?:\[|\()\s*((?:19|20)\d{2})[\s,.-]+([^\]\)]+)(?:\]|\))", re.I)
 BRACKET_RE = re.compile(r"\[([^\]]+)]")
-CATALOGUE_RE = re.compile(r"\b(?:[A-Z]{1,8}[- ]?\d{2,}(?:[- ]?\d+)*|\d{1,2}[- ]\d{3,}(?:[- ]\d+)*|\d{5,})\b", re.I)
+# Subsequent catalogue components must have an actual separator.  Allowing an
+# optional separator before another ``\d+`` creates many equivalent ways to
+# partition a long run of digits and can backtrack exponentially.
+CATALOGUE_RE = re.compile(r"\b(?:[A-Z]{1,8}[- ]?\d{2,}(?:[- ]\d+)*|\d{1,2}[- ]\d{3,}(?:[- ]\d+)*|\d{5,})\b", re.I)
 
 
 def _clean(value: Any) -> str:
@@ -84,7 +87,7 @@ def _format_for(path: Path, audio: Any) -> tuple[str, str]:
         return "FLAC", "FLAC"
     if ext == ".mp3" or "mp3" in class_name:
         return "MP3", "MP3"
-    if ext in {".m4a", ".mp4", ".aac"} or "mp4" in class_name or "aac" in class_name:
+    if ext in {".m4a", ".aac"} or "mp4" in class_name or "aac" in class_name:
         return "AAC", "AAC"
     if ext == ".ogg" or "vorbis" in class_name:
         return "Ogg Vorbis", "Vorbis"

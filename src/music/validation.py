@@ -76,8 +76,8 @@ class OrpheusMusicValidator(MusicValidator):
                 issues.append(ValidationIssue(ValidationLevel.ERROR, "unsupported_format", f"{track.relative_path}: {track.format} is not an allowed Orpheus music format."))
             if track.format == "FLAC" and suffix != ".flac":
                 issues.append(ValidationIssue(ValidationLevel.ERROR, "invalid_container", f"{track.relative_path}: FLAC must use the .flac container."))
-            if track.format == "AAC" and suffix not in {".m4a", ".mp4", ".aac"}:
-                issues.append(ValidationIssue(ValidationLevel.ERROR, "invalid_container", f"{track.relative_path}: AAC must use .m4a or .mp4."))
+            if track.format == "AAC" and suffix not in {".m4a", ".aac"}:
+                issues.append(ValidationIssue(ValidationLevel.ERROR, "invalid_container", f"{track.relative_path}: AAC must use the .m4a or .aac container."))
             if track.format == "FLAC":
                 if track.bit_depth and track.bit_depth > 24:
                     issues.append(ValidationIssue(ValidationLevel.ERROR, "bit_depth", f"{track.relative_path}: FLAC depth exceeds 24-bit."))

@@ -25,7 +25,7 @@ class MusicBrainzEnricher:
     _lock: ClassVar[asyncio.Lock] = asyncio.Lock()
     _last_request: ClassVar[float] = 0.0
 
-    def __init__(self, user_agent: str = "Upload-Assistant/2.x (music metadata lookup)") -> None:
+    def __init__(self, user_agent: str = "Upload-Assistant/2.x (+https://github.com/wastaken7/Upload-Assistant)") -> None:
         self.user_agent = user_agent
 
     async def enrich(self, release: MusicRelease) -> None:
@@ -55,7 +55,7 @@ class MusicBrainzEnricher:
         async with self._lock:
             if key in self._cache:
                 return self._cache[key]
-            delay = 1.0 - (time.monotonic() - self._last_request)
+            delay = 1.0 - (time.monotonic() - type(self)._last_request)
             if delay > 0:
                 await asyncio.sleep(delay)
             try:
@@ -68,8 +68,8 @@ class MusicBrainzEnricher:
                     result = next((item for item in releases if item.get("title", "").casefold() == album.casefold()), releases[0] if releases else None)
             except httpx.HTTPError, ValueError:
                 result = None
-            self._last_request = time.monotonic()
-            self._cache[key] = result
+            type(self)._last_request = time.monotonic()
+            type(self)._cache[key] = result
             return result
 
     @staticmethod
@@ -114,7 +114,7 @@ class DiscogsEnricher:
     _lock: ClassVar[asyncio.Lock] = asyncio.Lock()
     _last_request: ClassVar[float] = 0.0
 
-    def __init__(self, token: str = "", user_agent: str = "Upload-Assistant/2.x (music metadata lookup)") -> None:
+    def __init__(self, token: str = "", user_agent: str = "Upload-Assistant/2.x (+https://github.com/wastaken7/Upload-Assistant)") -> None:
         self.token = token.strip()
         self.user_agent = user_agent
 
@@ -169,7 +169,7 @@ class DiscogsEnricher:
         async with self._lock:
             if key in self._cache:
                 return self._cache[key]
-            delay = 1.0 - (time.monotonic() - self._last_request)
+            delay = 1.0 - (time.monotonic() - type(self)._last_request)
             if delay > 0:
                 await asyncio.sleep(delay)
             headers = {"User-Agent": self.user_agent}
@@ -184,8 +184,8 @@ class DiscogsEnricher:
                         result = None
             except httpx.HTTPError, ValueError:
                 result = None
-            self._last_request = time.monotonic()
-            self._cache[key] = result
+            type(self)._last_request = time.monotonic()
+            type(self)._cache[key] = result
             return result
 
     @classmethod

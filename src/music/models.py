@@ -79,13 +79,26 @@ class MusicRelease:
     warnings: list[str] = field(default_factory=list)
     external_ids: dict[str, str] = field(default_factory=dict)
 
+    @staticmethod
+    def _source_tier(source: MetadataSource) -> int:
+        """Return the provenance priority used when deciding real conflicts."""
+        return {
+            MetadataSource.USER: 4,
+            MetadataSource.FILE_TAG: 3,
+            MetadataSource.AUXILIARY: 2,
+            MetadataSource.DIRECTORY: 1,
+            MetadataSource.EXTERNAL: 0,
+            MetadataSource.TRACKER: 0,
+            MetadataSource.INFERRED: 0,
+        }[source]
+
     def set_field(self, name: str, value: Any, source: MetadataSource, confidence: float, *, force: bool = False) -> None:
         if value in (None, "", [], {}):
             return
         existing = self.fields.get(name)
         if force or existing is None or confidence > existing.confidence:
             self.fields[name] = MetadataValue(value=value, source=source, confidence=confidence)
-        elif existing.value != value:
+        elif existing.value != value and self._source_tier(source) == self._source_tier(existing.source):
             values = self.conflicts.setdefault(name, [str(existing.value)])
             if str(value) not in values:
                 values.append(str(value))

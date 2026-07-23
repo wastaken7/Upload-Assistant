@@ -32,6 +32,25 @@ def test_rip_log_establishes_cd_media_without_using_filename_alone(tmp_path):
     assert release.fields["media"].source == MetadataSource.AUXILIARY
 
 
+def test_external_metadata_does_not_create_file_tag_conflicts():
+    release = MusicRelease(root=".")
+    release.set_field("album", "Embedded Album", MetadataSource.FILE_TAG, 1.0)
+    release.set_field("album", "External Album", MetadataSource.EXTERNAL, 0.8)
+    release.set_field("album", "Different Embedded Album", MetadataSource.FILE_TAG, 0.8)
+
+    assert release.get("album") == "Embedded Album"
+    assert release.conflicts["album"] == ["Embedded Album", "Different Embedded Album"]
+
+
+def test_mp4_is_not_an_audio_release_extension(tmp_path):
+    video = tmp_path / "video.mp4"
+    video.write_bytes(b"not-an-audio-release")
+
+    release = MusicReleaseAnalyzer().analyze(video)
+
+    assert not release.tracks
+
+
 def test_original_group_year_and_explicit_remaster_edition_are_distinct():
     release = MusicRelease(root=".")
     release.tracks.append(

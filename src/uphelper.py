@@ -652,7 +652,6 @@ class UploadHelper:
             lines.append(("Resolution", resolution))
             lines.append(("Source", str(source)))
             lines.append(("Type", type_))
-            lines.append(("Edition", edition))
 
             if meta.category != "BOOK":
                 lines.append(("Group Tag", tag))
