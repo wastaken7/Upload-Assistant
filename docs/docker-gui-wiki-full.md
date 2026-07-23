@@ -61,7 +61,7 @@ Include the following in your `docker-compose.yml` as a starting point (adjust h
 ```yaml
 services:
   upload-assistant:
-    image: ghcr.io/audionut/upload-assistant:latest
+    image: ghcr.io/wastaken7/upload-assistant:latest
     container_name: upload-assistant
     restart: unless-stopped
     command: ["--webui", "0.0.0.0:5000"]
@@ -122,7 +122,7 @@ Example Unraid-specific compose snippet:
 ```yaml
 services:
   upload-assistant:
-    image: ghcr.io/audionut/upload-assistant:latest
+    image: ghcr.io/wastaken7/upload-assistant:latest
     container_name: upload-assistant
     restart: unless-stopped
     command: ["--webui", "0.0.0.0:5000"]

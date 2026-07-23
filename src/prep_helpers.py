@@ -152,6 +152,24 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
         raise
     logger.debug(f"[blue]is_disc: [yellow]{meta.is_disc}[/yellow][/blue]")
 
+    # Auto-detect MUSIC before BOOK: music releases are commonly multi-file FLAC
+    # directories, whereas audiobooks remain BOOK through their dedicated flow.
+    if not meta.category and not meta.manual_category and not meta.is_disc:
+        music_extensions = {".flac", ".mp3", ".m4a", ".mp4", ".aac", ".ac3", ".dts", ".wav", ".aiff", ".alac", ".ogg", ".opus", ".ape", ".wv"}
+        path_to_check = Path(meta.path) if meta.path else None
+        if path_to_check and path_to_check.exists():
+            if path_to_check.is_file() and path_to_check.suffix.lower() in music_extensions:
+                meta.category = "MUSIC"
+            elif path_to_check.is_dir():
+                # Stop as soon as representative content is found; do not scan an
+                # entire music library merely to classify a release.
+                for item in path_to_check.rglob("*"):
+                    if item.is_file() and item.suffix.lower() in music_extensions:
+                        meta.category = "MUSIC"
+                        break
+            if meta.category == "MUSIC":
+                logger.debug("[cyan]Auto-detected category: MUSIC[/cyan]")
+
     # Auto-detect BOOK category if category/manual_category is not already set and it's not a disc
     if not meta.category and not meta.manual_category and not meta.is_disc:
         is_book = False

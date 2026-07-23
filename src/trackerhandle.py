@@ -217,10 +217,12 @@ async def process_trackers(
 
                 status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                 if is_uploaded and "data error" not in str(status.get("status_message", "")):
+                    status["upload_success"] = True
                     if not getattr(tracker_class, "is_usenet", False):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:
+                    status["upload_success"] = False
                     print_tracker_result(tracker, tracker_class, status, False)
                     logger.info(f"[red]{tracker} upload failed or returned data error.[/red]")
 
@@ -254,10 +256,12 @@ async def process_trackers(
 
                 status = meta.tracker_status.setdefault(tracker_class.tracker, {})
                 if is_uploaded and "data error" not in str(status.get("status_message", "")):
+                    status["upload_success"] = True
                     if not getattr(tracker_class, "is_usenet", False):
                         await client.add_to_client(meta, tracker_class.tracker)
                     print_tracker_result(tracker, tracker_class, status, True)
                 else:
+                    status["upload_success"] = False
                     print_tracker_result(tracker, tracker_class, status, False)
                     logger.info(f"[red]{tracker} upload failed or returned data error.[/red]")
 

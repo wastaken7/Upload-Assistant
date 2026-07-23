@@ -12,6 +12,27 @@ from src.book_prep import detect_newspaper, sanitize_book_author, sanitize_book_
 from src.console import logger
 from src.meta import Meta
 
+MUSIC_MEDIA_CHOICES = ("cd", "web", "vinyl", "dvd", "bd", "soundboard", "sacd", "dat", "cassette")
+MUSIC_RELEASE_TYPE_CHOICES = (
+    "album",
+    "soundtrack",
+    "ep",
+    "anthology",
+    "compilation",
+    "sampler",
+    "single",
+    "demo",
+    "live album",
+    "split",
+    "remix",
+    "bootleg",
+    "interview",
+    "mixtape",
+    "concert recording",
+    "dj mix",
+    "unknown",
+)
+
 
 class ShortHelpFormatter(argparse.HelpFormatter):
     """
@@ -128,10 +149,49 @@ class Args:
             "--category",
             nargs=1,
             required=False,
-            help="Category [movie, tv, fanres, book, game]",
-            choices=["movie", "tv", "fanres", "book", "game"],
+            help="Category [movie, tv, fanres, book, game, music]",
+            choices=["movie", "tv", "fanres", "book", "game", "music"],
             dest="manual_category",
         )
+        parser.add_argument("--music-artist", nargs=1, required=False, help="MUSIC: main artist(s), separated by &", dest="music_artist")
+        parser.add_argument("--music-album", nargs=1, required=False, help="MUSIC: album/release title", dest="music_album")
+        parser.add_argument(
+            "--music-media",
+            nargs=1,
+            required=False,
+            type=str.casefold,
+            choices=MUSIC_MEDIA_CHOICES,
+            help="MUSIC: source medium (CD, WEB, Vinyl, DVD, BD, Soundboard, SACD, DAT, Cassette)",
+            dest="music_media",
+        )
+        parser.add_argument(
+            "--music-release-type",
+            nargs=1,
+            required=False,
+            type=str.casefold,
+            choices=MUSIC_RELEASE_TYPE_CHOICES,
+            help="MUSIC: Orpheus release type (album, ep, single, compilation, live album, etc.)",
+            dest="music_release_type",
+        )
+        parser.add_argument(
+            "--music-release-year", nargs=1, required=False, type=int, help="MUSIC: concrete release/pressing year (not the original group year)", dest="music_release_year"
+        )
+        parser.add_argument("--music-edition-year", nargs=1, required=False, type=int, help="MUSIC: remaster/reissue/edition year", dest="music_edition_year")
+        parser.add_argument("--music-label", nargs=1, required=False, help="MUSIC: label for this release", dest="music_label")
+        parser.add_argument("--music-catalogue-number", nargs=1, required=False, help="MUSIC: catalogue number for this release", dest="music_catalogue_number")
+        parser.add_argument("--music-genre", nargs=1, required=False, help="MUSIC: comma-separated genre override", dest="music_genres")
+        parser.add_argument("--music-cover", nargs=1, required=False, help="MUSIC: public artwork URL or local cover image path", dest="music_cover")
+        parser.add_argument(
+            "--music-discogs-id",
+            nargs=1,
+            required=False,
+            help="MUSIC: Discogs release ID, release/master URL, or master/ID reference (plain IDs mean a release)",
+            dest="music_discogs_id",
+        )
+        parser.add_argument("--music-discogs-release-id", nargs=1, required=False, help="MUSIC: exact Discogs release ID or URL", dest="music_discogs_release_id")
+        parser.add_argument("--music-discogs-master-id", nargs=1, required=False, help="MUSIC: Discogs master ID or URL", dest="music_discogs_master_id")
+        parser.add_argument("--music-enrich", dest="music_enrichment", action="store_true", default=None, help="MUSIC: enable bounded MusicBrainz enrichment for this run")
+        parser.add_argument("--no-music-enrich", dest="music_enrichment", action="store_false", help="MUSIC: disable MusicBrainz enrichment for this run")
         parser.add_argument(
             "-t",
             "--type",

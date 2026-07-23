@@ -431,7 +431,7 @@ class TorrentCreator:
 
                 # Fallback to CustomTorrent if mkbrr is not used
                 custom_include = include or []
-                if is_subs and not custom_include and not meta.is_disc and meta.category not in ("BOOK", "GAME"):
+                if is_subs and not custom_include and not meta.is_disc and meta.category in ("TV", "MOVIE"):
                     custom_include = ["*.mkv", "*.mp4", "*.ts", "*.srt", "*.sub", "*.vtt", "*.ssa", "*.ass", "*.idx"]
                 torrent = CustomTorrent(
                     meta=meta,
