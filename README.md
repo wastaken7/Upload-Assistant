@@ -48,6 +48,11 @@ This branch introduces new media categories and automation features not present 
   - **IGDB & Steam Metadata API**: Queries Twitch/IGDB API for storyline, ratings, involved companies, release year, genre mapping, and downloads cover images. Fetches PC system requirements via Steam Store API.
   - **Platform Detection**: Identifies systems (PC, PS5, Switch, Xbox Series X|S, etc.) and enforces platform-group duplicate checks (so Switch uploads aren't blocked by PC dupes).
   - **Platform-specific Prompts**: Attended prompts for console TV standard (NTSC/PAL) and region codes (USA/EUR/JPN) for trackers like BJSHARE.
+- **Music (`MUSIC` Category)**:
+  - **Local Tag & Metadata Extraction**: Parses audio tags, cue sheets, and rip logs (EAC, XLD, etc.) using Mutagen to extract tracklists, artists, and audio metadata.
+  - **Discogs & MusicBrainz APIs**: Optionally queries external APIs (Discogs via release/master ID or URL, and MusicBrainz) for metadata enrichment.
+  - **Artwork & Cover Extraction**: Automatically searches for local cover images or extracts embedded artwork from FLAC/MP3/M4A tags to upload to image hosts.
+  - **Preflight & Rule Validation**: Enforces mechanical validation for audio formats, sample/bit rates, track counts, and hybrid setups before uploading.
 
 ### 2. Audio Stream Spectrogram Generation
 
@@ -128,6 +133,7 @@ This branch introduces new media categories and automation features not present 
 | Nebulance              | NEBULANCE              | TV                    |
 | OldToonsWorld          | OLDTOONSWORLD          | MOVIE, TV             |
 | OnlyEncodes+           | ONLYENCODES            | MOVIE, TV             |
+| Orpheus                | ORPHEUS                | MUSIC                 |
 | PassThePopcorn         | PASSTHEPOPCORN         | MOVIE                 |
 | PolishTorrent          | POLISHTORRENT          | MOVIE, TV             |
 | Portugas               | PORTUGAS               | MOVIE, TV             |
