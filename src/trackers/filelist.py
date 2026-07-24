@@ -10,6 +10,7 @@ import aiofiles
 import cli_ui
 import httpx
 from bs4 import BeautifulSoup
+from rich.markup import escape
 from unidecode import unidecode
 
 from cogs.redaction import Redaction
@@ -146,7 +147,7 @@ class FileList:
                             if len(line_fields) >= 7:
                                 cookies[line_fields[5]] = line_fields[6]
             except Exception as e:
-                logger.error(f"[red]Error parsing FILELIST Netscape cookie file: {e}[/red]")
+                logger.error(f"{self.tracker}: [red]Error parsing {self.tracker} Netscape cookie file: {escape(str(e))}[/red]")
             return cookies
 
         # If it's a pickle file (ends with .pkl or .pickle)
@@ -161,7 +162,7 @@ class FileList:
                 self.cookie_validator._save_cookies_secure(session_cookies, str(json_path))  # pyright: ignore[reportPrivateUsage]
                 return {cookie.name: cookie.value for cookie in session_cookies}
             except Exception as e:
-                logger.error(f"[red]Failed to migrate legacy cookies from pickle: {e}[/red]")
+                logger.error(f"{self.tracker}: [red]Failed to migrate legacy cookies from pickle: {e}[/red]")
                 return {}
 
         # Default to loading as JSON
@@ -180,7 +181,7 @@ class FileList:
                             return {name: str(item.get("value", "")) for name, item in data.items()}
                     return {name: str(val) for name, val in data.items()}
             except Exception as e:
-                logger.error(f"[yellow]Warning: Error parsing cookie file: {e}[/yellow]")
+                logger.error(f"{self.tracker}: [yellow]Warning: Error parsing cookie file: {e}[/yellow]")
             return {}
 
     async def upload(self, meta: Meta) -> bool:
@@ -198,8 +199,8 @@ class FileList:
             if fl_confirm is not True:
                 fl_name_manually = cli_ui.ask_string("Please enter a proper name", default="")
                 if fl_name_manually == "":
-                    logger.info("No proper name given")
-                    logger.info("Aborting...")
+                    logger.info(f"{self.tracker}: No proper name given")
+                    logger.info(f"{self.tracker}: Aborting...")
                     return False
                 fl_name = fl_name_manually
 
@@ -263,7 +264,7 @@ class FileList:
             await self.download_new_torrent(cookies, torrent_id, torrent_path)
             return True
         logger.info(data)
-        logger.info("\n\n")
+        logger.info(f"{self.tracker}: \n\n")
         logger.info(up.text)
         raise UploadError(f"Upload to FILELIST Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa F405
 
@@ -305,7 +306,7 @@ class FileList:
             await self.login(cookiefile)
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
-            logger.error("[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
+            logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
             recreate = cli_ui.ask_yes_no("Log in again and create new session?")
             if recreate is True:
                 if Path(cookiefile).exists():
@@ -350,10 +351,10 @@ class FileList:
             index = f"{self.base_url}/index.php"
             response = await client.get(index)
             if response.text.find("Logout") != -1:
-                logger.info("[green]Successfully logged into FILELIST")
+                logger.info(f"{self.tracker}: [green]Successfully logged into {self.tracker}")
                 self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # pyright: ignore[reportPrivateUsage]
             else:
-                logger.info("[bold red]Something went wrong while trying to log into FILELIST")
+                logger.info(f"{self.tracker}: [bold red]Something went wrong while trying to log into {self.tracker}")
                 logger.info(response.url)
         return
 
@@ -365,7 +366,7 @@ class FileList:
             async with aiofiles.open(torrent_path, "wb") as tor:
                 await tor.write(r.content)
         else:
-            logger.info("[red]There was an issue downloading the new .torrent from FILELIST")
+            logger.info(f"{self.tracker}: [red]There was an issue downloading the new .torrent from {self.tracker}")
             logger.info(r.text)
         return
 

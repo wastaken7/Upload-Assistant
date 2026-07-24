@@ -3,6 +3,7 @@ import re
 from typing import Any, cast
 
 import langcodes
+from rich.markup import escape
 
 from src.console import logger
 from src.languages import languages_manager
@@ -175,7 +176,7 @@ class LastDigitalUnderground(UNIT3D):
                         non_eng_audio = True
                     break
                 except (LookupError, AttributeError, ValueError) as e:
-                    logger.info(f"[bold red]Error extracting audio language: {e}[/bold red]")
+                    logger.info(f"{self.tracker}: [bold red]Error extracting audio language: {escape(str(e))}[/bold red]")
 
         if meta.no_subs:
             iso_subtitle = "NoSubs"
@@ -192,7 +193,7 @@ class LastDigitalUnderground(UNIT3D):
                         iso_subtitle = f"Subs {lang.upper()}"
                         break
                     except (LookupError, AttributeError, ValueError) as e:
-                        logger.info(f"[bold red]Error extracting subtitle language: {e}[/bold red]")
+                        logger.info(f"{self.tracker}: [bold red]Error extracting subtitle language: {escape(str(e))}[/bold red]")
 
         if cat_id == "18" and iso_subtitle:
             ldu_name = f"{ldu_name} [{iso_subtitle}]"

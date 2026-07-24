@@ -319,7 +319,7 @@ class Curupira:
                 async with aiofiles.open(info_file_path, encoding="utf-8") as f:
                     return await f.read()
             except Exception as e:
-                logger.info(f"[bold red]Erro ao ler o arquivo de info em {info_file_path}: {e}[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Erro ao ler o arquivo de info em {info_file_path}: {e}[/bold red]")
                 return ""
         else:
             logger.info(f"[bold red]Arquivo de info não encontrado: {info_file_path}[/bold red]")
@@ -446,19 +446,19 @@ class Curupira:
 
         files = await self._prepare_files(meta)
         if not files:
-            logger.error(f"[red]Error: NZB file not found for {self.tracker}.[/red]")
+            logger.error(f"{self.tracker}: [red]Error: NZB file not found for {self.tracker}.[/red]")
             status_dict["status_message"] = "data error: NZB file not found"
             return False
 
         data = await self._prepare_data(meta)
 
         if meta.debug:
-            logger.debug("[cyan]Curupira Upload (DEBUG MODE):[/cyan]")
-            logger.debug(f"URL: {self.upload_url}")
-            logger.debug(f"Category ID: {self.get_category_id(meta)}")
-            logger.debug("Fields:")
+            logger.debug(f"{self.tracker}: [cyan]Upload (DEBUG MODE):[/cyan]")
+            logger.debug(f"{self.tracker}: URL: {self.upload_url}")
+            logger.debug(f"{self.tracker}: Category ID: {self.get_category_id(meta)}")
+            logger.debug(f"{self.tracker}: Fields:")
             logger.debug(Redaction.redact_private_info(data))
-            logger.debug("Files:")
+            logger.debug(f"{self.tracker}: Files:")
             logger.debug({k: v[0] for k, v in files.items()})
 
             status_dict["status_message"] = "Debug mode enabled, skipping upload."

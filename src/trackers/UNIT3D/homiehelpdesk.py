@@ -85,7 +85,7 @@ class HomieHelpDesk(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         should_continue = True
         if meta.type == "DVDRIP":
-            logger.info("[bold red]DVDRIP uploads are not allowed on HomieHelpDesk.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]DVDRIP uploads are not allowed on {self.tracker}.[/bold red]")
             return False
 
         return should_continue

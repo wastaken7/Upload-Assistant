@@ -112,7 +112,7 @@ class OldToonsWorld(UNIT3D):
 
         if not any(genre in combined_genres for genre in ["Animation", "Family"]):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info("[bold red]Genre does not match Animation or Family for OldToonsWorld.")
+                logger.info(f"{self.tracker}: [bold red]Genre does not match Animation or Family for OldToonsWorld.")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -126,7 +126,7 @@ class OldToonsWorld(UNIT3D):
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai", "adult animation", "softcore"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info("[bold red]Adult animation not allowed at OldToonsWorld.")
+                logger.info(f"{self.tracker}: [bold red]Adult animation not allowed at OldToonsWorld.")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -137,7 +137,7 @@ class OldToonsWorld(UNIT3D):
         game_show_keywords = ["reality", "game show", "game-show", "reality tv", "reality television"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in game_show_keywords):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info("[bold red]Reality / Game Show content not allowed at OldToonsWorld.")
+                logger.info(f"{self.tracker}: [bold red]Reality / Game Show content not allowed at OldToonsWorld.")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -147,7 +147,7 @@ class OldToonsWorld(UNIT3D):
 
         if meta.type not in ["WEBDL"] and not meta.is_disc and meta.tag in ["CMRG", "EVO", "TERMiNAL", "ViSION"]:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"[bold red]Group {meta.tag} is only allowed for raw type content at OldToonsWorld[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for raw type content at OldToonsWorld[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:

@@ -8,6 +8,7 @@ from urllib.parse import quote, urlparse
 
 import aiofiles
 import httpx
+from rich.markup import escape
 from unidecode import unidecode
 
 from cogs.redaction import Redaction
@@ -183,7 +184,7 @@ class HDBits:
         if "Atmos" in audio:
             tags.append(5)
         if meta.silent is True:
-            logger.info("[yellow]zxx audio track found, suggesting you tag as silent")  # 57
+            logger.info(f"{self.tracker}: [yellow]zxx audio track found, suggesting you tag as silent")  # 57
 
         # Video Metadata
         # HDR10, HDR10+, Dolby Vision, 10-bit,
@@ -243,10 +244,10 @@ class HDBits:
 
         for each in (cat_id, codec_id, medium_id):
             if each == 0:
-                logger.info("[bold red]Something didn't map correctly, or this content is not allowed on HDBITS")
+                logger.info(f"{self.tracker}: [bold red]Something didn't map correctly, or this content is not allowed on {self.tracker}")
                 return None
         if "Dual-Audio" in meta.audio and not (meta.anime or not meta.is_disc):
-            logger.info("[bold red]Dual-Audio Encodes are not allowed for non-anime and non-disc content")
+            logger.info(f"{self.tracker}: [bold red]Dual-Audio Encodes are not allowed for non-anime and non-disc content")
             return None
 
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as desc_file:
@@ -257,7 +258,7 @@ class HDBits:
 
         # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
         if base_piece_mb > 16 and not meta.nohash:
-            logger.info("[red]Piece size is OVER 16M and does not work on HDBITS. Generating a new .torrent")
+            logger.info(f"{self.tracker}: [red]Piece size is OVER 16M and does not work on {self.tracker}. Generating a new .torrent")
             hdb_config = self.config.get("TRACKERS", {}).get("HDBITS", {})
             hdb_config_dict = cast(dict[str, Any], hdb_config) if isinstance(hdb_config, dict) else {}
             tracker_url = str(hdb_config_dict.get("announce_url", "https://fake.tracker")).strip()
@@ -337,7 +338,7 @@ class HDBits:
                 await self.download_new_torrent(id, torrent_file_path)
             return True
         logger.info(data)
-        logger.info("\n\n")
+        logger.info(f"{self.tracker}: \n\n")
         logger.info(up.text)
         raise UploadError(f"Upload to HDBITS Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa F405
 
@@ -363,8 +364,8 @@ class HDBits:
         has_valid_ids = (meta.category == "TV" and meta.tvdb_id == 0 and meta.imdb_id == 0) or (meta.category == "MOVIE" and meta.imdb_id == 0)
 
         if has_valid_ids:
-            logger.info("[yellow]No IMDb or TVDB ID found, trying other options...")
-            logger.info("[yellow]Double check that the upload does not already exist...")
+            logger.info(f"{self.tracker}: [yellow]No IMDb or TVDB ID found, trying other options...")
+            logger.info(f"{self.tracker}: [yellow]Double check that the upload does not already exist...")
             if meta.filename:
                 search_terms.append(meta.filename)
             if meta.aka:
@@ -393,12 +394,12 @@ class HDBits:
                             }
                             dupes.append(result)
                 else:
-                    logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
+                    logger.info(f"{self.tracker}: [bold red]HTTP request failed. Status: {response.status_code}")
             return dupes
 
         # Otherwise, search for each term
         for search_term in search_terms:
-            logger.info(f"[yellow]Searching HDBITS for: {search_term}")
+            logger.info(f"{self.tracker}: [yellow]Searching {self.tracker} for: {escape(str(search_term))}")
             data["search"] = search_term
 
             async with httpx.AsyncClient(timeout=5.0) as client:
@@ -418,14 +419,14 @@ class HDBits:
                             }
                             dupes.append(result)
                 else:
-                    logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
+                    logger.info(f"{self.tracker}: [bold red]HTTP request failed. Status: {response.status_code}")
 
         return dupes
 
     async def validate_credentials(self, meta: Meta) -> bool:
         vcookie = await self.validate_cookies(meta)
         if vcookie is not True:
-            logger.error("[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
+            logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
             return False
         return True
 
@@ -440,7 +441,7 @@ class HDBits:
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0) as client:
                 resp = await client.get(url=url)
             return resp.text.find("""<a href="/logout.php">Logout</a>""") != -1
-        logger.info("[bold red]Missing Cookie File. (data/cookies/HDBITS.txt)")
+        logger.info(f"{self.tracker}: [bold red]Missing Cookie File. (data/cookies/HDBITS.txt)")
         return False
 
     async def download_new_torrent(self, id: str, torrent_path: str) -> None:
@@ -534,7 +535,7 @@ class HDBits:
         desc_parts.append(desc)
 
         if self.rehost_images is True:
-            logger.info("[green]Rehosting Images...")
+            logger.info(f"{self.tracker}: [green]Rehosting Images...")
             hdbimg_bbcode = await self.hdbimg_upload(meta)
             if hdbimg_bbcode is not None:
                 if meta.comparison:
@@ -593,10 +594,10 @@ class HDBits:
         if meta.comparison:
             comparison_path = meta.comparison
             if not comparison_path or not Path(comparison_path).is_dir():
-                logger.info(f"[red]Comparison path not found: {comparison_path}")
+                logger.info(f"{self.tracker}: [red]Comparison path not found: {comparison_path}")
                 return None
 
-            logger.info(f"[green]Uploading comparison images from {comparison_path} to HDBITS Image Host")
+            logger.info(f"{self.tracker}: [green]Uploading comparison images from {escape(str(comparison_path))} to {self.tracker} Image Host")
 
             group_images: dict[str, list[str]] = {}
             max_images_per_group = 0
@@ -661,9 +662,9 @@ class HDBits:
             for image_idx in range(max_images_per_group):
                 all_image_files.extend(group_images[group_idx][image_idx] for group_idx in sorted_group_indices if image_idx < len(group_images[group_idx]))
 
-            logger.debug("[cyan]Images will be uploaded in this order:")
+            logger.debug(f"{self.tracker}: [cyan]Images will be uploaded in this order:")
             for i, path in enumerate(all_image_files):
-                logger.debug(f"[cyan]{i}: {Path(path).name}")
+                logger.debug(f"{self.tracker}: [cyan]{i}: {Path(path).name}")
         else:
             thumb_size = "w300"
             screenshot_dir = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}"
@@ -685,7 +686,7 @@ class HDBits:
 
         # At this point, all_image_files contains paths to all images we want to upload
         if not all_image_files:
-            logger.info("[red]No images found for upload")
+            logger.info(f"{self.tracker}: [red]No images found for upload")
             return None
 
         url = "https://img.hdbits.org/upload_api.php"
@@ -699,7 +700,7 @@ class HDBits:
             upload_count = 3 if meta.category == "TV" and meta.tv_pack == 0 else 6
             upload_count = min(len(all_image_files), upload_count)
 
-        logger.debug(f"[cyan]Uploading {upload_count} images to HDBITS Image Host")
+        logger.debug(f"{self.tracker}: [cyan]Uploading {upload_count} images to {self.tracker} Image Host")
 
         upload_files: dict[str, tuple[str, bytes, str]] = {}
         for i in range(upload_count):
@@ -709,17 +710,17 @@ class HDBits:
                 async with aiofiles.open(file_path, "rb") as file_handle:
                     file_bytes = await file_handle.read()
                 upload_files[f"images_files[{i}]"] = (filename, file_bytes, "image/png")
-                logger.debug(f"[cyan]Added file {filename} as images_files[{i}]")
+                logger.debug(f"{self.tracker}: [cyan]Added file {escape(str(filename))} as images_files[{i}]")
             except (OSError, ValueError) as e:
-                logger.error(f"[red]Failed to open {file_path}: {e}")
+                logger.error(f"{self.tracker}: [red]Failed to open {escape(str(file_path))}: {escape(str(e))}")
                 continue
 
         try:
             if not upload_files:
-                logger.info("[red]No files to upload")
+                logger.info(f"{self.tracker}: [red]No files to upload")
                 return None
 
-            logger.debug(f"[green]Uploading {len(upload_files)} images to HDBITS...")
+            logger.debug(f"{self.tracker}: [green]Uploading {len(upload_files)} images to {self.tracker}...")
 
             upload_success = True
             if meta.comparison:
@@ -748,7 +749,7 @@ class HDBits:
                 if current_chunk:
                     chunks.append(current_chunk)
 
-                logger.debug(f"[cyan]Split into {len(chunks)} chunks based on 100 MiB limit")
+                logger.debug(f"{self.tracker}: [cyan]Split into {len(chunks)} chunks based on 100 MiB limit")
 
                 # Upload each chunk
                 for chunk_idx, chunk in enumerate(chunks):
@@ -758,22 +759,22 @@ class HDBits:
 
                     if meta.debug:
                         chunk_size_mb = sum(Path(all_image_files[int(key.split("[")[1].split("]")[0])]).stat().st_size for key, _ in chunk) / (1024 * 1024)
-                        logger.debug(f"[cyan]Uploading chunk {chunk_idx + 1}/{len(chunks)} ({len(file_list)} images, {chunk_size_mb:.2f} MiB)")
+                        logger.debug(f"{self.tracker}: [cyan]Uploading chunk {chunk_idx + 1}/{len(chunks)} ({len(file_list)} images, {chunk_size_mb:.2f} MiB)")
 
                     async with httpx.AsyncClient(timeout=30.0) as client:
                         response = await client.post(url, data=data, files=file_list)
                     if response.status_code == 200:
-                        logger.info(f"[green]Chunk {chunk_idx + 1}/{len(chunks)} upload successful!")
+                        logger.info(f"{self.tracker}: [green]Chunk {chunk_idx + 1}/{len(chunks)} upload successful!")
                         bbcode += response.text
                     else:
-                        logger.info(f"[red]Chunk {chunk_idx + 1}/{len(chunks)} upload failed with status code {response.status_code}")
+                        logger.info(f"{self.tracker}: [red]Chunk {chunk_idx + 1}/{len(chunks)} upload failed with status code {response.status_code}")
                         upload_success = False
                         break
             else:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = await client.post(url, data=data, files=upload_files)
                 if response.status_code == 200:
-                    logger.info("[green]Upload successful!")
+                    logger.info(f"{self.tracker}: [green]Upload successful!")
                     bbcode = response.text
                 else:
                     upload_success = False
@@ -793,16 +794,16 @@ class HDBits:
 
                     bbcode = formatted_bbcode
 
-                    logger.debug(f"[cyan]Response formatted with {num_groups} images per line")
+                    logger.debug(f"{self.tracker}: [cyan]Response formatted with {num_groups} images per line")
 
                 return bbcode
             if response is None:
-                logger.info("[red]Upload failed without a response")
+                logger.info(f"{self.tracker}: [red]Upload failed without a response")
             else:
-                logger.info(f"[red]Upload failed with status code {response.status_code}")
+                logger.info(f"{self.tracker}: [red]Upload failed with status code {response.status_code}")
             return None
         except httpx.RequestError as e:
-            logger.info(f"[red]HTTP Request failed: {e}")
+            logger.info(f"{self.tracker}: [red]HTTP Request failed: {e}")
             return None
 
     async def get_info_from_torrent_id(self, hdb_id: int) -> tuple[int | None, int | None, str | None, str | None, str | None]:
@@ -828,13 +829,16 @@ class HDBits:
                 else:
                     status_code = response_json.get("status", "unknown")
                     message = response_json.get("message", "No error message provided")
-                    logger.info(f"[red]API returned error status {status_code}: {message}[/red]")
+                    logger.info(f"{self.tracker}: [red]API returned error status {status_code}: {message}[/red]")
 
         except httpx.RequestError as e:
-            logger.info(f"[red]Request error: {e}[/red]")
+            logger.info(f"{self.tracker}: [red]Request error: {escape(str(e))}[/red]")
+        except (ValueError, KeyError, IndexError, TypeError) as e:
+            logger.error(f"{self.tracker}: [red]Failed to parse HDBITS response. Error: {escape(str(e))}[/red]")
         except Exception as e:
-            logger.error(f"[red]Unexpected error: {e}[/red]")
+            logger.error(f"{self.tracker}: [red]Unexpected error: {escape(str(e))}[/red]")
             console.print_exception()
+            raise
 
         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description
 
@@ -865,18 +869,18 @@ class HDBits:
                         "limit": 100,
                         "search": bd_summary,  # Using the Disc Title for search with uuid fallback
                     }
-                    logger.info(f"[green]Searching HDBITS for title: [bold yellow]{bd_summary}[/bold yellow]")
+                    logger.info(f"{self.tracker}: [green]Searching {self.tracker} for title: [bold yellow]{escape(str(bd_summary))}[/bold yellow]")
                     # console.print(f"[yellow]Using this data: {data}")
                 else:
                     return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 
             except FileNotFoundError:
-                logger.error(f"[red]Error: File not found at {bd_summary_path}[/red]")
+                logger.error(f"{self.tracker}: [red]Error: File not found at {bd_summary_path}[/red]")
                 return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 
         else:  # Handling non-disc case
             data = {"username": self.username, "passkey": self.passkey, "limit": 100, "file_in_torrent": Path(search_term).name}
-            logger.info(f"[green]Searching HDBITS for file: [bold yellow]{Path(search_term).name}[/bold yellow]")
+            logger.info(f"{self.tracker}: [green]Searching {self.tracker} for file: [bold yellow]{escape(str(Path(search_term).name))}[/bold yellow]")
             # console.print(f"[yellow]Using this data: {data}")
 
         try:
@@ -888,7 +892,9 @@ class HDBits:
                     # console.print(f"[green]HDBITS API response: {response_json}[/green]")
 
                     if "data" not in response_json:
-                        logger.error(f"[red]Error: 'data' key not found or empty in HDBITS API response. Full response: {response_json}[/red]")
+                        logger.error(
+                            f"{self.tracker}: [red]Error: 'data' key not found or empty in {self.tracker} API response. Full response: {escape(str(response_json))}[/red]"
+                        )
                         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
 
                     for each in response_json["data"]:
@@ -899,20 +905,24 @@ class HDBits:
                         hdb_id = each.get("id", None)
                         hdb_description = each.get("descr")
 
-                        logger.info(f"[bold green]Matched release with HDBITS ID: [yellow]{self.base_url}/details.php?id={hdb_id}[/yellow][/bold green]")
+                        logger.info(
+                            f"{self.tracker}: [bold green]Matched release with {self.tracker} ID: [yellow]{self.base_url}/details.php?id={hdb_id}[/yellow][/bold green]"
+                        )
 
                         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 
-                    logger.info("[yellow]No data found in the HDBITS API response[/yellow]")
+                    logger.info(f"{self.tracker}: [yellow]No data found in the {self.tracker} API response[/yellow]")
 
                 except (ValueError, KeyError, TypeError) as e:
                     console.print_exception()
-                    logger.error(f"[red]Failed to parse HDBITS API response. Error: {e!s}[/red]")
+                    logger.error(f"{self.tracker}: [red]Failed to parse {self.tracker} API response. Error: {escape(str(e))}[/red]")
             else:
-                logger.error(f"[red]Failed to get info from HDBITS. Status code: {response.status_code}, Reason: {response.reason_phrase}[/red]")
+                logger.error(
+                    f"{self.tracker}: [red]Failed to get info from {self.tracker}. Status code: {response.status_code}, Reason: {escape(str(response.reason_phrase))}[/red]"
+                )
 
         except httpx.RequestError as e:
-            logger.info(f"[red]Request error: {e!s}[/red]")
+            logger.info(f"{self.tracker}: [red]Request error: {escape(str(e))}[/red]")
 
-        logger.info("[yellow]Could not find a matching release on HDBITS[/yellow]")
+        logger.info(f"{self.tracker}: [yellow]Could not find a matching release on {self.tracker}[/yellow]")
         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id

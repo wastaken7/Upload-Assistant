@@ -102,13 +102,13 @@ class TorrentHR:
                 cookies = await self.login(meta)
 
                 if cookies:
-                    logger.info("[green]Using authenticated session for upload")
+                    logger.info(f"{self.tracker}: [green]Using authenticated session for upload")
 
                     async with httpx.AsyncClient(cookies=cookies, follow_redirects=True) as session:
                         response = await session.post(url=url, files=files, data=payload, headers=headers)
 
-                        logger.debug(f"[dim]Response status: {response.status_code}")
-                        logger.debug(f"[dim]Response URL: {response.url}")
+                        logger.debug(f"{self.tracker}: [dim]Response status: {response.status_code}")
+                        logger.debug(f"{self.tracker}: [dim]Response URL: {response.url}")
                         logger.debug(response.text[:500] + "...")
 
                         if "uploaded=1" in str(response.url):
@@ -116,30 +116,30 @@ class TorrentHR:
                             tracker_status.setdefault(self.tracker, {})
                             tracker_status[self.tracker]["status_message"] = response.url
                             return True
-                        logger.info(f"[yellow]Upload response didn't contain 'uploaded=1'. URL: {response.url}")
+                        logger.info(f"{self.tracker}: [yellow]Upload response didn't contain 'uploaded=1'. URL: {response.url}")
                         soup = BeautifulSoup(response.text, "html.parser")
                         error_text = soup.find("h2", string=re.compile(r"Error"))  # type: ignore
 
                         if error_text:
                             error_message = cast(Any, error_text).find_next("p")
                             if error_message:
-                                logger.info(f"[red]Upload error: {error_message.text}")
+                                logger.info(f"{self.tracker}: [red]Upload error: {error_message.text}")
 
                         return False
                 else:
-                    logger.error("[red]Failed to log in to TORRENTHR for upload")
+                    logger.error(f"{self.tracker}: [red]Failed to log in to TORRENTHR for upload")
                     return False
 
             except Exception as e:
-                logger.error(f"[red]Error during upload: {e!s}")
+                logger.error(f"{self.tracker}: [red]Error during upload: {e!s}")
                 console.print_exception()
                 if meta.debug and response is not None:
                     with contextlib.suppress(Exception):
-                        logger.info(f"[red]Response: {response.text[:500]}...")
-                logger.info("[yellow]It may have uploaded, please check TORRENTHR manually")
+                        logger.info(f"{self.tracker}: [red]Response: {response.text[:500]}...")
+                logger.info(f"{self.tracker}: [yellow]It may have uploaded, please check TORRENTHR manually")
                 return False
         else:
-            logger.info("[cyan]TORRENTHR Request Data:")
+            logger.info(f"{self.tracker}: Request Data:")
             logger.info(Redaction.redact_private_info(payload))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
@@ -273,7 +273,7 @@ class TorrentHR:
         image_list: list[str] = []
         image_api_key = str(self.config["TRACKERS"]["TORRENTHR"].get("img_api", "")).strip()
         if ordered_images and not image_api_key:
-            logger.info("[yellow]TORRENTHR image API key is not configured, skipping screenshot rehost")
+            logger.info(f"{self.tracker}: [yellow]image API key is not configured, skipping screenshot rehost")
 
         for image in ordered_images:
             if not image_api_key:
@@ -302,18 +302,18 @@ class TorrentHR:
                         raise KeyError("image.url")
                     image_list.append(img_url)
             except httpx.RequestError as exc:
-                logger.info(f"[yellow]Failed to upload image {Path(image).name}: {exc}")
+                logger.info(f"{self.tracker}: [yellow]Failed to upload image {Path(image).name}: {exc}")
             except httpx.HTTPStatusError:
-                logger.info(f"[yellow]Failed to upload image {Path(image).name}")
+                logger.info(f"{self.tracker}: [yellow]Failed to upload image {Path(image).name}")
                 if response is not None:
-                    logger.info(f"[yellow]TORRENTHR image host returned HTTP {response.status_code}")
+                    logger.info(f"{self.tracker}: [yellow]image host returned HTTP {response.status_code}")
                     logger.info(response.text)
             except json.decoder.JSONDecodeError:
-                logger.info(f"[yellow]Failed to parse TORRENTHR image host response for {Path(image).name}")
+                logger.info(f"{self.tracker}: [yellow]Failed to parse TORRENTHR image host response for {Path(image).name}")
                 if response is not None:
                     logger.info(response.text)
             except KeyError:
-                logger.info(f"[yellow]TORRENTHR image host response was missing an image URL for {Path(image).name}")
+                logger.info(f"{self.tracker}: [yellow]image host response was missing an image URL for {Path(image).name}")
                 logger.info(response_data)
             await asyncio.sleep(1)
 
@@ -339,8 +339,8 @@ class TorrentHR:
                     desc_parts.append(f"\n[img]{mi_img}[/img]\n")
                     pronfo = True
             except Exception:
-                logger.info("[bold red]Error parsing pronfo response, using TORRENTHR parser instead")
-                logger.debug(f"{response}")
+                logger.info(f"{self.tracker}: [bold red]Error parsing pronfo response, using TORRENTHR parser instead")
+                logger.debug(f"{self.tracker}: {response}")
                 logger.debug(response.text)
 
         screens = meta.screens or 0
@@ -365,7 +365,7 @@ class TorrentHR:
         dupes: list[str] = []
 
         if not imdb_id:
-            logger.info("[red]No IMDb ID available for search")
+            logger.info(f"{self.tracker}: [red]No IMDb ID available for search")
             return dupes
 
         cookies = await self.login(meta)
@@ -374,7 +374,7 @@ class TorrentHR:
         if cookies:
             client_args["cookies"] = cookies
         else:
-            logger.error("[red]Failed to log in to TORRENTHR for search")
+            logger.error(f"{self.tracker}: [red]Failed to log in to TORRENTHR for search")
             return dupes
 
         async with httpx.AsyncClient(**client_args) as client:
@@ -390,7 +390,7 @@ class TorrentHR:
                     page_url += f"&page={current_page}"
 
                 page_count += 1
-                logger.debug(f"[dim]Searching page {page_count}...")
+                logger.debug(f"{self.tracker}: [dim]Searching page {page_count}...")
                 response = await client.get(page_url)
                 response.raise_for_status()
 
@@ -402,7 +402,7 @@ class TorrentHR:
                         all_titles_seen.add(dupe)
 
                 if has_next_page:
-                    logger.debug(f"[dim]Next page available: page {next_page_number}")
+                    logger.debug(f"{self.tracker}: [dim]Next page available: page {next_page_number}")
 
                 if has_next_page:
                     current_page = next_page_number
@@ -424,18 +424,18 @@ class TorrentHR:
 
         if response.status_code == 200 or response.status_code == 302:
             html_length = len(response.text)
-            logger.debug(f"[dim]Response HTML length: {html_length} bytes")
+            logger.debug(f"{self.tracker}: [dim]Response HTML length: {html_length} bytes")
 
             if html_length < 1000:
-                logger.info(f"[yellow]Response seems too small ({html_length} bytes), might be an error page")
-                logger.debug(f"[yellow]Response content: {response.text[:500]}")
+                logger.info(f"{self.tracker}: [yellow]Response seems too small ({html_length} bytes), might be an error page")
+                logger.debug(f"{self.tracker}: [yellow]Response content: {response.text[:500]}")
                 return page_dupes, False, current_page
 
             soup = BeautifulSoup(response.text, "html.parser")
 
             result_table = soup.find("table", {"class": "torrentlist"}) or soup.find("table", {"align": "center"})
             if not result_table:
-                logger.info("[yellow]No results table found in HTML - either no results or page structure changed")
+                logger.info(f"{self.tracker}: [yellow]No results table found in HTML - either no results or page structure changed")
 
             link_count = 0
             onmousemove_count = 0
@@ -457,16 +457,16 @@ class TorrentHR:
                             dupe = dupe.replace("return overlibImage('", "")
                             page_dupes.append(dupe)
                         except Exception as parsing_error:
-                            logger.debug(f"[yellow]Error parsing link: {parsing_error}")
+                            logger.debug(f"{self.tracker}: [yellow]Error parsing link: {parsing_error}")
 
             page_number_display = current_page + 1
-            logger.debug(f"[dim]Page {page_number_display}: Found {link_count} detail links, {onmousemove_count} parsed successfully")
+            logger.debug(f"{self.tracker}: [dim]Page {page_number_display}: Found {link_count} detail links, {onmousemove_count} parsed successfully")
 
             pagination_text = None
             for p_tag in soup.find_all("p", align="center"):
                 if p_tag.text and ("Prev" in p_tag.text or "Next" in p_tag.text):
                     pagination_text = p_tag
-                    logger.debug(f"[dim]Found pagination: {pagination_text.text.strip()}")
+                    logger.debug(f"{self.tracker}: [dim]Found pagination: {pagination_text.text.strip()}")
                     break
 
             if pagination_text:
@@ -479,25 +479,25 @@ class TorrentHR:
                         if href_raw:
                             href = " ".join(href_raw) if isinstance(href_raw, AttributeValueList) else href_raw
 
-                        logger.debug(f"[dim]Next page URL: {href}")
+                        logger.debug(f"{self.tracker}: [dim]Next page URL: {href}")
 
                         page_match = re.search(r"page=(\d+)", href)
                         if page_match:
                             next_page_number = int(page_match.group(1))
-                            logger.debug(f"[dim]Found next page link: page={next_page_number} (will be displayed as page {next_page_number + 1})")
+                            logger.debug(f"{self.tracker}: [dim]Found next page link: page={next_page_number} (will be displayed as page {next_page_number + 1})")
                             break
         else:
-            logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
-            logger.debug(f"[red]Response: {response.text[:500]}...")
+            logger.info(f"{self.tracker}: [bold red]HTTP request failed. Status: {response.status_code}")
+            logger.debug(f"{self.tracker}: [red]Response: {response.text[:500]}...")
 
         return page_dupes, has_next_page, next_page_number
 
     async def login(self, meta: Meta) -> dict[str, Any] | None:
-        logger.info("[yellow]Logging in to TORRENTHR...")
+        logger.info(f"{self.tracker}: [yellow]Logging in to TORRENTHR...")
         url = f"{self.base_url}/takelogin.php"
 
         if not self.username or not self.password:
-            logger.info("[red]Missing TORRENTHR credentials in config.py")
+            logger.info(f"{self.tracker}: [red]Missing TORRENTHR credentials in config.py")
             return None
 
         payload: dict[str, Any] = {"username": self.username, "password": self.password, "ssl": "yes"}
@@ -522,15 +522,15 @@ class TorrentHR:
                 resp = await session.post(url, headers=headers, data=payload)
 
                 if "index.php" in str(resp.url) or "logout.php" in resp.text:
-                    logger.info("[green]Successfully logged in to TORRENTHR")
+                    logger.info(f"{self.tracker}: [green]Successfully logged in to TORRENTHR")
                     return dict(session.cookies)
-                logger.error("[red]Failed to log in to TORRENTHR")
-                logger.info(f"[red]Login response URL: {resp.url}")
-                logger.info(f"[red]Login status code: {resp.status_code}")
+                logger.error(f"{self.tracker}: [red]Failed to log in to TORRENTHR")
+                logger.info(f"{self.tracker}: [red]Login response URL: {resp.url}")
+                logger.info(f"{self.tracker}: [red]Login status code: {resp.status_code}")
                 return None
 
             except Exception as e:
-                logger.error(f"[red]Error during TORRENTHR login: {e!s}")
+                logger.error(f"{self.tracker}: [red]Error during TORRENTHR login: {e!s}")
                 console.print_exception()
                 return None
 

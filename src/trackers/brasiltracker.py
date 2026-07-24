@@ -15,6 +15,7 @@ import langcodes
 import rarfile
 from bs4 import BeautifulSoup
 from langcodes.tag_parser import LanguageTagError
+from rich.markup import escape
 
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
@@ -843,10 +844,10 @@ class BrasilTracker:
                 async with aiofiles.open(info_file_path, encoding="utf-8") as f:
                     return await f.read()
             except Exception as e:
-                logger.info(f"[bold red]Erro ao ler o arquivo de info em {info_file_path}: {e}[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Erro ao ler o arquivo de info em {escape(str(info_file_path))}: {escape(str(e))}[/bold red]")
                 return ""
         else:
-            logger.info(f"[bold red]Arquivo de info não encontrado: {info_file_path}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Arquivo de info não encontrado: {escape(str(info_file_path))}[/bold red]")
             return ""
 
     async def get_edition(self, meta: Meta) -> str:

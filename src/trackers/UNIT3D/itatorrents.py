@@ -2,6 +2,8 @@
 import re
 from typing import Any
 
+from rich.markup import escape
+
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
@@ -146,11 +148,11 @@ class ItaTorrents(UNIT3D):
         try:
             itt_name = " ".join(itt_name.split())
         except Exception:
-            logger.info("[bold red]Unable to generate name. Please re-run and correct any of the following args if needed.")
-            logger.info(f"--category [yellow]{meta.category}")
-            logger.info(f"--type [yellow]{meta.type}")
-            logger.info(f"--source [yellow]{meta.source}")
-            logger.info("[bold green]If you specified type, try also specifying source")
+            logger.info(f"{self.tracker}: [bold red]Unable to generate name. Please re-run and correct any of the following args if needed.")
+            logger.info(f"{self.tracker}: --category [yellow]{escape(str(meta.category))}")
+            logger.info(f"{self.tracker}: --type [yellow]{escape(str(meta.type))}")
+            logger.info(f"{self.tracker}: --source [yellow]{escape(str(meta.source))}")
+            logger.info(f"{self.tracker}: [bold green]If you specified type, try also specifying source")
 
             exit()
         name_notag = itt_name
@@ -178,6 +180,6 @@ class ItaTorrents(UNIT3D):
         # Translates to "Films and TV series that do not include Italian dubbing are not permitted."
         italian_languages = ["italian", "italiano"]
         if not await self.common.check_language_requirements(meta, self.tracker, languages_to_check=italian_languages, check_audio=True):
-            logger.info("Upload Rules: https://itatorrents.xyz/wikis/5")
+            logger.info(f"{self.tracker}: Upload Rules: https://itatorrents.xyz/wikis/5")
             return False
         return True

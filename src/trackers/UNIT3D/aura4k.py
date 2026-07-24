@@ -73,12 +73,12 @@ class Aura4K(UNIT3D):
         should_continue = True
         if meta.resolution not in ["2160p", "4320p"]:
             if not meta.unattended:
-                logger.info(f"[red]{self.tracker} only accepts 4K uploads.")
+                logger.info(f"{self.tracker}: [red]only accepts 4K uploads.")
             return False
 
         if meta.type not in ["DISC", "REMUX", "WEBDL", "ENCODE"]:
             if not meta.unattended:
-                logger.info(f"[red]{self.tracker} only accepts DISC, REMUX, WEBDL, and ENCODE uploads.")
+                logger.info(f"{self.tracker}: [red]only accepts DISC, REMUX, WEBDL, and ENCODE uploads.")
             return False
 
         if meta.is_disc not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(
@@ -105,16 +105,16 @@ class Aura4K(UNIT3D):
                                 bit_rate_kbps = bit_rate_num / 1000
                                 if meta.category == "MOVIE" and bit_rate_kbps < 15000:
                                     if not meta.unattended:
-                                        logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for AURA4K movie uploads.")
+                                        logger.info(f"{self.tracker}: Video bitrate too low: {bit_rate_kbps:.0f} kbps for AURA4K movie uploads.")
                                     return False
                                 if meta.category == "TV" and bit_rate_kbps < 10000:
                                     if not meta.unattended:
-                                        logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for AURA4K TV uploads.")
+                                        logger.info(f"{self.tracker}: Video bitrate too low: {bit_rate_kbps:.0f} kbps for AURA4K TV uploads.")
                                     return False
                             else:
                                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                                    logger.info(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                                    logger.info("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
+                                    logger.info(f"{self.tracker}: [bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
+                                    logger.info(f"{self.tracker}: [yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
                                     if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                                         pass
                                     else:
@@ -123,8 +123,8 @@ class Aura4K(UNIT3D):
                                     return False
                         else:
                             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                                logger.info(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                                logger.info("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
+                                logger.info(f"{self.tracker}: [bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
+                                logger.info(f"{self.tracker}: [yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
                                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                                     pass
                                 else:
@@ -133,8 +133,8 @@ class Aura4K(UNIT3D):
                                 return False
                     else:
                         if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                            logger.info(f"[bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
-                            logger.info("[yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
+                            logger.info(f"{self.tracker}: [bold red]Could not determine video bitrate from mediainfo for {self.tracker} upload.[/bold red]")
+                            logger.info(f"{self.tracker}: [yellow]Bitrate must be above 15000 kbps for movies and 10000 kbps for TV shows.[/yellow]")
                             if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                                 pass
                             else:
@@ -176,5 +176,5 @@ class Aura4K(UNIT3D):
             foreign_lang = audio_languages[0].upper()
             if meta.is_disc != "BDMV":
                 a4k_name = a4k_name.replace(meta.resolution, f"{foreign_lang} {meta.resolution}", 1)
-        logger.info(f"[yellow]Generated name for {self.tracker}: [bold]{a4k_name}[/bold][/yellow]")
+        logger.info(f"{self.tracker}: [yellow]Generated name for {self.tracker}: [bold]{a4k_name}[/bold][/yellow]")
         return {"name": a4k_name}

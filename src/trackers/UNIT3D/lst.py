@@ -39,7 +39,7 @@ class LST(UNIT3D):
 
         should_continue = True
         if not meta.valid_mi_settings:
-            logger.info(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
             return False
 
         if meta.is_disc not in ["BDMV", "DVD"] and not await self.common.check_language_requirements(

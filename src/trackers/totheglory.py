@@ -195,14 +195,14 @@ class ToTheGlory:
             await self.download_new_torrent(torrent_id, torrent_path)
             return True
         logger.info(data)
-        logger.info("\n\n")
+        logger.info(f"{self.tracker}: \n\n")
         raise UploadError(f"Upload to {self.tracker} Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa #F405
 
     async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
         cookiefile = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.json").resolve())
         if not Path(cookiefile).exists():
-            logger.info(f"[bold red]Cookie file not found: {self.tracker}.json")
+            logger.info(f"{self.tracker}: [bold red]Cookie file not found: {self.tracker}.json")
             return []
         cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
 
@@ -238,7 +238,7 @@ class ToTheGlory:
             await self.login(cookiefile)
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
-            logger.error("[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
+            logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
             recreate = cli_ui.ask_yes_no("Log in again and create new session?")
             if recreate is True:
                 if Path(cookiefile).exists():
@@ -255,7 +255,7 @@ class ToTheGlory:
             cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
                 resp = await client.get(url=url)
-                logger.debug("[cyan]Cookies:")
+                logger.debug(f"{self.tracker}: [cyan]Cookies:")
                 logger.debug(resp.url)
                 return resp.text.find("""<a href="/logout.php">Logout</a>""") != -1
         else:
@@ -278,10 +278,10 @@ class ToTheGlory:
                 response = await client.post(two_factor_url, data=two_factor_data)
                 await asyncio.sleep(0.5)
             if str(response.url).endswith("my.php"):
-                logger.info(f"[green]Successfully logged into {self.tracker}")
+                logger.info(f"{self.tracker}: [green]Successfully logged into {self.tracker}")
                 self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # type: ignore[reportPrivateUsage]
             else:
-                logger.info("[bold red]Something went wrong")
+                logger.info(f"{self.tracker}: [bold red]Something went wrong")
                 await asyncio.sleep(1)
                 logger.info(response.text)
                 logger.info(response.url)
@@ -369,5 +369,5 @@ class ToTheGlory:
             async with aiofiles.open(torrent_path, "wb") as tor:
                 await tor.write(r.content)
         else:
-            logger.info(f"[red]There was an issue downloading the new .torrent from {self.tracker}")
+            logger.info(f"{self.tracker}: [red]There was an issue downloading the new .torrent from {self.tracker}")
             logger.info(r.text)

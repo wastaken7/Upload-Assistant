@@ -29,7 +29,7 @@ def test_peergarden_get_imdb_non_video_category():
 
     meta = Meta()
     meta.category = "MUSIC"
-    meta.imdb = "1234567"
+    meta.imdb_id = 1234567
 
     imdb_data = asyncio.run(tracker.get_imdb(meta))
     assert imdb_data == {"imdb": "0"}
@@ -40,7 +40,7 @@ def test_peergarden_get_imdb_video_category_missing():
 
     meta = Meta()
     meta.category = "MOVIE"
-    meta.imdb = ""
+    meta.imdb_id = None
 
     imdb_data = asyncio.run(tracker.get_imdb(meta))
     assert imdb_data == {"imdb": "0"}
@@ -51,7 +51,7 @@ def test_peergarden_get_imdb_video_category_valid():
 
     meta = Meta()
     meta.category = "MOVIE"
-    meta.imdb = "1234567"
+    meta.imdb_id = 1234567
 
     imdb_data = asyncio.run(tracker.get_imdb(meta))
     assert imdb_data == {"imdb": "1234567"}

@@ -1042,7 +1042,7 @@ class BJShare:
         if category in ("MOVIE", "TV"):
             cover_path = self.main_tmdb_data.get("poster_path") or meta.tmdb_poster
             if not cover_path:
-                logger.info("Nenhum poster_path encontrado nos dados do TMDB.", extra={"markup": False})
+                logger.info(f"{self.tracker}: Nenhum poster_path encontrado nos dados do TMDB.", extra={"markup": False})
                 return None
 
             cover_tmdb_url = f"https://image.tmdb.org/t/p/w500{cover_path}"
@@ -1096,7 +1096,7 @@ class BJShare:
                 filename = Path(urlparse(url).path).name or "screenshot.png"
                 return await self.img_host(image_bytes, filename)
             except Exception as e:
-                logger.info(f"Failed to process screenshot from URL {url}: {e}", extra={"markup": False})
+                logger.info(f"{self.tracker}: Failed to process screenshot from URL {url}: {e}", extra={"markup": False})
                 return None
 
         results: list[str] = []
@@ -1378,7 +1378,7 @@ class BJShare:
             return results
 
         except Exception as e:
-            logger.info(f"[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
             import traceback
 
             logger.info(traceback.format_exc())

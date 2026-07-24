@@ -43,7 +43,7 @@ class Aither(UNIT3D):
             return False
 
         if meta.valid_mi is False:
-            logger.info(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
+            logger.info(f"{self.tracker}: [bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
             return False
 
         return should_continue

@@ -176,7 +176,7 @@ class FunFile:
             return results
 
         except Exception as e:
-            logger.info(f"An error occurred while fetching requests: {e}", extra={"markup": False})
+            logger.info(f"{self.tracker}: An error occurred while fetching requests: {e}", extra={"markup": False})
             return []
 
     async def generate_description(self, meta: Meta) -> str:

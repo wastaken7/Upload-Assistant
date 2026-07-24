@@ -12,6 +12,7 @@ import cli_ui
 import httpx
 import pyotp
 from defusedxml import ElementTree
+from rich.markup import escape
 
 from cogs.redaction import Redaction
 from src.console import console, logger
@@ -133,7 +134,7 @@ class MoreThanTV:
         if base_piece_mb > 8 and not meta.nohash:
             tracker_config = self.config["TRACKERS"].get(self.tracker, {})
             if str(tracker_config.get("skip_if_rehash", "false")).lower() == "false":
-                logger.info("[red]Piece size is OVER 8M and does not work on MORETHANTV. Generating a new .torrent")
+                logger.info(f"{self.tracker}: [red]Piece size is OVER 8M and does not work on {self.tracker}. Generating a new .torrent")
                 piece_size = 8
                 tracker_url = str(tracker_config.get("announce_url", "https://fake.tracker")).strip()
                 torrent_create = f"[{self.tracker}]"
@@ -148,7 +149,7 @@ class MoreThanTV:
                 await common.create_torrent_for_upload(meta, self.tracker, self.source_flag, torrent_filename=torrent_create)
 
             else:
-                logger.info("[red]Piece size is OVER 8M and skip_if_rehash enabled. Skipping upload.")
+                logger.info(f"{self.tracker}: [red]Piece size is OVER 8M and skip_if_rehash enabled. Skipping upload.")
                 return None
         else:
             await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
@@ -232,8 +233,8 @@ class MoreThanTV:
                         if "authkey.php" in str(response.url):
                             meta.tracker_status[self.tracker]["status_message"] = "data error - No DL link in response, It may have uploaded, check manually."
                         else:
-                            logger.info(f"response URL: {response.url}")
-                            logger.info(f"response status: {response.status_code}")
+                            logger.info(f"{self.tracker}: response URL: {response.url}")
+                            logger.info(f"{self.tracker}: response status: {response.status_code}")
                         return False
                     except Exception:
                         meta.tracker_status[self.tracker]["status_message"] = "data error -It may have uploaded, check manually."
@@ -243,7 +244,7 @@ class MoreThanTV:
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: {e}"
                 return False
         else:
-            logger.info("[cyan]MORETHANTV Request Data:")
+            logger.info(f"{self.tracker}: Request Data:")
             debug_data = data.copy()
             if "auth" in debug_data:
                 auth_value = str(debug_data.get("auth", ""))
@@ -504,7 +505,7 @@ class MoreThanTV:
             await self.login(cookiefile)
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
-            logger.error("[red]Failed to validate cookies. Please confirm that the site is up and your username and password is valid.")
+            logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your username and password is valid.")
             if "mtv_timeout" in meta and meta.mtv_timeout:
                 meta.skipping = "MORETHANTV"
                 return False
@@ -529,29 +530,29 @@ class MoreThanTV:
                 async with httpx.AsyncClient(cookies=cookies_dict, timeout=10) as client:
                     try:
                         resp = await client.get(url=url)
-                        logger.debug("[cyan]Validating MORETHANTV Cookies:")
+                        logger.debug(f"{self.tracker}: [cyan]Validating {self.tracker} Cookies:")
 
                         if "Logout" in resp.text:
                             return True
-                        logger.info("[yellow]Valid session not found in cookies")
+                        logger.info(f"{self.tracker}: [yellow]Valid session not found in cookies")
                         return False
 
                     except httpx.TimeoutException:
-                        logger.info(f"[red]Connection to {url} timed out. The site may be down or unreachable.")
+                        logger.info(f"{self.tracker}: [red]Connection to {url} timed out. The site may be down or unreachable.")
                         meta.mtv_timeout = True
                         return False
                     except httpx.ConnectError:
-                        logger.error(f"[red]Failed to connect to {url}. The site may be down or your connection is blocked.")
+                        logger.error(f"{self.tracker}: [red]Failed to connect to {url}. The site may be down or your connection is blocked.")
                         meta.mtv_timeout = True
                         return False
-                    except Exception as e:
-                        logger.error(f"[red]Error connecting to MORETHANTV: {e!s}")
+                    except httpx.HTTPError as e:
+                        logger.error(f"{self.tracker}: [red]HTTP error connecting to {self.tracker}: {escape(str(e))}")
                         return False
-            except Exception as e:
-                logger.error(f"[red]Error loading cookies: {e!s}")
+            except (OSError, ValueError) as e:
+                logger.error(f"{self.tracker}: [red]Error loading cookies: {escape(str(e))}")
                 return False
         else:
-            logger.info("[yellow]Cookie file not found")
+            logger.info(f"{self.tracker}: [yellow]Cookie file not found")
             return False
 
     async def get_auth(self, cookiefile: str) -> str:
@@ -567,16 +568,16 @@ class MoreThanTV:
                         resp = await client.get(url=url)
                         if "authkey=" in resp.text:
                             return resp.text.rsplit("authkey=", 1)[1][:32]
-                        logger.info("[yellow]Auth key not found in response")
+                        logger.info(f"{self.tracker}: [yellow]Auth key not found in response")
                         return ""
                     except httpx.RequestError as e:
-                        logger.error(f"[red]Error getting auth key: {e!s}")
+                        logger.error(f"{self.tracker}: [red]Error getting auth key: {escape(str(e))}")
                         return ""
             else:
-                logger.info("[yellow]Cookie file not found for auth key retrieval")
+                logger.info(f"{self.tracker}: [yellow]Cookie file not found for auth key retrieval")
                 return ""
-        except Exception as e:
-            logger.error(f"[red]Unexpected error retrieving auth key: {e!s}")
+        except (OSError, ValueError) as e:
+            logger.error(f"{self.tracker}: [red]Error loading cookies or parsing JSON: {escape(str(e))}")
             return ""
 
     async def login(self, cookiefile: str) -> bool:
@@ -596,7 +597,7 @@ class MoreThanTV:
                     res = await client.get(url=f"{self.base_url}/login")
 
                     if 'name="token" value="' not in res.text:
-                        logger.info("[red]Unable to find token in login page")
+                        logger.info(f"{self.tracker}: [red]Unable to find token in login page")
                         return False
 
                     token = res.text.rsplit('name="token" value="', 1)[1][:48]
@@ -611,9 +612,9 @@ class MoreThanTV:
                                 otp = pyotp.parse_uri(otp_uri)
                                 mfa_code = pyotp.TOTP(otp.secret).now()
                             except ValueError, TypeError:
-                                mfa_code = console.input("[yellow]MORETHANTV 2FA Code: ")
+                                mfa_code = console.input(f"[yellow]{self.tracker} 2FA Code: ")
                         else:
-                            mfa_code = console.input("[yellow]MORETHANTV 2FA Code: ")
+                            mfa_code = console.input(f"[yellow]{self.tracker} 2FA Code: ")
 
                         two_factor_token = resp.text.rsplit('name="token" value="', 1)[1][:48]
                         two_factor_payload = {"token": two_factor_token, "code": mfa_code, "submit": "login"}
@@ -621,36 +622,37 @@ class MoreThanTV:
 
                     await asyncio.sleep(1)
                     if "authkey=" in resp.text:
-                        logger.info("[green]Successfully logged in to MORETHANTV")
+                        logger.info(f"{self.tracker}: [green]Successfully logged in to {self.tracker}")
                         cookies_dict = dict(client.cookies)
                         cookies_data = await self.async_json_dumps(cookies_dict)
                         async with aiofiles.open(cookiefile, "w", encoding="utf-8") as cf:
                             await cf.write(cookies_data)
-                        logger.info(f"[green]Cookies saved to {cookiefile}")
+                        logger.info(f"{self.tracker}: [green]Cookies saved to {cookiefile}")
                         return True
-                    logger.info("[bold red]Something went wrong while trying to log into MORETHANTV")
-                    logger.info(f"[red]Final URL: {resp.url}")
+                    logger.info(f"{self.tracker}: [bold red]Something went wrong while trying to log into {self.tracker}")
+                    logger.info(f"{self.tracker}: [red]Final URL: {resp.url}")
                     return False
 
                 except httpx.TimeoutException:
-                    logger.info("[red]Connection to MORETHANTV timed out. The site may be down or unreachable.")
+                    logger.info(f"{self.tracker}: [red]Connection to {self.tracker} timed out. The site may be down or unreachable.")
                     return False
                 except httpx.ConnectError:
-                    logger.error("[red]Failed to connect to MORETHANTV. The site may be down or your connection is blocked.")
+                    logger.error(f"{self.tracker}: [red]Failed to connect to {self.tracker}. The site may be down or your connection is blocked.")
                     return False
-                except Exception as e:
-                    logger.error(f"[red]Error during MORETHANTV login: {e!s}")
-                    logger.info(f"[dim red]{traceback.format_exc()}[/dim red]")
+                except (httpx.HTTPError, KeyError, IndexError, ValueError) as e:
+                    logger.error(f"{self.tracker}: [red]Error during {self.tracker} login: {escape(str(e))}")
+                    logger.info(f"{self.tracker}: [dim red]{escape(traceback.format_exc())}[/dim red]")
                     return False
         except Exception as e:
-            logger.error(f"[red]Unexpected error during login: {e!s}")
-            logger.info(f"[dim red]{traceback.format_exc()}[/dim red]")
+            logger.error(f"{self.tracker}: [red]Unexpected error during login: {escape(str(e))}")
+            logger.info(f"{self.tracker}: [dim red]{escape(traceback.format_exc())}[/dim red]")
+            raise
         return False
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.type not in ["WEBDL"] and meta.tag and any(x in meta.tag for x in ["EVO"]):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"[bold red]Group {meta.tag} is only allowed for raw type content at {self.tracker}[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for raw type content at {self.tracker}[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -698,13 +700,13 @@ class MoreThanTV:
         if meta.resolution not in ["2160p"] and meta.video_codec in ["HEVC"]:
             if meta.anime and meta.tag and not any(x in meta.tag for x in allowed_anime):
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    logger.info(f"[bold red]Only 4K HEVC anime releases from {meta.tag} are allowed at {self.tracker}[/bold red]")
+                    logger.info(f"{self.tracker}: [bold red]Only 4K HEVC anime releases from {meta.tag} are allowed at {self.tracker}[/bold red]")
                     if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                         pass
                     else:
                         return False
             else:
-                logger.info(f"[bold red]Only 4K HEVC releases are allowed at {self.tracker}[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Only 4K HEVC releases are allowed at {self.tracker}[/bold red]")
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                     if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                         pass
@@ -726,7 +728,7 @@ class MoreThanTV:
         genres_lower = {g.lower() for g in genres_list if g}
         if any(keyword in keywords_lower for keyword in disallowed_keywords) or any(genre in genres_lower for genre in disallowed_genres):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"[bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:

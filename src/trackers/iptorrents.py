@@ -379,7 +379,7 @@ class IPTorrents:
             size_gb = total_size / (1024**3)
             return size_gb >= 8
         except Exception as e:
-            logger.info(f"[bold red]Error reading torrent file for size check on {self.tracker}: {e}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Error reading torrent file for size check on {self.tracker}: {e}[/bold red]")
             return False
 
     async def get_data(self, meta: Meta):

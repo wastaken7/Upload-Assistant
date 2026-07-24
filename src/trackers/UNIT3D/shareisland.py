@@ -295,7 +295,7 @@ class ShareIsland(UNIT3D):
                     region_name = region_name.strip().upper() if region_name else None
                     if region_name:
                         break
-                    logger.info("Region code is required.", extra={"markup": False})
+                    logger.info(f"{self.tracker}: Region code is required.", extra={"markup": False})
 
             # Validate region name was provided
             if not region_name:
@@ -748,7 +748,7 @@ class ShareIsland(UNIT3D):
                         if not logo_url and fallback_logo:
                             logo_url = f"https://image.tmdb.org/t/p/w300{fallback_logo}"
         except Exception as e:
-            logger.info(f"[DEBUG] TMDb fetch error: {e}", extra={"markup": False})
+            logger.info(f"{self.tracker}: [DEBUG] TMDb fetch error: {e}", extra={"markup": False})
 
         return summary, logo_url
 
@@ -924,7 +924,7 @@ class ShareIsland(UNIT3D):
                 "subs": subs,
             }
         except Exception as e:
-            logger.info(f"[DEBUG] Mediainfo extraction error: {e}", extra={"markup": False})
+            logger.info(f"{self.tracker}: [DEBUG] Mediainfo extraction error: {e}", extra={"markup": False})
             import traceback
 
             traceback.print_exc()

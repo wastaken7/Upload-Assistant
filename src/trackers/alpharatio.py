@@ -185,8 +185,8 @@ class AlphaRatio:
                     full_mediainfo = await mi_file.read()
                 description += f"[hide=FULL MEDIAINFO][code]{full_mediainfo}[/code][/hide]\n"
             else:
-                logger.info("[bold red]Couldn't find the MediaInfo template")
-                logger.info("[green]Using normal MediaInfo for the description.")
+                logger.info(f"{self.tracker}: [bold red]Couldn't find the MediaInfo template")
+                logger.info(f"{self.tracker}: [green]Using normal MediaInfo for the description.")
 
                 async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as mi_file:
                     cleaned_mediainfo = await mi_file.read()
@@ -231,7 +231,7 @@ class AlphaRatio:
                         if not has_eng_audio:
                             audio_lang = mi["media"]["track"][2].get("Language_String", "").upper()
             except Exception as e:
-                logger.error(f"[red]Error: {e}")
+                logger.error(f"{self.tracker}: [red]Error: {e}")
         else:
             for audio in meta.bdinfo["audio"]:
                 if audio["language"] == "English":
@@ -258,14 +258,14 @@ class AlphaRatio:
         title = meta.title.strip()
         year = str(meta.year).strip() if meta.year is not None else ""
         if not title:
-            logger.info("[red]Title is missing.")
+            logger.info(f"{self.tracker}: [red]Title is missing.")
             return dupes
 
         search_query = f"{title} {year}".strip()
         search_query_encoded = urllib.parse.quote(search_query)
         search_url = f"{self.base_url}/ajax.php?action=browse&searchstr={search_query_encoded}"
 
-        logger.debug(f"[blue]{search_url}")
+        logger.debug(f"{self.tracker}: [blue]{search_url}")
 
         headers = {"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"}
 
@@ -338,7 +338,7 @@ class AlphaRatio:
                             logger.info(f"{self.tracker}: [green]Auth key saved for future use[/green]")
                         return auth_key
         except Exception as e:
-            logger.error(f"[red]Error extracting auth key: {e}")
+            logger.error(f"{self.tracker}: [red]Error extracting auth key: {e}")
 
         return None
 
@@ -365,7 +365,7 @@ class AlphaRatio:
         while cover is None and not meta.unattended:
             cover = Prompt.ask("No Cover was found. Please input a link to a cover:", default="")
             if not re.match(r"https?://.*\.(jpg|png|gif)$", cover):
-                logger.info("[red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
+                logger.info(f"{self.tracker}: [red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
                 cover = None
 
         # Tag Compilation

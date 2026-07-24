@@ -161,7 +161,7 @@ class MTeam:
             return response.json()
 
         except Exception as e:
-            logger.info(f"Error fetching Douban info: {e}")
+            logger.info(f"{self.tracker}: Error fetching Douban info: {e}")
             return info
 
     async def mteam_standard_desc(self, meta: Meta):
@@ -601,7 +601,7 @@ class MTeam:
                 return False
 
         else:
-            logger.info("[cyan]M-Team Request Data:")
+            logger.info(f"{self.tracker}: [cyan]{self.tracker} Request Data:")
             logger.info(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading"
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")

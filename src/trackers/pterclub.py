@@ -56,7 +56,7 @@ class PTerClub:
     async def validate_credentials(self, meta: Meta) -> bool:
         vcookie = await self.validate_cookies(meta)
         if vcookie is not True:
-            logger.error("[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
+            logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
             return False
         return True
 
@@ -73,7 +73,7 @@ class PTerClub:
 
                 return resp.text.find("""<a href="#" data-url="logout.php" id="logout-confirm">""") != -1
         else:
-            logger.info("[bold red]Missing Cookie File. (data/cookies/PTERCLUB.txt)")
+            logger.info(f"{self.tracker}: [bold red]Missing Cookie File. (data/cookies/PTERCLUB.txt)")
             return False
 
     async def search_existing(self, meta: Meta) -> list[str] | bool:
@@ -83,7 +83,7 @@ class PTerClub:
 
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if not Path(cookiefile).exists():
-            logger.info("[bold red]Missing Cookie File. (data/cookies/PTERCLUB.txt)")
+            logger.info(f"{self.tracker}: [bold red]Missing Cookie File. (data/cookies/PTERCLUB.txt)")
             return False
         cookies = await common.parse_cookie_file(cookiefile)
         imdb_id = meta.imdb_id or 0
@@ -226,7 +226,7 @@ class PTerClub:
         parts.append(desc)
 
         if self.rehost_images is True:
-            logger.info("[green]Rehosting Images...")
+            logger.info(f"{self.tracker}: [green]Rehosting Images...")
             images = await self.pterimg_upload(meta)
             if len(images) > 0:
                 parts.append("[center]")
@@ -270,7 +270,7 @@ class PTerClub:
                 if logged_in is True:
                     return self._extract_auth_token(response.text, r'auth_token.*?"(\w+)"')
         else:
-            logger.info("[yellow]Pterimg Cookies not found. Creating new session.")
+            logger.info(f"{self.tracker}: [yellow]Pterimg Cookies not found. Creating new session.")
 
         data = {"login-subject": self.username, "password": self.password, "keep-login": 1}
         async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
@@ -449,7 +449,7 @@ class PTerClub:
                 up = await client.post(url=url, data=data, files=files)
 
                 if str(up.url).startswith(f"{self.base_url}/details.php?id="):
-                    logger.info(f"[green]Uploaded to: [yellow]{str(up.url).replace('&uploaded=1', '')}[/yellow][/green]")
+                    logger.info(f"{self.tracker}: [green]Uploaded to: [yellow]{str(up.url).replace('&uploaded=1', '')}[/yellow][/green]")
                     id_match = re.search(r"(id=)(\d+)", urlparse(str(up.url)).query)
                     if id_match is None:
                         raise UploadError("Upload succeeded but torrent id was not present in the redirect URL.", "red")  # noqa: F405
@@ -459,7 +459,7 @@ class PTerClub:
                     meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
                     return True
                 logger.info(data)
-                logger.info("\n\n")
+                logger.info(f"{self.tracker}: \n\n")
                 raise UploadError(f"Upload to Pter Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa #F405
         return False
 
@@ -471,5 +471,5 @@ class PTerClub:
             async with aiofiles.open(torrent_path, "wb") as tor:
                 await tor.write(r.content)
         else:
-            logger.info("[red]There was an issue downloading the new .torrent from pter")
+            logger.info(f"{self.tracker}: [red]There was an issue downloading the new .torrent from pter")
             logger.info(r.text)
