@@ -903,6 +903,118 @@ class DescriptionBuilder:
 
         return "\n".join(part for part in game_parts if part.strip())
 
+    def _build_music_desc_section(self, meta: Meta, header_size: int = 0, table: bool = True) -> str:
+        """Build a tracker-neutral BBCode summary for MUSIC-category uploads."""
+        if meta.category != "MUSIC" or not isinstance(meta.music_release, dict):
+            return ""
+
+        release = meta.music_release
+        fields_data = release.get("fields", {})
+        tracks = release.get("tracks", [])
+        if not isinstance(fields_data, dict):
+            fields_data = {}
+        if not isinstance(tracks, list):
+            tracks = []
+        if not fields_data and not tracks:
+            return ""
+
+        if self.tracker == "TORRENTLEECH" and not header_size:
+            header_size = 1
+        elif self.tracker in ("BJSHARE", "BRASILTRACKER") and not header_size:
+            header_size = 3
+
+        header = "[h2]" if not header_size else f"[size={header_size}][b]"
+        header_end = "[/h2]" if not header_size else "[/b][/size]\n"
+        use_pt_br = self.tracker in ("AMIGOSSHARE", "BRASILTRACKER", "CAPYBARABR", "SAMARITANO", "BJSHARE")
+
+        def value(name: str, fallback: Any = "") -> Any:
+            """Return a populated normalized release field or its fallback."""
+            item = fields_data.get(name, {})
+            if isinstance(item, dict) and item.get("value") not in (None, "", [], {}):
+                return item["value"]
+            return fallback
+
+        def display(item: Any) -> str:
+            """Format a release field for human-readable BBCode output."""
+            if isinstance(item, list):
+                return ", ".join(str(part) for part in item if str(part).strip())
+            return str(item).strip() if item not in (None, "") else ""
+
+        def technical_values(name: str, formatter: Any = str) -> str:
+            """Format unique valid technical values from the release tracks."""
+            formatted_values: dict[Any, str] = {}
+            for track in tracks:
+                if not isinstance(track, dict):
+                    continue
+                item = track.get(name)
+                if item in (None, ""):
+                    continue
+                try:
+                    hash(item)
+                    formatted = display(formatter(item))
+                except TypeError, ValueError, OverflowError:
+                    continue
+                if formatted:
+                    formatted_values[item] = formatted
+            return ", ".join(formatted_values[item] for item in sorted(formatted_values, key=str))
+
+        text = {
+            "details": "Music Details" if not use_pt_br else "Detalhes da Música",
+            "artist": "Artist" if not use_pt_br else "Artista",
+            "album": "Album" if not use_pt_br else "Álbum",
+            "year": "Original Release Year" if not use_pt_br else "Ano de Lançamento Original",
+            "release_year": "Release Year" if not use_pt_br else "Ano desta Edição",
+            "edition": "Edition" if not use_pt_br else "Edição",
+            "edition_year": "Edition Year" if not use_pt_br else "Ano da Edição",
+            "type": "Release Type" if not use_pt_br else "Tipo de Lançamento",
+            "media": "Media" if not use_pt_br else "Mídia",
+            "label": "Label" if not use_pt_br else "Gravadora",
+            "catalogue": "Catalogue Number" if not use_pt_br else "Número de Catálogo",
+            "genres": "Genres" if not use_pt_br else "Gêneros",
+            "tracks": "Tracks" if not use_pt_br else "Faixas",
+            "discs": "Discs" if not use_pt_br else "Discos",
+            "format": "Format" if not use_pt_br else "Formato",
+            "codec": "Codec",
+            "bit_depth": "Bit Depth" if not use_pt_br else "Profundidade de Bits",
+            "sample_rate": "Sample Rate" if not use_pt_br else "Taxa de Amostragem",
+            "channels": "Channels" if not use_pt_br else "Canais",
+            "bitrate": "Bitrate",
+        }
+
+        music_fields = [
+            (text["artist"], display(value("artists", value("artist", meta.artist)))),
+            (text["album"], display(value("album", meta.title))),
+            (text["year"], display(value("year", meta.year))),
+            (text["release_year"], display(value("release_year"))),
+            (text["edition"], display(value("edition"))),
+            (text["edition_year"], display(value("edition_year"))),
+            (text["type"], display(value("release_type"))),
+            (text["media"], display(value("media", meta.source))),
+            (text["label"], display(value("release_label", value("label")))),
+            (text["catalogue"], display(value("release_catalogue_number"))),
+            (text["genres"], display(value("genres"))),
+            (text["tracks"], display(value("track_count", len(tracks)))),
+            (text["discs"], display(value("disc_count", 1))),
+            (text["format"], display(value("format", technical_values("format")))),
+            (text["codec"], technical_values("codec")),
+            (text["bit_depth"], technical_values("bit_depth", lambda item: f"{item}-bit")),
+            (text["sample_rate"], technical_values("sample_rate", lambda item: f"{int(item) / 1000:g} kHz")),
+            (text["channels"], technical_values("channels", lambda item: {1: "Mono", 2: "Stereo"}.get(int(item), f"{item} channels"))),
+            (text["bitrate"], technical_values("bitrate", lambda item: f"{round(int(item) / 1000)} kbps")),
+        ]
+        music_fields = [(label, field_value) for label, field_value in music_fields if field_value]
+        if not music_fields:
+            return ""
+
+        if table:
+            table_lines = ["[table]"]
+            table_lines.extend(f"[tr][td][b]{label}[/b][/td][td]{field_value}[/td][/tr]" for label, field_value in music_fields)
+            table_lines.append("[/table]")
+            body = "\n".join(table_lines)
+        else:
+            body = "\n".join(f"[b]{label}:[/b] {field_value}" for label, field_value in music_fields)
+        return f"{header}{text['details']}{header_end}\n{body}"
+
     async def general_description_generator(
         self,
         meta: Meta,
@@ -924,6 +1036,7 @@ class DescriptionBuilder:
         tv_info: bool,
         ua_signature: bool,
         user_description: bool,
+        music: bool = True,
         approved_image_hosts: list[str] | None = None,
         signature: str = "",
         desc_header: str = "",
@@ -1054,6 +1167,12 @@ class DescriptionBuilder:
             if game_section:
                 desc_parts.append(game_section)
 
+        # Music details
+        if music and meta.category == "MUSIC":
+            music_section = self._build_music_desc_section(meta)
+            if music_section:
+                desc_parts.append(music_section)
+
         if self.tracker == "MTEAM" and meta.mteam_description:
             desc_parts.append(meta.mteam_description)
 
@@ -1180,6 +1299,7 @@ class DescriptionBuilder:
             tv_info=True,
             ua_signature=True,
             user_description=True,
+            music=True,
             signature=signature,
             desc_header=desc_header,
             approved_image_hosts=approved_image_hosts,

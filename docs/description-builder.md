@@ -66,15 +66,16 @@ graph TD
     F --> G[6. TV Episode Info]
     G --> H[7. Book/Audiobook Details]
     H --> I[8. Game Specifications]
-    I --> J[9. API Overview / Synopsis]
-    J --> K[10. NFO Content]
-    K --> L[11. User-provided Description]
-    L --> M[12. Disc Menu Screenshots]
-    M --> N[13. Tone-mapped Header]
-    N --> O[14. Screenshot Grid & Multi-file Info]
-    O --> P[15. Audio Spectrograms]
-    P --> Q[16. Signatures]
-    Q --> R[End: Apply Tracker-Specific Formatting]
+    I --> J[9. Music Details]
+    J --> K[10. API Overview / Synopsis]
+    K --> L[11. NFO Content]
+    L --> M[12. User-provided Description]
+    M --> N[13. Disc Menu Screenshots]
+    N --> O[14. Tone-mapped Header]
+    O --> P[15. Screenshot Grid & Multi-file Info]
+    P --> Q[16. Audio Spectrograms]
+    Q --> R[17. Signatures]
+    R --> S[End: Apply Tracker-Specific Formatting]
 ```
 
 ### Detailed Block Descriptions
@@ -129,30 +130,34 @@ For the `GAME` category, it renders:
 3.  **System Requirements:** Minimum and Recommended requirements placed side by side in a `[table]` layout.
 4.  **Languages:** A detailed table of supported interface, full audio, and subtitle configurations.
 
-#### 9. API Overview / Synopsis
+#### 9. Music Details
+
+For `MUSIC` uploads, it renders the normalized release data collected during music preparation: artist, album, original and concrete release years, edition, release type, medium, label, catalogue number, genres, disc/track counts, and detected audio format, codec, bit depth, sample rate, channels, and bitrate.
+
+#### 10. API Overview / Synopsis
 
 Insert the main synopsis (description) retrieved via external APIs (TMDb, IMDb, etc.).
 
 - _Aither Specifics:_ If the upload is a `FraMeSToR` release, formatting is customized to clean and style the scene group's information.
 - _MORETHANTV Specifics:_ Wraps the description in `[spoiler=Notes]...[/spoiler]`.
 
-#### 10. NFO Content
+#### 11. NFO Content
 
 Appends scene group release `.nfo` content wrapped in raw formatting blocks (like `[pre]` or `[nfo]`).
 
-#### 11. User-provided Description
+#### 12. User-provided Description
 
 Inserts plain text or links supplied manually by the user via file inputs (`description_file_content`) or custom links (`description_link_content`).
 
-#### 12. Disc Menu Screenshots
+#### 13. Disc Menu Screenshots
 
 If the media contains screenshots taken of DVD or BDMV menus (`-menus` / `--disc-menus`), they are placed in a grid using the config's `screens_per_row` settings.
 
-#### 13. Tone-mapped Header
+#### 14. Tone-mapped Header
 
 Inserts `tonemapped_header` if the source is tone-mapped from HDR to SDR.
 
-#### 14. Screenshot Grid & Multi-file Info
+#### 15. Screenshot Grid & Multi-file Info
 
 Handles screenshots for various content layouts:
 
@@ -160,11 +165,11 @@ Handles screenshots for various content layouts:
 - **Single File / Disc:** Formats a simple grid of thumbnails matching the specified parameters.
 - **Multiple Discs / Files (Packs):** Generates layouts iteratively. Files below `fileLimit` are listed with individual spoiler tags containing their MediaInfo and respective screenshots. Files above `fileLimit` are wrapped together under `[spoiler=Other files]`.
 
-#### 15. Audio Spectrograms
+#### 16. Audio Spectrograms
 
 Appends audio spectrogram analyses images in a grid format.
 
-#### 16. Signatures
+#### 17. Signatures
 
 Appends `custom_signature` and the automated tool signature link:
 
