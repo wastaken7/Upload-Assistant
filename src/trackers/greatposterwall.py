@@ -412,7 +412,7 @@ class GreatPosterWall:
             response = await client.get(url)
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
-            logger.info(f"Error on request: {e.response.status_code} - {e.response.reason_phrase}", extra={"markup": False})
+            logger.info(f"{self.tracker}: Error on request: {e.response.status_code} - {e.response.reason_phrase}", extra={"markup": False})
             return
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -455,8 +455,8 @@ class GreatPosterWall:
             if final_slots:
                 final_slots = final_slots.replace("Slot", "").replace("Empty slots:", "").strip()
                 if resolution == meta.resolution:
-                    logger.info(f"\n[green]Available Slots for[/green] {resolution}:")
-                    logger.info(f"{final_slots}\n")
+                    logger.info(f"{self.tracker}: \n[green]Available Slots for[/green] {resolution}:")
+                    logger.info(f"{self.tracker}: {final_slots}\n")
 
     async def get_media_info(self, meta: Meta) -> str:
         info_file_path = ""
@@ -471,10 +471,10 @@ class GreatPosterWall:
                 async with aiofiles.open(info_file_path, encoding="utf-8") as f:
                     return await f.read()
             except Exception as e:
-                logger.info(f"[bold red]Error reading info file at {info_file_path}: {e}[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Error reading info file at {info_file_path}: {e}[/bold red]")
                 return ""
         else:
-            logger.info(f"[bold red]Info file not found: {info_file_path}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Info file not found: {info_file_path}[/bold red]")
             return ""
 
     def get_edition(self, meta: Meta) -> str:
@@ -625,16 +625,16 @@ class GreatPosterWall:
                 response.raise_for_status()
 
         except httpx.RequestError as e:
-            logger.info(f"[bold red]Network error fetching groupid: {e}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Network error fetching groupid: {e}[/bold red]")
             return False
         except httpx.HTTPStatusError as e:
-            logger.info(f"[bold red]HTTP error when fetching groupid: Status {e.response.status_code}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]HTTP error when fetching groupid: Status {e.response.status_code}[/bold red]")
             return False
 
         try:
             data: dict[str, Any] = response.json()
         except Exception as e:
-            logger.info(f"[bold red]Error decoding JSON from groupid response: {e}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Error decoding JSON from groupid response: {e}[/bold red]")
             return False
 
         if data.get("status") == 200 and "response" in data and "ID" in data["response"]:
@@ -673,7 +673,7 @@ class GreatPosterWall:
                 if new_images:
                     return str(new_images[0].get("raw_url", ""))
             except Exception as e:
-                logger.error(f"[red]Error uploading poster: {e}[/red]")
+                logger.error(f"{self.tracker}: [red]Error uploading poster: {e}[/red]")
 
         return ""
 
@@ -688,7 +688,7 @@ class GreatPosterWall:
                 poster_url = (poster_url_raw or "").strip()
                 if any(host in poster_url for host in self.approved_image_hosts):
                     break
-                logger.info("[red]Invalid host. Please use a URL from the allowed hosts.[/red]")
+                logger.info(f"{self.tracker}: [red]Invalid host. Please use a URL from the allowed hosts.[/red]")
 
         imdb_identifier = str(meta.imdb_info.get("imdbID") or meta.imdb or "").strip()
         tmdb_identifier = str(meta.tmdb_id or "").strip()
@@ -815,14 +815,14 @@ class GreatPosterWall:
                 imdb_id_raw = await asyncio.to_thread(cli_ui.ask_string, "Enter Director IMDb ID (e.g., nm0000138): ")
                 imdb_id = (imdb_id_raw or "").strip()
                 if not re.match(r"^nm\d+$", imdb_id):
-                    logger.info("[red]Invalid IMDb person ID. Format must be like nm0000138.[/red]")
+                    logger.info(f"{self.tracker}: [red]Invalid IMDb person ID. Format must be like nm0000138.[/red]")
 
             english_name = ""
             while not english_name:
                 english_name_raw = await asyncio.to_thread(cli_ui.ask_string, "Enter Director English name: ")
                 english_name = (english_name_raw or "").strip()
                 if not english_name:
-                    logger.info("[red]Director English name cannot be empty.[/red]")
+                    logger.info(f"{self.tracker}: [red]Director English name cannot be empty.[/red]")
 
             chinese_name_raw = await asyncio.to_thread(cli_ui.ask_string, "Enter Director Chinese name (optional, press Enter to skip): ")
             chinese_name = (chinese_name_raw or "").strip()
@@ -937,7 +937,7 @@ class GreatPosterWall:
                         if score >= 10:
                             return response_data
             except Exception as e:
-                logger.debug(f"Failed to process response payload on GREATPOSTERWALL: {e}", exc_info=True)
+                logger.debug(f"{self.tracker}: Failed to process response payload on GREATPOSTERWALL: {e}", exc_info=True)
                 continue
 
         return best_response
@@ -1169,7 +1169,7 @@ class GreatPosterWall:
                 return False
 
         else:
-            logger.info("[cyan]GREATPOSTERWALL Request Data:")
+            logger.info(f"{self.tracker}: [cyan]Request Data:")
             logger.info(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")

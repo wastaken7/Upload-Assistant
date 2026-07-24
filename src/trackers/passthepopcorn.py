@@ -131,11 +131,11 @@ class PassThePopcorn:
         self.api_key = config["TRACKERS"]["PassThePopcorn"].get("api_key", "").strip()
         announce_url = config["TRACKERS"]["PassThePopcorn"].get("announce_url", "").strip()
         if announce_url and announce_url.startswith("http://"):
-            logger.info("[red]PassThePopcorn announce URL is using plaintext HTTP.\n")
+            logger.info(f"{self.tracker}: [red]announce URL is using plaintext HTTP.\n")
             logger.info(
-                "[red]PassThePopcorn is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PassThePopcorn/forums.php?page=1&action=viewthread&threadid=46663"
+                f"{self.tracker}: [red]is turning off their plaintext HTTP tracker soon. You must update your announce URLS. See PassThePopcorn/forums.php?page=1&action=viewthread&threadid=46663"
             )
-            logger.info("[yellow]Modifying the url to use HTTPS. Update your config file to avoid this message in the future.")
+            logger.info(f"{self.tracker}: [yellow]Modifying the url to use HTTPS. Update your config file to avoid this message in the future.")
             self.announce_url = announce_url.replace("http://", "https://").replace(":2710", "")
         else:
             self.announce_url = announce_url
@@ -154,20 +154,20 @@ class PassThePopcorn:
             tag_clean = meta.tag.strip().lower()
             banned_groups_lower = {g.lower() for g in self.banned_groups}
             if tag_clean in banned_groups_lower:
-                logger.info(f"[red]{self.tracker}: Release group {meta.tag} is banned. Skipping upload.[/red]")
+                logger.info(f"{self.tracker}: [red]Release group {meta.tag} is banned. Skipping upload.[/red]")
                 return False
 
         if not self.api_user:
-            logger.info(f"[red]{self.tracker}: API User is missing in config. Skipping upload.[/red]")
+            logger.info(f"{self.tracker}: [red]API User is missing in config. Skipping upload.[/red]")
             return False
 
         if not self.username or not self.password:
-            logger.info(f"[red]{self.tracker}: Username or Password is missing in config. Skipping upload.[/red]")
+            logger.info(f"{self.tracker}: [red]Username or Password is missing in config. Skipping upload.[/red]")
             return False
 
         passkey_match = re.match(r"https?://please\.passthepopcorn\.me:?\d*/(.+)/announce", self.announce_url)
         if not passkey_match:
-            logger.info(f"[red]{self.tracker}: Failed to extract passkey from PassThePopcorn announce URL. Skipping upload.[/red]")
+            logger.info(f"{self.tracker}: [red]Failed to extract passkey from PassThePopcorn announce URL. Skipping upload.[/red]")
             return False
 
         return True
@@ -219,18 +219,18 @@ class PassThePopcorn:
                     if imdb_value:
                         return int(imdb_value or 0), ptp_torrent_id, ptp_torrent_hash
 
-                logger.info(f"[yellow]Could not find any release matching [bold yellow]{search_value}[/bold yellow] on PassThePopcorn")
+                logger.info(f"{self.tracker}: [yellow]Could not find any release matching [bold yellow]{search_value}[/bold yellow] on PassThePopcorn")
                 return None, None, None
 
             if response.status_code in [400, 401, 403]:
-                logger.info("[bold red]PassThePopcorn Error: 400/401/403 - Invalid request or authentication failed[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Error: 400/401/403 - Invalid request or authentication failed[/bold red]")
                 return None, None, None
             if response.status_code == 503:
-                logger.info("[bold yellow]PassThePopcorn Unavailable (503)")
+                logger.info(f"{self.tracker}: [bold yellow]Unavailable (503)")
                 return None, None, None
             return None, None, None
         except Exception as e:
-            logger.info(f"[red]An error occurred: {e!s}[/red]")
+            logger.info(f"{self.tracker}: [red]An error occurred: {e!s}[/red]")
             return None, None, None
 
     async def get_imdb_from_torrent_id(self, ptp_torrent_id: int | str) -> tuple[int | None, str | None]:
@@ -253,7 +253,7 @@ class PassThePopcorn:
                 logger.info(response.text)
                 return None, None
             if response.status_code == 503:
-                logger.info("[bold yellow]PassThePopcorn Unavailable (503)")
+                logger.info(f"{self.tracker}: [bold yellow]Unavailable (503)")
                 return None, None
             return None, None
         except Exception:
@@ -263,7 +263,7 @@ class PassThePopcorn:
         params = {"id": ptp_torrent_id, "action": "get_description"}
         headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
         url = f"{self.base_url}/torrents.php"
-        logger.info(f"[yellow]Requesting description from {url} with ID {ptp_torrent_id}")
+        logger.info(f"{self.tracker}: [yellow]Requesting description from {url} with ID {ptp_torrent_id}")
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url, params=params, headers=headers)
         await asyncio.sleep(1)
@@ -276,12 +276,12 @@ class PassThePopcorn:
         desc, imagelist = bbcode.clean_ptp_description(ptp_desc, is_disc)
 
         if not meta.skip_tracker_descriptions:
-            logger.info("[bold green]Successfully grabbed description from PassThePopcorn")
-            logger.info(f"Description after cleaning:\n{desc[:1000]}...", extra={"markup": False})  # Show first 1000 characters for brevity
+            logger.info(f"{self.tracker}: [bold green]Successfully grabbed description from PassThePopcorn")
+            logger.info(f"{self.tracker}: Description after cleaning:\n{desc[:1000]}...", extra={"markup": False})  # Show first 1000 characters for brevity
 
             if not meta.skipit and not meta.unattended:
                 # Allow user to edit or discard the description
-                logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
+                logger.info(f"{self.tracker}: [cyan]Do you want to edit, discard or keep the description?[/cyan]")
                 edit_choice = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
 
                 if (edit_choice or "").lower() == "e":
@@ -290,12 +290,12 @@ class PassThePopcorn:
                         desc = edited_description.strip()
                         meta.description = desc
                         meta.saved_description = True
-                    logger.info(f"[green]Final description after editing:[/green] {desc}")
+                    logger.info(f"{self.tracker}: [green]Final description after editing:[/green] {desc}")
                 elif (edit_choice or "").lower() == "d":
                     desc = None
-                    logger.info("[yellow]Description discarded.[/yellow]")
+                    logger.info(f"{self.tracker}: [yellow]Description discarded.[/yellow]")
                 else:
-                    logger.info("[green]Keeping the original description.[/green]")
+                    logger.info(f"{self.tracker}: [green]Keeping the original description.[/green]")
                     meta.description = desc
                     meta.saved_description = True
             else:
@@ -314,24 +314,24 @@ class PassThePopcorn:
         await asyncio.sleep(1)
         try:
             if response.status_code != 200:
-                logger.info(f"[red]PassThePopcorn group lookup failed with HTTP {response.status_code}[/red]")
+                logger.info(f"{self.tracker}: [red]group lookup failed with HTTP {response.status_code}[/red]")
                 if response.text:
-                    logger.info(f"[red]Response body (truncated): {response.text[:200]}[/red]")
+                    logger.info(f"{self.tracker}: [red]Response body (truncated): {response.text[:200]}[/red]")
                 return None
 
             try:
                 response_data = response.json()
             except json.JSONDecodeError:
                 content_type = response.headers.get("content-type", "unknown")
-                logger.info(f"[red]PassThePopcorn group lookup returned non-JSON content (content-type: {content_type})[/red]")
+                logger.info(f"{self.tracker}: [red]group lookup returned non-JSON content (content-type: {content_type})[/red]")
                 if response.text:
-                    logger.info(f"[red]Response body (truncated): {response.text[:200]}[/red]")
+                    logger.info(f"{self.tracker}: [red]Response body (truncated): {response.text[:200]}[/red]")
                 return None
 
             if response_data.get("TotalResults"):  # Search results page
                 total_results = int(response_data.get("TotalResults", 0))
                 if total_results == 0:
-                    logger.info(f"[yellow]No results found for IMDb: tt{imdb}[/yellow]")
+                    logger.info(f"{self.tracker}: [yellow]No results found for IMDb: tt{imdb}[/yellow]")
                     return None
                 if total_results == 1:
                     # Single result - use it
@@ -339,11 +339,11 @@ class PassThePopcorn:
                     group_id: str | None = str(movie.get("GroupId")) if movie.get("GroupId") is not None else None
                     title = movie.get("Title", "Unknown")
                     year = movie.get("Year", "Unknown")
-                    logger.info(f"[green]Found single match for IMDb: [yellow]tt{imdb}[/yellow] -> Group ID: [yellow]{group_id}[/yellow][/green]")
-                    logger.info(f"[green]Title: [yellow]{title}[/yellow] ([yellow]{year}[/yellow])")
+                    logger.info(f"{self.tracker}: [green]Found single match for IMDb: [yellow]tt{imdb}[/yellow] -> Group ID: [yellow]{group_id}[/yellow][/green]")
+                    logger.info(f"{self.tracker}: [green]Title: [yellow]{title}[/yellow] ([yellow]{year}[/yellow])")
                     return group_id
                 # Multiple results - let user choose
-                logger.info(f"[yellow]Found {total_results} matches for IMDb: tt{imdb}[/yellow]")
+                logger.info(f"{self.tracker}: [yellow]Found {total_results} matches for IMDb: tt{imdb}[/yellow]")
                 movies = cast(list[dict[str, Any]], response_data.get("Movies", []))
                 choices: list[str] = []
                 for _i, movie in enumerate(movies):
@@ -358,7 +358,7 @@ class PassThePopcorn:
                 try:
                     selected = cli_ui.ask_choice("Select the correct movie:", choices=choices)
                     if selected == "Skip - Don't use any of these matches":
-                        logger.info("[yellow]User chose to skip all matches[/yellow]")
+                        logger.info(f"{self.tracker}: [yellow]User chose to skip all matches[/yellow]")
                         return None
 
                     # Match selection directly to movie data to avoid index issues from cli_ui sorting
@@ -371,22 +371,22 @@ class PassThePopcorn:
                             group_id = str(group_id)
                             break
 
-                    logger.info(f"[green]User selected: Group ID [yellow]{group_id}[/yellow][/green]")
+                    logger.info(f"{self.tracker}: [green]User selected: Group ID [yellow]{group_id}[/yellow][/green]")
                     return group_id
 
                 except KeyboardInterrupt:
-                    logger.info("[yellow]Selection cancelled by user[/yellow]")
+                    logger.info(f"{self.tracker}: [yellow]Selection cancelled by user[/yellow]")
                     return None
             elif response_data.get("Page") == "Browse":  # No Releases on Site with ID
                 return None
             elif response_data.get("Page") == "Details":  # Group Found
                 group_id = response_data.get("GroupId")
-                logger.info(f"[green]Matched IMDb: [yellow]tt{imdb}[/yellow] to Group ID: [yellow]{group_id}[/yellow][/green]")
-                logger.info(f"[green]Title: [yellow]{response_data.get('Name')}[/yellow] ([yellow]{response_data.get('Year')}[/yellow])")
+                logger.info(f"{self.tracker}: [green]Matched IMDb: [yellow]tt{imdb}[/yellow] to Group ID: [yellow]{group_id}[/yellow][/green]")
+                logger.info(f"{self.tracker}: [green]Title: [yellow]{response_data.get('Name')}[/yellow] ([yellow]{response_data.get('Year')}[/yellow])")
                 return str(group_id) if group_id is not None else None
         except Exception:
-            logger.info("[red]An error has occurred trying to find a group ID")
-            logger.info("[red]Please check that the site is online and your ApiUser/api_key values are correct")
+            logger.info(f"{self.tracker}: [red]An error has occurred trying to find a group ID")
+            logger.info(f"{self.tracker}: [red]Please check that the site is online and your ApiUser/api_key values are correct")
             return None
 
         return None
@@ -569,7 +569,7 @@ class PassThePopcorn:
                 if isinstance(uploaded_url, str) and uploaded_url:
                     return uploaded_url
         except Exception as e:
-            logger.info(f"[red]PassThePopcorn poster rehost to {selected_host} failed: {e}")
+            logger.info(f"{self.tracker}: [red]poster rehost to {selected_host} failed: {e}")
 
         return image_url
 
@@ -848,7 +848,7 @@ class PassThePopcorn:
         multi_screens = int(self.config["DEFAULT"].get("multiScreens", 2))
         if multi_screens < 2:
             multi_screens = 2
-            logger.info("[yellow]PassThePopcorn requires at least 2 screenshots for multi disc/file content, overriding config")
+            logger.info(f"{self.tracker}: [yellow]requires at least 2 screenshots for multi disc/file content, overriding config")
 
         image_list_value: Any = (meta.PTP_images_key if "PTP_images_key" in meta else meta.image_list) if not meta.skip_imghost_upload else []
         image_list = cast(list[dict[str, Any]], image_list_value) if isinstance(image_list_value, list) else []
@@ -881,10 +881,10 @@ class PassThePopcorn:
                                 if host_key in self.approved_image_hosts:
                                     images_to_keep.append(img)
                                 elif meta.debug:
-                                    logger.info(f"[yellow]Filtering out image from non-approved host: {hostname}[/yellow]")
+                                    logger.info(f"{self.tracker}: [yellow]Filtering out image from non-approved host: {hostname}[/yellow]")
                             except Exception:
                                 # If URL parsing fails, skip this image
-                                logger.debug(f"[yellow]Could not parse URL: {raw_url}[/yellow]")
+                                logger.debug(f"{self.tracker}: [yellow]Could not parse URL: {raw_url}[/yellow]")
                                 continue
 
                         if images_to_keep:
@@ -898,7 +898,7 @@ class PassThePopcorn:
                     # Remove keys with no approved images
                     for key_name in keys_to_remove:
                         del pack_images_data["keys"][key_name]
-                        logger.debug(f"[yellow]Removed key '{key_name}' - no approved image hosts[/yellow]")
+                        logger.debug(f"{self.tracker}: [yellow]Removed key '{key_name}' - no approved image hosts[/yellow]")
 
                     # Recalculate total count
                     keys = cast(dict[str, Any], pack_images_data.get("keys", {}))
@@ -906,12 +906,14 @@ class PassThePopcorn:
 
                     if pack_images_data.get("total_count", 0) < 3:
                         pack_images_data = {}  # Invalidate if less than 3 images total
-                        logger.debug("[yellow]Invalidating pack images - less than 3 approved images total[/yellow]")
+                        logger.debug(f"{self.tracker}: [yellow]Invalidating pack images - less than 3 approved images total[/yellow]")
                     else:
-                        logger.debug(f"[green]Loaded previously uploaded images from {pack_images_file}")
-                        logger.debug(f"[blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]")
+                        logger.debug(f"{self.tracker}: [green]Loaded previously uploaded images from {pack_images_file}")
+                        logger.debug(
+                            f"{self.tracker}: [blue]Found {pack_images_data.get('total_count', 0)} approved images across {len(pack_images_data.get('keys', {}))} keys[/blue]"
+                        )
             except Exception as e:
-                logger.warning(f"[yellow]Warning: Could not load pack image data: {e!s}[/yellow]")
+                logger.warning(f"{self.tracker}: [yellow]Warning: Could not load pack image data: {e!s}[/yellow]")
 
         desc = io.StringIO()
         discs = cast(list[dict[str, Any]], meta.discs)
@@ -940,7 +942,7 @@ class PassThePopcorn:
                         desc.write(tonemapped_header)
                         desc.write("\n\n")
                 except Exception as e:
-                    logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
+                    logger.warning(f"{self.tracker}: [yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
                 for img_index in range(len(images[: meta.screens])):
                     raw_url = str(image_list[img_index].get("raw_url", ""))
                     desc.write(f"[img]{raw_url}[/img]\n")
@@ -973,7 +975,7 @@ class PassThePopcorn:
                     if pack_images_data and "keys" in pack_images_data and new_images_key in pack_images_data["keys"]:
                         saved_images = cast(list[dict[str, Any]], pack_images_data["keys"][new_images_key]["images"])
                         if saved_images:
-                            logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                            logger.debug(f"{self.tracker}: [yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                             meta[new_images_key] = []
                             for img in saved_images:
@@ -985,7 +987,7 @@ class PassThePopcorn:
                         desc.write(f"\n[b]{edition}[/b]\n\n")
                         # Use the summary corresponding to the current bdinfo
                         desc.write(f"[mediainfo]{summary}[/mediainfo]\n\n")
-                        logger.debug("[yellow]Using original uploaded images for first disc")
+                        logger.debug(f"{self.tracker}: [yellow]Using original uploaded images for first disc")
                         for img in meta[new_images_key]:
                             raw_url = str(img.get("raw_url", ""))
                             desc.write(f"[img]{raw_url}[/img]\n")
@@ -1003,7 +1005,7 @@ class PassThePopcorn:
                                     meta, f"PLAYLIST_{i}", bdinfo, meta.uuid, meta.base_dir, use_vs, [], meta.ffdebug, multi_screens, True
                                 )
                             except Exception as e:
-                                logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
+                                logger.info(f"{self.tracker}: Error during BDMV screenshot capture: {e}", extra={"markup": False})
                             new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"PLAYLIST_{i}-*.png")]
                         uploaded_images: list[dict[str, Any]] = []
                         if new_screens and not meta.skip_imghost_upload:
@@ -1045,7 +1047,7 @@ class PassThePopcorn:
                                 desc.write(tonemapped_header)
                                 desc.write("\n\n")
                         except Exception as e:
-                            logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
+                            logger.warning(f"{self.tracker}: [yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
                         for img_index in range(min(multi_screens, len(image_list))):
                             raw_url = str(image_list[img_index].get("raw_url", ""))
                             desc.write(f"[img]{raw_url}[/img]\n")
@@ -1060,7 +1062,7 @@ class PassThePopcorn:
                         if pack_images_data and "keys" in pack_images_data and new_images_key in pack_images_data["keys"]:
                             saved_images = cast(list[dict[str, Any]], pack_images_data["keys"][new_images_key]["images"])
                             if saved_images:
-                                logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                                logger.debug(f"{self.tracker}: [yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
@@ -1082,7 +1084,7 @@ class PassThePopcorn:
                                         meta, f"FILE_{i}", each["bdinfo"], meta.uuid, meta.base_dir, meta.vapoursynth, [], meta.ffdebug, multi_screens, True
                                     )
                                 except Exception as e:
-                                    logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
+                                    logger.info(f"{self.tracker}: Error during BDMV screenshot capture: {e}", extra={"markup": False})
                             new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
                             uploaded_images: list[dict[str, Any]] = []
                             if new_screens and not meta.skip_imghost_upload:
@@ -1128,7 +1130,7 @@ class PassThePopcorn:
                         if pack_images_data and "keys" in pack_images_data and new_images_key in pack_images_data["keys"]:
                             saved_images = pack_images_data["keys"][new_images_key]["images"]
                             if saved_images:
-                                logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                                logger.debug(f"{self.tracker}: [yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                                 meta[new_images_key] = []
                                 for img in saved_images:
@@ -1146,7 +1148,7 @@ class PassThePopcorn:
                                 try:
                                     await self.takescreens_manager.dvd_screenshots(meta, i, multi_screens, True)
                                 except Exception as e:
-                                    logger.info(f"Error during DVD screenshot capture: {e}", extra={"markup": False})
+                                    logger.info(f"{self.tracker}: Error during DVD screenshot capture: {e}", extra={"markup": False})
                             new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
                             uploaded_images: list[dict[str, Any]] = []
                             if new_screens and not meta.skip_imghost_upload:
@@ -1206,7 +1208,7 @@ class PassThePopcorn:
                     desc.write(tonemapped_header)
                     desc.write("\n\n")
             except Exception as e:
-                logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
+                logger.warning(f"{self.tracker}: [yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
 
             for img_index in range(len(images[: meta.screens])):
                 raw_url = image_list[img_index]["raw_url"]
@@ -1233,7 +1235,7 @@ class PassThePopcorn:
                             desc.write(tonemapped_header)
                             desc.write("\n\n")
                     except Exception as e:
-                        logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
+                        logger.warning(f"{self.tracker}: [yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
                     for img_index in range(min(multi_screens, len(image_list))):
                         raw_url = image_list[img_index]["raw_url"]
                         desc.write(f"[img]{raw_url}[/img]\n")
@@ -1251,7 +1253,7 @@ class PassThePopcorn:
                     if pack_images_data and "keys" in pack_images_data and new_images_key in pack_images_data["keys"]:
                         saved_images = pack_images_data["keys"][new_images_key]["images"]
                         if saved_images:
-                            logger.debug(f"[yellow]Using saved images from pack_image_links.json for {new_images_key}")
+                            logger.debug(f"{self.tracker}: [yellow]Using saved images from pack_image_links.json for {new_images_key}")
 
                             meta[new_images_key] = []
                             for img in saved_images:
@@ -1269,7 +1271,7 @@ class PassThePopcorn:
                             try:
                                 await self.takescreens_manager.screenshots(file, f"FILE_{i}", meta.uuid, meta.base_dir, meta, multi_screens, True, "")
                             except Exception as e:
-                                logger.info(f"Error during generic screenshot capture: {e}", extra={"markup": False})
+                                logger.info(f"{self.tracker}: Error during generic screenshot capture: {e}", extra={"markup": False})
                         new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
                         if new_screens and not meta.skip_imghost_upload:
                             uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
@@ -1301,7 +1303,7 @@ class PassThePopcorn:
         image_list: list[dict[str, Any]] | None = None,
     ) -> str | None:
         if image_list is None:
-            logger.info("[yellow]No image links to save.[/yellow]")
+            logger.info(f"{self.tracker}: [yellow]No image links to save.[/yellow]")
             return None
 
         output_dir = Path(meta.base_dir) / "tmp" / meta.uuid
@@ -1316,7 +1318,7 @@ class PassThePopcorn:
                     content = await f.read()
                     existing_data = cast(dict[str, Any], json.loads(content)) if content.strip() else {}
             except Exception as e:
-                logger.warning(f"[yellow]Warning: Could not load existing image data: {e!s}[/yellow]")
+                logger.warning(f"{self.tracker}: [yellow]Warning: Could not load existing image data: {e!s}[/yellow]")
 
         # Create data structure if it doesn't exist yet
         if not existing_data:
@@ -1347,12 +1349,12 @@ class PassThePopcorn:
             async with aiofiles.open(output_file, "w", encoding="utf-8") as f:
                 await f.write(json.dumps(existing_data, indent=2))
 
-            logger.debug(f"[green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
-            logger.debug(f"[blue]  - JSON: {output_file}[/blue]")
+            logger.debug(f"{self.tracker}: [green]Saved {len(image_list)} new images for key '{image_key}' (total: {existing_data['total_count']}):[/green]")
+            logger.debug(f"{self.tracker}: [blue]  - JSON: {output_file}[/blue]")
 
             return output_file
         except Exception as e:
-            logger.info(f"[bold red]Error saving image links: {e}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Error saving image links: {e}[/bold red]")
             return None
 
     async def get_anti_csrf_token(self, meta: Meta) -> str:
@@ -1375,12 +1377,12 @@ class PassThePopcorn:
                     if token_match:
                         return token_match.group(1)
             # Cookies are expired/invalid — discard them so the login POST is clean
-            logger.info("[yellow]PassThePopcorn session expired. Clearing cookies and re-authenticating.")
+            logger.info(f"{self.tracker}: [yellow]session expired. Clearing cookies and re-authenticating.")
             cookies = {}
             with contextlib.suppress(OSError):
                 Path(cookiefile).unlink()
         else:
-            logger.info("[yellow]PassThePopcorn Cookies not found. Creating new session.")
+            logger.info(f"{self.tracker}: [yellow]Cookies not found. Creating new session.")
 
         passkey_match = re.match(r"https?://please\.passthepopcorn\.me:?\d*/(.+)/announce", self.announce_url)
         if not passkey_match:
@@ -1430,7 +1432,7 @@ class PassThePopcorn:
     async def validate_login(self, response: httpx.Response) -> bool:
         logged_in = False
         if response.text.find("""<a href="login.php?act=recover">""") != -1:
-            logger.info("Looks like you are not logged in to PassThePopcorn. Probably due to the bad user name, password, or expired session.")
+            logger.info(f"{self.tracker}: Looks like you are not logged in to PassThePopcorn. Probably due to the bad user name, password, or expired session.")
         elif "Your popcorn quota has been reached, come back later!" in response.text:
             raise LoginError("Your PassThePopcorn request/popcorn quota has been reached, try again later")  # noqa F405
         else:
@@ -1447,7 +1449,7 @@ class PassThePopcorn:
             async with aiofiles.open(file_path, encoding="utf-8") as f:
                 desc = await f.read()
         except OSError as e:
-            logger.info(f"File error: {e}", extra={"markup": False})
+            logger.info(f"{self.tracker}: File error: {e}", extra={"markup": False})
         ptp_subtitles = self.get_subtitles(meta)
         no_audio_found = False
         english_audio = False
@@ -1465,14 +1467,14 @@ class PassThePopcorn:
         else:
             mediainfo = meta.mediainfo
             audio_tracks = [track for track in mediainfo.get("media", {}).get("track", []) if track.get("@type") == "Audio"]
-            logger.debug(f"[Debug] Found {len(audio_tracks)} audio tracks")
+            logger.debug(f"{self.tracker}: [Debug] Found {len(audio_tracks)} audio tracks")
 
             if not audio_tracks:
                 no_audio_found = True
-                logger.info("[yellow]No audio tracks found in mediainfo")
+                logger.info(f"{self.tracker}: [yellow]No audio tracks found in mediainfo")
             else:
                 first_language = str(audio_tracks[0].get("Language", "")).lower()
-                logger.debug(f"[Debug] First audio track language: {first_language}")
+                logger.debug(f"{self.tracker}: [Debug] First audio track language: {first_language}")
 
                 if not first_language:
                     no_audio_found = True
@@ -1506,8 +1508,8 @@ class PassThePopcorn:
             if cli_ui.ask_yes_no("Mark trumpable?", default=True):
                 ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
 
-        logger.debug(f"ptp_trumpable: {ptp_trumpable}")
-        logger.debug(f"ptp_subtitles: {ptp_subtitles}")
+        logger.debug(f"{self.tracker}: ptp_trumpable: {ptp_trumpable}")
+        logger.debug(f"{self.tracker}: ptp_subtitles: {ptp_subtitles}")
         data: dict[str, Any] = {
             "submit": "true",
             "remaster_year": "",
@@ -1568,7 +1570,7 @@ class PassThePopcorn:
                 if not cover_input:
                     continue
                 if not cover_input.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
-                    logger.info("[red]Cover URL must end with .jpg, .jpeg, .png, or .webp")
+                    logger.info(f"{self.tracker}: [red]Cover URL must end with .jpg, .jpeg, .png, or .webp")
                     continue
                 cover = await self.rehost_poster_to_selected_host(meta, cover_input)
             new_data = {
@@ -1584,8 +1586,8 @@ class PassThePopcorn:
             if not new_data["tags"]:
                 if (meta.mode if meta.mode is not None else "non_cli") == "cli":
                     while not new_data["tags"]:
-                        logger.info("[yellow]Unable to match any tags")
-                        logger.info("Valid tags can be found on the PassThePopcorn upload form")
+                        logger.info(f"{self.tracker}: [yellow]Unable to match any tags")
+                        logger.info(f"{self.tracker}: Valid tags can be found on the PassThePopcorn upload form")
                         new_data["tags"] = console.input("Please enter at least one tag. Comma separated (action, animation, short):")
                 else:
                     raise UploadError("PassThePopcorn requires at least one valid tag.")
@@ -1612,7 +1614,7 @@ class PassThePopcorn:
 
         # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
         if base_piece_mb > 16 and not meta.nohash:
-            logger.info("[red]Piece size is OVER 16M and does not work on PassThePopcorn. Generating a new .torrent")
+            logger.info(f"{self.tracker}: [red]Piece size is OVER 16M and does not work on PassThePopcorn. Generating a new .torrent")
             tracker_url = self.announce_url.strip() if self.announce_url else "https://fake.tracker"
             piece_size = 16
             torrent_create = f"[{self.tracker}]"
@@ -1655,7 +1657,7 @@ class PassThePopcorn:
         cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
         async with httpx.AsyncClient(cookies=cookies, timeout=60.0, follow_redirects=True) as client:
             response = await client.post(url=url, data=data, headers=headers, files=files)
-        logger.info(f"[cyan]{response.url}")
+        logger.info(f"{self.tracker}: [cyan]{response.url}")
         responsetext = response.text
         # If the response contains our announce URL, then we are on the upload page and the upload wasn't successful.
         if responsetext.find(self.announce_url) != -1:

@@ -83,7 +83,7 @@ class Ptskit:
         if not mandarin:
             user_input = await asyncio.to_thread(input, "Warning: Mandarin subtitle or audio not found. Do you want to continue with the upload anyway? (y/n): ")
             if user_input.lower() not in ["y", "yes"]:
-                logger.info("Upload cancelled by user.", extra={"markup": False})
+                logger.info(f"{self.tracker}: Upload cancelled by user.", extra={"markup": False})
                 return False
         return True
 

@@ -57,7 +57,7 @@ class NEXUSPHP:
 
     async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
         if not self.announce_url:
-            logger.info(f"[red]Announce URL is not set for {self.tracker}[/red]", extra={"markup": True})
+            logger.info(f"{self.tracker}: [red]Announce URL is not set for {self.tracker}[/red]", extra={"markup": True})
             meta.skipping = self.tracker
             return []
 
@@ -145,7 +145,7 @@ class NEXUSPHP:
             return ""
 
         except Exception as e:
-            logger.info(f"Error getting BDInfo for torrent {torrent_id}: {e}", extra={"markup": False})
+            logger.info(f"{self.tracker}: Error getting BDInfo for torrent {torrent_id}: {e}", extra={"markup": False})
             return ""
 
     async def validate_credentials(self, meta: Meta) -> bool:

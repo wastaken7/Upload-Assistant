@@ -45,7 +45,7 @@ class Luminarr(UNIT3D):
 
         if meta.is_disc not in ["BDMV", "DVD"] and meta.resolution not in ["8640p", "4320p", "2160p", "1440p", "1080p", "1080i", "720p"]:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"[bold red]{self.tracker} only allows SD releases when the content does not have a higher resolution release.[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]only allows SD releases when the content does not have a higher resolution release.[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -54,11 +54,11 @@ class Luminarr(UNIT3D):
                 return False
 
         if not meta.is_disc and meta.container != "mkv":
-            logger.info(f"[bold red]{self.tracker} only allows MKV containers for non-disc uploads.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]only allows MKV containers for non-disc uploads.[/bold red]")
             return False
 
         if not meta.valid_mi_settings:
-            logger.info(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
             return False
 
         return self.common.check_and_confirm_adult_media_upload(meta, self.tracker)

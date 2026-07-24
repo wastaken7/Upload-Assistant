@@ -121,7 +121,7 @@ class TheOldSchool(UNIT3D):
             require_both=False,
             original_language=True,
         ):
-            logger.info(f"[bold red]Language requirements not met for {self.tracker}.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Language requirements not met for {self.tracker}.[/bold red]")
             return False
 
         # Check if it's a Scene release without NFO - TheOldSchool requires NFO for Scene releases
@@ -129,6 +129,6 @@ class TheOldSchool(UNIT3D):
         has_nfo = meta.nfo or meta.auto_nfo
 
         if is_scene and not has_nfo:
-            logger.info(f"[red]{self.tracker}: Scene release detected but no NFO file found. TheOldSchool requires NFO files for Scene releases.[/red]")
+            logger.info(f"{self.tracker}: [red]Scene release detected but no NFO file found. TheOldSchool requires NFO files for Scene releases.[/red]")
             return False
         return True

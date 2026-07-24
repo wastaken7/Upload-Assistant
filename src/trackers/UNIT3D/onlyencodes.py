@@ -238,7 +238,7 @@ class OnlyEncodes(UNIT3D):
                     desc = desc + str(tonemapped_header)
                     desc = desc + "\n\n"
             except Exception as e:
-                logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
+                logger.warning(f"{self.tracker}: [yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
             desc = desc.replace("[img]", "[img=300]")
             await descfile.write(desc)
             images_value = meta.get(f"{self.tracker}_images_key", meta.image_list)

@@ -186,16 +186,16 @@ class SpeedApp:
 
                     if channel_id and tag:
                         if tag != spd_channel:
-                            logger.info(f"[{self.tracker}]: Unable to find a matching channel based on your input. Please check if you entered it correctly.")
+                            logger.info(f"{self.tracker}: [{self.tracker}]Unable to find a matching channel based on your input. Please check if you entered it correctly.")
                             return None
                         return int(channel_id)
-                    logger.info(f"[{self.tracker}]: Could not find the channel ID. Please check if you entered it correctly.")
+                    logger.info(f"{self.tracker}: [{self.tracker}]Could not find the channel ID. Please check if you entered it correctly.")
 
                 else:
-                    logger.info(f"[bold red]HTTP request failed. Status: {response.status_code}")
+                    logger.info(f"{self.tracker}: [bold red]HTTP request failed. Status: {response.status_code}")
 
         except Exception as e:
-            logger.error(f"[bold red]Unexpected error: {e}")
+            logger.error(f"{self.tracker}: [bold red]Unexpected error: {e}")
             console.print_exception()
 
     async def edit_desc(self, meta: Meta) -> str:
@@ -361,7 +361,7 @@ class SpeedApp:
                 return False
 
         else:
-            logger.info("[cyan]SPEEDAPP Request Data:")
+            logger.info(f"{self.tracker}: [cyan]Request Data:")
             logger.info(Redaction.redact_private_info(data))
             tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")

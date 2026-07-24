@@ -100,7 +100,7 @@ class DarkPeers(UNIT3D):
         should_continue = True
         if meta.keep_folder:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"[bold red]{self.tracker} does not allow single files in a folder.")
+                logger.info(f"{self.tracker}: [bold red]does not allow single files in a folder.")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -114,11 +114,11 @@ class DarkPeers(UNIT3D):
 
         if meta.type not in ["WEBDL"] and meta.tag in ["EVO"]:
             if not meta.unattended:
-                logger.info(f"[bold red]{self.tracker} does not allow EVO for non-WEBDL types, skipping upload.")
+                logger.info(f"{self.tracker}: [bold red]does not allow EVO for non-WEBDL types, skipping upload.")
             return False
 
         if meta.hardcoded_subs and not meta.unattended:
-            logger.info(f"[bold red]{self.tracker} does not allow hardcoded subtitles.")
+            logger.info(f"{self.tracker}: [bold red]does not allow hardcoded subtitles.")
             return False
 
         return should_continue

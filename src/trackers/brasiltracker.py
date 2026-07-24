@@ -843,7 +843,7 @@ class BrasilTracker:
                 async with aiofiles.open(info_file_path, encoding="utf-8") as f:
                     return await f.read()
             except Exception as e:
-                logger.info(f"[bold red]Erro ao ler o arquivo de info em {info_file_path}: {e}[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Erro ao ler o arquivo de info em {info_file_path}: {e}[/bold red]")
                 return ""
         else:
             logger.info(f"[bold red]Arquivo de info não encontrado: {info_file_path}[/bold red]")

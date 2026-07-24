@@ -125,7 +125,9 @@ class AZTrackerBase:
                 break
 
             if attempt == 0 and not self.media_code:
-                logger.info(f"\n{self.tracker}: The media [[yellow]IMDB:{imdb_id}[/yellow]] [[blue]TMDB:{tmdb_id}[/blue]] appears to be missing from the site's database.")
+                logger.info(
+                    f"{self.tracker}: \n{self.tracker}: The media [[yellow]IMDB:{imdb_id}[/yellow]] [[blue]TMDB:{tmdb_id}[/blue]] appears to be missing from the site's database."
+                )
                 if cli_ui.ask_yes_no(f"{self.tracker}: Do you want to add it to the site database?\n"):
                     added_successfully = await self.add_media_to_db(meta, title, category, imdb_id, tmdb_id)
                     if not added_successfully:
@@ -171,7 +173,7 @@ class AZTrackerBase:
             Path(failure_path).parent.mkdir(parents=True, exist_ok=True)
             async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
                 await f.write(response.text)
-            logger.info(f"The server response was saved to {failure_path} for analysis.")
+            logger.info(f"{self.tracker}: The server response was saved to {failure_path} for analysis.")
             return False
 
         except Exception as e:
@@ -204,7 +206,7 @@ class AZTrackerBase:
 
         if meta.type not in ["WEBDL"] and self.tracker == "PRIVATEHD" and meta.tag in ["FGT", "EVO"]:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"[bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
                 if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     return False
             else:
@@ -318,15 +320,15 @@ class AZTrackerBase:
                 if pre_tag:
                     return pre_tag.get_text("\n", strip=True)
 
-            logger.info(f"[yellow]{self.tracker}: MediaInfo/BDInfo block not found at {torrent_link}[/yellow]")
+            logger.info(f"{self.tracker}: [yellow]MediaInfo/BDInfo block not found at {torrent_link}[/yellow]")
             return ""
 
         except httpx.HTTPStatusError as e:
-            logger.info(f"[red]{self.tracker}: HTTP error {e.response.status_code} from {torrent_link}[/red]")
+            logger.info(f"{self.tracker}: [red]HTTP error {e.response.status_code} from {torrent_link}[/red]")
         except httpx.RequestError as e:
-            logger.info(f"[red]{self.tracker}: Request failed to {torrent_link}. {e}[/red]")
+            logger.info(f"{self.tracker}: [red]Request failed to {torrent_link}. {e}[/red]")
         except Exception as e:
-            logger.error(f"[red]{self.tracker}: Unexpected error parsing {torrent_link}. {e}[/red]")
+            logger.error(f"{self.tracker}: [red]Unexpected error parsing {torrent_link}. {e}[/red]")
 
         return ""
 
@@ -406,8 +408,8 @@ class AZTrackerBase:
                             missing_audio_languages.append(track)
 
                 if missing_audio_languages:
-                    logger.info("No audio language/s found.")
-                    logger.info("You must enter (comma-separated) languages for all audio tracks, eg: English, Spanish: ")
+                    logger.info(f"{self.tracker}: No audio language/s found.")
+                    logger.info(f"{self.tracker}: You must enter (comma-separated) languages for all audio tracks, eg: English, Spanish: ")
                     user_input_raw = cli_ui.ask_string("[bold yellow]Enter languages: [/bold yellow]")
                     user_input = (user_input_raw or "").strip()
                     langs = [lang.strip() for lang in user_input.split(",")]
@@ -417,9 +419,9 @@ class AZTrackerBase:
                             audio_ids.add(target_id)
 
             except FileNotFoundError:
-                logger.warning(f"Warning: MediaInfo.json not found for uuid {meta.uuid}. No languages will be processed.", extra={"markup": False})
+                logger.warning(f"{self.tracker}: Warning: MediaInfo.json not found for uuid {meta.uuid}. No languages will be processed.", extra={"markup": False})
             except (json.JSONDecodeError, KeyError, TypeError) as e:
-                logger.info(f"Error processing MediaInfo.json for uuid {meta.uuid}: {e}", extra={"markup": False})
+                logger.info(f"{self.tracker}: Error processing MediaInfo.json for uuid {meta.uuid}: {e}", extra={"markup": False})
 
         final_subtitle_ids = sorted(subtitle_ids)
         final_audio_ids = sorted(audio_ids)
@@ -481,7 +483,7 @@ class AZTrackerBase:
                     image_bytes = await f.read()
                 return await self.img_host(meta, upload_referer, image_bytes, path.name)
             except Exception as e:
-                logger.info(f"Failed to process local screenshot {path}: {e}", extra={"markup": False})
+                logger.info(f"{self.tracker}: Failed to process local screenshot {path}: {e}", extra={"markup": False})
                 return None
 
         async def upload_remote_file(url: str):
@@ -494,7 +496,7 @@ class AZTrackerBase:
                     filename = f"{filename}.png"
                 return await self.img_host(meta, upload_referer, image_bytes, filename)
             except Exception as e:
-                logger.info(f"Failed to process screenshot from URL {url}: {e}", extra={"markup": False})
+                logger.info(f"{self.tracker}: Failed to process screenshot from URL {url}: {e}", extra={"markup": False})
                 return None
 
         # Upload menu images
@@ -607,7 +609,7 @@ class AZTrackerBase:
                         return 0
 
         except Exception as e:
-            logger.info(f"An unexpected error occurred while processing the tag '{word}': {e}", extra={"markup": False})
+            logger.info(f"{self.tracker}: An unexpected error occurred while processing the tag '{word}': {e}", extra={"markup": False})
 
         return 0
 
@@ -1022,7 +1024,7 @@ class AZTrackerBase:
             meta.tracker_status[self.tracker]["status_message"] = status_message
             return False
 
-        logger.info(f"[cyan]{self.tracker} Request Data:")
+        logger.info(f"{self.tracker}: [cyan]Request Data:")
         logger.info(Redaction.redact_private_info(data))
         meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
         await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")

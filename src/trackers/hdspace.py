@@ -72,7 +72,7 @@ class HDSpace:
                 signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=2]{meta.ua_signature}[/size][/url][/center]",
             )
         except Exception as e:
-            logger.info(f"Error generating description: {e}")
+            logger.info(f"{self.tracker}: Error generating description: {e}")
             description = ""
 
         return description
@@ -93,7 +93,7 @@ class HDSpace:
 
         imdb_id = str(meta.imdb)
         if imdb_id == "0":
-            logger.info(f"IMDb ID not found, cannot search for duplicates on {self.tracker}.")
+            logger.info(f"{self.tracker}: IMDb ID not found, cannot search for duplicates on {self.tracker}.")
             return dupes
 
         search_url = f"{self.base_url}/index.php"
@@ -116,7 +116,7 @@ class HDSpace:
             response.raise_for_status()
             parts = response.text.split("Show/Hide Categories", 1)
             if len(parts) < 2:
-                logger.info(f"[bold yellow]{self.tracker}: Unexpected page structure on page {current_page}, stopping search[/bold yellow]")
+                logger.info(f"{self.tracker}: [bold yellow]Unexpected page structure on page {current_page}, stopping search[/bold yellow]")
                 break
             relevant_html = parts[1]
             soup = BeautifulSoup(relevant_html, "html.parser")
@@ -161,7 +161,7 @@ class HDSpace:
             else:
                 break
 
-        logger.info(f"[bold green]Found {len(dupes)} duplicates on {self.tracker}[/bold green]")
+        logger.info(f"{self.tracker}: [bold green]Found {len(dupes)} duplicates on {self.tracker}[/bold green]")
         return dupes
 
     async def get_category_id(self, meta: Meta) -> int:
@@ -246,7 +246,7 @@ class HDSpace:
             return results
 
         except Exception as e:
-            logger.info(f"An error occurred while fetching requests: {e}", extra={"markup": False})
+            logger.info(f"{self.tracker}: An error occurred while fetching requests: {e}", extra={"markup": False})
             return []
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:

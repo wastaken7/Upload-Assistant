@@ -126,14 +126,14 @@ class HawkeUno(UNIT3D):
                     if encoding_settings:
                         crf_match = re.search(r"crf[ =:]+([\d.]+)", encoding_settings, re.IGNORECASE)
                         if crf_match:
-                            logger.debug(f"Found CRF value: {crf_match.group(1)}")
+                            logger.debug(f"{self.tracker}: Found CRF value: {crf_match.group(1)}")
                             crf_value = float(crf_match.group(1))
                             if crf_value > 22:
                                 if not meta.unattended:
-                                    logger.info(f"CRF value too high: {crf_value} for HawkeUno")
+                                    logger.info(f"{self.tracker}: CRF value too high: {crf_value} for HawkeUno")
                                 return False
                         else:
-                            logger.debug("No CRF value found in encoding settings.")
+                            logger.debug(f"{self.tracker}: No CRF value found in encoding settings.")
                             bit_rate = track.get("BitRate")
                             if bit_rate and "Animation" not in meta.genre:
                                 try:
@@ -146,7 +146,7 @@ class HawkeUno(UNIT3D):
 
                                     if bit_rate_kbps < 3000:
                                         if not meta.unattended:
-                                            logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for HawkeUno")
+                                            logger.info(f"{self.tracker}: Video bitrate too low: {bit_rate_kbps:.0f} kbps for HawkeUno")
                                         return False
 
         return should_continue
@@ -312,7 +312,7 @@ class HawkeUno(UNIT3D):
         url = f"{self.upload_url}?api_token={api_token}"
 
         if meta.debug:
-            logger.debug(f"[cyan]{self.tracker} Request Data:")
+            logger.debug(f"{self.tracker}: [cyan]Request Data:")
             logger.debug(Redaction.redact_private_info(data))
             status_dict["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}_DEBUG", f"{self.tracker}_DEBUG", announce_url="https://fake.tracker")
@@ -336,15 +336,15 @@ class HawkeUno(UNIT3D):
                     return True
                 error_msg = response_json.get("message", "Unknown error")
                 status_dict["status_message"] = f"data error: API error: {error_msg}"
-                logger.info(f"[yellow]Upload to {self.tracker} failed: {error_msg}[/yellow]")
+                logger.info(f"{self.tracker}: [yellow]Upload to {self.tracker} failed: {error_msg}[/yellow]")
                 return False
 
         except httpx.HTTPStatusError as e:
             msg = f"HTTP {e.response.status_code} - {e.response.text}"
             status_dict["status_message"] = f"data error: {msg}"
-            logger.info(f"[bold red]{self.tracker} Upload error: {msg}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Upload error: {msg}[/bold red]")
             return False
         except Exception as e:
             status_dict["status_message"] = f"data error: {e}"
-            logger.info(f"[bold red]{self.tracker} Upload unexpected error: {e}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Upload unexpected error: {e}[/bold red]")
             return False

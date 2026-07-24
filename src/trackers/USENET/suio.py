@@ -72,7 +72,7 @@ class Suio:
                     self.upload_url = None
                     self.torrent_url = None
                     self.search_url = None
-                    logger.info(f"{self.tracker} [red]base_url from config.py does not match the expected domain. Skipping...[/red]")
+                    logger.info(f"{self.tracker}: [red]base_url from config.py does not match the expected domain. Skipping...[/red]")
             except Exception:
                 self.upload_url = None
                 self.torrent_url = None
@@ -417,7 +417,7 @@ class Suio:
         status_dict = status_map[self.tracker]
 
         if not self.upload_url:
-            logger.info(f"[red]{self.tracker}: base_url missing. Cannot upload.[/red]")
+            logger.info(f"{self.tracker}: [red]base_url missing. Cannot upload.[/red]")
             status_dict["status_message"] = "data error: base_url missing"
             return False
 
@@ -430,11 +430,11 @@ class Suio:
 
         data = await self._prepare_data(meta)
         if meta.debug:
-            logger.debug(f"[cyan]{self.tracker} Upload (DEBUG MODE):[/cyan]")
-            logger.debug(f"User: {username}")
-            logger.debug("Fields:")
+            logger.debug(f"{self.tracker}: [cyan]Upload (DEBUG MODE):[/cyan]")
+            logger.debug(f"{self.tracker}: User: {username}")
+            logger.debug(f"{self.tracker}: Fields:")
             logger.debug(Redaction.redact_private_info(data))
-            logger.debug("Files:")
+            logger.debug(f"{self.tracker}: Files:")
             logger.debug({k: v[0] for k, v in files.items()})
             status_dict["status_message"] = "Debug mode enabled, skipping upload."
             return True

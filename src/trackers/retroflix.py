@@ -157,7 +157,7 @@ class RetroFlix:
                         except Exception:
                             error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
 
-                        logger.info(f"[bold red]Unexpected response: {error_msg}")
+                        logger.info(f"{self.tracker}: [bold red]Unexpected response: {error_msg}")
                         meta.tracker_status[self.tracker]["status_message"] = f"Unexpected response: {error_msg}"
                         return False
 
@@ -172,7 +172,7 @@ class RetroFlix:
                 return False
 
         else:
-            logger.info("[cyan]RETROFLIX Request Data:")
+            logger.info(f"{self.tracker}: [cyan]Request Data:")
             debug_data = json_data.copy()
             if debug_data.get("file"):
                 debug_data["file"] = f"{str(debug_data['file'])[:10]}..."
@@ -241,7 +241,7 @@ class RetroFlix:
                 ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365 * 10 + 3)  # add leeway
                 if release_date > ten_years_ago:
                     if not meta.unattended:
-                        logger.info("[red]Content must be older than 10 Years to upload at RETROFLIX")
+                        logger.info(f"{self.tracker}: [red]Content must be older than 10 Years to upload at RETROFLIX")
                     return False
             except ValueError, AttributeError:
                 # If date parsing fails, fall back to year comparison
@@ -250,7 +250,7 @@ class RetroFlix:
                     year = int(release_year)
                     if datetime.datetime.now(datetime.UTC).date().year - year <= 9:
                         if not meta.unattended:
-                            logger.info("[red]Content must be older than 10 Years to upload at RETROFLIX")
+                            logger.info(f"{self.tracker}: [red]Content must be older than 10 Years to upload at RETROFLIX")
                         return False
 
         elif meta.category == "TV" and most_recent_aired_date:
@@ -258,13 +258,13 @@ class RetroFlix:
             ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365 * 10 + 3)  # add leeway
             if most_recent_aired_date > ten_years_ago:
                 if not meta.unattended:
-                    logger.info("[red]Content must be older than 10 Years to upload at RETROFLIX")
+                    logger.info(f"{self.tracker}: [red]Content must be older than 10 Years to upload at RETROFLIX")
                 return False
 
         else:
             if year is not None and datetime.datetime.now(datetime.UTC).date().year - year <= 9:
                 if not meta.unattended:
-                    logger.info("[red]Content must be older than 10 Years to upload at RETROFLIX")
+                    logger.info(f"{self.tracker}: [red]Content must be older than 10 Years to upload at RETROFLIX")
                 return False
         return True
 
@@ -346,16 +346,16 @@ class RetroFlix:
                 response = await client.get(f"{self.base_url}/api/test", headers=headers)
 
                 if response.status_code != 200:
-                    logger.info("[bold red]Your API key is incorrect SO generating a new one")
+                    logger.info(f"{self.tracker}: [bold red]Your API key is incorrect SO generating a new one")
                     await self.generate_new_api(meta)
                     return None
                 return True
         except httpx.RequestError as e:
-            logger.info(f"[bold red]Error testing API: {e!s}")
+            logger.info(f"{self.tracker}: [bold red]Error testing API: {e!s}")
             await self.generate_new_api(meta)
             return None
         except Exception as e:
-            logger.error(f"[bold red]Unexpected error testing API: {e!s}")
+            logger.error(f"{self.tracker}: [bold red]Unexpected error testing API: {e!s}")
             await self.generate_new_api(meta)
             return None
 
@@ -408,31 +408,31 @@ class RetroFlix:
                             flags=re.DOTALL,
                         )
                         if replacements == 0:
-                            logger.info("[bold red]Failed to update RETROFLIX api_key in config file.")
+                            logger.info(f"{self.tracker}: [bold red]Failed to update RETROFLIX api_key in config file.")
                             return None
 
                         # Write the updated config back to the file
                         async with aiofiles.open(config_path, "w", encoding="utf-8") as file:
                             await file.write(new_config_data)
 
-                        logger.info(f"[bold green]API Key successfully saved to {config_path}")
+                        logger.info(f"{self.tracker}: [bold green]API Key successfully saved to {config_path}")
                         return True
                     except Exception as e:
-                        logger.info(f"[bold red]Failed to update config file: {e!s}")
+                        logger.info(f"{self.tracker}: [bold red]Failed to update config file: {e!s}")
                         return None
                 else:
-                    logger.info("[bold red]API response does not contain a token.")
+                    logger.info(f"{self.tracker}: [bold red]API response does not contain a token.")
                     return None
             else:
-                logger.info(f"[bold red]Error getting new API key: {response.status_code}, please check username and password in the config.")
+                logger.info(f"{self.tracker}: [bold red]Error getting new API key: {response.status_code}, please check username and password in the config.")
                 return None
 
         except httpx.RequestError as e:
-            logger.info(f"[bold red]An error occurred while requesting the API: {e!s}")
+            logger.info(f"{self.tracker}: [bold red]An error occurred while requesting the API: {e!s}")
             return None
 
         except Exception as e:
-            logger.info(f"[bold red]An unexpected error occurred: {e!s}")
+            logger.info(f"{self.tracker}: [bold red]An unexpected error occurred: {e!s}")
             return None
 
     async def get_name(self, meta: Meta) -> str:

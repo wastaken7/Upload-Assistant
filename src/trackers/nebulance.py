@@ -157,7 +157,7 @@ class Nebulance:
                         meta.tracker_status[self.tracker]["status_message"] = response_data
                     return False
             else:
-                logger.info("[cyan]NEBULANCE Request Data:")
+                logger.info(f"{self.tracker}: [cyan]Request Data:")
                 logger.info(Redaction.redact_private_info(data))
                 meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
                 await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
@@ -170,7 +170,7 @@ class Nebulance:
         if meta.category != "TV":
             if meta.tvmaze_id != 0:
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    logger.info("[red]Only TV or TV Movies are allowed at NEBULANCE, this has a tvmaze ID[/red]")
+                    logger.info(f"{self.tracker}: [red]Only TV or TV Movies are allowed at NEBULANCE, this has a tvmaze ID[/red]")
                     if cli_ui.ask_yes_no("Do you want to upload it?", default=False):
                         pass
                     else:
@@ -179,7 +179,7 @@ class Nebulance:
                     return False
             else:
                 if not meta.unattended:
-                    logger.info("[red]Only TV Is allowed at NEBULANCE")
+                    logger.info(f"{self.tracker}: [red]Only TV Is allowed at NEBULANCE")
                 return False
 
         if meta.is_disc != "BDMV" and not await self.common.check_language_requirements(
@@ -188,12 +188,12 @@ class Nebulance:
             return False
 
         if meta.valid_mi is False:
-            logger.info(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
+            logger.info(f"{self.tracker}: [bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
             return False
 
         if meta.is_disc:
             if not meta.unattended:
-                logger.info("[bold red]NEBULANCE does not allow raw discs")
+                logger.info(f"{self.tracker}: [bold red]does not allow raw discs")
             return False
 
         return True

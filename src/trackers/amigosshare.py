@@ -621,7 +621,7 @@ class AmigosShare:
                 filename = first_content.strip() if isinstance(first_content, str) else first_content.get_text(strip=True)
 
         except Exception as e:
-            logger.info(f"[bold red]Falha ao obter nome do arquivo para ID {torrent_id}: {e}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Falha ao obter nome do arquivo para ID {torrent_id}: {e}[/bold red]")
 
         return {"name": filename, "size": size, "link": torrent_link}
 
@@ -1080,7 +1080,7 @@ class AmigosShare:
             return results
 
         except Exception as e:
-            logger.info(f"[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
             import traceback
 
             logger.info(traceback.format_exc())

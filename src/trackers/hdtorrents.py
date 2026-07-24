@@ -171,7 +171,7 @@ class HDTorrents:
         if not hasattr(self, "auth_token") or not self.auth_token:
             credentials_valid = await self.validate_credentials(meta)
             if not credentials_valid:
-                logger.info(f"[bold red]{self.tracker}: Failed to validate credentials for search.")
+                logger.info(f"{self.tracker}: [bold red]Failed to validate credentials for search.")
                 return []
 
         search_url = f"{self.base_url}/torrents.php?"
