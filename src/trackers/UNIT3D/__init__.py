@@ -297,7 +297,7 @@ class UNIT3D:
         return {"tmdb": str(meta.tmdb) if meta.tmdb is not None else "0"}
 
     async def get_imdb(self, meta: Meta) -> dict[str, str]:
-        return {"imdb": f"{meta.imdb}"}
+        return {"imdb": str(meta.imdb_id or 0)}
 
     async def get_tvdb(self, meta: Meta) -> dict[str, str]:
         tvdb = meta.tvdb_id if meta.category == "TV" else 0
