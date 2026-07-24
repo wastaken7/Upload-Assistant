@@ -75,6 +75,7 @@ from src.trackers.UNIT3D.luminarr import Luminarr
 from src.trackers.UNIT3D.midnightscene import MidnightScene
 from src.trackers.UNIT3D.oldtoonsworld import OldToonsWorld
 from src.trackers.UNIT3D.onlyencodes import OnlyEncodes
+from src.trackers.UNIT3D.peergarden import PeerGarden
 from src.trackers.UNIT3D.polishtorrent import PolishTorrent
 from src.trackers.UNIT3D.portugas import Portugas
 from src.trackers.UNIT3D.racing4everyone import Racing4Everyone
@@ -1382,6 +1383,7 @@ tracker_class_map: dict[str, Any] = {
     "PTGTK": PTGTK,
     "PASSTHEPOPCORN": PassThePopcorn,
     "PTSKIT": Ptskit,
+    "PEERGARDEN": PeerGarden,
     "POLISHTORRENT": PolishTorrent,
     "RACING4EVERYONE": Racing4Everyone,
     "RASTASTUGAN": Rastastugan,

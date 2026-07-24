@@ -87,84 +87,85 @@ This branch introduces new media categories and automation features not present 
 <details>
 <summary><strong>Click to view Supported Torrent Trackers</strong></summary>
 
-| Site                   | Tracker                | Supported Categories  |
-| ---------------------- | ---------------------- | --------------------- |
-| Aither                 | AITHER                 | MOVIE, TV             |
-| Alpharatio             | ALPHARATIO             | MOVIE, TV             |
-| Amigos-Share           | AMIGOSSHARE            | MOVIE, TV, BOOK, GAME |
-| ANTHELION              | ANTHELION              | MOVIE                 |
-| AsianCinema            | ASIANCINEMA            | MOVIE, TV             |
-| Aura4K                 | AURA4K                 | MOVIE, TV             |
-| AvistaZ                | AVISTAZ                | MOVIE, TV             |
-| Beyond-HD              | BEYONDHD               | MOVIE, TV             |
-| BitHDTV                | BITHDTV                | MOVIE, TV             |
-| Blutopia               | BLUTOPIA               | MOVIE, TV             |
-| BrasilJapão-Share      | BJSHARE                | MOVIE, TV, BOOK, GAME |
-| BrasilTracker          | BRASILTRACKER          | MOVIE, TV, BOOK, GAME |
-| CapybaraBR             | CAPYBARABR             | MOVIE, TV, BOOK, GAME |
-| Cinematik              | CINEMATIK              | MOVIE, TV             |
-| CinemaZ                | CINEMAZ                | MOVIE, TV             |
-| DarkPeers              | DARKPEERS              | MOVIE, TV, BOOK, GAME |
-| DesiTorrents           | DESITORRENTS           | MOVIE, TV             |
-| DigitalCore            | DIGITALCORE            | MOVIE, TV, BOOK, GAME |
-| Emuwarez               | EMUWAREZ               | MOVIE, TV             |
-| FileList               | FILELIST               | MOVIE, TV             |
-| FunFile                | FUNFILE                | MOVIE, TV             |
-| GreatPosterWall        | GREATPOSTERWALL        | MOVIE                 |
-| hawke-uno              | HAWKEUNO               | MOVIE, TV             |
-| HDBits                 | HDBITS                 | MOVIE, TV             |
-| HD-Space               | HDSPACE                | MOVIE, TV             |
-| HD-Torrents            | HDTORRENTS             | MOVIE, TV             |
-| HomieHelpDesk          | HOMIEHELPDESK          | MOVIE, TV, BOOK, GAME |
-| ImmortalSeed           | IMMORTALSEED           | MOVIE, TV, BOOK       |
-| InfinityHD             | INFINITYHD             | MOVIE, TV             |
-| ItaTorrents            | ITATORRENTS            | MOVIE, TV             |
-| lajidui                | LAJIDUI                | MOVIE, TV             |
-| LastDigitalUnderground | LASTDIGITALUNDERGROUND | MOVIE, TV, BOOK       |
-| Lat-Team               | LATTEAM                | MOVIE, TV, BOOK       |
-| Locadora               | LOCADORA               | MOVIE, TV             |
-| LongPT                 | LONGPT                 | MOVIE, TV             |
-| LST                    | LST                    | MOVIE, TV, BOOK       |
-| Luminarr               | LUMINARR               | MOVIE, TV             |
-| MakingOff              | MAKINGOFF              | MOVIE                 |
-| MidnightScene          | MIDNIGHTSCENE          | MOVIE, TV             |
-| MoreThanTV             | MORETHANTV             | MOVIE, TV             |
-| M-Team                 | MTEAM                  | MOVIE, TV             |
-| Nebulance              | NEBULANCE              | TV                    |
-| OldToonsWorld          | OLDTOONSWORLD          | MOVIE, TV             |
-| OnlyEncodes+           | ONLYENCODES            | MOVIE, TV             |
-| Orpheus                | ORPHEUS                | MUSIC                 |
-| PassThePopcorn         | PASSTHEPOPCORN         | MOVIE                 |
-| PolishTorrent          | POLISHTORRENT          | MOVIE, TV             |
-| Portugas               | PORTUGAS               | MOVIE, TV             |
-| PrivateHD              | PRIVATEHD              | MOVIE, TV             |
-| PT GTK                 | PTGTK                  | MOVIE, TV             |
-| ptcafe                 | PTCAFE                 | MOVIE, TV             |
-| PTerClub               | PTERCLUB               | MOVIE, TV             |
-| PTFans                 | PTFANS                 | MOVIE, TV             |
-| PTSKIT                 | PTSKIT                 | MOVIE, TV             |
-| Racing4Everyone        | RACING4EVERYONE        | MOVIE, TV             |
-| RailgunPT              | RAILGUNPT              | MOVIE, TV             |
-| Rastastugan            | RASTASTUGAN            | MOVIE, TV, BOOK, GAME |
-| ReelFLiX               | REELFLIX               | MOVIE                 |
-| RetroFlix              | RETROFLIX              | MOVIE, TV             |
-| Samaritano             | SAMARITANO             | MOVIE, TV, BOOK, GAME |
-| seedpool               | SEEDPOOL               | MOVIE, TV             |
-| ShareIsland            | SHAREISLAND            | MOVIE, TV             |
-| SkipTheCommerials      | SKIPTHECOMMERCIALS     | MOVIE, TV             |
-| SpeedApp               | SPEEDAPP               | MOVIE, TV, BOOK, GAME |
-| Swarmazon              | SWARMAZON              | MOVIE, TV             |
-| The Leach Zone         | THELEACHZONE           | MOVIE, TV             |
-| TheOldSchool           | THEOLDSCHOOL           | MOVIE, TV             |
-| Torrenteros            | TORRENTEROS            | MOVIE, TV             |
-| TorrentHR              | TORRENTHR              | MOVIE, TV             |
-| TorrentLeech           | TORRENTLEECH           | MOVIE, TV, BOOK, GAME |
-| ToTheGlory             | TOTHEGLORY             | MOVIE, TV             |
-| TVChaosUK              | TVCHAOSUK              | MOVIE, TV             |
-| ULCX                   | ULCX                   | MOVIE, TV             |
-| UTOPIA                 | UTOPIA                 | MOVIE, TV             |
-| YUSCENE                | YUSCENE                | MOVIE, TV, BOOK, GAME |
-| Zenith                 | ZENITH                 | MOVIE, TV, BOOK, GAME |
+| Site                   | Tracker                | Supported Categories         |
+| ---------------------- | ---------------------- | ---------------------------- |
+| Aither                 | AITHER                 | MOVIE, TV                    |
+| Alpharatio             | ALPHARATIO             | MOVIE, TV                    |
+| Amigos-Share           | AMIGOSSHARE            | MOVIE, TV, BOOK, GAME        |
+| ANTHELION              | ANTHELION              | MOVIE                        |
+| AsianCinema            | ASIANCINEMA            | MOVIE, TV                    |
+| Aura4K                 | AURA4K                 | MOVIE, TV                    |
+| AvistaZ                | AVISTAZ                | MOVIE, TV                    |
+| Beyond-HD              | BEYONDHD               | MOVIE, TV                    |
+| BitHDTV                | BITHDTV                | MOVIE, TV                    |
+| Blutopia               | BLUTOPIA               | MOVIE, TV                    |
+| BrasilJapão-Share      | BJSHARE                | MOVIE, TV, BOOK, GAME        |
+| BrasilTracker          | BRASILTRACKER          | MOVIE, TV, BOOK, GAME        |
+| CapybaraBR             | CAPYBARABR             | MOVIE, TV, BOOK, GAME        |
+| Cinematik              | CINEMATIK              | MOVIE, TV                    |
+| CinemaZ                | CINEMAZ                | MOVIE, TV                    |
+| DarkPeers              | DARKPEERS              | MOVIE, TV, BOOK, GAME        |
+| DesiTorrents           | DESITORRENTS           | MOVIE, TV                    |
+| DigitalCore            | DIGITALCORE            | MOVIE, TV, BOOK, GAME        |
+| Emuwarez               | EMUWAREZ               | MOVIE, TV                    |
+| FileList               | FILELIST               | MOVIE, TV                    |
+| FunFile                | FUNFILE                | MOVIE, TV                    |
+| GreatPosterWall        | GREATPOSTERWALL        | MOVIE                        |
+| hawke-uno              | HAWKEUNO               | MOVIE, TV                    |
+| HDBits                 | HDBITS                 | MOVIE, TV                    |
+| HD-Space               | HDSPACE                | MOVIE, TV                    |
+| HD-Torrents            | HDTORRENTS             | MOVIE, TV                    |
+| HomieHelpDesk          | HOMIEHELPDESK          | MOVIE, TV, BOOK, GAME        |
+| ImmortalSeed           | IMMORTALSEED           | MOVIE, TV, BOOK              |
+| InfinityHD             | INFINITYHD             | MOVIE, TV                    |
+| ItaTorrents            | ITATORRENTS            | MOVIE, TV                    |
+| lajidui                | LAJIDUI                | MOVIE, TV                    |
+| LastDigitalUnderground | LASTDIGITALUNDERGROUND | MOVIE, TV, BOOK              |
+| Lat-Team               | LATTEAM                | MOVIE, TV, BOOK              |
+| Locadora               | LOCADORA               | MOVIE, TV                    |
+| LongPT                 | LONGPT                 | MOVIE, TV                    |
+| LST                    | LST                    | MOVIE, TV, BOOK              |
+| Luminarr               | LUMINARR               | MOVIE, TV                    |
+| MakingOff              | MAKINGOFF              | MOVIE                        |
+| MidnightScene          | MIDNIGHTSCENE          | MOVIE, TV                    |
+| MoreThanTV             | MORETHANTV             | MOVIE, TV                    |
+| M-Team                 | MTEAM                  | MOVIE, TV                    |
+| Nebulance              | NEBULANCE              | TV                           |
+| OldToonsWorld          | OLDTOONSWORLD          | MOVIE, TV                    |
+| OnlyEncodes+           | ONLYENCODES            | MOVIE, TV                    |
+| Orpheus                | ORPHEUS                | MUSIC                        |
+| PassThePopcorn         | PASSTHEPOPCORN         | MOVIE                        |
+| PeerGarden             | PEERGARDEN             | MOVIE, TV, GAME, BOOK, MUSIC |
+| PolishTorrent          | POLISHTORRENT          | MOVIE, TV                    |
+| Portugas               | PORTUGAS               | MOVIE, TV                    |
+| PrivateHD              | PRIVATEHD              | MOVIE, TV                    |
+| PT GTK                 | PTGTK                  | MOVIE, TV                    |
+| ptcafe                 | PTCAFE                 | MOVIE, TV                    |
+| PTerClub               | PTERCLUB               | MOVIE, TV                    |
+| PTFans                 | PTFANS                 | MOVIE, TV                    |
+| PTSKIT                 | PTSKIT                 | MOVIE, TV                    |
+| Racing4Everyone        | RACING4EVERYONE        | MOVIE, TV                    |
+| RailgunPT              | RAILGUNPT              | MOVIE, TV                    |
+| Rastastugan            | RASTASTUGAN            | MOVIE, TV, BOOK, GAME        |
+| ReelFLiX               | REELFLIX               | MOVIE                        |
+| RetroFlix              | RETROFLIX              | MOVIE, TV                    |
+| Samaritano             | SAMARITANO             | MOVIE, TV, BOOK, GAME        |
+| seedpool               | SEEDPOOL               | MOVIE, TV                    |
+| ShareIsland            | SHAREISLAND            | MOVIE, TV                    |
+| SkipTheCommerials      | SKIPTHECOMMERCIALS     | MOVIE, TV                    |
+| SpeedApp               | SPEEDAPP               | MOVIE, TV, BOOK, GAME        |
+| Swarmazon              | SWARMAZON              | MOVIE, TV                    |
+| The Leach Zone         | THELEACHZONE           | MOVIE, TV                    |
+| TheOldSchool           | THEOLDSCHOOL           | MOVIE, TV                    |
+| Torrenteros            | TORRENTEROS            | MOVIE, TV                    |
+| TorrentHR              | TORRENTHR              | MOVIE, TV                    |
+| TorrentLeech           | TORRENTLEECH           | MOVIE, TV, BOOK, GAME        |
+| ToTheGlory             | TOTHEGLORY             | MOVIE, TV                    |
+| TVChaosUK              | TVCHAOSUK              | MOVIE, TV                    |
+| ULCX                   | ULCX                   | MOVIE, TV                    |
+| UTOPIA                 | UTOPIA                 | MOVIE, TV                    |
+| YUSCENE                | YUSCENE                | MOVIE, TV, BOOK, GAME        |
+| Zenith                 | ZENITH                 | MOVIE, TV, BOOK, GAME        |
 
 </details>
 

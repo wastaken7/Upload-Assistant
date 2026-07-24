@@ -315,6 +315,7 @@ const trackerNameMap = {
   OLDTOONSWORLD: "OldToonsWorld",
   ONLYENCODES: "OnlyEncodes+",
   PASSTHEPOPCORN: "PassThePopcorn",
+  PEERGARDEN: "PeerGarden",
   POLISHTORRENT: "PolishTorrent",
   PORTUGAS: "Portugas",
   PRIVATEHD: "PrivateHD",

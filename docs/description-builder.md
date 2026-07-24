@@ -129,18 +129,22 @@ For the `GAME` category, it renders:
 3.  **System Requirements:** Minimum and Recommended requirements placed side by side in a `[table]` layout.
 4.  **Languages:** A detailed table of supported interface, full audio, and subtitle configurations.
 
-#### 9. API Overview / Synopsis
+#### 9. Music Details
+
+For `MUSIC` uploads, it renders the normalized release data collected during music preparation: artist, album, original and concrete release years, edition, release type, medium, label, catalogue number, genres, disc/track counts, and detected audio format, codec, bit depth, sample rate, channels, and bitrate.
+
+#### 10. API Overview / Synopsis
 
 Insert the main synopsis (description) retrieved via external APIs (TMDb, IMDb, etc.).
 
 - _Aither Specifics:_ If the upload is a `FraMeSToR` release, formatting is customized to clean and style the scene group's information.
 - _MORETHANTV Specifics:_ Wraps the description in `[spoiler=Notes]...[/spoiler]`.
 
-#### 10. NFO Content
+#### 11. NFO Content
 
 Appends scene group release `.nfo` content wrapped in raw formatting blocks (like `[pre]` or `[nfo]`).
 
-#### 11. User-provided Description
+#### 12. User-provided Description
 
 Inserts plain text or links supplied manually by the user via file inputs (`description_file_content`) or custom links (`description_link_content`).
 
