@@ -649,7 +649,7 @@ class TVChaosUK:
                 return False
 
         else:
-            logger.info(f"{self.tracker}: [cyan]Request Data:")
+            logger.info(f"{self.tracker}: Request Data:")
             logger.info(Redaction.redact_private_info(data))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})

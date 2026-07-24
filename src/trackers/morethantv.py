@@ -244,7 +244,7 @@ class MoreThanTV:
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: {e}"
                 return False
         else:
-            logger.info(f"{self.tracker}: [cyan]Request Data:")
+            logger.info(f"{self.tracker}: Request Data:")
             debug_data = data.copy()
             if "auth" in debug_data:
                 auth_value = str(debug_data.get("auth", ""))

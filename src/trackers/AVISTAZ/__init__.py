@@ -1025,7 +1025,7 @@ class AZTrackerBase:
             meta.tracker_status[self.tracker]["status_message"] = status_message
             return False
 
-        logger.info(f"{self.tracker}: [cyan]Request Data:")
+        logger.info(f"{self.tracker}: Request Data:")
         logger.info(Redaction.redact_private_info(data))
         meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
         await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")

@@ -139,7 +139,7 @@ class TorrentHR:
                 logger.info(f"{self.tracker}: [yellow]It may have uploaded, please check TORRENTHR manually")
                 return False
         else:
-            logger.info(f"{self.tracker}: [cyan]Request Data:")
+            logger.info(f"{self.tracker}: Request Data:")
             logger.info(Redaction.redact_private_info(payload))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})

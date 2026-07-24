@@ -172,7 +172,7 @@ class RetroFlix:
                 return False
 
         else:
-            logger.info(f"{self.tracker}: [cyan]Request Data:")
+            logger.info(f"{self.tracker}: Request Data:")
             debug_data = json_data.copy()
             if debug_data.get("file"):
                 debug_data["file"] = f"{str(debug_data['file'])[:10]}..."
