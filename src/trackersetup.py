@@ -134,11 +134,13 @@ class TrackerSetup:
             if isinstance(example_tracker_config, dict) and isinstance(tracker_config, dict):
                 if "api_key" in example_tracker_config and not tracker_config.get("api_key"):
                     logger.info(f"{tracker_name}: [bold red]Tracker is missing an API key and will be ignored.[/bold red]")
-                    continue
+                    if not meta.debug:
+                        continue
 
                 if "announce_url" in example_tracker_config and not tracker_config.get("announce_url"):
                     logger.info(f"{tracker_name}: [bold red]Tracker is missing an announce URL and will be ignored.[/bold red]")
-                    continue
+                    if not meta.debug:
+                        continue
 
             supported_cats = getattr(tracker_class, "supported_categories", None)
             if supported_cats is None:

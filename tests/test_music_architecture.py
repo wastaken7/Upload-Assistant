@@ -763,3 +763,46 @@ def test_orpheus_async_multipart_uses_mapping_and_repeats_list_fields():
     assert body.count(b'name="artists[]"') == 2
     assert body.count(b'name="importance[]"') == 2
     assert b'name="file_input"; filename="release.torrent"' in body
+
+
+def test_gather_music_prep_generates_mediainfo(tmp_path):
+    from src.music.prep import gather_music_prep
+    from src.music.models import AudioTrack, MusicRelease
+    
+    meta = Meta(
+        category="MUSIC",
+        path=str(tmp_path),
+        uuid="dummy-uuid",
+        base_dir=str(tmp_path),
+        edit=False,
+    )
+    
+    release = MusicRelease(root=str(tmp_path))
+    track = AudioTrack(
+        path=str(tmp_path / "01.flac"),
+        relative_path="01.flac",
+        format="FLAC",
+        codec="FLAC",
+    )
+    dummy_file = tmp_path / "01.flac"
+    dummy_file.write_bytes(b"dummy audio content")
+    release.tracks.append(track)
+    
+    mock_mi = {"media": {"track": [{"@type": "General", "Format": "FLAC"}]}}
+    
+    with (
+        patch.object(MusicReleaseAnalyzer, "analyze", return_value=release),
+        patch("src.exportmi.export_info", new=AsyncMock(return_value=mock_mi)) as mock_export_info,
+        patch("src.music.prep.prepare_music_cover", new=AsyncMock(return_value="")),
+    ):
+        asyncio.run(gather_music_prep(meta, {"DEFAULT": {}}))
+        
+    assert meta.mediainfo == mock_mi
+    mock_export_info.assert_awaited_once_with(
+        str(dummy_file),
+        meta.isdir,
+        meta.uuid,
+        meta.base_dir,
+        is_dvd=False,
+    )
+

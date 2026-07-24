@@ -281,6 +281,23 @@ async def gather_music_prep(meta: Meta, config: dict[str, Any]) -> None:
     meta.name = meta.name_notag
     meta.clean_name = meta.name_notag
 
+    if not meta.edit and release.tracks:
+        try:
+            largest_track = max(release.tracks, key=lambda t: Path(t.path).stat().st_size if Path(t.path).is_file() else 0)
+            from src.exportmi import export_info
+
+            mi = await export_info(
+                largest_track.path,
+                meta.isdir,
+                meta.uuid,
+                meta.base_dir,
+                is_dvd=False,
+            )
+            meta.mediainfo = mi
+        except Exception as e:
+            logger.error(f"[yellow]Warning: MediaInfo export failed for music: {e}[/yellow]")
+            meta.mediainfo = {}
+
     path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "music_release.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     async with aiofiles.open(path, "w", encoding="utf-8") as file:

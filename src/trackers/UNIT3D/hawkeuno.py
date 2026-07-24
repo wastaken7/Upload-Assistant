@@ -309,11 +309,6 @@ class HawkeUno(UNIT3D):
         status_dict = meta.tracker_status[self.tracker]
 
         api_token = str(self.config["TRACKERS"][self.tracker].get("api_key", ""))
-        if not api_token:
-            logger.info(f"[bold red]{self.tracker}: Missing API key in config.[/bold red]")
-            meta.skipping = self.tracker
-            return False
-
         url = f"{self.upload_url}?api_token={api_token}"
 
         if meta.debug:
