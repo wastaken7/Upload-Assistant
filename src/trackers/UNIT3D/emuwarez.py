@@ -4,7 +4,6 @@ from typing import Any, cast
 
 import cloudscraper
 
-from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
 from src.tmdb import TmdbManager
@@ -527,10 +526,6 @@ class Emuwarez(UNIT3D):
         meta.tracker_status.setdefault(self.tracker, {})
 
         api_key = str(self.config["TRACKERS"][self.tracker].get("api_key", "")).strip()
-        if not api_key:
-            logger.info(f"[bold red]{self.tracker}: Missing API key in config file. Skipping...[/bold red]")
-            meta.skipping = self.tracker
-            return dupes
 
         # For TV use only the season token; for movies leave name empty
         name = ""

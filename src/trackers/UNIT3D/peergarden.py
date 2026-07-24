@@ -261,3 +261,24 @@ class PeerGarden(UNIT3D):
         return {
             "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
+
+    async def get_imdb(self, meta: Meta) -> dict[str, str]:
+        """Resolve IMDB ID, ensuring it is '0' for non-video categories or missing/invalid IDs."""
+        if meta.category not in ("MOVIE", "TV"):
+            return {"imdb": "0"}
+
+        imdb_id = str(meta.imdb or "").strip()
+        if imdb_id.isdigit() and int(imdb_id) > 0:
+            return {"imdb": imdb_id}
+
+        return {"imdb": "0"}
+
+    async def get_data(self, meta: Meta) -> dict[str, Any]:
+        """Build PeerGarden-specific upload payload, filtering out prohibited fields."""
+        data = await super().get_data(meta)
+
+        # Pop prohibited administrative flags
+        for field in ("free", "featured", "doubleup", "sticky"):
+            data.pop(field, None)
+
+        return data

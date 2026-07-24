@@ -100,9 +100,6 @@ class Suio:
 
         if not self.search_url:
             return []
-        if not self.api_key:
-            logger.info(f"{self.tracker}: [yellow]Duplicate search skipped due to missing API key.[/yellow]")
-            return []
         if self.daily_api_hit_limit <= 0:
             logger.info(f"{self.tracker}: [yellow]Duplicate search via API is disabled because daily_api_hit_limit is 0.[/yellow]")
             return []
