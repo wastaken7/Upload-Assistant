@@ -61,6 +61,69 @@ def test_description_builder_renders_music_release_details():
     assert "3000 kbps, 3100 kbps" in result
 
 
+def test_description_generator_includes_music_release_details():
+    meta = Meta(
+        category="MUSIC",
+        music_release={
+            "fields": {
+                "artists": {"value": ["Artist One", "Artist Two"]},
+                "album": {"value": "Example Album"},
+            },
+            "tracks": [{"format": "FLAC", "sample_rate": 96000}],
+        },
+    )
+    builder = DescriptionBuilder("PEERGARDEN", {"DEFAULT": {}, "TRACKERS": {"PEERGARDEN": {}}})
+
+    result = asyncio.run(
+        builder.general_description_generator(
+            meta,
+            audio_spectrogram=False,
+            bluray=False,
+            book=False,
+            custom_header=False,
+            custom_signature=False,
+            description=False,
+            game=False,
+            languages=False,
+            logo=False,
+            mediainfo=False,
+            menu_screenshots=False,
+            nfo=False,
+            screenshots=False,
+            tonemapped_header=False,
+            tv_info=False,
+            ua_signature=False,
+            user_description=False,
+            music=True,
+        )
+    )
+
+    assert "[h2]Music Details[/h2]" in result
+    assert "Artist One, Artist Two" in result
+    assert "Example Album" in result
+    assert "96 kHz" in result
+
+
+def test_description_builder_skips_invalid_music_technical_values():
+    meta = Meta(
+        category="MUSIC",
+        music_release={
+            "fields": {"album": {"value": "Example Album"}},
+            "tracks": [
+                {"format": "FLAC", "sample_rate": 96000},
+                {"format": ["invalid"], "sample_rate": "not-a-number"},
+            ],
+        },
+    )
+    builder = DescriptionBuilder("PEERGARDEN", {"DEFAULT": {}, "TRACKERS": {"PEERGARDEN": {}}})
+
+    result = builder._build_music_desc_section(meta)
+
+    assert "FLAC" in result
+    assert "96 kHz" in result
+    assert "not-a-number" not in result
+
+
 def test_rip_log_establishes_cd_media_without_using_filename_alone(tmp_path):
     log = tmp_path / "release.log"
     log.write_text("Exact Audio Copy V1.6 from 23. October 2020\n", encoding="utf-8")

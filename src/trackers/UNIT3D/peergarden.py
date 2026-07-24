@@ -32,6 +32,7 @@ class PeerGarden(UNIT3D):
     tracker_urls = ("peergarden",)
 
     def __init__(self, config: Config) -> None:
+        """Initialize the PeerGarden tracker adapter."""
         super().__init__(config, tracker_name="PEERGARDEN")
         self.config = config
         self.common = Common(config)
@@ -43,6 +44,7 @@ class PeerGarden(UNIT3D):
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
+        """Resolve Upload Assistant categories to PeerGarden category IDs."""
         category_id = {
             "MOVIE": "1",
             "TV": "2",
@@ -60,7 +62,7 @@ class PeerGarden(UNIT3D):
                 "2": "TV",
                 "4": "GAME",
                 "5": "MUSIC",
-                "6": "BOOKS",
+                "6": "BOOK",
                 "7": "AUDIOBOOK",
                 "11": "ANIME",
             }
@@ -79,6 +81,7 @@ class PeerGarden(UNIT3D):
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
+        """Resolve Upload Assistant release types to PeerGarden type IDs."""
         type_id = {
             "DISC": "1",
             "REMUX": "2",
@@ -170,6 +173,7 @@ class PeerGarden(UNIT3D):
             }
 
         def normalize(value: object) -> str:
+            """Normalize tracker mapping inputs for lookup."""
             return str(value or "").upper().strip().lstrip(".")
 
         # An explicit type is used by search/edit callers and must not be
@@ -216,6 +220,7 @@ class PeerGarden(UNIT3D):
         reverse: bool = False,
         mapping_only: bool = False,
     ) -> dict[str, str]:
+        """Resolve video resolutions to PeerGarden resolution IDs."""
         resolution_id = {
             "4320p": "1",
             "2160p": "2",
@@ -249,9 +254,10 @@ class PeerGarden(UNIT3D):
         resolved_res = resolution if resolution else meta.resolution
         if isinstance(resolved_res, str):
             resolved_res = resolved_res.strip().lower()
-        return {"resolution_id": resolution_id.get(resolved_res or "", "11")}
+        return {"resolution_id": resolution_id.get(resolved_res or "", "10")}
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
+        """Build PeerGarden-specific upload flags."""
         return {
             "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }

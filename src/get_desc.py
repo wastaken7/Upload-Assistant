@@ -928,22 +928,35 @@ class DescriptionBuilder:
         use_pt_br = self.tracker in ("AMIGOSSHARE", "BRASILTRACKER", "CAPYBARABR", "SAMARITANO", "BJSHARE")
 
         def value(name: str, fallback: Any = "") -> Any:
+            """Return a populated normalized release field or its fallback."""
             item = fields_data.get(name, {})
             if isinstance(item, dict) and item.get("value") not in (None, "", [], {}):
                 return item["value"]
             return fallback
 
         def display(item: Any) -> str:
+            """Format a release field for human-readable BBCode output."""
             if isinstance(item, list):
                 return ", ".join(str(part) for part in item if str(part).strip())
             return str(item).strip() if item not in (None, "") else ""
 
         def technical_values(name: str, formatter: Any = str) -> str:
-            values = sorted(
-                {track.get(name) for track in tracks if isinstance(track, dict) and track.get(name) not in (None, "")},
-                key=str,
-            )
-            return ", ".join(display(formatter(item)) for item in values)
+            """Format unique valid technical values from the release tracks."""
+            formatted_values: dict[Any, str] = {}
+            for track in tracks:
+                if not isinstance(track, dict):
+                    continue
+                item = track.get(name)
+                if item in (None, ""):
+                    continue
+                try:
+                    hash(item)
+                    formatted = display(formatter(item))
+                except TypeError, ValueError, OverflowError:
+                    continue
+                if formatted:
+                    formatted_values[item] = formatted
+            return ", ".join(formatted_values[item] for item in sorted(formatted_values, key=str))
 
         text = {
             "details": "Music Details" if not use_pt_br else "Detalhes da Música",

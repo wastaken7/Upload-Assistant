@@ -1757,6 +1757,8 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # Send uploads to PEERGARDEN modq for staff approval
+            "modq": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
