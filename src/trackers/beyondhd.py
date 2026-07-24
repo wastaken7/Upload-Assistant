@@ -7,6 +7,7 @@ from typing import Any, cast
 import aiofiles
 import cli_ui
 import httpx
+from rich.markup import escape
 
 from cogs.redaction import Redaction
 from src.console import logger
@@ -170,14 +171,14 @@ class BEYONDHD:
                     response = await client.post(url=url, files=files, data=data, headers=headers)
                     response_json = cast(dict[str, Any], response.json())
                     if int(response_json["status_code"]) == 0:
-                        logger.info(f"{self.tracker}: [red]{response_json['status_message']}")
+                        logger.info(f"{self.tracker}: [red]{escape(response_json['status_message'])}")
                         if response_json["status_message"].startswith("Invalid imdb_id"):
                             logger.info(f"{self.tracker}: [yellow]RETRYING UPLOAD")
                             data["imdb_id"] = 1
                             response = await client.post(url=url, files=files, data=data, headers=headers)
                             response_json = cast(dict[str, Any], response.json())
                         elif response_json["status_message"].startswith("Invalid name value"):
-                            logger.info(f"{self.tracker}: [bold yellow]Submitted Name: {bhd_name}")
+                            logger.info(f"{self.tracker}: [bold yellow]Submitted Name: {escape(bhd_name)}")
 
                     if "status_message" in response_json:
                         match = re.search(rf"{re.escape(self.base_url)}/torrent/download/.*\.(\d+)\.", response_json["status_message"])
@@ -331,7 +332,7 @@ class BEYONDHD:
                     await desc.write(tonemapped_header)
                     await desc.write("\n\n")
             except Exception as e:
-                logger.warning(f"{self.tracker}: [yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
+                logger.warning(f"{self.tracker}: [yellow]Warning: Error setting tonemapped header: {escape(str(e))}[/yellow]")
             images = cast(list[dict[str, Any]], meta.get(f"{self.tracker}_images_key") or meta.image_list or [])
             if len(images) > 0:
                 await desc.write("[align=center]")
@@ -375,7 +376,7 @@ class BEYONDHD:
             )
         ):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"{self.tracker}: [bold red]This is an internal BEYONDHD release, skipping upload[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]This is an internal {self.tracker} release, skipping upload[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -388,12 +389,14 @@ class BEYONDHD:
             return False
 
         if meta.type in ["REMUX", "ENCODE", "WEBDL", "WEBRIP"] and meta.container not in ["mkv", "mp4"]:
-            logger.info(f"{self.tracker}: [bold red]Container '{meta.container}' is not allowed for {meta.type}. Only MKV and MP4 are permitted. Skipping upload.[/bold red]")
+            logger.info(
+                f"{self.tracker}: [bold red]Container '{escape(str(meta.container))}' is not allowed for {escape(str(meta.type))}. Only MKV and MP4 are permitted. Skipping upload.[/bold red]"
+            )
             return False
 
         if meta.type not in ["WEBDL"] and meta.tag and any(x in meta.tag for x in ["EVO"]):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for raw type content at BEYONDHD[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Group {escape(str(meta.tag))} is only allowed for raw type content at {self.tracker}[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:

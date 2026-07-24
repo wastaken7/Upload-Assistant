@@ -327,7 +327,7 @@ class MakingOff:
                                 )
                                 if stderr:
                                     logger.debug(f"{self.tracker}: [cyan][/cyan] ffmpeg stderr: {stderr.decode('utf-8', errors='ignore')}")
-                        except Exception as e:
+                        except (OSError, ValueError) as e:
                             logger.error(f"{self.tracker}: [cyan][/cyan] [red]Error running ffmpeg to extract subtitle: {e}[/red]")
 
         return sorted(set(pt_subs))
@@ -711,7 +711,7 @@ class MakingOff:
             if response is not None:
                 logger.debug(f"{self.tracker}: [cyan][/cyan] Response: {cast(httpx.Response, response).text}")
             return False
-        except Exception as e:
+        except ValueError as e:
             logger.error(f"{self.tracker}: [cyan][/cyan] [bold red]Failed to process upload response:[/bold red] {e}")
             return False
 
@@ -771,7 +771,7 @@ class MakingOff:
         except httpx.HTTPError as e:
             logger.error(f"{self.tracker}: [cyan][/cyan] [bold red]Error on the search POST:[/bold red] {e}")
             return None
-        except Exception as e:
+        except ValueError as e:
             logger.error(f"{self.tracker}: [cyan][/cyan] [bold red]Unwanted response while searching POST:[/bold red] {e}")
             return None
 
@@ -889,7 +889,7 @@ class MakingOff:
             if response is not None:
                 logger.debug(f"{self.tracker}: [cyan][/cyan] Response: {cast(httpx.Response, response).text}")
             return ""
-        except Exception as e:
+        except ValueError as e:
             logger.error(f"{self.tracker}: [cyan][/cyan] Failed to parse response: {e}")
             return ""
 
@@ -1598,7 +1598,7 @@ class MakingOff:
                         zipf.write(sub_file, arcname=Path(sub_file).name)
                 logger.info(f"{self.tracker}: [cyan][/cyan] [green]Zipped {len(sub_files)} subtitles to {Path(zip_path).name}[/green]")
                 sub_files = [zip_path]
-            except Exception as e:
+            except (OSError, zipfile.BadZipFile) as e:
                 logger.error(f"{self.tracker}: [cyan][/cyan] [red]Failed to create zip file for subtitles: {e}[/red]")
                 sub_files = []
 

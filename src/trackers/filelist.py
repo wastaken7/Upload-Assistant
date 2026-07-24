@@ -10,6 +10,7 @@ import aiofiles
 import cli_ui
 import httpx
 from bs4 import BeautifulSoup
+from rich.markup import escape
 from unidecode import unidecode
 
 from cogs.redaction import Redaction
@@ -146,7 +147,7 @@ class FileList:
                             if len(line_fields) >= 7:
                                 cookies[line_fields[5]] = line_fields[6]
             except Exception as e:
-                logger.error(f"{self.tracker}: [red]Error parsing FILELIST Netscape cookie file: {e}[/red]")
+                logger.error(f"{self.tracker}: [red]Error parsing {self.tracker} Netscape cookie file: {escape(str(e))}[/red]")
             return cookies
 
         # If it's a pickle file (ends with .pkl or .pickle)
@@ -350,10 +351,10 @@ class FileList:
             index = f"{self.base_url}/index.php"
             response = await client.get(index)
             if response.text.find("Logout") != -1:
-                logger.info(f"{self.tracker}: [green]Successfully logged into FILELIST")
+                logger.info(f"{self.tracker}: [green]Successfully logged into {self.tracker}")
                 self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # pyright: ignore[reportPrivateUsage]
             else:
-                logger.info(f"{self.tracker}: [bold red]Something went wrong while trying to log into FILELIST")
+                logger.info(f"{self.tracker}: [bold red]Something went wrong while trying to log into {self.tracker}")
                 logger.info(response.url)
         return
 
@@ -365,7 +366,7 @@ class FileList:
             async with aiofiles.open(torrent_path, "wb") as tor:
                 await tor.write(r.content)
         else:
-            logger.info(f"{self.tracker}: [red]There was an issue downloading the new .torrent from FILELIST")
+            logger.info(f"{self.tracker}: [red]There was an issue downloading the new .torrent from {self.tracker}")
             logger.info(r.text)
         return
 

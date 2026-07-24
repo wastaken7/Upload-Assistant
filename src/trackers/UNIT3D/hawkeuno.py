@@ -4,6 +4,7 @@ from typing import Any
 
 import aiofiles
 import httpx
+from rich.markup import escape
 
 from cogs.redaction import Redaction
 from src.console import logger
@@ -342,9 +343,13 @@ class HawkeUno(UNIT3D):
         except httpx.HTTPStatusError as e:
             msg = f"HTTP {e.response.status_code} - {e.response.text}"
             status_dict["status_message"] = f"data error: {msg}"
-            logger.info(f"{self.tracker}: [bold red]Upload error: {msg}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Upload error: {escape(str(msg))}[/bold red]")
+            return False
+        except (httpx.RequestError, ValueError, KeyError) as e:
+            status_dict["status_message"] = f"data error: {e}"
+            logger.info(f"{self.tracker}: [bold red]Upload connection/parsing error: {escape(str(e))}[/bold red]")
             return False
         except Exception as e:
             status_dict["status_message"] = f"data error: {e}"
-            logger.info(f"{self.tracker}: [bold red]Upload unexpected error: {e}[/bold red]")
-            return False
+            logger.info(f"{self.tracker}: [bold red]Upload unexpected error: {escape(str(e))}[/bold red]")
+            raise

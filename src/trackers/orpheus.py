@@ -8,6 +8,7 @@ from typing import Any, ClassVar, cast
 from urllib.parse import urlparse
 
 import httpx
+from rich.markup import escape
 
 from src.console import logger
 from src.meta import Meta
@@ -157,22 +158,36 @@ class Orpheus:
             async with httpx.AsyncClient(timeout=httpx.Timeout(8.0), headers=self._headers(meta)) as client:
                 response = await client.get(f"{self.base_url}/ajax.php", params=params)
                 response.raise_for_status()
-                payload = cast(dict[str, Any], response.json())
+                raw_json = response.json()
         except (httpx.HTTPError, ValueError) as error:
             logger.warning(f"{self.tracker}: [yellow]read-only duplicate search failed: {error}[/yellow]")
             return []
+        if not isinstance(raw_json, dict):
+            return []
+        payload = cast(dict[str, Any], raw_json)
         if payload.get("status") != "success":
             return []
-        response_data = cast(dict[str, Any], payload.get("response") or {})
-        results = cast(list[Any], response_data.get("results") or [])
+        response_data = payload.get("response")
+        if not isinstance(response_data, dict):
+            return []
+        response_data_dict = cast(dict[str, Any], response_data)
+        results = response_data_dict.get("results")
+        if not isinstance(results, list):
+            return []
+        results_list = cast(list[Any], results)
         dupes: list[dict[str, Any]] = []
-        for group_item in results:
+        for group_item in results_list:
+            if not isinstance(group_item, dict):
+                continue
             group = cast(dict[str, Any], group_item)
             group_id = group.get("groupId")
-            editions = cast(list[Any], group.get("torrents") or [])
+            editions = group.get("torrents")
+            if not isinstance(editions, list):
+                continue
+            editions_list = cast(list[Any], editions)
             encodings = [
                 f"{cast(dict[str, Any], torrent).get('media', '')} {cast(dict[str, Any], torrent).get('format', '')} {cast(dict[str, Any], torrent).get('encoding', '')}".strip()
-                for torrent in editions
+                for torrent in editions_list
                 if isinstance(torrent, dict)
             ]
             dupes.append(
@@ -201,14 +216,16 @@ class Orpheus:
             async with httpx.AsyncClient(timeout=httpx.Timeout(15.0), headers=self._headers(meta)) as client:
                 response = await client.get(f"{self.base_url}/ajax.php", params={"action": "torrent", "id": identifier})
                 response.raise_for_status()
-                payload = cast(dict[str, Any], response.json())
+                raw_json = response.json()
         except (httpx.HTTPError, ValueError) as error:
             logger.warning(f"{self.tracker}: [yellow]read-only torrent lookup failed for {identifier}: {error}[/yellow]")
             return None
+        if not isinstance(raw_json, dict):
+            return None
+        payload = cast(dict[str, Any], raw_json)
         response_data = payload.get("response")
         if payload.get("status") == "success" and isinstance(response_data, dict):
-            ret_val: dict[str, Any] = cast(dict[str, Any], response_data)
-            return ret_val
+            return cast(dict[str, Any], response_data)
         return None
 
     async def get_requests(self, meta: Meta) -> list[dict[str, Any]]:
@@ -236,17 +253,28 @@ class Orpheus:
             async with httpx.AsyncClient(timeout=httpx.Timeout(10.0), headers=self._headers(meta)) as client:
                 response = await client.get(f"{self.base_url}/ajax.php", params=params)
                 response.raise_for_status()
-                payload = cast(dict[str, Any], response.json())
+                raw_json = response.json()
         except (httpx.HTTPError, ValueError) as error:
             logger.warning(f"{self.tracker}: [yellow]read-only request search failed: {error}[/yellow]")
             return []
-        response_data = cast(dict[str, Any], payload.get("response") or {})
-        records = cast(list[Any], response_data.get("results") or [])
+        if not isinstance(raw_json, dict):
+            return []
+        payload = cast(dict[str, Any], raw_json)
         if payload.get("status") != "success":
             return []
+        response_data = payload.get("response")
+        if not isinstance(response_data, dict):
+            return []
+        response_data_dict = cast(dict[str, Any], response_data)
+        records = response_data_dict.get("results")
+        if not isinstance(records, list):
+            return []
+        records_list = cast(list[Any], records)
 
         matches: list[dict[str, Any]] = []
-        for record_item in records:
+        for record_item in records_list:
+            if not isinstance(record_item, dict):
+                continue
             record = cast(dict[str, Any], record_item)
             if record.get("isFilled"):
                 continue
@@ -280,7 +308,9 @@ class Orpheus:
         if matches:
             logger.info(f"{self.tracker}: [bold yellow]matching open music request(s) found; review requirements before filling:[/bold yellow]")
             for match in matches:
-                logger.info(f"[bold green]{match['match_type'].title()} match:[/bold green] {match['name']} — bounty: {match['bounty']}")
+                logger.info(
+                    f"{self.tracker}: [bold green]{match['match_type'].title()} match:[/bold green] {escape(str(match['name']))} — bounty: {escape(str(match['bounty']))}"
+                )
                 logger.info(f"{self.tracker}: [cyan]{match['url']}[/cyan]")
                 logger.info(f"{self.tracker}: [yellow]Requested technical fields: {match['requirements']}[/yellow]")
         meta.tracker_status.setdefault(self.tracker, {})["request_matches"] = matches

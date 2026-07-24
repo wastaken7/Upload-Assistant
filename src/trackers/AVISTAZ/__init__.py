@@ -125,9 +125,7 @@ class AZTrackerBase:
                 break
 
             if attempt == 0 and not self.media_code:
-                logger.info(
-                    f"{self.tracker}: \n{self.tracker}: The media [[yellow]IMDB:{imdb_id}[/yellow]] [[blue]TMDB:{tmdb_id}[/blue]] appears to be missing from the site's database."
-                )
+                logger.info(f"{self.tracker}: \nThe media [[yellow]IMDB:{imdb_id}[/yellow]] [[blue]TMDB:{tmdb_id}[/blue]] appears to be missing from the site's database.")
                 if cli_ui.ask_yes_no(f"{self.tracker}: Do you want to add it to the site database?\n"):
                     added_successfully = await self.add_media_to_db(meta, title, category, imdb_id, tmdb_id)
                     if not added_successfully:
@@ -327,8 +325,11 @@ class AZTrackerBase:
             logger.info(f"{self.tracker}: [red]HTTP error {e.response.status_code} from {torrent_link}[/red]")
         except httpx.RequestError as e:
             logger.info(f"{self.tracker}: [red]Request failed to {torrent_link}. {e}[/red]")
+        except (AttributeError, TypeError, ValueError) as e:
+            logger.info(f"{self.tracker}: [red]Parsing failed for {torrent_link}. {e}[/red]")
         except Exception as e:
-            logger.error(f"{self.tracker}: [red]Unexpected error parsing {torrent_link}. {e}[/red]")
+            logger.error(f"{self.tracker}: [red]Unexpected error parsing {torrent_link}. {e}[/red]", exc_info=True)
+            raise
 
         return ""
 

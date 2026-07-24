@@ -9,6 +9,7 @@ import aiofiles
 import cli_ui
 import httpx
 from bs4 import BeautifulSoup
+from rich.markup import escape
 
 from cogs.redaction import Redaction
 from src.console import logger
@@ -633,7 +634,7 @@ class GreatPosterWall:
 
         try:
             data: dict[str, Any] = response.json()
-        except Exception as e:
+        except ValueError as e:
             logger.info(f"{self.tracker}: [bold red]Error decoding JSON from groupid response: {e}[/bold red]")
             return False
 
@@ -936,8 +937,8 @@ class GreatPosterWall:
                             best_score = score
                         if score >= 10:
                             return response_data
-            except Exception as e:
-                logger.debug(f"{self.tracker}: Failed to process response payload on GREATPOSTERWALL: {e}", exc_info=True)
+            except (ValueError, KeyError, TypeError, IndexError) as e:
+                logger.debug(f"{self.tracker}: Failed to process response payload on {self.tracker}: {escape(str(e))}", exc_info=True)
                 continue
 
         return best_response

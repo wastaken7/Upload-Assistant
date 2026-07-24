@@ -8,6 +8,7 @@ from urllib.parse import quote, urlparse
 
 import aiofiles
 import httpx
+from rich.markup import escape
 from unidecode import unidecode
 
 from cogs.redaction import Redaction
@@ -243,7 +244,7 @@ class HDBits:
 
         for each in (cat_id, codec_id, medium_id):
             if each == 0:
-                logger.info(f"{self.tracker}: [bold red]Something didn't map correctly, or this content is not allowed on HDBITS")
+                logger.info(f"{self.tracker}: [bold red]Something didn't map correctly, or this content is not allowed on {self.tracker}")
                 return None
         if "Dual-Audio" in meta.audio and not (meta.anime or not meta.is_disc):
             logger.info(f"{self.tracker}: [bold red]Dual-Audio Encodes are not allowed for non-anime and non-disc content")
@@ -257,7 +258,7 @@ class HDBits:
 
         # Check if the piece size exceeds 16 MiB and regenerate the torrent if needed
         if base_piece_mb > 16 and not meta.nohash:
-            logger.info(f"{self.tracker}: [red]Piece size is OVER 16M and does not work on HDBITS. Generating a new .torrent")
+            logger.info(f"{self.tracker}: [red]Piece size is OVER 16M and does not work on {self.tracker}. Generating a new .torrent")
             hdb_config = self.config.get("TRACKERS", {}).get("HDBITS", {})
             hdb_config_dict = cast(dict[str, Any], hdb_config) if isinstance(hdb_config, dict) else {}
             tracker_url = str(hdb_config_dict.get("announce_url", "https://fake.tracker")).strip()
@@ -398,7 +399,7 @@ class HDBits:
 
         # Otherwise, search for each term
         for search_term in search_terms:
-            logger.info(f"{self.tracker}: [yellow]Searching HDBITS for: {search_term}")
+            logger.info(f"{self.tracker}: [yellow]Searching {self.tracker} for: {escape(str(search_term))}")
             data["search"] = search_term
 
             async with httpx.AsyncClient(timeout=5.0) as client:
@@ -596,7 +597,7 @@ class HDBits:
                 logger.info(f"{self.tracker}: [red]Comparison path not found: {comparison_path}")
                 return None
 
-            logger.info(f"{self.tracker}: [green]Uploading comparison images from {comparison_path} to HDBITS Image Host")
+            logger.info(f"{self.tracker}: [green]Uploading comparison images from {escape(str(comparison_path))} to {self.tracker} Image Host")
 
             group_images: dict[str, list[str]] = {}
             max_images_per_group = 0
@@ -699,7 +700,7 @@ class HDBits:
             upload_count = 3 if meta.category == "TV" and meta.tv_pack == 0 else 6
             upload_count = min(len(all_image_files), upload_count)
 
-        logger.debug(f"{self.tracker}: [cyan]Uploading {upload_count} images to HDBITS Image Host")
+        logger.debug(f"{self.tracker}: [cyan]Uploading {upload_count} images to {self.tracker} Image Host")
 
         upload_files: dict[str, tuple[str, bytes, str]] = {}
         for i in range(upload_count):
@@ -709,9 +710,9 @@ class HDBits:
                 async with aiofiles.open(file_path, "rb") as file_handle:
                     file_bytes = await file_handle.read()
                 upload_files[f"images_files[{i}]"] = (filename, file_bytes, "image/png")
-                logger.debug(f"{self.tracker}: [cyan]Added file {filename} as images_files[{i}]")
+                logger.debug(f"{self.tracker}: [cyan]Added file {escape(str(filename))} as images_files[{i}]")
             except (OSError, ValueError) as e:
-                logger.error(f"{self.tracker}: [red]Failed to open {file_path}: {e}")
+                logger.error(f"{self.tracker}: [red]Failed to open {escape(str(file_path))}: {escape(str(e))}")
                 continue
 
         try:
@@ -719,7 +720,7 @@ class HDBits:
                 logger.info(f"{self.tracker}: [red]No files to upload")
                 return None
 
-            logger.debug(f"{self.tracker}: [green]Uploading {len(upload_files)} images to HDBITS...")
+            logger.debug(f"{self.tracker}: [green]Uploading {len(upload_files)} images to {self.tracker}...")
 
             upload_success = True
             if meta.comparison:
@@ -831,10 +832,13 @@ class HDBits:
                     logger.info(f"{self.tracker}: [red]API returned error status {status_code}: {message}[/red]")
 
         except httpx.RequestError as e:
-            logger.info(f"{self.tracker}: [red]Request error: {e}[/red]")
+            logger.info(f"{self.tracker}: [red]Request error: {escape(str(e))}[/red]")
+        except (ValueError, KeyError, IndexError, TypeError) as e:
+            logger.error(f"{self.tracker}: [red]Failed to parse HDBITS response. Error: {escape(str(e))}[/red]")
         except Exception as e:
-            logger.error(f"{self.tracker}: [red]Unexpected error: {e}[/red]")
+            logger.error(f"{self.tracker}: [red]Unexpected error: {escape(str(e))}[/red]")
             console.print_exception()
+            raise
 
         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description
 
@@ -865,7 +869,7 @@ class HDBits:
                         "limit": 100,
                         "search": bd_summary,  # Using the Disc Title for search with uuid fallback
                     }
-                    logger.info(f"{self.tracker}: [green]Searching HDBITS for title: [bold yellow]{bd_summary}[/bold yellow]")
+                    logger.info(f"{self.tracker}: [green]Searching {self.tracker} for title: [bold yellow]{escape(str(bd_summary))}[/bold yellow]")
                     # console.print(f"[yellow]Using this data: {data}")
                 else:
                     return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
@@ -876,7 +880,7 @@ class HDBits:
 
         else:  # Handling non-disc case
             data = {"username": self.username, "passkey": self.passkey, "limit": 100, "file_in_torrent": Path(search_term).name}
-            logger.info(f"{self.tracker}: [green]Searching HDBITS for file: [bold yellow]{Path(search_term).name}[/bold yellow]")
+            logger.info(f"{self.tracker}: [green]Searching {self.tracker} for file: [bold yellow]{escape(str(Path(search_term).name))}[/bold yellow]")
             # console.print(f"[yellow]Using this data: {data}")
 
         try:
@@ -888,7 +892,9 @@ class HDBits:
                     # console.print(f"[green]HDBITS API response: {response_json}[/green]")
 
                     if "data" not in response_json:
-                        logger.error(f"{self.tracker}: [red]Error: 'data' key not found or empty in HDBITS API response. Full response: {response_json}[/red]")
+                        logger.error(
+                            f"{self.tracker}: [red]Error: 'data' key not found or empty in {self.tracker} API response. Full response: {escape(str(response_json))}[/red]"
+                        )
                         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
 
                     for each in response_json["data"]:
@@ -899,20 +905,24 @@ class HDBits:
                         hdb_id = each.get("id", None)
                         hdb_description = each.get("descr")
 
-                        logger.info(f"{self.tracker}: [bold green]Matched release with HDBITS ID: [yellow]{self.base_url}/details.php?id={hdb_id}[/yellow][/bold green]")
+                        logger.info(
+                            f"{self.tracker}: [bold green]Matched release with {self.tracker} ID: [yellow]{self.base_url}/details.php?id={hdb_id}[/yellow][/bold green]"
+                        )
 
                         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 
-                    logger.info(f"{self.tracker}: [yellow]No data found in the HDBITS API response[/yellow]")
+                    logger.info(f"{self.tracker}: [yellow]No data found in the {self.tracker} API response[/yellow]")
 
                 except (ValueError, KeyError, TypeError) as e:
                     console.print_exception()
-                    logger.error(f"{self.tracker}: [red]Failed to parse HDBITS API response. Error: {e!s}[/red]")
+                    logger.error(f"{self.tracker}: [red]Failed to parse {self.tracker} API response. Error: {escape(str(e))}[/red]")
             else:
-                logger.error(f"{self.tracker}: [red]Failed to get info from HDBITS. Status code: {response.status_code}, Reason: {response.reason_phrase}[/red]")
+                logger.error(
+                    f"{self.tracker}: [red]Failed to get info from {self.tracker}. Status code: {response.status_code}, Reason: {escape(str(response.reason_phrase))}[/red]"
+                )
 
         except httpx.RequestError as e:
-            logger.info(f"{self.tracker}: [red]Request error: {e!s}[/red]")
+            logger.info(f"{self.tracker}: [red]Request error: {escape(str(e))}[/red]")
 
-        logger.info(f"{self.tracker}: [yellow]Could not find a matching release on HDBITS[/yellow]")
+        logger.info(f"{self.tracker}: [yellow]Could not find a matching release on {self.tracker}[/yellow]")
         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id

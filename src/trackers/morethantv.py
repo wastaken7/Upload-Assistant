@@ -12,6 +12,7 @@ import cli_ui
 import httpx
 import pyotp
 from defusedxml import ElementTree
+from rich.markup import escape
 
 from cogs.redaction import Redaction
 from src.console import console, logger
@@ -133,7 +134,7 @@ class MoreThanTV:
         if base_piece_mb > 8 and not meta.nohash:
             tracker_config = self.config["TRACKERS"].get(self.tracker, {})
             if str(tracker_config.get("skip_if_rehash", "false")).lower() == "false":
-                logger.info(f"{self.tracker}: [red]Piece size is OVER 8M and does not work on MORETHANTV. Generating a new .torrent")
+                logger.info(f"{self.tracker}: [red]Piece size is OVER 8M and does not work on {self.tracker}. Generating a new .torrent")
                 piece_size = 8
                 tracker_url = str(tracker_config.get("announce_url", "https://fake.tracker")).strip()
                 torrent_create = f"[{self.tracker}]"
@@ -529,7 +530,7 @@ class MoreThanTV:
                 async with httpx.AsyncClient(cookies=cookies_dict, timeout=10) as client:
                     try:
                         resp = await client.get(url=url)
-                        logger.debug(f"{self.tracker}: [cyan]Validating MORETHANTV Cookies:")
+                        logger.debug(f"{self.tracker}: [cyan]Validating {self.tracker} Cookies:")
 
                         if "Logout" in resp.text:
                             return True
@@ -544,11 +545,11 @@ class MoreThanTV:
                         logger.error(f"{self.tracker}: [red]Failed to connect to {url}. The site may be down or your connection is blocked.")
                         meta.mtv_timeout = True
                         return False
-                    except Exception as e:
-                        logger.error(f"{self.tracker}: [red]Error connecting to MORETHANTV: {e!s}")
+                    except httpx.HTTPError as e:
+                        logger.error(f"{self.tracker}: [red]HTTP error connecting to {self.tracker}: {escape(str(e))}")
                         return False
-            except Exception as e:
-                logger.error(f"{self.tracker}: [red]Error loading cookies: {e!s}")
+            except (OSError, ValueError) as e:
+                logger.error(f"{self.tracker}: [red]Error loading cookies: {escape(str(e))}")
                 return False
         else:
             logger.info(f"{self.tracker}: [yellow]Cookie file not found")
@@ -570,13 +571,13 @@ class MoreThanTV:
                         logger.info(f"{self.tracker}: [yellow]Auth key not found in response")
                         return ""
                     except httpx.RequestError as e:
-                        logger.error(f"{self.tracker}: [red]Error getting auth key: {e!s}")
+                        logger.error(f"{self.tracker}: [red]Error getting auth key: {escape(str(e))}")
                         return ""
             else:
                 logger.info(f"{self.tracker}: [yellow]Cookie file not found for auth key retrieval")
                 return ""
-        except Exception as e:
-            logger.error(f"{self.tracker}: [red]Unexpected error retrieving auth key: {e!s}")
+        except (OSError, ValueError) as e:
+            logger.error(f"{self.tracker}: [red]Error loading cookies or parsing JSON: {escape(str(e))}")
             return ""
 
     async def login(self, cookiefile: str) -> bool:
@@ -611,9 +612,9 @@ class MoreThanTV:
                                 otp = pyotp.parse_uri(otp_uri)
                                 mfa_code = pyotp.TOTP(otp.secret).now()
                             except ValueError, TypeError:
-                                mfa_code = console.input("[yellow]MORETHANTV 2FA Code: ")
+                                mfa_code = console.input(f"[yellow]{self.tracker} 2FA Code: ")
                         else:
-                            mfa_code = console.input("[yellow]MORETHANTV 2FA Code: ")
+                            mfa_code = console.input(f"[yellow]{self.tracker} 2FA Code: ")
 
                         two_factor_token = resp.text.rsplit('name="token" value="', 1)[1][:48]
                         two_factor_payload = {"token": two_factor_token, "code": mfa_code, "submit": "login"}
@@ -621,30 +622,31 @@ class MoreThanTV:
 
                     await asyncio.sleep(1)
                     if "authkey=" in resp.text:
-                        logger.info(f"{self.tracker}: [green]Successfully logged in to MORETHANTV")
+                        logger.info(f"{self.tracker}: [green]Successfully logged in to {self.tracker}")
                         cookies_dict = dict(client.cookies)
                         cookies_data = await self.async_json_dumps(cookies_dict)
                         async with aiofiles.open(cookiefile, "w", encoding="utf-8") as cf:
                             await cf.write(cookies_data)
                         logger.info(f"{self.tracker}: [green]Cookies saved to {cookiefile}")
                         return True
-                    logger.info(f"{self.tracker}: [bold red]Something went wrong while trying to log into MORETHANTV")
+                    logger.info(f"{self.tracker}: [bold red]Something went wrong while trying to log into {self.tracker}")
                     logger.info(f"{self.tracker}: [red]Final URL: {resp.url}")
                     return False
 
                 except httpx.TimeoutException:
-                    logger.info(f"{self.tracker}: [red]Connection to MORETHANTV timed out. The site may be down or unreachable.")
+                    logger.info(f"{self.tracker}: [red]Connection to {self.tracker} timed out. The site may be down or unreachable.")
                     return False
                 except httpx.ConnectError:
-                    logger.error(f"{self.tracker}: [red]Failed to connect to MORETHANTV. The site may be down or your connection is blocked.")
+                    logger.error(f"{self.tracker}: [red]Failed to connect to {self.tracker}. The site may be down or your connection is blocked.")
                     return False
-                except Exception as e:
-                    logger.error(f"{self.tracker}: [red]Error during MORETHANTV login: {e!s}")
-                    logger.info(f"{self.tracker}: [dim red]{traceback.format_exc()}[/dim red]")
+                except (httpx.HTTPError, KeyError, IndexError, ValueError) as e:
+                    logger.error(f"{self.tracker}: [red]Error during {self.tracker} login: {escape(str(e))}")
+                    logger.info(f"{self.tracker}: [dim red]{escape(traceback.format_exc())}[/dim red]")
                     return False
         except Exception as e:
-            logger.error(f"{self.tracker}: [red]Unexpected error during login: {e!s}")
-            logger.info(f"{self.tracker}: [dim red]{traceback.format_exc()}[/dim red]")
+            logger.error(f"{self.tracker}: [red]Unexpected error during login: {escape(str(e))}")
+            logger.info(f"{self.tracker}: [dim red]{escape(traceback.format_exc())}[/dim red]")
+            raise
         return False
 
     async def get_additional_checks(self, meta: Meta) -> bool:

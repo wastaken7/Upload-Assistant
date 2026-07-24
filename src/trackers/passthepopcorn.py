@@ -15,6 +15,7 @@ import cli_ui
 import click
 import httpx
 from pymediainfo import MediaInfo
+from rich.markup import escape
 
 from cogs.redaction import PathAwareEncoder, Redaction
 from src.bbcode import BBCODE
@@ -290,7 +291,7 @@ class PassThePopcorn:
                         desc = edited_description.strip()
                         meta.description = desc
                         meta.saved_description = True
-                    logger.info(f"{self.tracker}: [green]Final description after editing:[/green] {desc}")
+                    logger.info(f"{self.tracker}: [green]Final description after editing:[/green] {escape(str(desc))}")
                 elif (edit_choice or "").lower() == "d":
                     desc = None
                     logger.info(f"{self.tracker}: [yellow]Description discarded.[/yellow]")
@@ -1301,7 +1302,7 @@ class PassThePopcorn:
         meta: Meta,
         image_key: str,
         image_list: list[dict[str, Any]] | None = None,
-    ) -> str | None:
+    ) -> Path | None:
         if image_list is None:
             logger.info(f"{self.tracker}: [yellow]No image links to save.[/yellow]")
             return None

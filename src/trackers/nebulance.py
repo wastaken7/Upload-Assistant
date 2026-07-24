@@ -150,7 +150,7 @@ class Nebulance:
                                 meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
                             return True
                         except json.JSONDecodeError:
-                            meta.tracker_status[self.tracker]["status_message"] = "data error: NEBULANCE json decode error, the API is probably down"
+                            meta.tracker_status[self.tracker]["status_message"] = f"data error: {self.tracker} json decode error, the API is probably down"
                             return False
                     else:
                         response_data = {"error": f"Unexpected status code: {response.status_code}", "response_content": response.text}
@@ -170,7 +170,7 @@ class Nebulance:
         if meta.category != "TV":
             if meta.tvmaze_id != 0:
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    logger.info(f"{self.tracker}: [red]Only TV or TV Movies are allowed at NEBULANCE, this has a tvmaze ID[/red]")
+                    logger.info(f"{self.tracker}: [red]Only TV or TV Movies are allowed at {self.tracker}, this has a tvmaze ID[/red]")
                     if cli_ui.ask_yes_no("Do you want to upload it?", default=False):
                         pass
                     else:
@@ -179,7 +179,7 @@ class Nebulance:
                     return False
             else:
                 if not meta.unattended:
-                    logger.info(f"{self.tracker}: [red]Only TV Is allowed at NEBULANCE")
+                    logger.info(f"{self.tracker}: [red]Only TV Is allowed at {self.tracker}[/red]")
                 return False
 
         if meta.is_disc != "BDMV" and not await self.common.check_language_requirements(
@@ -193,7 +193,7 @@ class Nebulance:
 
         if meta.is_disc:
             if not meta.unattended:
-                logger.info(f"{self.tracker}: [bold red]does not allow raw discs")
+                logger.info(f"{self.tracker}: [bold red]does not allow raw discs[/bold red]")
             return False
 
         return True

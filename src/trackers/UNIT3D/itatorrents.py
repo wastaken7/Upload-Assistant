@@ -2,6 +2,8 @@
 import re
 from typing import Any
 
+from rich.markup import escape
+
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
@@ -147,9 +149,9 @@ class ItaTorrents(UNIT3D):
             itt_name = " ".join(itt_name.split())
         except Exception:
             logger.info(f"{self.tracker}: [bold red]Unable to generate name. Please re-run and correct any of the following args if needed.")
-            logger.info(f"{self.tracker}: --category [yellow]{meta.category}")
-            logger.info(f"{self.tracker}: --type [yellow]{meta.type}")
-            logger.info(f"{self.tracker}: --source [yellow]{meta.source}")
+            logger.info(f"{self.tracker}: --category [yellow]{escape(str(meta.category))}")
+            logger.info(f"{self.tracker}: --type [yellow]{escape(str(meta.type))}")
+            logger.info(f"{self.tracker}: --source [yellow]{escape(str(meta.source))}")
             logger.info(f"{self.tracker}: [bold green]If you specified type, try also specifying source")
 
             exit()

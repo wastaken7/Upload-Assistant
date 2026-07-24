@@ -8,6 +8,7 @@ from typing import Any
 import aiofiles
 import cli_ui
 import httpx
+from rich.markup import escape
 
 from cogs.redaction import Redaction
 from src.console import logger
@@ -367,8 +368,8 @@ class Anthelion:
             error_type = type(e).__name__
             error_msg = str(e) if str(e) else "No error message"
             traceback_str = traceback.format_exc()
-            logger.info(f"{self.tracker}: [bold red]upload exception ({error_type}): {error_msg}[/bold red]")
-            logger.info(f"{self.tracker}: [red]Traceback:\n{traceback_str}[/red]")
+            logger.info(f"{self.tracker}: [bold red]upload exception ({error_type}): {escape(error_msg)}[/bold red]")
+            logger.info(f"{self.tracker}: [red]Traceback:\n{escape(traceback_str)}[/red]")
             meta.tracker_status[self.tracker]["status_message"] = "data error: double check if it uploaded"
             return False
 
@@ -462,7 +463,7 @@ class Anthelion:
 
             for each in data.get("item", []):
                 if target_resolution and each.get("resolution", "").lower() != target_resolution.lower():
-                    logger.debug(f"{self.tracker}: [yellow]Skipping {each.get('fileName')} - resolution mismatch: {each.get('resolution')} vs {target_resolution}")
+                    logger.debug(f"{self.tracker}: [yellow]Skipping {escape(each.get('fileName'))} - resolution mismatch: {each.get('resolution')} vs {target_resolution}")
                     continue
 
                 largest_file = None
@@ -486,7 +487,7 @@ class Anthelion:
                 }
                 dupes.append(result)
 
-                logger.debug(f"{self.tracker}: [green]Found potential dupe: {result['name']} ({result['size']} bytes)")
+                logger.debug(f"{self.tracker}: [green]Found potential dupe: {escape(result['name'])} ({result['size']} bytes)")
 
         return dupes
 
@@ -556,7 +557,7 @@ class Anthelion:
                             if tmdb_id and str(tmdb_id).isdigit() and int(tmdb_id) != 0:
                                 imdb_tmdb_list.append({"tmdb_id": int(tmdb_id)})
                     except json.JSONDecodeError:
-                        logger.info(f"{self.tracker}: [bold yellow]Error parsing JSON response from ANTHELION")
+                        logger.info(f"{self.tracker}: [bold yellow]Error parsing JSON response from {self.tracker}")
                         imdb_tmdb_list = []
                 else:
                     logger.info(f"{self.tracker}: [bold red]Failed to search torrents. HTTP Status: {response.status_code}")
@@ -565,10 +566,10 @@ class Anthelion:
             logger.info(f"{self.tracker}: [bold red]Request timed out after 5 seconds")
             imdb_tmdb_list = []
         except httpx.RequestError as e:
-            logger.info(f"{self.tracker}: [bold red]Unable to search for existing torrents: {e}")
+            logger.info(f"{self.tracker}: [bold red]Unable to search for existing torrents: {escape(str(e))}")
             imdb_tmdb_list = []
         except Exception as e:
-            logger.error(f"{self.tracker}: [bold red]Unexpected error: {e}")
+            logger.error(f"{self.tracker}: [bold red]Unexpected error: {escape(str(e))}")
             imdb_tmdb_list = []
 
         return imdb_tmdb_list

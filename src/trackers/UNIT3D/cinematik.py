@@ -1,5 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any, cast
@@ -8,6 +9,8 @@ from urllib.parse import urlparse
 import aiofiles
 import cli_ui
 import click
+import httpx
+from rich.markup import escape
 
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -207,9 +210,9 @@ class Cinematik(UNIT3D):
                 if parsed_url.scheme not in ("http", "https"):
                     raise ValueError(f"Invalid URL scheme: {parsed_url.scheme}")
                 urllib.request.urlretrieve(poster_url, poster_path)  # noqa: S310
-                logger.info(f"{self.tracker}: [green]Cover downloaded to {poster_path}[/green]")
-            except Exception as e:
-                logger.error(f"{self.tracker}: [red]Error downloading poster: {e}[/red]")
+                logger.info(f"{self.tracker}: [green]Cover downloaded to {escape(str(poster_path))}[/green]")
+            except (urllib.error.URLError, OSError, ValueError) as e:
+                logger.error(f"{self.tracker}: [red]Error downloading poster: {escape(str(e))}[/red]")
 
         # Upload the downloaded or existing poster image once
         if Path(poster_path).exists():
@@ -221,8 +224,8 @@ class Cinematik(UNIT3D):
                 poster_urls = new_poster_url
                 if len(poster_urls) > 0:
                     poster_url = str(poster_urls[0].get("raw_url", poster_url))
-            except Exception as e:
-                logger.error(f"{self.tracker}: [red]Error uploading poster: {e}[/red]")
+            except (httpx.HTTPError, ValueError, KeyError) as e:
+                logger.error(f"{self.tracker}: [red]Error uploading poster: {escape(str(e))}[/red]")
         else:
             logger.info(f"{self.tracker}: [red]Cover file not found, cannot upload.[/red]")
 

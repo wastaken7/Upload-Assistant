@@ -129,6 +129,6 @@ class TheOldSchool(UNIT3D):
         has_nfo = meta.nfo or meta.auto_nfo
 
         if is_scene and not has_nfo:
-            logger.info(f"{self.tracker}: [red]Scene release detected but no NFO file found. TheOldSchool requires NFO files for Scene releases.[/red]")
+            logger.info(f"{self.tracker}: [red]Scene release detected but no NFO file found. {self.tracker} requires NFO files for Scene releases.[/red]")
             return False
         return True
