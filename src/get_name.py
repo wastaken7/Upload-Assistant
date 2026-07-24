@@ -187,6 +187,9 @@ class NameManager:
         elif meta.category == "GAME":
             name = self.extract_game_name(meta)
             potential_missing = []
+        elif meta.category == "MUSIC":
+            name = meta.name_notag or f"{meta.artist} - {meta.title}"
+            potential_missing = []
 
         try:
             name = " ".join(name.split())

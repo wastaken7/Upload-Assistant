@@ -19,6 +19,7 @@ import traceback
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Protocol, cast
+from urllib.parse import urlparse
 
 from src.check_requirements import check_dependencies
 
@@ -745,6 +746,218 @@ async def _prompt_game_meta(meta: Meta) -> None:
         logger.info("[yellow]Input cancelled — continuing with current game fields.[/yellow]")
 
 
+MUSIC_REQUIRED_FIELDS = ("artist", "album", "year", "media", "release_type")
+MUSIC_MEDIA_CHOICES = ("CD", "WEB", "Vinyl", "DVD", "BD", "Soundboard", "SACD", "DAT", "Cassette")
+MUSIC_RELEASE_TYPE_CHOICES = (
+    "Album",
+    "Soundtrack",
+    "EP",
+    "Anthology",
+    "Compilation",
+    "Sampler",
+    "Single",
+    "Demo",
+    "Live album",
+    "Split",
+    "Remix",
+    "Bootleg",
+    "Interview",
+    "Mixtape",
+    "Concert recording",
+    "DJ Mix",
+    "Unknown",
+)
+
+
+def _music_field(meta: Meta, field: str) -> Any:
+    """Read a normalized release field, falling back to the shared Meta view."""
+    release = meta.music_release if isinstance(meta.music_release, dict) else {}
+    fields = release.get("fields", {}) if isinstance(release.get("fields", {}), dict) else {}
+    entry = fields.get(field, {}) if isinstance(fields.get(field, {}), dict) else {}
+    value = entry.get("value")
+    if value not in (None, ""):
+        return value
+    return {"artist": meta.artist, "album": meta.title, "year": meta.year, "media": meta.source, "cover_url": meta.cover}.get(field, "")
+
+
+def _music_field_source(meta: Meta, field: str) -> str:
+    release = meta.music_release if isinstance(meta.music_release, dict) else {}
+    fields = release.get("fields", {}) if isinstance(release.get("fields", {}), dict) else {}
+    entry = fields.get(field, {}) if isinstance(fields.get(field, {}), dict) else {}
+    return str(entry.get("source", ""))
+
+
+def _set_music_field(meta: Meta, field: str, value: str | int, *, source: str = "user") -> None:
+    """Keep prompted values and their provenance available to tracker adapters."""
+    if not isinstance(meta.music_release, dict):
+        meta.music_release = {"fields": {}}
+    fields = meta.music_release.setdefault("fields", {})
+    if not isinstance(fields, dict):
+        meta.music_release["fields"] = {}
+        fields = meta.music_release["fields"]
+    fields[field] = {"value": value, "source": source, "confidence": 1.0}
+    if field == "artist":
+        meta.artist = str(value)
+        artists = [part.strip() for part in re.split(r"\s+&\s+", str(value)) if part.strip()]
+        fields["artists"] = {"value": artists or [str(value)], "source": source, "confidence": 1.0}
+    elif field == "album":
+        meta.title = str(value)
+    elif field == "year":
+        meta.year = int(value)
+        meta.search_year = str(value)
+    elif field == "media":
+        meta.source = str(value)
+    elif field == "cover_url":
+        meta.cover = str(value)
+
+
+def _music_targets_orpheus(meta: Meta) -> bool:
+    """Whether this MUSIC job includes Orpheus (whose image field is optional)."""
+    trackers = [meta.trackers] if isinstance(meta.trackers, str) else (meta.trackers or [])
+    return any(str(tracker).strip().upper() == "ORPHEUS" for tracker in trackers)
+
+
+def _is_http_url(value: Any) -> bool:
+    parsed = urlparse(str(value or "").strip())
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+async def _write_music_snapshot(meta: Meta) -> None:
+    path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "music_release.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiofiles.open(path, "w", encoding="utf-8") as file:
+        await file.write(json.dumps(meta.music_release, indent=2, cls=PathAwareEncoder))
+
+
+async def _host_orpheus_music_cover(meta: Meta, uploadscreens_manager: UploadScreensManager) -> None:
+    """Host already-resolved local MUSIC artwork after confirmation only.
+
+    Image hosting is an external state-changing action, so debug mode never
+    calls an image host.  A manually supplied URL always wins over local art.
+    """
+    if not _music_targets_orpheus(meta) or _is_http_url(meta.cover):
+        return
+    cover_path = Path(str(meta.cover_path or ""))
+    if not cover_path.is_file():
+        return
+    if meta.debug:
+        logger.info(f"[yellow]MUSIC debug: artwork found at {cover_path.name}; image-host upload skipped.[/yellow]")
+        return
+    if meta.skip_imghost_upload:
+        logger.info("[yellow]MUSIC: image-host upload is disabled; provide a public artwork URL for Orpheus.[/yellow]")
+        return
+
+    cache_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "music_cover.json"
+    try:
+        if cache_path.is_file():
+            cached = json.loads(await asyncio.to_thread(cache_path.read_text, encoding="utf-8"))
+            cached_url = cached.get("raw_url", "") if isinstance(cached, dict) else ""
+            if _is_http_url(cached_url):
+                meta.cover = str(cached_url)
+                _set_music_field(meta, "cover_url", meta.cover, source="external")
+                return
+    except (OSError, ValueError, TypeError) as error:
+        logger.debug(f"[yellow]MUSIC: ignored unusable artwork cache: {error}[/yellow]")
+
+    try:
+        uploaded, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [str(cover_path)], {})
+    except Exception as error:
+        logger.warning(f"[yellow]MUSIC: artwork host upload failed: {error}[/yellow]")
+        return
+    if not uploaded or not _is_http_url(uploaded[0].get("raw_url")):
+        logger.warning("[yellow]MUSIC: image host did not return a usable artwork URL.[/yellow]")
+        return
+
+    meta.cover = str(uploaded[0]["raw_url"])
+    _set_music_field(meta, "cover_url", meta.cover, source="external")
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiofiles.open(cache_path, "w", encoding="utf-8") as file:
+        await file.write(json.dumps(uploaded[0], indent=2))
+    await _write_music_snapshot(meta)
+
+
+async def _prompt_music_meta(meta: Meta) -> None:
+    """Ask for minimum Orpheus music metadata, never technical stream fields."""
+    required = list(MUSIC_REQUIRED_FIELDS)
+    missing = [
+        field
+        for field in required
+        if (field == "cover_url" and not _is_http_url(_music_field(meta, field))) or (field != "cover_url" and not str(_music_field(meta, field) or "").strip())
+    ]
+    conflicts = meta.music_release.get("conflicts", {}) if isinstance(meta.music_release, dict) else {}
+    contextual: list[str] = []
+    if isinstance(conflicts, dict) and conflicts.get("year") and "year" not in missing:
+        contextual.append("year")
+    if (isinstance(conflicts, dict) and conflicts.get("edition_year") and "edition_year" not in missing) or (
+        _music_field(meta, "edition") and (not _music_field(meta, "edition_year") or _music_field_source(meta, "edition_year") == "file_tag")
+    ):
+        contextual.append("edition_year")
+    if isinstance(conflicts, dict) and conflicts.get("artist"):
+        contextual.append("artist")
+    fields_to_prompt = list(dict.fromkeys([*missing, *contextual]))
+    if not fields_to_prompt:
+        return
+    if meta.unattended:
+        logger.info(
+            f"[yellow]MUSIC upload: metadata requiring confirmation: {', '.join(fields_to_prompt)}. The tracker upload will be skipped until required values are supplied.[/yellow]"
+        )
+        return
+
+    logger.info("\n[bold yellow]MUSIC metadata required or requiring confirmation:[/bold yellow]")
+    changed = False
+    labels = {"artist": "main artist(s), separated by &", "album": "album title", "year": "original release year", "edition_year": "edition/remaster year"}
+    try:
+        for field in fields_to_prompt:
+            if field in labels:
+                if field in {"year", "edition_year"}:
+                    while True:
+                        current = str(_music_field(meta, field) or "")
+                        prompt = f"Enter {labels[field]}" + (f" (current: {current})" if current else "") + " (leave blank to keep/skip): "
+                        value = (CLI_UI.ask_string(prompt) or "").strip()
+                        if not value:
+                            break
+                        if value.isdigit() and len(value) == 4 and 1000 <= int(value) <= 3000:
+                            _set_music_field(meta, field, int(value))
+                            changed = True
+                            break
+                        logger.info("[red]Invalid year (must be a 4-digit number between 1000 and 3000).[/red]")
+                else:
+                    value = (CLI_UI.ask_string(f"Enter {labels[field]} (leave blank to skip): ") or "").strip()
+                    if value:
+                        _set_music_field(meta, field, value)
+                        changed = True
+            elif field == "media":
+                value = CLI_UI.ask_choice("Select source media:", choices=list(MUSIC_MEDIA_CHOICES), sort=False)
+                if value:
+                    _set_music_field(meta, field, value)
+                    changed = True
+            elif field == "release_type":
+                value = CLI_UI.ask_choice("Select release type:", choices=list(MUSIC_RELEASE_TYPE_CHOICES), sort=False)
+                if value:
+                    _set_music_field(meta, field, value)
+                    changed = True
+            elif field == "cover_url":
+                while True:
+                    value = (CLI_UI.ask_string("Enter public album-art URL for Orpheus (https://...; leave blank to skip): ") or "").strip()
+                    if not value:
+                        break
+                    if _is_http_url(value):
+                        _set_music_field(meta, field, value)
+                        changed = True
+                        break
+                    logger.info("[red]Invalid artwork URL (must be an HTTP or HTTPS link).[/red]")
+    except EOFError:
+        logger.info("[yellow]Input cancelled — continuing with missing music fields.[/yellow]")
+        return
+
+    if changed:
+        await _write_music_snapshot(meta)
+        year = f" [{meta.year}]" if meta.year else ""
+        media = str(_music_field(meta, "media") or "")
+        meta.name_notag = f"{meta.artist} - {meta.title}{year} [{media} {meta.format}]".strip()
+        meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
+
+
 def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
     """Count non-poster PNG screenshots for a BOOK upload and cap the upload minimum.
 
@@ -837,6 +1050,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
     if meta.category == "GAME":
         await _prompt_game_meta(meta)
+
+    if meta.category == "MUSIC":
+        await _prompt_music_meta(meta)
 
     meta = await gen_desc(meta, takescreens_manager, uploadscreens_manager)
 
@@ -1114,7 +1330,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                 elif meta.path_to_menu_screenshots or config["DEFAULT"].get("auto_dvd_menus", False):
                     await process_disc_menus(meta, config)
 
-            if meta.audio_spectrogram or meta.audio_spectrogram_tracks or config["DEFAULT"].get("add_audio_spectrogram", False):
+            if meta.category != "MUSIC" and (meta.audio_spectrogram or meta.audio_spectrogram_tracks or config["DEFAULT"].get("add_audio_spectrogram", False)):
                 try:
                     await process_audio_spectrograms(meta, config, uploadscreens_manager)
                 except Exception as e:
@@ -1122,7 +1338,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
             # Take Screenshots
             try:
-                if meta.is_disc == "BDMV":
+                if meta.category == "MUSIC":
+                    logger.debug("[cyan]MUSIC: skipping video screenshots and MediaInfo-dependent image processing.[/cyan]")
+                elif meta.is_disc == "BDMV":
                     use_vs = meta.vapoursynth
                     try:
                         await takescreens_manager.disc_screenshots(meta, bdmv_filename, bdinfo, meta.uuid, base_dir, use_vs, meta.image_list, meta.ffdebug, 0)
@@ -1159,7 +1377,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                         cleanup_manager.reset_terminal()
                         raise Exception(f"Error during screenshot capture: {e}") from e
 
-                else:
+                elif meta.category != "MUSIC":
                     try:
                         logger.debug(f"videopath: {videopath}, filename: {filename}, meta: {meta.uuid}, base_dir: {base_dir}, manual_frames: {manual_frames}")
 
@@ -1211,6 +1429,8 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
             if "image_list" not in meta:
                 meta.image_list = []
+            if meta.category == "MUSIC":
+                await _host_orpheus_music_cover(meta, uploadscreens_manager)
             manual_frames_str = meta.manual_frames
             if isinstance(manual_frames_str, str):
                 manual_frames_list = [f.strip() for f in manual_frames_str.split(",") if f.strip()]
@@ -1221,7 +1441,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             if manual_frames_count > 0:
                 meta.screens = manual_frames_count
             cutoff = meta.cutoff
-            if len(meta.image_list) < cutoff and meta.skip_imghost_upload is False and meta.category != "GAME":
+            if len(meta.image_list) < cutoff and meta.skip_imghost_upload is False and meta.category not in ("GAME", "MUSIC"):
                 # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
                 trackers_with_image_host_requirements = {
                     "AURA4K",
@@ -2228,7 +2448,14 @@ async def do_the_thing(base_dir: str) -> None:
 
                     if "queue" in meta and meta.queue is not None:
                         processed_files_count += 1
-                        if "limit_queue" in meta and meta.limit_queue > 0:
+                        tracker_statuses = [status for status in meta.tracker_status.values() if isinstance(status, Mapping)]
+                        upload_succeeded = any(status.get("upload_success") is True for status in tracker_statuses)
+                        if not upload_succeeded and not meta.debug:
+                            skipped_files_count += 1
+                            logger.info(f"[yellow]Processed {processed_files_count}/{total_files} files; no tracker upload succeeded.[/yellow]")
+                        elif meta.debug:
+                            logger.info(f"[cyan]Processed {processed_files_count}/{total_files} files in debug mode; no tracker upload was attempted.[/cyan]")
+                        elif "limit_queue" in meta and meta.limit_queue > 0:
                             logger.info(f"[cyan]Successfully uploaded {processed_files_count - skipped_files_count} of {meta.limit_queue} in limit with {total_files} files.")
                         else:
                             logger.info(f"[cyan]Successfully uploaded {processed_files_count - skipped_files_count}/{total_files} files.")

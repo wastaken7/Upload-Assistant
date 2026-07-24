@@ -102,6 +102,8 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "twitch_client_id": (str,),
     "twitch_client_secret": (str,),
     "upload_order": (str,),
+    "music_enrichment_enabled": (bool,),
+    "music_discogs_token": (str,),
 }
 
 # Valid image hosts

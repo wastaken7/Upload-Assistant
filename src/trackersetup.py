@@ -45,6 +45,7 @@ from src.trackers.NEXUSPHP.ptcafe import PTCafe
 from src.trackers.NEXUSPHP.ptfans import PTFans
 from src.trackers.NEXUSPHP.ptgtk import PTGTK
 from src.trackers.NEXUSPHP.railgunpt import RailgunPT
+from src.trackers.orpheus import Orpheus
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackers.pterclub import PTerClub
 from src.trackers.ptskit import Ptskit
@@ -751,10 +752,10 @@ class TrackerSetup:
                 if not url:
                     return False
                 requests = await self.bhd_request_check(meta, tracker_name, url)
-            elif tracker_name.upper() in ("AMIGOSSHARE", "BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD", "MTEAM"):
+            elif tracker_name.upper() in ("AMIGOSSHARE", "BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD", "MTEAM", "ORPHEUS"):
                 # These trackers have custom request handling
                 requests = cast(list[JsonDict], await tracker_instance.get_requests(meta))
-                return False
+                return bool(requests) if tracker_name.upper() == "ORPHEUS" else False
             else:
                 if not url:
                     return False
@@ -1372,6 +1373,7 @@ tracker_class_map: dict[str, Any] = {
     "NEBULANCE": Nebulance,
     "ONLYENCODES": OnlyEncodes,
     "OLDTOONSWORLD": OldToonsWorld,
+    "ORPHEUS": Orpheus,
     "PRIVATEHD": PrivateHD,
     "PORTUGAS": Portugas,
     "PTCAFE": PTCafe,

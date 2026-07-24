@@ -21,6 +21,7 @@ class Meta:
     ant_user_tags: bool | None = None
     ant: int | None = None
     archive_password: str | None = None
+    artist: str = ""
     args_line_queue: bool | None = None
     asian: bool = False
     asin: str = ""
@@ -242,6 +243,21 @@ class Meta:
     mkbrr_threads: str | int | None = None
     mkbrr: bool = False
     mode: str = ""
+    music_album: str = ""
+    music_artist: str = ""
+    music_catalogue_number: str = ""
+    music_cover: str = ""
+    music_discogs_id: str = ""
+    music_discogs_master_id: str = ""
+    music_discogs_release_id: str = ""
+    music_edition_year: int = 0
+    music_enrichment: bool | None = None
+    music_genres: str = ""
+    music_label: str = ""
+    music_media: str = ""
+    music_release_type: str = ""
+    music_release_year: int = 0
+    music_release: dict[str, Any] = field(default_factory=dict)
     modq: bool = False
     mteam_description: str = ""
     mtv_timeout: bool | None = None

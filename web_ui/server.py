@@ -1293,6 +1293,17 @@ def _book_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: s
     return ""
 
 
+def _music_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: str) -> str:
+    """Return a public cover URL or the authenticated local-preview endpoint."""
+    for key in ("cover", "poster"):
+        candidate = _stringify_preview_value(meta_data.get(key))
+        if _is_http_url(candidate):
+            return candidate
+    if _find_execution_preview_cover_file(preview_session_id) is not None:
+        return f"/api/execution_preview_cover?session_id={preview_session_id}"
+    return ""
+
+
 def _is_http_url(value: str) -> bool:
     return value.startswith(("http://", "https://"))
 
@@ -1504,17 +1515,139 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
             isbn_value,
         )
 
+    if category == "MUSIC":
+        music_release = meta_data.get("music_release")
+        fields = music_release.get("fields", {}) if isinstance(music_release, Mapping) else {}
+        external_ids = music_release.get("external_ids", {}) if isinstance(music_release, Mapping) else {}
+        musicbrainz_release = ""
+        if isinstance(fields, Mapping):
+            musicbrainz_entry = fields.get("musicbrainz_release", {})
+            if isinstance(musicbrainz_entry, Mapping):
+                musicbrainz_release = _stringify_preview_value(musicbrainz_entry.get("value"))
+        if not musicbrainz_release and isinstance(external_ids, Mapping):
+            musicbrainz_release = _stringify_preview_value(external_ids.get("musicbrainz_release"))
+        if musicbrainz_release:
+            _append_metadata_source(
+                sources,
+                seen_keys,
+                "musicbrainz",
+                "MusicBrainz",
+                musicbrainz_release,
+                f"https://musicbrainz.org/release/{quote(musicbrainz_release)}",
+            )
+
     return sources
+
+
+def _music_preview_from_meta(meta_data: Mapping[str, object]) -> dict[str, object]:
+    """Extract display-safe MUSIC data from the normalized release snapshot."""
+    release = meta_data.get("music_release")
+    if not isinstance(release, Mapping):
+        return {}
+    fields = release.get("fields", {}) if isinstance(release.get("fields"), Mapping) else {}
+    tracks = release.get("tracks", []) if isinstance(release.get("tracks"), Sequence) else []
+    auxiliary = release.get("auxiliary", {}) if isinstance(release.get("auxiliary"), Mapping) else {}
+    warnings = release.get("warnings", []) if isinstance(release.get("warnings"), Sequence) else []
+    conflicts = release.get("conflicts", {}) if isinstance(release.get("conflicts"), Mapping) else {}
+
+    def field_value(name: str, fallback: object = "") -> object:
+        entry = fields.get(name, {}) if isinstance(fields, Mapping) else {}
+        if isinstance(entry, Mapping) and entry.get("value") not in (None, "", [], {}):
+            return entry["value"]
+        return fallback
+
+    def source(name: str) -> str:
+        entry = fields.get(name, {}) if isinstance(fields, Mapping) else {}
+        raw = _stringify_preview_value(entry.get("source")) if isinstance(entry, Mapping) else ""
+        return {
+            "file_tag": "File tags",
+            "auxiliary": "Auxiliary files",
+            "directory": "Folder name",
+            "external": "External metadata",
+            "user": "User input",
+            "tracker": "Tracker",
+            "inferred": "Inferred",
+        }.get(raw, "")
+
+    def text(name: str, fallback: object = "") -> str:
+        value = field_value(name, fallback)
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            return " & ".join(_stringify_preview_value(item) for item in value if _stringify_preview_value(item))
+        return _stringify_preview_value(value)
+
+    def technical_values(key: str, formatter: Callable[[object], str]) -> str:
+        values = {track.get(key) for track in tracks if isinstance(track, Mapping) and track.get(key) not in (None, "")}
+        if not values:
+            return ""
+        try:
+            ordered = sorted(values)
+        except TypeError:
+            ordered = sorted(values, key=str)
+        rendered = [formatter(value) for value in ordered]
+        return ", ".join(rendered) if len(rendered) <= 2 else f"{len(rendered)} variants"
+
+    formats = technical_values("format", _stringify_preview_value)
+    codecs = technical_values("codec", _stringify_preview_value)
+    if formats.casefold() == codecs.casefold():
+        codecs = ""
+    bit_depth = technical_values("bit_depth", lambda value: f"{value}-bit")
+    sample_rate = technical_values("sample_rate", lambda value: f"{int(value) / 1000:g} kHz")
+    channels = technical_values(
+        "channels",
+        lambda value: {1: "Mono", 2: "Stereo"}.get(int(value), f"{value} channels"),
+    )
+    bitrate = technical_values("bitrate", lambda value: f"{round(int(value) / 1000)} kbps")
+    technical = " / ".join(item for item in (formats or text("format", meta_data.get("format")), codecs, bit_depth, sample_rate, channels, bitrate) if item)
+
+    sidecars: list[str] = []
+    for label, key in (("log", "logs"), ("cue", "cues"), ("NFO", "nfos"), ("playlist", "playlists"), ("SFV", "sfvs"), ("artwork", "artwork"), ("scan", "scans")):
+        items = auxiliary.get(key, []) if isinstance(auxiliary, Mapping) else []
+        count = len(items) if isinstance(items, Sequence) and not isinstance(items, (str, bytes, bytearray)) else 0
+        if count:
+            sidecars.append(f"{count} {label}{'' if count == 1 else 's'}")
+
+    genres_value = field_value("genres", [])
+    genres = _string_list_preview_values(genres_value)
+    artist = text("artists", field_value("artist", meta_data.get("artist", "")))
+    return {
+        "artist": artist,
+        "artist_source": source("artists") or source("artist"),
+        "album": text("album", meta_data.get("title", "")),
+        "album_source": source("album"),
+        "original_year": text("year", meta_data.get("year", "")),
+        "year_source": source("year"),
+        "release_type": text("release_type"),
+        "release_type_source": source("release_type"),
+        "media": text("media", meta_data.get("source", "")),
+        "media_source": source("media"),
+        "technical": technical,
+        "track_count": text("track_count", len(tracks)),
+        "disc_count": text("disc_count", 1),
+        "release_year": text("release_year"),
+        "retail_date": text("retail_date"),
+        "release_label": text("release_label"),
+        "release_catalogue_number": text("release_catalogue_number"),
+        "edition": text("edition"),
+        "edition_year": text("edition_year"),
+        "genres": genres,
+        "auxiliary": sidecars,
+        "warnings": [_stringify_preview_value(item) for item in warnings[:5] if _stringify_preview_value(item)],
+        "conflicts": [str(name).replace("_", " ") for name in sorted(conflicts)[:5]],
+    }
 
 
 def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: str) -> ExecutionPreview:
     title = _stringify_preview_value(meta_data.get("title")) or _stringify_preview_value(meta_data.get("name"))
     original_title = _stringify_preview_value(meta_data.get("original_title"))
+    category = _stringify_preview_value(meta_data.get("category")).upper()
     poster_url = _stringify_preview_value(meta_data.get("poster"))
+    if category == "MUSIC":
+        poster_url = _music_cover_from_meta(meta_data, _stringify_preview_value(meta_data.get("webui_session_id")))
     tmdb_poster = _stringify_preview_value(meta_data.get("tmdb_poster"))
     if not poster_url and tmdb_poster:
         poster_url = tmdb_poster if tmdb_poster.startswith("http") else f"https://image.tmdb.org/t/p/w500{tmdb_poster}"
-    genres = _string_list_preview_values(meta_data.get("genres"))
+    music = _music_preview_from_meta(meta_data)
+    genres = _string_list_preview_values(meta_data.get("genres")) or list(music.get("genres", []))
     networks = _string_list_preview_values(meta_data.get("networks"))
     audiobook_bitrate = _stringify_preview_value(meta_data.get("audiobook_bitrate"))
     if audiobook_bitrate.isdigit():
@@ -1524,7 +1657,7 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
     return {
         "path": _stringify_preview_value(meta_data.get("path")) or fallback_path,
         "filename": Path(fallback_path).name,
-        "title": title,
+        "title": title or _stringify_preview_value(music.get("album")),
         "original_title": original_title,
         "year": _stringify_preview_value(meta_data.get("year")),
         "category": _stringify_preview_value(meta_data.get("category")),
@@ -1563,6 +1696,7 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
         "game_region": _stringify_preview_value(meta_data.get("game_region")),
         "game_system": _stringify_preview_value(meta_data.get("game_system")),
         "developer": _stringify_preview_value(meta_data.get("developer")),
+        "music": music,
         "awaiting_input": False,
         "input_type": None,
     }
@@ -1587,6 +1721,8 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
                         meta_data = enriched_meta
                     except Exception as err:
                         console.print(f"Execution preview cover enrichment failed for session {session_id}: {err}", markup=False)
+            if _stringify_preview_value(meta_data.get("category")).upper() == "MUSIC":
+                meta_data = {**meta_data, "webui_session_id": session_id}
             preview = _extract_execution_preview(meta_data, execution_path)
             preview["awaiting_input"] = bool(process_info.get("awaiting_input"))
             preview["input_type"] = process_info.get("input_type")
@@ -1637,6 +1773,7 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
         "game_region": "",
         "game_system": "",
         "developer": "",
+        "music": {},
         "awaiting_input": bool(process_info.get("awaiting_input")),
         "input_type": process_info.get("input_type"),
         "progress": _progress_items_for_process(process_info),
@@ -1654,15 +1791,42 @@ def _find_execution_preview_cover_file(session_id: str) -> Path | None:
         candidate_dirs.append(Path(__file__).parent.parent / "tmp" / meta_uuid)
     candidate_dirs.append(Path(__file__).parent.parent / "tmp" / Path(execution_path).name)
 
+    # A music sidecar cover may stay beside the release, while embedded art is
+    # extracted into tmp/MUSIC_COVER.*.  Never serve an arbitrary configured
+    # path: accept it only when it is inside this release's selected root.
+    if isinstance(resolved_meta, Mapping):
+        cover_path = _stringify_preview_value(resolved_meta.get("cover_path"))
+        if cover_path:
+            try:
+                candidate = Path(cover_path).resolve()
+                release_path = Path(execution_path).resolve()
+                release_root = release_path if release_path.is_dir() else release_path.parent
+                candidate.relative_to(release_root)
+                if candidate.is_file() and candidate.suffix.casefold() in {".jpg", ".jpeg", ".png", ".webp"}:
+                    return candidate
+            except OSError, ValueError:
+                pass
+
     seen: set[str] = set()
     for tmp_dir in candidate_dirs:
         tmp_dir_key = str(tmp_dir)
         if tmp_dir_key in seen or not tmp_dir.exists():
             continue
         seen.add(tmp_dir_key)
-        for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg", "cover.jpg", "cover.png"):
+        for filename in (
+            "MUSIC_COVER.jpg",
+            "MUSIC_COVER.png",
+            "MUSIC_COVER.webp",
+            "POSTER.png",
+            "poster.png",
+            "POSTER.jpg",
+            "poster.jpg",
+            "cover.jpg",
+            "cover.png",
+            "cover.webp",
+        ):
             candidate = tmp_dir / filename
-            if candidate.exists():
+            if candidate.is_file():
                 return candidate
     return None
 
@@ -1744,6 +1908,7 @@ class ExecutionPreview(TypedDict, total=False):
     game_region: str
     game_system: str
     developer: str
+    music: dict[str, object]
     awaiting_input: bool
     input_type: str | None
     progress: list[ProgressItem]

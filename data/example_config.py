@@ -430,6 +430,15 @@ config: dict[str, Any] = {
         # regardless of whether the tracker was selected for upload or not (needs cross-seeding above to be True)
         "cross_seed_check_everything": False,
 
+        # Use MusicBrainz only as corroborating metadata. Local file tags remain
+        # authoritative and no external lookup is made unless this is enabled.
+        "music_enrichment_enabled": False,
+
+        # Optional Discogs personal access token. A supplied --music-discogs-id
+        # performs a bounded read-only lookup; this token raises Discogs API
+        # limits but is never written to release metadata or logs.
+        "music_discogs_token": "",
+
     },
 
     # these are used for DB links on ALPHARATIO
@@ -449,7 +458,7 @@ config: dict[str, Any] = {
         # Available tracker: AURA4K, ASIANCINEMA, AITHER, ANTHELION, ALPHARATIO, AMIGOSSHARE, AVISTAZ, BEYONDHD, BITHDTV, BJSHARE, BLUTOPIA, BRASILTRACKER, CAPYBARABR, CURUPIRA, SUIO, CINEMAZ, DIGITALCORE, DRUNKENSLUG, DARKPEERS, DESITORRENTS, EMUWAREZ, FUNFILE, FILELIST,
         # GREATPOSTERWALL, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK, HAWKEUNO, INFINITYHD, IMMORTALSEED, ITATORRENTS, LAJIDUI, LOCADORA, LASTDIGITALUNDERGROUND, LONGPT, LST, LATTEAM, LUMINARR, MIDNIGHTSCENE, MTEAM, MORETHANTV, NEBULANCE, ONLYENCODES,
         # OLDTOONSWORLD, PRIVATEHD, PORTUGAS, PTCAFE, PTERCLUB, PTFANS, PTGTK, PASSTHEPOPCORN, PTSKIT, POLISHTORRENT, RACING4EVERYONE, RASTASTUGAN, REELFLIX, RAILGUNPT, RETROFLIX, SAMARITANO, SHAREISLAND, SWARMAZON, SEEDPOOL, SPEEDAPP, SKIPTHECOMMERCIALS, TORRENTHR,
-        # CINEMATIK, TORRENTLEECH, THELEACHZONE, THEOLDSCHOOL, TOTHEGLORY, TORRENTEROS, TVCHAOSUK, ULCX, UTOPIA, YUSCENE, ZENITH
+        # CINEMATIK, ORPHEUS, TORRENTLEECH, THELEACHZONE, THEOLDSCHOOL, TOTHEGLORY, TORRENTEROS, TVCHAOSUK, ULCX, UTOPIA, YUSCENE, ZENITH
 
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
@@ -1718,6 +1727,14 @@ config: dict[str, Any] = {
             "use_bluray_images": True,
             "bluray_image_size": "",
             "add_audio_spectrogram": True,
+            "inject_delay": 0,
+        },
+        "ORPHEUS": {
+            # Orpheus Gazelle API token. Do not commit a real token.
+            "api_key": "",
+            "base_url": "https://orpheus.network",
+            # Obtain from https://orpheus.network/upload.php
+            "announce_url": "",
             "inject_delay": 0,
         },
         "PASSTHEPOPCORN": {

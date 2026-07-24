@@ -861,6 +861,10 @@ const metadataProviderStyles = {
     light: "border-orange-300 bg-transparent text-orange-900",
     dark: "border-orange-900/80 bg-transparent text-orange-100",
   },
+  musicbrainz: {
+    light: "border-[#BA478F] bg-transparent text-[#7D205D]",
+    dark: "border-[#BA478F]/75 bg-transparent text-[#F4C7E4]",
+  },
   default: {
     light: "border-gray-300 bg-transparent text-gray-900",
     dark: "border-gray-700 bg-transparent text-gray-100",
@@ -891,6 +895,10 @@ const metadataProviderIcons = {
   openlibrary: {
     src: "/static/img/providers/openlibrary.svg",
     alt: "Open Library",
+  },
+  musicbrainz: {
+    src: "/static/img/providers/musicbrainz.ico",
+    alt: "MusicBrainz",
   },
   steam: { src: "/static/img/providers/steam.svg", alt: "Steam" },
   tvmaze: { src: "/static/img/providers/tvmaze.svg", alt: "TVMaze" },
@@ -3129,6 +3137,7 @@ function AudionutsUAGUI() {
       category === "TV"
         ? media?.episode_overview || media?.overview
         : media?.overview;
+    const music = media?.music || {};
 
     const detailRows = (rows) => rows.filter((row) => row.value);
     const renderDetailGrid = (title, rows) => {
@@ -3224,6 +3233,77 @@ function AudionutsUAGUI() {
       { label: "Region", value: media?.game_region },
       { label: "System", value: media?.game_system },
     ]);
+    const musicRows = detailRows([
+      {
+        label: "Artist",
+        value: music?.artist
+          ? `${music.artist}${music.artist_source ? ` (${music.artist_source})` : ""}`
+          : "",
+      },
+      {
+        label: "Album",
+        value: music?.album
+          ? `${music.album}${music.album_source ? ` (${music.album_source})` : ""}`
+          : "",
+      },
+      {
+        label: "Original Year",
+        value: music?.original_year
+          ? `${music.original_year}${music.year_source ? ` (${music.year_source})` : ""}`
+          : "",
+      },
+      {
+        label: "Release Type",
+        value: music?.release_type
+          ? `${music.release_type}${music.release_type_source ? ` (${music.release_type_source})` : ""}`
+          : "",
+      },
+      {
+        label: "Media",
+        value: music?.media
+          ? `${music.media}${music.media_source ? ` (${music.media_source})` : ""}`
+          : "",
+      },
+      { label: "Audio", value: music?.technical || media?.audio },
+      {
+        label: "Tracks / Discs",
+        value:
+          music?.track_count || music?.disc_count
+            ? `${music.track_count || "?"} / ${music.disc_count || "1"}`
+            : "",
+      },
+      {
+        label: "This Release",
+        value: [
+          music?.release_year,
+          music?.retail_date,
+          music?.release_label,
+          music?.release_catalogue_number,
+        ]
+          .filter(Boolean)
+          .join(" • "),
+      },
+      {
+        label: "Edition",
+        value: [music?.edition, music?.edition_year]
+          .filter(Boolean)
+          .join(" • "),
+      },
+    ]);
+    const musicCheckRows = detailRows([
+      {
+        label: "Auxiliary Files",
+        value: Array.isArray(music?.auxiliary)
+          ? music.auxiliary.join(", ")
+          : "",
+      },
+      {
+        label: "Metadata Conflicts",
+        value: Array.isArray(music?.conflicts)
+          ? music.conflicts.join(", ")
+          : "",
+      },
+    ]);
     let categorySection = null;
     if (category === "TV")
       categorySection = renderDetailGrid("TV Details", tvRows);
@@ -3231,6 +3311,8 @@ function AudionutsUAGUI() {
       categorySection = renderDetailGrid("Book Details", bookRows);
     else if (category === "GAME")
       categorySection = renderDetailGrid("Game Details", gameRows);
+    else if (category === "MUSIC")
+      categorySection = renderDetailGrid("Music Details", musicRows);
     else categorySection = renderDetailGrid("Movie Details", movieRows);
 
     return (
@@ -3365,15 +3447,37 @@ function AudionutsUAGUI() {
 
               {categorySection}
 
+              {category === "MUSIC" &&
+                renderDetailGrid("Release Checks", musicCheckRows)}
+
+              {category === "MUSIC" &&
+                Array.isArray(music?.warnings) &&
+                music.warnings.length > 0 && (
+                  <div
+                    className={`rounded-xl p-3 border ${isDarkMode ? "bg-amber-950/30 border-amber-900 text-amber-100" : "bg-amber-50 border-amber-200 text-amber-900"}`}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide mb-2">
+                      Music Validation
+                    </p>
+                    <ul className="space-y-1 text-xs leading-5">
+                      {music.warnings.map((warning, index) => (
+                        <li key={`${warning}-${index}`}>• {warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
               <div
                 className={`rounded-xl p-3 ${isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-50 border border-gray-200"}`}
               >
                 <p
                   className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
                 >
-                  {category === "TV" && media?.episode_overview
-                    ? "Episode Overview"
-                    : "Overview"}
+                  {category === "MUSIC"
+                    ? "Release Notes"
+                    : category === "TV" && media?.episode_overview
+                      ? "Episode Overview"
+                      : "Overview"}
                 </p>
                 <p
                   className={`text-sm leading-6 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
@@ -3381,7 +3485,9 @@ function AudionutsUAGUI() {
                   {overviewText ||
                     (media?.status === "waiting"
                       ? "Metadata will appear here as soon as Upload-Assistant writes the first meta snapshot."
-                      : "No overview available for this item.")}
+                      : category === "MUSIC"
+                        ? "No release notes were supplied. Review the music details and validation above before continuing."
+                        : "No overview available for this item.")}
                 </p>
               </div>
 
@@ -3810,7 +3916,7 @@ function AudionutsUAGUI() {
               <div
                 ref={richOutputRef}
                 id="rich-output"
-                className={`flex-1 rounded-lg overflow-auto p-2 border text-sm ${isDarkMode ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+                className="flex-1 rounded-lg overflow-auto p-2 border text-sm bg-black border-gray-700 text-white"
               ></div>
               {isExecuting && (
                 <div
@@ -4638,7 +4744,7 @@ function AudionutsUAGUI() {
             <div
               ref={richOutputRef}
               id="rich-output"
-              className={`flex-1 rounded-lg overflow-auto p-3 border ${isDarkMode ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+              className="flex-1 rounded-lg overflow-auto p-3 border bg-black border-gray-700 text-white"
             ></div>
             {isExecuting && (
               <div

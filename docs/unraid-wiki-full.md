@@ -65,7 +65,7 @@ docker run \
   -v '/mnt/user/share_media':'/data':'rw' \
   -v '/mnt/user/appdata/upload-assistant/config.py':'/Upload-Assistant/data/config.py':'rw' \
   -v '/mnt/user/appdata/qbittorrent/qBittorrent/BT_backup/':'/BT_backup':'rw' \
-  -v '/mnt/user/appdata/upload-assistant/tmp':'/Upload-Assistant/tmp':'rw' 'ghcr.io/audionut/upload-assistant:latest' \
+  -v '/mnt/user/appdata/upload-assistant/tmp':'/Upload-Assistant/tmp':'rw' 'ghcr.io/wastaken7/upload-assistant:latest' \
   -f /dev/null
 docker exec -it upload-assistant-cli /bin/sh
 ## After this, you can python3 upload.py --help
@@ -98,7 +98,7 @@ Next replace it with
 ```
 services:
   upload-assistant-cli:
-    image: ghcr.io/audionut/upload-assistant:latest
+    image: ghcr.io/wastaken7/upload-assistant:latest
     container_name: upload-assistant-cli
     restart: unless-stopped
     networks:

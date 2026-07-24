@@ -28,6 +28,7 @@ try:
     from src.is_scene import SceneManager
     from src.languages import languages_manager
     from src.metadata_searching import MetadataSearchingManager
+    from src.music.prep import gather_music_prep as _gather_music_prep_fn
     from src.prep_game import gather_game_prep as _gather_game_prep_fn
     from src.prep_game import resolve_game_filelist as _resolve_game_filelist_fn
     from src.radarr import RadarrManager
@@ -105,6 +106,10 @@ class Prep:
         """Delegate to :func:`src.prep_game.gather_game_prep`."""
         await _gather_game_prep_fn(meta, videopath, base_dir, self.config)
 
+    async def _gather_music_prep(self, meta: Meta) -> None:
+        """Run the non-destructive MUSIC pipeline instead of video preparation."""
+        await _gather_music_prep_fn(meta, self.config)
+
     async def gather_prep(self, meta: Meta, mode: str) -> Meta:
         meta_start_time = time.time()
 
@@ -113,6 +118,17 @@ class Prep:
 
         # 2. Disc and Category Detection
         videoloc, bdinfo = await prep_helpers.detect_disc_and_category(self, meta)
+
+        # Music has its own release-oriented metadata pipeline.  It must not flow
+        # through video/media-info, TMDB, screenshots or episode handling. It
+        # still needs the shared tracker/client stage: qBittorrent path matching
+        # supplies an existing infohash, which the later base-torrent reuse
+        # stage exports and validates without rehashing the music release.
+        if meta.category == "MUSIC":
+            await self._gather_music_prep(meta)
+            await prep_helpers.process_trackers_and_torrent(self, meta, client, hash_ids, tracker_ids, "", "")
+            logger.debug(f"Music metadata processed in {time.time() - meta_start_time:.2f} seconds")
+            return meta
 
         # 3. File information and basic media processing
         filename, untouched_filename, videopath, search_term, search_file_folder, mi, video = await prep_helpers.process_media_files(self, meta, videoloc, bdinfo)
@@ -160,6 +176,11 @@ class Prep:
         if meta.manual_category:
             manual_category = meta.manual_category
             return manual_category.upper() if isinstance(manual_category, str) else None
+
+        music_extensions = {".flac", ".mp3", ".m4a", ".aac", ".ac3", ".dts", ".wav", ".aiff", ".alac", ".ogg", ".opus", ".ape", ".wv"}
+        candidate = Path(meta.path or "")
+        if candidate.suffix.lower() in music_extensions:
+            return "MUSIC"
 
         path_patterns = [
             r"(?i)[\\/](?:tv|tvshows|tv.shows|series|shows)[\\/]",

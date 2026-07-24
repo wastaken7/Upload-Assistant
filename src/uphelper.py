@@ -22,6 +22,130 @@ from src.trackersetup import tracker_class_map
 DupeEntry = dict[str, Any]
 
 
+def _music_confirmation_lines(meta: Meta, missing_warning: str) -> list[tuple[str, str] | str]:
+    """Build a concise, tracker-neutral MUSIC review for the confirmation UI.
+
+    Music analysis intentionally remains in ``meta.music_release`` so tracker
+    adapters can use the full provenance-rich model.  The confirmation prompt
+    should expose the important parts of that analysis without printing local
+    paths, complete tags, or an unbounded list of warnings.
+    """
+    release = meta.music_release if isinstance(meta.music_release, dict) else {}
+    fields = release.get("fields", {}) if isinstance(release.get("fields"), dict) else {}
+    tracks = release.get("tracks", []) if isinstance(release.get("tracks"), list) else []
+    auxiliary = release.get("auxiliary", {}) if isinstance(release.get("auxiliary"), dict) else {}
+    warnings = release.get("warnings", []) if isinstance(release.get("warnings"), list) else []
+    conflicts = release.get("conflicts", {}) if isinstance(release.get("conflicts"), dict) else {}
+
+    def value(name: str, fallback: Any = "") -> Any:
+        entry = fields.get(name, {})
+        if isinstance(entry, dict) and entry.get("value") not in (None, "", [], {}):
+            return entry["value"]
+        return fallback
+
+    def source(name: str) -> str:
+        entry = fields.get(name, {})
+        source_name = entry.get("source", "") if isinstance(entry, dict) else ""
+        return {
+            "file_tag": "tags",
+            "auxiliary": "auxiliary files",
+            "directory": "folder name",
+            "external": "external metadata",
+            "user": "user input",
+            "tracker": "tracker",
+            "inferred": "inferred",
+        }.get(str(source_name), "")
+
+    def display(name: str, fallback: Any = "") -> str:
+        item = value(name, fallback)
+        if isinstance(item, list):
+            item = " & ".join(str(part) for part in item)
+        text = str(item).strip()
+        provenance = source(name)
+        return escape(text) + (f" [dim]({provenance})[/dim]" if text and provenance else "")
+
+    def technical_values(key: str, formatter: Callable[[Any], str]) -> str:
+        values = sorted({track.get(key) for track in tracks if isinstance(track, dict) and track.get(key) not in (None, "")})
+        if not values:
+            return ""
+        rendered = [formatter(item) for item in values]
+        return ", ".join(rendered) if len(rendered) <= 2 else f"{len(rendered)} variants"
+
+    artist = display("artists", value("artist", meta.artist))
+    album = display("album", meta.title)
+    year = display("year", meta.year)
+    media = display("media", meta.source)
+    release_type = display("release_type")
+    format_name = display("format", meta.format)
+    formats = technical_values("format", str)
+    codecs = technical_values("codec", str)
+    bit_depth = technical_values("bit_depth", lambda item: f"{item}-bit")
+    sample_rate = technical_values("sample_rate", lambda item: f"{int(item) / 1000:g} kHz")
+    channels = technical_values("channels", lambda item: {1: "Mono", 2: "Stereo"}.get(int(item), f"{item} channels"))
+    bitrate = technical_values("bitrate", lambda item: f"{round(int(item) / 1000)} kbps")
+    # Container and codec are commonly both "FLAC"; repeating them adds no
+    # review value, while different values (for example M4A / AAC) stay clear.
+    if formats.casefold() == codecs.casefold():
+        codecs = ""
+    technical = " / ".join(part for part in (formats or format_name, codecs, bit_depth, sample_rate, channels, bitrate) if part)
+
+    disc_count = value("disc_count", 1)
+    track_count = value("track_count", len(tracks))
+    edition = display("edition")
+    edition_year = display("edition_year")
+    release_year = display("release_year")
+    retail_date = display("retail_date")
+    release_label = display("release_label")
+    release_catalogue = display("release_catalogue_number")
+    genres = display("genres")
+
+    lines: list[tuple[str, str] | str] = [
+        ("Artist", artist or missing_warning),
+        ("Album", album or missing_warning),
+        ("Original Year", year or missing_warning),
+        ("Release Type", release_type or missing_warning),
+        ("Media", media or missing_warning),
+        ("Tracks / Discs", f"{track_count or missing_warning} / {disc_count or 1}"),
+        ("Audio", technical or format_name or missing_warning),
+    ]
+    if genres:
+        lines.append(("Genre", genres))
+    if any((release_year, retail_date, release_label, release_catalogue)):
+        release_details = " / ".join(part for part in (release_year, retail_date, release_label, release_catalogue) if part)
+        lines.append(("This Release", release_details))
+    if edition:
+        edition_details = " / ".join(part for part in (edition, edition_year) if part)
+        lines.append(("Edition", edition_details))
+
+    if re.match(r"^https?://[^/]+", str(meta.cover or "").strip(), flags=re.IGNORECASE):
+        artwork = "public URL supplied"
+    elif Path(str(meta.cover_path or "")).is_file():
+        artwork = "local/embedded artwork available"
+        if meta.debug:
+            artwork += "; host upload skipped in debug"
+    else:
+        artwork = "not found (optional for Orpheus)"
+    lines.append(("Artwork", artwork))
+
+    sidecars = []
+    for label, key in (("log", "logs"), ("cue", "cues"), ("NFO", "nfos"), ("playlist", "playlists"), ("SFV", "sfvs"), ("artwork", "artwork"), ("scan", "scans")):
+        count = len(auxiliary.get(key, [])) if isinstance(auxiliary.get(key, []), list) else 0
+        if count:
+            sidecars.append(f"{count} {label}{'' if count == 1 else 's'}")
+    if sidecars:
+        lines.append(("Auxiliary", ", ".join(sidecars)))
+
+    if conflicts:
+        names = ", ".join(str(name).replace("_", " ") for name in sorted(conflicts)[:5])
+        extra = f" (+{len(conflicts) - 5})" if len(conflicts) > 5 else ""
+        lines.append(("Metadata conflicts", f"[yellow]{escape(names)}{extra}[/yellow]"))
+    if warnings:
+        preview = "; ".join(str(item) for item in warnings[:3])
+        extra = f" (+{len(warnings) - 3} more)" if len(warnings) > 3 else ""
+        lines.append(("Music validation", f"[yellow]{escape(preview)}{extra}[/yellow]"))
+    return lines
+
+
 def parse_size_to_bytes(size_str: Any) -> int | None:
     if size_str is None:
         return None
@@ -491,51 +615,53 @@ class UploadHelper:
                     lang_summary = str(languages)
                 lines.append(("Languages", lang_summary))
 
-        lines.append(("Overview", f"{meta.overview[:60]}...."))
-        if meta.category == "TV" and not meta.tv_pack and meta.auto_episode_title:
-            lines.append(("Episode Title", (meta.auto_episode_title)))
-        if meta.category == "TV" and not meta.tv_pack and meta.overview_meta:
-            lines.append(("Episode overview:", meta.overview_meta[:60] + "...."))
-        lines.append(("Genre", ", ".join(meta.genres)))
-        if meta.demographic != "":
-            lines.append(("Demographic", meta.demographic))
+        if meta.category == "MUSIC":
+            lines.extend(_music_confirmation_lines(meta, missing_warning))
+        else:
+            lines.append(("Overview", f"{meta.overview[:60]}...."))
+            if meta.category == "TV" and not meta.tv_pack and meta.auto_episode_title:
+                lines.append(("Episode Title", (meta.auto_episode_title)))
+            if meta.category == "TV" and not meta.tv_pack and meta.overview_meta:
+                lines.append(("Episode overview:", meta.overview_meta[:60] + "...."))
+            lines.append(("Genre", ", ".join(meta.genres)))
+            if meta.demographic != "":
+                lines.append(("Demographic", meta.demographic))
 
-        if meta.tmdb_id or 0 != 0:
-            lines.append(("TMDB", f"https://www.themoviedb.org/{(meta.category or '').lower()}/{meta.tmdb_id}"))
-        if meta.imdb_id or 0 != 0:
-            lines.append(("IMDB", f"https://www.imdb.com/title/tt{meta.imdb}"))
-        if meta.tvdb_id or 0 != 0:
-            lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series"))
-        if meta.tvmaze_id or 0 != 0:
-            lines.append(("TVMaze", f"https://www.tvmaze.com/shows/{meta.tvmaze_id}"))
-        if meta.mal_id or 0 != 0:
-            lines.append(("MAL", f"https://myanimelist.net/anime/{meta.mal_id}"))
+            if meta.tmdb_id or 0 != 0:
+                lines.append(("TMDB", f"https://www.themoviedb.org/{(meta.category or '').lower()}/{meta.tmdb_id}"))
+            if meta.imdb_id or 0 != 0:
+                lines.append(("IMDB", f"https://www.imdb.com/title/tt{meta.imdb}"))
+            if meta.tvdb_id or 0 != 0:
+                lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series"))
+            if meta.tvmaze_id or 0 != 0:
+                lines.append(("TVMaze", f"https://www.thetvmaze.com/shows/{meta.tvmaze_id}"))
+            if meta.mal_id or 0 != 0:
+                lines.append(("MAL", f"https://myanimelist.net/anime/{meta.mal_id}"))
 
-        resolution = meta.resolution
-        source = meta.source
-        type_ = meta.type or ""
-        tag = meta.tag or ""
-        if tag and tag.startswith("-"):
-            tag = tag[1:]
-        region = meta.region or missing_warning
-        distributor = meta.distributor or missing_warning
-        edition = meta.edition
+            resolution = meta.resolution
+            source = meta.source
+            type_ = meta.type or ""
+            tag = meta.tag or ""
+            if tag and tag.startswith("-"):
+                tag = tag[1:]
+            region = meta.region or missing_warning
+            distributor = meta.distributor or missing_warning
+            edition = meta.edition
 
-        lines.append(("Edition", edition))
-        lines.append(("Resolution", resolution))
-        lines.append(("Source", str(source)))
-        lines.append(("Type", type_))
-        lines.append(("Edition", edition))
+            lines.append(("Edition", edition))
+            lines.append(("Resolution", resolution))
+            lines.append(("Source", str(source)))
+            lines.append(("Type", type_))
 
-        if meta.category != "BOOK":
-            lines.append(("Group Tag", tag))
+            if meta.category != "BOOK":
+                lines.append(("Group Tag", tag))
 
-        if meta.is_disc:
-            lines.append(("Region", region))
-            lines.append(("Distributor", distributor))
+            if meta.is_disc:
+                lines.append(("Region", region))
+                lines.append(("Distributor", distributor))
 
-        if meta.freeleech != 0:
-            lines.append(("Freeleech", str(meta.freeleech)))
+            if meta.freeleech != 0:
+                lines.append(("Freeleech", str(meta.freeleech)))
         lines.append("")
 
         if meta.personalrelease is True:
