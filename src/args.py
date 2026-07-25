@@ -190,6 +190,7 @@ class Args:
         )
         parser.add_argument("--music-discogs-release-id", nargs=1, required=False, help="MUSIC: exact Discogs release ID or URL", dest="music_discogs_release_id")
         parser.add_argument("--music-discogs-master-id", nargs=1, required=False, help="MUSIC: Discogs master ID or URL", dest="music_discogs_master_id")
+        parser.add_argument("--no-music-discogs", dest="music_discogs_enabled", action="store_false", default=True, help="MUSIC: disable Discogs lookup and metadata")
         parser.add_argument("--music-enrich", dest="music_enrichment", action="store_true", default=None, help="MUSIC: enable bounded MusicBrainz enrichment for this run")
         parser.add_argument("--no-music-enrich", dest="music_enrichment", action="store_false", help="MUSIC: disable MusicBrainz enrichment for this run")
         parser.add_argument(
@@ -390,6 +391,7 @@ class Args:
         parser.add_argument("-hdb", "--hdb", nargs=1, required=False, help="HDBITS torrent id/link", type=str)
         parser.add_argument("-btn", "--btn", nargs=1, required=False, help="BTN torrent id/link", type=str)
         parser.add_argument("-bhd", "--bhd", nargs=1, required=False, help="BEYONDHD torrent_id/link", type=str)
+        parser.add_argument("--orpheus", nargs=1, required=False, help="Orpheus torrent id/permalink (MUSIC metadata enrichment)", type=str)
         parser.add_argument("-huno", "--huno", nargs=1, required=False, help="HAWKEUNO torrent id/link", type=str)
         parser.add_argument("-ulcx", "--ulcx", nargs=1, required=False, help="ULCX torrent id/link", type=str)
         parser.add_argument("-req", "--search_requests", action="store_true", required=False, help="Search for matching requests on supported trackers", default=None)
@@ -816,6 +818,19 @@ class Args:
                                 logger.info("[red]Continuing without --bhd")
                         else:
                             meta.bhd = value2
+
+                    elif key == "orpheus":
+                        if value2.startswith("http"):
+                            parsed = urllib.parse.urlparse(value2)
+                            torrent_id = urllib.parse.parse_qs(parsed.query).get("torrentid", [""])[0]
+                            if torrent_id.isdigit():
+                                meta.orpheus = torrent_id
+                            else:
+                                logger.info("[red]Unable to parse torrentid from --orpheus URL; pass a torrent ID or permalink.[/red]")
+                        elif value2.isdigit():
+                            meta.orpheus = value2
+                        else:
+                            logger.info("[red]Invalid --orpheus value; pass a numeric torrent ID or permalink.[/red]")
 
                     elif key == "huno":
                         if value2.startswith("http"):

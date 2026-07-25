@@ -865,6 +865,10 @@ const metadataProviderStyles = {
     light: "border-[#BA478F] bg-transparent text-[#7D205D]",
     dark: "border-[#BA478F]/75 bg-transparent text-[#F4C7E4]",
   },
+  discogs: {
+    light: "border-slate-400 bg-transparent text-slate-900",
+    dark: "border-slate-500/80 bg-transparent text-slate-100",
+  },
   default: {
     light: "border-gray-300 bg-transparent text-gray-900",
     dark: "border-gray-700 bg-transparent text-gray-100",
@@ -900,6 +904,7 @@ const metadataProviderIcons = {
     src: "/static/img/providers/musicbrainz.ico",
     alt: "MusicBrainz",
   },
+  discogs: { src: "/static/img/providers/discogs.svg", alt: "Discogs" },
   steam: { src: "/static/img/providers/steam.svg", alt: "Steam" },
   tvmaze: { src: "/static/img/providers/tvmaze.svg", alt: "TVMaze" },
 };
@@ -913,7 +918,9 @@ const renderMetadataProviderIcon = (key, isDarkMode) => {
       <img
         src={iconSrc}
         alt={iconAsset.alt}
-        className="block h-3.5 w-auto max-w-[3.75rem] object-contain"
+        className={`block h-3.5 w-auto max-w-[3.75rem] object-contain ${
+          key === "discogs" && !isDarkMode ? "invert" : ""
+        }`}
       />
     );
   }

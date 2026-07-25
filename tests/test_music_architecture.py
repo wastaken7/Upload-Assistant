@@ -14,8 +14,8 @@ from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.music.analyzer import MusicReleaseAnalyzer, _clean, _format_for
 from src.music.models import AudioTrack, MetadataSource, MusicRelease
-from src.music.prep import _apply_music_cli_overrides, _discogs_ids, _music_override_year
-from src.music.sources import DiscogsEnricher, MusicBrainzEnricher
+from src.music.prep import _apply_music_cli_overrides, _discogs_ids, _find_discogs_release, _music_override_year, enrich_music_from_orpheus
+from src.music.sources import DiscogsEnricher, MusicBrainzEnricher, _music_cache_path, _write_music_cache
 from src.prep import Prep
 from src.trackers.orpheus import Orpheus
 from src.uphelper import _music_confirmation_lines
@@ -59,6 +59,32 @@ def test_description_builder_renders_music_release_details():
     assert "96 kHz" in result
     assert "Stereo" in result
     assert "3000 kbps, 3100 kbps" in result
+
+
+def test_description_builder_renders_external_music_ids_as_links():
+    musicbrainz_release = "c0d17e85-3a36-4dc8-9a88-c188a5e78b0d"
+    musicbrainz_group = "3bdb2b21-f6f5-3f8b-a1e0-067f8bb71940"
+    meta = Meta(
+        category="MUSIC",
+        music_release={
+            "external_ids": {
+                "musicbrainz_release": musicbrainz_release,
+                "musicbrainz_release_group": musicbrainz_group,
+                "discogs_release": "https://www.discogs.com/release/1791341-example-release",
+                "discogs_master": "master/28700",
+                "invalid": "ignored",
+            },
+        },
+    )
+    builder = DescriptionBuilder("PEERGARDEN", {"DEFAULT": {}, "TRACKERS": {"PEERGARDEN": {}}})
+
+    result = builder._build_music_desc_section(meta)
+
+    assert "External IDs" in result
+    assert f"[url=https://musicbrainz.org/release/{musicbrainz_release}]{musicbrainz_release}[/url]" in result
+    assert f"[url=https://musicbrainz.org/release-group/{musicbrainz_group}]{musicbrainz_group}[/url]" in result
+    assert "[url=https://www.discogs.com/release/1791341]1791341[/url]" in result
+    assert "[url=https://www.discogs.com/master/28700]28700[/url]" in result
 
 
 def test_description_generator_includes_music_release_details():
@@ -647,6 +673,101 @@ def test_music_discogs_cli_ids_keep_user_requested_identifiers(tmp_path):
     assert release.fields["discogs_release"].source == MetadataSource.USER
 
 
+def test_no_music_discogs_cli_disables_automatic_lookup(tmp_path):
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--no-music-discogs"], Meta())
+
+    assert meta.music_discogs_enabled is False
+
+
+def test_discogs_exact_search_requires_exact_artist_and_title():
+    assert DiscogsEnricher._is_exact_release({"title": "Artist - Album"}, "Artist", "Album")
+    assert not DiscogsEnricher._is_exact_release({"title": "Artist - Album (Deluxe)"}, "Artist", "Album")
+    assert not DiscogsEnricher._is_exact_release({"title": "Another Artist - Album"}, "Artist", "Album")
+
+
+def test_discogs_match_filter_excludes_incompatible_media():
+    candidates = [
+        {"id": 1, "format": ["File", "FLAC"]},
+        {"id": 2, "format": ["DVD", "Album"]},
+        {"id": 3, "format": ["CD", "Album"]},
+        {"id": 4, "format": []},
+        {"id": 5, "format": ["CDr", "Album"]},
+        {"id": 6, "format": ["MiniDisc", "Album"]},
+    ]
+
+    assert [candidate["id"] for candidate in DiscogsEnricher.filter_releases_by_media(candidates, "WEB")] == [1, 4]
+    assert [candidate["id"] for candidate in DiscogsEnricher.filter_releases_by_media(candidates, "CD")] == [3, 4, 5]
+    assert [candidate["id"] for candidate in DiscogsEnricher.filter_releases_by_media(candidates, "DVD")] == [2, 4]
+
+
+def test_discogs_catalogue_filter_preserves_hyphens_and_uses_safe_fallbacks():
+    candidates = [{"id": 1, "catno": "B0012198-02"}, {"id": 2, "catno": "1791341"}]
+
+    assert DiscogsEnricher.filter_releases_by_catalogue(candidates, "B001219802") == candidates
+    assert DiscogsEnricher.filter_releases_by_catalogue(candidates, " B0012198-02 ") == [candidates[0]]
+    assert DiscogsEnricher.filter_releases_by_catalogue(candidates, "does-not-exist") == candidates
+
+
+def test_directory_catalogue_and_label_are_extracted_from_braced_release_info(tmp_path):
+    release = MusicRelease(root=str(tmp_path))
+
+    MusicReleaseAnalyzer._derive_from_directory(release, "Kanye West - 808s & Heartbreak (2008) [FLAC] {Roc-A-Fella Records B001219802 CD}")
+
+    assert release.get("release_catalogue_number") == "B001219802"
+    assert release.get("directory_catalogue_number") == "B001219802"
+    assert release.get("release_label") == "Roc-A-Fella Records"
+
+
+def test_orpheus_enrichment_extracts_discogs_master_from_group_wiki(tmp_path):
+    release = MusicRelease(root=str(tmp_path))
+    release.set_field("artist", "Kanye West", MetadataSource.FILE_TAG, 1.0)
+    release.set_field("album", "808s & Heartbreak", MetadataSource.FILE_TAG, 1.0)
+    meta = Meta(category="MUSIC", orpheus="953914", base_dir=str(tmp_path), uuid="orpheus-master", music_release=release.to_dict())
+    response = {
+        "group": {"id": 610888, "name": "808s & Heartbreak", "year": 2008, "wikiBBcode": "https://www.discogs.com/master/8489"},
+        "torrent": {"media": "CD", "encoding": "Lossless", "remasterYear": 2008, "remasterRecordLabel": "Roc-A-Fella Records", "remasterCatalogueNumber": "B001219802"},
+    }
+
+    with patch.object(Orpheus, "get_torrent", new=AsyncMock(return_value=response)):
+        assert asyncio.run(enrich_music_from_orpheus(meta, {"TRACKERS": {"ORPHEUS": {}}}))
+
+    assert meta.music_release["external_ids"]["discogs_master"] == "8489"
+    assert meta.music_release["fields"]["release_catalogue_number"]["value"] == "B001219802"
+
+
+def test_discogs_auto_lookup_uses_only_one_exact_match(tmp_path):
+    meta = Meta(unattended=True)
+    release = MusicRelease(root=str(tmp_path))
+    release.set_field("artist", "Artist", MetadataSource.FILE_TAG, 1.0)
+    release.set_field("album", "Album", MetadataSource.FILE_TAG, 1.0)
+
+    with patch.object(DiscogsEnricher, "find_exact_releases", new=AsyncMock(return_value=[{"id": 12345}])):
+        assert asyncio.run(_find_discogs_release(meta, release, "")) == "12345"
+
+    with patch.object(DiscogsEnricher, "find_exact_releases", new=AsyncMock(return_value=[{"id": 12345}, {"id": 67890}])):
+        assert asyncio.run(_find_discogs_release(meta, release, "")) == ""
+
+    release.set_field("media", "WEB", MetadataSource.USER, 1.0)
+    with patch.object(DiscogsEnricher, "find_exact_releases", new=AsyncMock(return_value=[{"id": 12345, "format": ["File"]}, {"id": 67890, "format": ["DVD"]}])):
+        assert asyncio.run(_find_discogs_release(meta, release, "")) == "12345"
+
+
+def test_discogs_and_musicbrainz_use_persistent_music_metadata_cache(tmp_path):
+    discogs_path = _music_cache_path(str(tmp_path), "discogs", "releases", "987654321")
+    musicbrainz_key = "artist\x1falbum\x1f2"
+    musicbrainz_path = _music_cache_path(str(tmp_path), "musicbrainz", "release_search", musicbrainz_key)
+    asyncio.run(_write_music_cache(discogs_path, {"id": 987654321, "title": "Artist - Album"}))
+    asyncio.run(_write_music_cache(musicbrainz_path, {"id": "cached-release", "title": "Album"}))
+
+    DiscogsEnricher._cache.clear()
+    MusicBrainzEnricher._cache.clear()
+    discogs = DiscogsEnricher(base_dir=str(tmp_path))
+    musicbrainz = MusicBrainzEnricher(base_dir=str(tmp_path))
+
+    assert asyncio.run(discogs._get("releases", "987654321"))["id"] == 987654321
+    assert asyncio.run(musicbrainz._find_release("Artist", "Album", 2))["id"] == "cached-release"
+
+
 def test_music_prep_runs_shared_client_path_lookup_before_returning():
     prep = Prep.__new__(Prep)
     prep.config = {"DEFAULT": {}, "TRACKERS": {"default_trackers": "ORPHEUS"}}
@@ -660,11 +781,15 @@ def test_music_prep_runs_shared_client_path_lookup_before_returning():
         patch("src.prep.prep_helpers.detect_disc_and_category", new=AsyncMock(return_value=("", {}))),
         patch.object(Prep, "_gather_music_prep", new=AsyncMock()),
         patch("src.prep.prep_helpers.process_trackers_and_torrent", new=AsyncMock()) as process_trackers,
+        patch("src.prep._enrich_music_from_orpheus_fn", new=AsyncMock()) as enrich_orpheus,
+        patch("src.prep._enrich_music_from_discogs_fn", new=AsyncMock()) as enrich_discogs,
     ):
         result = asyncio.run(prep.gather_prep(meta, "cli"))
 
     assert result is meta
     process_trackers.assert_awaited_once_with(prep, meta, client, hash_ids, tracker_ids, "", "")
+    enrich_orpheus.assert_awaited_once_with(meta, prep.config)
+    enrich_discogs.assert_awaited_once_with(meta, prep.config)
 
 
 def test_webui_music_preview_includes_release_review_data():

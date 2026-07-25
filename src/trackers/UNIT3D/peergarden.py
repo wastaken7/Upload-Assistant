@@ -185,15 +185,7 @@ class PeerGarden(UNIT3D):
         resolved_type = normalize(meta.type)
 
         if category == "MUSIC":
-            # Music preparation stores the detected codec(s) in ``format``;
-            # ``meta.type`` is intentionally not populated by that pipeline.
-            # A mixed release is invalid upstream, but selecting the first
-            # supported codec still provides a safe value for an API upload.
-            formats = [candidate.strip() for value in (normalize(meta.format), resolved_type) for candidate in value.replace("/", ",").split(",")]
-            resolved_type = next(
-                (format_name for format_name in formats if format_name in type_id),
-                "OTHER",
-            )
+            resolved_type = meta.format.upper()
         elif category == "GAME":
             platform = normalize(meta.platform)
             if meta.console_game:

@@ -74,6 +74,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     "BTN": "broadcasthe.net",
                     "BEYONDHD": "beyond-hd.me",
                     "HAWKEUNO": "hawke.uno",
+                    "ORPHEUS": "orpheus.network",
                 }
                 hostname = hardcoded_hosts.get(tracker_name, "")
             if hostname:
@@ -122,6 +123,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 match = re.search(r"/details/(\d+)", path)
                 if match:
                     tracker_ids[tracker_key] = match.group(1)
+            elif matched_tracker == "ORPHEUS":
+                torrent_id = _query_id(parsed.query, "torrentid")
+                if torrent_id:
+                    tracker_ids[tracker_key] = torrent_id
             else:
                 # UNIT3D style: last path ID
                 tracker_id = _last_path_id(path)

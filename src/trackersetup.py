@@ -153,7 +153,7 @@ class TrackerSetup:
             if category.upper() in [c.upper() for c in supported_cats]:
                 supported_trackers.append(tracker_name)
             else:
-                logger.info(f"{tracker_name}: [bold red]category '{category}' is not supported. Removing from queue.[/bold red]", extra={"markup": False})
+                logger.info(f"{tracker_name}: [bold red]category '{category}' is not supported. Removing from queue.[/bold red]")
                 meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})["upload"] = False
                 meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})["skipped"] = True
 

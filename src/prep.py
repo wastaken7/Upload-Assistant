@@ -28,6 +28,8 @@ try:
     from src.is_scene import SceneManager
     from src.languages import languages_manager
     from src.metadata_searching import MetadataSearchingManager
+    from src.music.prep import enrich_music_from_discogs as _enrich_music_from_discogs_fn
+    from src.music.prep import enrich_music_from_orpheus as _enrich_music_from_orpheus_fn
     from src.music.prep import gather_music_prep as _gather_music_prep_fn
     from src.prep_game import gather_game_prep as _gather_game_prep_fn
     from src.prep_game import resolve_game_filelist as _resolve_game_filelist_fn
@@ -127,6 +129,8 @@ class Prep:
         if meta.category == "MUSIC":
             await self._gather_music_prep(meta)
             await prep_helpers.process_trackers_and_torrent(self, meta, client, hash_ids, tracker_ids, "", "")
+            await _enrich_music_from_orpheus_fn(meta, self.config)
+            await _enrich_music_from_discogs_fn(meta, self.config)
             logger.debug(f"Music metadata processed in {time.time() - meta_start_time:.2f} seconds")
             return meta
 

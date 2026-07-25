@@ -82,7 +82,10 @@ class Orpheus:
         self.common = Common(config)
 
     def _headers(self, meta: Meta) -> dict[str, str]:
-        return {"Authorization": f"token {self.api_key}", "User-Agent": f"{meta.ua_name} {meta.current_version} ({platform.system()} {platform.release()})"}
+        product = str(meta.ua_name or "Upload Assistant").strip() or "Upload Assistant"
+        version = str(meta.current_version or "").strip()
+        user_agent = f"{product}{f' {version}' if version else ''} ({platform.system()} {platform.release()})"
+        return {"Authorization": f"token {self.api_key}", "User-Agent": user_agent}
 
     @staticmethod
     def _release(meta: Meta) -> MusicRelease:

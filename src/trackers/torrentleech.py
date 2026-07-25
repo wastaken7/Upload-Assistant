@@ -30,7 +30,7 @@ class TorrentLeech:
     http_upload_url = f"{base_url}/torrents/upload/"
     api_upload_url = f"{base_url}/torrents/upload/apiupload"
     torrent_url = f"{base_url}/torrent/"
-    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
     tracker_urls = ("tracker.tleechreload", "tracker.torrentleech")
     allows_bloated_audio = True
 
@@ -91,6 +91,7 @@ class TorrentLeech:
             logo=True,
             mediainfo=True,
             menu_screenshots=process_screenshot,
+            music=True,
             nfo=True,
             screenshots=process_screenshot,
             tonemapped_header=True,
@@ -136,6 +137,8 @@ class TorrentLeech:
         games_mac = 42
         games_switch = 48
         games_ps5 = 49
+
+        music = 31
 
         if meta.anime:
             return anime
@@ -210,6 +213,9 @@ class TorrentLeech:
                 return games_mac
 
             return games_pc
+
+        if category == "MUSIC":
+            return music
 
         return 0
 
@@ -390,9 +396,7 @@ class TorrentLeech:
         return data
 
     async def cookie_upload(self, meta: Meta) -> bool | None:
-        await self.generate_description(meta)
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
-            description_content = await f.read()
+        description_content = await self.generate_description(meta)
         login = await self.login(meta)
         if not login:
             tracker_status = meta.tracker_status

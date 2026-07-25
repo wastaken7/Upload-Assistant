@@ -1,4 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import re
+from contextlib import suppress
 from typing import Any
 
 import cli_ui
@@ -88,7 +90,7 @@ class DarkPeers(UNIT3D):
     requests_url = f"{base_url}/api/requests/filter"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
-    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
     tracker_urls = ("https://darkpeers.org",)
 
     def __init__(self, config: dict[str, Any]):
@@ -149,6 +151,12 @@ class DarkPeers(UNIT3D):
         return f"{languages_result}"
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
+        if meta.category == "MUSIC":
+            return {"name": self._music_name(meta)}
+
+        if meta.category == "BOOK":
+            return {"name": self._book_name(meta)}
+
         dp_name = meta.name
 
         audio = await self.get_audio(meta)
@@ -157,12 +165,93 @@ class DarkPeers(UNIT3D):
 
         return {"name": dp_name}
 
+    @staticmethod
+    def _release_field(release: dict[str, Any], name: str, default: Any = "") -> Any:
+        """Read a value from the serialized music release model."""
+        fields = release.get("fields", {})
+        value = fields.get(name, {}) if isinstance(fields, dict) else {}
+        return value.get("value", default) if isinstance(value, dict) else default
+
+    @classmethod
+    def _music_name(cls, meta: Meta) -> str:
+        """Format music as ``Artist - Album (Year) - Format`` for DarkPeers."""
+        release = meta.music_release if isinstance(meta.music_release, dict) else {}
+        artist = str(cls._release_field(release, "artist", meta.artist)).strip()
+        album = str(cls._release_field(release, "album", meta.title)).strip()
+        year = str(cls._release_field(release, "release_year", cls._release_field(release, "year", meta.year or ""))).strip()
+        media = str(cls._release_field(release, "media", meta.source)).strip()
+        tracks = release.get("tracks", []) if isinstance(release.get("tracks"), list) else []
+        first_track = tracks[0] if tracks and isinstance(tracks[0], dict) else {}
+        codec = str(first_track.get("codec") or first_track.get("format") or meta.format or meta.type).upper().strip()
+
+        format_parts = [media, codec]
+        if codec in {"FLAC", "ALAC", "PCM"}:
+            depth = first_track.get("bit_depth") or cls._release_field(release, "nfo_bit_depth")
+            rate = first_track.get("sample_rate") or cls._release_field(release, "nfo_sample_rate")
+            if depth and rate:
+                with suppress(TypeError, ValueError):
+                    format_parts.append(f"{int(depth)}-{int(rate) / 1000:g}")
+        elif codec in {"MP3", "AAC", "OPUS", "VORBIS"}:
+            bitrate = first_track.get("bitrate") or meta.audio_bitrate
+            if bitrate:
+                with suppress(TypeError, ValueError):
+                    bitrate_kbps = int(bitrate) // 1000 if int(bitrate) >= 1000 else int(bitrate)
+                    format_parts.append(str(bitrate_kbps))
+            bitrate_mode = str(first_track.get("bitrate_mode") or "").upper().strip()
+            if bitrate_mode:
+                format_parts.append(bitrate_mode)
+
+        format_name = " ".join(part for part in format_parts if part)
+        title = " - ".join(part for part in (artist, album) if part)
+        if year:
+            title = f"{title} ({year})" if title else f"({year})"
+        return f"{title} - {format_name}" if format_name else title
+
+    @staticmethod
+    def _book_name(meta: Meta) -> str:
+        """Format eBooks and audiobooks according to DarkPeers' book rules."""
+        author = str(meta.author or meta.publisher or "").strip()
+        title = str(meta.title or "").strip()
+        year = str(meta.year or "").strip()
+        edition = str(meta.manual_edition or meta.edition or "").strip()
+        format_name = str(meta.type or meta.format or "").upper().strip()
+        identifier = re.sub(r"[^0-9Xx]", "", str(meta.isbn or meta.asin or ""))
+
+        parts = [part for part in (author, "-" if author and title else "", title, year) if part]
+        if not meta.audiobook and edition and not re.search(r"\b(?:1st|first)\b", edition, re.IGNORECASE):
+            parts.append(edition)
+        if format_name:
+            parts.append(format_name)
+
+        if meta.audiobook:
+            if format_name in {"MP3", "AAC", "OPUS", "VORBIS"} and meta.audiobook_bitrate:
+                parts.append(str(meta.audiobook_bitrate))
+            if identifier:
+                parts.append(identifier)
+            base_name = " ".join(parts)
+            tag = str(meta.tag or "").strip()
+            if tag:
+                return f"{base_name}{tag if tag.startswith('-') else f'-{tag}'}"
+            return base_name
+
+        if identifier:
+            parts.append(identifier)
+        source = str(meta.manual_source or meta.source or "").upper().strip()
+        if source == "RETAIL":
+            parts.append("Retail")
+        if source == "SCAN":
+            parts.append("Scan")
+        if meta.ocr:
+            parts.append("OCR")
+        return " ".join(parts)
+
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {
             "MOVIE": "1",
             "TV": "2",
             "BOOK": "8",
             "GAME": "4",
+            "MUSIC": "3",
         }
         if mapping_only:
             return category_id
@@ -190,6 +279,8 @@ class DarkPeers(UNIT3D):
             "LINUX": "14",
             "MAC": "11",
             "CONSOLE": "10",
+            "FLAC": "8",
+            "MP3": "7",
         }
         if mapping_only:
             return type_id
@@ -219,6 +310,9 @@ class DarkPeers(UNIT3D):
 
         if meta.category == "GAME":
             meta_type = "CONSOLE" if meta.console_game else meta.platform.upper()
+
+        if meta.category == "MUSIC":
+            meta_type = meta.format.upper()
 
         resolved_id = type_id.get(meta_type, "0")
         return {"type_id": resolved_id}

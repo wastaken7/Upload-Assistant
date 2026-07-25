@@ -23,7 +23,7 @@ YEAR_RE = re.compile(r"(?:^|[^0-9])((?:19|20)\d{2})(?:[^0-9]|$)")
 LEADING_YEAR_RE = re.compile(r"^\s*[\[(]?\s*((?:19|20)\d{2})\b")
 EDITION_RE = re.compile(r"(?:\[|\()([^\]\)]*(?:deluxe|remaster|anniversary|reissue|expanded|edition)[^\]\)]*)(?:\]|\))", re.I)
 EDITION_WITH_YEAR_RE = re.compile(r"(?:\[|\()\s*((?:19|20)\d{2})[\s,.-]+([^\]\)]+)(?:\]|\))", re.I)
-BRACKET_RE = re.compile(r"\[([^\]]+)]")
+BRACKET_RE = re.compile(r"[\[{]([^\]}]+)[\]}]")
 # Subsequent catalogue components must have an actual separator.  Allowing an
 # optional separator before another ``\d+`` creates many equivalent ways to
 # partition a long run of digits and can backtrack exponentially.
@@ -464,6 +464,19 @@ class MusicReleaseAnalyzer:
                 continue
             if CATALOGUE_RE.fullmatch(detail):
                 release.set_field("release_catalogue_number", detail, MetadataSource.DIRECTORY, 0.65)
+                release.set_field("directory_catalogue_number", detail, MetadataSource.DIRECTORY, 0.7)
+                continue
+            catalogue = CATALOGUE_RE.search(detail)
+            if catalogue:
+                release.set_field("release_catalogue_number", catalogue.group(0), MetadataSource.DIRECTORY, 0.65)
+                release.set_field("directory_catalogue_number", catalogue.group(0), MetadataSource.DIRECTORY, 0.7)
+                # A scene-style block may combine imprint, catalogue and
+                # medium, e.g. ``{Roc-A-Fella B001219802 CD}``.
+                label = re.sub(r"\b(?:CD|WEB|DIGITAL|VINYL|LP|SACD|DVD|BD|BLU-?RAY)\b", "", CATALOGUE_RE.sub("", detail), flags=re.I)
+                label = re.sub(r"[|,;/]+", " ", label)
+                label = re.sub(r"^[\s._-]+|[\s._-]+$", "", label)
+                if label and re.search(r"[A-Za-z]", label):
+                    release.set_field("release_label", label, MetadataSource.DIRECTORY, 0.6)
                 continue
             upper_detail = detail.upper()
             if not any(marker in upper_detail for marker in (*source_markers, *format_markers, *edition_markers_upper)) and re.search(r"[A-Za-z]", detail):

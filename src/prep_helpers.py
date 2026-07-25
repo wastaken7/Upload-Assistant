@@ -106,7 +106,7 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     hash_ids = ["infohash", "torrent_hash", "skip_auto_torrent"]
     from src.trackersetup import api_trackers
 
-    tracker_ids = [t.lower() for t in api_trackers] + ["ptp", "btn", "hdb"]
+    tracker_ids = [t.lower() for t in api_trackers] + ["ptp", "btn", "hdb", "orpheus"]
     use_sonarr = prep_instance.config["DEFAULT"].get("use_sonarr", False)
     use_radarr = prep_instance.config["DEFAULT"].get("use_radarr", False)
     meta.print_tracker_messages = prep_instance.config["DEFAULT"].get("print_tracker_messages", False)
