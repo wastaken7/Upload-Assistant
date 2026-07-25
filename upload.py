@@ -5,6 +5,7 @@ import asyncio
 import contextlib
 import filecmp
 import gc
+import ipaddress
 import json
 import os
 import platform
@@ -12,6 +13,7 @@ import re
 import shlex
 import shutil
 import signal
+import socket
 import sys
 import threading
 import time
@@ -19,7 +21,7 @@ import traceback
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Protocol, cast
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from src.check_requirements import check_dependencies
 
@@ -816,6 +818,69 @@ def _is_http_url(value: Any) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
+MUSIC_COVER_MAX_BYTES = 10 * 1024 * 1024
+MUSIC_COVER_MAX_REDIRECTS = 3
+
+
+def _is_public_music_cover_url(value: Any) -> bool:
+    """Allow artwork downloads only from public HTTP(S) hosts."""
+    if not _is_http_url(value):
+        return False
+    host = urlparse(str(value).strip()).hostname
+    if not host:
+        return False
+    try:
+        addresses = {result[4][0] for result in socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)}
+    except OSError:
+        return False
+    try:
+        return bool(addresses) and all(ipaddress.ip_address(address).is_global for address in addresses)
+    except ValueError:
+        return False
+
+
+def _download_music_cover(url: str) -> bytes | None:
+    """Download a bounded image while validating every redirect destination."""
+    current_url = url
+    for _ in range(MUSIC_COVER_MAX_REDIRECTS + 1):
+        if not _is_public_music_cover_url(current_url):
+            logger.warning("[yellow]MUSIC: refused artwork download from a non-public URL.[/yellow]")
+            return None
+        response: requests.Response | None = None
+        try:
+            response = requests.get(current_url, timeout=30, allow_redirects=False, stream=True)
+            if response.is_redirect:
+                location = response.headers.get("Location", "")
+                if not location:
+                    return None
+                current_url = urljoin(current_url, location)
+                continue
+            response.raise_for_status()
+            content_type = response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+            if not content_type.startswith("image/"):
+                logger.warning(f"[yellow]MUSIC: artwork URL returned unsupported content type {content_type or 'unknown'}.[/yellow]")
+                return None
+            content_length = response.headers.get("Content-Length")
+            if content_length and (not content_length.isdigit() or int(content_length) > MUSIC_COVER_MAX_BYTES):
+                logger.warning("[yellow]MUSIC: artwork download exceeds the 10 MiB limit.[/yellow]")
+                return None
+            content = bytearray()
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                content.extend(chunk)
+                if len(content) > MUSIC_COVER_MAX_BYTES:
+                    logger.warning("[yellow]MUSIC: artwork download exceeds the 10 MiB limit.[/yellow]")
+                    return None
+            return bytes(content)
+        except requests.RequestException as error:
+            logger.warning(f"[yellow]MUSIC: could not download artwork for image hosting: {error}[/yellow]")
+            return None
+        finally:
+            if response is not None:
+                response.close()
+    logger.warning("[yellow]MUSIC: artwork URL exceeded the redirect limit.[/yellow]")
+    return None
+
+
 async def _write_music_snapshot(meta: Meta) -> None:
     path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "music_release.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -827,20 +892,6 @@ async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensMana
     """Host MUSIC artwork and publish it through the shared ``meta.covers`` API."""
     if meta.debug:
         logger.info("[yellow]MUSIC debug: image-host upload skipped.[/yellow]")
-        return
-    cover_path = Path(str(meta.cover_path or ""))
-    if not cover_path.is_file() and _is_http_url(meta.cover):
-        cover_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "music_cover.jpg"
-        try:
-            response = await asyncio.to_thread(requests.get, meta.cover, timeout=30)
-            response.raise_for_status()
-            cover_path.parent.mkdir(parents=True, exist_ok=True)
-            await asyncio.to_thread(cover_path.write_bytes, response.content)
-            meta.cover_path = str(cover_path)
-        except requests.RequestException as error:
-            logger.warning(f"[yellow]MUSIC: could not download artwork for image hosting: {error}[/yellow]")
-            return
-    if not cover_path.is_file():
         return
     if meta.skip_imghost_upload:
         logger.info("[yellow]MUSIC: image-host upload is disabled; provide a hosted artwork URL.[/yellow]")
@@ -859,6 +910,22 @@ async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensMana
                 return
     except (OSError, ValueError, TypeError) as error:
         logger.debug(f"[yellow]MUSIC: ignored unusable artwork cache: {error}[/yellow]")
+
+    cover_path = Path(str(meta.cover_path or ""))
+    if not cover_path.is_file() and _is_http_url(meta.cover):
+        cover_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "music_cover.jpg"
+        content = await asyncio.to_thread(_download_music_cover, meta.cover)
+        if content is None:
+            return
+        try:
+            cover_path.parent.mkdir(parents=True, exist_ok=True)
+            await asyncio.to_thread(cover_path.write_bytes, content)
+            meta.cover_path = str(cover_path)
+        except OSError as error:
+            logger.warning(f"[yellow]MUSIC: could not save downloaded artwork for image hosting: {error}[/yellow]")
+            return
+    if not cover_path.is_file():
+        return
 
     try:
         uploaded, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [str(cover_path)], {})
