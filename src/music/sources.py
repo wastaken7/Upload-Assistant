@@ -260,6 +260,9 @@ class DiscogsEnricher:
         """
         if not artist.strip() or not album.strip():
             return []
+        if not self.token:
+            logger.warning("[yellow]MUSIC: Discogs exact-match search skipped because no Discogs token is configured.[/yellow]")
+            return []
         key = ("search", f"{artist.casefold()}\x1f{album.casefold()}")
         if key in self._cache:
             result = self._cache[key]

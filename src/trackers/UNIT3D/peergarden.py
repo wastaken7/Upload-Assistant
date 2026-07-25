@@ -185,7 +185,7 @@ class PeerGarden(UNIT3D):
         resolved_type = normalize(meta.type)
 
         if category == "MUSIC":
-            resolved_type = meta.format.upper()
+            resolved_type = normalize(meta.format)
         elif category == "GAME":
             platform = normalize(meta.platform)
             if meta.console_game:

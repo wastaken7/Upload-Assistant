@@ -274,7 +274,7 @@ class TorrentLeech:
             param = f"{cat_id}/query/{search_name} {year} {resolution}"
             search_urls.append(f"{self.base_url}/torrents/browse/list/categories/{param}")
 
-        elif meta.category in ("BOOK", "GAME"):
+        elif meta.category in ("BOOK", "GAME", "MUSIC"):
             param = f"{cat_id}/query/{search_name}"
             search_urls.append(f"{self.base_url}/torrents/browse/list/categories/{param}")
 

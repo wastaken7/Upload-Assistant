@@ -21,6 +21,14 @@ def test_lst_music_payload_includes_discogs_release_and_master_ids():
     assert data["extra_discogs_master_ids"] == ""
 
 
+def test_lst_music_payload_omits_discogs_existence_flag_for_invalid_ids():
+    meta = Meta(category="MUSIC", music_release={"external_ids": {"discogs_release": "not-an-id"}})
+
+    data = asyncio.run(LST({"DEFAULT": {}, "TRACKERS": {"LST": {}}}).get_additional_data(meta))
+
+    assert "release_exists_on_discogs" not in data
+
+
 def test_lst_music_name_uses_technical_fields_for_lossless_releases():
     meta = Meta(
         category="MUSIC",
@@ -39,6 +47,14 @@ def test_lst_music_name_uses_technical_fields_for_lossless_releases():
     name = asyncio.run(LST({"DEFAULT": {}, "TRACKERS": {"LST": {}}}).get_name(meta))["name"]
 
     assert name == "Taylor Swift - Red 2012 WEB FLAC 16-bit 44.1 kHz-FiVE0"
+
+
+def test_lst_music_name_ignores_invalid_sample_rate():
+    meta = Meta(category="MUSIC", music_release={"fields": {"artist": {"value": "Artist"}, "album": {"value": "Album"}, "release_year": {"value": "2000"}, "media": {"value": "CD"}, "nfo_sample_rate": {"value": "unknown"}}, "tracks": [{"codec": "FLAC", "bit_depth": 16}]})
+
+    name = asyncio.run(LST({"DEFAULT": {}, "TRACKERS": {"LST": {}}}).get_name(meta))["name"]
+
+    assert name == "Artist - Album 2000 CD FLAC 16-bit"
 
 
 def test_lst_audiobook_name_omits_lossy_technical_fields():

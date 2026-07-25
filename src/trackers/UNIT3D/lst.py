@@ -135,13 +135,14 @@ class LST(UNIT3D):
 
             data.update(
                 {
-                    "release_exists_on_discogs": "1",
                     "discogs": release_id[1] if release_id and release_id[0] == "release" else "",
                     "discogs_master_id": master_id[1] if master_id and master_id[0] == "master" else "",
                     "extra_discogs_master_ids": "",
                     "extra_discogs_ids": "",
                 }
             )
+            if release_id or master_id:
+                data["release_exists_on_discogs"] = "1"
 
         return data
 
@@ -264,7 +265,10 @@ class LST(UNIT3D):
             if depth:
                 parts.append(f"{depth}-bit")
             if rate:
-                parts.append(f"{int(rate) / 1000:g} kHz")
+                match = re.search(r"\d+(?:[.,]\d+)?", str(rate))
+                if match:
+                    value = float(match.group().replace(",", "."))
+                    parts.append(f"{value / 1000:g} kHz" if value >= 1000 else f"{value:g} kHz")
         return cls._with_tag(parts, meta.tag)
 
     @classmethod

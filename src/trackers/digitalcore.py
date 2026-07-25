@@ -28,7 +28,7 @@ class DigitalCore:
     banned_groups = ("",)
     approved_image_hosts = ("imgbox", "imgbb", "bhd", "imgur", "postimg", "sharex")
     torrent_url = f"{base_url}/torrent/"
-    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
     tracker_urls = ("tracker.digitalcore.club", "trackerprxy.digitalcore.club")
     allows_bloated_audio = True
 
@@ -41,7 +41,7 @@ class DigitalCore:
 
     async def mediainfo(self, meta: Meta) -> str:
         mediainfo = ""
-        if meta.category in ("TV", "MOVIE"):
+        if meta.category in ("TV", "MOVIE", "MUSIC") or meta.audiobook:
             if meta.is_disc == "BDMV":
                 mediainfo = await self.common.get_bdmv_mediainfo(meta, remove=["File size", "Overall bit rate"])
             else:
@@ -67,6 +67,7 @@ class DigitalCore:
             logo=False,
             mediainfo=True,
             menu_screenshots=True,
+            music=True,
             nfo=True,
             screenshots=True,
             tonemapped_header=True,
@@ -110,6 +111,12 @@ class DigitalCore:
             if platform == "MAC":
                 return 27
             return 26  # Console
+
+        if category == "MUSIC":
+            if meta.format.upper() == "FLAC":
+                return 23
+            if meta.format.upper() == "MP3":
+                return 22
 
         if sd == 1:
             if category == "MOVIE":
@@ -220,7 +227,7 @@ class DigitalCore:
         return
 
     async def get_firstpic(self, meta: Meta) -> str:
-        if meta.category == "BOOK":
+        if meta.category in ("BOOK", "MUSIC"):
             covers = meta.covers
             if isinstance(covers, list) and len(covers) > 0:
                 raw_url = covers[0].get("raw_url")
@@ -233,7 +240,7 @@ class DigitalCore:
 
         return {
             "category": self.get_category_id(meta),
-            "imdbId": meta.imdb_info.get("imdbID", ""),
+            "imdbId": meta.imdb_tt,
             "nfo": await self.generate_description(meta),
             "mediainfo": await self.mediainfo(meta),
             "reqid": "0",

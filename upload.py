@@ -811,12 +811,6 @@ def _set_music_field(meta: Meta, field: str, value: str | int, *, source: str = 
         meta.cover = str(value)
 
 
-def _music_targets_orpheus(meta: Meta) -> bool:
-    """Whether this MUSIC job includes Orpheus (whose image field is optional)."""
-    trackers = [meta.trackers] if isinstance(meta.trackers, str) else (meta.trackers or [])
-    return any(str(tracker).strip().upper() == "ORPHEUS" for tracker in trackers)
-
-
 def _is_http_url(value: Any) -> bool:
     parsed = urlparse(str(value or "").strip())
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
@@ -829,31 +823,38 @@ async def _write_music_snapshot(meta: Meta) -> None:
         await file.write(json.dumps(meta.music_release, indent=2, cls=PathAwareEncoder))
 
 
-async def _host_orpheus_music_cover(meta: Meta, uploadscreens_manager: UploadScreensManager) -> None:
-    """Host already-resolved local MUSIC artwork after confirmation only.
-
-    Image hosting is an external state-changing action, so debug mode never
-    calls an image host.  A manually supplied URL always wins over local art.
-    """
-    if not _music_targets_orpheus(meta) or _is_http_url(meta.cover):
+async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensManager) -> None:
+    """Host MUSIC artwork and publish it through the shared ``meta.covers`` API."""
+    if meta.debug:
+        logger.info("[yellow]MUSIC debug: image-host upload skipped.[/yellow]")
         return
     cover_path = Path(str(meta.cover_path or ""))
+    if not cover_path.is_file() and _is_http_url(meta.cover):
+        cover_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "music_cover.jpg"
+        try:
+            response = await asyncio.to_thread(requests.get, meta.cover, timeout=30)
+            response.raise_for_status()
+            cover_path.parent.mkdir(parents=True, exist_ok=True)
+            await asyncio.to_thread(cover_path.write_bytes, response.content)
+            meta.cover_path = str(cover_path)
+        except requests.RequestException as error:
+            logger.warning(f"[yellow]MUSIC: could not download artwork for image hosting: {error}[/yellow]")
+            return
     if not cover_path.is_file():
         return
-    if meta.debug:
-        logger.info(f"[yellow]MUSIC debug: artwork found at {cover_path.name}; image-host upload skipped.[/yellow]")
-        return
     if meta.skip_imghost_upload:
-        logger.info("[yellow]MUSIC: image-host upload is disabled; provide a public artwork URL for Orpheus.[/yellow]")
+        logger.info("[yellow]MUSIC: image-host upload is disabled; provide a hosted artwork URL.[/yellow]")
         return
 
-    cache_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "music_cover.json"
+    cache_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "covers.json"
     try:
         if cache_path.is_file():
             cached = json.loads(await asyncio.to_thread(cache_path.read_text, encoding="utf-8"))
-            cached_url = cached.get("raw_url", "") if isinstance(cached, dict) else ""
+            cached_cover = cached[0] if isinstance(cached, list) and cached else {}
+            cached_url = cached_cover.get("raw_url", "") if isinstance(cached_cover, dict) else ""
             if _is_http_url(cached_url):
                 meta.cover = str(cached_url)
+                meta.covers = cached
                 _set_music_field(meta, "cover_url", meta.cover, source="external")
                 return
     except (OSError, ValueError, TypeError) as error:
@@ -869,10 +870,11 @@ async def _host_orpheus_music_cover(meta: Meta, uploadscreens_manager: UploadScr
         return
 
     meta.cover = str(uploaded[0]["raw_url"])
+    meta.covers = uploaded
     _set_music_field(meta, "cover_url", meta.cover, source="external")
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     async with aiofiles.open(cache_path, "w", encoding="utf-8") as file:
-        await file.write(json.dumps(uploaded[0], indent=2))
+        await file.write(json.dumps(uploaded, indent=2))
     await _write_music_snapshot(meta)
 
 
@@ -1430,7 +1432,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             if "image_list" not in meta:
                 meta.image_list = []
             if meta.category == "MUSIC":
-                await _host_orpheus_music_cover(meta, uploadscreens_manager)
+                await _host_music_cover(meta, uploadscreens_manager)
             manual_frames_str = meta.manual_frames
             if isinstance(manual_frames_str, str):
                 manual_frames_list = [f.strip() for f in manual_frames_str.split(",") if f.strip()]

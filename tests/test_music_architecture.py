@@ -718,6 +718,15 @@ def test_directory_catalogue_and_label_are_extracted_from_braced_release_info(tm
     assert release.get("release_label") == "Roc-A-Fella Records"
 
 
+def test_directory_derivation_strips_only_matched_bracketed_metadata(tmp_path):
+    release = MusicRelease(root=str(tmp_path))
+
+    MusicReleaseAnalyzer._derive_from_directory(release, "Artist - Album (2008) [FLAC] {Label CATNO CD}")
+
+    assert release.get("artist") == "Artist"
+    assert release.get("album") == "Album (2008)"
+
+
 def test_orpheus_enrichment_extracts_discogs_master_from_group_wiki(tmp_path):
     release = MusicRelease(root=str(tmp_path))
     release.set_field("artist", "Kanye West", MetadataSource.FILE_TAG, 1.0)
@@ -733,6 +742,7 @@ def test_orpheus_enrichment_extracts_discogs_master_from_group_wiki(tmp_path):
 
     assert meta.music_release["external_ids"]["discogs_master"] == "8489"
     assert meta.music_release["fields"]["release_catalogue_number"]["value"] == "B001219802"
+    assert "edition_year" not in meta.music_release["fields"]
 
 
 def test_discogs_auto_lookup_uses_only_one_exact_match(tmp_path):
@@ -742,14 +752,20 @@ def test_discogs_auto_lookup_uses_only_one_exact_match(tmp_path):
     release.set_field("album", "Album", MetadataSource.FILE_TAG, 1.0)
 
     with patch.object(DiscogsEnricher, "find_exact_releases", new=AsyncMock(return_value=[{"id": 12345}])):
-        assert asyncio.run(_find_discogs_release(meta, release, "")) == "12345"
+        assert asyncio.run(_find_discogs_release(meta, release, "token")) == "12345"
 
     with patch.object(DiscogsEnricher, "find_exact_releases", new=AsyncMock(return_value=[{"id": 12345}, {"id": 67890}])):
-        assert asyncio.run(_find_discogs_release(meta, release, "")) == ""
+        assert asyncio.run(_find_discogs_release(meta, release, "token")) == ""
 
     release.set_field("media", "WEB", MetadataSource.USER, 1.0)
     with patch.object(DiscogsEnricher, "find_exact_releases", new=AsyncMock(return_value=[{"id": 12345, "format": ["File"]}, {"id": 67890, "format": ["DVD"]}])):
-        assert asyncio.run(_find_discogs_release(meta, release, "")) == "12345"
+        assert asyncio.run(_find_discogs_release(meta, release, "token")) == "12345"
+
+
+def test_discogs_exact_lookup_requires_a_token(tmp_path):
+    enricher = DiscogsEnricher(base_dir=str(tmp_path))
+
+    assert asyncio.run(enricher.find_exact_releases("Artist", "Album")) == []
 
 
 def test_discogs_and_musicbrainz_use_persistent_music_metadata_cache(tmp_path):

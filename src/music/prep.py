@@ -410,7 +410,8 @@ async def enrich_music_from_orpheus(meta: Meta, config: dict[str, Any]) -> bool:
 
     from src.trackers.orpheus import Orpheus
 
-    result = await Orpheus(config).get_torrent(identifier, meta)
+    orpheus = Orpheus(config)
+    result = await orpheus.get_torrent(identifier, meta)
     if not isinstance(result, dict):
         logger.info(f"[yellow]MUSIC: Orpheus metadata was unavailable for torrent {identifier}.[/yellow]")
         return False
@@ -432,7 +433,10 @@ async def enrich_music_from_orpheus(meta: Meta, config: dict[str, Any]) -> bool:
     _set_tracker_field(release, "genres", group.get("tags", []), 0.78)
     _set_tracker_field(release, "media", str(torrent.get("media", "")).strip(), 0.9)
     _set_tracker_field(release, "release_year", str(torrent.get("remasterYear", "")).strip(), 0.89)
-    _set_tracker_field(release, "edition_year", str(torrent.get("remasterYear", "")).strip(), 0.89)
+    remaster_title = str(torrent.get("remasterTitle", "")).strip()
+    if remaster_title:
+        _set_tracker_field(release, "edition", remaster_title, 0.9)
+        _set_tracker_field(release, "edition_year", str(torrent.get("remasterYear", "")).strip(), 0.89)
     _set_tracker_field(release, "release_label", str(torrent.get("remasterRecordLabel", "")).strip(), 0.91)
     _set_tracker_field(release, "release_catalogue_number", str(torrent.get("remasterCatalogueNumber", "")).strip(), 0.91)
     _set_tracker_field(release, "orpheus_encoding", str(torrent.get("encoding", "")).strip(), 0.9)
@@ -441,7 +445,7 @@ async def enrich_music_from_orpheus(meta: Meta, config: dict[str, Any]) -> bool:
     group_id = str(group.get("id", "")).strip()
     if group_id:
         release.external_ids.setdefault("orpheus_group", group_id)
-        release.external_ids.setdefault("orpheus_url", f"{Orpheus(config).base_url}/torrents.php?id={group_id}&torrentid={identifier}")
+        release.external_ids.setdefault("orpheus_url", f"{orpheus.base_url}/torrents.php?id={group_id}&torrentid={identifier}")
     wiki = str(group.get("wikiBBcode", ""))
     for key, pattern in (
         ("musicbrainz_release", r"musicbrainz\.org/release/([0-9a-f-]{36})"),
