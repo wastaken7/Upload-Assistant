@@ -434,8 +434,8 @@ config: dict[str, Any] = {
         # authoritative and no external lookup is made unless this is enabled.
         "music_enrichment_enabled": False,
 
-        # Optional Discogs personal access token. A supplied --music-discogs-id
-        # performs a bounded read-only lookup; this token raises Discogs API
+        # Optional Discogs personal access token. Automatic or supplied Discogs
+        # lookups are bounded and read-only; this token raises Discogs API
         # limits but is never written to release metadata or logs.
         "music_discogs_token": "",
 

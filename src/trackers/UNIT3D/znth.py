@@ -1,7 +1,7 @@
 import re
 import unicodedata
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import aiofiles
 
@@ -46,7 +46,7 @@ class Zenith(UNIT3D):
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     banned_url = f"{base_url}/api/bannedReleaseGroups"
-    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
     tracker_urls = ("https://znth.cx",)
 
     _banned_authors_raw = (
@@ -99,8 +99,8 @@ class Zenith(UNIT3D):
         words = cleaned.split()
         conjunctions = {"and", "e", "y", "with", "und", "et"}
         words = [w for w in words if w not in conjunctions]
-        merged_words = []
-        initials_buffer = []
+        merged_words: list[str] = []
+        initials_buffer: list[str] = []
         for w in words:
             if len(w) == 1 and w.isalpha():
                 initials_buffer.append(w)
@@ -120,7 +120,7 @@ class Zenith(UNIT3D):
         major_pattern = r"\s*(?:;|&|/|\+|\band\b|\be\b|\by\b|\bwith\b|\s+-\s+)\s*"
         candidates = re.split(major_pattern, author_str, flags=re.IGNORECASE)
 
-        final_authors = []
+        final_authors: list[str] = []
         for cand in candidates:
             cand = cand.strip()
             if not cand:
@@ -189,6 +189,9 @@ class Zenith(UNIT3D):
     async def get_name(self, meta: Meta) -> dict[str, str]:
         category = meta.category
         audiobook = meta.audiobook
+
+        if category == "MUSIC":
+            return {"name": self._music_name(meta)}
 
         if category == "BOOK":
             if _is_misc(meta):
@@ -317,6 +320,79 @@ class Zenith(UNIT3D):
 
         return {"name": meta.name}
 
+    @staticmethod
+    def _music_field(release: dict[str, Any], name: str, default: Any = "") -> Any:
+        """Read a serialized MusicRelease field, ignoring its provenance metadata."""
+        fields_raw = release.get("fields")
+        fields = cast(dict[str, Any], fields_raw) if isinstance(fields_raw, dict) else {}
+        field_raw = fields.get(name)
+        field = cast(dict[str, Any], field_raw) if isinstance(field_raw, dict) else {}
+        return field.get("value", default) if isinstance(field, dict) else default
+
+    @staticmethod
+    def _music_source(value: Any) -> str:
+        """Use the source spelling prescribed by Zenith's music naming guide."""
+        source = str(value or "").strip()
+        aliases = {"cd": "CD", "web": "WEB", "vinyl": "Vinyl", "sacd": "SACD", "dvd": "DVD", "bd": "BD", "soundboard": "Soundboard", "dat": "DAT", "cassette": "Cassette"}
+        return aliases.get(source.casefold(), source)
+
+    @staticmethod
+    def _music_sample_rate(value: Any) -> str:
+        try:
+            return f"{float(value) / 1000:g}kHz"
+        except TypeError, ValueError:
+            return ""
+
+    @classmethod
+    def _music_name(cls, meta: Meta) -> str:
+        """Format MUSIC as ``Artist - Album (Year) - [Format]`` for Zenith."""
+        release = cast(dict[str, Any], meta.music_release) if isinstance(meta.music_release, dict) else {}
+        artist_value = cls._music_field(release, "artist", meta.artist)
+        artist = str(artist_value).strip() if isinstance(artist_value, str) else ""
+        if not artist:
+            artists = cls._music_field(release, "artists", [])
+            artist_list = cast(list[Any], artists) if isinstance(artists, list) else []
+            artist = " & ".join(str(item).strip() for item in artist_list if str(item).strip()) if artist_list else str(artists or "").strip()
+        album = cls._music_field(release, "album", meta.title or meta.name)
+        year = cls._music_field(release, "release_year", cls._music_field(release, "year", meta.year))
+        source = cls._music_source(cls._music_field(release, "media", meta.source))
+        tracks_raw = release.get("tracks")
+        tracks = cast(list[Any], tracks_raw) if isinstance(tracks_raw, list) else []
+        first_track: dict[str, Any] = {}
+        if tracks and isinstance(tracks[0], dict):
+            first_track = cast(dict[str, Any], tracks[0])
+        codec = str(cls._music_field(release, "format", first_track.get("codec") or first_track.get("format") or meta.format or meta.type) or "").upper().strip()
+
+        format_parts: list[str] = [part for part in (source, codec) if part]
+        bit_depth = first_track.get("bit_depth") or cls._music_field(release, "nfo_bit_depth")
+        sample_rate = first_track.get("sample_rate") or cls._music_field(release, "nfo_sample_rate")
+        bit_depth_name = f"{bit_depth}bit" if bit_depth else ""
+        sample_rate_name = cls._music_sample_rate(sample_rate) if sample_rate else ""
+        if bit_depth_name and sample_rate_name:
+            format_parts.append(f"{bit_depth_name}-{sample_rate_name}")
+        elif bit_depth_name or sample_rate_name:
+            format_parts.append(bit_depth_name or sample_rate_name)
+        bitrate = first_track.get("bitrate")
+        if bitrate and codec not in {"FLAC", "ALAC", "WAV", "AIFF"}:
+            try:
+                bitrate_kbps = round(float(bitrate) / 1000)
+                bitrate_mode = str(first_track.get("bitrate_mode") or "").upper().strip()
+                format_parts.append(f"{bitrate_kbps} {bitrate_mode}".strip())
+            except TypeError, ValueError:
+                pass
+        release_type = str(cls._music_field(release, "release_type", "")).casefold()
+        if release_type == "single":
+            format_parts.append("Single")
+
+        title_parts = [str(artist or "").strip(), "-", str(album or "").strip()]
+        if year:
+            title_parts.append(f"({year})")
+        if format_parts:
+            title_parts.extend(["-", f"[{' '.join(part for part in format_parts if part)}]"])
+        name = " ".join(part for part in title_parts if part)
+        name = " ".join(name.split())
+        return f"{name}{str(meta.tag or '').strip()}"
+
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {
             "MOVIE": "1",
@@ -325,6 +401,7 @@ class Zenith(UNIT3D):
             "BOOK": "6",
             "MISC": "9",
             "GAME": "3",
+            "MUSIC": "5",
         }
         if mapping_only:
             return category_id
@@ -372,6 +449,11 @@ class Zenith(UNIT3D):
             resolved_id = "16"
         elif category == "BOOK":
             resolved_id = type_id.get(_book_format(meta) or "", "16")
+        elif category == "MUSIC":
+            fmt = meta.format
+            if not fmt and isinstance(meta.music_release, dict):
+                fmt = self._music_field(meta.music_release, "format")
+            resolved_id = type_id.get(str(fmt or "").upper(), "0")
         else:
             resolved_id = type_id.get(meta_type or "", "0")
 
@@ -379,6 +461,30 @@ class Zenith(UNIT3D):
 
     async def get_additional_data(self, meta: Meta) -> dict[str, str]:
         data: dict[str, str] = {}
+        if meta.category == "MUSIC":
+            release = cast(dict[str, Any], meta.music_release) if isinstance(meta.music_release, dict) else {}
+            external_ids_raw = release.get("external_ids")
+            external_ids = cast(dict[str, Any], external_ids_raw) if isinstance(external_ids_raw, dict) else {}
+
+            musicbrainz_release = str(external_ids.get("musicbrainz_release") or "").strip()
+            musicbrainz_group = str(external_ids.get("musicbrainz_release_group") or "").strip()
+            valid_musicbrainz = re.compile(r"^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$", re.IGNORECASE)
+            if valid_musicbrainz.fullmatch(musicbrainz_release) or valid_musicbrainz.fullmatch(musicbrainz_group):
+                data["exists_on_musicbrainz"] = "1"
+                if valid_musicbrainz.fullmatch(musicbrainz_release):
+                    data["musicbrainz_release_id"] = musicbrainz_release
+                if valid_musicbrainz.fullmatch(musicbrainz_group):
+                    data["musicbrainz_release_group_id"] = musicbrainz_group
+
+            if meta.music_discogs_enabled:
+                discogs_release = str(external_ids.get("discogs_release") or meta.music_discogs_release_id or meta.music_discogs_id or "").strip()
+                discogs_master = str(external_ids.get("discogs_master") or meta.music_discogs_master_id or "").strip()
+                if discogs_release.isdecimal() or discogs_master.isdecimal():
+                    data["exists_on_discogs"] = "1"
+                    if discogs_release.isdecimal():
+                        data["discogs_release_id"] = discogs_release
+                    if discogs_master.isdecimal():
+                        data["discogs_master_id"] = discogs_master
         if meta.category == "BOOK" and not _is_misc(meta):
             if meta.isbn:
                 data["isbn"] = meta.isbn

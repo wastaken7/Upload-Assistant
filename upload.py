@@ -5,6 +5,7 @@ import asyncio
 import contextlib
 import filecmp
 import gc
+import ipaddress
 import json
 import os
 import platform
@@ -12,6 +13,7 @@ import re
 import shlex
 import shutil
 import signal
+import socket
 import sys
 import threading
 import time
@@ -19,7 +21,7 @@ import traceback
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Protocol, cast
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from src.check_requirements import check_dependencies
 
@@ -54,6 +56,7 @@ from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
 from src.trackers.alpharatio import AlphaRatio
 from src.trackers.common import Common
+from src.trackers.digitalcore import DigitalCore
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup, api_trackers, http_trackers, other_api_trackers, tracker_class_map
 from src.trackerstatus import TrackerStatusManager
@@ -811,15 +814,72 @@ def _set_music_field(meta: Meta, field: str, value: str | int, *, source: str = 
         meta.cover = str(value)
 
 
-def _music_targets_orpheus(meta: Meta) -> bool:
-    """Whether this MUSIC job includes Orpheus (whose image field is optional)."""
-    trackers = [meta.trackers] if isinstance(meta.trackers, str) else (meta.trackers or [])
-    return any(str(tracker).strip().upper() == "ORPHEUS" for tracker in trackers)
-
-
 def _is_http_url(value: Any) -> bool:
     parsed = urlparse(str(value or "").strip())
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+MUSIC_COVER_MAX_BYTES = 10 * 1024 * 1024
+MUSIC_COVER_MAX_REDIRECTS = 3
+
+
+def _is_public_music_cover_url(value: Any) -> bool:
+    """Allow artwork downloads only from public HTTP(S) hosts."""
+    if not _is_http_url(value):
+        return False
+    host = urlparse(str(value).strip()).hostname
+    if not host:
+        return False
+    try:
+        addresses = {result[4][0] for result in socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)}
+    except OSError:
+        return False
+    try:
+        return bool(addresses) and all(ipaddress.ip_address(address).is_global for address in addresses)
+    except ValueError:
+        return False
+
+
+def _download_music_cover(url: str) -> bytes | None:
+    """Download a bounded image while validating every redirect destination."""
+    current_url = url
+    for _ in range(MUSIC_COVER_MAX_REDIRECTS + 1):
+        if not _is_public_music_cover_url(current_url):
+            logger.warning("[yellow]MUSIC: refused artwork download from a non-public URL.[/yellow]")
+            return None
+        response: requests.Response | None = None
+        try:
+            response = requests.get(current_url, timeout=30, allow_redirects=False, stream=True)
+            if response.is_redirect:
+                location = response.headers.get("Location", "")
+                if not location:
+                    return None
+                current_url = urljoin(current_url, location)
+                continue
+            response.raise_for_status()
+            content_type = response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+            if not content_type.startswith("image/"):
+                logger.warning(f"[yellow]MUSIC: artwork URL returned unsupported content type {content_type or 'unknown'}.[/yellow]")
+                return None
+            content_length = response.headers.get("Content-Length")
+            if content_length and (not content_length.isdigit() or int(content_length) > MUSIC_COVER_MAX_BYTES):
+                logger.warning("[yellow]MUSIC: artwork download exceeds the 10 MiB limit.[/yellow]")
+                return None
+            content = bytearray()
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                content.extend(chunk)
+                if len(content) > MUSIC_COVER_MAX_BYTES:
+                    logger.warning("[yellow]MUSIC: artwork download exceeds the 10 MiB limit.[/yellow]")
+                    return None
+            return bytes(content)
+        except requests.RequestException as error:
+            logger.warning(f"[yellow]MUSIC: could not download artwork for image hosting: {error}[/yellow]")
+            return None
+        finally:
+            if response is not None:
+                response.close()
+    logger.warning("[yellow]MUSIC: artwork URL exceeded the redirect limit.[/yellow]")
+    return None
 
 
 async def _write_music_snapshot(meta: Meta) -> None:
@@ -829,38 +889,60 @@ async def _write_music_snapshot(meta: Meta) -> None:
         await file.write(json.dumps(meta.music_release, indent=2, cls=PathAwareEncoder))
 
 
-async def _host_orpheus_music_cover(meta: Meta, uploadscreens_manager: UploadScreensManager) -> None:
-    """Host already-resolved local MUSIC artwork after confirmation only.
+def _music_cover_allowed_hosts(config: Mapping[str, Any], trackers: Iterable[Any]) -> list[str]:
+    """Return image hosts accepted by DigitalCore and every selected constrained tracker."""
+    approved_hosts = set(getattr(DigitalCore(config=config), "approved_image_hosts", ()))
+    for tracker_name in trackers:
+        tracker_class = tracker_class_map.get(str(tracker_name).upper())
+        if tracker_class is None:
+            continue
+        tracker_hosts = getattr(tracker_class(config=config), "approved_image_hosts", None)
+        if tracker_hosts:
+            approved_hosts &= {str(host) for host in tracker_hosts}
+    return sorted(approved_hosts)
 
-    Image hosting is an external state-changing action, so debug mode never
-    calls an image host.  A manually supplied URL always wins over local art.
-    """
-    if not _music_targets_orpheus(meta) or _is_http_url(meta.cover):
-        return
-    cover_path = Path(str(meta.cover_path or ""))
-    if not cover_path.is_file():
-        return
+
+async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensManager, allowed_hosts: list[str] | None = None) -> None:
+    """Host MUSIC artwork and publish it through the shared ``meta.covers`` API."""
     if meta.debug:
-        logger.info(f"[yellow]MUSIC debug: artwork found at {cover_path.name}; image-host upload skipped.[/yellow]")
+        logger.info("[yellow]MUSIC debug: image-host upload skipped.[/yellow]")
         return
     if meta.skip_imghost_upload:
-        logger.info("[yellow]MUSIC: image-host upload is disabled; provide a public artwork URL for Orpheus.[/yellow]")
+        logger.info("[yellow]MUSIC: image-host upload is disabled; provide a hosted artwork URL.[/yellow]")
         return
 
-    cache_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "music_cover.json"
+    cache_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "covers.json"
     try:
         if cache_path.is_file():
             cached = json.loads(await asyncio.to_thread(cache_path.read_text, encoding="utf-8"))
-            cached_url = cached.get("raw_url", "") if isinstance(cached, dict) else ""
+            cached_cover = cached[0] if isinstance(cached, list) and cached else {}
+            cached_url = cached_cover.get("raw_url", "") if isinstance(cached_cover, dict) else ""
             if _is_http_url(cached_url):
                 meta.cover = str(cached_url)
+                meta.covers = cached
                 _set_music_field(meta, "cover_url", meta.cover, source="external")
                 return
     except (OSError, ValueError, TypeError) as error:
         logger.debug(f"[yellow]MUSIC: ignored unusable artwork cache: {error}[/yellow]")
 
+    cover_path = Path(str(meta.cover_path or ""))
+    if not cover_path.is_file() and _is_http_url(meta.cover):
+        cover_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "music_cover.jpg"
+        content = await asyncio.to_thread(_download_music_cover, meta.cover)
+        if content is None:
+            return
+        try:
+            cover_path.parent.mkdir(parents=True, exist_ok=True)
+            await asyncio.to_thread(cover_path.write_bytes, content)
+            meta.cover_path = str(cover_path)
+        except OSError as error:
+            logger.warning(f"[yellow]MUSIC: could not save downloaded artwork for image hosting: {error}[/yellow]")
+            return
+    if not cover_path.is_file():
+        return
+
     try:
-        uploaded, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [str(cover_path)], {})
+        uploaded, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [str(cover_path)], {}, allowed_hosts=allowed_hosts)
     except Exception as error:
         logger.warning(f"[yellow]MUSIC: artwork host upload failed: {error}[/yellow]")
         return
@@ -869,10 +951,11 @@ async def _host_orpheus_music_cover(meta: Meta, uploadscreens_manager: UploadScr
         return
 
     meta.cover = str(uploaded[0]["raw_url"])
+    meta.covers = uploaded
     _set_music_field(meta, "cover_url", meta.cover, source="external")
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     async with aiofiles.open(cache_path, "w", encoding="utf-8") as file:
-        await file.write(json.dumps(uploaded[0], indent=2))
+        await file.write(json.dumps(uploaded, indent=2))
     await _write_music_snapshot(meta)
 
 
@@ -1430,7 +1513,11 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             if "image_list" not in meta:
                 meta.image_list = []
             if meta.category == "MUSIC":
-                await _host_orpheus_music_cover(meta, uploadscreens_manager)
+                allowed_hosts = _music_cover_allowed_hosts(config, cast(list[Any], meta.trackers))
+                if not allowed_hosts:
+                    logger.warning("[yellow]MUSIC: no image host is approved by all selected trackers.[/yellow]")
+                    return False
+                await _host_music_cover(meta, uploadscreens_manager, allowed_hosts)
             manual_frames_str = meta.manual_frames
             if isinstance(manual_frames_str, str):
                 manual_frames_list = [f.strip() for f in manual_frames_str.split(",") if f.strip()]
@@ -2364,6 +2451,9 @@ async def do_the_thing(base_dir: str) -> None:
                                     if usenet_trackers:
                                         meta_usenet = meta.copy()
                                         meta_usenet["trackers"] = usenet_trackers
+                                        # Meta.copy() is deep; keep results on the queue item's
+                                        # status map so its final summary can see this flow.
+                                        meta_usenet.tracker_status = meta.tracker_status
                                         logger.info(f"[yellow]Processing uploads to Usenet indexers: {', '.join(usenet_trackers)}.....")
                                         await process_trackers(
                                             meta_usenet,
@@ -2396,6 +2486,9 @@ async def do_the_thing(base_dir: str) -> None:
                         if torrent_trackers:
                             meta_torrent = meta.copy()
                             meta_torrent["trackers"] = torrent_trackers
+                            # The final queue result is evaluated against ``meta``, not this
+                            # per-flow copy, including when both flows run concurrently.
+                            meta_torrent.tracker_status = meta.tracker_status
                             await process_trackers(
                                 meta_torrent,
                                 config,

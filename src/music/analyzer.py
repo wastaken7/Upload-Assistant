@@ -23,7 +23,7 @@ YEAR_RE = re.compile(r"(?:^|[^0-9])((?:19|20)\d{2})(?:[^0-9]|$)")
 LEADING_YEAR_RE = re.compile(r"^\s*[\[(]?\s*((?:19|20)\d{2})\b")
 EDITION_RE = re.compile(r"(?:\[|\()([^\]\)]*(?:deluxe|remaster|anniversary|reissue|expanded|edition)[^\]\)]*)(?:\]|\))", re.I)
 EDITION_WITH_YEAR_RE = re.compile(r"(?:\[|\()\s*((?:19|20)\d{2})[\s,.-]+([^\]\)]+)(?:\]|\))", re.I)
-BRACKET_RE = re.compile(r"\[([^\]]+)]")
+BRACKET_RE = re.compile(r"\[([^\]]+)\]|\{([^\}]+)\}")
 # Subsequent catalogue components must have an actual separator.  Allowing an
 # optional separator before another ``\d+`` creates many equivalent ways to
 # partition a long run of digits and can backtrack exponentially.
@@ -411,7 +411,8 @@ class MusicReleaseAnalyzer:
         if match:
             release.set_field("year", match.group(1), MetadataSource.DIRECTORY, 1.0)
         if not release.get("artist") or not release.get("album"):
-            match = re.search(r"(?:^|\d{4}\s*-?\s*)(.+?)\s+-\s+(.+?)(?:\s*\[[^]]+])?$", normalized)
+            name_without_metadata = re.sub(r"(?:\s*(?:\[[^\]]+\]|\{[^\}]+\}))*$", "", normalized)
+            match = re.search(r"(?:^|\d{4}\s*-?\s*)(.+?)\s+-\s+(.+?)$", name_without_metadata)
             if match:
                 release.set_field("artist", match.group(1).strip(), MetadataSource.DIRECTORY, 0.55)
                 release.set_field("album", match.group(2).strip(), MetadataSource.DIRECTORY, 0.55)
@@ -447,7 +448,7 @@ class MusicReleaseAnalyzer:
         # for example ``[2014 WEB FLAC][Label Name][886444460446]``.  A WEB
         # release date, label and catalogue number do not by themselves prove
         # an audio-distinct edition, so retain them as ``release_*`` fields.
-        brackets = [_clean(value) for value in BRACKET_RE.findall(normalized)]
+        brackets = [_clean(value) for match in BRACKET_RE.findall(normalized) for value in match if value]
         source_markers = ("WEB", "DIGITAL", "CD", "VINYL", "LP", "SACD", "BLU-RAY", "BLURAY")
         format_markers = ("FLAC", "MP3", "AAC", "ALAC", "M4A", "OGG", "OPUS", "WAV", "AIFF")
         edition_markers_upper = tuple(marker.upper() for marker in edition_markers)
@@ -464,6 +465,19 @@ class MusicReleaseAnalyzer:
                 continue
             if CATALOGUE_RE.fullmatch(detail):
                 release.set_field("release_catalogue_number", detail, MetadataSource.DIRECTORY, 0.65)
+                release.set_field("directory_catalogue_number", detail, MetadataSource.DIRECTORY, 0.7)
+                continue
+            catalogue = CATALOGUE_RE.search(detail)
+            if catalogue:
+                release.set_field("release_catalogue_number", catalogue.group(0), MetadataSource.DIRECTORY, 0.65)
+                release.set_field("directory_catalogue_number", catalogue.group(0), MetadataSource.DIRECTORY, 0.7)
+                # A scene-style block may combine imprint, catalogue and
+                # medium, e.g. ``{Roc-A-Fella B001219802 CD}``.
+                label = re.sub(r"\b(?:CD|WEB|DIGITAL|VINYL|LP|SACD|DVD|BD|BLU-?RAY)\b", "", CATALOGUE_RE.sub("", detail), flags=re.I)
+                label = re.sub(r"[|,;/]+", " ", label)
+                label = re.sub(r"^[\s._-]+|[\s._-]+$", "", label)
+                if label and re.search(r"[A-Za-z]", label):
+                    release.set_field("release_label", label, MetadataSource.DIRECTORY, 0.6)
                 continue
             upper_detail = detail.upper()
             if not any(marker in upper_detail for marker in (*source_markers, *format_markers, *edition_markers_upper)) and re.search(r"[A-Za-z]", detail):

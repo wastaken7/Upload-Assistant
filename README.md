@@ -87,95 +87,96 @@ This branch introduces new media categories and automation features not present 
 <details>
 <summary><strong>Click to view Supported Torrent Trackers</strong></summary>
 
-| Site                   | Tracker                | Supported Categories         |
-| ---------------------- | ---------------------- | ---------------------------- |
-| Aither                 | AITHER                 | MOVIE, TV                    |
-| Alpharatio             | ALPHARATIO             | MOVIE, TV                    |
-| Amigos-Share           | AMIGOSSHARE            | MOVIE, TV, BOOK, GAME        |
-| ANTHELION              | ANTHELION              | MOVIE                        |
-| AsianCinema            | ASIANCINEMA            | MOVIE, TV                    |
-| Aura4K                 | AURA4K                 | MOVIE, TV                    |
-| AvistaZ                | AVISTAZ                | MOVIE, TV                    |
-| Beyond-HD              | BEYONDHD               | MOVIE, TV                    |
-| BitHDTV                | BITHDTV                | MOVIE, TV                    |
-| Blutopia               | BLUTOPIA               | MOVIE, TV                    |
-| BrasilJapão-Share      | BJSHARE                | MOVIE, TV, BOOK, GAME        |
-| BrasilTracker          | BRASILTRACKER          | MOVIE, TV, BOOK, GAME        |
-| CapybaraBR             | CAPYBARABR             | MOVIE, TV, BOOK, GAME        |
-| Cinematik              | CINEMATIK              | MOVIE, TV                    |
-| CinemaZ                | CINEMAZ                | MOVIE, TV                    |
-| DarkPeers              | DARKPEERS              | MOVIE, TV, BOOK, GAME        |
-| DesiTorrents           | DESITORRENTS           | MOVIE, TV                    |
-| DigitalCore            | DIGITALCORE            | MOVIE, TV, BOOK, GAME        |
-| Emuwarez               | EMUWAREZ               | MOVIE, TV                    |
-| FileList               | FILELIST               | MOVIE, TV                    |
-| FunFile                | FUNFILE                | MOVIE, TV                    |
-| GreatPosterWall        | GREATPOSTERWALL        | MOVIE                        |
-| hawke-uno              | HAWKEUNO               | MOVIE, TV                    |
-| HDBits                 | HDBITS                 | MOVIE, TV                    |
-| HD-Space               | HDSPACE                | MOVIE, TV                    |
-| HD-Torrents            | HDTORRENTS             | MOVIE, TV                    |
-| HomieHelpDesk          | HOMIEHELPDESK          | MOVIE, TV, BOOK, GAME        |
-| ImmortalSeed           | IMMORTALSEED           | MOVIE, TV, BOOK              |
-| InfinityHD             | INFINITYHD             | MOVIE, TV                    |
-| ItaTorrents            | ITATORRENTS            | MOVIE, TV                    |
-| lajidui                | LAJIDUI                | MOVIE, TV                    |
-| LastDigitalUnderground | LASTDIGITALUNDERGROUND | MOVIE, TV, BOOK              |
-| Lat-Team               | LATTEAM                | MOVIE, TV, BOOK              |
-| Locadora               | LOCADORA               | MOVIE, TV                    |
-| LongPT                 | LONGPT                 | MOVIE, TV                    |
-| LST                    | LST                    | MOVIE, TV, BOOK              |
-| Luminarr               | LUMINARR               | MOVIE, TV                    |
-| MakingOff              | MAKINGOFF              | MOVIE                        |
-| MidnightScene          | MIDNIGHTSCENE          | MOVIE, TV                    |
-| MoreThanTV             | MORETHANTV             | MOVIE, TV                    |
-| M-Team                 | MTEAM                  | MOVIE, TV                    |
-| Nebulance              | NEBULANCE              | TV                           |
-| OldToonsWorld          | OLDTOONSWORLD          | MOVIE, TV                    |
-| OnlyEncodes+           | ONLYENCODES            | MOVIE, TV                    |
-| Orpheus                | ORPHEUS                | MUSIC                        |
-| PassThePopcorn         | PASSTHEPOPCORN         | MOVIE                        |
-| PeerGarden             | PEERGARDEN             | MOVIE, TV, GAME, BOOK, MUSIC |
-| PolishTorrent          | POLISHTORRENT          | MOVIE, TV                    |
-| Portugas               | PORTUGAS               | MOVIE, TV                    |
-| PrivateHD              | PRIVATEHD              | MOVIE, TV                    |
-| PT GTK                 | PTGTK                  | MOVIE, TV                    |
-| ptcafe                 | PTCAFE                 | MOVIE, TV                    |
-| PTerClub               | PTERCLUB               | MOVIE, TV                    |
-| PTFans                 | PTFANS                 | MOVIE, TV                    |
-| PTSKIT                 | PTSKIT                 | MOVIE, TV                    |
-| Racing4Everyone        | RACING4EVERYONE        | MOVIE, TV                    |
-| RailgunPT              | RAILGUNPT              | MOVIE, TV                    |
-| Rastastugan            | RASTASTUGAN            | MOVIE, TV, BOOK, GAME        |
-| ReelFLiX               | REELFLIX               | MOVIE                        |
-| RetroFlix              | RETROFLIX              | MOVIE, TV                    |
-| Samaritano             | SAMARITANO             | MOVIE, TV, BOOK, GAME        |
-| seedpool               | SEEDPOOL               | MOVIE, TV                    |
-| ShareIsland            | SHAREISLAND            | MOVIE, TV                    |
-| SkipTheCommerials      | SKIPTHECOMMERCIALS     | MOVIE, TV                    |
-| SpeedApp               | SPEEDAPP               | MOVIE, TV, BOOK, GAME        |
-| Swarmazon              | SWARMAZON              | MOVIE, TV                    |
-| The Leach Zone         | THELEACHZONE           | MOVIE, TV                    |
-| TheOldSchool           | THEOLDSCHOOL           | MOVIE, TV                    |
-| Torrenteros            | TORRENTEROS            | MOVIE, TV                    |
-| TorrentHR              | TORRENTHR              | MOVIE, TV                    |
-| TorrentLeech           | TORRENTLEECH           | MOVIE, TV, BOOK, GAME        |
-| ToTheGlory             | TOTHEGLORY             | MOVIE, TV                    |
-| TVChaosUK              | TVCHAOSUK              | MOVIE, TV                    |
-| ULCX                   | ULCX                   | MOVIE, TV                    |
-| UTOPIA                 | UTOPIA                 | MOVIE, TV                    |
-| YUSCENE                | YUSCENE                | MOVIE, TV, BOOK, GAME        |
-| Zenith                 | ZENITH                 | MOVIE, TV, BOOK, GAME        |
+| Site                                                                                                                 | Tracker                | Supported Categories         |
+| -------------------------------------------------------------------------------------------------------------------- | ---------------------- | ---------------------------- |
+| <img src="web_ui/static/img/trackers/aither.png" width="16" height="16" />‎ ‎ Aither                                 | AITHER                 | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/alpharatio.png" width="16" height="16" />‎ ‎ Alpharatio                         | ALPHARATIO             | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/amigosshare.png" width="16" height="16" />‎ ‎ Amigos-Share                      | AMIGOSSHARE            | MOVIE, TV, BOOK, GAME        |
+| <img src="web_ui/static/img/trackers/anthelion.png" width="16" height="16" />‎ ‎ Anthelion                           | ANTHELION              | MOVIE                        |
+| <img src="web_ui/static/img/trackers/asiancinema.png" width="16" height="16" />‎ ‎ AsianCinema                       | ASIANCINEMA            | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/aura4k.png" width="16" height="16" />‎ ‎ Aura4K                                 | AURA4K                 | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/avistaz.png" width="16" height="16" />‎ ‎ AvistaZ                               | AVISTAZ                | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/beyondhd.png" width="16" height="16" />‎ ‎ Beyond-HD                            | BEYONDHD               | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/bithdtv.png" width="16" height="16" />‎ ‎ BitHDTV                               | BITHDTV                | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/blutopia.png" width="16" height="16" />‎ ‎ Blutopia                             | BLUTOPIA               | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/bjshare.png" width="16" height="16" />‎ ‎ BrasilJapão-Share                     | BJSHARE                | MOVIE, TV, BOOK, GAME        |
+| <img src="web_ui/static/img/trackers/brasiltracker.png" width="16" height="16" />‎ ‎ BrasilTracker                   | BRASILTRACKER          | MOVIE, TV, BOOK, GAME        |
+| <img src="web_ui/static/img/trackers/capybarabr.png" width="16" height="16" />‎ ‎ CapybaraBR                         | CAPYBARABR             | MOVIE, TV, BOOK, GAME        |
+| <img src="web_ui/static/img/trackers/cinematik.png" width="16" height="16" />‎ ‎ Cinematik                           | CINEMATIK              | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/cinemaz.png" width="16" height="16" />‎ ‎ CinemaZ                               | CINEMAZ                | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/darkpeers.png" width="16" height="16" />‎ ‎ DarkPeers                           | DARKPEERS              | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/desitorrents.png" width="16" height="16" />‎ ‎ DesiTorrents                     | DESITORRENTS           | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/digitalcore.png" width="16" height="16" />‎ ‎ DigitalCore                       | DIGITALCORE            | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/emuwarez.png" width="16" height="16" />‎ ‎ Emuwarez                             | EMUWAREZ               | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/filelist.png" width="16" height="16" />‎ ‎ FileList                             | FILELIST               | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/funfile.png" width="16" height="16" />‎ ‎ FunFile                               | FUNFILE                | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/greatposterwall.png" width="16" height="16" />‎ ‎ GreatPosterWall               | GREATPOSTERWALL        | MOVIE                        |
+| <img src="web_ui/static/img/trackers/hawkeuno.png" width="16" height="16" />‎ ‎ hawke-uno                            | HAWKEUNO               | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/hdbits.png" width="16" height="16" />‎ ‎ HDBits                                 | HDBITS                 | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/hdspace.png" width="16" height="16" />‎ ‎ HD-Space                              | HDSPACE                | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/hdtorrents.png" width="16" height="16" />‎ ‎ HD-Torrents                        | HDTORRENTS             | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/homiehelpdesk.png" width="16" height="16" />‎ ‎ HomieHelpDesk                   | HOMIEHELPDESK          | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/immortalseed.png" width="16" height="16" />‎ ‎ ImmortalSeed                     | IMMORTALSEED           | MOVIE, TV, BOOK, MUSIC, GAME |
+| <img src="web_ui/static/img/trackers/infinityhd.png" width="16" height="16" />‎ ‎ InfinityHD                         | INFINITYHD             | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/infinityhd.png" width="16" height="16" />‎ ‎ IPTorrents                         | IPTORRENTS             | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/itatorrents.png" width="16" height="16" />‎ ‎ ItaTorrents                       | ITATORRENTS            | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/lajidui.png" width="16" height="16" />‎ ‎ lajidui                               | LAJIDUI                | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/lastdigitalunderground.png" width="16" height="16" />‎ ‎ LastDigitalUnderground | LASTDIGITALUNDERGROUND | MOVIE, TV, BOOK              |
+| <img src="web_ui/static/img/trackers/latteam.png" width="16" height="16" />‎ ‎ Lat-Team                              | LATTEAM                | MOVIE, TV, BOOK              |
+| <img src="web_ui/static/img/trackers/locadora.png" width="16" height="16" />‎ ‎ Locadora                             | LOCADORA               | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/longpt.png" width="16" height="16" />‎ ‎ LongPT                                 | LONGPT                 | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/lst.png" width="16" height="16" />‎ ‎ LST                                       | LST                    | MOVIE, TV, BOOK, MUSIC       |
+| <img src="web_ui/static/img/trackers/luminarr.png" width="16" height="16" />‎ ‎ Luminarr                             | LUMINARR               | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/makingoff.png" width="16" height="16" />‎ ‎ MakingOff                           | MAKINGOFF              | MOVIE                        |
+| <img src="web_ui/static/img/trackers/midnightscene.png" width="16" height="16" />‎ ‎ MidnightScene                   | MIDNIGHTSCENE          | MOVIE, TV, GAME, MUSIC       |
+| <img src="web_ui/static/img/trackers/morethantv.png" width="16" height="16" />‎ ‎ MoreThanTV                         | MORETHANTV             | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/mteam.png" width="16" height="16" />‎ ‎ M-Team                                  | MTEAM                  | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/nebulance.png" width="16" height="16" />‎ ‎ Nebulance                           | NEBULANCE              | TV                           |
+| <img src="web_ui/static/img/trackers/oldtoonsworld.png" width="16" height="16" />‎ ‎ OldToonsWorld                   | OLDTOONSWORLD          | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/onlyencodes.png" width="16" height="16" />‎ ‎ OnlyEncodes+                      | ONLYENCODES            | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/orpheus.png" width="16" height="16" />‎ ‎ Orpheus                               | ORPHEUS                | MUSIC                        |
+| <img src="web_ui/static/img/trackers/passthepopcorn.png" width="16" height="16" />‎ ‎ PassThePopcorn                 | PASSTHEPOPCORN         | MOVIE                        |
+| <img src="web_ui/static/img/trackers/peergarden.png" width="16" height="16" />‎ ‎ PeerGarden                         | PEERGARDEN             | MOVIE, TV, GAME, BOOK, MUSIC |
+| <img src="web_ui/static/img/trackers/polishtorrent.png" width="16" height="16" />‎ ‎ PolishTorrent                   | POLISHTORRENT          | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/portugas.png" width="16" height="16" />‎ ‎ Portugas                             | PORTUGAS               | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/privatehd.png" width="16" height="16" />‎ ‎ PrivateHD                           | PRIVATEHD              | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/ptgtk.png" width="16" height="16" />‎ ‎ PT GTK                                  | PTGTK                  | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/ptcafe.png" width="16" height="16" />‎ ‎ ptcafe                                 | PTCAFE                 | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/pterclub.png" width="16" height="16" />‎ ‎ PTerClub                             | PTERCLUB               | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/ptfans.png" width="16" height="16" />‎ ‎ PTFans                                 | PTFANS                 | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/ptskit.png" width="16" height="16" />‎ ‎ PTSKIT                                 | PTSKIT                 | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/racing4everyone.png" width="16" height="16" />‎ ‎ Racing4Everyone               | RACING4EVERYONE        | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/railgunpt.png" width="16" height="16" />‎ ‎ RailgunPT                           | RAILGUNPT              | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/rastastugan.png" width="16" height="16" />‎ ‎ Rastastugan                       | RASTASTUGAN            | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/reelflix.png" width="16" height="16" />‎ ‎ ReelFLiX                             | REELFLIX               | MOVIE                        |
+| <img src="web_ui/static/img/trackers/retroflix.png" width="16" height="16" />‎ ‎ RetroFlix                           | RETROFLIX              | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/samaritano.png" width="16" height="16" />‎ ‎ Samaritano                         | SAMARITANO             | MOVIE, TV, BOOK, GAME        |
+| <img src="web_ui/static/img/trackers/seedpool.png" width="16" height="16" />‎ ‎ seedpool                             | SEEDPOOL               | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/shareisland.png" width="16" height="16" />‎ ‎ ShareIsland                       | SHAREISLAND            | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/skipthecommercials.png" width="16" height="16" />‎ ‎ SkipTheCommerials          | SKIPTHECOMMERCIALS     | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/speedapp.png" width="16" height="16" />‎ ‎ SpeedApp                             | SPEEDAPP               | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/swarmazon.png" width="16" height="16" />‎ ‎ Swarmazon                           | SWARMAZON              | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/theleachzone.png" width="16" height="16" />‎ ‎ The Leach Zone                   | THELEACHZONE           | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/theoldschool.png" width="16" height="16" />‎ ‎ TheOldSchool                     | THEOLDSCHOOL           | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/torrenteros.png" width="16" height="16" />‎ ‎ Torrenteros                       | TORRENTEROS            | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/torrenthr.png" width="16" height="16" />‎ ‎ TorrentHR                           | TORRENTHR              | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/torrentleech.png" width="16" height="16" />‎ ‎ TorrentLeech                     | TORRENTLEECH           | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/totheglory.png" width="16" height="16" />‎ ‎ ToTheGlory                         | TOTHEGLORY             | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/tvchaosuk.png" width="16" height="16" />‎ ‎ TVChaosUK                           | TVCHAOSUK              | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/ulcx.png" width="16" height="16" />‎ ‎ ULCX                                     | ULCX                   | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/utopia.png" width="16" height="16" />‎ ‎ UTOPIA                                 | UTOPIA                 | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/yuscene.png" width="16" height="16" />‎ ‎ YUSCENE                               | YUSCENE                | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/zenith.png" width="16" height="16" />‎ ‎ Zenith                                 | ZENITH                 | MOVIE, TV, BOOK, GAME, MUSIC |
 
 </details>
 
 <details>
 <summary><strong>Click to view Supported Usenet Indexers</strong></summary>
 
-| Site        | Tracker     | Supported Categories  |
-| ----------- | ----------- | --------------------- |
-| Curupira    | CURUPIRA    | MOVIE, TV, BOOK, GAME |
-| DrunkenSlug | DRUNKENSLUG | MOVIE, TV, BOOK, GAME |
+| Site                                                                                           | Tracker     | Supported Categories  |
+| ---------------------------------------------------------------------------------------------- | ----------- | --------------------- |
+| <img src="web_ui/static/img/trackers/curupira.png" width="16" height="16" />‎ ‎ Curupira       | CURUPIRA    | MOVIE, TV, BOOK, GAME |
+| <img src="web_ui/static/img/trackers/drunkenslug.png" width="16" height="16" />‎ ‎ DrunkenSlug | DRUNKENSLUG | MOVIE, TV, BOOK, GAME |
 
 </details>
 

@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import platform
-import re
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +27,7 @@ class ImmortalSeed:
     banned_groups = ("",)
     base_url = "https://immortalseed.me"
     torrent_url = "https://immortalseed.me/details.php?hash="
-    supported_categories = ("TV", "MOVIE", "BOOK")
+    supported_categories = ("TV", "MOVIE", "BOOK", "MUSIC", "GAME")
     tracker_urls = ("https://immortalseed.me",)
 
     def __init__(self, config: Config) -> None:
@@ -60,8 +59,10 @@ class ImmortalSeed:
             logo=False,
             mediainfo=True,
             menu_screenshots=True,
+            music=True,
             nfo=False,
             screenshots=True,
+            signature=f"\n{meta.ua_signature} (https://github.com/wastaken7/Upload-Assistant)",
             tonemapped_header=True,
             tv_info=True,
             ua_signature=True,
@@ -81,14 +82,17 @@ class ImmortalSeed:
 
         if category == "MOVIE":
             search_type = "t_genre"
-            search_query = str(meta.imdb_info.get("imdbID", ""))
+            search_query = str(meta.imdb_tt)
 
         elif category == "TV":
             search_type = "t_name"
-            search_query = f"{meta.title} {meta.season}{meta.episode}"
-        elif category == "BOOK":
+            search_query = f"{meta.title} {meta.season}"
+        elif category in ("BOOK", "GAME"):
             search_type = "t_name"
             search_query = meta.title
+        elif category == "MUSIC":
+            search_type = "t_name"
+            search_query = f"{meta.artist} {meta.title}"
         else:
             return dupes
 
@@ -121,12 +125,16 @@ class ImmortalSeed:
             size_tag = row.select_one("td:nth-of-type(5)")
             size = size_tag.get_text(strip=True) if size_tag else None
 
-            duplicate_entry = {"name": name, "size": size, "link": torrent_link}
+            duplicate_entry: dict[str, str | None] = {
+                "name": name,
+                "size": size,
+                "link": torrent_link,
+            }
             dupes.append(duplicate_entry)
 
         return dupes
 
-    async def get_category_id(self, meta: Meta) -> int:
+    def get_category_id(self, meta: Meta) -> int:
         resolution = meta.resolution
         category = str(meta.category)
         genres = [g.lower() for g in meta.genres]
@@ -168,6 +176,15 @@ class ImmortalSeed:
         comics = 41
         ebooks = 22
         magazines = 46
+
+        music_flac = 37
+        music_mp3 = 36
+        music_other = 39
+
+        game_nin = 61
+        game_pc = 26
+        game_playstation = 28
+        game_xbox = 29
 
         if category == "MOVIE":
             if "documentary" in genres or "documentary" in keywords:
@@ -226,6 +243,23 @@ class ImmortalSeed:
                 return magazines
             return ebooks
 
+        if category == "MUSIC":
+            if meta.format == "FLAC":
+                return music_flac
+            if meta.format == "MP3":
+                return music_mp3
+            return music_other
+
+        if category == "GAME":
+            platform = str(meta.platform).upper()
+            if platform in {"NDS", "3DS", "SWITCH", "WII", "WIIU"}:
+                return game_nin
+            if platform in {"PS1", "PS2", "PS3", "PS4", "PS5", "PSP", "PSVITA"}:
+                return game_playstation
+            if platform in {"XBOX", "X360", "XONE", "XSX"}:
+                return game_xbox
+            return game_pc
+
         return 0
 
     async def get_nfo(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
@@ -239,20 +273,16 @@ class ImmortalSeed:
             return {"nfofile": (nfo_path.name, nfo_bytes, "application/octet-stream")}
         nfo_content = await self.generate_description(meta)
         nfo_bytes = nfo_content.encode("utf-8")
-        nfo_filename = f"{(meta.scene_name if meta.scene_name is not None else meta.basename_no_ext)}.nfo"
+        nfo_filename = f"{(meta.scene_name or meta.basename_no_ext)}.nfo"
         return {"nfofile": (nfo_filename, nfo_bytes, "application/octet-stream")}
 
     async def get_name(self, meta: Meta) -> str:
-        scene_name = meta.scene_name
-        if scene_name:
-            return scene_name
-        name_value = meta.name
-        aka_value = meta.aka
-        is_name = name_value.replace(aka_value, "").replace("Dubbed", "").replace("Dual-Audio", "")
-        is_name = re.sub(r"\s{2,}", " ", is_name)
-        return is_name.replace(" ", ".")
+        if meta.scene_name:
+            return meta.scene_name
 
-    async def get_book_cover(self, meta: Meta) -> str:
+        return meta.basename_no_ext
+
+    async def get_cover(self, meta: Meta) -> str:
         covers = meta.covers
         if isinstance(covers, list) and len(covers) > 0:
             raw_url = covers[0].get("raw_url")
@@ -269,14 +299,14 @@ class ImmortalSeed:
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         message = f"{meta.overview}\n\n[youtube]{meta.youtube}[/youtube]"
         cover = meta.poster
-        if meta.category == "BOOK":
+        if meta.category in ("BOOK", "MUSIC"):
             message = meta.overview
-            cover = await self.get_book_cover(meta)
+            cover = await self.get_cover(meta)
 
         data: dict[str, Any] = {
             "UseNFOasDescr": "no",
             "message": message,
-            "category": await self.get_category_id(meta),
+            "category": self.get_category_id(meta),
             "subject": await self.get_name(meta),
             "nothingtopost": "1",
             "t_image_url": cover,

@@ -3,14 +3,44 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import re
 import time
-from typing import Any, ClassVar
+from pathlib import Path
+from typing import Any, ClassVar, cast
 
 import httpx
 
 from src.console import logger
 from src.music.models import MetadataSource, MusicRelease
+
+
+def _music_cache_path(base_dir: str, provider: str, kind: str, key: str) -> Path | None:
+    """Return a stable cache location without exposing query text in filenames."""
+    if not base_dir:
+        return None
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    return Path(base_dir) / "tmp" / "music_metadata_cache" / provider / kind / f"{digest}.json"
+
+
+async def _read_music_cache(path: Path | None) -> Any | None:
+    if path is None or not path.is_file():
+        return None
+    try:
+        return json.loads(await asyncio.to_thread(path.read_text, encoding="utf-8"))
+    except OSError, ValueError, json.JSONDecodeError:
+        return None
+
+
+async def _write_music_cache(path: Path | None, value: Any) -> None:
+    if path is None:
+        return
+    try:
+        await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(path.write_text, json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError, TypeError, ValueError:
+        pass
 
 
 class MusicBrainzEnricher:
@@ -25,8 +55,9 @@ class MusicBrainzEnricher:
     _lock: ClassVar[asyncio.Lock] = asyncio.Lock()
     _last_request: ClassVar[float] = 0.0
 
-    def __init__(self, user_agent: str = "Upload-Assistant/2.x (+https://github.com/wastaken7/Upload-Assistant)") -> None:
+    def __init__(self, user_agent: str = "Upload-Assistant/2.x (+https://github.com/wastaken7/Upload-Assistant)", base_dir: str = "") -> None:
         self.user_agent = user_agent
+        self.base_dir = base_dir
 
     async def enrich(self, release: MusicRelease) -> None:
         artist, album = str(release.get("artist", "")), str(release.get("album", ""))
@@ -36,6 +67,10 @@ class MusicBrainzEnricher:
         if not result:
             return
         release.external_ids["musicbrainz_release"] = str(result.get("id", ""))
+        release_group_raw = result.get("release-group", {})
+        release_group = cast(dict[str, Any], release_group_raw) if isinstance(release_group_raw, dict) else {}
+        if release_group.get("id"):
+            release.external_ids["musicbrainz_release_group"] = str(release_group["id"])
         release.set_field("musicbrainz_release", result.get("id"), MetadataSource.EXTERNAL, 0.9)
         _set_external_release_type(release, self._release_type(result), 0.72, "MusicBrainz")
         # MusicBrainz's release ``date`` is a concrete release date.  Use the
@@ -52,13 +87,29 @@ class MusicBrainzEnricher:
         key = (artist.casefold(), album.casefold(), track_count)
         if key in self._cache:
             return self._cache[key]
+        cache_path = _music_cache_path(self.base_dir, "musicbrainz", "release_search", "\x1f".join(map(str, key)))
+        cached = await _read_music_cache(cache_path)
+        if isinstance(cached, dict):
+            if cached.get("not_found") is True:
+                self._cache[key] = None
+                return None
+            self._cache[key] = cached
+            return cached
         async with self._lock:
             if key in self._cache:
                 return self._cache[key]
+            cached = await _read_music_cache(cache_path)
+            if isinstance(cached, dict):
+                if cached.get("not_found") is True:
+                    self._cache[key] = None
+                    return None
+                self._cache[key] = cached
+                return cached
             delay = 1.0 - (time.monotonic() - type(self)._last_request)
             if delay > 0:
                 await asyncio.sleep(delay)
             try:
+                request_succeeded = False
                 async with httpx.AsyncClient(timeout=httpx.Timeout(5.0), headers={"User-Agent": self.user_agent}) as client:
                     response = await client.get(
                         "https://musicbrainz.org/ws/2/release/", params={"query": f'artist:"{artist}" AND release:"{album}"', "fmt": "json", "limit": 3}
@@ -66,10 +117,13 @@ class MusicBrainzEnricher:
                     response.raise_for_status()
                     releases = response.json().get("releases", [])
                     result = self._select_release(releases, album, track_count)
+                    request_succeeded = True
             except httpx.HTTPError, ValueError:
                 result = None
             type(self)._last_request = time.monotonic()
             type(self)._cache[key] = result
+            if request_succeeded:
+                await _write_music_cache(cache_path, result if result is not None else {"not_found": True})
             return result
 
     @staticmethod
@@ -136,11 +190,11 @@ class MusicBrainzEnricher:
 
 
 class DiscogsEnricher:
-    """Resolve an explicitly supplied Discogs release or master reference.
+    """Resolve explicit or unambiguous Discogs release references.
 
-    Discogs is deliberately ID-only: title searches can select the wrong
-    pressing, while a release ID identifies the exact edition whose label,
-    catalogue number, country and date are useful to a tracker upload.  The
+    An explicit release ID identifies the exact pressing.  When no ID is
+    supplied, a title/artist search is accepted only after an exact match has
+    been established (and selected by the user where it is ambiguous).  The
     client is read-only, caches responses per process and serialises requests
     to one per second, comfortably below Discogs' public API limit.
     """
@@ -149,9 +203,10 @@ class DiscogsEnricher:
     _lock: ClassVar[asyncio.Lock] = asyncio.Lock()
     _last_request: ClassVar[float] = 0.0
 
-    def __init__(self, token: str = "", user_agent: str = "Upload-Assistant/2.x (+https://github.com/wastaken7/Upload-Assistant)") -> None:
+    def __init__(self, token: str = "", user_agent: str = "Upload-Assistant/2.x (+https://github.com/wastaken7/Upload-Assistant)", base_dir: str = "") -> None:
         self.token = token.strip()
         self.user_agent = user_agent
+        self.base_dir = base_dir
 
     @classmethod
     def parse_reference(cls, value: Any, default_kind: str = "release") -> tuple[str, str] | None:
@@ -177,7 +232,6 @@ class DiscogsEnricher:
             release_data = await self._get("releases", release_id)
             if release_data:
                 self._apply_release(release, release_data)
-                logger.info(f"[cyan]Music: enriched from Discogs release {release_id}.[/cyan]")
                 master_id = master_id or str(release_data.get("master_id", ""))
             else:
                 logger.warning(f"[yellow]MUSIC: Discogs release {release_id} was not found or could not be read.[/yellow]")
@@ -185,7 +239,7 @@ class DiscogsEnricher:
             master_data = await self._get("masters", master_id)
             if master_data:
                 self._apply_master(release, master_data)
-                logger.info(f"[cyan]Music: corroborated original release data from Discogs master {master_id}.[/cyan]")
+                logger.info(f"[cyan]MUSIC: corroborated original release data from Discogs master {master_id}.[/cyan]")
                 # A master alone is not a concrete pressing.  Its main release
                 # supplies label/catalogue data, so fetch that single linked
                 # record when the caller did not already specify a release.
@@ -193,17 +247,161 @@ class DiscogsEnricher:
                     release_data = await self._get("releases", str(master_data["main_release"]))
                     if release_data:
                         self._apply_release(release, release_data)
-                        logger.info(f"[cyan]Music: enriched concrete release from Discogs master {master_id}.[/cyan]")
+                        logger.info(f"[cyan]MUSIC: enriched concrete release from Discogs master {master_id}.[/cyan]")
             else:
                 logger.warning(f"[yellow]MUSIC: Discogs master {master_id} was not found or could not be read.[/yellow]")
+
+    async def find_exact_releases(self, artist: str, album: str) -> list[dict[str, Any]]:
+        """Return Discogs releases whose displayed artist and title are exact.
+
+        Search is deliberately stricter than the API query: partial titles,
+        compilations with a matching word, and a different artist are ignored.
+        Multiple pressings are retained for the caller to choose from.
+        """
+        if not artist.strip() or not album.strip():
+            return []
+        if not self.token:
+            logger.warning("[yellow]MUSIC: Discogs exact-match search skipped because no Discogs token is configured.[/yellow]")
+            return []
+        key = ("search", f"{artist.casefold()}\x1f{album.casefold()}")
+        if key in self._cache:
+            result = self._cache[key]
+            return list(result.get("results", [])) if result else []
+        cache_path = _music_cache_path(self.base_dir, "discogs", "release_search", key[1])
+        cached = await _read_music_cache(cache_path)
+        if isinstance(cached, list):
+            self._cache[key] = {"results": cached}
+            return list(cached)
+        async with self._lock:
+            if key in self._cache:
+                result = self._cache[key]
+                return list(result.get("results", [])) if result else []
+            cached = await _read_music_cache(cache_path)
+            if isinstance(cached, list):
+                self._cache[key] = {"results": cached}
+                return list(cached)
+            delay = 1.0 - (time.monotonic() - type(self)._last_request)
+            if delay > 0:
+                await asyncio.sleep(delay)
+            headers = {"User-Agent": self.user_agent}
+            if self.token:
+                headers["Authorization"] = f"Discogs token={self.token}"
+            try:
+                request_succeeded = False
+                async with httpx.AsyncClient(timeout=httpx.Timeout(8.0), headers=headers) as client:
+                    response = await client.get(
+                        "https://api.discogs.com/database/search",
+                        params={"artist": artist, "release_title": album, "type": "release", "per_page": 100},
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
+                    results = payload.get("results", []) if isinstance(payload, dict) else []
+                    matches = [item for item in results if isinstance(item, dict) and self._is_exact_release(item, artist, album)]
+                    request_succeeded = True
+            except httpx.HTTPError, ValueError:
+                matches = []
+            type(self)._last_request = time.monotonic()
+            cached = {"results": matches}
+            type(self)._cache[key] = cached
+            if request_succeeded:
+                await _write_music_cache(cache_path, matches)
+            return list(matches)
+
+    @staticmethod
+    def _normalise_match(value: Any) -> str:
+        return re.sub(r"[\W_]+", "", str(value or "").casefold())
+
+    @classmethod
+    def _is_exact_release(cls, result: dict[str, Any], artist: str, album: str) -> bool:
+        title = str(result.get("title", "")).strip()
+        if " - " not in title:
+            return False
+        candidate_artist, candidate_album = title.split(" - ", 1)
+        return cls._normalise_match(candidate_artist) == cls._normalise_match(artist) and cls._normalise_match(candidate_album) == cls._normalise_match(album)
+
+    @classmethod
+    def filter_releases_by_media(cls, releases: list[dict[str, Any]], media: Any) -> list[dict[str, Any]]:
+        """Remove candidates whose Discogs physical/digital format conflicts.
+
+        A release with no recognised Discogs medium is retained: search results
+        are occasionally incomplete, and unknown is safer than a false reject.
+        """
+        target = {
+            "WEB": {"file"},
+            "CD": {"cd", "cdr"},
+            "DVD": {"dvd", "dvd-r"},
+            "BD": {"blu-ray", "blu-ray-r"},
+            "Vinyl": {"vinyl", "shellac", "flexi-disc", "lacquer"},
+            "Cassette": {"cassette"},
+            "SACD": {"sacd"},
+            "DAT": {"dat"},
+        }.get(str(media or ""))
+        if not target:
+            return releases
+        known = {
+            "file",
+            "cd",
+            "cdr",
+            "dvd",
+            "dvd-r",
+            "blu-ray",
+            "blu-ray-r",
+            "vinyl",
+            "shellac",
+            "flexi-disc",
+            "lacquer",
+            "cassette",
+            "sacd",
+            "dat",
+            "reel-to-reel",
+            "minidisc",
+            "memory stick",
+            "usb flash drive",
+            "vhs",
+            "laserdisc",
+            "8-track cartridge",
+            "dcc",
+            "betamax",
+            "hd-dvd",
+        }
+        filtered: list[dict[str, Any]] = []
+        for release in releases:
+            formats = release.get("format", [])
+            formats = formats if isinstance(formats, list) else [formats]
+            recognised = {str(value).casefold() for value in formats} & known
+            if not recognised or recognised & target:
+                filtered.append(release)
+        return filtered
+
+    @classmethod
+    def filter_releases_by_catalogue(cls, releases: list[dict[str, Any]], catalogue: Any) -> list[dict[str, Any]]:
+        """Keep exact catalogue matches, allowing only whitespace variation.
+
+        Hyphens are significant in catalogue numbers: ``B001219802`` and
+        ``B0012198-02`` can identify different releases.
+        """
+        wanted = re.sub(r"\s+", "", str(catalogue or "")).casefold()
+        if not wanted:
+            return releases
+        matches = [release for release in releases if re.sub(r"\s+", "", str(release.get("catno", ""))).casefold() == wanted]
+        return matches or releases
 
     async def _get(self, resource: str, identifier: str) -> dict[str, Any] | None:
         key = (resource, identifier)
         if key in self._cache:
             return self._cache[key]
+        cache_path = _music_cache_path(self.base_dir, "discogs", resource, identifier)
+        cached = await _read_music_cache(cache_path)
+        if isinstance(cached, dict):
+            self._cache[key] = cached
+            return cached
         async with self._lock:
             if key in self._cache:
                 return self._cache[key]
+            cached = await _read_music_cache(cache_path)
+            if isinstance(cached, dict):
+                self._cache[key] = cached
+                return cached
             delay = 1.0 - (time.monotonic() - type(self)._last_request)
             if delay > 0:
                 await asyncio.sleep(delay)
@@ -221,6 +419,8 @@ class DiscogsEnricher:
                 result = None
             type(self)._last_request = time.monotonic()
             type(self)._cache[key] = result
+            if result is not None:
+                await _write_music_cache(cache_path, result)
             return result
 
     @classmethod
@@ -238,23 +438,23 @@ class DiscogsEnricher:
         cls._apply_common(release, result, release_record=True)
         label = cls._first_label(result)
         if label:
-            cls._set_external(release, "release_label", label[0], 0.88)
-            cls._set_external(release, "release_catalogue_number", label[1], 0.88)
+            cls._set_external(release, "release_label", label[0], 0.94)
+            cls._set_external(release, "release_catalogue_number", label[1], 0.94)
         released = str(result.get("released", "")).strip()
         if released:
-            cls._set_external(release, "retail_date", released, 0.84)
+            cls._set_external(release, "retail_date", released, 0.90)
         year = cls._year(result.get("year"))
         if year:
-            cls._set_external(release, "release_year", year, 0.86)
+            cls._set_external(release, "release_year", year, 0.92)
         country = str(result.get("country", "")).strip()
         if country:
-            cls._set_external(release, "release_country", country, 0.78)
+            cls._set_external(release, "release_country", country, 0.86)
         media = cls._media(result.get("formats"))
         if media:
-            cls._set_external(release, "media", media, 0.7)
+            cls._set_external(release, "media", media, 0.84)
         release_type = cls._release_type(result.get("formats"))
         if release_type:
-            _set_external_release_type(release, release_type, 0.76, "Discogs")
+            _set_external_release_type(release, release_type, 0.86, "Discogs")
 
     @classmethod
     def _apply_master(cls, release: MusicRelease, result: dict[str, Any]) -> None:
@@ -268,20 +468,20 @@ class DiscogsEnricher:
         cls._apply_common(release, result, release_record=False)
         year = cls._year(result.get("year"))
         if year:
-            cls._set_external(release, "year", year, 0.82)
+            cls._set_external(release, "year", year, 0.90)
 
     @classmethod
     def _apply_common(cls, release: MusicRelease, result: dict[str, Any], *, release_record: bool) -> None:
         artists = cls._artists(result)
         if artists:
-            cls._set_external(release, "artists", artists, 0.84)
-            cls._set_external(release, "artist", " & ".join(artists), 0.84)
+            cls._set_external(release, "artists", artists, 0.92)
+            cls._set_external(release, "artist", " & ".join(artists), 0.92)
         title = cls._title(result, artists)
         if title:
-            cls._set_external(release, "album", title, 0.84)
+            cls._set_external(release, "album", title, 0.92)
         genres = cls._genres(result)
         if genres:
-            cls._set_external(release, "genres", genres, 0.78)
+            cls._set_external(release, "genres", genres, 0.86)
         if release_record:
             notes = str(result.get("notes", "")).strip()
             if notes:

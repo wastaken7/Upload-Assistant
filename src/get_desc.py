@@ -2,6 +2,7 @@
 import asyncio
 import contextlib
 import glob
+import html
 import json
 import os
 import re
@@ -357,7 +358,7 @@ class DescriptionBuilder:
 
     async def get_mediainfo_section(self, meta: Meta) -> str:
         """Returns the mediainfo section, using a cache file if available."""
-        if meta.is_disc == "BDMV" or meta.category in ("GAME", "BOOK"):
+        if meta.is_disc == "BDMV" or meta.category in ("GAME", "BOOK", "MUSIC"):
             return ""
 
         if self._get_bool_config("full_mediainfo", False) or meta.is_disc:
@@ -637,7 +638,7 @@ class DescriptionBuilder:
 
     def _build_book_desc_section(self, meta: Meta, header_size: int = 0, table: bool = True, underline: bool = False, bullet: str = "") -> str:
         """Build the BBCode table or list for BOOK-category uploads."""
-        if self.tracker == "TORRENTLEECH":
+        if self.tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP"):
             table = False
             header_size = -1
         elif self.tracker in ("BJSHARE", "BRASILTRACKER", "AMIGOSSHARE"):
@@ -679,7 +680,7 @@ class DescriptionBuilder:
             overview = re.sub(r"<[^>]+>", "", overview).strip()
 
         # Collect key-value pairs
-        fields = []
+        fields: list[tuple[str, str]] = []
         if author:
             fields.append((str_author, author))
         if book_translator:
@@ -786,7 +787,7 @@ class DescriptionBuilder:
         str_support = "Support" if not use_pt_br else "Suporte"
 
         # 1. Technical Details
-        fields = []
+        fields: list[tuple[str, str]] = []
         if meta.platform:
             fields.append((str_platform, meta.platform))
         if meta.game_version:
@@ -908,19 +909,25 @@ class DescriptionBuilder:
         if meta.category != "MUSIC" or not isinstance(meta.music_release, dict):
             return ""
 
+        if self.tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP"):
+            table = False
+
         release = meta.music_release
         fields_data = release.get("fields", {})
         tracks = release.get("tracks", [])
+        external_ids = release.get("external_ids", {})
         if not isinstance(fields_data, dict):
             fields_data = {}
         if not isinstance(tracks, list):
             tracks = []
-        if not fields_data and not tracks:
+        if not isinstance(external_ids, dict):
+            external_ids = {}
+        if not fields_data and not tracks and not external_ids:
             return ""
 
         if self.tracker == "TORRENTLEECH" and not header_size:
             header_size = 1
-        elif self.tracker in ("BJSHARE", "BRASILTRACKER") and not header_size:
+        elif self.tracker in ("BJSHARE", "BRASILTRACKER", "SPEEDAPP") and not header_size:
             header_size = 3
 
         header = "[h2]" if not header_size else f"[size={header_size}][b]"
@@ -979,7 +986,34 @@ class DescriptionBuilder:
             "sample_rate": "Sample Rate" if not use_pt_br else "Taxa de Amostragem",
             "channels": "Channels" if not use_pt_br else "Canais",
             "bitrate": "Bitrate",
+            "external_ids": "External IDs" if not use_pt_br else "IDs Externos",
         }
+
+        def musicbrainz_link(kind: str, identifier: Any) -> str:
+            """Return a safe MusicBrainz BBCode link for a canonical UUID."""
+            identifier = str(identifier or "").strip()
+            if not re.fullmatch(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}", identifier, re.IGNORECASE):
+                return ""
+            return f"[url=https://musicbrainz.org/{kind}/{identifier}]{identifier}[/url]"
+
+        def discogs_link(kind: str, identifier: Any) -> str:
+            """Return a safe Discogs BBCode link for a known release/master ID."""
+            raw_identifier = str(identifier or "").strip()
+            match = re.fullmatch(
+                rf"(?:https?://(?:www\.)?discogs\.com/)?{kind}(?:/|:)(\d+)(?:-[^/?#]+)?/?(?:[?#].*)?",
+                raw_identifier,
+                re.IGNORECASE,
+            )
+            numeric_identifier = match.group(1) if match else raw_identifier if raw_identifier.isdecimal() else ""
+            return f"[url=https://www.discogs.com/{kind}/{numeric_identifier}]{numeric_identifier}[/url]" if numeric_identifier else ""
+
+        external_id_links = [
+            ("MusicBrainz Release", musicbrainz_link("release", external_ids.get("musicbrainz_release"))),
+            ("MusicBrainz Release Group", musicbrainz_link("release-group", external_ids.get("musicbrainz_release_group"))),
+            ("Discogs Release", discogs_link("release", external_ids.get("discogs_release"))),
+            ("Discogs Master", discogs_link("master", external_ids.get("discogs_master"))),
+        ]
+        external_id_links = [f"{label}: {link}" for label, link in external_id_links if link]
 
         music_fields = [
             (text["artist"], display(value("artists", value("artist", meta.artist)))),
@@ -1001,6 +1035,7 @@ class DescriptionBuilder:
             (text["sample_rate"], technical_values("sample_rate", lambda item: f"{int(item) / 1000:g} kHz")),
             (text["channels"], technical_values("channels", lambda item: {1: "Mono", 2: "Stereo"}.get(int(item), f"{item} channels"))),
             (text["bitrate"], technical_values("bitrate", lambda item: f"{round(int(item) / 1000)} kbps")),
+            (text["external_ids"], ", ".join(external_id_links) if table else "\n".join(external_id_links)),
         ]
         music_fields = [(label, field_value) for label, field_value in music_fields if field_value]
         if not music_fields:
@@ -2168,6 +2203,16 @@ class DescriptionBuilder:
             description = bbcode.convert_comparison_to_centered(description, 1000)
             description = bbcode.remove_spoiler(description)
             description = re.sub(r"\n{3,}", "\n\n", description)
+
+        if tracker == "IMMORTALSEED":
+            # all tags must be removed, this is a plain-text only description
+            description = html.unescape(description)
+            # Preserve text structure where markup normally separates content.
+            description = re.sub(r"<br\s*/?\s*>", "\n", description, flags=re.IGNORECASE)
+            description = re.sub(r"</(?:p|div|li|tr|h[1-6]|blockquote|pre)\s*>", "\n", description, flags=re.IGNORECASE)
+            description = re.sub(r"<!--.*?-->|<![^>]*>|</?[a-z][^>]*>", "", description, flags=re.IGNORECASE | re.DOTALL)
+            # Strip BBCode names and attributes while retaining their contents.
+            description = re.sub(r"\[/?[a-z][a-z0-9_-]*(?:=[^\]]*|\s+[^\]]*)?\]|\[\*\]", "", description, flags=re.IGNORECASE)
 
         from src.trackersetup import api_trackers as unit3d_trackers
 

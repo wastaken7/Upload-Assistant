@@ -46,7 +46,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         from src.trackersetup import tracker_class_map
 
-        tracker_hosts: dict[str, str] = {}
+        tracker_hosts: dict[str, tuple[str, ...]] = {}
         for tracker_name in set(tracker_class_map.keys()) | {"PASSTHEPOPCORN", "BeyondHD", "BTN", "HDBITS"}:
             # Check base_url from class
             hostname = ""
@@ -74,10 +74,14 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     "BTN": "broadcasthe.net",
                     "BEYONDHD": "beyond-hd.me",
                     "HAWKEUNO": "hawke.uno",
+                    "ORPHEUS": "orpheus.network",
                 }
                 hostname = hardcoded_hosts.get(tracker_name, "")
             if hostname:
-                tracker_hosts[tracker_name] = hostname.lower()
+                domains = (hostname.lower(),)
+                if tracker_name == "ORPHEUS":
+                    domains = tuple(dict.fromkeys((*domains, "orpheus.network", "home.opsfet.ch")))
+                tracker_hosts[tracker_name] = domains
 
         urls: list[str] = re.findall(r"https?://[^\s\"'<>]+", comment)
         for url in urls:
@@ -87,8 +91,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
             # Match against tracker_hosts
             matched_tracker = None
-            for name, domain in tracker_hosts.items():
-                if _is_host(host, domain):
+            for name, domains in tracker_hosts.items():
+                if any(_is_host(host, domain) for domain in domains):
                     matched_tracker = name
                     break
 
@@ -122,6 +126,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 match = re.search(r"/details/(\d+)", path)
                 if match:
                     tracker_ids[tracker_key] = match.group(1)
+            elif matched_tracker == "ORPHEUS":
+                torrent_id = _query_id(parsed.query, "torrentid")
+                if torrent_id:
+                    tracker_ids[tracker_key] = torrent_id
             else:
                 # UNIT3D style: last path ID
                 tracker_id = _last_path_id(path)

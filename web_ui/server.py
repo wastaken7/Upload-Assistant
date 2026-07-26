@@ -1516,6 +1516,8 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
         )
 
     if category == "MUSIC":
+        from src.music.sources import DiscogsEnricher
+
         music_release = meta_data.get("music_release")
         fields = music_release.get("fields", {}) if isinstance(music_release, Mapping) else {}
         external_ids = music_release.get("external_ids", {}) if isinstance(music_release, Mapping) else {}
@@ -1535,6 +1537,24 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
                 musicbrainz_release,
                 f"https://musicbrainz.org/release/{quote(musicbrainz_release)}",
             )
+
+        if isinstance(external_ids, Mapping):
+            discogs_references = (
+                ("release", external_ids.get("discogs_release")),
+                ("master", external_ids.get("discogs_master")),
+            )
+            for reference_kind, reference_value in discogs_references:
+                parsed_reference = DiscogsEnricher.parse_reference(_stringify_preview_value(reference_value), reference_kind)
+                if parsed_reference:
+                    parsed_kind, discogs_id = parsed_reference
+                    _append_metadata_source(
+                        sources,
+                        seen_keys,
+                        f"discogs_{parsed_kind}",
+                        f"Discogs {parsed_kind.title()}",
+                        discogs_id,
+                        f"https://www.discogs.com/{parsed_kind}/{quote(discogs_id)}",
+                    )
 
     return sources
 

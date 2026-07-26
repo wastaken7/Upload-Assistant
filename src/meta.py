@@ -250,6 +250,7 @@ class Meta:
     music_discogs_id: str = ""
     music_discogs_master_id: str = ""
     music_discogs_release_id: str = ""
+    music_discogs_enabled: bool = True
     music_edition_year: int = 0
     music_enrichment: bool | None = None
     music_genres: str = ""
@@ -258,6 +259,7 @@ class Meta:
     music_release_type: str = ""
     music_release_year: int = 0
     music_release: dict[str, Any] = field(default_factory=dict)
+    orpheus: str | int | None = None
     modq: bool = False
     mteam_description: str = ""
     mtv_timeout: bool | None = None
