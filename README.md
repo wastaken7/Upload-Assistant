@@ -87,7 +87,7 @@ This branch introduces new media categories and automation features not present 
 <details>
 <summary><strong>Click to view Supported Torrent Trackers</strong></summary>
 
-| Site                                                                                                                 | Tracker                | Supported Categories         |
+| Site                                                                                                                 | Usage                | Supported Categories         |
 | -------------------------------------------------------------------------------------------------------------------- | ---------------------- | ---------------------------- |
 | <img src="web_ui/static/img/trackers/aither.png" width="16" height="16" />‎ ‎ Aither                                 | AITHER                 | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/alpharatio.png" width="16" height="16" />‎ ‎ Alpharatio                         | ALPHARATIO             | MOVIE, TV                    |
