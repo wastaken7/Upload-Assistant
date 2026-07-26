@@ -626,7 +626,7 @@ class Args:
             "--audio-spectrogram-tracks",
             nargs=1,
             required=False,
-            help="Select which audio tracks/streams to generate spectrograms for (comma-separated indexes or 'all')",
+            help="Select zero-based displayed audio stream positions for spectrograms (comma-separated, e.g. '0,1', or 'all')",
             type=str,
             dest="audio_spectrogram_tracks",
             default=None,

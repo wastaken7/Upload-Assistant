@@ -56,7 +56,7 @@ This branch introduces new media categories and automation features not present 
 
 ### 2. Audio Stream Spectrogram Generation
 
-- **Spectrogram Extraction & Plotting**: Use `-as` / `--audio-spectrogram` to automatically extract audio streams from MKVs or Blu-ray BDInfo using FFmpeg and plot frequency/time graphs (inferno theme) via `librosa` and `matplotlib`.
+- **Spectrogram Extraction & Plotting**: Use `-as` / `--audio-spectrogram` to automatically extract audio streams from MKVs, Blu-ray BDInfo, music tracks, or audiobook chapters using FFmpeg and plot frequency/time graphs (inferno theme) via `librosa` and `matplotlib`. Music and audiobook processing is capped by `audio_spectrogram_max_files`.
 - **Automated Upload**: Automatically uploads generated spectrograms along with your screenshots for release verification.
 - **Stream Selection**: Supports targeting specific tracks using `-ast` / `--audio-spectrogram-tracks` (e.g., track indexes or `all`).
 
@@ -87,7 +87,7 @@ This branch introduces new media categories and automation features not present 
 <details>
 <summary><strong>Click to view Supported Torrent Trackers</strong></summary>
 
-| Site                                                                                                                 | Usage                | Supported Categories         |
+| Site                                                                                                                 | Usage                  | Supported Categories         |
 | -------------------------------------------------------------------------------------------------------------------- | ---------------------- | ---------------------------- |
 | <img src="web_ui/static/img/trackers/aither.png" width="16" height="16" />‎ ‎ Aither                                 | AITHER                 | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/alpharatio.png" width="16" height="16" />‎ ‎ Alpharatio                         | ALPHARATIO             | MOVIE, TV                    |
@@ -173,7 +173,7 @@ This branch introduces new media categories and automation features not present 
 <details>
 <summary><strong>Click to view Supported Usenet Indexers</strong></summary>
 
-| Site                                                                                           | Usage     | Supported Categories  |
+| Site                                                                                           | Usage       | Supported Categories  |
 | ---------------------------------------------------------------------------------------------- | ----------- | --------------------- |
 | <img src="web_ui/static/img/trackers/curupira.png" width="16" height="16" />‎ ‎ Curupira       | CURUPIRA    | MOVIE, TV, BOOK, GAME |
 | <img src="web_ui/static/img/trackers/drunkenslug.png" width="16" height="16" />‎ ‎ DrunkenSlug | DRUNKENSLUG | MOVIE, TV, BOOK, GAME |
