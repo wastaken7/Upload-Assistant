@@ -641,6 +641,35 @@ def test_musicbrainz_requires_an_exact_title_and_track_count_match():
     assert result is None
 
 
+def test_musicbrainz_prefers_matching_cd_barcode_over_same_track_count_vinyl():
+    result = MusicBrainzEnricher._select_release(
+        [
+            {
+                "id": "wrong-vinyl",
+                "title": "Seventh Son of a Seventh Son",
+                "score": "100",
+                "barcode": "881034121455",
+                "media": [{"format": '12\" Vinyl', "track-count": 8}],
+            },
+            {
+                "id": "correct-cd",
+                "title": "Seventh Son of a Seventh Son",
+                "score": "95",
+                "barcode": "0190295567699",
+                "media": [{"format": "CD", "track-count": 8}],
+                "label-info": [{"catalog-number": "0190295567699"}],
+            },
+        ],
+        "Seventh Son of a Seventh Son",
+        8,
+        "CD",
+        "0190295567699",
+    )
+
+    assert result is not None
+    assert result["id"] == "correct-cd"
+
+
 def test_external_single_cannot_override_an_album_length_local_release():
     release = MusicRelease(root=".")
     release.tracks = [
@@ -770,7 +799,7 @@ def test_discogs_exact_lookup_requires_a_token(tmp_path):
 
 def test_discogs_and_musicbrainz_use_persistent_music_metadata_cache(tmp_path):
     discogs_path = _music_cache_path(str(tmp_path), "discogs", "releases", "987654321")
-    musicbrainz_key = "artist\x1falbum\x1f2"
+    musicbrainz_key = "artist\x1falbum\x1f2\x1f\x1f"
     musicbrainz_path = _music_cache_path(str(tmp_path), "musicbrainz", "release_search", musicbrainz_key)
     asyncio.run(_write_music_cache(discogs_path, {"id": 987654321, "title": "Artist - Album"}))
     asyncio.run(_write_music_cache(musicbrainz_path, {"id": "cached-release", "title": "Album"}))

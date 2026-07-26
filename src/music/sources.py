@@ -51,7 +51,7 @@ class MusicBrainzEnricher:
     observed across all instances in this process.
     """
 
-    _cache: ClassVar[dict[tuple[str, str, int], dict[str, Any] | None]] = {}
+    _cache: ClassVar[dict[tuple[str, str, str, str, str], dict[str, Any] | None]] = {}
     _lock: ClassVar[asyncio.Lock] = asyncio.Lock()
     _last_request: ClassVar[float] = 0.0
 
@@ -63,7 +63,11 @@ class MusicBrainzEnricher:
         artist, album = str(release.get("artist", "")), str(release.get("album", ""))
         if not artist or not album:
             return
-        result = await self._find_release(artist, album, len(release.tracks))
+        media = str(release.get("media", "")).strip()
+        # Prefer the directory value: it is parsed before enrichment and is not
+        # affected by a loose external match from an earlier provider.
+        catalogue_number = str(release.get("directory_catalogue_number", "") or release.get("release_catalogue_number", "") or release.get("catalogue_number", "")).strip()
+        result = await self._find_release(artist, album, len(release.tracks), media, catalogue_number)
         if not result:
             return
         release.external_ids["musicbrainz_release"] = str(result.get("id", ""))
@@ -83,8 +87,8 @@ class MusicBrainzEnricher:
         release.set_field("artists", artists, MetadataSource.EXTERNAL, 0.8)
         release.set_field("artist", " & ".join(artists), MetadataSource.EXTERNAL, 0.8)
 
-    async def _find_release(self, artist: str, album: str, track_count: int = 0) -> dict[str, Any] | None:
-        key = (artist.casefold(), album.casefold(), track_count)
+    async def _find_release(self, artist: str, album: str, track_count: int = 0, media: str = "", catalogue_number: str = "") -> dict[str, Any] | None:
+        key = (artist.casefold(), album.casefold(), str(track_count), media.casefold(), catalogue_number.casefold())
         if key in self._cache:
             return self._cache[key]
         cache_path = _music_cache_path(self.base_dir, "musicbrainz", "release_search", "\x1f".join(map(str, key)))
@@ -111,12 +115,12 @@ class MusicBrainzEnricher:
             try:
                 request_succeeded = False
                 async with httpx.AsyncClient(timeout=httpx.Timeout(5.0), headers={"User-Agent": self.user_agent}) as client:
-                    response = await client.get(
-                        "https://musicbrainz.org/ws/2/release/", params={"query": f'artist:"{artist}" AND release:"{album}"', "fmt": "json", "limit": 3}
-                    )
+                    barcode = self._barcode(catalogue_number)
+                    query = f"barcode:{barcode}" if barcode else f'artist:"{artist}" AND release:"{album}"'
+                    response = await client.get("https://musicbrainz.org/ws/2/release/", params={"query": query, "fmt": "json", "limit": 25})
                     response.raise_for_status()
                     releases = response.json().get("releases", [])
-                    result = self._select_release(releases, album, track_count)
+                    result = self._select_release(releases, album, track_count, media, catalogue_number)
                     request_succeeded = True
             except httpx.HTTPError, ValueError:
                 result = None
@@ -127,7 +131,7 @@ class MusicBrainzEnricher:
             return result
 
     @staticmethod
-    def _select_release(releases: Any, album: str, track_count: int) -> dict[str, Any] | None:
+    def _select_release(releases: Any, album: str, track_count: int, media: str = "", catalogue_number: str = "") -> dict[str, Any] | None:
         """Return only a MusicBrainz release that corroborates local evidence.
 
         A title search can return related releases or partial word matches.  It
@@ -141,9 +145,33 @@ class MusicBrainzEnricher:
         candidates = [item for item in releases if isinstance(item, dict) and MusicBrainzEnricher._normalise_title(item.get("title", "")) == normalised_album]
         if track_count:
             candidates = [item for item in candidates if MusicBrainzEnricher._track_count(item) == track_count]
+        if media:
+            candidates = [item for item in candidates if MusicBrainzEnricher._has_compatible_media(item, media)]
+        if catalogue_number:
+            candidates = [item for item in candidates if MusicBrainzEnricher._matches_catalogue_or_barcode(item, catalogue_number)]
         if not candidates:
             return None
         return max(candidates, key=lambda item: int(item.get("score", 0) or 0))
+
+    @staticmethod
+    def _barcode(value: Any) -> str:
+        """Return an EAN/UPC-like value, or an empty string for a catalogue ID."""
+        digits = re.sub(r"\D", "", str(value or ""))
+        return digits if 8 <= len(digits) <= 14 else ""
+
+    @staticmethod
+    def _matches_catalogue_or_barcode(result: dict[str, Any], value: str) -> bool:
+        expected = str(value).strip().casefold()
+        barcode = MusicBrainzEnricher._barcode(value)
+        if barcode and MusicBrainzEnricher._barcode(result.get("barcode", "")) == barcode:
+            return True
+        return any(isinstance(info, dict) and str(info.get("catalog-number", "")).strip().casefold() == expected for info in result.get("label-info", []))
+
+    @staticmethod
+    def _has_compatible_media(result: dict[str, Any], media: str) -> bool:
+        expected = {"web": "digital media"}.get(str(media).strip().casefold(), str(media).strip().casefold())
+        formats = [str(item.get("format", "")).strip().casefold() for item in result.get("media", []) if isinstance(item, dict)]
+        return any(candidate == expected or (expected == "vinyl" and "vinyl" in candidate) for candidate in formats)
 
     @staticmethod
     def _normalise_title(value: Any) -> str:
