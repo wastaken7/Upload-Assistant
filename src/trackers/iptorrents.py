@@ -104,7 +104,7 @@ class IPTorrents:
         "zombiRG",
     )
     torrent_url = "https://iptorrents.com/torrent.php?id="
-    supported_categories = ("TV", "MOVIE")
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
     tracker_urls = ("ssl.empirehost.me", "routing.bgp.technology", "127.0.0.1.stackoverflow.tech")
 
     def __init__(self, config: Config):
@@ -135,6 +135,7 @@ class IPTorrents:
             languages=False,
             logo=False,
             mediainfo=True,
+            music=True,
             menu_screenshots=True,
             nfo=False,
             screenshots=True,
@@ -145,14 +146,29 @@ class IPTorrents:
             signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/center][/url][/right]",
         )
 
-    async def search_existing(self, meta: Meta):
-        dupes = []
-        cat_id = 72 if meta.category == "MOVIE" else 73 if meta.category == "TV" else 0
-        if not cat_id:
-            return dupes
-        search_url = f"{self.base_url}/t?{cat_id}=&q={meta.title}"
+    async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
+        dupes: list[dict[str, str]] = []
+        search_query: str = ""
 
-        forbidden_keywords = []
+        if meta.category == "MOVIE":
+            search_query = meta.title
+            cat_id = 72
+        elif meta.category == "TV":
+            search_query = f"{meta.title} {meta.season}"
+            cat_id = 73
+        else:
+            cat_id = self.get_category_id(meta)
+            if meta.category in ("BOOK", "GAME"):
+                search_query = meta.title
+            elif meta.category == "MUSIC":
+                search_query = f"{meta.artist} {meta.title}"
+
+        if not cat_id or not search_query:
+            return dupes
+
+        search_url = f"{self.base_url}/t?{cat_id}=&q={search_query}"
+
+        forbidden_keywords: list[str] = []
 
         is_disc = str(meta.is_disc or "").strip().lower()
         _type = str(meta.type or "").strip().lower()
@@ -209,18 +225,20 @@ class IPTorrents:
                         link_tag = name_cell.find("a", class_="hv")
 
                         if link_tag:
-                            name = link_tag.get_text(strip=True)
+                            name = " ".join(link_tag.get_text(" ", strip=True).split())
                             torrent_path = link_tag.get("href")
                             torrent_link = f"{self.base_url}{torrent_path}"
-                            size = cells[5].get_text(strip=True)
+                            size_text = cells[5].get_text(" ", strip=True)
+                            size_match = re.search(r"\d+(?:[.,]\d+)?\s*(?:KB|MB|GB|TB)", size_text, re.IGNORECASE)
+                            size = size_match.group(0) if size_match else ""
 
-                            if not any(keyword in name.lower() for keyword in forbidden_keywords):
+                            if size and not any(keyword in name.lower() for keyword in forbidden_keywords):
                                 duplicate_entry = {"name": name, "size": size, "link": torrent_link}
                                 dupes.append(duplicate_entry)
 
         return dupes
 
-    async def get_category_id(self, meta: Meta):
+    def get_category_id(self, meta: Meta) -> int:
         resolution = meta.resolution
         category = meta.category
         type_ = meta.type
@@ -257,6 +275,21 @@ class IPTorrents:
         movie_kids = 54
         movie_480p = 77
         movie_cam = 96
+
+        music_all_codecs = 3
+        music_flac = 80
+
+        game_nin = 47
+        game_pc = 43
+        game_playstation = 71
+        game_wii = 50
+        game_xbox = 44
+
+        book = 35
+        book_non_english = 102
+        book_comic = 94
+        audiobook = 64
+        magazines_or_newspapers = 92
 
         if "documentary" in genres:
             return documentaries
@@ -315,7 +348,36 @@ class IPTorrents:
             if type_ == "XVID":
                 return tv_xvid
             return tv_x264
-        return None
+
+        if category == "GAME":
+            platform = str(meta.platform).upper()
+            if platform in {"NDS", "3DS", "SWITCH"}:
+                return game_nin
+            if platform in {"WII", "WIIU"}:
+                return game_wii
+            if platform in {"PS1", "PS2", "PS3", "PS4", "PS5", "PSP", "PSVITA"}:
+                return game_playstation
+            if platform in {"XBOX", "X360", "XONE", "XSX"}:
+                return game_xbox
+            return game_pc
+
+        if category == "BOOK":
+            if meta.audiobook:
+                return audiobook
+            if meta.comic or meta.manga:
+                return book_comic
+            if meta.magazine or meta.newspaper:
+                return magazines_or_newspapers
+            if meta.book_language_iso.lower() != "eng":
+                return book_non_english
+            return book
+
+        if category == "MUSIC":
+            if str(meta.format).upper() == "FLAC":
+                return music_flac
+            return music_all_codecs
+
+        return 0
 
     async def get_name(self, meta: Meta):
         name: str = meta.scene_name if meta.scene_name else meta.clean_name
@@ -382,11 +444,11 @@ class IPTorrents:
             logger.info(f"{self.tracker}: [bold red]Error reading torrent file for size check on {self.tracker}: {e}[/bold red]")
             return False
 
-    async def get_data(self, meta: Meta):
-        data = {
+    async def get_data(self, meta: Meta) -> dict[str, str | int]:
+        data: dict[str, str | int] = {
             "name": meta.name,
             "descr": await self.generate_description(meta),
-            "type": await self.get_category_id(meta),
+            "type": self.get_category_id(meta),
         }
 
         if await self.get_is_freeleech(meta):
@@ -428,10 +490,10 @@ class IPTorrents:
 
     async def edit_post_upload(self, meta: Meta):
         torrent_id = meta.tracker_status[self.tracker]["torrent_id"]
-        data = {
+        data: dict[str, str | int] = {
             "name": meta.name,
             "descr": await self.generate_description(meta),
-            "type": await self.get_category_id(meta),
+            "type": self.get_category_id(meta),
             "imdb_id": str(meta.tmdb_id),
             "id": torrent_id,
         }

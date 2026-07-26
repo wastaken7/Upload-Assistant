@@ -104,9 +104,9 @@ This branch introduces new media categories and automation features not present 
 | CapybaraBR             | CAPYBARABR             | MOVIE, TV, BOOK, GAME        |
 | Cinematik              | CINEMATIK              | MOVIE, TV                    |
 | CinemaZ                | CINEMAZ                | MOVIE, TV                    |
-| DarkPeers              | DARKPEERS              | MOVIE, TV, BOOK, GAME        |
+| DarkPeers              | DARKPEERS              | MOVIE, TV, BOOK, GAME, MUSIC |
 | DesiTorrents           | DESITORRENTS           | MOVIE, TV                    |
-| DigitalCore            | DIGITALCORE            | MOVIE, TV, BOOK, GAME        |
+| DigitalCore            | DIGITALCORE            | MOVIE, TV, BOOK, GAME, MUSIC |
 | Emuwarez               | EMUWAREZ               | MOVIE, TV                    |
 | FileList               | FILELIST               | MOVIE, TV                    |
 | FunFile                | FUNFILE                | MOVIE, TV                    |
@@ -115,8 +115,8 @@ This branch introduces new media categories and automation features not present 
 | HDBits                 | HDBITS                 | MOVIE, TV                    |
 | HD-Space               | HDSPACE                | MOVIE, TV                    |
 | HD-Torrents            | HDTORRENTS             | MOVIE, TV                    |
-| HomieHelpDesk          | HOMIEHELPDESK          | MOVIE, TV, BOOK, GAME        |
-| ImmortalSeed           | IMMORTALSEED           | MOVIE, TV, BOOK              |
+| HomieHelpDesk          | HOMIEHELPDESK          | MOVIE, TV, BOOK, GAME, MUSIC |
+| ImmortalSeed           | IMMORTALSEED           | MOVIE, TV, BOOK, MUSIC, GAME |
 | InfinityHD             | INFINITYHD             | MOVIE, TV                    |
 | ItaTorrents            | ITATORRENTS            | MOVIE, TV                    |
 | lajidui                | LAJIDUI                | MOVIE, TV                    |
@@ -124,10 +124,10 @@ This branch introduces new media categories and automation features not present 
 | Lat-Team               | LATTEAM                | MOVIE, TV, BOOK              |
 | Locadora               | LOCADORA               | MOVIE, TV                    |
 | LongPT                 | LONGPT                 | MOVIE, TV                    |
-| LST                    | LST                    | MOVIE, TV, BOOK              |
+| LST                    | LST                    | MOVIE, TV, BOOK, MUSIC       |
 | Luminarr               | LUMINARR               | MOVIE, TV                    |
 | MakingOff              | MAKINGOFF              | MOVIE                        |
-| MidnightScene          | MIDNIGHTSCENE          | MOVIE, TV                    |
+| MidnightScene          | MIDNIGHTSCENE          | MOVIE, TV, GAME, MUSIC       |
 | MoreThanTV             | MORETHANTV             | MOVIE, TV                    |
 | M-Team                 | MTEAM                  | MOVIE, TV                    |
 | Nebulance              | NEBULANCE              | TV                           |
@@ -146,26 +146,26 @@ This branch introduces new media categories and automation features not present 
 | PTSKIT                 | PTSKIT                 | MOVIE, TV                    |
 | Racing4Everyone        | RACING4EVERYONE        | MOVIE, TV                    |
 | RailgunPT              | RAILGUNPT              | MOVIE, TV                    |
-| Rastastugan            | RASTASTUGAN            | MOVIE, TV, BOOK, GAME        |
+| Rastastugan            | RASTASTUGAN            | MOVIE, TV, BOOK, GAME, MUSIC |
 | ReelFLiX               | REELFLIX               | MOVIE                        |
 | RetroFlix              | RETROFLIX              | MOVIE, TV                    |
 | Samaritano             | SAMARITANO             | MOVIE, TV, BOOK, GAME        |
-| seedpool               | SEEDPOOL               | MOVIE, TV                    |
+| seedpool               | SEEDPOOL               | MOVIE, TV, BOOK, GAME, MUSIC |
 | ShareIsland            | SHAREISLAND            | MOVIE, TV                    |
 | SkipTheCommerials      | SKIPTHECOMMERCIALS     | MOVIE, TV                    |
-| SpeedApp               | SPEEDAPP               | MOVIE, TV, BOOK, GAME        |
+| SpeedApp               | SPEEDAPP               | MOVIE, TV, BOOK, GAME, MUSIC |
 | Swarmazon              | SWARMAZON              | MOVIE, TV                    |
 | The Leach Zone         | THELEACHZONE           | MOVIE, TV                    |
 | TheOldSchool           | THEOLDSCHOOL           | MOVIE, TV                    |
 | Torrenteros            | TORRENTEROS            | MOVIE, TV                    |
 | TorrentHR              | TORRENTHR              | MOVIE, TV                    |
-| TorrentLeech           | TORRENTLEECH           | MOVIE, TV, BOOK, GAME        |
+| TorrentLeech           | TORRENTLEECH           | MOVIE, TV, BOOK, GAME, MUSIC |
 | ToTheGlory             | TOTHEGLORY             | MOVIE, TV                    |
 | TVChaosUK              | TVCHAOSUK              | MOVIE, TV                    |
 | ULCX                   | ULCX                   | MOVIE, TV                    |
 | UTOPIA                 | UTOPIA                 | MOVIE, TV                    |
-| YUSCENE                | YUSCENE                | MOVIE, TV, BOOK, GAME        |
-| Zenith                 | ZENITH                 | MOVIE, TV, BOOK, GAME        |
+| YUSCENE                | YUSCENE                | MOVIE, TV, BOOK, GAME, MUSIC |
+| Zenith                 | ZENITH                 | MOVIE, TV, BOOK, GAME, MUSIC |
 
 </details>
 

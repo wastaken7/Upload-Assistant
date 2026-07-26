@@ -34,8 +34,8 @@ class SpeedApp:
     upload_url = f"{base_url}/api/upload"
     torrent_url = f"{base_url}/browse/"
     banned_url = f"{base_url}/api/torrent/release-group/blacklist"
-    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
-    tracker_urls = ("ramjet.speedapp.io", "ramjet.speedapp.to", "ramjet.speedappio.org")
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
+    tracker_urls = ("speedapp",)
     allowed_bloated_audio_languages = ("ro",)
 
     def __init__(self, config: Config) -> None:
@@ -51,7 +51,7 @@ class SpeedApp:
             timeout=30.0,
         )
 
-    async def get_cat_id(self, meta: Meta) -> str | None:
+    async def get_cat_id(self, meta: Meta) -> int:
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
@@ -64,52 +64,55 @@ class SpeedApp:
         category = str(meta.category)
         if "RO" in origin_countries:
             if category == "TV":
-                return "60"
+                return 60
             if category == "MOVIE":
-                return "59"
+                return 59
 
         # documentary
         genres = str(meta.genres)
         keywords = str(meta.keywords)
         if "documentary" in genres.lower() or "documentary" in keywords.lower():
-            return "63" if romanian else "9"
+            return 63 if romanian else 9
 
         # anime
         if meta.anime:
-            return "3"
+            return 3
 
         # TV
         if category == "TV":
             if meta.tv_pack:
-                return "66" if romanian else "41"
+                return 66 if romanian else 41
             if meta.sd:
-                return "46" if romanian else "45"
-            return "44" if romanian else "43"
+                return 46 if romanian else 45
+            return 44 if romanian else 43
 
         # MOVIE
         if category == "MOVIE":
             resolution = meta.resolution
             media_type = str(meta.type)
             if resolution == "2160p" and media_type != "DISC":
-                return "57" if romanian else "61"
+                return 57 if romanian else 61
             if media_type in ("REMUX", "WEBDL", "WEBRIP", "HDTV", "ENCODE"):
-                return "29" if romanian else "8"
+                return 29 if romanian else 8
             if media_type == "DISC":
-                return "24" if romanian else "17"
+                return 24 if romanian else 17
             if media_type == "SD":
-                return "35" if romanian else "10"
+                return 35 if romanian else 10
 
         # BOOK/EBOOK category
         if category == "BOOK":
-            return "6"
+            return 6
 
         # Game
         if category == "GAME":
             if meta.console_game:
-                return "52"
-            return "11"
+                return 52
+            return 11
 
-        return None
+        if category == "MUSIC":
+            return 5
+
+        return 0
 
     async def get_file_info(self, meta: Meta) -> tuple[str | None, str | None]:
         base_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}"
@@ -136,11 +139,13 @@ class SpeedApp:
         search_url = f"{self.base_url}/api/torrent"
 
         params: dict[str, str] = {}
-        if meta.imdb_id or 0 != 0:
-            imdb_info = cast(dict[str, Any], meta.imdb_info)
-            params["imdbId"] = str(imdb_info.get("imdbID", ""))
+        if meta.imdb_id:
+            params["imdbId"] = meta.imdb_tt
         else:
-            search_title = meta.title.replace(":", "").replace("'", "").replace(",", "")
+            search_title = meta.title
+            if meta.category == "MUSIC":
+                search_title = f"{meta.artist} {meta.title}"
+            search_title = search_title.replace(":", "").replace("'", "").replace(",", "")
             params["search"] = search_title
 
         response = await self.session.get(url=search_url, params=params, headers=self.session.headers)
@@ -213,13 +218,14 @@ class SpeedApp:
             logo=True,
             mediainfo=False,
             menu_screenshots=False,
+            music=True,
             nfo=False,
             screenshots=False,
             tonemapped_header=True,
             tv_info=True,
             ua_signature=True,
             user_description=True,
-            signature=f"[url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/url]",
+            signature=f"\n[url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/url]",
         )
 
     async def get_name(self, meta: Meta) -> str:
@@ -273,7 +279,7 @@ class SpeedApp:
             "description": str(meta.genres),
             "name": await self.get_name(meta),
             "nfo": await self.get_nfo(meta),
-            "poster": meta.poster,
+            "poster": meta.poster or meta.cover,
             "technicalDetails": await self.edit_desc(meta),
             "screenshots": await self.get_screenshots(meta),
             "type": await self.get_cat_id(meta),

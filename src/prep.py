@@ -128,6 +128,7 @@ class Prep:
         # stage exports and validates without rehashing the music release.
         if meta.category == "MUSIC":
             await self._gather_music_prep(meta)
+            prep_helpers.calculate_source_size(self, meta, str(meta.path or ""))
             await prep_helpers.process_trackers_and_torrent(self, meta, client, hash_ids, tracker_ids, "", "")
             await _enrich_music_from_orpheus_fn(meta, self.config)
             await _enrich_music_from_discogs_fn(meta, self.config)

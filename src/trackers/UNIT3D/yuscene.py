@@ -73,7 +73,7 @@ class YUSCENE(UNIT3D):
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
-    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
     tracker_urls = ("https://yu-scene.net",)
 
     def __init__(self, config: Config) -> None:
@@ -163,6 +163,9 @@ class YUSCENE(UNIT3D):
         resolved_type = type if type is not None and type != "" else meta.type
         if isinstance(resolved_type, str):
             resolved_type = resolved_type.upper().strip().lstrip(".")
+
+        if meta.category == "MUSIC":
+            resolved_type = meta.format.upper()
 
         val = type_id.get(resolved_type or "", "0")
         if meta.category == "BOOK" and val == "0":

@@ -89,7 +89,7 @@ class MidnightScene(UNIT3D):
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     requests_url = f"{base_url}/api/requests/filter"
-    supported_categories = ("TV", "MOVIE", "GAME")
+    supported_categories = ("TV", "MOVIE", "GAME", "MUSIC")
     tracker_urls = ("midnightscene.cc",)
 
     def __init__(self, config: Config) -> None:
@@ -107,6 +107,7 @@ class MidnightScene(UNIT3D):
         category_id = {
             "MOVIE": "1",
             "TV": "2",
+            "MUSIC": "3",
             "GAME": "4",
         }
         if mapping_only:
@@ -174,6 +175,12 @@ class MidnightScene(UNIT3D):
                 val = "11"
             else:
                 val = "9"  # PC
+        elif meta.category == "MUSIC":
+            release = meta.music_release if isinstance(meta.music_release, dict) else {}
+            fields = release.get("fields", {}) if isinstance(release.get("fields"), dict) else {}
+            format_field = fields.get("format", {}) if isinstance(fields.get("format"), dict) else {}
+            music_format = str(meta.format or format_field.get("value", "") or meta.type or "").upper().strip().lstrip(".")
+            val = type_id.get(music_format, "0")
         elif "FLAC" in (meta.audio or "").upper():
             val = "8"
         elif "MP3" in (meta.audio or "").upper():
@@ -185,6 +192,40 @@ class MidnightScene(UNIT3D):
         return {"type_id": val}
 
     async def get_name(self, meta: Meta):
+        if meta.category == "MUSIC":
+            # Scene titles retain their original segment separators; only the
+            # artist/title underscores are rendered as spaces on the site.
+            if meta.scene:
+                scene_name = str(meta.scene_name or meta.basename_no_ext or meta.name or "").strip()
+                if scene_name:
+                    return {"name": scene_name.replace("_", " ")}
+
+            release = meta.music_release if isinstance(meta.music_release, dict) else {}
+            fields = release.get("fields", {}) if isinstance(release.get("fields"), dict) else {}
+
+            def release_field(name: str, fallback: Any = "") -> str:
+                field = fields.get(name, {}) if isinstance(fields.get(name), dict) else {}
+                return str(field.get("value", fallback) or "").strip()
+
+            artist = release_field("artist", meta.artist)
+            title = release_field("album", meta.title)
+            year = release_field("release_year", release_field("year", meta.year))
+            catalogue = release_field("release_catalogue_number", release_field("catalogue_number", meta.music_catalogue_number))
+            edition = release_field("edition", meta.manual_edition or meta.edition)
+            media = release_field("media", meta.source)
+            format_name = release_field("format", meta.format or meta.type).upper()
+
+            name = " - ".join(part for part in (artist, title) if part)
+            if year:
+                name = f"{name} ({year})" if name else f"({year})"
+            catalogue_edition = " - ".join(part for part in (catalogue, edition) if part)
+            if catalogue_edition:
+                name = f"{name} [{catalogue_edition}]" if name else f"[{catalogue_edition}]"
+            media_format = " - ".join(part for part in (media, format_name) if part)
+            if media_format:
+                name = f"{name} [{media_format}]" if name else f"[{media_format}]"
+            return {"name": name}
+
         ms_name: str = meta.name
         name_type: str = meta.type or ""
         source: str = meta.source or ""

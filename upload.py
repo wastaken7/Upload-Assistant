@@ -2433,6 +2433,9 @@ async def do_the_thing(base_dir: str) -> None:
                                     if usenet_trackers:
                                         meta_usenet = meta.copy()
                                         meta_usenet["trackers"] = usenet_trackers
+                                        # Meta.copy() is deep; keep results on the queue item's
+                                        # status map so its final summary can see this flow.
+                                        meta_usenet.tracker_status = meta.tracker_status
                                         logger.info(f"[yellow]Processing uploads to Usenet indexers: {', '.join(usenet_trackers)}.....")
                                         await process_trackers(
                                             meta_usenet,
@@ -2465,6 +2468,9 @@ async def do_the_thing(base_dir: str) -> None:
                         if torrent_trackers:
                             meta_torrent = meta.copy()
                             meta_torrent["trackers"] = torrent_trackers
+                            # The final queue result is evaluated against ``meta``, not this
+                            # per-flow copy, including when both flows run concurrently.
+                            meta_torrent.tracker_status = meta.tracker_status
                             await process_trackers(
                                 meta_torrent,
                                 config,
