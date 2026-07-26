@@ -1118,6 +1118,12 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             if tracker in meta.trackers:
                 meta.trackers.remove(tracker)
 
+    # The category is final after gather_prep.  Remove incompatible trackers
+    # before generating tracker-specific names, prompting for confirmation, or
+    # validating their credentials.  The later status/upload stages retain the
+    # same check as a defensive guard for tracker lists changed after this point.
+    TrackerSetup(config=config).filter_unsupported_trackers(meta)
+
     meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
 
     logger.debug(f"Trackers list before editing: {meta.trackers}")
@@ -1187,6 +1193,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         logger.debug(f"Trackers list during edit process: {meta.trackers}")
         meta.edit = True
         meta = await prep.gather_prep(meta=meta, mode="cli")
+        TrackerSetup(config=config).filter_unsupported_trackers(meta)
         meta.name_notag, meta.name, meta.clean_name, meta.potential_missing = await name_manager.get_name(meta)
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
             await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
@@ -2813,7 +2820,7 @@ async def process_cross_seeds(meta: Meta) -> None:
 async def get_mkbrr_path(base_dir: str | None = None) -> str | None:
     try:
         resolved_base_dir = base_dir or str(Path(__file__).resolve().parent)
-        mkbrr_path = await MkbrrBinaryManager.ensure_mkbrr_binary(resolved_base_dir, version="v1.18.0")
+        mkbrr_path = await MkbrrBinaryManager.ensure_mkbrr_binary(resolved_base_dir, version="v1.24.0")
         return mkbrr_path if mkbrr_path else None
     except Exception as e:
         logger.error(f"[red]Error setting up mkbrr binary: {e}[/red]")
