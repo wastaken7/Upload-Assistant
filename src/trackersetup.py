@@ -68,6 +68,7 @@ from src.trackers.UNIT3D.hawkeuno import HawkeUno
 from src.trackers.UNIT3D.homiehelpdesk import HomieHelpDesk
 from src.trackers.UNIT3D.infinityhd import InfinityHD
 from src.trackers.UNIT3D.itatorrents import ItaTorrents
+from src.trackers.UNIT3D.lastdigitalunderground import LastDigitalUnderground
 from src.trackers.UNIT3D.latteam import LatTeam
 from src.trackers.UNIT3D.locadora import Locadora
 from src.trackers.UNIT3D.lst import LST
@@ -85,7 +86,6 @@ from src.trackers.UNIT3D.samaritano import Samaritano
 from src.trackers.UNIT3D.seedpool import Seedpool
 from src.trackers.UNIT3D.shareisland import ShareIsland
 from src.trackers.UNIT3D.skipthecommercials import SkipTheCommercials
-from src.trackers.UNIT3D.theldu import LastDigitalUnderground
 from src.trackers.UNIT3D.theoldschool import TheOldSchool
 from src.trackers.UNIT3D.tlzdigital import TheLeachZone
 from src.trackers.UNIT3D.torrentdesi import DesiTorrents
