@@ -572,6 +572,36 @@ const argumentCategories = [
     ],
   },
   {
+    title: "Audio Spectrograms",
+    subtitle:
+      "The stream positions are zero-based. Choose a preset, then edit the command if you want a different list.",
+    args: [
+      {
+        label: "First audio stream",
+        insert: "--audio-spectrogram --audio-spectrogram-tracks 0",
+        description:
+          "Generate an upload-ready spectrogram for stream position 0.",
+      },
+      {
+        label: "All audio streams",
+        insert: "--audio-spectrogram --audio-spectrogram-tracks all",
+        description: "Generate one spectrogram per available stream.",
+      },
+      {
+        label: "--audio-spectrogram",
+        description:
+          "Generate spectrograms; without a stream selection, the workflow will ask which streams to use.",
+      },
+      {
+        label: "--audio-spectrogram-tracks",
+        placeholder: "0,1 or all",
+        insert: "--audio-spectrogram --audio-spectrogram-tracks all",
+        description:
+          "Preset inserts a valid selection. Replace 'all' with zero-based positions in the command field if needed.",
+      },
+    ],
+  },
+  {
     title: "Misc Options",
     args: [
       {
@@ -582,15 +612,6 @@ const argumentCategories = [
         label: "--channel",
         placeholder: "ID_OR_TAG",
         description: "SPD channel",
-      },
-      {
-        label: "--audio-spectrogram",
-        description: "Generate audio spectrograms",
-      },
-      {
-        label: "--audio-spectrogram-tracks",
-        placeholder: "1,2",
-        description: "Specific tracks for spectrograms",
       },
       { label: "--usenet", description: "Upload files to Usenet (NNTP)" },
       {
@@ -4125,7 +4146,9 @@ function AudionutsUAGUI() {
                                 >
                                   <div className="flex items-start justify-between gap-3">
                                     <button
-                                      onClick={() => addArgument(a.label)}
+                                      onClick={() =>
+                                        addArgument(a.insert || a.label)
+                                      }
                                       disabled={isExecuting}
                                       className={`px-3 py-1.5 text-sm font-mono rounded-md border ${isDarkMode ? "bg-gray-700 border-gray-600 text-white hover:bg-purple-600 hover:text-white" : "bg-white border-gray-200 text-gray-800 hover:bg-purple-600 hover:text-white"} transition-colors`}
                                     >
@@ -4970,7 +4993,9 @@ function AudionutsUAGUI() {
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <button
-                                  onClick={() => addArgument(a.label)}
+                                  onClick={() =>
+                                    addArgument(a.insert || a.label)
+                                  }
                                   disabled={isExecuting}
                                   className={`px-3 py-1 text-sm font-mono rounded-md border ${isDarkMode ? "bg-gray-700 border-gray-600 text-white hover:bg-purple-600 hover:text-white" : "bg-white border-gray-200 text-gray-800 hover:bg-purple-600 hover:text-white"} transition-colors`}
                                 >

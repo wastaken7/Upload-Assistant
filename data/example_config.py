@@ -333,6 +333,12 @@ config: dict[str, Any] = {
         "add_audio_spectrogram": True,
         # Set true to generate spectrograms for all audio streams
         "process_all_audio_spectrogram": False,
+        # Seconds from the beginning of each selected stream to analyse.
+        "audio_spectrogram_duration": 600,
+        # Decode at this sample rate (48 kHz retains frequencies up to 24 kHz).
+        "audio_spectrogram_sample_rate": 48000,
+        # For MUSIC and audiobooks, limit the number of tracks/chapters processed.
+        "audio_spectrogram_max_files": 12,
 
         # CLIENT SETUP
 
