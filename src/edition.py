@@ -28,6 +28,11 @@ def _has_release_token(value: str, token: str) -> bool:
     return re.search(rf"(?<![A-Z0-9]){re.escape(token)}(?![A-Z0-9])", value, flags=re.IGNORECASE) is not None
 
 
+def _strip_release_tokens(value: str) -> str:
+    """Remove standalone release markers while preserving adjacent text."""
+    return re.sub(r"(?<![A-Z0-9])(?:REPACK\d?|RERIP|PROPER\d?)(?![A-Z0-9])", "", value, flags=re.IGNORECASE).strip()
+
+
 async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[str], manual_edition: str | list[str], meta: Meta) -> tuple[str, str, bool]:
     edition = ""
     imdb_info = cast(dict[str, Any], meta.imdb_info)
@@ -329,7 +334,7 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
         if len(filelist) == 1:
             video = Path(video).name
 
-        video = video.upper().replace(".", " ").replace(tag.upper(), "").replace("-", "")
+        video = video.upper().replace(".", " ").replace(tag.upper(), "").replace("-", " ")
 
         if "OPEN MATTE" in video.upper():
             edition = edition + " Open Matte"
@@ -365,7 +370,7 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
         isinstance(manual_edition, str)
         and all(tag.lower() not in ["repack", "repack2", "repack3", "proper", "proper2", "proper3", "rerip"] for tag in manual_edition.strip().lower().split())
     ):
-        edition = re.sub(r"(\bREPACK\d?\b|\bRERIP\b|\bPROPER\d?\b)", "", edition, flags=re.IGNORECASE).strip()
+        edition = _strip_release_tokens(edition)
 
     if not meta.webdv:
         hybrid = False
