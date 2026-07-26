@@ -232,7 +232,7 @@ class IPTorrents:
                             size_match = re.search(r"\d+(?:[.,]\d+)?\s*(?:KB|MB|GB|TB)", size_text, re.IGNORECASE)
                             size = size_match.group(0) if size_match else ""
 
-                            if size and not any(keyword in name.lower() for keyword in forbidden_keywords):
+                            if not any(keyword in name.lower() for keyword in forbidden_keywords):
                                 duplicate_entry = {"name": name, "size": size, "link": torrent_link}
                                 dupes.append(duplicate_entry)
 
@@ -244,7 +244,7 @@ class IPTorrents:
         type_ = meta.type
         is_disc = meta.is_disc
         genres = str(meta.genres or "").lower()
-        source = meta.source or "".lower()
+        source = (meta.source or "").lower()
 
         # TV
         tv_web_dl = 22

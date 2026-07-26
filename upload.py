@@ -56,6 +56,7 @@ from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
 from src.trackers.alpharatio import AlphaRatio
 from src.trackers.common import Common
+from src.trackers.digitalcore import DigitalCore
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup, api_trackers, http_trackers, other_api_trackers, tracker_class_map
 from src.trackerstatus import TrackerStatusManager
@@ -888,7 +889,20 @@ async def _write_music_snapshot(meta: Meta) -> None:
         await file.write(json.dumps(meta.music_release, indent=2, cls=PathAwareEncoder))
 
 
-async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensManager) -> None:
+def _music_cover_allowed_hosts(config: Mapping[str, Any], trackers: Iterable[Any]) -> list[str]:
+    """Return image hosts accepted by DigitalCore and every selected constrained tracker."""
+    approved_hosts = set(getattr(DigitalCore(config=config), "approved_image_hosts", ()))
+    for tracker_name in trackers:
+        tracker_class = tracker_class_map.get(str(tracker_name).upper())
+        if tracker_class is None:
+            continue
+        tracker_hosts = getattr(tracker_class(config=config), "approved_image_hosts", None)
+        if tracker_hosts:
+            approved_hosts &= {str(host) for host in tracker_hosts}
+    return sorted(approved_hosts)
+
+
+async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensManager, allowed_hosts: list[str] | None = None) -> None:
     """Host MUSIC artwork and publish it through the shared ``meta.covers`` API."""
     if meta.debug:
         logger.info("[yellow]MUSIC debug: image-host upload skipped.[/yellow]")
@@ -928,7 +942,7 @@ async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensMana
         return
 
     try:
-        uploaded, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [str(cover_path)], {})
+        uploaded, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [str(cover_path)], {}, allowed_hosts=allowed_hosts)
     except Exception as error:
         logger.warning(f"[yellow]MUSIC: artwork host upload failed: {error}[/yellow]")
         return
@@ -1499,7 +1513,11 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             if "image_list" not in meta:
                 meta.image_list = []
             if meta.category == "MUSIC":
-                await _host_music_cover(meta, uploadscreens_manager)
+                allowed_hosts = _music_cover_allowed_hosts(config, cast(list[Any], meta.trackers))
+                if not allowed_hosts:
+                    logger.warning("[yellow]MUSIC: no image host is approved by all selected trackers.[/yellow]")
+                    return False
+                await _host_music_cover(meta, uploadscreens_manager, allowed_hosts)
             manual_frames_str = meta.manual_frames
             if isinstance(manual_frames_str, str):
                 manual_frames_list = [f.strip() for f in manual_frames_str.split(",") if f.strip()]

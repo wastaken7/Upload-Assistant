@@ -273,7 +273,7 @@ class ImmortalSeed:
             return {"nfofile": (nfo_path.name, nfo_bytes, "application/octet-stream")}
         nfo_content = await self.generate_description(meta)
         nfo_bytes = nfo_content.encode("utf-8")
-        nfo_filename = f"{(meta.scene_name if meta.scene_name is not None else meta.basename_no_ext)}.nfo"
+        nfo_filename = f"{(meta.scene_name or meta.basename_no_ext)}.nfo"
         return {"nfofile": (nfo_filename, nfo_bytes, "application/octet-stream")}
 
     async def get_name(self, meta: Meta) -> str:

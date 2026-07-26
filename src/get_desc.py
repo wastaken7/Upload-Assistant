@@ -641,7 +641,7 @@ class DescriptionBuilder:
         if self.tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP"):
             table = False
             header_size = -1
-        elif self.tracker in ("BJSHARE", "BRASILTRACKER", "AMIGOSSHARE", "SPEEDAPP"):
+        elif self.tracker in ("BJSHARE", "BRASILTRACKER", "AMIGOSSHARE"):
             if not header_size:
                 header_size = 3
             if self.tracker == "AMIGOSSHARE":
@@ -1035,7 +1035,7 @@ class DescriptionBuilder:
             (text["sample_rate"], technical_values("sample_rate", lambda item: f"{int(item) / 1000:g} kHz")),
             (text["channels"], technical_values("channels", lambda item: {1: "Mono", 2: "Stereo"}.get(int(item), f"{item} channels"))),
             (text["bitrate"], technical_values("bitrate", lambda item: f"{round(int(item) / 1000)} kbps")),
-            (text["external_ids"], "\n".join(external_id_links)),
+            (text["external_ids"], ", ".join(external_id_links) if table else "\n".join(external_id_links)),
         ]
         music_fields = [(label, field_value) for label, field_value in music_fields if field_value]
         if not music_fields:

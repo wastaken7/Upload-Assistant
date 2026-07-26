@@ -164,7 +164,7 @@ class YUSCENE(UNIT3D):
         if isinstance(resolved_type, str):
             resolved_type = resolved_type.upper().strip().lstrip(".")
 
-        if meta.category == "MUSIC":
+        if meta.category == "MUSIC" and not str(type or "").strip():
             resolved_type = meta.format.upper()
 
         val = type_id.get(resolved_type or "", "0")
