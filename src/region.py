@@ -2309,6 +2309,7 @@ async def get_service(
         "TRVL": "TRVL",
         "TUBI": "TUBI",
         "TubiTV": "TUBI",
+        "TV2": "TV2",
         "TV3": "TV3",
         "TV3 Ireland": "TV3",
         "TV4": "TV4",
