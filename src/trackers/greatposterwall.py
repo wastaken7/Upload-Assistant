@@ -4,6 +4,7 @@ import re
 import unicodedata
 from pathlib import Path
 from typing import Any, ClassVar, cast
+from urllib.parse import urlparse
 
 import aiofiles
 import cli_ui
@@ -91,6 +92,7 @@ class GreatPosterWall:
         "YIFY",
     )
     approved_image_hosts = ("kshare", "pixhost", "pterclub", "ilikeshots", "imgbox")
+    can_rehost_unapproved_images = True
     torrent_url = f"{base_url}/torrents.php?torrentid="
     url_host_mapping: ClassVar = {
         "kshare.club": "kshare",
@@ -234,8 +236,59 @@ class GreatPosterWall:
 
         return title if title and title != meta.title else ""
 
+    def is_approved_image_url(self, image_url: str) -> bool:
+        hostname = urlparse(image_url).hostname or ""
+        for domain, host_name in self.url_host_mapping.items():
+            if hostname == domain or hostname.endswith(f".{domain}"):
+                return host_name in self.approved_image_hosts
+        return False
+
+    async def rehost_unapproved_images(self, meta: Meta) -> None:
+        """Import public image URLs to GPW's KShare host before the normal host check."""
+        image_list = meta.image_list
+        if not isinstance(image_list, list) or not image_list:
+            return
+        if not self.api_key:
+            logger.warning("[yellow]GREATPOSTERWALL: cannot rehost images because no API key is configured.[/yellow]")
+            return
+
+        rehosted_images: list[dict[str, str]] = []
+        async with httpx.AsyncClient(timeout=60) as client:
+            for image in cast(list[dict[str, str]], image_list):
+                raw_url = image.get("raw_url", "")
+                if not raw_url.startswith(("https://", "http://")) or self.is_approved_image_url(raw_url):
+                    rehosted_images.append(image)
+                    continue
+
+                try:
+                    response = await client.post(
+                        f"{self.base_url}/api.php",
+                        params={"action": "img_upload", "api_key": self.api_key},
+                        data={"urls[]": raw_url},
+                    )
+                    response_data = response.json()
+                    response_body = response_data.get("response", {})
+                    files = response_body.get("files", []) if isinstance(response_body, dict) else []
+                    hosted_url = files[0].get("name") if files else None
+                    if response.status_code != 200 or response_data.get("status") != 200 or not isinstance(hosted_url, str):
+                        error = response_body.get("Error", "no image URL returned") if isinstance(response_body, dict) else "no image URL returned"
+                        logger.warning(f"[yellow]GREATPOSTERWALL: could not rehost {raw_url}: {error}[/yellow]")
+                        rehosted_images.append(image)
+                        continue
+                except (httpx.HTTPError, TypeError, ValueError) as e:
+                    logger.warning(f"[yellow]GREATPOSTERWALL: could not rehost {raw_url}: {e!s}[/yellow]")
+                    rehosted_images.append(image)
+                    continue
+
+                rehosted_image = image.copy()
+                rehosted_image.update({"img_url": hosted_url, "raw_url": hosted_url, "web_url": hosted_url})
+                rehosted_images.append(rehosted_image)
+
+        meta.image_list = rehosted_images
+
     async def check_image_hosts(self, meta: Meta) -> None:
         # Rule: 2.2.1. Screenshots: They have to be saved at kshare.club, pixhost.to, img.pterclub.com, yes.ilikeshots.club, imgbox.com, s3.pterclub.com
+        await self.rehost_unapproved_images(meta)
         await self.rehost_images_manager.check_hosts(
             meta,
             self.tracker,
@@ -257,7 +310,7 @@ class GreatPosterWall:
             description=True,
             game=False,
             languages=False,
-            logo=True,
+            logo=False,
             mediainfo=False,
             menu_screenshots=True,
             nfo=True,
@@ -296,8 +349,8 @@ class GreatPosterWall:
         tags = ""
 
         genres = meta.genres
-        if genres and isinstance(genres, str):
-            genre_names = [g.strip() for g in genres.split(",") if g.strip()]
+        if genres:
+            genre_names = [genre.strip() for genre in genres if isinstance(genre, str) and genre.strip()]
             if genre_names:
                 tags = ", ".join(unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("utf-8").replace(" ", ".").lower() for name in genre_names)
 
@@ -643,54 +696,7 @@ class GreatPosterWall:
             return True
         return False
 
-    async def _get_poster(self, meta: Meta) -> str:
-        poster_url = meta.poster.strip()
-        if not poster_url:
-            tmdb_poster = meta.tmdb_poster
-            if tmdb_poster:
-                poster_url = f"https://image.tmdb.org/t/p/original{tmdb_poster}"
-
-        if not poster_url:
-            return ""
-
-        poster_path = Path(meta.base_dir) / "tmp" / meta.uuid / "poster.jpg"
-        if not Path(poster_path).exists():
-            try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(poster_url, timeout=30)
-                    response.raise_for_status()
-                    async with aiofiles.open(poster_path, mode="wb") as f:
-                        await f.write(response.content)
-            except Exception as e:
-                logger.error(f"{self.tracker}: [red]Error downloading poster: {e}[/red]")
-                return ""
-
-        if Path(poster_path).exists():
-            try:
-                logger.info(f"{self.tracker}: Uploading poster to image host...")
-                new_images, _ = await self.rehost_images_manager.uploadscreens_manager.upload_screens(
-                    meta, 1, 1, 0, 1, [poster_path], {}, allowed_hosts=self.approved_image_hosts
-                )
-                if new_images:
-                    return str(new_images[0].get("raw_url", ""))
-            except Exception as e:
-                logger.error(f"{self.tracker}: [red]Error uploading poster: {e}[/red]")
-
-        return ""
-
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
-        poster_url = await self._get_poster(meta)
-
-        if not poster_url:
-            while True:
-                poster_url_raw = await asyncio.to_thread(
-                    cli_ui.ask_string, f"{self.tracker}: Enter the poster image URL (must be from one of {', '.join(self.approved_image_hosts)}): \n"
-                )
-                poster_url = (poster_url_raw or "").strip()
-                if any(host in poster_url for host in self.approved_image_hosts):
-                    break
-                logger.info(f"{self.tracker}: [red]Invalid host. Please use a URL from the allowed hosts.[/red]")
-
         imdb_identifier = str(meta.imdb_info.get("imdbID") or meta.imdb or "").strip()
         tmdb_identifier = str(meta.tmdb_id or "").strip()
         if imdb_identifier:
@@ -707,7 +713,7 @@ class GreatPosterWall:
             "data_source": data_source,
             "identifier": identifier,
             "desc": self.tmdb_data.get("overview", ""),
-            "image": poster_url,
+            "image": f"https://image.tmdb.org/t/p/original{meta.tmdb_poster}",
             "maindesc": meta.overview,
             "name": meta.title,
             "releasetype": self._get_movie_type(meta),
@@ -1044,7 +1050,6 @@ class GreatPosterWall:
         data: dict[str, Any] = {}
 
         if not GreatPosterWall.group_id:
-            logger.info(f"{self.tracker}: This movie is not registered in the database, please enter additional information.")
             data.update(await self.get_additional_data(meta))
 
         data.update(
