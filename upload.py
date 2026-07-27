@@ -1585,7 +1585,13 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                                 break
                             if isinstance(approved_hosts, (list, set, tuple)):
                                 approved_hosts_list = [str(host) for host in cast(Iterable[Any], approved_hosts)]
-                                approved_sets.append(set(approved_hosts_list))
+                                approved_host_set = set(approved_hosts_list)
+                                # GreatPosterWall can import any public URL with its tracker API,
+                                # then serves it from its approved KShare host.  Its configured
+                                # image hosts are therefore valid sources, not final destinations.
+                                if getattr(tracker_instance, "can_rehost_unapproved_images", False) and getattr(tracker_instance, "api_key", ""):
+                                    approved_host_set.update(configured_hosts)
+                                approved_sets.append(approved_host_set)
                             else:
                                 all_known = False
                                 break
