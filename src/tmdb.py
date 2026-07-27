@@ -362,7 +362,7 @@ async def get_tmdb_from_imdb(
     imdb_info = imdb_info or await imdb_manager.get_imdb_info_api(imdb_id, {})
     title = str(imdb_info.get("title") or filename or "")
     year = imdb_info.get("year") or search_year
-    original_language = imdb_info.get("original language") or "en"
+    original_language = imdb_info.get("original_language") or imdb_info.get("original language") or "en"
 
     logger.info(f"[yellow]TMDb was unable to find anything from external IDs, searching TMDb for {title} ({year})[/yellow]")
 

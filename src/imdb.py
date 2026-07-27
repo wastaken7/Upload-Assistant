@@ -314,6 +314,7 @@ class ImdbManager:
         imdb_info["genres"] = ", ".join(filter(None, genre_list))
 
         imdb_info["rating"] = self.safe_get(title_data, ["ratingsSummary", "aggregateRating"], "N/A")
+        imdb_info["votes"] = self.safe_get(title_data, ["ratingsSummary", "voteCount"], 0)
 
         def get_credits(title_data: dict[str, Any], category_keyword: str) -> tuple[list[str], list[str]]:
             people_list: list[str] = []

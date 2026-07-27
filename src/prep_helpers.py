@@ -1053,9 +1053,9 @@ async def search_metadata(
     if tmdb_id_value != 0 and meta.category not in ("BOOK", "GAME"):
         await prep_instance.tmdb_manager.set_tmdb_metadata(meta, filename)
 
-    # Ensure IMDb info is retrieved if it wasn't already fetched
+    # Ensure IMDb info is retrieved if it wasn't already fetched or was cleared.
     imdb_id_value = _to_int(meta.imdb_id)
-    if meta.imdb_info is None and imdb_id_value != 0 and meta.category not in ("BOOK", "GAME"):
+    if not meta.imdb_info and imdb_id_value != 0 and meta.category not in ("BOOK", "GAME"):
         imdb_info = await imdb_manager.get_imdb_info_api(imdb_id_value, manual_language=meta.manual_language)
         meta.imdb_info = imdb_info
 
