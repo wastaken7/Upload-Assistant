@@ -1552,9 +1552,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
                 relevant_trackers = [t for t in cast(list[Any], meta.trackers) if isinstance(t, str) and t in trackers_with_image_host_requirements and t in tracker_class_map]
 
-                # If all relevant trackers share exactly one common approved host that the user has configured,
-                # and it's not the initially selected host, switch meta.imghost to that common host.
-                # If multiple common hosts exist, pick the first by config priority (img_host_1..img_host_9).
+                # Prefer a configured host accepted by all relevant trackers.  If that is
+                # not possible, keep processing the compatible trackers and skip only
+                # those for which the user has no acceptable configured host.
                 allowed_hosts: list[str] | None = None
                 if relevant_trackers:
                     try:
@@ -1604,11 +1604,36 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                             logger.debug(f"[cyan]Image host debug: common_hosts={sorted(common_hosts)}[/cyan]")
                             logger.debug(f"[cyan]Image host debug: common_configured_hosts={common_configured_hosts}[/cyan]")
 
-                            # If we have any common hosts, use them as allowed_hosts for upload_screens
+                            # A shared configured host is ideal: upload the common image
+                            # list once and use it for every compatible tracker.
                             if common_configured_hosts:
                                 allowed_hosts = common_configured_hosts
-                            elif common_hosts:
-                                allowed_hosts = sorted(common_hosts)
+                            else:
+                                configured_host_set = set(configured_hosts)
+                                incompatible_trackers = [
+                                    tracker_name
+                                    for tracker_name, approved_hosts in zip(relevant_trackers, approved_sets, strict=True)
+                                    if not approved_hosts & configured_host_set
+                                ]
+
+                                if incompatible_trackers:
+                                    logger.warning(
+                                        "[yellow]Skipping tracker(s) with no compatible configured image host: "
+                                        f"{', '.join(incompatible_trackers)}. Configured hosts: {', '.join(configured_hosts)}.[/yellow]"
+                                    )
+                                    for tracker_name in incompatible_trackers:
+                                        status = meta.tracker_status.setdefault(tracker_name, {})
+                                        status["upload"] = False
+                                        status["skipped"] = True
+                                        status["status_message"] = "No compatible configured image host"
+                                    meta.trackers = [tracker_name for tracker_name in meta.trackers if tracker_name not in incompatible_trackers]
+                                    relevant_trackers = [tracker_name for tracker_name in relevant_trackers if tracker_name not in incompatible_trackers]
+
+                                if relevant_trackers:
+                                    logger.info(
+                                        "[yellow]No single configured image host supports every remaining tracker. "
+                                        "Compatible trackers will use their own configured image-host fallback when needed.[/yellow]"
+                                    )
 
                             # Prefer the user-selected host if it's valid for all relevant trackers; otherwise
                             # fall back to the first common configured host by config priority (img_host_1..img_host_9).
@@ -1617,8 +1642,6 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
                             if common_configured_hosts and current_img_host not in common_configured_hosts:
                                 preferred_host = common_configured_hosts[0]
-                            elif common_hosts and current_img_host not in common_hosts:
-                                preferred_host = sorted(common_hosts)[0]
 
                             if preferred_host and preferred_host != meta.imghost:
                                 logger.debug(
