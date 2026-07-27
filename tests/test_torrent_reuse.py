@@ -164,6 +164,36 @@ async def test_client_search_rejects_partially_subtitled_fallback(tmp_path, monk
 
 
 @pytest.mark.asyncio
+async def test_client_search_keeps_best_piece_size_video_only_fallback(tmp_path, monkeypatch):
+    small_piece_torrent = tmp_path / "small-piece.torrent"
+    large_piece_torrent = tmp_path / "large-piece.torrent"
+    selected_subtitle = tmp_path / "release.srt"
+    small_piece_torrent.touch()
+    large_piece_torrent.touch()
+    selected_subtitle.touch()
+
+    torrents = {
+        str(small_piece_torrent): SimpleNamespace(files=["release.mkv"], piece_size=4 * 1024 * 1024),
+        str(large_piece_torrent): SimpleNamespace(files=["release.mkv"], piece_size=32 * 1024 * 1024),
+    }
+    monkeypatch.setattr("src.clients.Torrent.read", lambda path: torrents[str(path)])
+
+    async def fake_search(_self, _meta, client_name, *_args):
+        return str(small_piece_torrent) if client_name == "first" else str(large_piece_torrent)
+
+    monkeypatch.setattr(Clients, "_search_single_client_for_torrent", fake_search)
+    config = {
+        "DEFAULT": {"default_torrent_client": "first", "searching_client_list": ["first", "second"], "prefer_max_16_torrent": True},
+        "TRACKERS": {},
+        "TORRENT_CLIENTS": {"first": {}, "second": {}},
+    }
+    meta = Meta({"client": "none", "subtitle_files": [str(selected_subtitle)]})
+
+    assert await Clients(config).find_existing_torrent(meta) == str(small_piece_torrent)  # noqa: S101
+    assert meta.reuse_torrent_client == "first"  # noqa: S101
+
+
+@pytest.mark.asyncio
 async def test_metadata_lookup_uses_reuse_source_client(monkeypatch):
     source_client = {"torrent_client": "qbit"}
     config = {

@@ -325,7 +325,11 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     # Only a subtitle-free torrent can safely provide BASE.torrent.
                     # A partially subtitle-bearing torrent would produce an invalid
                     # BASE_SUBS.torrent and omit selected local subtitles.
-                    if self._torrent_has_no_subtitles(candidate_path):
+                    if self._torrent_has_no_subtitles(candidate_path) and (
+                        video_only_fallback is None
+                        or not prefer_small_pieces
+                        or self._is_preferred_piece_size_candidate(candidate_path, video_only_fallback[0], mtv_torrent, piece_limit)
+                    ):
                         video_only_fallback = (candidate_path, client_name)
                     continue
                 if isinstance(result, dict):
@@ -712,6 +716,24 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         except Exception:
             return False
         return not any(Path(str(path)).suffix.casefold() in SUBTITLE_EXTENSIONS for path in torrent.files)
+
+    @staticmethod
+    def _is_preferred_piece_size_candidate(candidate_path: str, current_path: str, mtv_torrent: bool, piece_limit: bool) -> bool:
+        """Whether a candidate outranks the current fallback by configured piece preference."""
+        try:
+            candidate_piece_size = Torrent.read(candidate_path).piece_size
+            current_piece_size = Torrent.read(current_path).piece_size
+        except Exception:
+            return False
+
+        if mtv_torrent:
+            return candidate_piece_size < current_piece_size
+        if piece_limit:
+            limit = 16 * 1024 * 1024
+            candidate_within_limit = candidate_piece_size <= limit
+            current_within_limit = current_piece_size <= limit
+            return candidate_within_limit and (not current_within_limit or candidate_piece_size < current_piece_size)
+        return False
 
     async def remote_path_map(self, meta: Meta, torrent_client_name: str | dict[str, Any] | None = None) -> tuple[str, str]:
         if isinstance(torrent_client_name, dict):
