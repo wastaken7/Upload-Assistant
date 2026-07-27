@@ -118,7 +118,7 @@ This branch introduces new media categories and automation features not present 
 | <img src="web_ui/static/img/trackers/homiehelpdesk.png" width="16" height="16" />‎ ‎ HomieHelpDesk                   | HOMIEHELPDESK          | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/immortalseed.png" width="16" height="16" />‎ ‎ ImmortalSeed                     | IMMORTALSEED           | MOVIE, TV, BOOK, MUSIC, GAME |
 | <img src="web_ui/static/img/trackers/infinityhd.png" width="16" height="16" />‎ ‎ InfinityHD                         | INFINITYHD             | MOVIE, TV                    |
-| <img src="web_ui/static/img/trackers/infinityhd.png" width="16" height="16" />‎ ‎ IPTorrents                         | IPTORRENTS             | MOVIE, TV, BOOK, GAME, MUSIC |
+| <img src="web_ui/static/img/trackers/iptorrents.png" width="16" height="16" />‎ ‎ IPTorrents                         | IPTORRENTS             | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/itatorrents.png" width="16" height="16" />‎ ‎ ItaTorrents                       | ITATORRENTS            | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/lajidui.png" width="16" height="16" />‎ ‎ lajidui                               | LAJIDUI                | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/lastdigitalunderground.png" width="16" height="16" />‎ ‎ LastDigitalUnderground | LASTDIGITALUNDERGROUND | MOVIE, TV, BOOK              |
