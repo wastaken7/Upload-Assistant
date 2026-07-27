@@ -534,9 +534,12 @@ class QbittorrentClientMixin:
 
                 if valid:
                     if meta.subtitle_files and not self._torrent_includes_all_local_subtitles(str(torrent_file_path), meta):
-                        video_only_fallback = torrent_hash
-                        meta.base_reuse_torrent_path = str(torrent_path or torrent_file_path)
-                        logger.debug(f"[yellow]Keeping video-only torrent as fallback: {torrent_hash}")
+                        if self._torrent_has_no_subtitles(str(torrent_file_path)):
+                            video_only_fallback = torrent_hash
+                            meta.base_reuse_torrent_path = str(torrent_path or torrent_file_path)
+                            logger.debug(f"[yellow]Keeping video-only torrent as fallback: {torrent_hash}")
+                        else:
+                            logger.debug(f"[yellow]Skipping partial-subtitle torrent as fallback: {torrent_hash}")
                         continue
                     if prefer_small_pieces:
                         # **Track best match based on piece size**
@@ -1568,8 +1571,11 @@ class QbittorrentClientMixin:
                 valid, torrent_path = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, "qbit", client_config)
                 if valid:
                     if meta.subtitle_files and not self._torrent_includes_all_local_subtitles(torrent_file_path, meta):
-                        subtitle_fallback = {"hash": torrent_hash, "torrent_path": torrent_path or torrent_file_path}
-                        logger.debug(f"[yellow]Keeping video-only torrent as fallback: {torrent_hash}")
+                        if self._torrent_has_no_subtitles(torrent_file_path):
+                            subtitle_fallback = {"hash": torrent_hash, "torrent_path": torrent_path or torrent_file_path}
+                            logger.debug(f"[yellow]Keeping video-only torrent as fallback: {torrent_hash}")
+                        else:
+                            logger.debug(f"[yellow]Skipping partial-subtitle torrent as fallback: {torrent_hash}")
                     elif use_piece_preference:
                         # **Track best match based on piece size**
                         try:
@@ -1629,8 +1635,11 @@ class QbittorrentClientMixin:
 
                         if alt_valid:
                             if meta.subtitle_files and not self._torrent_includes_all_local_subtitles(alt_torrent_file_path, meta):
-                                subtitle_fallback = {"hash": alt_torrent_hash, "torrent_path": alt_torrent_path or alt_torrent_file_path}
-                                logger.debug(f"[yellow]Keeping video-only alternative as fallback: {alt_torrent_hash}")
+                                if self._torrent_has_no_subtitles(alt_torrent_file_path):
+                                    subtitle_fallback = {"hash": alt_torrent_hash, "torrent_path": alt_torrent_path or alt_torrent_file_path}
+                                    logger.debug(f"[yellow]Keeping video-only alternative as fallback: {alt_torrent_hash}")
+                                else:
+                                    logger.debug(f"[yellow]Skipping partial-subtitle alternative as fallback: {alt_torrent_hash}")
                             elif use_piece_preference:
                                 # **Track best match based on piece size**
                                 try:

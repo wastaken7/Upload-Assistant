@@ -289,7 +289,7 @@ class TrackerStatusManager:
                             torrent_path = base_torrent_path if base_torrent_path.exists() else subs_torrent_path
                             if not torrent_path.exists():
                                 check_torrent = await client.find_existing_torrent(cast(dict[str, Any], local_meta))
-                                if check_torrent:
+                                if check_torrent and client._torrent_has_no_subtitles(check_torrent):
                                     logger.info(f"[yellow]Existing torrent found on {check_torrent}[yellow]")
                                     created_torrent_path = await TorrentCreator.create_base_from_existing_torrent(check_torrent, local_meta["base_dir"], local_meta["uuid"])
                                     if created_torrent_path:

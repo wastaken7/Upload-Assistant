@@ -1844,7 +1844,12 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
         # 3. Otherwise generate if missing
         else:
-            if not Path(torrent_path).exists() and base_reuse_torrent and Path(base_reuse_torrent).exists():
+            if (
+                not Path(torrent_path).exists()
+                and base_reuse_torrent
+                and Path(base_reuse_torrent).exists()
+                and (not has_local_subs or client._torrent_has_no_subtitles(base_reuse_torrent))
+            ):
                 await TORRENT_CREATOR.create_base_from_existing_torrent(base_reuse_torrent, meta.base_dir, meta.uuid)
             if not Path(torrent_path).exists() and meta.nohash is False:
                 await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE")

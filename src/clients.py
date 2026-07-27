@@ -16,6 +16,7 @@ from torf import Torrent
 from src.console import logger
 from src.meta import Meta
 from src.torrent_clients import DelugeClientMixin, QbittorrentClientMixin, RtorrentClientMixin, TransmissionClientMixin
+from src.torrentcreate import SUBTITLE_EXTENSIONS
 
 # Secure XML-RPC client using defusedxml to prevent XML attacks
 defusedxml.xmlrpc.monkey_patch()
@@ -284,7 +285,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             mtv_torrent = False
         prefer_small_pieces = mtv_torrent or piece_limit
         best_match = None  # Track the best match for fallback if prefer_small_pieces is enabled
-        video_only_fallback: str | None = None
+        video_only_fallback: tuple[str, str] | None = None
 
         default_torrent_client = cast(str, self.config["DEFAULT"]["default_torrent_client"])
 
@@ -321,33 +322,38 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             if result:
                 candidate_path = result.get("torrent_path") if isinstance(result, dict) else result
                 if meta.subtitle_files and isinstance(candidate_path, str) and not self._torrent_includes_all_local_subtitles(candidate_path, meta):
-                    # A video-only torrent remains useful as a fallback, but do not
-                    # stop until every configured search client has had a chance to
-                    # provide the exact video-plus-subtitles layout.
-                    video_only_fallback = candidate_path
+                    # Only a subtitle-free torrent can safely provide BASE.torrent.
+                    # A partially subtitle-bearing torrent would produce an invalid
+                    # BASE_SUBS.torrent and omit selected local subtitles.
+                    if self._torrent_has_no_subtitles(candidate_path):
+                        video_only_fallback = (candidate_path, client_name)
                     continue
                 if isinstance(result, dict):
                     # Got a valid torrent but not ideal piece size
-                    best_match = result
+                    best_match = {**result, "client_name": client_name}
                     # If prefer_small_pieces is False, we don't care about piece size optimization
                     # so stop searching after finding the first valid torrent
                     if not prefer_small_pieces:
                         logger.info(f"[green]Found valid torrent in client '{client_name}', stopping search[/green]")
                         torrent_path = best_match.get("torrent_path")
+                        meta.reuse_torrent_client = client_name
                         return torrent_path if isinstance(torrent_path, str) else None
                 else:
                     # Got a path - this means we found a torrent with ideal piece size
                     logger.debug(f"[green]Found valid torrent with preferred piece size in client '{client_name}', stopping search[/green]")
+                    meta.reuse_torrent_client = client_name
                     return result
 
         if prefer_small_pieces and best_match:
             logger.info(f"[yellow]Using best match torrent with hash: [bold yellow]{best_match['torrenthash']}[/bold yellow]")
             torrent_path = best_match.get("torrent_path")
+            meta.reuse_torrent_client = cast(str | None, best_match.get("client_name"))
             return torrent_path if isinstance(torrent_path, str) else None
 
         if video_only_fallback:
             logger.info("[yellow]No matching torrent with all local subtitles found; using the video-only fallback.[/yellow]")
-            return video_only_fallback
+            meta.reuse_torrent_client = video_only_fallback[1]
+            return video_only_fallback[0]
 
         logger.info("[bold yellow]No Valid .torrent found")
         return None
@@ -616,6 +622,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     # basenames alone can reuse a torrent from a different folder
                     # structure when releases have repeated filenames.
                     elif len(torrent.files) == len(cand):
+
                         def relative_layout(paths: list[str]) -> list[str]:
                             root = Path(os.path.commonpath(paths))
                             return sorted(str(Path(path).relative_to(root)).replace("\\", "/") for path in paths)
@@ -697,6 +704,15 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         subtitle_names = {Path(str(path)).name.casefold() for path in meta.subtitle_files}
         return subtitle_names.issubset(torrent_names)
 
+    @staticmethod
+    def _torrent_has_no_subtitles(torrent_path: str) -> bool:
+        """Whether a torrent contains no external subtitle files."""
+        try:
+            torrent = Torrent.read(torrent_path)
+        except Exception:
+            return False
+        return not any(Path(str(path)).suffix.casefold() in SUBTITLE_EXTENSIONS for path in torrent.files)
+
     async def remote_path_map(self, meta: Meta, torrent_client_name: str | dict[str, Any] | None = None) -> tuple[str, str]:
         if isinstance(torrent_client_name, dict):
             client_config: dict[str, Any] = torrent_client_name
@@ -738,10 +754,10 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         return local_path, remote_path
 
-    async def get_ptp_from_hash(self, meta: Meta, pathed: bool = False) -> Meta:
+    async def get_ptp_from_hash(self, meta: Meta, pathed: bool = False, client_name: str | None = None) -> Meta:
         default_config = self.config.get("DEFAULT", {})
         clients_config = self.config.get("TORRENT_CLIENTS", {})
-        default_torrent_client = default_config.get("default_torrent_client") if isinstance(default_config, dict) else None
+        default_torrent_client = client_name or (default_config.get("default_torrent_client") if isinstance(default_config, dict) else None)
         if not isinstance(default_torrent_client, str) or not default_torrent_client:
             logger.debug("[yellow]Skipping torrent metadata lookup: no default torrent client configured.[/yellow]")
             return meta
@@ -753,7 +769,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         torrent_client = client.get("torrent_client")
         if torrent_client == "rtorrent":
-            await self.get_ptp_from_hash_rtorrent(meta, pathed)
+            await self.get_ptp_from_hash_rtorrent(meta, pathed, client)
             return meta
         if torrent_client == "qbit":
             return await self.get_ptp_from_hash_qbit(meta, client, pathed)

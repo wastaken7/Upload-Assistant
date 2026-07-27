@@ -688,7 +688,7 @@ async def process_trackers_and_torrent(
                 logger.debug(f"[yellow]Unable to read infohash from cached torrent: {e}")
             # Fetch properties only: this preserves comment/tracker-ID discovery
             # without running another name-based torrent search or exporting it.
-            await client.get_ptp_from_hash(meta, pathed=True)
+            await client.get_ptp_from_hash(meta, pathed=True, client_name=meta.reuse_torrent_client)
 
 
 async def search_metadata(

@@ -443,11 +443,17 @@ class TorrentCreator:
                 # Fallback to CustomTorrent if mkbrr is not used
                 custom_include = include or []
                 if is_subs and not meta.is_disc and meta.category in ("TV", "MOVIE"):
-                    # `include` is usually already populated with video globs. Add
-                    # subtitle globs rather than relying on it being empty, otherwise
-                    # a file named BASE_SUBS may silently omit the subtitles.
-                    subtitle_globs = [f"*{extension}" for extension in SUBTITLE_EXTENSIONS]
-                    custom_include = list(dict.fromkeys([*custom_include, *subtitle_globs]))
+                    # Preserve the existing video include rules and add only the
+                    # subtitle files selected for this upload, never every subtitle
+                    # matching an extension below the creation root.
+                    root = Path(path).resolve()
+                    selected_subtitles: list[str] = []
+                    for subtitle_file in meta.subtitle_files:
+                        try:
+                            selected_subtitles.append(Path(str(subtitle_file)).resolve().relative_to(root).as_posix())
+                        except ValueError:
+                            logger.warning(f"[yellow]Selected subtitle is outside torrent root and will be skipped: {subtitle_file}")
+                    custom_include = list(dict.fromkeys([*custom_include, *selected_subtitles]))
                 torrent = CustomTorrent(
                     meta=meta,
                     path=path,
