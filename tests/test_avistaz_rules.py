@@ -46,3 +46,12 @@ def test_low_audio_bitrate_is_reported_for_non_webdl():
     warnings = AvistaZ({"TRACKERS": {"AVISTAZ": {}}}).rules(meta)
 
     assert "128 kbit/s" in warnings  # noqa: S101
+
+
+def test_grouped_and_megabit_audio_bitrates_are_normalized():
+    for bitrate in ("1 024 kb/s", "1.5 Mb/s"):
+        meta = make_meta(type="HDTV", mediainfo={"media": {"track": [{"@type": "Audio", "Format": "AAC", "BitRate": bitrate}]}})
+
+        warnings = AvistaZ({"TRACKERS": {"AVISTAZ": {}}}).rules(meta)
+
+        assert warnings == ""  # noqa: S101

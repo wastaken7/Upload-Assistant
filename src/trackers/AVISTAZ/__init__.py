@@ -788,9 +788,14 @@ class AZTrackerBase:
 
             if self.tracker == "CINEMAZ":
                 # CinemaZ requires HYBRID immediately after the video quality.
-                has_hybrid = bool(re.search(r"\bHYBRID\b", upload_name, flags=re.IGNORECASE))
-                if has_hybrid:
-                    upload_name_without_hybrid = re.sub(r"\bHYBRID\b", "", upload_name, flags=re.IGNORECASE)
+                has_hybrid_marker = bool(meta.webdv) or "hybrid" in (meta.edition or "").casefold()
+                title_match = re.search(re.escape(meta.title), upload_name, flags=re.IGNORECASE) if meta.title else None
+                marker_search_start = title_match.end() if title_match else 0
+                hybrid_match = re.search(r"\bHYBRID\b", upload_name[marker_search_start:], flags=re.IGNORECASE) if has_hybrid_marker else None
+                if hybrid_match:
+                    hybrid_start = marker_search_start + hybrid_match.start()
+                    hybrid_end = marker_search_start + hybrid_match.end()
+                    upload_name_without_hybrid = f"{upload_name[:hybrid_start]}{upload_name[hybrid_end:]}"
                     resolution_match = re.search(r"\b(?:\d{3,4}[pi]|4K|UHD|SD)\b", upload_name_without_hybrid, flags=re.IGNORECASE)
                     if resolution_match:
                         upload_name = upload_name_without_hybrid

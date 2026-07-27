@@ -467,12 +467,12 @@ class AvistaZ(AZTrackerBase):
                     bitrate = str(track.get("bitrate", "") or "")
                     if not bitrate:
                         continue
-                    bitrate_match = re.search(r"\d+(?:\.\d+)?", bitrate)
+                    normalized_bitrate = re.sub(r"[\s,]", "", bitrate)
+                    bitrate_match = re.fullmatch(r"(\d+(?:\.\d+)?)([kmg]?)(?:bit/s|b/s|bps)?", normalized_bitrate, flags=re.IGNORECASE)
                     if not bitrate_match:
                         continue
-                    bitrate_value = float(bitrate_match.group())
-                    if "k" in bitrate.lower():
-                        bitrate_value *= 1000
+                    bitrate_value = float(bitrate_match.group(1))
+                    bitrate_value *= {"": 1, "k": 1_000, "m": 1_000_000, "g": 1_000_000_000}[bitrate_match.group(2).lower()]
                     if bitrate_value < 128000:
                         low_bitrate_tracks.append(f"{track['codec']} ({bitrate})")
                 if low_bitrate_tracks:

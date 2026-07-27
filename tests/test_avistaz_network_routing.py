@@ -30,8 +30,8 @@ def make_meta(**overrides):
     return SimpleNamespace(**values)
 
 
-def router():
-    return AvistaZNetworkRouter({"DEFAULT": {"avistaz_network_auto_redirect": True}}, {"AVISTAZ": FakeTracker, "CINEMAZ": FakeTracker, "PRIVATEHD": FakeTracker})
+def router(auto_redirect=True):
+    return AvistaZNetworkRouter({"DEFAULT": {"avistaz_network_auto_redirect": auto_redirect}}, {"AVISTAZ": FakeTracker, "CINEMAZ": FakeTracker, "PRIVATEHD": FakeTracker})
 
 
 @pytest.mark.asyncio
@@ -75,6 +75,16 @@ async def test_asian_privatehd_content_is_redirected_to_avistaz():
     await router().apply(meta)
 
     assert meta.trackers == ["AVISTAZ"]  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_disabled_string_value_does_not_enable_unattended_redirects():
+    meta = make_meta(year=1970)
+
+    await router("false").apply(meta)
+
+    assert meta.trackers == ["PRIVATEHD"]  # noqa: S101
+    assert meta.tracker_status["PRIVATEHD"]["routing_suggested_to"] == "CINEMAZ"  # noqa: S101
 
 
 @pytest.mark.asyncio

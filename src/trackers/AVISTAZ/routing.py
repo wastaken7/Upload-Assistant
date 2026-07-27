@@ -235,16 +235,19 @@ class AvistaZNetworkRouter:
     network_trackers = frozenset({"AVISTAZ", "CINEMAZ", "PRIVATEHD"})
 
     def __init__(self, config: dict[str, Any], tracker_class_map: dict[str, Any]):
+        """Store configuration and tracker factories used for redirect validation."""
         self.config = config
         self.tracker_class_map = tracker_class_map
 
     @staticmethod
     def _countries(meta: Meta) -> set[str]:
+        """Return normalized production-country ISO codes from metadata."""
         raw_countries = meta.origin_country if isinstance(meta.origin_country, list) else []
         return {str(country).upper() for country in raw_countries if country}
 
     @staticmethod
     def _is_older_than_50_years(meta: Meta) -> bool:
+        """Determine whether the release year is at least fifty years old."""
         try:
             return datetime.now(UTC).year - int(meta.year) >= 50
         except TypeError, ValueError:
@@ -252,12 +255,19 @@ class AvistaZNetworkRouter:
 
     @staticmethod
     def _is_sd(meta: Meta) -> bool:
+        """Identify SD content from either the explicit flag or its resolution."""
         if bool(meta.sd):
             return True
         resolution_match = re.search(r"(\d{3,4})", str(meta.resolution or ""))
         return bool(resolution_match and int(resolution_match.group(1)) < 720)
 
+    @staticmethod
+    def _config_enabled(value: Any) -> bool:
+        """Interpret boolean configuration values without treating non-empty strings as true."""
+        return value if isinstance(value, bool) else str(value).strip().lower() in {"1", "true", "yes", "on"}
+
     def decide(self, source: str, meta: Meta) -> RoutingDecision | None:
+        """Return an automatic redirect or manual-review decision for one source tracker."""
         source = source.upper()
         countries = self._countries(meta)
         destinations: list[tuple[str, str]] = []
@@ -293,6 +303,7 @@ class AvistaZNetworkRouter:
         return RoutingDecision(source, destination, reason, automatic=True)
 
     async def apply(self, meta: Meta) -> None:
+        """Apply confirmed, cookie-validated redirects to the tracker upload list."""
         trackers = [str(tracker).upper() for tracker in meta.trackers]
         for source in tuple(trackers):
             if source not in self.network_trackers:
@@ -310,7 +321,7 @@ class AvistaZNetworkRouter:
 
             destination = decision.destination
             if meta.unattended:
-                enabled = bool(self.config.get("DEFAULT", {}).get("avistaz_network_auto_redirect", False))
+                enabled = self._config_enabled(self.config.get("DEFAULT", {}).get("avistaz_network_auto_redirect", False))
                 if not enabled:
                     source_status["routing_suggested_to"] = destination
                     logger.info(
