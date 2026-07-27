@@ -60,11 +60,11 @@ def select_audio_streams(streams: list[dict[str, Any]], choice: str) -> list[dic
     seen: set[int] = set()
     for item in normalized:
         if not item.isdigit():
-            logger.info(f"Invalid audio stream selection: {item}. Use zero-based positions or 'all'.")
+            logger.warning(f"Invalid audio stream selection: {item}. Use zero-based positions or 'all'.")
             continue
         position = int(item)
         if not 0 <= position < len(streams):
-            logger.info(f"Invalid audio stream position: {position}. Available positions: 0-{len(streams) - 1}.")
+            logger.warning(f"Invalid audio stream position: {position}. Available positions: 0-{len(streams) - 1}.")
             continue
         if position not in seen:
             selected.append(streams[position])
@@ -125,7 +125,7 @@ def _load_cached_images(cache_path: Path, fingerprint: str) -> list[Any]:
         if cache.get("fingerprint") == fingerprint and isinstance(images, list):
             return images
     except (OSError, json.JSONDecodeError) as error:
-        logger.info(f"[yellow]Could not load spectrogram image cache: {error!s}[/yellow]")
+        logger.warning(f"[yellow]Could not load spectrogram image cache: {error!s}[/yellow]")
     return []
 
 
@@ -141,7 +141,6 @@ def generate_spectrogram(
     source_name: str,
 ) -> Path:
     """Decode one stream and generate a frequency/time image suitable for review."""
-    logger.info(f"--- Processing Stream {stream_index} ({stream_label}) [{stream_lang}] ---")
     command = [
         "ffmpeg",
         "-v",
@@ -210,7 +209,6 @@ def generate_spectrogram(
     figure.tight_layout()
     figure.savefig(output_name, dpi=DPI_VALUE, bbox_inches="tight")
     plt.close(figure)
-    logger.info(f"Saved: {output_name}")
     return output_name
 
 
@@ -263,34 +261,31 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
             source_streams.append((source_position, audio_path, streams))
 
     if not source_streams:
-        logger.info("No audio streams found.")
+        logger.warning("No audio streams found.")
         return []
-
-    _, first_audio_path, first_streams = source_streams[0]
-    logger.info(f"\nAvailable Audio Streams for {first_audio_path.name} (use these zero-based positions):")
-    for position, stream in enumerate(first_streams):
-        tags = stream.get("tags", {})
-        logger.info(f"[{position}] FFmpeg stream {stream.get('index')} | Lang: {tags.get('language', 'und')} | Title: {tags.get('title', 'No Title')}")
 
     if meta.audio_spectrogram_tracks is not None:
         choice = str(meta.audio_spectrogram_tracks)
-        logger.info(f"[yellow]Using audio spectrogram tracks from argument: {choice}[/yellow]")
     elif meta.unattended or len(source_streams) > 1:
         choice = "all" if config["DEFAULT"].get("process_all_audio_spectrogram", False) else "0"
-        logger.info(f"[yellow]Automatically selected stream position: {choice}[/yellow]")
     else:
+        _, first_audio_path, first_streams = source_streams[0]
+        logger.info(f"Available audio streams for {first_audio_path.name} (use zero-based positions):")
+        for position, stream in enumerate(first_streams):
+            tags = stream.get("tags", {})
+            logger.info(f"[{position}] FFmpeg stream {stream.get('index')} | Lang: {tags.get('language', 'und')} | Title: {tags.get('title', 'No Title')}")
         choice = Prompt.ask("\nSelect audio stream positions (e.g. [bold yellow]0,1[/bold yellow] or [bold yellow]all[/bold yellow])", default="all")
 
     selected_jobs: list[tuple[int, Path, dict[str, Any]]] = []
     for source_position, audio_path, streams in source_streams:
         selected_streams = select_audio_streams(streams, choice)
         if not selected_streams:
-            logger.info(f"[yellow]No valid streams selected for {audio_path.name}; skipping it.[/yellow]")
+            logger.warning(f"[yellow]No valid streams selected for {audio_path.name}; skipping it.[/yellow]")
             continue
         selected_jobs.extend((source_position, audio_path, stream) for stream in selected_streams)
 
     if not selected_jobs:
-        logger.info("[yellow]No valid audio streams were selected.[/yellow]")
+        logger.warning("[yellow]No valid audio streams were selected.[/yellow]")
         return []
 
     duration = _positive_config_int(config, "audio_spectrogram_duration", DURATION_LIMIT)
