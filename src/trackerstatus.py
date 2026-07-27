@@ -17,9 +17,18 @@ from src.imdb import imdb_manager
 from src.meta import Meta
 from src.metadata_searching import get_douban_id
 from src.torrentcreate import TorrentCreator
+from src.trackers.AVISTAZ.routing import AvistaZNetworkRouter
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup, tracker_class_map
 from src.uphelper import UploadHelper
+
+
+def merge_tracker_status(processed: dict[str, dict[str, Any]], existing: Mapping[str, Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Preserve routing metadata while keeping fresh processing results authoritative."""
+    merged = {tracker: dict(status) for tracker, status in existing.items()}
+    for tracker, status in processed.items():
+        merged.setdefault(tracker, {}).update(status)
+    return merged
 
 
 class TrackerStatusManager:
@@ -28,11 +37,12 @@ class TrackerStatusManager:
         self.trackers_config = cast(Mapping[str, Mapping[str, Any]], config.get("TRACKERS", {}))
 
     async def process_all_trackers(self, meta: Meta) -> int:
-        tracker_status: dict[str, dict[str, bool]] = {}
+        tracker_status: dict[str, dict[str, Any]] = {}
         successful_trackers = 0
         client: Any = Clients(config=self.config)
         tracker_setup: Any = TrackerSetup(config=self.config)
         tracker_setup.filter_unsupported_trackers(meta)
+        await AvistaZNetworkRouter(self.config, tracker_class_map).apply(meta)
         helper: Any = UploadHelper(self.config)
         dupe_checker = DupeChecker(self.config)
         if any(tracker in meta.trackers for tracker in ["MTEAM", "LAJIDUI", "PTFANS", "PTGTK", "RAILGUNPT"]):
@@ -391,7 +401,7 @@ class TrackerStatusManager:
             logger.debug("", extra={"markup": False})
             logger.debug("[bold red]DEBUG MODE does not upload to sites")
 
-        meta.tracker_status = tracker_status
+        meta.tracker_status = merge_tracker_status(tracker_status, status_map)
         return successful_trackers
 
 

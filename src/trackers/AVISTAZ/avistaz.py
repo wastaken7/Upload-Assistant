@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import re
 from typing import Any
 
 from src.meta import Meta
@@ -42,13 +43,9 @@ class AvistaZ(AZTrackerBase):
         if video_encode:
             video_encode = video_encode.strip().lower()
 
-        release_type = meta.type
-        if release_type:
-            release_type = release_type.strip().lower()
+        release_type = str(meta.type or "").strip().lower()
 
-        source = meta.source
-        if source:
-            source = source.strip().lower()
+        source = str(meta.source or "").strip().lower()
 
         # This also checks the rule 'FANRES content is not allowed'
         if meta.category not in ("MOVIE", "TV"):
@@ -388,10 +385,17 @@ class AvistaZ(AZTrackerBase):
         elif any(code in cinemaz_countries for code in origin_countries_codes):
             warnings.append("DO NOT upload non-allowed Asian or Western content. Upload this content to our sister site CINEMAZ.to instead.")
 
-        if not is_disc and meta.container not in ["mkv", "mp4", "avi"]:
-            warnings.append("Allowed containers: MKV, MP4, AVI.")
+        container = str(meta.container or "").strip().lower().lstrip(".")
+        allowed_containers = {"mkv", "mp4", "avi"}
+        if release_type == "hdtv":
+            allowed_containers.update({"ts", "tp"})
+        if not is_disc and container not in allowed_containers:
+            allowed = ", ".join(sorted(allowed_containers)).upper()
+            warnings.append(f"Container not allowed for this rip type: {container or 'unknown'}. Allowed: {allowed}.")
 
-        if not is_disc and video_codec not in ("avc", "h.264", "h.265", "x264", "x265", "hevc", "divx", "xvid"):
+        allowed_video_codecs = {"avc", "h.264", "h.265", "x264", "x265", "hevc", "divx", "xvid"}
+        is_hdtv_mpeg2 = release_type == "hdtv" and video_codec in {"mpeg-2", "mpeg2"}
+        if not is_disc and video_codec not in allowed_video_codecs and not is_hdtv_mpeg2:
             warnings.append(
                 f"Video codec not allowed in your upload: {video_codec}.\n"
                 "Allowed: H264/x264/AVC, H265/x265/HEVC, DivX/Xvid\n"
@@ -400,10 +404,25 @@ class AvistaZ(AZTrackerBase):
                 "    VC-1/MPEG2 for Bluray only if that's what is on the disc"
             )
 
+        resolution_value = str(meta.resolution or "").lower()
+        resolution_match = re.search(r"(\d{3,4})", resolution_value)
+        resolution = int(resolution_match.group(1)) if resolution_match else 0
+        video_width = int(meta.video_width or 0)
+        if not is_disc and video_width and video_width < 600:
+            warnings.append(f"Video width is {video_width}px; AvistaZ requires a minimum width of 600px.")
+        if video_codec in {"divx", "xvid"} and (resolution >= 720 or video_width >= 720):
+            warnings.append("DivX/XviD is not allowed for HD video (720p and above).")
+
+        conditional_rip_types = {"webrip", "vodrip", "vhsrip"}
+        if release_type in conditional_rip_types:
+            warnings.append(f"{release_type.upper()} is allowed only when the video is unavailable in a preferred AvistaZ rip type; verify this manually before uploading.")
+        if source == "brrip" and resolution >= 720:
+            warnings.append("BRRip is allowed only for SD content (below 720p).")
+
         if is_disc:
             pass
         else:
-            allowed_keywords = ["AC3", "Audio Layer III", "MP3", "Dolby Digital", "Dolby TrueHD", "DTS", "DTS-HD", "FLAC", "AAC", "Dolby"]
+            allowed_keywords = ["AC3", "E-AC3", "E-AC-3", "Audio Layer III", "MP3", "Dolby Digital", "Dolby TrueHD", "DTS", "DTS-HD", "FLAC", "AAC", "HE-AAC", "Dolby"]
 
             is_untouched_opus = False
             audio_field = meta.audio
@@ -416,7 +435,7 @@ class AvistaZ(AZTrackerBase):
                 if track.get("@type") == "Audio":
                     codec_info = track.get("Format_Commercial_IfAny") or track.get("Format")
                     codec = codec_info if isinstance(codec_info, str) else ""
-                    audio_tracks.append({"codec": codec, "language": track.get("Language", "")})
+                    audio_tracks.append({"codec": codec, "language": track.get("Language", ""), "bitrate": track.get("BitRate", "")})
 
             invalid_codecs: list[str] = []
             for track in audio_tracks:
@@ -441,6 +460,23 @@ class AvistaZ(AZTrackerBase):
                     f"Allowed codecs: AC3 (Dolby Digital), Dolby TrueHD, DTS, DTS-HD (MA), FLAC, AAC, MP3, etc.\n"
                     f"Exceptions: Untouched Opus from source; Uncompressed codecs from Blu-ray discs (PCM, LPCM)."
                 )
+
+            if release_type != "webdl":
+                low_bitrate_tracks: list[str] = []
+                for track in audio_tracks:
+                    bitrate = str(track.get("bitrate", "") or "")
+                    if not bitrate:
+                        continue
+                    normalized_bitrate = re.sub(r"[\s,]", "", bitrate)
+                    bitrate_match = re.fullmatch(r"(\d+(?:\.\d+)?)([kmg]?)(?:bit/s|b/s|bps)?", normalized_bitrate, flags=re.IGNORECASE)
+                    if not bitrate_match:
+                        continue
+                    bitrate_value = float(bitrate_match.group(1))
+                    bitrate_value *= {"": 1, "k": 1_000, "m": 1_000_000, "g": 1_000_000_000}[bitrate_match.group(2).lower()]
+                    if bitrate_value < 128000:
+                        low_bitrate_tracks.append(f"{track['codec']} ({bitrate})")
+                if low_bitrate_tracks:
+                    warnings.append(f"Audio bitrate must be at least 128 kbit/s outside WEB-DL uploads: {', '.join(low_bitrate_tracks)}.")
 
         if warnings:
             return "\n\n".join(filter(None, warnings))

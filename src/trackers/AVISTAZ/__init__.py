@@ -769,14 +769,38 @@ class AZTrackerBase:
         daily_episode_title = meta.daily_episode_title or ""
         upload_name: str = meta.name.replace(aka_name, "").replace("Dubbed", "").replace("Dual-Audio", "").replace(manual_episode_title, "").replace(daily_episode_title, "")
 
-        if self.tracker == "PRIVATEHD":
+        if self.tracker in ("CINEMAZ", "PRIVATEHD"):
+            # Both sites prohibit these release descriptors in torrent titles.
             forbidden_terms = [r"\bLIMITED\b", r"\bCriterion Collection\b", r"\b\d{1,3}(?:st|nd|rd|th)\s+Anniversary Edition\b"]
             for term in forbidden_terms:
                 upload_name = re.sub(term, "", upload_name, flags=re.IGNORECASE).strip()
 
             upload_name = re.sub(r"\bDirector[’\'`]s\s+Cut\b", "DC", upload_name, flags=re.IGNORECASE)  # noqa: RUF001
-            upload_name = re.sub(r"\bExtended\s+Cut\b", "Extended", upload_name, flags=re.IGNORECASE)
-            upload_name = re.sub(r"\bTheatrical\s+Cut\b", "Theatrical", upload_name, flags=re.IGNORECASE)
+            if self.tracker == "CINEMAZ":
+                upload_name = re.sub(r"\bExtended\s+Cut\b", "EXT", upload_name, flags=re.IGNORECASE)
+                upload_name = re.sub(r"\bTheatrical\s+Cut\b", "TC", upload_name, flags=re.IGNORECASE)
+            else:
+                upload_name = re.sub(r"\bExtended\s+Cut\b", "Extended", upload_name, flags=re.IGNORECASE)
+                upload_name = re.sub(r"\bTheatrical\s+Cut\b", "Theatrical", upload_name, flags=re.IGNORECASE)
+
+            # CinemaZ and PrivateHD prohibit brackets in torrent titles.
+            upload_name = upload_name.replace("[", "").replace("]", "")
+
+            if self.tracker == "CINEMAZ":
+                # CinemaZ requires HYBRID immediately after the video quality.
+                has_hybrid_marker = bool(meta.webdv) or "hybrid" in (meta.edition or "").casefold()
+                title_match = re.search(re.escape(meta.title), upload_name, flags=re.IGNORECASE) if meta.title else None
+                marker_search_start = title_match.end() if title_match else 0
+                hybrid_match = re.search(r"\bHYBRID\b", upload_name[marker_search_start:], flags=re.IGNORECASE) if has_hybrid_marker else None
+                if hybrid_match:
+                    hybrid_start = marker_search_start + hybrid_match.start()
+                    hybrid_end = marker_search_start + hybrid_match.end()
+                    upload_name_without_hybrid = f"{upload_name[:hybrid_start]}{upload_name[hybrid_end:]}"
+                    resolution_match = re.search(r"\b(?:\d{3,4}[pi]|4K|UHD|SD)\b", upload_name_without_hybrid, flags=re.IGNORECASE)
+                    if resolution_match:
+                        upload_name = upload_name_without_hybrid
+                        upload_name = f"{upload_name[: resolution_match.end()]} HYBRID{upload_name[resolution_match.end() :]}"
+
             upload_name = re.sub(r"\s{2,}", " ", upload_name).strip()
 
         if meta.has_encode_settings:
