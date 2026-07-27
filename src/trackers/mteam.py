@@ -166,9 +166,9 @@ class MTeam:
 
     async def mteam_standard_desc(self, meta: Meta):
         db_info = await self.get_douban_info(meta)
+        d = db_info.get("data") if isinstance(db_info, dict) else None
 
-        if db_info and db_info.get("code") == "0":
-            d = db_info.get("data", {})
+        if db_info and db_info.get("code") == "0" and isinstance(d, dict):
             title = d.get("title", "")
             aka = d.get("aka", [])
             translated_names = " / ".join([title, *aka]) if title else " / ".join(aka)
@@ -210,7 +210,7 @@ class MTeam:
 
         # Fallback
         logger.info(f"{self.tracker}: Douban information is unavailable, using an alternative English version for the description.")
-        imdb = meta.imdb_info
+        imdb = meta.imdb_info or {}
 
         tmdb_poster_path = meta.tmdb_poster or "".strip()
         tmdb_poster = f"https://image.tmdb.org/t/p/w200{tmdb_poster_path}" if tmdb_poster_path else ""

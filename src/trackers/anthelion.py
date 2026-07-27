@@ -3,7 +3,7 @@ import asyncio
 import json
 import platform
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import aiofiles
 import cli_ui
@@ -108,8 +108,7 @@ class Anthelion:
         "ZMNT",
     )
     base_url = "https://anthelion.me"
-    search_url = f"{base_url}/api.php"
-    upload_url = f"{base_url}/api.php"
+    api_url = f"{base_url}/api.php"
     supported_categories = ("MOVIE",)
     tracker_urls = ("tracker.anthelion.me",)
 
@@ -117,6 +116,7 @@ class Anthelion:
         self.config = config
         self.common = Common(config)
         self.tracker_config = self.config["TRACKERS"].get(self.tracker, {})
+        self.api_key: str = str(self.tracker_config.get("api_key", "")).strip()
 
     async def get_flags(self, meta: Meta) -> list[str]:
         flags: list[str] = []
@@ -332,7 +332,7 @@ class Anthelion:
         try:
             if not meta.debug:
                 async with httpx.AsyncClient(timeout=40) as client:
-                    response = await client.post(url=self.upload_url, files=files, data=data, headers=headers)
+                    response = await client.post(url=self.api_url, files=files, data=data, headers=headers)
                     try:
                         response_data: dict[str, Any] = response.json()
                     except json.JSONDecodeError:
@@ -440,50 +440,59 @@ class Anthelion:
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
-        api_key = self.tracker_config.get("api_key")
-        if not api_key or not isinstance(api_key, str) or not api_key.strip():
-            return dupes
 
         params = {"t": "search", "o": "json"}
         if meta.tmdb:
-            params["tmdb"] = str(meta.tmdb)
-        elif meta.imdb_id is not None and meta.imdb_id != 0:
-            params["imdb"] = str(meta.imdb)
+            params["tmdbid"] = str(meta.tmdb)
+        elif meta.imdb_id:
+            params["imdbid"] = str(meta.imdb)
 
         headers = {
-            "X-API-Key": api_key.strip(),
+            "X-API-Key": self.api_key,
             "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})",
         }
 
         async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.get(url=self.search_url, params=params, headers=headers)
+            response = await client.get(url=self.api_url, params=params, headers=headers)
             response.raise_for_status()
             data = response.json()
-            target_resolution = meta.resolution.lower()
+            target_resolution = str(meta.resolution or "").lower()
+            raw_items = data.get("item", [])
 
-            for each in data.get("item", []):
-                if target_resolution and each.get("resolution", "").lower() != target_resolution.lower():
-                    logger.debug(f"{self.tracker}: [yellow]Skipping {escape(each.get('fileName'))} - resolution mismatch: {each.get('resolution')} vs {target_resolution}")
+            if not isinstance(raw_items, list):
+                logger.warning(f"{self.tracker}: Unexpected search response: 'item' is not a list.")
+                return dupes
+
+            items = cast(list[Any], raw_items)
+            for each in items:
+                if not isinstance(each, dict):
+                    logger.warning(f"{self.tracker}: Skipping malformed search result.")
+                    continue
+                search_result = cast(dict[str, Any], each)
+
+                resolution = str(search_result.get("resolution") or "")
+                if target_resolution and resolution.lower() != target_resolution:
+                    logger.debug(
+                        f"{self.tracker}: [yellow]Skipping {escape(str(search_result.get('fileName') or ''))} - resolution mismatch: {resolution} vs {target_resolution}"
+                    )
                     continue
 
-                largest_file = None
-                if "files" in each and len(each["files"]) > 0:
-                    largest = each["files"][0]
-                    for file in each["files"]:
-                        current_size = int(file.get("size", 0))
-                        largest_size = int(largest.get("size", 0))
-                        if current_size > largest_size:
-                            largest = file
+                largest_file: Any = None
+                raw_files = search_result.get("files", [])
+                files = cast(list[Any], raw_files) if isinstance(raw_files, list) else []
+                valid_files: list[dict[str, Any]] = [cast(dict[str, Any], file) for file in files if isinstance(file, dict)]
+                if valid_files:
+                    largest = max(valid_files, key=lambda file: int(file.get("size") or 0))
                     largest_file = largest.get("name", "")
 
                 result: dict[str, Any] = {
-                    "name": largest_file or each.get("fileName", ""),
-                    "files": [file.get("name", "") for file in each.get("files", [])],
-                    "size": int(each.get("size", 0)),
-                    "link": each.get("guid", ""),
-                    "flags": each.get("flags", []),
-                    "file_count": each.get("fileCount", 0),
-                    "download": each.get("link", "").replace("&amp;", "&"),
+                    "name": largest_file or search_result.get("fileName", ""),
+                    "files": [cast(dict[str, Any], file).get("name", "") for file in files if isinstance(file, dict)],
+                    "size": int(search_result.get("size", 0)),
+                    "link": search_result.get("guid", ""),
+                    "flags": search_result.get("flags", []),
+                    "file_count": search_result.get("fileCount", 0),
+                    "download": search_result.get("link", "").replace("&amp;", "&"),
                 }
                 dupes.append(result)
 
@@ -514,7 +523,7 @@ class Anthelion:
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.get(url=self.search_url, params=params, headers=headers)
+                response = await client.get(url=self.api_url, params=params, headers=headers)
                 if response.status_code == 200:
                     try:
                         data = response.json()
