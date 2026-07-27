@@ -2,6 +2,7 @@
 import platform
 from typing import Any, ClassVar
 
+import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
@@ -304,7 +305,7 @@ class NEXUSPHP:
             description=True,
             game=True,
             languages=False,
-            logo=True,
+            logo=False,
             mediainfo=False,
             menu_screenshots=True,
             nfo=False,
@@ -366,9 +367,13 @@ class NEXUSPHP:
         meta = meta
         return 0
 
+    async def get_technical_info(self, meta: Meta) -> str:
+        file = "BD_SUMMARY_00" if meta.is_disc == "BDMV" else "MEDIAINFO_CLEANPATH"
+        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{file}.txt", encoding="utf-8") as f:
+            return await f.read()
+
     async def get_data(self, meta: Meta):
         await self.load_localized_data(meta)
-        builder = DescriptionBuilder(self.tracker, self.config)
         data: dict[str, Any] = {
             "codec_sel[4]": self.get_codec(meta),
             "color": 0,
@@ -379,7 +384,7 @@ class NEXUSPHP:
             "size": 0,
             "small_descr": self.common.get_small_description(meta),
             "standard_sel[4]": self.get_resolution(meta),
-            "technical_info": await builder.get_mediainfo_section(meta) if meta.is_disc != "BDMV" else await builder.get_bdinfo_section(meta),
+            "technical_info": await self.get_technical_info(meta),
             "type": self.get_category(meta),
         }
 
