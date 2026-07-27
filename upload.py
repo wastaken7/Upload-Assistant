@@ -1824,13 +1824,15 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         await waiter.select_and_recheck_best_torrent(meta, cast(str, meta.path), check_interval=5)
 
     # 1. Reuse existing torrent from client if possible
-    reuse_torrent = None
+    reuse_torrent = meta.reuse_torrent_path
+    base_reuse_torrent = meta.base_reuse_torrent_path
     trackers_list = [t.strip().upper() for t in meta.trackers.split(",")] if isinstance(meta.trackers, str) else [t.strip().upper() for t in meta.trackers]
 
     is_usenet_only = len(trackers_list) > 0 and all(t in ("USENET", "MANUAL") or getattr(tracker_class_map.get(t), "is_usenet", False) for t in trackers_list)
     if not is_usenet_only:
         if meta.rehash is False and not meta.base_torrent_created and not meta.we_checked_them_all:
-            reuse_torrent = await client.find_existing_torrent(meta)
+            if not reuse_torrent or not Path(reuse_torrent).exists():
+                reuse_torrent = await client.find_existing_torrent(meta)
             if reuse_torrent is not None:
                 await TORRENT_CREATOR.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid)
 
@@ -1842,6 +1844,8 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
         # 3. Otherwise generate if missing
         else:
+            if not Path(torrent_path).exists() and base_reuse_torrent and Path(base_reuse_torrent).exists():
+                await TORRENT_CREATOR.create_base_from_existing_torrent(base_reuse_torrent, meta.base_dir, meta.uuid)
             if not Path(torrent_path).exists() and meta.nohash is False:
                 await TORRENT_CREATOR.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
             if has_local_subs and not Path(subs_torrent_path).exists() and meta.nohash is False:

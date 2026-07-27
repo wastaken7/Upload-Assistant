@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import aiofiles
 import cli_ui
 import guessit
+from torf import Torrent
 
 from src.bluray_com import get_bluray_releases
 from src.cleanup import cleanup_manager
@@ -670,9 +671,24 @@ async def process_trackers_and_torrent(
     meta.trackers = cast(list[str], trackers)
     meta.requested_trackers = cast(list[str], trackers)
 
-    # auto torrent searching with qbittorrent that grabs torrent ids for metadata searching
+    # Find one reusable torrent while all local files (including external
+    # subtitles) are known. Its path is cached for the upload stage, which
+    # prevents a second full client search later in the run.
     if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids) and not meta.skip_trackers and not meta.edit:
-        await client.get_pathed_torrents(str(meta.path), meta)
+        reuse_torrent_path = await client.find_existing_torrent(meta)
+        if reuse_torrent_path:
+            meta.reuse_torrent_path = reuse_torrent_path
+            if meta.subtitle_files and client._torrent_includes_all_local_subtitles(reuse_torrent_path, meta):
+                meta.subs_reuse_torrent_path = reuse_torrent_path
+            else:
+                meta.base_reuse_torrent_path = reuse_torrent_path
+            try:
+                meta.infohash = Torrent.read(reuse_torrent_path).infohash
+            except Exception as e:
+                logger.debug(f"[yellow]Unable to read infohash from cached torrent: {e}")
+            # Fetch properties only: this preserves comment/tracker-ID discovery
+            # without running another name-based torrent search or exporting it.
+            await client.get_ptp_from_hash(meta, pathed=True)
 
 
 async def search_metadata(

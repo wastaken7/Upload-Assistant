@@ -27,6 +27,7 @@ from src.webui_progress import complete_progress, publish_progress
 
 PIECE_SIZE_MIN = 32 * 1024  # 32 KiB
 PIECE_SIZE_MAX = 134_217_728  # 128 MiB
+SUBTITLE_EXTENSIONS = (".srt", ".sub", ".vtt", ".ssa", ".ass", ".idx")
 
 
 def calculate_piece_size(
@@ -221,6 +222,12 @@ class TorrentCreator:
                 if is_subs and meta.subtitle_files:
                     creation_filelist.extend(meta.subtitle_files)
 
+                # A single-file release must use its parent as the creation root
+                # when external subtitles are requested; otherwise neither torf nor
+                # mkbrr can discover sibling subtitle files.
+                if is_subs and Path(path).is_file():
+                    path = Path(path).parent
+
                 if meta.category not in ("MOVIE", "TV"):
                     if meta.isdir and len(meta.filelist) == 1 and not meta.keep_folder:
                         path = meta.filelist[0]
@@ -264,6 +271,10 @@ class TorrentCreator:
                         folder_name = Path(str(path)).name
                         include = [f"{folder_name}/{Path(f).name}" for f in creation_filelist]
                         exclude = ["*", "*/**"]
+                elif is_subs:
+                    folder_name = Path(path).name
+                    include = [f"{folder_name}/{Path(file).name}" for file in creation_filelist]
+                    exclude = ["*", "*/**"]
                 else:
                     exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta.is_disc else []
                     include = ["*.mkv", "*.mp4", "*.ts"] if not meta.is_disc else []
@@ -431,8 +442,12 @@ class TorrentCreator:
 
                 # Fallback to CustomTorrent if mkbrr is not used
                 custom_include = include or []
-                if is_subs and not custom_include and not meta.is_disc and meta.category in ("TV", "MOVIE"):
-                    custom_include = ["*.mkv", "*.mp4", "*.ts", "*.srt", "*.sub", "*.vtt", "*.ssa", "*.ass", "*.idx"]
+                if is_subs and not meta.is_disc and meta.category in ("TV", "MOVIE"):
+                    # `include` is usually already populated with video globs. Add
+                    # subtitle globs rather than relying on it being empty, otherwise
+                    # a file named BASE_SUBS may silently omit the subtitles.
+                    subtitle_globs = [f"*{extension}" for extension in SUBTITLE_EXTENSIONS]
+                    custom_include = list(dict.fromkeys([*custom_include, *subtitle_globs]))
                 torrent = CustomTorrent(
                     meta=meta,
                     path=path,
@@ -508,7 +523,7 @@ class TorrentCreator:
             Torrent.copy(new_torrent).write(f"{base_dir}{'/' + 'tmp' + '/'}{uuid}/[RAND-{i}]{manual_name}.torrent", overwrite=True)
 
     @staticmethod
-    async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> None:
+    async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> str | None:
         if Path(torrentpath).exists():
             base_torrent = Torrent.read(torrentpath)
             base_torrent.trackers = ["https://fake.tracker"]
@@ -548,14 +563,13 @@ class TorrentCreator:
                     base_torrent.metainfo.pop(each, None)  # type: ignore
             base_torrent.source = "L4G"
             base_torrent.private = True
-            has_subs = False
-            for f in base_torrent.files:
-                ext = Path(str(f)).suffix.lower()
-                if ext in {".srt", ".sub", ".vtt", ".ssa", ".ass", ".idx"}:
-                    has_subs = True
-                    break
+            has_subs = any(Path(str(f)).suffix.lower() in SUBTITLE_EXTENSIONS for f in base_torrent.files)
             out_name = "BASE_SUBS.torrent" if has_subs else "BASE.torrent"
-            Torrent.copy(base_torrent).write(f"{base_dir}{'/' + 'tmp' + '/'}{uuid}/{out_name}", overwrite=True)
+            output_path = Path(base_dir) / "tmp" / uuid / out_name
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            Torrent.copy(base_torrent).write(output_path, overwrite=True)
+            return str(output_path)
+        return None
 
     @staticmethod
     def get_mkbrr_path(meta: Meta) -> str:
@@ -626,8 +640,8 @@ def create_random_torrents(base_dir: str, uuid: str, num: int | str, path: str) 
     TorrentCreator.create_random_torrents(base_dir, uuid, num, path)
 
 
-async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> None:
-    await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid)
+async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> str | None:
+    return await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid)
 
 
 def get_mkbrr_path(meta: Meta) -> str:

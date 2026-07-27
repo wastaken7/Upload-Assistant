@@ -284,17 +284,20 @@ class TrackerStatusManager:
                     if tracker_name == "MORETHANTV" and not local_tracker_status["banned"] and not local_tracker_status["skipped"] and not local_tracker_status["dupe"]:
                         tracker_config = self.trackers_config.get(tracker_name, {})
                         if str(tracker_config.get("skip_if_rehash", "false")).lower() == "true":
-                            torrent_path = str(Path(f"{local_meta['base_dir']}{'/' + 'tmp' + '/'}{local_meta['uuid']}/BASE.torrent").resolve())
-                            if not Path(torrent_path).exists():
+                            base_torrent_path = Path(f"{local_meta['base_dir']}{'/' + 'tmp' + '/'}{local_meta['uuid']}/BASE.torrent").resolve()
+                            subs_torrent_path = Path(f"{local_meta['base_dir']}{'/' + 'tmp' + '/'}{local_meta['uuid']}/BASE_SUBS.torrent").resolve()
+                            torrent_path = base_torrent_path if base_torrent_path.exists() else subs_torrent_path
+                            if not torrent_path.exists():
                                 check_torrent = await client.find_existing_torrent(cast(dict[str, Any], local_meta))
                                 if check_torrent:
                                     logger.info(f"[yellow]Existing torrent found on {check_torrent}[yellow]")
-                                    await TorrentCreator.create_base_from_existing_torrent(check_torrent, local_meta["base_dir"], local_meta["uuid"])
-                                    torrent = Torrent.read(torrent_path)
-                                    if torrent.piece_size > 8388608:
-                                        logger.info("[yellow]No existing torrent found with piece size lesser than 8MB[yellow]")
-                                        local_tracker_status["skipped"] = True
-                            elif Path(torrent_path).exists():
+                                    created_torrent_path = await TorrentCreator.create_base_from_existing_torrent(check_torrent, local_meta["base_dir"], local_meta["uuid"])
+                                    if created_torrent_path:
+                                        torrent = Torrent.read(created_torrent_path)
+                                        if torrent.piece_size > 8388608:
+                                            logger.info("[yellow]No existing torrent found with piece size lesser than 8MB[yellow]")
+                                            local_tracker_status["skipped"] = True
+                            else:
                                 torrent = Torrent.read(torrent_path)
                                 if torrent.piece_size > 8388608:
                                     logger.info("[yellow]Existing torrent found with piece size greater than 8MB[yellow]")

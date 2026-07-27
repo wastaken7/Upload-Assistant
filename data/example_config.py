@@ -2644,6 +2644,10 @@ config: dict[str, Any] = {
             "qbit_pass": "",
             # API Key authentication (stateless, qBittorrent v5.2.0+). When set, qbit_user and qbit_pass are ignored.
             "qbit_api_key": "",
+            # Optional qBittorrent BT_backup directory. Used together with QUI/API search;
+            # reading .torrent files locally can substantially speed up candidate validation.
+            # Use double-backslashes on Windows, e.g. "C:\\Users\\<YOUR_USER>\\AppData\\Local\\qBittorrent\\BT_backup".
+            "torrent_storage_dir": "",
             # List of trackers to activate "super-seed" (or "initial seeding") mode when adding the torrent.
             # https://www.bittorrent.org/beps/bep_0016.html
             # Super-seed mode is NOT recommended for general use.
@@ -2674,9 +2678,6 @@ config: dict[str, Any] = {
             # Remote path mapping (docker/etc.) CASE SENSITIVE
             "local_path": [""],
             "remote_path": [""],
-            # only set qBitTorrent torrent_storage_dir if API searching does not work
-            # use double-backslash on windows eg: "C:\\client\\backup"
-            # "torrent_storage_dir": "path/to/BT_backup folder",
 
             # Set to False to skip verify certificate for HTTPS connections; for instance, if the connection is using a self-signed certificate.
             # "VERIFY_WEBUI_CERTIFICATE": True,

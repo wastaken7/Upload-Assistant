@@ -199,8 +199,8 @@ class QbittorrentClientMixin:
                             except TimeoutError:
                                 logger.info(f"[bold red]Failed to export .torrent for {torrent_hash} after retries")
 
-                        found = True
-                        break
+                    found = True
+                    break
             except Exception as e:
                 if qbt_session:
                     await qbt_session.aclose()
@@ -433,6 +433,26 @@ class QbittorrentClientMixin:
                 logger.debug(f"Save Path: {torrent.save_path}")
                 logger.debug(f"Content Path: {torrent_path}")
 
+                # The early cached-search path must retain the same tracker
+                # discovery side effect as the former get_pathed_torrents flow.
+                # Otherwise a tracker already present in the client is not added
+                # to meta.remove_trackers and can be uploaded again.
+                tracker_urls: list[str] = []
+                primary_tracker = str(getattr(torrent, "tracker", "") or "")
+                if primary_tracker:
+                    tracker_urls.append(primary_tracker)
+                raw_trackers = getattr(torrent, "trackers", []) or []
+                if isinstance(raw_trackers, list):
+                    for tracker in raw_trackers:
+                        if isinstance(tracker, dict):
+                            url = tracker.get("url")
+                            if url:
+                                tracker_urls.append(str(url))
+                        elif tracker:
+                            tracker_urls.append(str(tracker))
+                if tracker_urls:
+                    await match_tracker_url(tracker_urls, meta)
+
                 matching_torrents.append({"hash": torrent.hash, "name": torrent.name})
 
             logger.debug(f"[cyan]DEBUG: Checked {torrent_count} total torrents in qBittorrent[/cyan]")
@@ -445,6 +465,7 @@ class QbittorrentClientMixin:
             # **Step 2: Extract and Save .torrent Files**
             processed_hashes: set[str] = set()
             best_match = None
+            video_only_fallback: str | None = None
             torrent_hash: str | None = None
             for matching_torrent in matching_torrents:
                 try:
@@ -512,6 +533,11 @@ class QbittorrentClientMixin:
                     torrent_path = None
 
                 if valid:
+                    if meta.subtitle_files and not self._torrent_includes_all_local_subtitles(str(torrent_file_path), meta):
+                        video_only_fallback = torrent_hash
+                        meta.base_reuse_torrent_path = str(torrent_path or torrent_file_path)
+                        logger.debug(f"[yellow]Keeping video-only torrent as fallback: {torrent_hash}")
+                        continue
                     if prefer_small_pieces:
                         # **Track best match based on piece size**
                         try:
@@ -537,6 +563,9 @@ class QbittorrentClientMixin:
             if best_match:
                 logger.info(f"[green]Using best match torrent with hash: {best_match['hash']}")
                 result = str(best_match["hash"]) if "hash" in best_match else None
+            elif video_only_fallback:
+                logger.info(f"[yellow]No matching torrent with all local subtitles found; using video-only fallback: {video_only_fallback}")
+                result = video_only_fallback
             else:
                 logger.info("[yellow]No valid torrents found.")
                 result = None
@@ -1069,7 +1098,7 @@ class QbittorrentClientMixin:
 
             end_time = time.time()
             duration = end_time - start_time
-            if duration > 3:
+            if duration > 5:
                 # Check if any searched client already has qui_proxy_url configured
                 using_proxy = False
                 for client_name in clients_to_search:
@@ -1077,8 +1106,9 @@ class QbittorrentClientMixin:
                     if client_config and isinstance(client_config, dict) and str(client_config.get("qui_proxy_url", "")).strip():
                         using_proxy = True
                         break
+                logger.info(f"[yellow]qBittorrent search took {duration:.1f} seconds.[/yellow]")
                 if not using_proxy:
-                    logger.info(f"[yellow]qBittorrent search took {duration:.1f} seconds. For faster searches, consider configuring 'qui_proxy_url' in your config.[/yellow]")
+                    logger.info("[yellow]For faster searches, consider configuring 'qui_proxy_url' in your config.[/yellow]")
 
             if meta.debug:
                 if len(all_matching_torrents) != len(unique_torrents):
@@ -1266,7 +1296,11 @@ class QbittorrentClientMixin:
                 # Build qui's enhanced filter options with expression support
                 qui_filters = {
                     "status": [],  # Empty = all statuses, or specify like ["downloading","seeding"]
-                    "excludeStatus": ["unregistered", "tracker_down"],
+                    # Reuse is determined by the local file layout and piece
+                    # hashes, not by the health of the torrent's old tracker.
+                    # Keeping this empty also makes this early lookup use the
+                    # same query semantics as the upload-stage fallback.
+                    "excludeStatus": [],
                     "categories": [],
                     "excludeCategories": [],
                     "tags": [],
@@ -1519,6 +1553,7 @@ class QbittorrentClientMixin:
             # Use piece preference if MORETHANTV preference is true, otherwise use general piece limit
             use_piece_preference = prefer_small_pieces or piece_limit
             piece_size_best_match: dict[str, Any] | None = None  # Track the best match for fallback if piece preference is enabled
+            subtitle_fallback: dict[str, str] | None = None
             found_valid_torrent = False
 
             # Try the best match first (from the sorted matching torrents)
@@ -1532,7 +1567,10 @@ class QbittorrentClientMixin:
             if torrent_file_path:
                 valid, torrent_path = await self.is_valid_torrent(meta, torrent_file_path, torrent_hash, "qbit", client_config)
                 if valid:
-                    if use_piece_preference:
+                    if meta.subtitle_files and not self._torrent_includes_all_local_subtitles(torrent_file_path, meta):
+                        subtitle_fallback = {"hash": torrent_hash, "torrent_path": torrent_path or torrent_file_path}
+                        logger.debug(f"[yellow]Keeping video-only torrent as fallback: {torrent_hash}")
+                    elif use_piece_preference:
                         # **Track best match based on piece size**
                         try:
                             torrent_data = Torrent.read(torrent_file_path)
@@ -1590,7 +1628,10 @@ class QbittorrentClientMixin:
                         alt_valid, alt_torrent_path = await self.is_valid_torrent(meta, alt_torrent_file_path, alt_torrent_hash, "qbit", client_config)
 
                         if alt_valid:
-                            if use_piece_preference:
+                            if meta.subtitle_files and not self._torrent_includes_all_local_subtitles(alt_torrent_file_path, meta):
+                                subtitle_fallback = {"hash": alt_torrent_hash, "torrent_path": alt_torrent_path or alt_torrent_file_path}
+                                logger.debug(f"[yellow]Keeping video-only alternative as fallback: {alt_torrent_hash}")
+                            elif use_piece_preference:
                                 # **Track best match based on piece size**
                                 try:
                                     torrent_data = Torrent.read(alt_torrent_file_path)
@@ -1633,6 +1674,17 @@ class QbittorrentClientMixin:
                             logger.debug(f"[bold red]{alt_torrent_hash} failed validation")
                             if Path(alt_torrent_file_path).exists() and alt_torrent_file_path.startswith(extracted_torrent_dir):
                                 Path(alt_torrent_file_path).unlink()
+
+                if subtitle_fallback and not found_valid_torrent and not piece_size_best_match:
+                    try:
+                        await TorrentCreator.create_base_from_existing_torrent(subtitle_fallback["torrent_path"], meta.base_dir, meta.uuid)
+                        meta.infohash = subtitle_fallback["hash"]
+                        meta.hash_used = subtitle_fallback["hash"]
+                        meta.base_torrent_created = True
+                        found_valid_torrent = True
+                        logger.info(f"[yellow]No torrent with all local subtitles found; using video-only fallback: {subtitle_fallback['hash']}")
+                    except Exception as e:
+                        logger.info(f"[bold red]Error creating BASE.torrent from video-only fallback: {e}")
 
                 if not found_valid_torrent:
                     logger.debug("[bold red]No valid torrents found after checking all matches, falling back to a best match if preference is set")
