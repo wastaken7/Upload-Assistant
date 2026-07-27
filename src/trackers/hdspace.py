@@ -161,7 +161,6 @@ class HDSpace:
             else:
                 break
 
-        logger.info(f"{self.tracker}: [bold green]Found {len(dupes)} duplicates on {self.tracker}[/bold green]")
         return dupes
 
     async def get_category_id(self, meta: Meta) -> int:
