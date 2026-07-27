@@ -662,7 +662,12 @@ async def _prompt_game_meta(meta: Meta) -> None:
 
                 elif field == "game_subcategory":
                     subcategory_choices = ["full_game (Full Game)", "full_game_dlc (Full Game + DLC)", "dlc (DLC only)", "update (Update only)"]
-                    subcategory_values = {"Full Game": "full_game", "Full Game + DLC": "full_game_dlc", "DLC": "dlc", "Update": "update"}
+                    subcategory_values = {
+                        "full_game (Full Game)": "full_game",
+                        "full_game_dlc (Full Game + DLC)": "full_game_dlc",
+                        "dlc (DLC only)": "dlc",
+                        "update (Update only)": "update",
+                    }
                     choice = CLI_UI.ask_choice("Select game subcategory (can be manually set with -gsc / --game-subcategory):", choices=subcategory_choices, sort=False)
                     meta.game_subcategory = subcategory_values.get(choice, "full_game")
                     name_needs_rebuild = True
