@@ -1447,9 +1447,7 @@ class MakingOff:
             self._display_title_cache[cache_key] = title_native
         return title_native
 
-    # -- topic title
-
-    async def get_topic_title(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         """
         Generate the forum topic title.
 
@@ -1778,7 +1776,7 @@ class MakingOff:
                 sub_files = []
 
         if meta.debug:
-            topic_title = await self.get_topic_title(meta)
+            topic_title = await self.get_name(meta)
             post_body = await self.generate_description(meta)
 
             fields = self.get_topic_fields(
@@ -1824,7 +1822,7 @@ class MakingOff:
             logger.info(f"{self.tracker}: [yellow]Uploading Portuguese subtitle as attachment:[/yellow] {Path(sub_file).name}")
             await self.upload_attachment(sub_file, csrf_token, attachment_hash, attachment_hash_combined, forum_id)
 
-        topic_title = await self.get_topic_title(meta)
+        topic_title = await self.get_name(meta)
         post_body = await self.generate_description(meta)
 
         topic_url = await self.create_topic(
