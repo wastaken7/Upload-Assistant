@@ -176,8 +176,8 @@ const argumentCategories = [
       },
       {
         label: "--music-media",
-        placeholder: "CD / WEB / VINYL",
-        description: "Source medium",
+        placeholder: "MEDIUM",
+        description: "Source medium (CD, WEB, Vinyl, DVD, BD, Soundboard, SACD, DAT, Cassette)",
       },
       {
         label: "--music-release-type",
