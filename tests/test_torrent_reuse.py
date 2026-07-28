@@ -179,7 +179,7 @@ async def test_client_search_keeps_best_piece_size_video_only_fallback(tmp_path,
     monkeypatch.setattr("src.clients.Torrent.read", lambda path: torrents[str(path)])
 
     async def fake_search(_self, _meta, client_name, *_args):
-        return str(small_piece_torrent) if client_name == "first" else str(large_piece_torrent)
+        return str(large_piece_torrent) if client_name == "first" else str(small_piece_torrent)
 
     monkeypatch.setattr(Clients, "_search_single_client_for_torrent", fake_search)
     config = {
@@ -190,7 +190,7 @@ async def test_client_search_keeps_best_piece_size_video_only_fallback(tmp_path,
     meta = Meta({"client": "none", "subtitle_files": [str(selected_subtitle)]})
 
     assert await Clients(config).find_existing_torrent(meta) == str(small_piece_torrent)  # noqa: S101
-    assert meta.reuse_torrent_client == "first"  # noqa: S101
+    assert meta.reuse_torrent_client == "second"  # noqa: S101
 
 
 @pytest.mark.asyncio
