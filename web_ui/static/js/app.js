@@ -162,6 +162,88 @@ const argumentCategories = [
     ],
   },
   {
+    title: "Music Metadata",
+    args: [
+      {
+        label: "--music-artist",
+        placeholder: "ARTIST",
+        description: "Override the main artist(s)",
+      },
+      {
+        label: "--music-album",
+        placeholder: "TITLE",
+        description: "Override the album or release title",
+      },
+      {
+        label: "--music-media",
+        placeholder: "CD / WEB / VINYL",
+        description: "Source medium",
+      },
+      {
+        label: "--music-release-type",
+        placeholder: "ALBUM / EP / SINGLE",
+        description: "Release type",
+      },
+      {
+        label: "--music-release-year",
+        placeholder: "YYYY",
+        description: "Concrete release or pressing year",
+      },
+      {
+        label: "--music-edition-year",
+        placeholder: "YYYY",
+        description: "Remaster, reissue, or edition year",
+      },
+      {
+        label: "--music-label",
+        placeholder: "LABEL",
+        description: "Record label",
+      },
+      {
+        label: "--music-catalogue-number",
+        placeholder: "CATALOGUE",
+        description: "Catalogue number",
+      },
+      {
+        label: "--music-genre",
+        placeholder: "GENRE1,GENRE2",
+        description: "Comma-separated genre override",
+      },
+      {
+        label: "--music-cover",
+        placeholder: "URL_OR_PATH",
+        description: "Artwork URL or local cover path",
+      },
+      {
+        label: "--music-discogs-id",
+        placeholder: "ID_OR_URL",
+        description: "Discogs release or master reference",
+      },
+      {
+        label: "--music-discogs-release-id",
+        placeholder: "ID_OR_URL",
+        description: "Exact Discogs release reference",
+      },
+      {
+        label: "--music-discogs-master-id",
+        placeholder: "ID_OR_URL",
+        description: "Exact Discogs master reference",
+      },
+      {
+        label: "--no-music-discogs",
+        description: "Disable Discogs lookup and metadata",
+      },
+      {
+        label: "--music-enrich",
+        description: "Enable bounded MusicBrainz enrichment",
+      },
+      {
+        label: "--no-music-enrich",
+        description: "Disable MusicBrainz enrichment",
+      },
+    ],
+  },
+  {
     title: "Screenshots / Images",
     args: [
       {
@@ -183,11 +265,6 @@ const argumentCategories = [
         label: "--comparison_index",
         placeholder: "N",
         description: "Comparison main index",
-      },
-      {
-        label: "--disc-menus",
-        placeholder: "PATH",
-        description: "Folder containing disc menus screenshots",
       },
       {
         label: "--imghost",
@@ -299,6 +376,12 @@ const argumentCategories = [
       },
       { label: "--untouched", description: "Mark as untouched disc" },
       { label: "--menus", description: "Path to menus screenshots (PNGs)" },
+      { label: "--menu", description: "Path to menus screenshots (alias)" },
+      {
+        label: "--manual_dvds",
+        placeholder: "2xDVD9+DVD5",
+        description: "Override the default number of DVDs",
+      },
       {
         label: "--sorted-filelist",
         description: "Sorted filelist (handles typical anime nonsense)",
@@ -377,6 +460,7 @@ const argumentCategories = [
         placeholder: "dlc",
         description: "Game subcategory",
       },
+      { label: "--multi", description: "Force a MULTI language tag" },
     ],
   },
   {
@@ -400,6 +484,11 @@ const argumentCategories = [
       { label: "--hdb", placeholder: "ID_OR_URL", description: "HDB id/link" },
       { label: "--btn", placeholder: "ID_OR_URL", description: "BTN id/link" },
       { label: "--bhd", placeholder: "ID_OR_URL", description: "BHD id/link" },
+      {
+        label: "--orpheus",
+        placeholder: "ID_OR_URL",
+        description: "Orpheus id/link for music metadata enrichment",
+      },
       {
         label: "--huno",
         placeholder: "ID_OR_URL",
