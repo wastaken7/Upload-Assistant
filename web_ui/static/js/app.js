@@ -1713,7 +1713,9 @@ function AudionutsUAGUI() {
       try {
         const response = await apiFetch(
           `${API_BASE}/execution_preview?session_id=${encodeURIComponent(sessionId)}`,
-          { signal: controller.signal },
+          // This endpoint changes throughout a queue run.  Do not allow a
+          // browser or intermediary cache to keep showing an earlier item.
+          { cache: "no-store", signal: controller.signal },
         );
         if (!response.ok) {
           return;

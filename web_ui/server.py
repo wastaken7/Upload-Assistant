@@ -4175,7 +4175,11 @@ def execution_preview():
     if preview is None:
         return jsonify({"success": False, "error": "Session not found"}), 404
 
-    return jsonify({"success": True, "media": preview})
+    response = jsonify({"success": True, "media": preview})
+    # A queue run updates this resource in place.  Prevent stale previews when
+    # clients poll the same session URL repeatedly.
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return response
 
 
 @app.route("/api/execution_preview_cover")
