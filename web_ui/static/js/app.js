@@ -1,8 +1,29 @@
 const { useState, useRef, useEffect, useCallback } = React;
 const THEME_KEY = "ua_config_theme";
+const ARGUMENT_PRESETS_KEY = "ua_argument_presets";
+const MAX_ARGUMENT_PRESETS = 50;
 
 const storage = window.UAStorage;
 const getStoredTheme = window.getUAStoredTheme;
+
+const loadArgumentPresets = () => {
+  try {
+    const stored = storage.get(ARGUMENT_PRESETS_KEY);
+    const presets = JSON.parse(stored || "[]");
+    if (!Array.isArray(presets)) return [];
+
+    return presets
+      .filter(
+        (preset) =>
+          preset &&
+          typeof preset.name === "string" &&
+          typeof preset.arguments === "string",
+      )
+      .slice(0, MAX_ARGUMENT_PRESETS);
+  } catch (error) {
+    return [];
+  }
+};
 
 // Local CSRF cache used by fallback `apiFetch` when `uaApiFetch` isn't present.
 let localCsrf = null;
@@ -1028,6 +1049,9 @@ function AudionutsUAGUI() {
   const [selectedPath, setSelectedPath] = useState("");
   const [, setSelectedName] = useState("");
   const [customArgs, setCustomArgs] = useState("");
+  const [argumentPresets, setArgumentPresets] = useState(loadArgumentPresets);
+  const [argumentPresetName, setArgumentPresetName] = useState("");
+  const [selectedArgumentPreset, setSelectedArgumentPreset] = useState("");
   const [trackers, setTrackers] = useState([]);
   const [defaultTrackers, setDefaultTrackers] = useState(new Set());
   const [selectedTrackers, setSelectedTrackers] = useState(new Set());
@@ -3062,6 +3086,112 @@ function AudionutsUAGUI() {
     setCustomArgs((prev) => (prev && prev.length ? `${prev} ${arg}` : arg));
   };
 
+  const saveArgumentPreset = () => {
+    const name = argumentPresetName.trim();
+    const argumentsValue = customArgs.trim();
+    if (!name || !argumentsValue) return;
+
+    setArgumentPresets((prev) => {
+      const preset = { name, arguments: argumentsValue };
+      const existingIndex = prev.findIndex(
+        (item) => item.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
+      );
+      const next =
+        existingIndex >= 0
+          ? prev.map((item, index) => (index === existingIndex ? preset : item))
+          : [...prev, preset].slice(-MAX_ARGUMENT_PRESETS);
+      storage.set(ARGUMENT_PRESETS_KEY, JSON.stringify(next));
+      return next;
+    });
+    setSelectedArgumentPreset(name);
+    setArgumentPresetName("");
+  };
+
+  const loadArgumentPreset = (name) => {
+    setSelectedArgumentPreset(name);
+    const preset = argumentPresets.find((item) => item.name === name);
+    if (preset) setCustomArgs(preset.arguments);
+  };
+
+  const deleteArgumentPreset = () => {
+    if (!selectedArgumentPreset) return;
+
+    setArgumentPresets((prev) => {
+      const next = prev.filter((item) => item.name !== selectedArgumentPreset);
+      storage.set(ARGUMENT_PRESETS_KEY, JSON.stringify(next));
+      return next;
+    });
+    setSelectedArgumentPreset("");
+  };
+
+  const renderArgumentPresetControls = (isMobileView = false) => (
+    <div className={`space-y-2 ${isMobileView ? "pt-1" : ""}`}>
+      <div className="flex gap-2">
+        <select
+          value={selectedArgumentPreset}
+          onChange={(e) => loadArgumentPreset(e.target.value)}
+          className={`min-w-0 flex-1 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+            isDarkMode
+              ? "bg-gray-700 border-gray-600 text-white"
+              : "bg-white border-gray-300 text-gray-900"
+          }`}
+          disabled={isExecuting || argumentPresets.length === 0}
+          aria-label="Saved argument presets"
+        >
+          <option value="">Saved argument presets</option>
+          {argumentPresets.map((preset) => (
+            <option key={preset.name} value={preset.name}>
+              {preset.name}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={deleteArgumentPreset}
+          disabled={isExecuting || !selectedArgumentPreset}
+          className="px-3 py-2 text-sm font-medium rounded-lg border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-red-950"
+          title="Delete selected preset"
+        >
+          Delete
+        </button>
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={argumentPresetName}
+          onChange={(e) => setArgumentPresetName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              saveArgumentPreset();
+            }
+          }}
+          placeholder="Preset name"
+          className={`min-w-0 flex-1 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+            isDarkMode
+              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+          }`}
+          disabled={isExecuting}
+        />
+        <button
+          onClick={saveArgumentPreset}
+          disabled={
+            isExecuting || !argumentPresetName.trim() || !customArgs.trim()
+          }
+          className="px-3 py-2 text-sm font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Save current arguments as a named preset"
+        >
+          Save
+        </button>
+      </div>
+      <p
+        className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+      >
+        Saving an existing name updates that preset.
+      </p>
+    </div>
+  );
+
   // Toggle section collapse
   const toggleSectionCollapse = (title) => {
     setCollapsedSections((prev) => {
@@ -3840,6 +3970,7 @@ function AudionutsUAGUI() {
                 }`}
                 disabled={isExecuting}
               />
+              {renderArgumentPresetControls(true)}
 
               {/* Desc Link Input */}
               {hasDescLink &&
@@ -4587,6 +4718,7 @@ function AudionutsUAGUI() {
                     }`}
                     disabled={isExecuting}
                   />
+                  {renderArgumentPresetControls()}
                 </div>
 
                 {/* Description Link URL Input - shown when --desclink is in args */}
