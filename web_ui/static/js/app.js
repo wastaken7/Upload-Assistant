@@ -1,29 +1,8 @@
 const { useState, useRef, useEffect, useCallback } = React;
 const THEME_KEY = "ua_config_theme";
-const ARGUMENT_PRESETS_KEY = "ua_argument_presets";
-const MAX_ARGUMENT_PRESETS = 50;
 
 const storage = window.UAStorage;
 const getStoredTheme = window.getUAStoredTheme;
-
-const loadArgumentPresets = () => {
-  try {
-    const stored = storage.get(ARGUMENT_PRESETS_KEY);
-    const presets = JSON.parse(stored || "[]");
-    if (!Array.isArray(presets)) return [];
-
-    return presets
-      .filter(
-        (preset) =>
-          preset &&
-          typeof preset.name === "string" &&
-          typeof preset.arguments === "string",
-      )
-      .slice(0, MAX_ARGUMENT_PRESETS);
-  } catch (error) {
-    return [];
-  }
-};
 
 // Local CSRF cache used by fallback `apiFetch` when `uaApiFetch` isn't present.
 let localCsrf = null;
@@ -1049,7 +1028,7 @@ function AudionutsUAGUI() {
   const [selectedPath, setSelectedPath] = useState("");
   const [, setSelectedName] = useState("");
   const [customArgs, setCustomArgs] = useState("");
-  const [argumentPresets, setArgumentPresets] = useState(loadArgumentPresets);
+  const [argumentPresets, setArgumentPresets] = useState([]);
   const [argumentPresetName, setArgumentPresetName] = useState("");
   const [selectedArgumentPreset, setSelectedArgumentPreset] = useState("");
   const [trackers, setTrackers] = useState([]);
@@ -1075,6 +1054,26 @@ function AudionutsUAGUI() {
   const [selectedPaths, setSelectedPaths] = useState([]);
   const [sortBy, setSortBy] = useState("name");
   const [sortOrder, setSortOrder] = useState("asc");
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadArgumentPresets = async () => {
+      try {
+        const response = await apiFetch(`${API_BASE}/argument_presets`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled && data.success && Array.isArray(data.presets)) {
+          setArgumentPresets(data.presets);
+        }
+      } catch (error) {
+        console.error("Failed to load argument presets:", error);
+      }
+    };
+    loadArgumentPresets();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Mobile state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -3086,25 +3085,25 @@ function AudionutsUAGUI() {
     setCustomArgs((prev) => (prev && prev.length ? `${prev} ${arg}` : arg));
   };
 
-  const saveArgumentPreset = () => {
+  const saveArgumentPreset = async () => {
     const name = argumentPresetName.trim();
     const argumentsValue = customArgs.trim();
     if (!name || !argumentsValue) return;
 
-    setArgumentPresets((prev) => {
-      const preset = { name, arguments: argumentsValue };
-      const existingIndex = prev.findIndex(
-        (item) => item.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
-      );
-      const next =
-        existingIndex >= 0
-          ? prev.map((item, index) => (index === existingIndex ? preset : item))
-          : [...prev, preset].slice(-MAX_ARGUMENT_PRESETS);
-      storage.set(ARGUMENT_PRESETS_KEY, JSON.stringify(next));
-      return next;
-    });
-    setSelectedArgumentPreset(name);
-    setArgumentPresetName("");
+    try {
+      const response = await apiFetch(`${API_BASE}/argument_presets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, arguments: argumentsValue }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || "Save failed");
+      setArgumentPresets(data.presets || []);
+      setSelectedArgumentPreset(name);
+      setArgumentPresetName("");
+    } catch (error) {
+      console.error("Failed to save argument preset:", error);
+    }
   };
 
   const loadArgumentPreset = (name) => {
@@ -3113,15 +3112,22 @@ function AudionutsUAGUI() {
     if (preset) setCustomArgs(preset.arguments);
   };
 
-  const deleteArgumentPreset = () => {
+  const deleteArgumentPreset = async () => {
     if (!selectedArgumentPreset) return;
 
-    setArgumentPresets((prev) => {
-      const next = prev.filter((item) => item.name !== selectedArgumentPreset);
-      storage.set(ARGUMENT_PRESETS_KEY, JSON.stringify(next));
-      return next;
-    });
-    setSelectedArgumentPreset("");
+    try {
+      const response = await apiFetch(`${API_BASE}/argument_presets`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: selectedArgumentPreset }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || "Delete failed");
+      setArgumentPresets(data.presets || []);
+      setSelectedArgumentPreset("");
+    } catch (error) {
+      console.error("Failed to delete argument preset:", error);
+    }
   };
 
   const renderArgumentPresetControls = (isMobileView = false) => (
