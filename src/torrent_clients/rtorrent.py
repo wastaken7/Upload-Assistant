@@ -351,14 +351,15 @@ class RtorrentClientMixin:
 
         return metainfo
 
-    async def get_ptp_from_hash_rtorrent(self, meta: Meta, pathed: bool = False) -> Meta:
+    async def get_ptp_from_hash_rtorrent(self, meta: Meta, pathed: bool = False, client: dict[str, Any] | None = None) -> Meta:
         default_cfg = cast(dict[str, Any], self.config.get("DEFAULT", {}))
         default_client_value = default_cfg.get("default_torrent_client")
-        if not isinstance(default_client_value, str) or not default_client_value:
-            logger.info("[yellow]Missing default torrent client for rTorrent")
-            return meta
-        clients_cfg = cast(dict[str, Any], self.config.get("TORRENT_CLIENTS", {}))
-        client = cast(dict[str, Any], clients_cfg.get(default_client_value, {}))
+        if client is None:
+            if not isinstance(default_client_value, str) or not default_client_value:
+                logger.info("[yellow]Missing default torrent client for rTorrent")
+                return meta
+            clients_cfg = cast(dict[str, Any], self.config.get("TORRENT_CLIENTS", {}))
+            client = cast(dict[str, Any], clients_cfg.get(default_client_value, {}))
         torrent_storage_dir_value = client.get("torrent_storage_dir")
         torrent_storage_dir = torrent_storage_dir_value if isinstance(torrent_storage_dir_value, str) else None
         info_hash_value = meta.infohash

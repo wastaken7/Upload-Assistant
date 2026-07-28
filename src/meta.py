@@ -348,6 +348,10 @@ class Meta:
     requirements_minimum: str = ""
     requirements_recommended: str = ""
     resolution: str = ""
+    base_reuse_torrent_path: str | None = None
+    reuse_torrent_path: str | None = None
+    reuse_torrent_client: str | None = None
+    subs_reuse_torrent_path: str | None = None
     retake_call_count: int | None = None
     retake: bool = False
     retrieved_aka: str | None = None
