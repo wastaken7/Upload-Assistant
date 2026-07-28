@@ -1079,6 +1079,19 @@ class MakingOff:
         results: dict[str, str] = {}
         exact_imdb_urls: set[str] = set()
 
+        def merge_results(found: dict[str, str]) -> None:
+            """Preserve every topic when separate searches return the same title."""
+            for title, url in found.items():
+                result_title = title
+                if result_title in results and results[result_title] != url:
+                    topic_id = url.rstrip("/").split(".")[-1]
+                    result_title = f"{title} ({topic_id})"
+                    duplicate_number = 2
+                    while result_title in results and results[result_title] != url:
+                        result_title = f"{title} ({topic_id}-{duplicate_number})"
+                        duplicate_number += 1
+                results[result_title] = url
+
         # 1. The catalogue accepts IMDb IDs directly and lets us verify the
         # exact ID in its result card, avoiding false positives from XenForo's
         # full-post text search.
@@ -1086,7 +1099,7 @@ class MakingOff:
             logger.info(f"{self.tracker}: [yellow]Searching catalogue by IMDB ID:[/yellow] {meta.imdb_tt}")
             found = await self.search_index_by_imdb(meta.imdb_tt)
             if found:
-                results.update(found)
+                merge_results(found)
                 exact_imdb_urls.update(found.values())
 
         # 2. Search by title candidates (with title_only=True)
@@ -1095,7 +1108,7 @@ class MakingOff:
             logger.info(f"{self.tracker}: [yellow]Searching for title:[/yellow] {phrase}")
             found = await self.search_candidate(phrase, forum_id=forum_id, title_only=True)
             if found:
-                results.update(found)
+                merge_results(found)
 
         if not results:
             return duplicates
@@ -1773,6 +1786,9 @@ class MakingOff:
                 sub_files = [zip_path]
             except (OSError, zipfile.BadZipFile) as e:
                 logger.error(f"{self.tracker}: [red]Failed to create zip file for subtitles: {e}[/red]")
+                if not meta.debug:
+                    meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to package Portuguese subtitles."
+                    return False
                 sub_files = []
 
         if meta.debug:
@@ -1820,7 +1836,9 @@ class MakingOff:
         # Upload Portuguese subtitles if any
         for sub_file in sub_files:
             logger.info(f"{self.tracker}: [yellow]Uploading Portuguese subtitle as attachment:[/yellow] {Path(sub_file).name}")
-            await self.upload_attachment(sub_file, csrf_token, attachment_hash, attachment_hash_combined, forum_id)
+            if not await self.upload_attachment(sub_file, csrf_token, attachment_hash, attachment_hash_combined, forum_id):
+                meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to upload Portuguese subtitle attachment."
+                return False
 
         topic_title = await self.get_name(meta)
         post_body = await self.generate_description(meta)

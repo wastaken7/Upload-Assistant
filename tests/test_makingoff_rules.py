@@ -58,6 +58,10 @@ def test_rejects_missing_subtitles():
     assert not asyncio.run(tracker().get_additional_checks(make_meta(subtitle_languages=[])))  # noqa: S101
 
 
+def test_accepts_hardcoded_subtitles_without_a_language_tag():
+    assert asyncio.run(tracker().get_additional_checks(make_meta(subtitle_languages=[], hardcoded_subs=True)))  # noqa: S101
+
+
 def test_rejects_prohibited_release_markers_and_archives():
     assert not asyncio.run(tracker().get_additional_checks(make_meta(name="Example.Movie.2020.CAM")))  # noqa: S101
     assert not asyncio.run(tracker().get_additional_checks(make_meta(filelist=["Example.Movie.mkv", "payload.exe"])))  # noqa: S101

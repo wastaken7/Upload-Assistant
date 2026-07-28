@@ -26,6 +26,7 @@ def test_index_parser_keeps_only_the_exact_imdb_match():
 def test_exact_imdb_result_uses_post_resolution_and_skips_year_filter():
     tracker = MakingOff({"TRACKERS": {"MAKINGOFF": {}}})
     topic_url = "https://www.makingoff.org/topicos/12345/"
+    colliding_topic_url = "https://www.makingoff.org/topicos/67890/"
     meta = SimpleNamespace(
         resolution="1080p",
         video_width=1920,
@@ -54,10 +55,10 @@ def test_exact_imdb_result_uses_post_resolution_and_skips_year_filter():
         return {"Known": topic_url}
 
     async def title_search(*_args, **_kwargs):
-        return {"[Hidef] Known (2020)": topic_url}
+        return {"Known": colliding_topic_url}
 
-    async def post_resolution(_url):
-        return 1080
+    async def post_resolution(url):
+        return 1080 if url == topic_url else 0
 
     tracker.validate_credentials = valid_credentials
     tracker._resolve_display_title = display_title
