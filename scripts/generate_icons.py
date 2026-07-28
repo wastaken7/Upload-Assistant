@@ -52,6 +52,7 @@ def main():
     # Render every raster asset from the root SVG source.
     master_logo = draw_logo(512)
     app_icon = draw_app_icon(master_logo)
+    pwa_logo_192 = draw_app_icon(draw_logo(192))
 
     # Save PNG versions
     master_logo.save(web_static_img / "logo.png", "PNG")
@@ -61,6 +62,10 @@ def main():
     app_icon_path = web_static_img / "apple-touch-icon.png"
     app_icon.save(app_icon_path, "PNG")
     print(f"Saved opaque app icon (512x512) to {app_icon_path}")
+
+    pwa_icon_192_path = web_static_img / "icon-192.png"
+    pwa_logo_192.save(pwa_icon_192_path, "PNG")
+    print(f"Saved opaque app icon (192x192) to {pwa_icon_192_path}")
 
     # Generate and save multi-resolution ICO files
     sizes = [16, 32, 48, 64, 128, 256]

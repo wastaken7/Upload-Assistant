@@ -248,12 +248,12 @@ a:hover {
   display: none;
 }
 
-.ua-config-tabs > button {
-  flex: 0 0 auto;
-  scroll-snap-align: start;
-}
-
 @media (max-width: 767px) {
+  .ua-config-tabs > button {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+
   .ua-output-box-empty {
     flex-basis: 7rem;
     min-height: 7rem;
