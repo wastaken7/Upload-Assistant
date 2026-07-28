@@ -9,6 +9,7 @@ import shutil
 import zipfile
 from pathlib import Path
 from typing import Any, ClassVar, cast
+from urllib.parse import urljoin
 
 import aiofiles
 import httpx
@@ -37,10 +38,11 @@ class MakingOff:
     display_name = "MakingOff"
     source_flag = ""
     base_url = "https://www.makingoff.org"
-    banned_groups: tuple[str, ...] = ()
+    banned_groups: tuple[str, ...] = ("aXXo", "CM8", "YIFY", "STUTTERSHIT")
     index_url = "https://www.makingoff.org/"
     torrent_url = ""
     supported_categories = ("MOVIE",)
+    max_search_pages = 25
     allows_bloated_audio = True
     tmdb_localization_requirements: ClassVar = {
         "pt-BR": {
@@ -177,6 +179,10 @@ class MakingOff:
 
     def _screen_rows(self, image_urls: list[str]) -> str:
         """Pair screenshot URLs into two-column BBCode rows matching makingoff structure."""
+        # The forum permits no more than eight screenshots.  The upload check
+        # reports an overage, but retain this cap here as a defensive measure
+        # for callers which generate a description directly.
+        image_urls = image_urls[:8]
         scr = [image_urls[i] if i < len(image_urls) else "" for i in range(max(4, len(image_urls)))]
 
         # Row 4 already opened in _build_bbcode with [tr][poster]...[tableScreen]Screenshots[/tableScreen]
@@ -247,6 +253,60 @@ class MakingOff:
         en_count = sum(1 for w in words if w in en_words)
         return pt_count > en_count
 
+    @staticmethod
+    def _has_portuguese_language(languages: Any) -> bool:
+        """Return whether a MediaInfo/UA language value denotes Portuguese."""
+        values = [languages] if isinstance(languages, str) else (languages or [])
+        for value in values:
+            normalized = str(value).strip().lower()
+            if normalized in {"pt", "por", "portuguese", "português", "pt-br", "pt_br", "pt-pt", "pt_pt"}:
+                return True
+        return False
+
+    def _has_portuguese_subtitle(self, meta: Meta) -> bool:
+        """Detect a Portuguese subtitle track, sidecar subtitle, or hard sub."""
+        if self._has_portuguese_language(getattr(meta, "subtitle_languages", [])):
+            return True
+
+        for sub_file in getattr(meta, "subtitle_files", []):
+            path = Path(sub_file)
+            if not path.exists():
+                continue
+            name = path.name.lower()
+            if any(term in name for term in (".pt", ".por", "portuguese", "português", "ptbr", "pt_br", "pt-pt", "ptpt")):
+                return True
+            if self._is_subtitle_in_portuguese(str(path)):
+                return True
+
+        tracks = cast(list[dict[str, Any]], getattr(meta, "mediainfo", {}).get("media", {}).get("track", []))
+        for track in tracks:
+            if track.get("@type") != "Text":
+                continue
+            if self._has_portuguese_language(track.get("Language", "")):
+                return True
+            title = str(track.get("Title", "")).lower()
+            if any(term in title for term in ("portuguese", "português", "pt-br", "ptbr", "pt_br", "pt-pt", "ptpt")):
+                return True
+
+        return bool(getattr(meta, "hardcoded_subs", False))
+
+    @staticmethod
+    def _is_hidef(meta: Meta) -> bool:
+        """Apply MakingOff's definition of HD, falling back to UA resolution."""
+        try:
+            if int(meta.video_width or 0) > 1024 or int(meta.video_height or 0) > 576:
+                return True
+        except TypeError, ValueError:
+            pass
+        return str(getattr(meta, "resolution", "")).lower() in {"720p", "1080i", "1080p", "1440p", "2160p", "4320p"}
+
+    @staticmethod
+    def _release_tokens(meta: Meta) -> str:
+        """Return release-identifying text used for deterministic quality checks."""
+        fields = (getattr(meta, "name", ""), getattr(meta, "basename_no_ext", ""), getattr(meta, "source", ""), getattr(meta, "type", ""))
+        filenames = (str(item) for item in getattr(meta, "filelist", []) or [])
+        return " ".join(str(value) for value in (*fields, *filenames) if value).lower()
+
     async def _get_portuguese_subtitles(self, meta: Meta) -> list[str]:
         """
         Find and extract Portuguese subtitles for this release.
@@ -267,10 +327,10 @@ class MakingOff:
             name_lower = Path(sub_file).name.lower()
             if any(term in name_lower for term in (".pt", ".pt-br", ".por", "portuguese", "ptbr", "pt_br")):
                 pt_subs.append(sub_file)
-                logger.info(f"{self.tracker}: [cyan][/cyan] [green]Found external Portuguese subtitle:[/green] {Path(sub_file).name}")
+                logger.info(f"{self.tracker}: [green]Found external Portuguese subtitle:[/green] {Path(sub_file).name}")
             elif self._is_subtitle_in_portuguese(sub_file):
                 pt_subs.append(sub_file)
-                logger.info(f"{self.tracker}: [cyan][/cyan] [green]Found external Portuguese subtitle (content-matched):[/green] {Path(sub_file).name}")
+                logger.info(f"{self.tracker}: [green]Found external Portuguese subtitle (content-matched):[/green] {Path(sub_file).name}")
 
         # 2. Check embedded subtitle tracks (if it is a file upload, not a BD/DVD folder/disc structure)
         if not meta.is_disc and meta.filelist and len(meta.filelist) > 0:
@@ -314,21 +374,22 @@ class MakingOff:
                         ffmpeg_path = self._get_ffmpeg_path(meta)
                         cmd: list[str] = [ffmpeg_path, "-y", "-i", video_file, "-map", f"0:s:{idx}", output_path]
 
-                        logger.info(f"{self.tracker}: [cyan][/cyan] Extracting embedded Portuguese subtitle (stream {idx}) to {output_name}...")
+                        logger.info(f"{self.tracker}: Extracting embedded Portuguese subtitle (stream {idx}) to {output_name}...")
                         try:
-                            process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-                            _, stderr = await process.communicate()
-                            if process.returncode == 0 and Path(output_path).exists() and Path(output_path).stat().st_size > 0:
-                                pt_subs.append(output_path)
-                                logger.info(f"{self.tracker}: [cyan][/cyan] [green]Successfully extracted embedded Portuguese subtitle.[/green]")
+                            if meta.debug:
+                                logger.debug(f"{self.tracker}: Skipping ffmpeg extraction in debug mode. Command: {' '.join(cmd)}")
                             else:
-                                logger.warning(
-                                    f"{self.tracker}: [cyan][/cyan] [yellow]Failed to extract subtitle stream {idx}. ffmpeg exit code: {process.returncode}[/yellow]"
-                                )
-                                if stderr:
-                                    logger.debug(f"{self.tracker}: [cyan][/cyan] ffmpeg stderr: {stderr.decode('utf-8', errors='ignore')}")
+                                process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                                _, stderr = await process.communicate()
+                                if process.returncode == 0 and Path(output_path).exists() and Path(output_path).stat().st_size > 0:
+                                    pt_subs.append(output_path)
+                                    logger.info(f"{self.tracker}: [green]Successfully extracted embedded Portuguese subtitle.[/green]")
+                                else:
+                                    logger.warning(f"{self.tracker}: [yellow]Failed to extract subtitle stream {idx}. ffmpeg exit code: {process.returncode}[/yellow]")
+                                    if stderr:
+                                        logger.debug(f"{self.tracker}: ffmpeg stderr: {stderr.decode('utf-8', errors='ignore')}")
                         except (OSError, ValueError) as e:
-                            logger.error(f"{self.tracker}: [cyan][/cyan] [red]Error running ffmpeg to extract subtitle: {e}[/red]")
+                            logger.error(f"{self.tracker}: [red]Error running ffmpeg to extract subtitle: {e}[/red]")
 
         return sorted(set(pt_subs))
 
@@ -558,7 +619,7 @@ class MakingOff:
             if response is not None:
                 html = cast(httpx.Response, response).text
             else:
-                logger.error(f"{self.tracker}: [cyan][/cyan] Error validating session: {e}")
+                logger.error(f"{self.tracker}: Error validating session: {e}")
                 return False
 
         soup = BeautifulSoup(html, "html.parser")
@@ -566,7 +627,7 @@ class MakingOff:
         logged_in = html_tag.get("data-logged-in") == "true" if html_tag else False
 
         if not logged_in:
-            logger.warning(f"{self.tracker}: [cyan][/cyan] The session is unauthenticated. Check the cookie file.")
+            logger.warning(f"{self.tracker}: The session is unauthenticated. Check the cookie file.")
             return False
 
         self._csrf_token = self._get_csrf_token(html)
@@ -588,7 +649,7 @@ class MakingOff:
             resp = await self.session.get(url)
             resp.raise_for_status()
         except httpx.HTTPError as e:
-            logger.error(f"{self.tracker}: [cyan][/cyan] Failed loading topic new page: {e}")
+            logger.error(f"{self.tracker}: Failed loading topic new page: {e}")
             return "", "", ""
 
         soup = BeautifulSoup(resp.text, "html.parser")
@@ -596,7 +657,7 @@ class MakingOff:
         html_tag = soup.find("html")
         logged_in = html_tag.get("data-logged-in") == "true" if html_tag else False
         if not logged_in:
-            logger.warning(f"{self.tracker}: [cyan][/cyan] Unauthenticated session detected on this page.")
+            logger.warning(f"{self.tracker}: Unauthenticated session detected on this page.")
             return "", "", ""
 
         csrf_token = self._get_csrf_token(resp.text)
@@ -612,9 +673,21 @@ class MakingOff:
             attachment_hash_combined = str(combined_tag.get("value", "")).strip()
 
         if not csrf_token:
-            logger.warning(f"{self.tracker}: [cyan][/cyan] It wasn't possible to extract xfToken. Check if the session is valid.")
+            logger.warning(f"{self.tracker}: It wasn't possible to extract xfToken. Check if the session is valid.")
 
         return csrf_token, attachment_hash, attachment_hash_combined
+
+    @staticmethod
+    def _extract_post_height(text: str) -> int:
+        """Extract a release height from MakingOff's current or legacy post layout."""
+        match = re.search(r"Resolu[^\s:]*[:\s]+(\d{3,4})\s*[xX×]\s*(\d{3,4})", text)  # noqa: RUF001
+        if match:
+            return int(match.group(2))
+
+        # Older generator posts did not render a ``Resolução`` field.  Their
+        # release name still carries the usual 480p/720p/etc. marker.
+        match = re.search(r"(?<!\d)(2160|1440|1080|720|576|540|480|432|360|240)[pi]\b", text, re.IGNORECASE)
+        return int(match.group(1)) if match else 0
 
     async def get_post_resolution(self, topic_url: str) -> int:
         """
@@ -633,15 +706,12 @@ class MakingOff:
 
         soup = BeautifulSoup(resp.content, "html.parser")
 
-        resolution = ""
         first_post = soup.find(class_="bbWrapper") or soup.find("div", attrs={"itemprop": "commentText"})
         if first_post:
             text = first_post.get_text(" ", strip=True)
-            m = re.search(r"Resolu[^\s:]*[:\s]+(\d{3,4})\s*[xX×]\s*(\d{3,4})", text)  # noqa: RUF001
-            if m:
-                resolution = f"{m.group(1)}x{m.group(2)}"
+            return self._extract_post_height(text)
 
-        return int(resolution.split("x")[1]) if resolution else 0
+        return 0
 
     async def upload_attachment(
         self,
@@ -703,25 +773,25 @@ class MakingOff:
             resp.raise_for_status()
             res_data = resp.json()
         except FileNotFoundError:
-            logger.error(f"{self.tracker}: [cyan][/cyan] [bold red]File not found[/bold red]: {file_path}")
+            logger.error(f"{self.tracker}: [bold red]File not found[/bold red]: {file_path}")
             return False
         except httpx.HTTPError as e:
-            logger.error(f"{self.tracker}: [cyan][/cyan] [bold red]Failed uploading attachment:[/bold red] {e}")
+            logger.error(f"{self.tracker}: [bold red]Failed uploading attachment:[/bold red] {e}")
             response = getattr(e, "response", None)
             if response is not None:
-                logger.debug(f"{self.tracker}: [cyan][/cyan] Response: {cast(httpx.Response, response).text}")
+                logger.debug(f"{self.tracker}: Response: {cast(httpx.Response, response).text}")
             return False
         except ValueError as e:
-            logger.error(f"{self.tracker}: [cyan][/cyan] [bold red]Failed to process upload response:[/bold red] {e}")
+            logger.error(f"{self.tracker}: [bold red]Failed to process upload response:[/bold red] {e}")
             return False
 
         if res_data.get("status") == "ok" or "attachment" in res_data:
-            logger.info(f"{self.tracker}: [cyan][/cyan] [green]Attachment sent successfully: {filename}[/green]")
+            logger.info(f"{self.tracker}: [green]Attachment sent successfully: {filename}[/green]")
             return True
 
         errors = res_data.get("errors", {})
         error_msg = res_data.get("errorHtml", {}).get("content", "") or str(errors)
-        logger.error(f"{self.tracker}: [cyan][/cyan] [bold red]Unwanted response while uploading attachment {filename}:[/bold red]\n{error_msg}")
+        logger.error(f"{self.tracker}: [bold red]Unwanted response while uploading attachment {filename}:[/bold red]\n{error_msg}")
         return False
 
     async def search_candidate(
@@ -745,7 +815,7 @@ class MakingOff:
         if not self._csrf_token:
             await self.refresh_session()
             if not self._csrf_token:
-                logger.error(f"{self.tracker}: [cyan][/cyan] Cannot search, no CSRF token available.")
+                logger.error(f"{self.tracker}: Cannot search, no CSRF token available.")
                 return None
 
         search_url = f"{self.base_url}/search/search"
@@ -769,51 +839,97 @@ class MakingOff:
             resp.raise_for_status()
             res_data = resp.json()
         except httpx.HTTPError as e:
-            logger.error(f"{self.tracker}: [cyan][/cyan] [bold red]Error on the search POST:[/bold red] {e}")
+            logger.error(f"{self.tracker}: [bold red]Error on the search POST:[/bold red] {e}")
             return None
         except ValueError as e:
-            logger.error(f"{self.tracker}: [cyan][/cyan] [bold red]Unwanted response while searching POST:[/bold red] {e}")
+            logger.error(f"{self.tracker}: [bold red]Unwanted response while searching POST:[/bold red] {e}")
             return None
 
         redirect_url = res_data.get("redirect")
         if not redirect_url:
             errors = res_data.get("errors", {})
             if errors:
-                logger.debug(f"{self.tracker}: [cyan][/cyan] Search errors: {errors}")
+                logger.debug(f"{self.tracker}: Search errors: {errors}")
             return None
 
         if redirect_url.startswith("/"):
             redirect_url = f"{self.base_url.rstrip('/')}/{redirect_url.lstrip('/')}"
 
-        try:
-            resp = await self.session.get(redirect_url)
-            resp.raise_for_status()
-        except httpx.HTTPError as e:
-            logger.error(f"{self.tracker}: [cyan][/cyan] [bold red]Error fetching search results page:[/bold red] {e}")
-            return None
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-        items = soup.find_all(class_="contentRow-title")
-
         results: dict[str, str] = {}
-        for item in items:
-            a_tag = item.find("a")
-            if not a_tag:
-                continue
-            title = a_tag.get_text(" ", strip=True)
-            href_val = a_tag.get("href", "")
-            href = " ".join(href_val) if isinstance(href_val, list) else str(href_val)
-            href = href.strip()
-            if href:
-                if href.startswith("/"):
-                    href = f"{self.base_url.rstrip('/')}/{href.lstrip('/')}"
+        page_url = redirect_url
+        visited_pages: set[str] = set()
+
+        while page_url and page_url not in visited_pages and len(visited_pages) < self.max_search_pages:
+            visited_pages.add(page_url)
+            try:
+                resp = await self.session.get(page_url)
+                resp.raise_for_status()
+            except httpx.HTTPError as e:
+                logger.error(f"{self.tracker}: [bold red]Error fetching search results page:[/bold red] {e}")
+                break
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            for item in soup.find_all(class_="contentRow-title"):
+                a_tag = item.find("a")
+                if not a_tag:
+                    continue
+                title = a_tag.get_text(" ", strip=True)
+                href_val = a_tag.get("href", "")
+                href = " ".join(href_val) if isinstance(href_val, list) else str(href_val)
+                href = href.strip()
+                if not href:
+                    continue
+                href = urljoin(f"{self.base_url}/", href)
                 if title in results:
-                    # Append topic ID from URL to avoid title duplication conflicts
+                    # Append topic ID from URL to avoid title duplication conflicts.
                     topic_id = href.rstrip("/").split(".")[-1]
                     title = f"{title} ({topic_id})"
                 results[title] = href
 
+            next_page = soup.select_one("a.pageNav-jump--next[href]")
+            page_url = urljoin(f"{self.base_url}/", str(next_page["href"])) if next_page else ""
+
+        if page_url and len(visited_pages) == self.max_search_pages:
+            logger.warning(f"{self.tracker}: [yellow]Stopped duplicate search after {self.max_search_pages} result pages.[/yellow]")
+
         return results or None
+
+    @staticmethod
+    def _parse_index_results(html: str, imdb_tt: str) -> dict[str, str]:
+        """Extract only exact IMDb matches from the MakingOff catalogue cards."""
+        soup = BeautifulSoup(html, "html.parser")
+        results: dict[str, str] = {}
+        imdb_pattern = re.compile(rf"/title/{re.escape(imdb_tt)}(?:[/?#]|$)", re.IGNORECASE)
+
+        for card in soup.select(".filme-card"):
+            if not any(imdb_pattern.search(str(anchor.get("href", ""))) for anchor in card.select("a[href]")):
+                continue
+
+            topic_anchor = card.select_one(".card-title a[href*='/topicos/']") or card.select_one("a[href*='/topicos/']")
+            if not topic_anchor:
+                continue
+            title = topic_anchor.get_text(" ", strip=True)
+            href = str(topic_anchor.get("href", "")).strip()
+            if not title or not href:
+                continue
+
+            year_anchor = card.select_one("a[href^='?ano=']")
+            year = year_anchor.get_text(" ", strip=True) if year_anchor else ""
+            display_title = f"{title} ({year})" if year.isdigit() else title
+            results[display_title] = urljoin(f"{MakingOff.base_url}/", href)
+
+        return results
+
+    async def search_index_by_imdb(self, imdb_tt: str) -> dict[str, str] | None:
+        """Search the catalogue, which supports exact IMDb identifiers."""
+        try:
+            resp = await self.session.get(f"{self.base_url}/indice/", params={"q": imdb_tt})
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            logger.error(f"{self.tracker}: [bold red]Error searching the catalogue by IMDb ID:[/bold red] {e}")
+            return None
+
+        return self._parse_index_results(resp.text, imdb_tt) or None
 
     def get_topic_fields(
         self,
@@ -884,13 +1000,13 @@ class MakingOff:
             resp.raise_for_status()
             res_data = resp.json()
         except httpx.HTTPError as e:
-            logger.error(f"{self.tracker}: [cyan][/cyan] Failed creating topic: {e}")
+            logger.error(f"{self.tracker}: Failed creating topic: {e}")
             response = getattr(e, "response", None)
             if response is not None:
-                logger.debug(f"{self.tracker}: [cyan][/cyan] Response: {cast(httpx.Response, response).text}")
+                logger.debug(f"{self.tracker}: Response: {cast(httpx.Response, response).text}")
             return ""
         except ValueError as e:
-            logger.error(f"{self.tracker}: [cyan][/cyan] Failed to parse response: {e}")
+            logger.error(f"{self.tracker}: Failed to parse response: {e}")
             return ""
 
         if res_data.get("status") == "ok" and "redirect" in res_data:
@@ -901,7 +1017,7 @@ class MakingOff:
 
         errors = res_data.get("errors", {})
         error_msg = res_data.get("errorHtml", {}).get("content", "") or str(errors)
-        logger.error(f"{self.tracker}: [cyan][/cyan] [bold red]Failed creating topic:[/bold red]\n{error_msg}")
+        logger.error(f"{self.tracker}: [bold red]Failed creating topic:[/bold red]\n{error_msg}")
         return ""
 
     async def validate_credentials(self, meta: Meta) -> bool:
@@ -923,7 +1039,7 @@ class MakingOff:
         self.session.cookies = cast(Any, cookie_jar)
 
         if not await self.refresh_session():
-            logger.error(f"{self.tracker}: [cyan][/cyan] [bold red]Session couldn't be validated.[/bold red] Cookies may be expired.")
+            logger.error(f"{self.tracker}: [bold red]Session couldn't be validated.[/bold red] Cookies may be expired.")
             return False
 
         return True
@@ -943,9 +1059,8 @@ class MakingOff:
         if not await self.validate_credentials(meta):
             return duplicates
 
-        hidef_resolutions = {"720p", "1080i", "1080p", "2160p", "4320p"}
         resolution_str = meta.resolution
-        uploading_hidef = resolution_str in hidef_resolutions
+        uploading_hidef = self._is_hidef(meta)
         upload_year = str(meta.year)
 
         title_ptbr = await self._resolve_display_title(meta)
@@ -962,39 +1077,62 @@ class MakingOff:
 
         forum_id = await self.get_forum_id(meta)
         results: dict[str, str] = {}
+        exact_imdb_urls: set[str] = set()
 
-        # 1. Search by IMDB ID (without title_only, as it is in the post description)
+        def merge_results(found: dict[str, str]) -> None:
+            """Preserve every topic when separate searches return the same title."""
+            for title, url in found.items():
+                result_title = title
+                if result_title in results and results[result_title] != url:
+                    topic_id = url.rstrip("/").split(".")[-1]
+                    result_title = f"{title} ({topic_id})"
+                    duplicate_number = 2
+                    while result_title in results and results[result_title] != url:
+                        result_title = f"{title} ({topic_id}-{duplicate_number})"
+                        duplicate_number += 1
+                results[result_title] = url
+
+        # 1. The catalogue accepts IMDb IDs directly and lets us verify the
+        # exact ID in its result card, avoiding false positives from XenForo's
+        # full-post text search.
         if meta.imdb_tt:
-            logger.info(f"{self.tracker}: [cyan][/cyan] [yellow]Searching by IMDB ID:[/yellow] {meta.imdb_tt}")
-            found = await self.search_candidate(meta.imdb_tt, forum_id=forum_id, title_only=False)
+            logger.info(f"{self.tracker}: [yellow]Searching catalogue by IMDB ID:[/yellow] {meta.imdb_tt}")
+            found = await self.search_index_by_imdb(meta.imdb_tt)
             if found:
-                results.update(found)
+                merge_results(found)
+                exact_imdb_urls.update(found.values())
 
         # 2. Search by title candidates (with title_only=True)
         for candidate in candidates:
             phrase = candidate.strip()
-            logger.info(f"{self.tracker}: [cyan][/cyan] [yellow]Searching for title:[/yellow] {phrase}")
+            logger.info(f"{self.tracker}: [yellow]Searching for title:[/yellow] {phrase}")
             found = await self.search_candidate(phrase, forum_id=forum_id, title_only=True)
             if found:
-                results.update(found)
+                merge_results(found)
 
         if not results:
             return duplicates
 
+        processed_urls: set[str] = set()
         for title, url in results.items():
-            existing_hidef = title.strip().startswith("[Hidef]")
+            if url in processed_urls:
+                continue
+            processed_urls.add(url)
+            resolution = await self.get_post_resolution(url)
+            existing_hidef = title.strip().startswith("[Hidef]") or resolution > 576
 
-            if upload_year:
+            if upload_year and url not in exact_imdb_urls:
                 year_int = int(upload_year)
                 if not any(f"({y})" in title for y in (year_int - 1, year_int, year_int + 1)):
-                    logger.info(f"{self.tracker}: [cyan][/cyan] [yellow]Skipping: different year in existing release:[/yellow] {title}")
+                    logger.info(f"{self.tracker}: [yellow]Skipping: different year in existing release:[/yellow] [link={url}]{title}[/link]")
                     continue
 
             # Uploading SD while a Hidef exists → block immediately.
             if not uploading_hidef and existing_hidef:
-                logger.warning(f"{self.tracker}: [cyan][/cyan] [bold red]Aborting: A Hidef release exists:[/bold red] {title}")
-                meta.skipping = self.tracker
-                duplicates.append({"name": title, "size": "", "link": url})
+                logger.warning(f"{self.tracker}: [bold red]Aborting: A Hidef release exists:[/bold red] [link={url}]{title}[/link]")
+                if not meta.debug:
+                    meta.skipping = self.tracker
+                duplicates.append({"name": f"[url={url}]{title}[/url]", "size": "", "link": url})
                 continue
 
             # Uploading Hidef over an existing SD → allowed.
@@ -1002,7 +1140,6 @@ class MakingOff:
                 continue
 
             # Same tier (SD vs SD or Hidef vs Hidef) → compare resolution.
-            resolution = await self.get_post_resolution(url)
 
             try:
                 upload_height = int(resolution_str.replace("p", "").replace("i", ""))
@@ -1010,9 +1147,10 @@ class MakingOff:
                 upload_height = 0
 
             if resolution >= upload_height:
-                logger.warning(f"{self.tracker}: [cyan][/cyan] [bold red]Aborting: A better or equivalent Hidef release exists:[/bold red] {title}")
-                meta.skipping = self.tracker
-                duplicates.append({"name": title, "size": str(resolution), "link": url})
+                logger.warning(f"{self.tracker}: [bold red]Aborting: A better or equivalent Hidef release exists:[/bold red] [link={url}]{title}[/link]")
+                if not meta.debug:
+                    meta.skipping = self.tracker
+                duplicates.append({"name": f"[url={url}]{title}[/url]", "size": str(resolution), "link": url})
                 continue
 
         return duplicates
@@ -1216,9 +1354,7 @@ class MakingOff:
             if code in forum_id_by_country:
                 return forum_id_by_country[code]
 
-        logger.info(
-            f"{self.tracker}: [cyan][/cyan] [bold yellow]Unmapped origin country [/bold yellow]({origin_countries}). [bold yellow]Select the subforum manually:[/bold yellow]"
-        )
+        logger.info(f"{self.tracker}: [bold yellow]Unmapped origin country [/bold yellow]({origin_countries}). [bold yellow]Select the subforum manually:[/bold yellow]")
         forum_options = {
             "1": (461, "África"),
             "2": (24, "Asiático"),
@@ -1238,7 +1374,7 @@ class MakingOff:
         if choice in forum_options:
             return forum_options[choice][0]
 
-        logger.warning(f"{self.tracker}: [cyan][/cyan] [yellow]Invalid option, using North-American (26) as default.[/yellow]")
+        logger.warning(f"{self.tracker}: [yellow]Invalid option, using North-American (26) as default.[/yellow]")
         return 26
 
     # -- title resolution
@@ -1324,9 +1460,7 @@ class MakingOff:
             self._display_title_cache[cache_key] = title_native
         return title_native
 
-    # -- topic title
-
-    async def get_topic_title(self, meta: Meta) -> str:
+    async def get_name(self, meta: Meta) -> str:
         """
         Generate the forum topic title.
 
@@ -1339,8 +1473,7 @@ class MakingOff:
         Returns:
             str: Formatted topic title.
         """
-        hidef_resolutions = {"720p", "1080i", "1080p", "2160p", "4320p"}
-        prefix = "[Hidef] " if meta.resolution in hidef_resolutions else ""
+        prefix = "[Hidef] " if self._is_hidef(meta) else ""
 
         title_ptbr = await self._resolve_display_title(meta)
         year: str = str(meta.year) if meta.year else ""
@@ -1418,7 +1551,7 @@ class MakingOff:
             "4": "Fixas",
             "5": "Sem Legenda",
         }
-        logger.info(f"{self.tracker}: [cyan][/cyan] [yellow]Any subtitles?[/yellow]")
+        logger.info(f"{self.tracker}: [yellow]Any subtitles?[/yellow]")
         for k, v in options.items():
             logger.info(f"{self.tracker}:   {k}) {v}")
         selection = (await asyncio.to_thread(input, "Choose: ")).strip()
@@ -1542,17 +1675,60 @@ class MakingOff:
         Returns:
             bool: True if the release meets all requirements.
         """
-        if meta.resolution == "2160p":
-            logger.warning(f"{self.tracker}: [cyan][/cyan] [bold red]4K Resolution (2160p) isn't allowed on this forum.[/bold red]")
+        if str(getattr(meta, "category", "")).upper() != "MOVIE":
+            logger.warning(f"{self.tracker}: [bold red]Only films may be uploaded to this forum.[/bold red]")
             return False
 
-        video = meta.video_codec.upper()
-        if not any(c in video for c in ("H264", "H.264", "AVC")):
-            logger.warning(f"{self.tracker}: [cyan][/cyan] [bold red]Only H.264 codec is allowed on this forum.[/bold red]")
+        if bool(getattr(meta, "adult_media", False) or getattr(meta, "tmdb_adult_media", False) or getattr(meta, "nsfw", False)):
+            logger.warning(f"{self.tracker}: [bold red]Adult releases are not allowed on this forum.[/bold red]")
+            return False
+
+        if meta.is_disc and meta.is_disc != "DVD":
+            logger.warning(f"{self.tracker}: [bold red]Only complete DVD structures are allowed; Blu-ray/HDDVD structures must be remuxed to MKV.[/bold red]")
             return False
 
         if not meta.is_disc and meta.container.upper() not in ("MKV", "AVI"):
-            logger.warning(f"{self.tracker}: [cyan][/cyan] [bold red]Only MKV/AVI containers are allowed on this forum.[/bold red]")
+            logger.warning(f"{self.tracker}: [bold red]Only MKV/AVI containers are allowed on this forum.[/bold red]")
+            return False
+
+        video = f"{getattr(meta, 'video_codec', '')} {getattr(meta, 'video_encode', '')}".upper()
+        if any(codec in video for codec in ("HEVC", "H.265", "H265", "X265")):
+            logger.warning(f"{self.tracker}: [bold red]HEVC/H.265 video is not allowed on this forum.[/bold red]")
+            return False
+
+        if not meta.is_disc and self._is_hidef(meta):
+            if not any(codec in video for codec in ("H264", "H.264", "AVC", "X264")):
+                logger.warning(f"{self.tracker}: [bold red]High-definition releases must use H.264/AVC video.[/bold red]")
+                return False
+
+            try:
+                bitrate = int(meta.video_bitrate or 0)
+                height = int(meta.video_height or 0)
+            except TypeError, ValueError:
+                bitrate, height = 0, 0
+            minimum = 5000 if height >= 1080 or str(meta.resolution) in {"1080i", "1080p", "1440p", "2160p", "4320p"} else 2200
+            if bitrate and bitrate < minimum:
+                logger.warning(
+                    f"{self.tracker}: [yellow]HD bitrate is {bitrate} kbps; the forum normally requires at least {minimum} kbps. "
+                    "TV/internet captures require a manual quality review.[/yellow]"
+                )
+
+        release = self._release_tokens(meta)
+        prohibited_release = re.search(
+            r"(?:^|[. _-])(cam|telesync|ts|telecine|tc|r5|dvdscr(?:eener)?|hdrip|vodrip|axxo|cm8|yify|yts|stuttershit)(?:$|[. _-])", release, re.IGNORECASE
+        )
+        if prohibited_release:
+            logger.warning(f"{self.tracker}: [bold red]Prohibited/low-quality release marker found: {prohibited_release.group(1)}.[/bold red]")
+            return False
+
+        prohibited_files = {".zip", ".rar", ".7z", ".exe", ".msi", ".bat", ".cmd", ".com", ".scr", ".ps1", ".sh"}
+        bad_file = next((Path(str(item)).name for item in getattr(meta, "filelist", []) or [] if Path(str(item)).suffix.lower() in prohibited_files), "")
+        if bad_file:
+            logger.warning(f"{self.tracker}: [bold red]Torrent contains prohibited archive/executable file: {bad_file}.[/bold red]")
+            return False
+
+        if not self._has_portuguese_subtitle(meta):
+            logger.warning(f"{self.tracker}: [bold red]A Portuguese subtitle is required for this forum.[/bold red]")
             return False
 
         return True
@@ -1568,7 +1744,20 @@ class MakingOff:
             bool: True if the upload succeeded.
         """
         forum_id = await self.get_forum_id(meta)
-        logger.info(f"{self.tracker}: [cyan][/cyan] [green]Selected subforum:[/green] {forum_id} ")
+        logger.info(f"{self.tracker}: [green]Selected subforum:[/green] {forum_id} ")
+        # Extract before creating the torrent so a non-hardcoded embedded
+        # Portuguese subtitle can be included in the torrent as well as
+        # attached separately to the forum post.
+        sub_files = await self._get_portuguese_subtitles(meta)
+        if not sub_files and not getattr(meta, "hardcoded_subs", False) and not meta.debug:
+            logger.warning(f"{self.tracker}: [bold red]Unable to provide a separate Portuguese subtitle file.[/bold red]")
+            meta["tracker_status"][self.tracker]["status_message"] = "Upload blocked: no separate Portuguese subtitle file."
+            return False
+
+        if sub_files:
+            existing = list(getattr(meta, "subtitle_files", []) or [])
+            meta.subtitle_files = list(dict.fromkeys([*existing, *sub_files]))
+
         await self.common.create_torrent_for_upload(
             meta=meta,
             tracker=self.tracker,
@@ -1585,9 +1774,6 @@ class MakingOff:
         named_torrent_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{release_filename}.torrent"
         shutil.copy2(torrent_path, named_torrent_path)
 
-        # Get Portuguese subtitles (external or extracted)
-        sub_files = await self._get_portuguese_subtitles(meta)
-
         # Zip subtitles to comply with MakingOff allowed formats (.torrent, .rar, .zip)
         if sub_files:
             temp_dir = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}"
@@ -1596,14 +1782,17 @@ class MakingOff:
                 with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
                     for sub_file in sub_files:
                         zipf.write(sub_file, arcname=Path(sub_file).name)
-                logger.info(f"{self.tracker}: [cyan][/cyan] [green]Zipped {len(sub_files)} subtitles to {Path(zip_path).name}[/green]")
+                logger.info(f"{self.tracker}: [green]Zipped {len(sub_files)} subtitles to {Path(zip_path).name}[/green]")
                 sub_files = [zip_path]
             except (OSError, zipfile.BadZipFile) as e:
-                logger.error(f"{self.tracker}: [cyan][/cyan] [red]Failed to create zip file for subtitles: {e}[/red]")
+                logger.error(f"{self.tracker}: [red]Failed to create zip file for subtitles: {e}[/red]")
+                if not meta.debug:
+                    meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to package Portuguese subtitles."
+                    return False
                 sub_files = []
 
         if meta.debug:
-            topic_title = await self.get_topic_title(meta)
+            topic_title = await self.get_name(meta)
             post_body = await self.generate_description(meta)
 
             fields = self.get_topic_fields(
@@ -1625,7 +1814,7 @@ class MakingOff:
             async with aiofiles.open(txt_path, "w", encoding="utf-8") as f:
                 await f.write(f"TITULO: {topic_title}\n\n")
                 await f.write(post_body)
-            logger.info(f"{self.tracker}: [cyan][/cyan] [yellow]BBCode saved.[/yellow] {txt_path}")
+            logger.info(f"{self.tracker}: [yellow]BBCode saved.[/yellow] {txt_path}")
             meta["tracker_status"][self.tracker]["status_message"] = "Debug mode enabled, not uploading (simulated successfully)"
             return True
 
@@ -1646,10 +1835,12 @@ class MakingOff:
 
         # Upload Portuguese subtitles if any
         for sub_file in sub_files:
-            logger.info(f"{self.tracker}: [cyan][/cyan] [yellow]Uploading Portuguese subtitle as attachment:[/yellow] {Path(sub_file).name}")
-            await self.upload_attachment(sub_file, csrf_token, attachment_hash, attachment_hash_combined, forum_id)
+            logger.info(f"{self.tracker}: [yellow]Uploading Portuguese subtitle as attachment:[/yellow] {Path(sub_file).name}")
+            if not await self.upload_attachment(sub_file, csrf_token, attachment_hash, attachment_hash_combined, forum_id):
+                meta["tracker_status"][self.tracker]["status_message"] = "data error: Failed to upload Portuguese subtitle attachment."
+                return False
 
-        topic_title = await self.get_topic_title(meta)
+        topic_title = await self.get_name(meta)
         post_body = await self.generate_description(meta)
 
         topic_url = await self.create_topic(
