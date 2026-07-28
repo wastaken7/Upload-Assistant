@@ -175,6 +175,40 @@ with contextlib.suppress(Exception):
 cfg_dir = auth_mod.get_config_dir()
 cfg_dir.mkdir(parents=True, exist_ok=True)
 
+ARGUMENT_PRESETS_PATH = Path(__file__).resolve().parent.parent / "data" / "argument_presets.json"
+MAX_ARGUMENT_PRESETS = 50
+_argument_presets_lock = threading.Lock()
+
+
+def _load_argument_presets() -> list[dict[str, str]]:
+    """Load the shared Web UI argument presets from the data directory."""
+    try:
+        if not ARGUMENT_PRESETS_PATH.exists():
+            return []
+        raw = json.loads(ARGUMENT_PRESETS_PATH.read_text(encoding="utf-8"))
+        if not isinstance(raw, list):
+            return []
+        presets: list[dict[str, str]] = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            arguments = item.get("arguments")
+            if isinstance(name, str) and isinstance(arguments, str) and name.strip() and arguments.strip():
+                presets.append({"name": name.strip(), "arguments": arguments.strip()})
+        return presets[-MAX_ARGUMENT_PRESETS:]
+    except OSError, TypeError, ValueError:
+        return []
+
+
+def _save_argument_presets(presets: list[dict[str, str]]) -> None:
+    """Persist shared Web UI argument presets with an atomic file replacement."""
+    ARGUMENT_PRESETS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = ARGUMENT_PRESETS_PATH.with_suffix(".json.tmp")
+    temp_path.write_text(json.dumps(presets, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temp_path.replace(ARGUMENT_PRESETS_PATH)
+
+
 # Access logging helper
 AccessLogger: Callable[[Path], _AccessLoggerLike] | None = None
 with contextlib.suppress(Exception):
@@ -2937,7 +2971,7 @@ def login_page():
             if auth_mod.verify_user(username, password):
                 if _totp_enabled() and not (totp_code and _verify_totp_code(totp_code)):
                     _handle_failed_auth(get_remote_address())
-                    return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled())
+                    return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled(), setup_mode=False)
 
                 _session_set("authenticated", True)
                 with contextlib.suppress(Exception):
@@ -2957,18 +2991,18 @@ def login_page():
                 return resp
             # Credentials don't match persisted user
             _handle_failed_auth(get_remote_address())
-            return render_template("login.html", error="Credentials did not match")
+            return render_template("login.html", error="Credentials did not match", setup_mode=False)
         # No persisted user: allow UI-driven creation (first-run setup)
         if username and password:
             if _totp_enabled() and not (totp_code and _verify_totp_code(totp_code)):
                 _handle_failed_auth(get_remote_address())
-                return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled())
+                return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled(), setup_mode=True)
             try:
                 auth_mod.create_user(username, password)
             except ValueError as exc:
-                return render_template("login.html", error=str(exc), show_2fa=_totp_enabled())
+                return render_template("login.html", error=str(exc), show_2fa=_totp_enabled(), setup_mode=True)
             except Exception:
-                return render_template("login.html", error="Unable to create account", show_2fa=_totp_enabled())
+                return render_template("login.html", error="Unable to create account", show_2fa=_totp_enabled(), setup_mode=True)
 
             _session_set("authenticated", True)
             with contextlib.suppress(Exception):
@@ -2991,11 +3025,11 @@ def login_page():
             return redirect(url_for("config_page"))
         # No username/password provided
         _handle_failed_auth(get_remote_address())
-        return render_template("login.html", error="Credentials did not match")
+        return render_template("login.html", error="Credentials did not match", setup_mode=True)
 
     # Show 2FA field if enabled
     show_2fa = _totp_enabled()
-    return render_template("login.html", show_2fa=show_2fa)
+    return render_template("login.html", show_2fa=show_2fa, setup_mode=_load_user_record() is None)
 
 
 @app.errorhandler(429)
@@ -4167,15 +4201,64 @@ def browse_search():
 @app.route("/api/execution_preview")
 def execution_preview():
     """Return the current media preview for an active execution session."""
+
+    def no_store(response: object) -> object:
+        response.headers["Cache-Control"] = "no-store, max-age=0"  # type: ignore[attr-defined]
+        return response
+
     session_id = str(request.args.get("session_id", "")).strip()
     if not session_id:
-        return jsonify({"success": False, "error": "Missing session_id"}), 400
+        return no_store(jsonify({"success": False, "error": "Missing session_id"})), 400
 
     preview = _find_execution_preview(session_id)
     if preview is None:
-        return jsonify({"success": False, "error": "Session not found"}), 404
+        return no_store(jsonify({"success": False, "error": "Session not found"})), 404
 
-    return jsonify({"success": True, "media": preview})
+    return no_store(jsonify({"success": True, "media": preview}))
+
+
+@app.route("/api/argument_presets", methods=["GET", "POST", "DELETE"])
+def argument_presets():
+    """Read and persist shared Web UI argument presets in ``data``."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    with _argument_presets_lock:
+        presets = _load_argument_presets()
+        if request.method == "GET":
+            return jsonify({"success": True, "presets": presets})
+
+        data = _request_json_dict()
+        name_value = data.get("name")
+        name = name_value.strip() if isinstance(name_value, str) else ""
+        if not name:
+            return jsonify({"success": False, "error": "Preset name is required"}), 400
+
+        if request.method == "DELETE":
+            next_presets = [preset for preset in presets if preset["name"].casefold() != name.casefold()]
+        else:
+            arguments_value = data.get("arguments")
+            arguments = arguments_value.strip() if isinstance(arguments_value, str) else ""
+            if not arguments:
+                return jsonify({"success": False, "error": "Preset arguments are required"}), 400
+            replacement = {"name": name, "arguments": arguments}
+            existing_index = next(
+                (index for index, preset in enumerate(presets) if preset["name"].casefold() == name.casefold()),
+                None,
+            )
+            if existing_index is None:
+                next_presets = [*presets, replacement][-MAX_ARGUMENT_PRESETS:]
+            else:
+                next_presets = presets.copy()
+                next_presets[existing_index] = replacement
+
+        try:
+            _save_argument_presets(next_presets)
+        except OSError:
+            return jsonify({"success": False, "error": "Failed to persist argument presets"}), 500
+        return jsonify({"success": True, "presets": next_presets})
 
 
 @app.route("/api/execution_preview_cover")

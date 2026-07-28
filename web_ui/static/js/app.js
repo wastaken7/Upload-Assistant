@@ -1,8 +1,43 @@
 const { useState, useRef, useEffect, useCallback } = React;
 const THEME_KEY = "ua_config_theme";
+const LEFT_SIDEBAR_WIDTH_KEY = "ua_webui_left_sidebar_width";
+const RIGHT_SIDEBAR_WIDTH_KEY = "ua_webui_right_sidebar_width";
+const COLLAPSED_ARGUMENT_SECTIONS_KEY = "ua_webui_collapsed_argument_sections";
+const DEFAULT_SIDEBAR_WIDTH = 320;
+const SIDEBAR_MIN_WIDTH = 200;
+const LEFT_SIDEBAR_MAX_WIDTH = 600;
+const RIGHT_SIDEBAR_MAX_WIDTH = 800;
 
 const storage = window.UAStorage;
 const getStoredTheme = window.getUAStoredTheme;
+const colorThemes = window.UAThemes || [];
+const getStoredColorTheme = window.getUAStoredColorTheme;
+const setColorTheme = window.setUAColorTheme;
+
+const getStoredSidebarWidth = (key, defaultWidth, maxWidth) => {
+  const storedWidth = Number(storage.get(key));
+  if (
+    Number.isFinite(storedWidth) &&
+    storedWidth >= SIDEBAR_MIN_WIDTH &&
+    storedWidth <= maxWidth
+  ) {
+    return storedWidth;
+  }
+  return defaultWidth;
+};
+
+const getStoredCollapsedSections = () => {
+  try {
+    const storedSections = JSON.parse(
+      storage.get(COLLAPSED_ARGUMENT_SECTIONS_KEY) || "[]",
+    );
+    return Array.isArray(storedSections)
+      ? storedSections.filter((section) => typeof section === "string")
+      : [];
+  } catch (error) {
+    return [];
+  }
+};
 
 // Local CSRF cache used by fallback `apiFetch` when `uaApiFetch` isn't present.
 let localCsrf = null;
@@ -1028,29 +1063,88 @@ function AudionutsUAGUI() {
   const [selectedPath, setSelectedPath] = useState("");
   const [, setSelectedName] = useState("");
   const [customArgs, setCustomArgs] = useState("");
+  const [argumentPresets, setArgumentPresets] = useState([]);
+  const [argumentPresetName, setArgumentPresetName] = useState("");
+  const [selectedArgumentPreset, setSelectedArgumentPreset] = useState("");
   const [trackers, setTrackers] = useState([]);
   const [defaultTrackers, setDefaultTrackers] = useState(new Set());
   const [selectedTrackers, setSelectedTrackers] = useState(new Set());
   const [failedFavicons, setFailedFavicons] = useState(new Set());
   const [isExecuting, setIsExecuting] = useState(false);
+  const [hasTerminalOutput, setHasTerminalOutput] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState(
     new Set(["/data", "/torrent_storage_dir"]),
   );
   const [sessionId, setSessionId] = useState("");
-  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [sidebarWidth, setSidebarWidth] = useState(() =>
+    getStoredSidebarWidth(
+      LEFT_SIDEBAR_WIDTH_KEY,
+      DEFAULT_SIDEBAR_WIDTH,
+      LEFT_SIDEBAR_MAX_WIDTH,
+    ),
+  );
   const [isResizing, setIsResizing] = useState(false);
-  const [rightSidebarWidth, setRightSidebarWidth] = useState(320);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(() =>
+    getStoredSidebarWidth(
+      RIGHT_SIDEBAR_WIDTH_KEY,
+      DEFAULT_SIDEBAR_WIDTH,
+      RIGHT_SIDEBAR_MAX_WIDTH,
+    ),
+  );
   const [isResizingRight, setIsResizingRight] = useState(false);
   const [userInput, setUserInput] = useState("");
   const [isSendingInput, setIsSendingInput] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(getStoredTheme);
+  const [colorTheme, setColorThemeState] = useState(getStoredColorTheme);
   const [argSearchFilter, setArgSearchFilter] = useState("");
-  const [collapsedSections, setCollapsedSections] = useState(new Set());
+  const [collapsedSections, setCollapsedSections] = useState(
+    () => new Set(getStoredCollapsedSections()),
+  );
   const [executionPreview, setExecutionPreview] = useState(null);
   const [progressItems, setProgressItems] = useState([]);
   const [selectedPaths, setSelectedPaths] = useState([]);
   const [sortBy, setSortBy] = useState("name");
   const [sortOrder, setSortOrder] = useState("asc");
+
+  useEffect(() => {
+    storage.set(
+      COLLAPSED_ARGUMENT_SECTIONS_KEY,
+      JSON.stringify(Array.from(collapsedSections)),
+    );
+  }, [collapsedSections]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadArgumentPresets = async () => {
+      try {
+        const response = await apiFetch(`${API_BASE}/argument_presets`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled && data.success && Array.isArray(data.presets)) {
+          setArgumentPresets(data.presets);
+        }
+      } catch (error) {
+        console.error("Failed to load argument presets:", error);
+      }
+    };
+    loadArgumentPresets();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleColorThemeChange = (event) => {
+      setColorThemeState(event.detail?.theme || getStoredColorTheme());
+    };
+    window.addEventListener("ua-theme-change", handleColorThemeChange);
+    return () =>
+      window.removeEventListener("ua-theme-change", handleColorThemeChange);
+  }, []);
+
+  const handleColorThemeChange = (event) => {
+    setColorThemeState(setColorTheme(event.target.value));
+  };
 
   // Mobile state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -1713,7 +1807,9 @@ function AudionutsUAGUI() {
       try {
         const response = await apiFetch(
           `${API_BASE}/execution_preview?session_id=${encodeURIComponent(sessionId)}`,
-          { signal: controller.signal },
+          // This endpoint changes throughout a queue run.  Do not allow a
+          // browser or intermediary cache to keep showing an earlier item.
+          { cache: "no-store", signal: controller.signal },
         );
         if (!response.ok) {
           return;
@@ -2499,6 +2595,7 @@ function AudionutsUAGUI() {
           >
             <input
               type="checkbox"
+              aria-label={`Select ${item.type === "folder" ? "folder" : "file"} ${item.name}`}
               checked={selectedPaths.some((x) => x.path === item.path)}
               onChange={(e) => {
                 e.stopPropagation();
@@ -2566,6 +2663,7 @@ function AudionutsUAGUI() {
           >
             <input
               type="checkbox"
+              aria-label={`Select ${item.type === "folder" ? "folder" : "file"} ${item.name}`}
               checked={selectedPaths.some((x) => x.path === item.path)}
               onChange={(e) => {
                 e.stopPropagation();
@@ -2886,6 +2984,7 @@ function AudionutsUAGUI() {
   const executeCommand = async () => {
     if (selectedPaths.length > 1) {
       setIsExecuting(true);
+      setHasTerminalOutput(true);
       const rootContainer = richOutputRef.current;
       if (rootContainer) {
         rootContainer.innerHTML = "";
@@ -2941,6 +3040,7 @@ function AudionutsUAGUI() {
 
     const rootContainer = richOutputRef.current;
     setIsExecuting(true);
+    setHasTerminalOutput(true);
     if (rootContainer) {
       rootContainer.innerHTML = "";
     }
@@ -2984,6 +3084,7 @@ function AudionutsUAGUI() {
     const container = richOutputRef.current;
     if (container) {
       container.innerHTML = "";
+      setHasTerminalOutput(false);
       setProgressItems([]);
       appendSystemMessage("Upload-Assistant Interactive Output");
       appendSystemMessage(
@@ -3004,8 +3105,9 @@ function AudionutsUAGUI() {
   const resize = useCallback(
     (e) => {
       const newWidth = e.clientX;
-      if (newWidth >= 200 && newWidth <= 600) {
+      if (newWidth >= SIDEBAR_MIN_WIDTH && newWidth <= LEFT_SIDEBAR_MAX_WIDTH) {
         setSidebarWidth(newWidth);
+        storage.set(LEFT_SIDEBAR_WIDTH_KEY, String(newWidth));
       }
     },
     [setSidebarWidth],
@@ -3035,8 +3137,12 @@ function AudionutsUAGUI() {
     (e) => {
       // Calculate width from right edge
       const newWidth = window.innerWidth - e.clientX;
-      if (newWidth >= 200 && newWidth <= 800) {
+      if (
+        newWidth >= SIDEBAR_MIN_WIDTH &&
+        newWidth <= RIGHT_SIDEBAR_MAX_WIDTH
+      ) {
         setRightSidebarWidth(newWidth);
+        storage.set(RIGHT_SIDEBAR_WIDTH_KEY, String(newWidth));
       }
     },
     [setRightSidebarWidth],
@@ -3059,6 +3165,121 @@ function AudionutsUAGUI() {
   const addArgument = (arg) => {
     setCustomArgs((prev) => (prev && prev.length ? `${prev} ${arg}` : arg));
   };
+
+  const saveArgumentPreset = async () => {
+    const name = argumentPresetName.trim();
+    const argumentsValue = customArgs.trim();
+    if (!name || !argumentsValue) return;
+
+    try {
+      const response = await apiFetch(`${API_BASE}/argument_presets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, arguments: argumentsValue }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success)
+        throw new Error(data.error || "Save failed");
+      setArgumentPresets(data.presets || []);
+      setSelectedArgumentPreset(name);
+      setArgumentPresetName("");
+    } catch (error) {
+      console.error("Failed to save argument preset:", error);
+    }
+  };
+
+  const loadArgumentPreset = (name) => {
+    setSelectedArgumentPreset(name);
+    const preset = argumentPresets.find((item) => item.name === name);
+    if (preset) setCustomArgs(preset.arguments);
+  };
+
+  const deleteArgumentPreset = async () => {
+    if (!selectedArgumentPreset) return;
+
+    try {
+      const response = await apiFetch(`${API_BASE}/argument_presets`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: selectedArgumentPreset }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success)
+        throw new Error(data.error || "Delete failed");
+      setArgumentPresets(data.presets || []);
+      setSelectedArgumentPreset("");
+    } catch (error) {
+      console.error("Failed to delete argument preset:", error);
+    }
+  };
+
+  const renderArgumentPresetControls = (isMobileView = false) => (
+    <div className={`space-y-2 ${isMobileView ? "pt-1" : ""}`}>
+      <div className="flex gap-2">
+        <select
+          value={selectedArgumentPreset}
+          onChange={(e) => loadArgumentPreset(e.target.value)}
+          className={`min-w-0 flex-1 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+            isDarkMode
+              ? "bg-gray-700 border-gray-600 text-white"
+              : "bg-white border-gray-300 text-gray-900"
+          }`}
+          disabled={isExecuting || argumentPresets.length === 0}
+          aria-label="Saved argument presets"
+        >
+          <option value="">Saved argument presets</option>
+          {argumentPresets.map((preset) => (
+            <option key={preset.name} value={preset.name}>
+              {preset.name}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={deleteArgumentPreset}
+          disabled={isExecuting || !selectedArgumentPreset}
+          className="px-3 py-2 text-sm font-medium rounded-lg border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-red-950"
+          title="Delete selected preset"
+        >
+          Delete
+        </button>
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={argumentPresetName}
+          onChange={(e) => setArgumentPresetName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              saveArgumentPreset();
+            }
+          }}
+          placeholder="Preset name"
+          className={`min-w-0 flex-1 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+            isDarkMode
+              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+          }`}
+          disabled={isExecuting}
+        />
+        <button
+          onClick={saveArgumentPreset}
+          disabled={
+            isExecuting || !argumentPresetName.trim() || !customArgs.trim()
+          }
+          className="px-3 py-2 text-sm font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Save current arguments as a named preset"
+        >
+          Save
+        </button>
+      </div>
+      <p
+        className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+      >
+        Saving an existing name updates that preset.
+      </p>
+    </div>
+  );
 
   // Toggle section collapse
   const toggleSectionCollapse = (title) => {
@@ -3553,6 +3774,7 @@ function AudionutsUAGUI() {
       <button
         key={panel}
         onClick={() => setActivePanel(panel)}
+        aria-current={activePanel === panel ? "page" : undefined}
         className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-colors ${
           activePanel === panel
             ? "text-purple-400 border-t-2 border-purple-400"
@@ -3581,6 +3803,18 @@ function AudionutsUAGUI() {
             Upload-Assistant
           </h1>
           <div className="flex items-center gap-2">
+            <select
+              value={colorTheme}
+              onChange={handleColorThemeChange}
+              aria-label="Color theme"
+              className="ua-theme-picker rounded px-2 py-1 text-xs"
+            >
+              {colorThemes.map((theme) => (
+                <option key={theme.id} value={theme.id}>
+                  {theme.label}
+                </option>
+              ))}
+            </select>
             <a
               href={`${APP_BASE}/config`}
               className="px-2 py-1 rounded text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700"
@@ -3589,6 +3823,9 @@ function AudionutsUAGUI() {
             </a>
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
+              aria-label={
+                isDarkMode ? "Switch to light mode" : "Switch to dark mode"
+              }
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isDarkMode ? "bg-purple-600" : "bg-gray-300"}`}
             >
               <span
@@ -3838,6 +4075,7 @@ function AudionutsUAGUI() {
                 }`}
                 disabled={isExecuting}
               />
+              {renderArgumentPresetControls(true)}
 
               {/* Desc Link Input */}
               {hasDescLink &&
@@ -3905,6 +4143,11 @@ function AudionutsUAGUI() {
                 </button>
                 <button
                   onClick={clearTerminal}
+                  aria-label={
+                    isExecuting
+                      ? "Kill process and clear terminal"
+                      : "Clear terminal"
+                  }
                   className={`flex items-center gap-1 px-3 py-3 rounded-lg transition-colors ${
                     isExecuting
                       ? "bg-red-600 hover:bg-red-700 text-white"
@@ -3924,7 +4167,7 @@ function AudionutsUAGUI() {
 
             {/* Terminal output */}
             <div
-              className={`flex-1 p-3 flex flex-col min-h-0 overflow-hidden ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}
+              className={`${isExecuting || hasTerminalOutput ? "flex-1" : "ua-output-section-empty"} p-3 flex flex-col min-h-0 overflow-hidden ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}
             >
               <div className="flex items-center gap-2 mb-2 flex-shrink-0">
                 <span className={isDarkMode ? "text-white" : "text-gray-800"}>
@@ -3944,7 +4187,7 @@ function AudionutsUAGUI() {
               <div
                 ref={richOutputRef}
                 id="rich-output"
-                className="flex-1 rounded-lg overflow-auto p-2 border text-sm bg-black border-gray-700 text-white"
+                className={`rounded-lg overflow-auto p-2 border text-sm bg-black border-gray-700 text-white ${isExecuting || hasTerminalOutput ? "flex-1" : "ua-output-box-empty"}`}
               ></div>
               {isExecuting && (
                 <div
@@ -4507,6 +4750,7 @@ function AudionutsUAGUI() {
                 </div>
                 <button
                   onClick={clearTerminal}
+                  aria-label="Kill process and clear terminal"
                   className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors bg-red-600 hover:bg-red-700 text-white flex-shrink-0"
                   title="Kill process and clear terminal"
                 >
@@ -4537,6 +4781,18 @@ function AudionutsUAGUI() {
 
                   {/* Controls */}
                   <div className="flex items-center gap-3">
+                    <select
+                      value={colorTheme}
+                      onChange={handleColorThemeChange}
+                      aria-label="Color theme"
+                      className="ua-theme-picker rounded-lg px-2 py-1.5 text-sm"
+                    >
+                      {colorThemes.map((theme) => (
+                        <option key={theme.id} value={theme.id}>
+                          {theme.label}
+                        </option>
+                      ))}
+                    </select>
                     <a
                       href={`${APP_BASE}/config`}
                       className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700"
@@ -4585,6 +4841,7 @@ function AudionutsUAGUI() {
                     }`}
                     disabled={isExecuting}
                   />
+                  {renderArgumentPresetControls()}
                 </div>
 
                 {/* Description Link URL Input - shown when --desclink is in args */}
@@ -4729,6 +4986,11 @@ function AudionutsUAGUI() {
                   </button>
                   <button
                     onClick={clearTerminal}
+                    aria-label={
+                      isExecuting
+                        ? "Kill process and clear terminal"
+                        : "Clear terminal"
+                    }
                     className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${
                       isExecuting
                         ? "bg-red-600 hover:bg-red-700 text-white"
@@ -4752,7 +5014,7 @@ function AudionutsUAGUI() {
 
         {/* Execution Output */}
         <div
-          className={`flex-1 ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} p-4 flex flex-col min-h-0 overflow-hidden`}
+          className={`${isExecuting || hasTerminalOutput ? "flex-1" : "ua-output-section-empty"} ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} p-4 flex flex-col min-h-0 overflow-hidden`}
         >
           <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col min-h-0">
             <div className="flex items-center gap-2 mb-3 flex-shrink-0">
@@ -4774,7 +5036,7 @@ function AudionutsUAGUI() {
             <div
               ref={richOutputRef}
               id="rich-output"
-              className="flex-1 rounded-lg overflow-auto p-3 border bg-black border-gray-700 text-white"
+              className={`rounded-lg overflow-auto p-3 border bg-black border-gray-700 text-white ${isExecuting || hasTerminalOutput ? "flex-1" : "ua-output-box-empty"}`}
             ></div>
             {isExecuting && (
               <div

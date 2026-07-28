@@ -187,6 +187,9 @@ const API_BASE = window.location.origin + "/api";
 const THEME_KEY = "ua_config_theme";
 const storage = window.UAStorage;
 const getStoredTheme = window.getUAStoredTheme;
+const colorThemes = window.UAThemes || [];
+const getStoredColorTheme = window.getUAStoredColorTheme;
+const setColorTheme = window.setUAColorTheme;
 
 // Local CSRF cache used by fallback `apiFetch` when `uaApiFetch` isn't present.
 let localCsrf = null;
@@ -3262,6 +3265,7 @@ function ConfigApp() {
     type: "info",
   });
   const [isDarkMode, setIsDarkMode] = useState(getStoredTheme);
+  const [colorTheme, setColorThemeState] = useState(getStoredColorTheme);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
   const [pendingChanges, setPendingChanges] = useState(new Map());
   const [isSaving, setIsSaving] = useState(false);
@@ -3281,6 +3285,19 @@ function ConfigApp() {
     }
   });
   const [torrentClients, setTorrentClients] = useState([]);
+
+  useEffect(() => {
+    const handleColorThemeChange = (event) => {
+      setColorThemeState(event.detail?.theme || getStoredColorTheme());
+    };
+    window.addEventListener("ua-theme-change", handleColorThemeChange);
+    return () =>
+      window.removeEventListener("ua-theme-change", handleColorThemeChange);
+  }, []);
+
+  const handleColorThemeChange = (event) => {
+    setColorThemeState(setColorTheme(event.target.value));
+  };
   const getSubTabsForSection = (section) => {
     if (section.client_types) {
       return section.client_types.map((type) => {
@@ -3691,6 +3708,18 @@ function ConfigApp() {
             </button>
           </div>
           <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+            <select
+              value={colorTheme}
+              onChange={handleColorThemeChange}
+              aria-label="Color theme"
+              className="ua-theme-picker rounded-lg px-2 py-1.5 text-sm"
+            >
+              {colorThemes.map((theme) => (
+                <option key={theme.id} value={theme.id}>
+                  {theme.label}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
               className={saveButtonClass}
@@ -3769,7 +3798,7 @@ function ConfigApp() {
               )}
               {/* Tab Navigation */}
               <div
-                className={`flex space-x-1 rounded-lg p-1 overflow-x-auto ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}
+                className={`ua-config-tabs flex space-x-1 rounded-lg p-1 overflow-x-auto ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}
               >
                 <button
                   onClick={() => setActiveTab("security")}
@@ -3848,7 +3877,7 @@ function ConfigApp() {
                       {/* Sub-tab Navigation */}
                       {hasSubTabs && (
                         <div
-                          className={`flex space-x-1 rounded-lg p-1 overflow-x-auto ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
+                          className={`ua-config-tabs flex space-x-1 rounded-lg p-1 overflow-x-auto ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
                         >
                           {subTabs.map((subTab) => {
                             const isActive = activeSubTab === subTab.id;

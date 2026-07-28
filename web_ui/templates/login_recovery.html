@@ -15,10 +15,25 @@
       href="{{ url_for('static', filename='img/logo.png') }}"
     />
     <link
+      rel="apple-touch-icon"
+      sizes="512x512"
+      href="{{ url_for('static', filename='img/apple-touch-icon.png') }}"
+    />
+    <link
+      rel="manifest"
+      href="{{ url_for('static', filename='manifest.webmanifest') }}"
+    />
+    <meta name="apple-mobile-web-app-title" content="Upload-Assistant" />
+    <meta name="theme-color" content="#171615" />
+    <link
       rel="shortcut icon"
       href="{{ url_for('static', filename='favicon.ico') }}"
     />
     <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/theme.css') }}"
+    />
   </head>
   <body style="background-color: oklch(0.145 0 0)">
     <div
