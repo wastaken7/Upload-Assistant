@@ -1,6 +1,13 @@
 // Shared utility for storage and theme handling used by multiple UI scripts.
 (() => {
   const THEME_KEY = "ua_config_theme";
+  const COLOR_THEME_KEY = "ua_color_theme";
+  const DEFAULT_COLOR_THEME = "obsidian";
+  const UA_THEMES = Object.freeze([
+    { id: "obsidian", label: "Obsidian", description: "Copper and gold" },
+    { id: "graphite", label: "Graphite", description: "Cool blue graphite" },
+  ]);
+  const UA_THEME_IDS = new Set(UA_THEMES.map((theme) => theme.id));
 
   const uaStorage = {
     get(key) {
@@ -35,6 +42,32 @@
       ? window.UA_DEFAULT_THEME
       : true;
   }
+
+  function getUAStoredColorTheme() {
+    const stored = uaStorage.get(COLOR_THEME_KEY);
+    return UA_THEME_IDS.has(stored) ? stored : DEFAULT_COLOR_THEME;
+  }
+
+  function applyUAColorTheme(themeId = getUAStoredColorTheme()) {
+    const nextTheme = UA_THEME_IDS.has(themeId) ? themeId : DEFAULT_COLOR_THEME;
+    if (typeof document !== "undefined") {
+      document.documentElement.dataset.uaTheme = nextTheme;
+    }
+    return nextTheme;
+  }
+
+  function setUAColorTheme(themeId) {
+    const nextTheme = applyUAColorTheme(themeId);
+    uaStorage.set(COLOR_THEME_KEY, nextTheme);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("ua-theme-change", { detail: { theme: nextTheme } }),
+      );
+    }
+    return nextTheme;
+  }
+
+  applyUAColorTheme();
 
   // CSRF + apiFetch helpers with automatic refresh on 401/403 responses.
   let uaCsrfToken = null;
@@ -167,7 +200,11 @@
   // Expose as globals for non-module usage by existing scripts.
   if (typeof window !== "undefined") {
     window.UAStorage = window.UAStorage || uaStorage;
+    window.UAThemes = window.UAThemes || UA_THEMES;
     window.getUAStoredTheme = window.getUAStoredTheme || getUAStoredTheme;
+    window.getUAStoredColorTheme =
+      window.getUAStoredColorTheme || getUAStoredColorTheme;
+    window.setUAColorTheme = window.setUAColorTheme || setUAColorTheme;
     window.loadCsrfToken = window.loadCsrfToken || loadCsrfToken;
     window.clearCsrfToken = window.clearCsrfToken || clearCsrfToken;
     window.uaApiFetch = window.uaApiFetch || uaApiFetch;

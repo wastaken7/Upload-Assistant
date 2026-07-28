@@ -8,14 +8,14 @@
 
     <!-- Node Source Gradient (Charcoal Stone) -->
     <linearGradient id="node-src-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#292524" />
-      <stop offset="100%" stop-color="#1c1917" />
+      <stop offset="0%" stop-color="#713f12" />
+      <stop offset="100%" stop-color="#422006" />
     </linearGradient>
 
     <!-- Node P2P Gradient (Copper) -->
     <linearGradient id="node-p2p-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#78350f" />
-      <stop offset="100%" stop-color="#451a03" />
+      <stop offset="0%" stop-color="#713f12" />
+      <stop offset="100%" stop-color="#422006" />
     </linearGradient>
 
     <!-- Node Usenet Gradient (Gold) -->
@@ -154,7 +154,7 @@
     <line x1="340" y1="160" x2="340" y2="178" stroke="#ffffff" stroke-width="2" class="p2p-spoke" />
     <line x1="340" y1="160" x2="322" y2="160" stroke="#ffffff" stroke-width="2" class="p2p-spoke" />
     <line x1="340" y1="160" x2="340" y2="142" stroke="#ffffff" stroke-width="2" class="p2p-spoke" />
-    
+
     <line x1="358" y1="160" x2="340" y2="178" stroke="#ffffff" stroke-width="2" stroke-opacity="0.6" class="p2p-ring" />
     <line x1="340" y1="178" x2="322" y2="160" stroke="#ffffff" stroke-width="2" stroke-opacity="0.6" class="p2p-ring" />
     <line x1="322" y1="160" x2="340" y2="142" stroke="#ffffff" stroke-width="2" stroke-opacity="0.6" class="p2p-ring" />

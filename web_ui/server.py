@@ -197,7 +197,7 @@ def _load_argument_presets() -> list[dict[str, str]]:
             if isinstance(name, str) and isinstance(arguments, str) and name.strip() and arguments.strip():
                 presets.append({"name": name.strip(), "arguments": arguments.strip()})
         return presets[-MAX_ARGUMENT_PRESETS:]
-    except (OSError, TypeError, ValueError):
+    except OSError, TypeError, ValueError:
         return []
 
 
@@ -207,6 +207,7 @@ def _save_argument_presets(presets: list[dict[str, str]]) -> None:
     temp_path = ARGUMENT_PRESETS_PATH.with_suffix(".json.tmp")
     temp_path.write_text(json.dumps(presets, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     temp_path.replace(ARGUMENT_PRESETS_PATH)
+
 
 # Access logging helper
 AccessLogger: Callable[[Path], _AccessLoggerLike] | None = None
@@ -2970,7 +2971,7 @@ def login_page():
             if auth_mod.verify_user(username, password):
                 if _totp_enabled() and not (totp_code and _verify_totp_code(totp_code)):
                     _handle_failed_auth(get_remote_address())
-                    return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled())
+                    return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled(), setup_mode=False)
 
                 _session_set("authenticated", True)
                 with contextlib.suppress(Exception):
@@ -2990,18 +2991,18 @@ def login_page():
                 return resp
             # Credentials don't match persisted user
             _handle_failed_auth(get_remote_address())
-            return render_template("login.html", error="Credentials did not match")
+            return render_template("login.html", error="Credentials did not match", setup_mode=False)
         # No persisted user: allow UI-driven creation (first-run setup)
         if username and password:
             if _totp_enabled() and not (totp_code and _verify_totp_code(totp_code)):
                 _handle_failed_auth(get_remote_address())
-                return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled())
+                return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled(), setup_mode=True)
             try:
                 auth_mod.create_user(username, password)
             except ValueError as exc:
-                return render_template("login.html", error=str(exc), show_2fa=_totp_enabled())
+                return render_template("login.html", error=str(exc), show_2fa=_totp_enabled(), setup_mode=True)
             except Exception:
-                return render_template("login.html", error="Unable to create account", show_2fa=_totp_enabled())
+                return render_template("login.html", error="Unable to create account", show_2fa=_totp_enabled(), setup_mode=True)
 
             _session_set("authenticated", True)
             with contextlib.suppress(Exception):
@@ -3024,11 +3025,11 @@ def login_page():
             return redirect(url_for("config_page"))
         # No username/password provided
         _handle_failed_auth(get_remote_address())
-        return render_template("login.html", error="Credentials did not match")
+        return render_template("login.html", error="Credentials did not match", setup_mode=True)
 
     # Show 2FA field if enabled
     show_2fa = _totp_enabled()
-    return render_template("login.html", show_2fa=show_2fa)
+    return render_template("login.html", show_2fa=show_2fa, setup_mode=_load_user_record() is None)
 
 
 @app.errorhandler(429)
@@ -4200,6 +4201,7 @@ def browse_search():
 @app.route("/api/execution_preview")
 def execution_preview():
     """Return the current media preview for an active execution session."""
+
     def no_store(response: object) -> object:
         response.headers["Cache-Control"] = "no-store, max-age=0"  # type: ignore[attr-defined]
         return response

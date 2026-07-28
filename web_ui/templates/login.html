@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Upload-Assistant Web UI - Login</title>
+    <title>
+      Upload-Assistant Web UI - {{ 'Create account' if setup_mode else 'Login'
+      }}
+    </title>
     <link
       rel="icon"
       type="image/svg+xml"
@@ -15,10 +18,25 @@
       href="{{ url_for('static', filename='img/logo.png') }}"
     />
     <link
+      rel="apple-touch-icon"
+      sizes="512x512"
+      href="{{ url_for('static', filename='img/apple-touch-icon.png') }}"
+    />
+    <link
+      rel="manifest"
+      href="{{ url_for('static', filename='manifest.webmanifest') }}"
+    />
+    <meta name="apple-mobile-web-app-title" content="Upload-Assistant" />
+    <meta name="theme-color" content="#171615" />
+    <link
       rel="shortcut icon"
       href="{{ url_for('static', filename='favicon.ico') }}"
     />
     <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/theme.css') }}"
+    />
     <style>
       @keyframes shine {
         0% {
@@ -96,27 +114,38 @@
             <div
               class="text-3xl font-bold pointer-events-none select-none text-white"
             >
-              Upload-Assistant
+              {{ 'Create your Web UI account' if setup_mode else 'Sign in to the
+              Web UI' }}
             </div>
             <div
               class="text-muted-foreground text-sm pointer-events-none select-none text-gray-300"
             >
-              Web UI for Upload-Assistant
+              {{ 'Set up the first Web UI account to continue' if setup_mode
+              else 'Web UI for Upload-Assistant' }}
             </div>
           </div>
           <div class="px-6 pt-6">
+            {% if setup_mode %}
+            <div
+              class="mb-4 rounded-md border border-blue-400/40 bg-blue-500/10 px-4 py-3 text-sm text-blue-100"
+            >
+              This is the first-run setup. Choose the username and password for
+              your Web UI account.
+            </div>
+            {% endif %}
             <form method="post" class="space-y-4">
               <div class="space-y-2">
                 <label
                   class="flex items-center gap-2 text-sm leading-none font-medium select-none text-white"
                   for="username"
-                  >Username</label
+                  >{{ 'Choose a username' if setup_mode else 'Username'
+                  }}</label
                 >
                 <input
                   class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive text-white placeholder-gray-400 border-gray-600"
                   id="username"
                   name="username"
-                  placeholder="Enter your username"
+                  placeholder="{{ 'Choose a username' if setup_mode else 'Enter your username' }}"
                   type="text"
                   autocomplete="username"
                   required
@@ -126,15 +155,16 @@
                 <label
                   class="flex items-center gap-2 text-sm leading-none font-medium select-none text-white"
                   for="password"
-                  >Password</label
+                  >{{ 'Choose a password' if setup_mode else 'Password'
+                  }}</label
                 >
                 <input
                   class="file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive text-white placeholder-gray-400 border-gray-600"
                   id="password"
                   name="password"
-                  placeholder="Enter your password"
+                  placeholder="{{ 'Choose a password' if setup_mode else 'Enter your password' }}"
                   type="password"
-                  autocomplete="current-password"
+                  autocomplete="{{ 'new-password' if setup_mode else 'current-password' }}"
                   required
                 />
               </div>
@@ -175,7 +205,7 @@
               </div>
               {% if error %}
               <div class="text-red-400 text-sm">{{ error }}</div>
-              {% endif %}
+              {% endif %} {% if not setup_mode %}
               <details
                 class="rounded-md border border-gray-700/80 bg-black/10 px-4 py-3 text-sm text-gray-200"
               >
@@ -233,11 +263,12 @@
                   </p>
                 </div>
               </details>
+              {% endif %}
               <button
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all cursor-pointer disabled:cursor-not-allowed disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-10 rounded-md px-6 has-[&gt;svg]:px-4 w-full bg-blue-600 text-white hover:bg-blue-700"
                 type="submit"
               >
-                Sign in
+                {{ 'Create account' if setup_mode else 'Sign in' }}
               </button>
             </form>
             {% if show_2fa %}
