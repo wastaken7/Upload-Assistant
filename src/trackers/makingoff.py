@@ -288,7 +288,7 @@ class MakingOff:
             if any(term in title for term in ("portuguese", "português", "pt-br", "ptbr", "pt_br", "pt-pt", "ptpt")):
                 return True
 
-        return bool(getattr(meta, "hardcoded_subs", False) and self._has_portuguese_language(getattr(meta, "subtitle_languages", [])))
+        return bool(getattr(meta, "hardcoded_subs", False))
 
     @staticmethod
     def _is_hidef(meta: Meta) -> bool:
@@ -1077,6 +1077,7 @@ class MakingOff:
 
         forum_id = await self.get_forum_id(meta)
         results: dict[str, str] = {}
+        exact_imdb_urls: set[str] = set()
 
         # 1. The catalogue accepts IMDb IDs directly and lets us verify the
         # exact ID in its result card, avoiding false positives from XenForo's
@@ -1086,6 +1087,7 @@ class MakingOff:
             found = await self.search_index_by_imdb(meta.imdb_tt)
             if found:
                 results.update(found)
+                exact_imdb_urls.update(found.values())
 
         # 2. Search by title candidates (with title_only=True)
         for candidate in candidates:
@@ -1103,9 +1105,10 @@ class MakingOff:
             if url in processed_urls:
                 continue
             processed_urls.add(url)
-            existing_hidef = title.strip().startswith("[Hidef]")
+            resolution = await self.get_post_resolution(url)
+            existing_hidef = title.strip().startswith("[Hidef]") or resolution > 576
 
-            if upload_year:
+            if upload_year and url not in exact_imdb_urls:
                 year_int = int(upload_year)
                 if not any(f"({y})" in title for y in (year_int - 1, year_int, year_int + 1)):
                     logger.info(f"{self.tracker}: [yellow]Skipping: different year in existing release:[/yellow] [link={url}]{title}[/link]")
@@ -1116,7 +1119,7 @@ class MakingOff:
                 logger.warning(f"{self.tracker}: [bold red]Aborting: A Hidef release exists:[/bold red] [link={url}]{title}[/link]")
                 if not meta.debug:
                     meta.skipping = self.tracker
-                duplicates.append({"name": title, "size": "", "link": url})
+                duplicates.append({"name": f"[url={url}]{title}[/url]", "size": "", "link": url})
                 continue
 
             # Uploading Hidef over an existing SD → allowed.
@@ -1124,7 +1127,6 @@ class MakingOff:
                 continue
 
             # Same tier (SD vs SD or Hidef vs Hidef) → compare resolution.
-            resolution = await self.get_post_resolution(url)
 
             try:
                 upload_height = int(resolution_str.replace("p", "").replace("i", ""))
@@ -1135,7 +1137,7 @@ class MakingOff:
                 logger.warning(f"{self.tracker}: [bold red]Aborting: A better or equivalent Hidef release exists:[/bold red] [link={url}]{title}[/link]")
                 if not meta.debug:
                     meta.skipping = self.tracker
-                duplicates.append({"name": title, "size": str(resolution), "link": url})
+                duplicates.append({"name": f"[url={url}]{title}[/url]", "size": str(resolution), "link": url})
                 continue
 
         return duplicates
