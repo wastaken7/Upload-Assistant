@@ -745,6 +745,11 @@ const argumentCategories = [
         description: "Custom Usenet subject line",
       },
       {
+        label: "--archive-password",
+        placeholder: "PASSWORD or random",
+        description: "Override the Usenet 7z archive password for this run",
+      },
+      {
         label: "--unattended",
         description: "Unattended (no prompts (AT ALL))",
       },
