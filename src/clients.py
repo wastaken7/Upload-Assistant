@@ -25,22 +25,27 @@ defusedxml.xmlrpc.monkey_patch()
 
 class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, TransmissionClientMixin):
     def __init__(self, config: dict[str, Any]) -> None:
+        """Initialize torrent-client operations with the application config."""
         self.config = config
 
     def _extract_tracker_ids_from_comment(self, comment: str) -> dict[str, str]:
+        """Extract known tracker IDs from a torrent comment URL set."""
         if not comment:
             return {}
 
         def _is_host(host: str, domain: str) -> bool:
+            """Return whether host matches domain or one of its subdomains."""
             host = host.lower()
             domain = domain.lower()
             return host == domain or host.endswith(f".{domain}")
 
         def _last_path_id(path: str) -> str | None:
+            """Extract a numeric tracker ID from the end of a URL path."""
             match = re.search(r"/(\d+)$", path)
             return match.group(1) if match else None
 
         def _query_id(query: str, key: str) -> str | None:
+            """Extract the first value for key from a URL query string."""
             values = urllib.parse.parse_qs(query).get(key)
             return values[0] if values else None
 
@@ -141,6 +146,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         return tracker_ids
 
     async def add_to_client(self, meta: Meta, tracker: str, cross: bool = False) -> None:
+        """Add the prepared torrent to each configured client."""
         if meta.path is None:
             logger.info("[bold red]meta.path is None, cannot add to client")
             return
@@ -274,6 +280,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             await asyncio.sleep(inject_delay)
 
     async def find_existing_torrent(self, meta: Meta) -> str | None:
+        """Find a reusable torrent matching the prepared metadata."""
         if meta.get("skip_auto_torrent", False):
             return None
 
@@ -569,6 +576,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         return best_match
 
     async def is_valid_torrent(self, meta: Meta, torrent_path: str, torrenthash: str, torrent_client: str, _client: dict[str, Any]) -> tuple[bool, str]:
+        """Validate a candidate torrent against files, layout, and piece limits."""
         torrent_path = str(torrent_path)
         valid = False
         wrong_file = False
@@ -631,6 +639,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     elif len(torrent.files) == len(cand):
 
                         def relative_layout(paths: list[str]) -> list[str]:
+                            """Normalize relative file layout for structural comparison."""
                             root = Path(os.path.commonpath(paths))
                             return sorted(str(Path(path).relative_to(root)).replace("\\", "/") for path in paths)
 
@@ -739,6 +748,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         return False
 
     async def remote_path_map(self, meta: Meta, torrent_client_name: str | dict[str, Any] | None = None) -> tuple[str, str]:
+        """Return the local and remote roots matching the torrent metadata path."""
         if isinstance(torrent_client_name, dict):
             client_config: dict[str, Any] = torrent_client_name
         elif isinstance(torrent_client_name, str) and torrent_client_name:
@@ -774,6 +784,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         return local_path, remote_path
 
     async def get_ptp_from_hash(self, meta: Meta, pathed: bool = False, client_name: str | None = None) -> Meta:
+        """Fetch PTP metadata through the configured torrent client when available."""
         default_config = self.config.get("DEFAULT", {})
         clients_config = self.config.get("TORRENT_CLIENTS", {})
         default_torrent_client = client_name or (default_config.get("default_torrent_client") if isinstance(default_config, dict) else None)
