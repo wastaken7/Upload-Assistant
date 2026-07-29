@@ -862,18 +862,27 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         logger.error("[red]Error: USENET section is missing from configuration.[/red]")
         return None
 
-    # Handle Usenet archive encryption/password
-    archive_password = meta.archive_password or usenet_cfg.get("archive_password")
+    # Keep the configured password mode separate from the resolved value.  The
+    # early preparation pass stores a generated password in ``meta`` so the
+    # posting pass can reuse it; that must not make a configured ``random``
+    # password look like a static one on the second pass.
+    configured_archive_password = usenet_cfg.get("archive_password")
+    configured_random_archive_password = str(configured_archive_password).lower() == "random"
+    random_archive_password = meta.usenet_archive_password_is_random if meta.usenet_archive_password_is_random is not None else configured_random_archive_password
+    archive_password = meta.archive_password or configured_archive_password
     if archive_password:
-        if str(archive_password).lower() == "random" and not meta.archive_password:
+        if random_archive_password and str(archive_password).lower() == "random":
             while True:
                 archive_password = secrets.token_urlsafe(16)
                 if not archive_password.startswith("-"):
                     break
-            logger.debug(f"[cyan]Generated random Usenet archive password: {archive_password}[/cyan]")
+            logger.info("[cyan]Generated a random Usenet archive password for this upload.[/cyan]")
+        elif random_archive_password:
+            logger.info("[cyan]Reusing the random Usenet archive password prepared for this upload.[/cyan]")
         else:
             logger.info("[cyan]Using configured static password for Usenet archive encryption.[/cyan]")
         meta.archive_password = archive_password
+        meta.usenet_archive_password_is_random = random_archive_password
 
     # Determine paths and names
     base_dir = meta.base_dir
@@ -1102,7 +1111,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         meta.usenet_prepared_files = [str(file_path) for file_path in upload_files]
 
     if prepare_only:
-        logger.info("[cyan]Usenet archive and PAR2 preparation completed; posting will run later.[/cyan]")
+        logger.debug("[cyan]Usenet archive and PAR2 preparation completed; posting will run later.[/cyan]")
         return str(upload_root)
 
     # 4. Poster / From header

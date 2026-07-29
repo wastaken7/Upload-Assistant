@@ -633,6 +633,14 @@ class Args:
         )
         parser.add_argument("-u", "--usenet", action="store_true", required=False, help="Upload files to Usenet (NNTP)")
         parser.add_argument("--usenet-subject", nargs=1, required=False, help="Custom subject line for Usenet post", type=str, dest="usenet_subject", default=None)
+        parser.add_argument(
+            "--archive-password",
+            nargs=1,
+            required=False,
+            help="Override the Usenet 7z archive password for this run; use 'random' to generate one",
+            type=str,
+            dest="archive_password",
+        )
         parsed_args_ns, before_args = parser.parse_known_args(input)
         parsed_args: dict[str, Any] = vars(parsed_args_ns)
         # console.print(args)
@@ -979,6 +987,9 @@ class Args:
                 meta[key] = meta.get(key)
             # if key == 'help' and value == True:
             # parser.print_help()
+
+        if parsed_args.get("archive_password"):
+            meta.usenet_archive_password_is_random = str(meta.archive_password).lower() == "random"
 
         manual_frames_value = meta.manual_frames
         if manual_frames_value is not None:
