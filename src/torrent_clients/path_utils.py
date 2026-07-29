@@ -1,12 +1,13 @@
 import ast
 import os
 from pathlib import Path, PureWindowsPath
-from typing import Any
+from typing import cast
 
 
-def coerce_str_list(value: Any) -> list[str]:
+def coerce_str_list(value: object) -> list[str]:
     if isinstance(value, (list, tuple)):
-        return [str(item) for item in value if item is not None and str(item)]
+        values = cast(list[object] | tuple[object, ...], value)
+        return [str(item) for item in values if item is not None and str(item)]
     if isinstance(value, str):
         value = value.strip()
         if value.startswith("[") and value.endswith("]"):
@@ -15,7 +16,8 @@ def coerce_str_list(value: Any) -> list[str]:
             except (SyntaxError, ValueError):
                 parsed = None
             if isinstance(parsed, (list, tuple)):
-                return [str(item) for item in parsed if item is not None and str(item)]
+                parsed_values = cast(list[object] | tuple[object, ...], parsed)
+                return [str(item) for item in parsed_values if item is not None and str(item)]
         return [value] if value else []
     return [str(value)] if value is not None else []
 

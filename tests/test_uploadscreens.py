@@ -1,6 +1,7 @@
 # ruff: noqa: S101
 
 import asyncio
+from itertools import pairwise
 
 from src.uploadscreens import _build_image_start_limiter
 
@@ -18,4 +19,4 @@ def test_image_start_limiter_staggers_concurrent_starts() -> None:
         return starts
 
     starts = asyncio.run(exercise())
-    assert all(later - earlier >= 0.015 for earlier, later in zip(starts, starts[1:]))
+    assert all(later - earlier >= 0.015 for earlier, later in pairwise(starts))

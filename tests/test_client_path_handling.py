@@ -51,7 +51,7 @@ def test_tracker_directory_falls_back_to_tracker_name() -> None:
 
 
 def test_tracker_directory_rejects_paths_outside_link_root() -> None:
-    for directory_name in ("/tmp/exposed", "../exposed", "nested/exposed", "C:tmp", "C:", "C:/tmp", "C:\\tmp", "CON", "NUL", "AUX", "COM1", "LPT1", "CON.txt"):
+    for directory_name in ("/outside/exposed", "../exposed", "nested/exposed", "C:tmp", "C:", "C:/tmp", "C:\\tmp", "CON", "NUL", "AUX", "COM1", "LPT1", "CON.txt"):
         try:
             tracker_directory("/links", directory_name, "AMIGOSSHARE")
         except ValueError:
@@ -62,4 +62,3 @@ def test_tracker_directory_rejects_paths_outside_link_root() -> None:
 def test_automatic_management_paths_require_path_boundaries() -> None:
     assert is_path_under("/media/local/release", "/media/local")
     assert not is_path_under("/media/locality/release", "/media/local")
-
