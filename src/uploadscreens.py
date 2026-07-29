@@ -3,6 +3,7 @@ import asyncio
 import base64
 import contextlib
 import gc
+import math
 import os
 import re
 import time
@@ -738,7 +739,8 @@ async def _upload_screens(
 
     configured_delay = default_config.get("image_upload_delay", 0)
     try:
-        image_upload_delay = max(0.0, float(configured_delay))
+        parsed_delay = float(configured_delay)
+        image_upload_delay = max(0.0, parsed_delay) if math.isfinite(parsed_delay) else 0.0
     except (TypeError, ValueError):
         image_upload_delay = 0.0
     wait_for_image_start_slot = _build_image_start_limiter(image_upload_delay)

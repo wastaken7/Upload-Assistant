@@ -16,7 +16,7 @@ def test_empty_inject_delay_is_a_no_op() -> None:
         sleep_calls += 1
 
     async def exercise() -> None:
-        clients = Clients({"DEFAULT": {"inject_delay": 0}, "TRACKERS": {"TEST": {"inject_delay": ""}}})
+        clients = Clients({"DEFAULT": {"inject_delay": 3}, "TRACKERS": {"TEST": {"inject_delay": ""}}})
         await clients.inject_delay(Meta(), "TEST", "qbit")
 
     with patch("src.clients.asyncio.sleep", new=fake_sleep):
@@ -67,4 +67,4 @@ def test_config_validator_warns_for_infinite_image_upload_concurrency() -> None:
         }
     )
 
-    assert any(warning.key == "image_upload_concurrency" for warning in warnings)
+    assert any(warning.key == "image_upload_concurrency" and "Cannot parse" in warning.message for warning in warnings)
