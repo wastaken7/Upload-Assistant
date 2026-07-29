@@ -16,6 +16,7 @@ from torf import Torrent
 from src.console import logger
 from src.meta import Meta
 from src.torrent_clients import DelugeClientMixin, QbittorrentClientMixin, RtorrentClientMixin, TransmissionClientMixin
+from src.torrent_clients.path_utils import coerce_str_list, is_path_under
 from src.torrentcreate import SUBTITLE_EXTENSIONS
 
 # Secure XML-RPC client using defusedxml to prevent XML attacks
@@ -249,26 +250,28 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         tracker_cfg = self.config.get("TRACKERS", {}).get(tracker, {})
         has_tracker_delay = isinstance(tracker_cfg, dict) and "inject_delay" in tracker_cfg
         inject_delay = tracker_cfg.get("inject_delay") if has_tracker_delay else self.config["DEFAULT"].get("inject_delay", 0)
-        if inject_delay is not None:
-            try:
-                inject_delay = int(inject_delay)
-            except ValueError, TypeError:
-                if has_tracker_delay:
-                    logger.info(f"{tracker}: [bold red]CONFIG ERROR: 'inject_delay' must be an integer")
-                else:
-                    logger.info("[bold red]CONFIG ERROR: 'inject_delay' must be an integer")
-                inject_delay = 0
+        if inject_delay is None or (isinstance(inject_delay, str) and not inject_delay.strip()):
+            return
 
-            if inject_delay < 0:
-                logger.info("[bold red]CONFIG ERROR: 'inject_delay' must be >= 0")
-                inject_delay = 0
-            if inject_delay > 0:
-                if meta.debug or inject_delay > 5:
-                    if has_tracker_delay:
-                        logger.info(f"{tracker}: [cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
-                    else:
-                        logger.info(f"[cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
-                await asyncio.sleep(inject_delay)
+        try:
+            inject_delay = int(inject_delay)
+        except (ValueError, TypeError):
+            if has_tracker_delay:
+                logger.info(f"{tracker}: [bold red]CONFIG ERROR: 'inject_delay' must be an integer")
+            else:
+                logger.info("[bold red]CONFIG ERROR: 'inject_delay' must be an integer")
+            inject_delay = 0
+
+        if inject_delay < 0:
+            logger.info("[bold red]CONFIG ERROR: 'inject_delay' must be >= 0")
+            inject_delay = 0
+        if inject_delay > 0:
+            if meta.debug or inject_delay > 5:
+                if has_tracker_delay:
+                    logger.info(f"{tracker}: [cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
+                else:
+                    logger.info(f"[cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
+            await asyncio.sleep(inject_delay)
 
     async def find_existing_torrent(self, meta: Meta) -> str | None:
         if meta.get("skip_auto_torrent", False):
@@ -746,14 +749,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         else:
             raise ValueError("torrent_client_name must be a client name or client config dict")
 
-        def _coerce_paths(value: Any) -> list[str]:
-            if isinstance(value, list):
-                value_list = value
-                return [str(v) for v in value_list if str(v)]
-            return [str(value)] if value is not None else []
-
-        local_paths = _coerce_paths(client_config.get("local_path", ["/LocalPath"]))
-        remote_paths = _coerce_paths(client_config.get("remote_path", ["/RemotePath"]))
+        local_paths = coerce_str_list(client_config.get("local_path", ["/LocalPath"]))
+        remote_paths = coerce_str_list(client_config.get("remote_path", ["/RemotePath"]))
         if not local_paths:
             local_paths = ["/LocalPath"]
         if not remote_paths:
@@ -764,7 +761,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         meta_path = str(meta.path)
 
         for i, local_path_value in enumerate(local_paths):
-            if os.path.normpath(local_path_value).lower() in meta_path.lower():
+            if is_path_under(meta_path, local_path_value):
                 list_local_path = local_path_value
                 list_remote_path = remote_paths[i] if i < len(remote_paths) else remote_paths[0]
                 break
