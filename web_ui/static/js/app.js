@@ -1278,6 +1278,9 @@ function AudionutsUAGUI() {
     useState(false);
   const [screenshotActionId, setScreenshotActionId] = useState("");
   const [expandedScreenshot, setExpandedScreenshot] = useState(null);
+  const themePaletteRef = useRef(null);
+  const screenshotModalRef = useRef(null);
+  const screenshotModalCloseRef = useRef(null);
   const [isScreenshotReviewOpen, setIsScreenshotReviewOpen] = useState(false);
   const [progressItems, setProgressItems] = useState([]);
   const [selectedPaths, setSelectedPaths] = useState([]);
@@ -1320,12 +1323,30 @@ function AudionutsUAGUI() {
       window.removeEventListener("ua-theme-change", handleColorThemeChange);
   }, []);
 
+  useEffect(() => {
+    if (!isThemePaletteOpen) return undefined;
+    const closeWhenOutside = (event) => {
+      if (!themePaletteRef.current?.contains(event.target)) {
+        setIsThemePaletteOpen(false);
+      }
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setIsThemePaletteOpen(false);
+    };
+    document.addEventListener("pointerdown", closeWhenOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeWhenOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isThemePaletteOpen]);
+
   const handleColorThemeChange = (event) => {
     setColorThemeState(setColorTheme(event.target.value));
   };
 
   const renderThemePalette = () => (
-    <div className="relative">
+    <div ref={themePaletteRef} className="relative">
       <button
         type="button"
         onClick={() => setIsThemePaletteOpen((open) => !open)}
@@ -1912,7 +1933,9 @@ function AudionutsUAGUI() {
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto pr-1">
+        <div
+          className={`flex flex-wrap gap-2 pr-1 ${!isExecuting && !isOutputExpanded ? "" : "max-h-48 overflow-y-auto"}`}
+        >
           {trackers.map((tracker) => {
             const isSelected = selectedTrackers.has(tracker.name);
             const isDefault = defaultTrackers.has(tracker.name);
@@ -2104,6 +2127,19 @@ function AudionutsUAGUI() {
     };
   }, [API_BASE, isExecuting, sessionId]);
 
+  const refreshExecutionScreenshots = async () => {
+    const refreshed = await apiFetch(
+      `${API_BASE}/execution_screenshots?session_id=${encodeURIComponent(sessionId)}`,
+      { cache: "no-store" },
+    );
+    const refreshedData = await refreshed.json().catch(() => null);
+    if (!refreshed.ok || !refreshedData?.success) {
+      throw new Error("Could not refresh screenshots.");
+    }
+    setExecutionScreenshots(refreshedData.screenshots || []);
+    setCanAddExecutionScreenshot(Boolean(refreshedData.can_add));
+  };
+
   const changeExecutionScreenshot = async (screenshotId, action) => {
     if (!sessionId || screenshotActionId) return;
     setScreenshotActionId(`${action}:${screenshotId}`);
@@ -2121,15 +2157,10 @@ function AudionutsUAGUI() {
         window.alert(data?.error || `Could not ${action} screenshot.`);
         return;
       }
-      const refreshed = await apiFetch(
-        `${API_BASE}/execution_screenshots?session_id=${encodeURIComponent(sessionId)}`,
-        { cache: "no-store" },
-      );
-      const refreshedData = await refreshed.json().catch(() => null);
-      if (refreshed.ok && refreshedData?.success) {
-        setExecutionScreenshots(refreshedData.screenshots || []);
-        setCanAddExecutionScreenshot(Boolean(refreshedData.can_add));
-      }
+      await refreshExecutionScreenshots();
+    } catch (error) {
+      console.error(`Could not ${action} screenshot:`, error);
+      window.alert(`Could not ${action} screenshot. Please try again.`);
     } finally {
       setScreenshotActionId("");
     }
@@ -2149,19 +2180,41 @@ function AudionutsUAGUI() {
         window.alert(data?.error || "Could not add screenshot.");
         return;
       }
-      const refreshed = await apiFetch(
-        `${API_BASE}/execution_screenshots?session_id=${encodeURIComponent(sessionId)}`,
-        { cache: "no-store" },
-      );
-      const refreshedData = await refreshed.json().catch(() => null);
-      if (refreshed.ok && refreshedData?.success) {
-        setExecutionScreenshots(refreshedData.screenshots || []);
-        setCanAddExecutionScreenshot(Boolean(refreshedData.can_add));
-      }
+      await refreshExecutionScreenshots();
+    } catch (error) {
+      console.error("Could not add screenshot:", error);
+      window.alert("Could not add screenshot. Please try again.");
     } finally {
       setScreenshotActionId("");
     }
   };
+
+  useEffect(() => {
+    if (!expandedScreenshot) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setExpandedScreenshot(null);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    const focusTimer = window.setTimeout(
+      () => screenshotModalCloseRef.current?.focus(),
+      0,
+    );
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      window.clearTimeout(focusTimer);
+    };
+  }, [expandedScreenshot]);
+
+  useEffect(() => {
+    if (
+      expandedScreenshot &&
+      !executionScreenshots.some(
+        (screenshot) => screenshot.id === expandedScreenshot,
+      )
+    ) {
+      setExpandedScreenshot(null);
+    }
+  }, [executionScreenshots, expandedScreenshot]);
 
   // Update descfile in args
   const updateDescFile = (path) => {
@@ -3650,6 +3703,9 @@ function AudionutsUAGUI() {
 
   const renderScreenshotsPanel = () => {
     const isWorking = Boolean(screenshotActionId);
+    const expandedItem = executionScreenshots.find(
+      (screenshot) => screenshot.id === expandedScreenshot,
+    );
     return (
       <>
         <div className="flex flex-col h-full">
@@ -3730,7 +3786,7 @@ function AudionutsUAGUI() {
                             </button>
                           )}
                           <button
-                            onClick={() => setExpandedScreenshot(screenshot)}
+                            onClick={() => setExpandedScreenshot(screenshot.id)}
                             disabled={isWorking}
                             className={`p-1.5 rounded-md disabled:opacity-50 ${isDarkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
                             title={`Expand ${screenshot.filename}`}
@@ -3757,27 +3813,36 @@ function AudionutsUAGUI() {
             )}
           </div>
         </div>
-        {expandedScreenshot && (
+        {expandedItem && (
           <div
+            ref={screenshotModalRef}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
             role="dialog"
             aria-modal="true"
-            aria-label={`Expanded ${expandedScreenshot.filename}`}
+            aria-label={`Expanded ${expandedItem.filename}`}
+            tabIndex="-1"
             onClick={() => setExpandedScreenshot(null)}
+            onKeyDown={(event) => {
+              if (event.key === "Tab") {
+                event.preventDefault();
+                screenshotModalCloseRef.current?.focus();
+              }
+            }}
           >
             <div
               className="relative max-h-full max-w-full"
               onClick={(event) => event.stopPropagation()}
             >
               <button
+                ref={screenshotModalCloseRef}
                 onClick={() => setExpandedScreenshot(null)}
                 className="absolute right-2 top-2 z-10 rounded-md bg-black/70 px-3 py-1.5 text-sm text-white hover:bg-black"
               >
                 Close
               </button>
               <img
-                src={expandedScreenshot.image_url}
-                alt={expandedScreenshot.filename}
+                src={expandedItem.image_url}
+                alt={expandedItem.filename}
                 className="max-h-[90vh] max-w-[92vw] object-contain"
               />
             </div>
@@ -4489,7 +4554,7 @@ function AudionutsUAGUI() {
             {/* Top controls */}
             {!isExecuting && (
               <div
-                className={`p-3 space-y-3 border-b flex-shrink-0 ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+                className={`p-3 space-y-3 border-b ${!isOutputExpanded ? "flex-1 overflow-y-auto" : "flex-shrink-0"} ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
               >
                 {renderSelectedPathOrQueue(true)}
 
@@ -4600,7 +4665,7 @@ function AudionutsUAGUI() {
 
             {/* Terminal output */}
             <div
-              className={`${isExecuting || isOutputExpanded ? "flex-1" : "ua-output-section-empty"} p-3 flex flex-col min-h-0 overflow-hidden ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}
+              className={`${isExecuting || isOutputExpanded ? "flex-1 p-3" : "flex-none p-2"} flex flex-col min-h-0 overflow-hidden ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}
             >
               <div
                 className={`flex items-center gap-2 ${isExecuting || isOutputExpanded ? "mb-2" : ""} flex-shrink-0`}
@@ -5205,7 +5270,7 @@ function AudionutsUAGUI() {
       <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Panel */}
         <div
-          className={`${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b ${isExecuting ? "p-3" : "p-4"} flex-shrink-0`}
+          className={`${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b ${isExecuting ? "p-3" : "p-4"} ${!isExecuting && !isOutputExpanded ? "flex-1 overflow-y-auto" : "flex-shrink-0"}`}
         >
           <div
             className={`max-w-6xl mx-auto ${isExecuting ? "" : "space-y-4"}`}
@@ -5480,9 +5545,16 @@ function AudionutsUAGUI() {
 
         {/* Execution Output */}
         <div
-          className={`${isExecuting || isOutputExpanded ? "flex-1" : "ua-output-section-empty"} ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} p-4 flex flex-col min-h-0 overflow-hidden`}
+          className={`${isExecuting || isOutputExpanded ? "flex-1 p-4" : "flex-none p-2"} ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} flex flex-col min-h-0 overflow-hidden`}
+          style={
+            isExecuting || isOutputExpanded
+              ? undefined
+              : { flex: "0 0 auto", minHeight: 0 }
+          }
         >
-          <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col min-h-0">
+          <div
+            className={`max-w-6xl mx-auto w-full ${isExecuting || isOutputExpanded ? "flex-1" : "flex-none"} flex flex-col min-h-0`}
+          >
             <div
               className={`flex items-center gap-2 ${isExecuting || isOutputExpanded ? "mb-3" : ""} flex-shrink-0`}
             >

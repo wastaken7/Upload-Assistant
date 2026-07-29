@@ -527,7 +527,8 @@ class TorrentCreator:
             speed_str = "-- MB/s"
 
         # Display progress with percentage, speed, and ETA
-        cli_ui.info_progress(f"Hashing... {speed_str} | ETA: {eta}", int(percentage_done), 100)
+        if not has_progress_callback():
+            cli_ui.info_progress(f"Hashing... {speed_str} | ETA: {eta}", int(percentage_done), 100)
         progress_id = getattr(torrent, "_webui_progress_id", "torrent-hash")
         progress_label = getattr(torrent, "_webui_progress_label", "Hashing torrent")
         publish_progress(

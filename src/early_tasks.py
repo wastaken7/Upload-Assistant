@@ -11,6 +11,31 @@ from src.meta import Meta
 from src.torrentcreate import TorrentCreator
 from src.trackersetup import tracker_class_map
 
+_early_artifact_tasks: dict[str, tuple[asyncio.Task[None], asyncio.Task[None]]] = {}
+
+
+def start_early_artifact_tasks(meta: Meta, client: Clients, config: Mapping[str, Any]) -> tuple[asyncio.Task[None], asyncio.Task[None]]:
+    """Start, and retain outside ``Meta``, the local-artifact preparation tasks."""
+    release_id = str(meta.uuid)
+    tasks = _early_artifact_tasks.get(release_id)
+    if tasks is None:
+        tasks = (
+            asyncio.create_task(create_base_torrents_early(meta, client)),
+            asyncio.create_task(prepare_usenet_archive_early(meta, config)),
+        )
+        _early_artifact_tasks[release_id] = tasks
+    return tasks
+
+
+def get_early_artifact_tasks(release_id: str) -> tuple[asyncio.Task[None], asyncio.Task[None]] | None:
+    """Return the retained tasks for a release, if prep already started them."""
+    return _early_artifact_tasks.get(str(release_id))
+
+
+def discard_early_artifact_tasks(release_id: str) -> None:
+    """Forget completed task handles after the upload stage has awaited them."""
+    _early_artifact_tasks.pop(str(release_id), None)
+
 
 def is_usenet_only(meta: Meta) -> bool:
     raw_trackers = meta.trackers

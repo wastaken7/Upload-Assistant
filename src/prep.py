@@ -22,7 +22,7 @@ try:
     from src.book_prep import gather_book_prep as _gather_book_prep_fn
     from src.book_prep import resolve_book_filelist as _resolve_book_filelist_fn
     from src.console import logger
-    from src.early_tasks import create_base_torrents_early, prepare_usenet_archive_early
+    from src.early_tasks import start_early_artifact_tasks
     from src.get_disc import DiscInfoManager
     from src.get_name import NameManager
     from src.get_tracker_data import TrackerDataManager
@@ -150,7 +150,7 @@ class Prep:
         # Screenshot capture is CPU/IO-heavy and independent from the metadata
         # requests below. Start it with a snapshot so ffmpeg can run while the
         # tracker/ID searches continue without racing on the live Meta object.
-        early_screenshots_task = asyncio.create_task(self._capture_early_screenshots(meta, filename, videopath, bdinfo))
+        early_screenshots_task = asyncio.create_task(self._capture_early_screenshots(meta.copy(), filename, videopath, bdinfo))
 
         # 4. Calculate source size
         prep_helpers.calculate_source_size(self, meta, videopath)
@@ -163,8 +163,7 @@ class Prep:
 
         # These tasks only create local artifacts. Posting and tracker upload
         # decisions remain in the upload stage after duplicate checks.
-        meta.early_base_torrent_task = asyncio.create_task(create_base_torrents_early(meta, client))
-        meta.early_usenet_prepare_task = asyncio.create_task(prepare_usenet_archive_early(meta, self.config))
+        start_early_artifact_tasks(meta, client, self.config)
 
         # 7. Sonarr, Radarr and Metadata Searches
         await prep_helpers.search_metadata(
@@ -197,24 +196,23 @@ class Prep:
         if meta.category in ("MUSIC", "GAME", "BOOK") or meta.screens <= 0:
             return
 
-        screenshot_meta = meta.copy()
         try:
             if meta.is_disc == "BDMV":
                 await self.takescreens_manager.disc_screenshots(
-                    screenshot_meta,
-                    screenshot_meta.filename or filename,
+                    meta,
+                    meta.filename or filename,
                     bdinfo,
-                    screenshot_meta.uuid,
-                    screenshot_meta.base_dir,
-                    screenshot_meta.vapoursynth,
-                    screenshot_meta.image_list,
-                    screenshot_meta.ffdebug,
+                    meta.uuid,
+                    meta.base_dir,
+                    meta.vapoursynth,
+                    meta.image_list,
+                    meta.ffdebug,
                     0,
                     cleanup_after_capture=False,
                 )
             elif meta.is_disc == "DVD":
                 await self.takescreens_manager.dvd_screenshots(
-                    screenshot_meta,
+                    meta,
                     disc_num=0,
                     num_screens=0,
                     retry_cap=False,
@@ -224,10 +222,10 @@ class Prep:
                 await self.takescreens_manager.screenshots(
                     videopath,
                     filename,
-                    screenshot_meta.uuid,
-                    screenshot_meta.base_dir,
-                    screenshot_meta,
-                    manual_frames=screenshot_meta.manual_frames or "",
+                    meta.uuid,
+                    meta.base_dir,
+                    meta,
+                    manual_frames=meta.manual_frames or "",
                     cleanup_after_capture=False,
                 )
             logger.debug("[cyan]Early screenshot generation completed.[/cyan]")

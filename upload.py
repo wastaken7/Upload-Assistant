@@ -46,7 +46,7 @@ from src.console import current_release_log_path, logger  # pyright: ignore[repo
 from src.console import rich_handler as _rich_handler
 from src.disc_menus import process_disc_menus
 from src.dupe_checking import DupeChecker
-from src.early_tasks import create_base_torrents_early, prepare_usenet_archive_early
+from src.early_tasks import discard_early_artifact_tasks, get_early_artifact_tasks, start_early_artifact_tasks
 from src.early_tasks import is_usenet_only as _is_usenet_only
 from src.get_desc import gen_desc
 from src.get_name import NameManager
@@ -1062,7 +1062,7 @@ def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
         ``min(min_successful_uploads, actual_screens)`` so the upload loop never
         requires more images than actually exist.
     """
-    screenshot_files = screenshots_dir(meta.base_dir, meta.uuid).glob("*.png")
+    screenshot_files = list(screenshots_dir(meta.base_dir, meta.uuid).glob("*.png"))
     actual_screens = len(screenshot_files)
     capped_min = min(min_successful_uploads, actual_screens)
     return actual_screens, capped_min
@@ -1353,12 +1353,8 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
     # Prep normally starts these while metadata and screenshots are being
     # generated. Keep this fallback for paths which bypass normal prep.
-    early_base_torrent_task = meta.get("early_base_torrent_task")
-    if early_base_torrent_task is None:
-        early_base_torrent_task = asyncio.create_task(create_base_torrents_early(meta, client))
-    early_usenet_prepare_task = meta.get("early_usenet_prepare_task")
-    if early_usenet_prepare_task is None:
-        early_usenet_prepare_task = asyncio.create_task(prepare_usenet_archive_early(meta, config))
+    early_artifact_tasks = get_early_artifact_tasks(meta.uuid) or start_early_artifact_tasks(meta, client, config)
+    early_base_torrent_task, early_usenet_prepare_task = early_artifact_tasks
 
     filename: str = meta.title
     bdmv_filename = meta.filename
@@ -1851,8 +1847,11 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     torrent_path = str(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BASE.torrent").resolve())
     subs_torrent_path = str(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BASE_SUBS.torrent").resolve())
 
-    await early_base_torrent_task
-    await early_usenet_prepare_task
+    try:
+        await early_base_torrent_task
+        await early_usenet_prepare_task
+    finally:
+        discard_early_artifact_tasks(meta.uuid)
 
     if meta.force_recheck:
         waiter = Wait(config)
