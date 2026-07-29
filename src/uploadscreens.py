@@ -351,13 +351,35 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 async with httpx.AsyncClient() as client:
                     response = await client.post(url, files={"file": (filename, file_bytes)}, headers=headers, timeout=timeout)
                     if response.status_code == 200:
-                        response_data = response.json()
-                        if "files" in response_data:
-                            img_url = response_data["files"][0]
-                            raw_url = img_url.replace("/u/", "/r/")
-                            web_url = img_url.replace("/u/", "/r/")
-                            return {"status": "success", "img_url": img_url, "raw_url": raw_url, "web_url": web_url}
-                        return {"status": "failed", "reason": "No valid URL returned from Zipline"}
+                        zipline_response_data: object = response.json()
+                        zipline_response_mapping = (
+                            cast(dict[str, Any], zipline_response_data)
+                            if isinstance(zipline_response_data, dict)
+                            else {}
+                        )
+                        zipline_files_value = zipline_response_mapping.get("files")
+                        if not isinstance(zipline_files_value, list) or not zipline_files_value:
+                            return {"status": "failed", "reason": "No valid URL returned from Zipline"}
+
+                        file_entry: object = cast(list[object], zipline_files_value)[0]
+                        zipline_img_url: str | None = None
+                        if isinstance(file_entry, dict):
+                            file_entry_dict = cast(dict[str, object], file_entry)
+                            candidate_url = file_entry_dict.get("url")
+                            if isinstance(candidate_url, str):
+                                zipline_img_url = candidate_url
+                        elif isinstance(file_entry, str):
+                            zipline_img_url = file_entry
+                        if not zipline_img_url:
+                            return {"status": "failed", "reason": "No valid URL returned from Zipline"}
+                        zipline_raw_url = zipline_img_url.replace("/u/", "/r/")
+                        zipline_web_url = zipline_img_url.replace("/u/", "/r/")
+                        return {
+                            "status": "success",
+                            "img_url": zipline_img_url,
+                            "raw_url": zipline_raw_url,
+                            "web_url": zipline_web_url,
+                        }
 
                     return {"status": "failed", "reason": f"Zipline upload failed: {response.text}"}
             except httpx.TimeoutException:
