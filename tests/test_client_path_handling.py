@@ -2,10 +2,13 @@
 
 import asyncio
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 from src.clients import Clients
 from src.meta import Meta
 from src.torrent_clients.path_utils import coerce_str_list, is_path_under, map_save_path, tracker_directory
+from src.torrent_clients.qbittorrent import create_cross_seed_links
 
 
 def test_qbittorrent_coerce_str_list_parses_stringified_paths() -> None:
@@ -80,3 +83,25 @@ def test_tracker_directory_rejects_paths_outside_link_root() -> None:
 def test_automatic_management_paths_require_path_boundaries() -> None:
     assert is_path_under("/media/local/release", "/media/local")
     assert not is_path_under("/media/locality/release", "/media/local")
+
+
+def test_cross_seed_links_normalize_component_paths(tmp_path: Path) -> None:
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+    (source_dir / "episode.mkv").write_bytes(b"episode")
+    torrent = SimpleNamespace(
+        metainfo={
+            "info": {
+                "name": "Release",
+                "files": [{"path": ["Season 1", "episode.mkv"], "length": 7}],
+            }
+        },
+        name="Release",
+    )
+    meta = Meta({"path": str(source_dir), "filelist": [str(source_dir / "episode.mkv")]})
+
+    async def exercise() -> bool:
+        with patch("src.torrent_clients.qbittorrent.async_link_directory", new=AsyncMock(return_value=True)):
+            return await create_cross_seed_links(meta, torrent, str(tmp_path / "tracker"), use_hardlink=False)
+
+    assert asyncio.run(exercise())

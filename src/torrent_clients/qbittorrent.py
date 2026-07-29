@@ -1830,7 +1830,7 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
             if isinstance(raw_path, (list, tuple)):
                 raw_path_list = cast(list[Any], raw_path)
                 components = [decode_component(part) for part in raw_path_list]
-                rel_path = Path(*components) if components else ""
+                rel_path = str(Path(*components)) if components else ""
             else:
                 rel_path = decode_component(raw_path)
             rel_path = rel_path.replace("/", os.sep)
