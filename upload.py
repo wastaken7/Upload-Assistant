@@ -46,7 +46,7 @@ from src.console import current_release_log_path, logger  # pyright: ignore[repo
 from src.console import rich_handler as _rich_handler
 from src.disc_menus import process_disc_menus
 from src.dupe_checking import DupeChecker
-from src.early_tasks import discard_early_artifact_tasks, get_early_artifact_tasks, start_early_artifact_tasks
+from src.early_tasks import cancel_and_drain_early_artifact_tasks, get_early_artifact_tasks, start_early_artifact_tasks
 from src.early_tasks import is_usenet_only as _is_usenet_only
 from src.get_desc import gen_desc
 from src.get_name import NameManager
@@ -1848,10 +1848,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     subs_torrent_path = str(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BASE_SUBS.torrent").resolve())
 
     try:
-        await early_base_torrent_task
-        await early_usenet_prepare_task
+        await asyncio.gather(early_base_torrent_task, early_usenet_prepare_task)
     finally:
-        discard_early_artifact_tasks(meta.uuid)
+        await cancel_and_drain_early_artifact_tasks(meta.uuid)
 
     if meta.force_recheck:
         waiter = Wait(config)
@@ -2413,7 +2412,10 @@ async def do_the_thing(base_dir: str) -> None:
 
             logger.info(f"[green]Gathering info for {Path(path).name}")
 
-            meta_success = await process_meta(meta, base_dir)
+            try:
+                meta_success = await process_meta(meta, base_dir)
+            finally:
+                await cancel_and_drain_early_artifact_tasks(meta.uuid)
             if not meta_success:
                 if "queue" in meta and meta.queue is not None:
                     processed_files_count += 1

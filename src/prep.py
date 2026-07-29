@@ -22,7 +22,7 @@ try:
     from src.book_prep import gather_book_prep as _gather_book_prep_fn
     from src.book_prep import resolve_book_filelist as _resolve_book_filelist_fn
     from src.console import logger
-    from src.early_tasks import start_early_artifact_tasks
+    from src.early_tasks import restart_early_artifact_tasks
     from src.get_disc import DiscInfoManager
     from src.get_name import NameManager
     from src.get_tracker_data import TrackerDataManager
@@ -163,7 +163,7 @@ class Prep:
 
         # These tasks only create local artifacts. Posting and tracker upload
         # decisions remain in the upload stage after duplicate checks.
-        start_early_artifact_tasks(meta, client, self.config)
+        await restart_early_artifact_tasks(meta, client, self.config)
 
         # 7. Sonarr, Radarr and Metadata Searches
         await prep_helpers.search_metadata(

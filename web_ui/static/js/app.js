@@ -2389,7 +2389,9 @@ function AudionutsUAGUI() {
   }, [isDarkMode]);
 
   useEffect(() => {
-    setIsOutputExpanded(isExecuting);
+    if (isExecuting) {
+      setIsOutputExpanded(true);
+    }
   }, [isExecuting]);
 
   useEffect(() => {

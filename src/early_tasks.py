@@ -32,9 +32,21 @@ def get_early_artifact_tasks(release_id: str) -> tuple[asyncio.Task[None], async
     return _early_artifact_tasks.get(str(release_id))
 
 
-def discard_early_artifact_tasks(release_id: str) -> None:
-    """Forget completed task handles after the upload stage has awaited them."""
-    _early_artifact_tasks.pop(str(release_id), None)
+async def cancel_and_drain_early_artifact_tasks(release_id: str) -> None:
+    """Cancel unfinished preparation tasks and wait for both before forgetting them."""
+    tasks = _early_artifact_tasks.pop(str(release_id), None)
+    if tasks is None:
+        return
+    for task in tasks:
+        if not task.done():
+            task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def restart_early_artifact_tasks(meta: Meta, client: Clients, config: Mapping[str, Any]) -> tuple[asyncio.Task[None], asyncio.Task[None]]:
+    """Replace stale tasks after metadata edits with tasks based on current metadata."""
+    await cancel_and_drain_early_artifact_tasks(str(meta.uuid))
+    return start_early_artifact_tasks(meta, client, config)
 
 
 def is_usenet_only(meta: Meta) -> bool:
