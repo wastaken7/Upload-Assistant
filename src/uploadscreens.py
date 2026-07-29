@@ -6,7 +6,7 @@ import gc
 import os
 import re
 import time
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any, cast
 
@@ -19,6 +19,24 @@ from src.meta import Meta
 from src.temp_paths import screenshots_dir
 
 type ImageDict = dict[str, Any]
+
+
+def _build_image_start_limiter(delay: float) -> Callable[[], Awaitable[None]]:
+    start_lock = asyncio.Lock()
+    last_start = 0.0
+
+    async def wait_for_start_slot() -> None:
+        nonlocal last_start
+        if delay <= 0:
+            return
+        async with start_lock:
+            now = time.monotonic()
+            wait_time = delay - (now - last_start) if last_start else 0.0
+            if wait_time > 0:
+                await asyncio.sleep(wait_time)
+            last_start = time.monotonic()
+
+    return wait_for_start_slot
 
 
 class UploadScreensManager:
@@ -701,9 +719,21 @@ async def _upload_screens(
     # Concurrency Control
     default_pool_size = len(upload_tasks)
     host_limits = {"onlyimage": 6, "ptscreens": 6, "lensdump": 1, "passtheimage": 6}
-    pool_size = host_limits.get(img_host, default_pool_size)
+    configured_concurrency = default_config.get("image_upload_concurrency", 0)
+    try:
+        configured_concurrency = int(configured_concurrency)
+    except (TypeError, ValueError):
+        configured_concurrency = 0
+    pool_size = configured_concurrency if configured_concurrency > 0 else host_limits.get(img_host, default_pool_size)
     max_workers = min(len(upload_tasks), pool_size)
     semaphore = asyncio.Semaphore(max_workers)
+
+    configured_delay = default_config.get("image_upload_delay", 0)
+    try:
+        image_upload_delay = max(0.0, float(configured_delay))
+    except (TypeError, ValueError):
+        image_upload_delay = 0.0
+    wait_for_image_start_slot = _build_image_start_limiter(image_upload_delay)
 
     # Track running tasks for cancellation
     running_tasks: set[asyncio.Task[dict[str, Any]]] = set()
@@ -720,6 +750,7 @@ async def _upload_screens(
             while retry_count <= max_retries:
                 future: asyncio.Task[dict[str, Any]] | None = None
                 try:
+                    await wait_for_image_start_slot()
                     future = asyncio.create_task(upload_image_task(task_args))
                     running_tasks.add(future)
 
