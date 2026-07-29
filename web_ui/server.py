@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 # ruff: noqa: I001
 import ast
+import asyncio
 import base64
 import contextlib
 import importlib
@@ -1320,7 +1321,7 @@ def _book_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: s
     if not meta_uuid:
         return ""
 
-    tmp_dir = Path(__file__).parent.parent / "tmp" / meta_uuid
+    tmp_dir = Path(__file__).parent.parent / "tmp" / meta_uuid / "posters"
     for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg", "cover.jpg", "cover.png"):
         if (tmp_dir / filename).exists():
             return f"/api/execution_preview_cover?session_id={preview_session_id}"
@@ -1842,8 +1843,10 @@ def _find_execution_preview_cover_file(session_id: str) -> Path | None:
     meta_uuid = _stringify_preview_value(resolved_meta.get("uuid")) if resolved_meta is not None else ""
     candidate_dirs: list[Path] = []
     if meta_uuid:
-        candidate_dirs.append(Path(__file__).parent.parent / "tmp" / meta_uuid)
-    candidate_dirs.append(Path(__file__).parent.parent / "tmp" / Path(execution_path).name)
+        release_tmp = Path(__file__).parent.parent / "tmp" / meta_uuid
+        candidate_dirs.extend((release_tmp / "covers", release_tmp / "posters"))
+    release_tmp = Path(__file__).parent.parent / "tmp" / Path(execution_path).name
+    candidate_dirs.extend((release_tmp / "covers", release_tmp / "posters"))
 
     # A music sidecar cover may stay beside the release, while embedded art is
     # extracted into tmp/MUSIC_COVER.*.  Never serve an arbitrary configured
@@ -1883,6 +1886,25 @@ def _find_execution_preview_cover_file(session_id: str) -> Path | None:
             if candidate.is_file():
                 return candidate
     return None
+
+
+def _resolve_execution_screenshot_review(session_id: str) -> tuple[Path, Mapping[str, object]] | None:
+    """Resolve the current execution's screenshot directory without trusting client paths."""
+    _execution_path, meta_file, meta_data = _resolve_execution_preview_meta(session_id)
+    if meta_file is None or meta_data is None:
+        return None
+    meta_uuid = _stringify_preview_value(meta_data.get("uuid"))
+    if not meta_uuid:
+        return None
+    temp_root = (Path(__file__).parent.parent / "tmp").resolve()
+    try:
+        temp_dir = (temp_root / meta_uuid).resolve()
+        temp_dir.relative_to(temp_root)
+    except OSError, ValueError:
+        return None
+    if not temp_dir.is_dir():
+        return None
+    return temp_dir, meta_data
 
 
 class BrowseItem(TypedDict, total=False):
@@ -4274,6 +4296,114 @@ def execution_preview_cover():
 
     mimetype = mimetypes.guess_type(str(cover_file))[0] or "application/octet-stream"
     return send_file(cover_file, mimetype=mimetype, conditional=True, max_age=30)
+
+
+@app.route("/api/execution_screenshots")
+def execution_screenshots():
+    """List local FFmpeg screenshots belonging to the active execution only."""
+    session_id = str(request.args.get("session_id", "")).strip()
+    if not session_id:
+        return jsonify({"success": False, "error": "Missing session_id"}), 400
+    resolved = _resolve_execution_screenshot_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
+
+    from src.screenshot_review import image_version, list_screenshots
+
+    temp_dir, meta_data = resolved
+    items = list_screenshots(temp_dir, meta_data)
+    return jsonify(
+        {
+            "success": True,
+            "can_add": bool(items) and not bool(meta_data.get("is_disc")),
+            "screenshots": [
+                {
+                    "id": item.id,
+                    "filename": item.path.name,
+                    "size": item.path.stat().st_size,
+                    "image_url": f"/api/execution_screenshots/{item.id}/image?session_id={session_id}&v={image_version(temp_dir, item.id, item.path.stat().st_mtime_ns)}",
+                    "can_replace": not bool(meta_data.get("is_disc")),
+                }
+                for item in items
+            ],
+        }
+    )
+
+
+@app.route("/api/execution_screenshots/<screenshot_id>/image")
+def execution_screenshot_image(screenshot_id: str):
+    """Serve one reviewed local screenshot after resolving it through its session."""
+    session_id = str(request.args.get("session_id", "")).strip()
+    resolved = _resolve_execution_screenshot_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
+    from src.screenshot_review import list_screenshots
+
+    temp_dir, meta_data = resolved
+    screenshot = next((item for item in list_screenshots(temp_dir, meta_data) if item.id == screenshot_id), None)
+    if screenshot is None:
+        return jsonify({"success": False, "error": "Screenshot not found"}), 404
+    response = send_file(screenshot.path, mimetype="image/png", conditional=True, max_age=0)
+    response.headers["Cache-Control"] = "no-store, max-age=0"  # type: ignore[attr-defined]
+    return response
+
+
+@app.route("/api/execution_screenshots/add", methods=["POST"])
+def add_execution_screenshot():
+    """Capture one extra local screenshot for the active execution."""
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+    payload = _request_json_dict()
+    session_id = _stringify_preview_value(payload.get("session_id"))
+    resolved = _resolve_execution_screenshot_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
+    temp_dir, meta_data = resolved
+    if meta_data.get("image_list"):
+        return jsonify({"success": False, "error": "Screenshots can no longer be changed after image hosting starts"}), 409
+
+    try:
+        from src.screenshot_review import add_screenshot
+
+        asyncio.run(add_screenshot(temp_dir, meta_data))
+    except (FileNotFoundError, ValueError) as error:
+        return jsonify({"success": False, "error": str(error)}), 404
+    except Exception as error:
+        console.print(f"Screenshot add failed for {session_id}: {error}", markup=False)
+        return jsonify({"success": False, "error": "Could not add screenshot"}), 500
+    return jsonify({"success": True})
+
+
+@app.route("/api/execution_screenshots/<screenshot_id>/<action>", methods=["POST"])
+def mutate_execution_screenshot(screenshot_id: str, action: str):
+    """Delete or replace a reviewed frame with CSRF and same-origin protection."""
+    if action not in {"delete", "replace"}:
+        return jsonify({"success": False, "error": "Unsupported screenshot action"}), 404
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+    payload = _request_json_dict()
+    session_id = _stringify_preview_value(payload.get("session_id"))
+    resolved = _resolve_execution_screenshot_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
+    temp_dir, meta_data = resolved
+    if meta_data.get("image_list"):
+        return jsonify({"success": False, "error": "Screenshots can no longer be changed after image hosting starts"}), 409
+
+    try:
+        from src.screenshot_review import delete_screenshot, replace_screenshot
+
+        if action == "delete":
+            delete_screenshot(temp_dir, meta_data, screenshot_id)
+        else:
+            asyncio.run(replace_screenshot(temp_dir, meta_data, screenshot_id))
+    except (FileNotFoundError, ValueError) as error:
+        return jsonify({"success": False, "error": str(error)}), 404
+    except Exception as error:
+        console.print(f"Screenshot {action} failed for {session_id}: {error}", markup=False)
+        return jsonify({"success": False, "error": f"Could not {action} screenshot"}), 500
+
+    return jsonify({"success": True})
 
 
 @app.route("/api/save_queue", methods=["POST"])

@@ -153,11 +153,6 @@ class QbittorrentClientMixin:
                     tracker_ids: dict[str, str] = self._extract_tracker_ids_from_comment(comment)
                     meta.update(tracker_ids)
 
-                    if tracker_ids:
-                        for tracker in tracker_ids:
-                            if meta.get(tracker):
-                                logger.info(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
-
                     if meta.torrent_comments and meta.debug:
                         logger.info(f"[green]Stored {len(meta.torrent_comments)} torrent comments for later use")
 

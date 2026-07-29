@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -21,6 +22,7 @@ try:
     from src.book_prep import gather_book_prep as _gather_book_prep_fn
     from src.book_prep import resolve_book_filelist as _resolve_book_filelist_fn
     from src.console import logger
+    from src.early_tasks import restart_early_artifact_tasks
     from src.get_disc import DiscInfoManager
     from src.get_name import NameManager
     from src.get_tracker_data import TrackerDataManager
@@ -37,6 +39,7 @@ try:
     from src.region import get_service
     from src.rehostimages import RehostImagesManager
     from src.sonarr import SonarrManager
+    from src.takescreens import TakeScreensManager
     from src.tmdb import TmdbManager
     from src.tvdb import TvdbData
 
@@ -73,6 +76,7 @@ class Prep:
         self.radarr_manager = RadarrManager(config)
         self.sonarr_manager = SonarrManager(config)
         self.rehost_images_manager = RehostImagesManager(config)
+        self.takescreens_manager = TakeScreensManager(config)
 
     @staticmethod
     def _resolve_book_filelist(
@@ -138,6 +142,16 @@ class Prep:
         # 3. File information and basic media processing
         filename, untouched_filename, videopath, search_term, search_file_folder, mi, video = await prep_helpers.process_media_files(self, meta, videoloc, bdinfo)
 
+        # HDR is normally finalized after the metadata searches, but ffmpeg
+        # needs it while the early capture is running (for optional tonemapping).
+        if meta.category in ("TV", "MOVIE") and not meta.hdr:
+            meta.hdr = await prep_helpers.video_manager.get_hdr(mi or {}, bdinfo)
+
+        # Screenshot capture is CPU/IO-heavy and independent from the metadata
+        # requests below. Start it with a snapshot so ffmpeg can run while the
+        # tracker/ID searches continue without racing on the live Meta object.
+        early_screenshots_task = asyncio.create_task(self._capture_early_screenshots(meta.copy(), filename, videopath, bdinfo))
+
         # 4. Calculate source size
         prep_helpers.calculate_source_size(self, meta, videopath)
 
@@ -146,6 +160,10 @@ class Prep:
 
         # 6. Tracker and Existing Torrent Info
         await prep_helpers.process_trackers_and_torrent(self, meta, client, hash_ids, tracker_ids, search_term, search_file_folder)
+
+        # These tasks only create local artifacts. Posting and tracker upload
+        # decisions remain in the upload stage after duplicate checks.
+        await restart_early_artifact_tasks(meta, client, self.config)
 
         # 7. Sonarr, Radarr and Metadata Searches
         await prep_helpers.search_metadata(
@@ -157,6 +175,11 @@ class Prep:
 
         await languages_manager.process_desc_language(meta)
 
+        # Ensure the background capture is complete before the upload stage
+        # starts consuming the generated files. Any error is logged by the
+        # helper; the existing upload-stage capture remains the fallback.
+        await early_screenshots_task
+
         if meta.category == "BOOK":
             await self.rehost_images_manager.takescreens_manager.prepare_book_cover(videopath, meta.uuid, meta.base_dir, meta)
             meta_path = Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json")
@@ -167,6 +190,49 @@ class Prep:
         logger.debug(f"Metadata processed in {time.time() - meta_start_time:.2f} seconds")
 
         return meta
+
+    async def _capture_early_screenshots(self, meta: Meta, filename: str, videopath: str, bdinfo: dict[str, Any]) -> None:
+        """Generate local screenshots while metadata and tracker IDs are fetched."""
+        if meta.category in ("MUSIC", "GAME", "BOOK") or meta.screens <= 0:
+            return
+
+        try:
+            if meta.is_disc == "BDMV":
+                await self.takescreens_manager.disc_screenshots(
+                    meta,
+                    meta.filename or filename,
+                    bdinfo,
+                    meta.uuid,
+                    meta.base_dir,
+                    meta.vapoursynth,
+                    meta.image_list,
+                    meta.ffdebug,
+                    0,
+                    cleanup_after_capture=False,
+                )
+            elif meta.is_disc == "DVD":
+                await self.takescreens_manager.dvd_screenshots(
+                    meta,
+                    disc_num=0,
+                    num_screens=0,
+                    retry_cap=False,
+                    cleanup_after_capture=False,
+                )
+            elif videopath:
+                await self.takescreens_manager.screenshots(
+                    videopath,
+                    filename,
+                    meta.uuid,
+                    meta.base_dir,
+                    meta,
+                    manual_frames=meta.manual_frames or "",
+                    cleanup_after_capture=False,
+                )
+            logger.debug("[cyan]Early screenshot generation completed.[/cyan]")
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            logger.warning(f"[yellow]Early screenshot generation failed; upload stage will retry: {error}[/yellow]")
 
     def check_adult_media(self, meta) -> bool:
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]

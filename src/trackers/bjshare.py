@@ -22,6 +22,7 @@ from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
+from src.temp_paths import screenshots_dir
 from src.tmdb import TmdbManager
 from src.trackers.common import Common
 
@@ -1081,8 +1082,8 @@ class BJShare:
         return None
 
     async def get_screenshots(self, meta: Meta) -> list[str]:
-        screenshot_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-        local_files = sorted([f for f in screenshot_dir.glob("*.png") if "POSTER" not in f.stem.upper() and "COVER" not in f.stem.upper()])
+        screens_dir = screenshots_dir(meta.base_dir, meta.uuid)
+        local_files = sorted(screens_dir.glob("*.png"))
 
         disc_menu_links = [img.get("raw_url") for img in meta.menu_images if img.get("raw_url")][:3]
 

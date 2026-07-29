@@ -19,6 +19,7 @@ from rich.prompt import Prompt
 
 from src.console import logger
 from src.meta import Meta
+from src.temp_paths import spectrograms_dir
 from src.webui_progress import complete_progress, publish_progress
 
 DURATION_LIMIT = 600
@@ -217,9 +218,8 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
         return []
 
     logger.info("[yellow]Generating Audio Spectrograms...[/yellow]")
-    output_dir = Path(meta.base_dir) / "tmp" / meta.uuid / "spectrograms"
+    output_dir = spectrograms_dir(meta.base_dir, meta.uuid)
     cache_path = Path(meta.base_dir) / "tmp" / meta.uuid / "audio_spectrograms_images.json"
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     bdinfo = meta.bdinfo
     disc_final_path: Path | None = None

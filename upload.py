@@ -46,12 +46,15 @@ from src.console import current_release_log_path, logger  # pyright: ignore[repo
 from src.console import rich_handler as _rich_handler
 from src.disc_menus import process_disc_menus
 from src.dupe_checking import DupeChecker
+from src.early_tasks import cancel_and_drain_early_artifact_tasks, get_early_artifact_tasks, start_early_artifact_tasks
+from src.early_tasks import is_usenet_only as _is_usenet_only
 from src.get_desc import gen_desc
 from src.get_name import NameManager
 from src.get_tracker_data import TrackerDataManager
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
 from src.takescreens import TakeScreensManager
+from src.temp_paths import covers_dir, posters_dir, screenshots_dir
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
 from src.trackers.alpharatio import AlphaRatio
@@ -932,7 +935,7 @@ async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensMana
 
     cover_path = Path(str(meta.cover_path or ""))
     if not cover_path.is_file() and _is_http_url(meta.cover):
-        cover_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "music_cover.jpg"
+        cover_path = covers_dir(meta.base_dir, str(meta.uuid)) / "music_cover.jpg"
         content = await asyncio.to_thread(_download_music_cover, meta.cover)
         if content is None:
             return
@@ -1059,9 +1062,7 @@ def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
         ``min(min_successful_uploads, actual_screens)`` so the upload loop never
         requires more images than actually exist.
     """
-    tmp_dir = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}"
-    img_files = Path(tmp_dir).glob("*.png")
-    screenshot_files = [f for f in img_files if not f.name.startswith("POSTER")]
+    screenshot_files = list(screenshots_dir(meta.base_dir, meta.uuid).glob("*.png"))
     actual_screens = len(screenshot_files)
     capped_min = min(min_successful_uploads, actual_screens)
     return actual_screens, capped_min
@@ -1350,6 +1351,11 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         meta.we_are_uploading = False
         return True
 
+    # Prep normally starts these while metadata and screenshots are being
+    # generated. Keep this fallback for paths which bypass normal prep.
+    early_artifact_tasks = get_early_artifact_tasks(meta.uuid) or start_early_artifact_tasks(meta, client, config)
+    early_base_torrent_task, early_usenet_prepare_task = early_artifact_tasks
+
     filename: str = meta.title
     bdmv_filename = meta.filename
     bdinfo = meta.bdinfo
@@ -1433,12 +1439,28 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
             # Take Screenshots
             try:
+                # Keep the later upload count in sync with screenshots removed
+                # through the Web UI review while this run awaited confirmation.
+                from src.screenshot_review import target_count
+
+                meta.screens = target_count(Path(meta.base_dir) / "tmp" / meta.uuid, meta.screens)
                 if meta.category == "MUSIC":
                     logger.debug("[cyan]MUSIC: skipping video screenshots and MediaInfo-dependent image processing.[/cyan]")
                 elif meta.is_disc == "BDMV":
                     use_vs = meta.vapoursynth
                     try:
-                        await takescreens_manager.disc_screenshots(meta, bdmv_filename, bdinfo, meta.uuid, base_dir, use_vs, meta.image_list, meta.ffdebug, 0)
+                        await takescreens_manager.disc_screenshots(
+                            meta,
+                            bdmv_filename,
+                            bdinfo,
+                            meta.uuid,
+                            base_dir,
+                            use_vs,
+                            meta.image_list,
+                            meta.ffdebug,
+                            0,
+                            cleanup_after_capture=False,
+                        )
                     except asyncio.CancelledError as e:
                         await cleanup_screenshot_temp_files(meta)
                         await asyncio.sleep(0.1)
@@ -1456,7 +1478,13 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
                 elif meta.is_disc == "DVD":
                     try:
-                        await takescreens_manager.dvd_screenshots(meta, disc_num=0, num_screens=0, retry_cap=False)
+                        await takescreens_manager.dvd_screenshots(
+                            meta,
+                            disc_num=0,
+                            num_screens=0,
+                            retry_cap=False,
+                            cleanup_after_capture=False,
+                        )
                     except asyncio.CancelledError as e:
                         await cleanup_screenshot_temp_files(meta)
                         await asyncio.sleep(0.1)
@@ -1483,6 +1511,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                             base_dir,
                             meta,
                             manual_frames=manual_frames,  # Pass additional kwargs directly
+                            cleanup_after_capture=False,
                         )
                     except asyncio.CancelledError as e:
                         await cleanup_screenshot_temp_files(meta)
@@ -1518,7 +1547,6 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                 raise Exception("Error during screenshot capture") from e
             finally:
                 await asyncio.sleep(0.1)
-                await cleanup_manager.cleanup()
                 gc.collect()
                 cleanup_manager.reset_terminal()
 
@@ -1752,7 +1780,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                     if Path(poster_url).exists():
                         cover_path = poster_url
                     else:
-                        poster_jpg_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/poster.jpg"
+                        poster_jpg_path = str(posters_dir(meta.base_dir, meta.uuid) / "poster.jpg")
                         try:
                             import urllib.parse
                             import urllib.request
@@ -1819,6 +1847,11 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     torrent_path = str(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BASE.torrent").resolve())
     subs_torrent_path = str(Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/BASE_SUBS.torrent").resolve())
 
+    try:
+        await asyncio.gather(early_base_torrent_task, early_usenet_prepare_task)
+    finally:
+        await cancel_and_drain_early_artifact_tasks(meta.uuid)
+
     if meta.force_recheck:
         waiter = Wait(config)
         await waiter.select_and_recheck_best_torrent(meta, cast(str, meta.path), check_interval=5)
@@ -1828,9 +1861,9 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     base_reuse_torrent = meta.base_reuse_torrent_path
     trackers_list = [t.strip().upper() for t in meta.trackers.split(",")] if isinstance(meta.trackers, str) else [t.strip().upper() for t in meta.trackers]
 
-    is_usenet_only = len(trackers_list) > 0 and all(t in ("USENET", "MANUAL") or getattr(tracker_class_map.get(t), "is_usenet", False) for t in trackers_list)
+    is_usenet_only = _is_usenet_only(meta)
     if not is_usenet_only:
-        if meta.rehash is False and not meta.base_torrent_created and not meta.we_checked_them_all:
+        if meta.rehash is False and not Path(torrent_path).exists() and not meta.base_torrent_created and not meta.we_checked_them_all:
             if not reuse_torrent or not Path(reuse_torrent).exists():
                 reuse_torrent = await client.find_existing_torrent(meta)
             if reuse_torrent is not None:
@@ -1898,11 +1931,11 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
 async def cleanup_screenshot_temp_files(meta: Meta) -> None:
     """Cleanup temporary screenshot files to prevent orphaned files in case of failures."""
-    tmp_dir = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}"
-    if Path(tmp_dir).exists():
+    screenshot_path = screenshots_dir(meta.base_dir, meta.uuid)
+    if screenshot_path.exists():
         try:
-            for file in (p.name for p in Path(tmp_dir).iterdir()):
-                file_path = Path(tmp_dir) / file
+            for file in (p.name for p in screenshot_path.iterdir()):
+                file_path = screenshot_path / file
                 if file_path.is_file() and file.endswith((".png", ".jpg")):
                     file_path.unlink()
                     logger.debug(f"[yellow]Removed temporary screenshot file: {file_path}[/yellow]")
@@ -2379,7 +2412,10 @@ async def do_the_thing(base_dir: str) -> None:
 
             logger.info(f"[green]Gathering info for {Path(path).name}")
 
-            meta_success = await process_meta(meta, base_dir)
+            try:
+                meta_success = await process_meta(meta, base_dir)
+            finally:
+                await cancel_and_drain_early_artifact_tasks(meta.uuid)
             if not meta_success:
                 if "queue" in meta and meta.queue is not None:
                     processed_files_count += 1

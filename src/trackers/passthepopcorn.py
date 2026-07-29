@@ -26,6 +26,7 @@ from src.exceptions import UploadError
 from src.meta import Meta
 from src.rehostimages import RehostImagesManager
 from src.takescreens import TakeScreensManager
+from src.temp_paths import posters_dir, screenshots_dir
 from src.torrentcreate import TorrentCreator
 from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
@@ -546,7 +547,7 @@ class PassThePopcorn:
         if self._poster_already_on_selected_host(image_url, selected_host):
             return image_url
 
-        tmp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        tmp_dir = posters_dir(meta.base_dir, meta.uuid)
         try:
             tmp_dir.mkdir(parents=True, exist_ok=True)
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
@@ -998,7 +999,7 @@ class PassThePopcorn:
                         desc.write(f"[mediainfo]{summary}[/mediainfo]\n\n")
                         meta.retry_count += 1
                         meta[new_images_key] = []
-                        new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"PLAYLIST_{i}-*.png")]
+                        new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"PLAYLIST_{i}-*.png")]
                         if not new_screens:
                             use_vs = meta.vapoursynth
                             try:
@@ -1007,7 +1008,7 @@ class PassThePopcorn:
                                 )
                             except Exception as e:
                                 logger.info(f"{self.tracker}: Error during BDMV screenshot capture: {e}", extra={"markup": False})
-                            new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"PLAYLIST_{i}-*.png")]
+                            new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"PLAYLIST_{i}-*.png")]
                         uploaded_images: list[dict[str, Any]] = []
                         if new_screens and not meta.skip_imghost_upload:
                             uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
@@ -1078,7 +1079,7 @@ class PassThePopcorn:
                         else:
                             meta.retry_count += 1
                             meta[new_images_key] = []
-                            new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
+                            new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"FILE_{i}-*.png")]
                             if not new_screens:
                                 try:
                                     await self.takescreens_manager.disc_screenshots(
@@ -1086,7 +1087,7 @@ class PassThePopcorn:
                                     )
                                 except Exception as e:
                                     logger.info(f"{self.tracker}: Error during BDMV screenshot capture: {e}", extra={"markup": False})
-                            new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
+                            new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"FILE_{i}-*.png")]
                             uploaded_images: list[dict[str, Any]] = []
                             if new_screens and not meta.skip_imghost_upload:
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
@@ -1144,13 +1145,13 @@ class PassThePopcorn:
                         else:
                             meta.retry_count += 1
                             meta[new_images_key] = []
-                            new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
+                            new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
                             if not new_screens:
                                 try:
                                     await self.takescreens_manager.dvd_screenshots(meta, i, multi_screens, True)
                                 except Exception as e:
                                     logger.info(f"{self.tracker}: Error during DVD screenshot capture: {e}", extra={"markup": False})
-                            new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
+                            new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
                             uploaded_images: list[dict[str, Any]] = []
                             if new_screens and not meta.skip_imghost_upload:
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
@@ -1267,13 +1268,13 @@ class PassThePopcorn:
                     else:
                         meta.retry_count = meta.retry_count + 1
                         meta[new_images_key] = []
-                        new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
+                        new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"FILE_{i}-*.png")]
                         if not new_screens:
                             try:
                                 await self.takescreens_manager.screenshots(file, f"FILE_{i}", meta.uuid, meta.base_dir, meta, multi_screens, True, "")
                             except Exception as e:
                                 logger.info(f"{self.tracker}: Error during generic screenshot capture: {e}", extra={"markup": False})
-                        new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
+                        new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"FILE_{i}-*.png")]
                         if new_screens and not meta.skip_imghost_upload:
                             uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
                                 meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts

@@ -12,6 +12,7 @@ from pymediainfo import MediaInfo
 
 from src.console import logger
 from src.meta import Meta
+from src.temp_paths import menu_screenshots_dir
 from src.uploadscreens import UploadScreensManager
 
 
@@ -85,8 +86,7 @@ class DiscMenus:
             max_menu_screens = 6
 
         captured_images = []
-        output_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        output_dir = menu_screenshots_dir(meta.base_dir, meta.uuid)
 
         # Get ffmpeg path
         ffmpeg_path = "ffmpeg"

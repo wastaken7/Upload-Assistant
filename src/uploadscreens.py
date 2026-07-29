@@ -16,6 +16,7 @@ import pyimgbox
 
 from src.console import logger
 from src.meta import Meta
+from src.temp_paths import screenshots_dir
 
 type ImageDict = dict[str, Any]
 
@@ -587,7 +588,7 @@ async def _upload_screens(
     if meta.debug:
         upload_start_time = time.time()
 
-    os.chdir(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")
+    os.chdir(screenshots_dir(meta.base_dir, meta.uuid))
 
     initial_img_host = default_config[f"img_host_{img_host_num}"]
     img_host = meta.imghost

@@ -2,7 +2,6 @@
 import asyncio
 import glob
 import json
-import os
 import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -15,6 +14,7 @@ from aiofiles import os as aio_os
 from src.console import logger
 from src.meta import Meta
 from src.takescreens import TakeScreensManager
+from src.temp_paths import covers_dir, screenshots_dir
 from src.type_utils import to_int
 from src.uploadscreens import UploadScreensManager
 
@@ -309,14 +309,14 @@ async def _handle_image_upload(
     folder_id = meta.uuid
     meta[new_images_key] = []
 
-    screenshots_dir = Path(base_dir) / "tmp" / folder_id
-    logger.debug(f"[yellow]Searching for screenshots in {screenshots_dir}...")
+    screenshot_path = screenshots_dir(base_dir, folder_id)
+    logger.debug(f"[yellow]Searching for screenshots in {screenshot_path}...")
     all_screenshots: list[str] = []
 
     # First check if there are any saved screenshots matching those in the image_list
     if meta.image_list and isinstance(meta.image_list, list):
         # Get all PNG files in the screenshots directory
-        all_png_files: list[str] = [str(screenshots_dir / name) for name in await aio_os.listdir(screenshots_dir) if name.endswith(".png")]
+        all_png_files: list[str] = [str(screenshot_path / name) for name in await aio_os.listdir(screenshot_path) if name.endswith(".png")]
         if all_png_files and meta.debug:
             logger.info(f"[cyan]Found {len(all_png_files)} PNG files in screenshots directory")
 
@@ -366,10 +366,10 @@ async def _handle_image_upload(
 
             if meta.is_disc == "DVD":
                 existing_screens = await asyncio.to_thread(
-                    lambda: [str(p) for p in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[0]['name'])}-*.png")]
+                    lambda: [str(p) for p in screenshots_dir(meta.base_dir, meta.uuid).glob(f"{glob.escape(meta.discs[0]['name'])}-*.png")]
                 )
             else:
-                existing_screens = await asyncio.to_thread(lambda fp=filename_pattern: [str(p) for p in Path(screenshots_dir).glob(fp)])
+                existing_screens = await asyncio.to_thread(lambda fp=filename_pattern: [str(p) for p in screenshot_path.glob(fp)])
 
             # Add any new screenshots to our list
             for screen in existing_screens:
@@ -378,22 +378,21 @@ async def _handle_image_upload(
 
     # Fallback: glob for indexed screenshots if still not enough
     if len(all_screenshots) < multi_screens:
-        os.chdir(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")
         image_patterns = ["*.png", ".[!.]*.png"]
         image_glob: list[str] = []
         for pattern in image_patterns:
-            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
+            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path) for path in screenshot_path.glob(p)])
             image_glob.extend(glob_results)
             logger.debug(f"[cyan]Found {len(image_glob)} files matching pattern: {pattern}")
 
-        unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
+        unwanted_patterns = ["FILE*", "PLAYLIST*"]
         unwanted_files: set[str] = set()
         for pattern in unwanted_patterns:
-            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
+            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path) for path in screenshot_path.glob(p)])
             unwanted_files.update(glob_results)
             if pattern.startswith("FILE") or pattern.startswith("PLAYLIST") or pattern.startswith("POSTER"):
                 hidden_pattern = "." + pattern
-                hidden_glob_results = await asyncio.to_thread(lambda hp=hidden_pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(hp)])
+                hidden_glob_results = await asyncio.to_thread(lambda hp=hidden_pattern: [str(path) for path in screenshot_path.glob(hp)])
                 unwanted_files.update(hidden_glob_results)
 
         # Remove unwanted files
@@ -414,7 +413,7 @@ async def _handle_image_upload(
 
     if tracker == "covers":
         all_screenshots = []
-        existing_screens = await asyncio.to_thread(lambda: [str(p) for p in (Path(meta.base_dir) / "tmp" / meta.uuid).glob("cover_*.jpg")])
+        existing_screens = await asyncio.to_thread(lambda: [str(p) for p in covers_dir(meta.base_dir, meta.uuid).glob("cover_*.jpg")])
         for screen in existing_screens:
             if screen not in all_screenshots:
                 all_screenshots.append(screen)
@@ -453,10 +452,10 @@ async def _handle_image_upload(
                     logger.info("[red]No valid path available for screenshot generation.[/red]")
 
             if meta.is_disc == "DVD":
-                new_screens = await asyncio.to_thread(lambda: [str(p) for p in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[0]['name'])}-*.png")])
+                new_screens = await asyncio.to_thread(lambda: [str(p) for p in screenshots_dir(meta.base_dir, meta.uuid).glob(f"{glob.escape(meta.discs[0]['name'])}-*.png")])
             else:
                 # Use a more generic pattern to find any PNG files that aren't already in all_screenshots
-                new_screens = await asyncio.to_thread(lambda: [str(p) for p in Path(screenshots_dir).glob("*.png")])
+                new_screens = await asyncio.to_thread(lambda: [str(p) for p in screenshot_path.glob("*.png")])
                 indexed_pattern = re.compile(r".*-\d+\.png$")
                 new_screens = [s for s in new_screens if indexed_pattern.match(Path(s).name)]
 
@@ -582,7 +581,7 @@ async def _handle_image_upload(
             mapped_host = url_host_mapping.get(matched_host, matched_host)
             valid_hosts.append(mapped_host in approved_image_hosts)
         if uploaded_images and all(valid_hosts) and new_images_key in meta and isinstance(meta[new_images_key], list):
-            output_file = Path(meta.base_dir) / "tmp" / meta.uuid / "covers.json" if tracker == "covers" else Path(screenshots_dir) / "reuploaded_images.json"
+            output_file = Path(meta.base_dir) / "tmp" / meta.uuid / "covers.json" if tracker == "covers" else screenshot_path / "reuploaded_images.json"
 
             existing_data: list[dict[str, str]] = []
             try:
