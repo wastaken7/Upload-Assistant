@@ -3,6 +3,7 @@ import asyncio
 import json
 import platform
 import re
+import unicodedata
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, ClassVar, cast
@@ -750,14 +751,56 @@ class AmigosShare:
 
         return final_description
 
+    @staticmethod
+    def _has_portuguese_external_subtitle(meta: Meta) -> bool:
+        subtitle_languages = meta.subtitle_languages or []
+        language_values = [subtitle_languages] if isinstance(subtitle_languages, str) else subtitle_languages
+        portuguese_aliases = {"brazilian", "brazilianportuguese", "por", "portuguese", "portugues", "pt", "ptbr", "ptbrasil"}
+
+        for language in language_values:
+            normalized = re.sub(r"[^a-z0-9]+", " ", str(language).casefold())
+            if portuguese_aliases.intersection(normalized.split()):
+                return True
+
+        for subtitle_file in meta.subtitle_files or []:
+            filename = unicodedata.normalize("NFKD", Path(str(subtitle_file)).stem.casefold())
+            filename = "".join(char for char in filename if not unicodedata.combining(char))
+            filename_tokens = re.findall(r"[a-z0-9]+", filename)
+            if filename_tokens and filename_tokens[-1] in {"por", "portuguese", "portugues", "pt", "ptbr"}:
+                return True
+            if len(filename_tokens) >= 2 and tuple(filename_tokens[-2:]) in {("pt", "br"), ("brazilian", "portuguese")}:
+                return True
+
+        return False
+
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK" and meta.source_size <= 1024 * 1024:
             logger.info(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
             return False
 
-        if meta.category not in ("BOOK", "GAME") and not meta.imdb_id and not meta.anime:
+        if meta.category in ("BOOK", "GAME"):
+            return True
+
+        if not meta.imdb_id and not meta.anime:
             logger.info(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
             return False
+
+        if meta.category in ("MOVIE", "TV"):
+            if self._has_portuguese_external_subtitle(meta):
+                return True
+
+            subtitles = await self.common.check_language_requirements(
+                meta,
+                self.tracker,
+                languages_to_check=["portuguese", "português", "por", "pt", "pt-br", "pt br", "brazilian portuguese"],
+                check_audio=True,
+                check_subtitle=True,
+            )
+            if not subtitles and (not meta.unattended or meta.unattended_confirm):
+                return await self.common.prompt_user_for_confirmation(
+                    f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
+                )
+            return subtitles
 
         return True
 
