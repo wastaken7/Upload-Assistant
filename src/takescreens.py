@@ -562,7 +562,7 @@ async def dvd_screenshots(
             existing_image_paths.append(image)
 
     if existing_images_count == num_screens and not meta.retake:
-        logger.info("[yellow]The correct number of screenshots already exists. Skipping capture process.")
+        logger.debug("[yellow]The correct number of screenshots already exists. Skipping capture process.")
         capture_results: list[str] = existing_image_paths
         return
     capture_tasks = []
@@ -1563,7 +1563,7 @@ async def screenshots(
             existing_image_paths.append(image_path)
 
     if existing_images_count == num_screens and not meta.retake:
-        logger.info("[yellow]The correct number of screenshots already exists. Skipping capture process.")
+        logger.debug("[yellow]The correct number of screenshots already exists. Skipping capture process.")
         return existing_image_paths
 
     num_capture = num_screens - existing_images_count

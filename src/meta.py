@@ -21,6 +21,7 @@ class Meta:
     ant_user_tags: bool | None = None
     ant: int | None = None
     archive_password: str | None = None
+    usenet_archive_password_is_random: bool | None = None
     artist: str = ""
     args_line_queue: bool | None = None
     asian: bool = False
