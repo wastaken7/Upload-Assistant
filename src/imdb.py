@@ -39,6 +39,8 @@ class ImdbManager:
         self,
         imdb_id: int | str | None,
         manual_language: str | dict[str, Any] | None = None,
+        base_dir: str = "",
+        config: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         imdb_info: dict[str, Any] = {}
 
@@ -52,7 +54,7 @@ class ImdbManager:
             logger.error(f"[red]Error:[/red] {e}")
             return imdb_info
 
-        cache = cache_for("")
+        cache = cache_for(base_dir, config)
         cache_key = f"{imdb_id_str}|{manual_language!s}"
         cached_info = await cache.get("imdb", "title", cache_key)
         if not is_cache_miss(cached_info) and isinstance(cached_info, dict):

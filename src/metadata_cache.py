@@ -54,8 +54,14 @@ class MetadataCache:
         root = Path(base_dir) if base_dir else _project_root()
         cache_dir = Path(configured_dir or "data/cache/metadata")
         self.root = cache_dir if cache_dir.is_absolute() else root / cache_dir
-        self.default_ttl = max(0, int(default.get("metadata_cache_default_ttl_hours", 168))) * 3600
-        self.negative_ttl = max(0, int(default.get("metadata_cache_negative_ttl_minutes", 60))) * 60
+        try:
+            self.default_ttl = max(0, int(default.get("metadata_cache_default_ttl_hours", 168))) * 3600
+        except (TypeError, ValueError):
+            self.default_ttl = 168 * 3600
+        try:
+            self.negative_ttl = max(0, int(default.get("metadata_cache_negative_ttl_minutes", 60))) * 60
+        except (TypeError, ValueError):
+            self.negative_ttl = 60 * 60
         services = default.get("metadata_cache_services", {})
         self.services = services if isinstance(services, dict) else {}
 
@@ -130,3 +136,18 @@ def set_run_disabled(disabled: bool) -> None:
     """Apply the CLI cache override to all metadata providers in this process."""
     global _RUN_DISABLED
     _RUN_DISABLED = disabled
+
+
+def tracker_metadata_cache_for(base_dir: str | Path, config: dict[str, Any]) -> MetadataCache:
+    """Create the separately configured cache for explicit tracker torrent IDs."""
+    default_value = config.get("DEFAULT", {}) if isinstance(config, dict) else {}
+    default = default_value if isinstance(default_value, dict) else {}
+    cache_config = {
+        "DEFAULT": {
+            "metadata_cache_enabled": default.get("tracker_metadata_cache_enabled", True),
+            "metadata_cache_dir": default.get("tracker_metadata_cache_dir", "data/cache/tracker_metadata"),
+            "metadata_cache_default_ttl_hours": default.get("tracker_metadata_cache_ttl_hours", 24),
+            "metadata_cache_negative_ttl_minutes": default.get("tracker_metadata_cache_negative_ttl_minutes", 15),
+        }
+    }
+    return MetadataCache(base_dir, cache_config)

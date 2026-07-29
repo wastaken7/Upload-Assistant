@@ -109,6 +109,10 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "metadata_cache_default_ttl_hours": (int,),
     "metadata_cache_negative_ttl_minutes": (int,),
     "metadata_cache_services": (dict,),
+    "tracker_metadata_cache_enabled": (bool,),
+    "tracker_metadata_cache_dir": (str,),
+    "tracker_metadata_cache_ttl_hours": (int,),
+    "tracker_metadata_cache_negative_ttl_minutes": (int,),
 }
 
 # Valid image hosts

@@ -130,6 +130,7 @@ class TmdbManager:
         tvdb_id: int | None = 0,
         quickie_search: bool = False,
         filename: str | None = None,
+        base_dir: str = "",
     ) -> dict[str, Any]:
         return await tmdb_other_meta(
             tmdb_id=tmdb_id,
@@ -148,6 +149,8 @@ class TmdbManager:
             tvdb_id=tvdb_id,
             quickie_search=quickie_search,
             filename=filename,
+            base_dir=base_dir,
+            config=self.config,
         )
 
     async def get_keywords(self, tmdb_id: int, category: str) -> list[str]:
@@ -944,6 +947,8 @@ async def tmdb_other_meta(
     tvdb_id: int | None = 0,
     quickie_search: bool = False,
     filename: str | None = None,
+    base_dir: str = "",
+    config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Fetch metadata from TMDB for a movie or TV show.
@@ -1020,7 +1025,7 @@ async def tmdb_other_meta(
     year = None
     original_imdb_id = imdb_id
 
-    cache = cache_for("")
+    cache = cache_for(base_dir, config)
     async with httpx.AsyncClient() as client:
         # Get main media details first (movie or TV show)
         main_url = f"{TMDB_BASE_URL}/{('movie' if category == 'MOVIE' else 'tv')}/{tmdb_id}"
@@ -1481,6 +1486,7 @@ async def get_romaji(tmdb_name: str, mal: int | None, meta: Meta) -> tuple[str, 
                 demographic = str(cached_anilist.get("demographic", demographic))
                 if media:
                     break
+                continue
         for attempt in range(3):
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
@@ -1974,6 +1980,8 @@ async def set_tmdb_metadata(meta: Meta, filename: str | None = None) -> None:
                     tvdb_id=meta.tvdb_id,
                     quickie_search=meta.quickie_search,
                     filename=filename,
+                    base_dir=meta.base_dir,
+                    config=default_config,
                 )
 
                 if tmdb_metadata and all(tmdb_metadata.get(field) for field in ["title", "year"]):

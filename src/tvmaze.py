@@ -20,6 +20,8 @@ class TvmazeManager:
         manual_date: str | None = None,
         tvmaze_manual: int | str | None = None,
         return_full_tuple: bool = False,
+        base_dir: str = "",
+        config: dict[str, Any] | None = None,
     ) -> int | tuple[int, int, int]:
         """Searches TVMaze for a show using TVDB ID, IMDb ID, or a title query.
 
@@ -64,7 +66,7 @@ class TvmazeManager:
 
         async def fetch_tvmaze_data(url: str, params: dict[str, Any]) -> list[dict[str, Any]]:
             """Helper function to fetch data from TVMaze API."""
-            response = await self._make_tvmaze_request(url, params)
+            response = await self._make_tvmaze_request(url, params, base_dir, config)
             if response:
                 return [response] if isinstance(response, dict) else response
             return []
@@ -145,10 +147,12 @@ class TvmazeManager:
         self,
         url: str,
         params: dict[str, Any],
+        base_dir: str = "",
+        config: dict[str, Any] | None = None,
     ) -> dict[str, Any] | list[dict[str, Any]] | None:
         """Sync function to make the request inside ThreadPoolExecutor."""
         cache_key = json.dumps({"url": url, "params": params}, sort_keys=True, default=str)
-        cache = cache_for("")
+        cache = cache_for(base_dir, config)
         cached = await cache.get("tvmaze", "response", cache_key)
         if not is_cache_miss(cached) and isinstance(cached, (dict, list)):
             return cast(dict[str, Any] | list[dict[str, Any]], cached)

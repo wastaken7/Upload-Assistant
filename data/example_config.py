@@ -64,6 +64,26 @@ config: dict[str, Any] = {
             "discogs": {"enabled": True, "ttl_hours": 720},
         },
 
+        # TRACKER METADATA CACHE
+        # Saves metadata fetched from a tracker when you provide a specific
+        # torrent ID (for example, --ptp, --hdb, or a tracker link in a torrent
+        # comment). It never caches dupe checks or broad name searches.
+        "tracker_metadata_cache_enabled": True,
+
+        # Folder for cached tracker responses. You normally do not need to
+        # change this setting.
+        "tracker_metadata_cache_dir": "data/cache/tracker_metadata",
+
+        # Number of hours an explicit tracker torrent-ID response can be reused.
+        # 24 = 1 day. Trackers can edit descriptions and images, so this is kept
+        # shorter than the public metadata cache.
+        "tracker_metadata_cache_ttl_hours": 24,
+
+        # Number of minutes an explicit tracker ID with no result is remembered.
+        # 15 minutes avoids repeated requests without hiding a newly available
+        # torrent for too long.
+        "tracker_metadata_cache_negative_ttl_minutes": 15,
+
         # Google Books API key. "" = disabled
         # You can get one here https://console.cloud.google.com/apis/library/books.googleapis.com
         "google_books_api_key": "",

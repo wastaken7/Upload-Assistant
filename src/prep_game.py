@@ -826,15 +826,21 @@ async def gather_game_prep(
             params["l"] = "brazilian"
 
         try:
-            cache = cache_for(meta.base_dir, config)
+            cache = cache_for(base_dir, config)
             cache_key = json.dumps(params, sort_keys=True)
             res_data = await cache.get("steam", "appdetails", cache_key)
             if is_cache_miss(res_data):
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     resp = await client.get(url, params=params)
-                    res_data = resp.json() if resp.status_code == 200 else {}
-                if isinstance(res_data, dict):
-                    await cache.set("steam", "appdetails", cache_key, res_data, negative=not bool(res_data))
+                if resp.status_code == 200:
+                    res_data = resp.json()
+                    if isinstance(res_data, dict):
+                        await cache.set("steam", "appdetails", cache_key, res_data, negative=not bool(res_data))
+                elif resp.status_code == 404:
+                    res_data = {}
+                    await cache.set("steam", "appdetails", cache_key, res_data, negative=True)
+                else:
+                    res_data = {}
             if isinstance(res_data, dict) and res_data and steam_id in res_data and res_data[steam_id].get("success"):
                 app_data = res_data[steam_id]["data"]
 
