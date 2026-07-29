@@ -1738,7 +1738,6 @@ config: dict[str, Any] = {
         "ORPHEUS": {
             # Orpheus Gazelle API token. Do not commit a real token.
             "api_key": "",
-            "base_url": "https://orpheus.network",
             # Obtain from https://orpheus.network/upload.php
             "announce_url": "",
             "inject_delay": 0,
@@ -2647,6 +2646,7 @@ config: dict[str, Any] = {
             # Optional qBittorrent BT_backup directory. Used together with QUI/API search;
             # reading .torrent files locally can substantially speed up candidate validation.
             # Use double-backslashes on Windows, e.g. "C:\\Users\\<YOUR_USER>\\AppData\\Local\\qBittorrent\\BT_backup".
+            # WARNING: this should not be used when using SQLite Mode for qBittorrent.
             "torrent_storage_dir": "",
             # List of trackers to activate "super-seed" (or "initial seeding") mode when adding the torrent.
             # https://www.bittorrent.org/beps/bep_0016.html

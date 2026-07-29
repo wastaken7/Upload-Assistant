@@ -745,6 +745,11 @@ const argumentCategories = [
         description: "Custom Usenet subject line",
       },
       {
+        label: "--archive-password",
+        placeholder: "PASSWORD or random",
+        description: "Override the Usenet 7z archive password for this run",
+      },
+      {
         label: "--unattended",
         description: "Unattended (no prompts (AT ALL))",
       },
@@ -3754,6 +3759,32 @@ function AudionutsUAGUI() {
                     screenshotActionId === `replace:${screenshot.id}`;
                   const deleting =
                     screenshotActionId === `delete:${screenshot.id}`;
+                  const undoing =
+                    screenshotActionId === `undo:${screenshot.id}`;
+                  const screenshotState =
+                    screenshot.source === "remote"
+                      ? "Remote"
+                      : screenshot.source === "replacement"
+                        ? "Pending upload"
+                        : screenshot.source === "addition"
+                          ? "Pending upload"
+                          : "Local";
+                  const screenshotStateClass =
+                    screenshot.source === "remote"
+                      ? isDarkMode
+                        ? "bg-sky-950 text-sky-300"
+                        : "bg-sky-100 text-sky-700"
+                      : screenshot.source === "replacement"
+                        ? isDarkMode
+                          ? "bg-amber-950 text-amber-300"
+                          : "bg-amber-100 text-amber-700"
+                        : screenshot.source === "addition"
+                          ? isDarkMode
+                            ? "bg-emerald-950 text-emerald-300"
+                            : "bg-emerald-100 text-emerald-700"
+                          : isDarkMode
+                            ? "bg-gray-700 text-gray-300"
+                            : "bg-gray-100 text-gray-600";
                   return (
                     <article
                       key={screenshot.id}
@@ -3766,12 +3797,19 @@ function AudionutsUAGUI() {
                         loading="lazy"
                       />
                       <div className="p-2.5 flex items-center justify-between gap-2">
-                        <span
-                          className={`min-w-0 truncate text-xs font-mono ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
-                          title={screenshot.filename}
-                        >
-                          {screenshot.filename}
-                        </span>
+                        <div className="min-w-0 flex-1">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${screenshotStateClass}`}
+                          >
+                            {screenshotState}
+                          </span>
+                          <span
+                            className={`mt-1 block truncate text-[11px] font-mono ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                            title={screenshot.filename}
+                          >
+                            {screenshot.filename}
+                          </span>
+                        </div>
                         <div className="flex gap-1.5 flex-shrink-0">
                           {screenshot.can_replace && (
                             <button
@@ -3796,16 +3834,33 @@ function AudionutsUAGUI() {
                           >
                             <ExpandIcon />
                           </button>
-                          <button
-                            onClick={() =>
-                              changeExecutionScreenshot(screenshot.id, "delete")
-                            }
-                            disabled={isWorking}
-                            className="p-1.5 rounded-md text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-50"
-                            title={`Delete ${screenshot.filename}`}
-                          >
-                            {deleting ? <SpinnerIcon /> : <TrashIcon />}
-                          </button>
+                          {screenshot.can_delete && (
+                            <button
+                              onClick={() =>
+                                changeExecutionScreenshot(
+                                  screenshot.id,
+                                  "delete",
+                                )
+                              }
+                              disabled={isWorking}
+                              className="p-1.5 rounded-md text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-50"
+                              title={`Delete ${screenshot.filename}`}
+                            >
+                              {deleting ? <SpinnerIcon /> : <TrashIcon />}
+                            </button>
+                          )}
+                          {screenshot.source === "replacement" && (
+                            <button
+                              onClick={() =>
+                                changeExecutionScreenshot(screenshot.id, "undo")
+                              }
+                              disabled={isWorking}
+                              className={`px-2 py-1 text-xs rounded-md disabled:opacity-50 ${isDarkMode ? "bg-gray-700 text-gray-100 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                              title="Restore the original remote screenshot"
+                            >
+                              {undoing ? "Restoring…" : "Undo"}
+                            </button>
+                          )}
                         </div>
                       </div>
                     </article>

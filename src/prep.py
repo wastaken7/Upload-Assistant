@@ -150,7 +150,14 @@ class Prep:
         # Screenshot capture is CPU/IO-heavy and independent from the metadata
         # requests below. Start it with a snapshot so ffmpeg can run while the
         # tracker/ID searches continue without racing on the live Meta object.
-        early_screenshots_task = asyncio.create_task(self._capture_early_screenshots(meta.copy(), filename, videopath, bdinfo))
+        # When description images are enabled, however, tracker metadata may
+        # satisfy cutoff_screens. Do not generate local frames that would then
+        # be discarded solely because that lookup has not completed yet.
+        early_screenshots_task: asyncio.Task[None] | None = None
+        if not meta.keep_images:
+            early_screenshots_task = asyncio.create_task(self._capture_early_screenshots(meta.copy(), filename, videopath, bdinfo))
+        else:
+            logger.debug("[cyan]Deferring screenshot capture until description images have been checked.[/cyan]")
 
         # 4. Calculate source size
         prep_helpers.calculate_source_size(self, meta, videopath)
@@ -178,7 +185,8 @@ class Prep:
         # Ensure the background capture is complete before the upload stage
         # starts consuming the generated files. Any error is logged by the
         # helper; the existing upload-stage capture remains the fallback.
-        await early_screenshots_task
+        if early_screenshots_task is not None:
+            await early_screenshots_task
 
         if meta.category == "BOOK":
             await self.rehost_images_manager.takescreens_manager.prepare_book_cover(videopath, meta.uuid, meta.base_dir, meta)
@@ -193,6 +201,8 @@ class Prep:
 
     async def _capture_early_screenshots(self, meta: Meta, filename: str, videopath: str, bdinfo: dict[str, Any]) -> None:
         """Generate local screenshots while metadata and tracker IDs are fetched."""
+        if meta.keep_images:
+            return
         if meta.category in ("MUSIC", "GAME", "BOOK") or meta.screens <= 0:
             return
 

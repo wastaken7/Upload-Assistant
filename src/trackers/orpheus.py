@@ -25,6 +25,7 @@ class Orpheus:
     auth_type = "other_api"
     supported_categories = ("MUSIC",)
     source_flag = "OPS"
+    base_url = "https://orpheus.network"
     release_types: ClassVar[dict[str, int]] = {
         "Album": 1,
         "Soundtrack": 3,
@@ -69,13 +70,13 @@ class Orpheus:
         "Sandero Classic Sound",
         "Sip It & Trip It Records",
     )
+    comment_hosts = ("orpheus.network", "home.opsfet.ch")
     tracker_urls = ("home.opsfet.ch",)
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
         settings = config.get("TRACKERS", {}).get(self.tracker, {})
         self.api_key = str(settings.get("api_key", "")).strip()
-        self.base_url = str(settings.get("base_url", "https://orpheus.network")).rstrip("/")
         self.announce_url = str(settings.get("announce_url", "")).strip()
         self.requests_url = f"{self.base_url}/requests.php"
         self.torrent_url = f"{self.base_url}/torrents.php?torrentid="

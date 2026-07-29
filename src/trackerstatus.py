@@ -351,7 +351,7 @@ class TrackerStatusManager:
                 successful_trackers += 1
                 passed_names.append(tracker_name)
             if passed_names:
-                logger.info(f"[bold blue]{', '.join(passed_names)}[/bold blue]: [bold green]no potential dupes found.[/bold green]")
+                logger.info(f"[bold]{', '.join(passed_names)}[/bold]: [bold green]no potential dupes found.[/bold green]")
         else:
             # Attended mode
             prompt_trackers = [tracker_name for tracker_name, _display_name, _tracker_class in passed_trackers if tracker_name not in ("MANUAL", "USENET")]
@@ -359,15 +359,14 @@ class TrackerStatusManager:
             if not meta.get("debug", False) and prompt_trackers:
                 if len(prompt_trackers) == 1:
                     tracker_name = prompt_trackers[0]
-                    logger.info(f"[bold blue]{tracker_name}:[/bold blue] [green]no potential dupes found.[/green]")
-                    prompt_msg = "Enter 'y' to upload, or press enter to skip uploading:"
+                    logger.info(f"[bold]{tracker_name}:[/bold] [green]no potential dupes found.[/green]")
+                    prompt_msg = "Upload?"
                 else:
-                    logger.info(f"[bold blue]{', '.join(prompt_trackers)}:[/bold blue] [green]no potential dupes found.[/green]")
-                    prompt_msg = "Enter 'y' to upload to all, or press enter to skip uploading:"
+                    logger.info(f"[bold]{', '.join(prompt_trackers)}:[/bold] [green]no potential dupes found.[/green]")
+                    prompt_msg = "Upload to all?"
 
                 try:
-                    edit_choice = cli_ui.ask_string(prompt_msg)
-                    upload_all = (edit_choice or "").lower() == "y"
+                    upload_all = cli_ui.ask_yes_no(prompt_msg, default=False)
                 except EOFError:
                     logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()

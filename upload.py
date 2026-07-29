@@ -1568,7 +1568,13 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             if manual_frames_count > 0:
                 meta.screens = manual_frames_count
             cutoff = meta.cutoff
-            if len(meta.image_list) < cutoff and meta.skip_imghost_upload is False and meta.category not in ("GAME", "MUSIC"):
+            # Remote images can be reviewed in the WebUI.  Replacements and
+            # additions remain local until this normal hosting stage, even if
+            # the original remote list already satisfies the cutoff.
+            from src.screenshot_review import staged_remote_uploads
+
+            reviewed_uploads = staged_remote_uploads(Path(meta.base_dir) / "tmp" / meta.uuid, cast(list[dict[str, Any]], meta.image_list or []))
+            if (len(meta.image_list) < cutoff or reviewed_uploads) and meta.skip_imghost_upload is False and meta.category not in ("GAME", "MUSIC"):
                 # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
                 trackers_with_image_host_requirements = {
                     "AURA4K",
@@ -1744,6 +1750,29 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
                     if image_list_count < min_successful_uploads:
                         raise Exception(f"Minimum of {min_successful_uploads} successful image uploads required, but only {image_list_count} were uploaded.")
+
+                    if reviewed_uploads:
+                        from src.screenshot_review import apply_staged_remote_uploads
+
+                        review_files = [str(path) for _index, path in reviewed_uploads]
+                        uploaded_review_images, uploaded_count = await uploadscreens_manager.upload_screens(
+                            meta,
+                            len(review_files),
+                            1,
+                            0,
+                            len(review_files),
+                            review_files,
+                            {},
+                            allowed_hosts=allowed_hosts,
+                        )
+                        if uploaded_count != len(review_files):
+                            raise Exception("Could not upload every reviewed screenshot")
+                        meta.image_list = apply_staged_remote_uploads(
+                            Path(meta.base_dir) / "tmp" / meta.uuid,
+                            cast(list[dict[str, Any]], meta.image_list or []),
+                            uploaded_review_images,
+                            reviewed_uploads,
+                        )
 
                     # Now that image_list exists, populate tracker-specific keys (and only reupload if required)
                     for tracker_name in relevant_trackers:
