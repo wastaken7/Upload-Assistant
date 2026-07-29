@@ -1,8 +1,10 @@
 # ruff: noqa: S101
 
+import asyncio
 from pathlib import Path
 
 from src.screenshot_review import (
+    add_screenshot,
     apply_staged_remote_uploads,
     delete_screenshot,
     image_version,
@@ -106,3 +108,47 @@ def test_delete_remote_addition_discards_its_file_and_pending_upload(tmp_path: P
     assert not addition.exists()
     assert [(item.id, item.source) for item in remaining] == [("remote-0", "remote")]
     assert staged_remote_uploads(tmp_path, meta_data["image_list"]) == []
+
+
+def test_add_after_deleting_earlier_remote_addition_uses_next_id(tmp_path: Path, monkeypatch) -> None:
+    screenshots_dir = tmp_path / "screenshots"
+    screenshots_dir.mkdir()
+    for index in range(2):
+        (screenshots_dir / f"review-remote-add-{index}.png").write_bytes(b"png")
+    (tmp_path / "screenshot_review.json").write_text(
+        '{"remote_additions": [{"id": "remote-add-0", "file": "review-remote-add-0.png"}, {"id": "remote-add-1", "file": "review-remote-add-1.png"}]}',
+        encoding="utf-8",
+    )
+    meta_data = {"image_list": [{"img_url": "https://images.example/one.jpg", "raw_url": "https://images.example/one.jpg"}]}
+
+    async def capture_stub(_temp_dir, _meta_data, target):
+        target.path.write_bytes(b"new png")
+        return 1.0
+
+    monkeypatch.setattr("src.screenshot_review._capture_fresh_frame", capture_stub)
+    delete_screenshot(tmp_path, meta_data, "remote-add-0")
+    addition = asyncio.run(add_screenshot(tmp_path, meta_data))
+
+    assert addition.id == "remote-add-2"
+    assert [item.id for item in list_review_items(tmp_path, meta_data)] == ["remote-0", "remote-add-1", "remote-add-2"]
+
+
+def test_apply_staged_remote_uploads_preserves_later_review_changes(tmp_path: Path) -> None:
+    screenshots_dir = tmp_path / "screenshots"
+    screenshots_dir.mkdir()
+    first = screenshots_dir / "review-remote-0.png"
+    second = screenshots_dir / "review-remote-1.png"
+    first.write_bytes(b"first")
+    (tmp_path / "screenshot_review.json").write_text('{"remote_replacements": {"remote-0": "review-remote-0.png"}}', encoding="utf-8")
+    image_list = [
+        {"img_url": "https://images.example/one.jpg", "raw_url": "https://images.example/one.jpg"},
+        {"img_url": "https://images.example/two.jpg", "raw_url": "https://images.example/two.jpg"},
+    ]
+
+    pending = staged_remote_uploads(tmp_path, image_list)
+    second.write_bytes(b"second")
+    (tmp_path / "screenshot_review.json").write_text('{"remote_replacements": {"remote-0": "review-remote-0.png", "remote-1": "review-remote-1.png"}}', encoding="utf-8")
+
+    apply_staged_remote_uploads(tmp_path, image_list, [{"img_url": "https://new.example/one.jpg", "raw_url": "https://new.example/one.jpg"}], pending)
+
+    assert staged_remote_uploads(tmp_path, image_list) == [(1, second)]
