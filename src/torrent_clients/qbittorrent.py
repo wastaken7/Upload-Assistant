@@ -21,6 +21,7 @@ from torf import Torrent
 from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
+from src.torrent_clients.path_utils import coerce_str_list, is_path_under, map_save_path, tracker_directory
 from src.torrentcreate import TorrentCreator
 
 # These have to be global variables to be shared across all instances since a new instance is made every time
@@ -223,13 +224,6 @@ class QbittorrentClientMixin:
 
         logger.debug(f"[cyan]Completed qBittorrent hash lookup in {time.perf_counter() - lookup_started:.2f}s[/cyan]")
         return meta
-
-    @staticmethod
-    def _coerce_str_list(value: Any) -> list[str]:
-        if isinstance(value, list):
-            value_list = value
-            return [str(v) for v in value_list if str(v)]
-        return [str(value)] if value is not None else []
 
     def create_ssl_context_for_client(self, client_config: dict[str, Any]) -> ssl.SSLContext:
         """Create SSL context for qBittorrent client based on VERIFY_WEBUI_CERTIFICATE setting."""
@@ -630,7 +624,7 @@ class QbittorrentClientMixin:
         use_hardlink = linking_method == "hardlink"
 
         # Get linked folder for this drive
-        linked_folder = self._coerce_str_list(client.get("linked_folder", []))
+        linked_folder = coerce_str_list(client.get("linked_folder", []))
         logger.debug(f"Linked folders: {linked_folder}")
 
         # Determine drive letter (Windows) or root (Linux)
@@ -731,7 +725,7 @@ class QbittorrentClientMixin:
             link_dir_name = str(tracker_cfg.get("link_dir_name", "")).strip()
             if link_target is None:
                 raise RuntimeError("link_target cannot be None")
-            tracker_dir = Path(link_target) / link_dir_name or tracker
+            tracker_dir = tracker_directory(link_target, link_dir_name, tracker)
             await asyncio.to_thread(os.makedirs, tracker_dir, exist_ok=True)
 
             if cross:
@@ -776,29 +770,7 @@ class QbittorrentClientMixin:
         else:
             save_path = str(path)  # Default to the original path
 
-        # Handle remote path mapping
-        if local_path and remote_path and local_path.lower() != remote_path.lower():
-            # Normalize paths for comparison
-            norm_save_path = os.path.normpath(save_path).lower()
-            norm_local_path = os.path.normpath(local_path).lower()
-
-            # Check if the save_path starts with local_path
-            if norm_save_path.startswith(norm_local_path):
-                # Get the relative part of the path
-                rel_path = os.path.relpath(save_path, local_path)
-                # Combine remote path with relative path while keeping a string path
-                save_path = str(Path(remote_path) / rel_path)
-
-            # For direct replacement if the above approach doesn't work
-            elif local_path.lower() in save_path.lower():
-                save_path = save_path.replace(local_path, remote_path, 1)  # Replace only at the beginning
-
-        # Always normalize separators for qBittorrent (it expects forward slashes)
-        save_path = save_path.replace(os.sep, "/")
-
-        # Ensure qBittorrent save path is formatted correctly
-        if not save_path.endswith("/"):
-            save_path += "/"
+        save_path = map_save_path(save_path, local_path, remote_path)
 
         logger.debug(f"[cyan]Original path: {path}")
         logger.debug(f"[cyan]Mapped save path: {save_path}")
@@ -808,14 +780,7 @@ class QbittorrentClientMixin:
         if not use_symlink and not use_hardlink:
             am_config = client.get("automatic_management_paths", "")
             logger.debug(f"AM Config: {am_config}")
-            if isinstance(am_config, list):
-                for each in self._coerce_str_list(am_config):
-                    if os.path.normpath(each).lower() in os.path.normpath(path).lower():
-                        auto_management = True
-            else:
-                am_config_str = str(am_config)
-                if os.path.normpath(am_config_str).lower() in os.path.normpath(path).lower() and am_config_str.strip() != "":
-                    auto_management = True
+            auto_management = any(is_path_under(path, each) for each in coerce_str_list(am_config))
 
         qbt_category = client["qbit_cross_cat"] if cross and client.get("qbit_cross_cat") else client.get("qbit_cat") if not meta.qbit_cat else meta.qbit_cat
         content_layout = client.get("content_layout", "Original")
@@ -1053,7 +1018,7 @@ class QbittorrentClientMixin:
             else:
                 # Use searching_client_list if available, otherwise default client
                 searching_list = self.config["DEFAULT"].get("searching_client_list", [])
-                searching_list_values = self._coerce_str_list(searching_list)
+                searching_list_values = coerce_str_list(searching_list)
                 if searching_list_values:
                     clients_to_search = [c for c in searching_list_values if c and c != "none"]
 
@@ -1891,7 +1856,7 @@ async def create_cross_seed_links(meta: Meta, torrent: Torrent, tracker_dir: str
             if isinstance(raw_path, (list, tuple)):
                 raw_path_list = cast(list[Any], raw_path)
                 components = [decode_component(part) for part in raw_path_list]
-                rel_path = Path(*components) if components else ""
+                rel_path = str(Path(*components)) if components else ""
             else:
                 rel_path = decode_component(raw_path)
             rel_path = rel_path.replace("/", os.sep)

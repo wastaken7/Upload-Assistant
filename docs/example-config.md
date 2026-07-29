@@ -64,6 +64,8 @@ Important gotchas:
 Order matters: `img_host_1` is primary, later hosts are fallbacks.
 
 - `img_host_1`..`img_host_5` (str): Image host names. Valid examples include `imgbb`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `passtheimage`, `seedpool_cdn`, `utppm`, `lostimg`.
+- `image_upload_concurrency` (int): Maximum number of image uploads running at once. Set to `0` to use the image host default.
+- `image_upload_delay` (float): Minimum delay in seconds between starting image uploads.
 
 ### Image host credentials
 
@@ -355,7 +357,8 @@ Typical keys:
 - `linking` (str): `"symlink"`, `"hardlink"`, or empty to disable.
 - `allow_fallback` (bool): Fallback to original path injection if linking fails.
 - `linked_folder` (list[str]): Destination folder(s) for linked content. This is the top level directory that will contain the linked content.
-- `local_path` / `remote_path` (list[str]): Local/remote path mapping (docker/seedbox), case-sensitive. Local path is how UA sees the content, remote path is how the client sees the content.
+- `local_path` / `remote_path` (list[str]): Local/remote path mapping (docker/seedbox), matched case-insensitively. Local path is how UA sees the content, remote path is how the client sees the content.
+- `link_dir_name` (str): Optional single directory name for linked content. Path separators, parent traversal, absolute paths, and Windows drive/device names are rejected.
 - `torrent_storage_dir` (str, optional): Only needed if API searching doesn’t work. Falls back to search the client storage directory for existing torrents.
 
 ### ruTorrent / rTorrent
