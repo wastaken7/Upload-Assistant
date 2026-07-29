@@ -23,7 +23,7 @@ from torf import Torrent
 
 from src.console import console, logger
 from src.meta import Meta
-from src.webui_progress import complete_progress, publish_progress
+from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
 PIECE_SIZE_MIN = 32 * 1024  # 32 KiB
 PIECE_SIZE_MAX = 134_217_728  # 128 MiB
@@ -257,7 +257,6 @@ class TorrentCreator:
                         exclude = []
                     elif not meta.tv_pack:
                         path_dir = os.fspath(path)
-                        os.chdir(path_dir)
                         path_dir_path = Path(path_dir)
                         globs = [f.name for f in path_dir_path.glob("*.mkv")] + [f.name for f in path_dir_path.glob("*.mp4")] + [f.name for f in path_dir_path.glob("*.ts")]
                         no_sample_globs = [
@@ -347,6 +346,7 @@ class TorrentCreator:
                                 TaskProgressColumn(),
                                 console=console,
                                 transient=False,
+                                disable=has_progress_callback(),
                             ) as progress:
                                 task = progress.add_task("mkbrr hashing...", total=total_pieces)
                                 publish_progress("mkbrr-hash", "mkbrr hashing...", current=0, total=total_pieces, detail="Starting mkbrr hashing")
@@ -467,6 +467,11 @@ class TorrentCreator:
                     created_by=f"{meta.ua_name} (fork)",
                     piece_size=piece_size,
                 )
+                progress_id = f"torrent-hash-{meta.uuid}"
+                progress_label = f"Hashing {output_filename} torrent"
+                torrent._webui_progress_id = progress_id
+                torrent._webui_progress_label = progress_label
+                publish_progress(progress_id, progress_label, current=0, total=1, detail="Starting torrent hash", group="media", unit="pieces")
 
                 # Run torrent generation in thread to avoid blocking the event loop
                 def generate_torrent() -> None:
@@ -474,7 +479,11 @@ class TorrentCreator:
                     torrent.write(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{output_filename}.torrent", overwrite=True)
                     torrent.verify_filesize(path)
 
-                await asyncio.to_thread(generate_torrent)
+                try:
+                    await asyncio.to_thread(generate_torrent)
+                except Exception as error:
+                    publish_progress(progress_id, progress_label, detail=str(error), status="failed", group="media", unit="pieces")
+                    raise
 
                 total_elapsed_time = time.time() - overall_start_time
                 formatted_time = time.strftime("%H:%M:%S", time.gmtime(total_elapsed_time))
@@ -484,6 +493,7 @@ class TorrentCreator:
                 logger.debug("")
                 logger.debug(f"[bold green]torrent created in {formatted_time}")
                 logger.debug(f"[green]Torrent file size: {torrent_file_size:.2f} KB")
+                complete_progress(progress_id, progress_label, current=1, total=1, detail="Torrent created", group="media", unit="pieces")
                 return torrent
             finally:
                 cls._create_torrent_inflight -= 1
@@ -518,6 +528,17 @@ class TorrentCreator:
 
         # Display progress with percentage, speed, and ETA
         cli_ui.info_progress(f"Hashing... {speed_str} | ETA: {eta}", int(percentage_done), 100)
+        progress_id = getattr(torrent, "_webui_progress_id", "torrent-hash")
+        progress_label = getattr(torrent, "_webui_progress_label", "Hashing torrent")
+        publish_progress(
+            progress_id,
+            progress_label,
+            current=pieces_done,
+            total=pieces_total or 1,
+            detail=f"{speed_str} | ETA: {eta}",
+            group="media",
+            unit="pieces",
+        )
 
     @staticmethod
     def create_random_torrents(base_dir: str, uuid: str, num: int | str, path: str) -> None:

@@ -26,6 +26,8 @@ from data import config as data_config
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
+from src.temp_paths import posters_dir, screenshots_dir
+from src.webui_progress import complete_progress, publish_progress
 
 default_config: dict[str, Any] = {}
 task_limit = 1
@@ -122,6 +124,7 @@ async def disc_screenshots(
     ffdebug: bool = False,
     num_screens: int = 0,
     force_screenshots: bool = False,
+    cleanup_after_capture: bool = True,
 ) -> None:
     img_host = await get_image_host(meta)
     screens = meta.screens
@@ -171,8 +174,8 @@ async def disc_screenshots(
 
     keyframe = "nokey" if "VC-1" in bdinfo["video"][0]["codec"] or bdinfo["video"][0]["hdr_dv"] != "" else "none"
     logger.debug(f"File: {file_path}, Length: {length}, Frame Rate: {frame_rate}", extra={"markup": False})
-    os.chdir(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}")
-    existing_screens = [p.name for p in Path.cwd().glob(f"{glob.escape(sanitized_filename)}-*.png")]
+    screenshot_dir = screenshots_dir(base_dir, folder_id)
+    existing_screens = [p.name for p in screenshot_dir.glob(f"{glob.escape(sanitized_filename)}-*.png")]
     existing_screens = [f for f in existing_screens if re.match(r"^-\d+\.png$", Path(f).name[len(sanitized_filename) :])]
     total_existing = len(existing_screens) + len(existing_images)
     num_screens = max(0, screens - total_existing) if not force_screenshots else num_screens
@@ -198,7 +201,7 @@ async def disc_screenshots(
         frame_info_tasks_with_idx = [
             (i, get_frame_info(file_path, ss_times[i], meta))
             for i in range(num_screens + 1)
-            if not Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/{sanitized_filename}-{len(existing_screens) + i}.png").exists() or meta.retake
+            if not (screenshot_dir / f"{sanitized_filename}-{len(existing_screens) + i}.png").exists() or meta.retake
         ]
         frame_info_results = await asyncio.gather(*[task for _, task in frame_info_tasks_with_idx])
         meta.frame_info_map = {}
@@ -220,7 +223,7 @@ async def disc_screenshots(
     if use_vs:
         from src.vs import vs_screengn
 
-        vs_screengn(source=file_path, encode=None, num=num_screens, dir=f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/")
+        vs_screengn(source=file_path, encode=None, num=num_screens, dir=f"{screenshot_dir}/")
     else:
         loglevel = "verbose" if ffdebug else "quiet"
 
@@ -240,7 +243,7 @@ async def disc_screenshots(
                 i,
                 file_path,
                 ss_times[i],
-                str(Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/{sanitized_filename}-{len(existing_indices) + i}.png").resolve()),
+                str((screenshot_dir / f"{sanitized_filename}-{len(existing_indices) + i}.png").resolve()),
                 keyframe,
                 loglevel,
                 hdr_tonemap,
@@ -362,7 +365,7 @@ async def disc_screenshots(
     elif discs and len(discs) > 1:
         one_disc = False
 
-    if (not meta.tv_pack and one_disc) or multi_screens == 0:
+    if cleanup_after_capture and ((not meta.tv_pack and one_disc) or multi_screens == 0):
         await cleanup_manager.cleanup()
 
 
@@ -448,7 +451,13 @@ async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str
         return None
 
 
-async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry_cap: bool = False) -> None:
+async def dvd_screenshots(
+    meta: Meta,
+    disc_num: int,
+    num_screens: int = 0,
+    retry_cap: bool = False,
+    cleanup_after_capture: bool = True,
+) -> None:
     screens = meta.screens
     if "image_list" not in meta:
         meta.image_list = []
@@ -465,7 +474,8 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
         return
 
     sanitized_disc_name = await sanitize_filename(meta.discs[disc_num]["name"])
-    existing_screens = [str(p) for p in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(sanitized_disc_name)}-*.png")]
+    screenshot_dir = screenshots_dir(meta.base_dir, meta.uuid)
+    existing_screens = [str(p) for p in screenshot_dir.glob(f"{glob.escape(sanitized_disc_name)}-*.png")]
     normal_screens = [f for f in existing_screens if re.match(r"^-\d+\.png$", Path(f).name[len(sanitized_disc_name) :])]
     if len(normal_screens) >= num_screens:
         i = num_screens
@@ -538,7 +548,6 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
         return fallback_duration, 0.0
 
     main_set = meta.discs[disc_num]["main_set"][1:] if len(meta.discs[disc_num]["main_set"]) > 1 else meta.discs[disc_num]["main_set"]
-    os.chdir(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}")
     voblength, _vob_index = await _is_vob_good(0, 0, num_screens)
     ss_times = await valid_ss_time([], num_screens, voblength, frame_rate, meta, retake=retry_cap)
     capture_tasks: list[Awaitable[tuple[int, str | None]]] = []
@@ -546,7 +555,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
     existing_image_paths: list[str] = []
 
     for i in range(num_screens + 1):
-        image = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{sanitized_disc_name}-{i}.png"
+        image = str(screenshot_dir / f"{sanitized_disc_name}-{i}.png")
         input_file = f"{meta.discs[disc_num]['path']}/VTS_{main_set[i % len(main_set)]}"
         if Path(image).exists() and not meta.retake:
             existing_images_count += 1
@@ -561,7 +570,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
     input_files: list[str] = []
 
     for i in range(num_screens + 1):
-        image = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{sanitized_disc_name}-{i}.png"
+        image = str(screenshot_dir / f"{sanitized_disc_name}-{i}.png")
         input_file = f"{meta.discs[disc_num]['path']}/VTS_{main_set[i % len(main_set)]}"
         image_paths.append(image)
         input_files.append(input_file)
@@ -606,10 +615,10 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
     if capture_results and len(capture_results) > num_screens:
         smallest = None
         smallest_size = float("inf")
-        matching_files = [str(p) for p in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(sanitized_disc_name)}-*")]
+        matching_files = [str(p) for p in screenshot_dir.glob(f"{glob.escape(sanitized_disc_name)}-*")]
         normal_screens = [Path(f).name for f in matching_files if re.match(r"^-\d+\.png$", Path(f).name[len(sanitized_disc_name) :])]
         for screens in normal_screens:
-            screen_path = Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/") / screens
+            screen_path = screenshot_dir / screens
             try:
                 screen_size = Path(screen_path).stat().st_size
                 if screen_size < smallest_size:
@@ -691,7 +700,7 @@ async def dvd_screenshots(meta: Meta, disc_num: int, num_screens: int = 0, retry
     elif discs and len(discs) > 1:
         one_disc = False
 
-    if (not meta.tv_pack and one_disc) or multi_screens == 0:
+    if cleanup_after_capture and ((not meta.tv_pack and one_disc) or multi_screens == 0):
         await cleanup_manager.cleanup()
 
 
@@ -1198,8 +1207,7 @@ async def extract_document_cover(path: str, dest_path: str) -> bool:
 
 
 async def prepare_book_cover(path: str, folder_id: str, base_dir: str, meta: Meta) -> str | None:
-    output_dir = Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}").resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = posters_dir(base_dir, folder_id)
     cover_path = output_dir / "POSTER.png"
 
     if Path(cover_path).exists() and Path(cover_path).stat().st_size >= 20480 and not meta.retake:
@@ -1283,15 +1291,15 @@ async def generate_ebook_screenshots(
     with contextlib.suppress(Exception):
         fitz.TOOLS.mupdf_display_errors(False)
 
-    output_dir = str(Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}").resolve())
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_dir = str(screenshots_dir(base_dir, folder_id).resolve())
     sanitized_filename = await sanitize_filename(filename)
 
     extension = Path(path).suffix.lower().lstrip(".")
     screenshots = []
 
-    cover_path = Path(output_dir) / "POSTER.png"
-    banner_path = Path(output_dir) / "POSTER_BANNER.png"
+    poster_dir = posters_dir(base_dir, folder_id)
+    cover_path = poster_dir / "POSTER.png"
+    banner_path = poster_dir / "POSTER_BANNER.png"
 
     banner_cached = Path(banner_path).exists() and Path(banner_path).stat().st_size > 0 and not meta.retake
 
@@ -1437,6 +1445,7 @@ async def screenshots(
     num_screens: int = 0,
     force_screenshots: bool = False,
     manual_frames: str | list[int] | list[str] = "",
+    cleanup_after_capture: bool = True,
 ) -> list[str] | None:
     if meta.category == "GAME":
         return []
@@ -1449,6 +1458,12 @@ async def screenshots(
 
     img_host = await get_image_host(meta)
     screens = meta.screens
+    # A Web UI review can remove frames while the run waits for confirmation.
+    # Respect that persisted target when this later, normal capture pass runs.
+    from src.screenshot_review import target_count
+
+    screens = target_count(Path(base_dir) / "tmp" / folder_id, screens)
+    meta.screens = screens
     start_time = time.time() if meta.debug else 0.0
     logger.debug(f"Image Host: {img_host}")
     if "image_list" not in meta:
@@ -1512,8 +1527,6 @@ async def screenshots(
         return None
     meta.frame_rate = frame_rate
     loglevel = "verbose" if meta.ffdebug else "quiet"
-    os.chdir(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}")
-
     if manual_frames and meta.debug:
         logger.info(f"[yellow]Using manual frames: {manual_frames}")
     ss_times: list[str] = []
@@ -1538,12 +1551,13 @@ async def screenshots(
         return None
 
     sanitized_filename = await sanitize_filename(filename)
-    test_image_path = str(Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/{sanitized_filename}-libplacebo-test.png").resolve())
+    screenshot_dir = screenshots_dir(base_dir, folder_id)
+    test_image_path = str((screenshot_dir / f"{sanitized_filename}-libplacebo-test.png").resolve())
 
     existing_images_count = 0
     existing_image_paths: list[str] = []
     for i in range(num_screens):
-        image_path = str(Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/{sanitized_filename}-{i}.png").resolve())
+        image_path = str((screenshot_dir / f"{sanitized_filename}-{i}.png").resolve())
         if Path(image_path).exists() and not meta.retake:
             existing_images_count += 1
             existing_image_paths.append(image_path)
@@ -1554,6 +1568,19 @@ async def screenshots(
 
     num_capture = num_screens - existing_images_count
 
+    progress_id = f"screenshots-{folder_id}"
+    progress_label = "FFmpeg screenshots"
+    completed_captures = 0
+    publish_progress(
+        progress_id,
+        progress_label,
+        current=completed_captures,
+        total=num_capture,
+        detail=f"0/{num_capture} frames completed",
+        group="media",
+        unit="frames",
+    )
+
     if not ss_times:
         ss_times = await valid_ss_time([], num_capture, length, frame_rate, meta, retake=force_screenshots)
 
@@ -1563,7 +1590,7 @@ async def screenshots(
         frame_info_tasks_with_idx = [
             (i, get_frame_info(path, ss_times[i], meta))
             for i in range(num_capture)
-            if not Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/{sanitized_filename}-{existing_images_count + i}.png").exists() or meta.retake
+            if not (screenshot_dir / f"{sanitized_filename}-{existing_images_count + i}.png").exists() or meta.retake
         ]
         frame_info_results = await asyncio.gather(*[task for _, task in frame_info_tasks_with_idx])
         meta.frame_info_map = {}
@@ -1616,13 +1643,25 @@ async def screenshots(
     semaphore = asyncio.Semaphore(num_workers)
 
     async def capture_with_semaphore(args: tuple[int, str, float, str, float, float, float, float, str, bool, Meta]) -> tuple[int, str | None] | None:
+        nonlocal completed_captures
         async with semaphore:
-            return await capture_screenshot(args)
+            result = await capture_screenshot(args)
+            completed_captures += 1
+            publish_progress(
+                progress_id,
+                progress_label,
+                current=completed_captures,
+                total=num_capture,
+                detail=f"{completed_captures}/{num_capture} frames completed",
+                group="media",
+                unit="frames",
+            )
+            return result
 
     capture_tasks: list[Awaitable[tuple[int, str | None] | None]] = []
     for i in range(num_capture):
         image_index = existing_images_count + i
-        image_path = str(Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/{sanitized_filename}-{image_index}.png").resolve())
+        image_path = str((screenshot_dir / f"{sanitized_filename}-{image_index}.png").resolve())
         if not Path(image_path).exists() or meta.retake:
             capture_tasks.append(capture_with_semaphore((i, path, float(ss_times[i]), image_path, width, height, w_sar, h_sar, loglevel, hdr_tonemap, meta)))
 
@@ -1813,8 +1852,18 @@ async def screenshots(
     elif discs and len(discs) > 1:
         one_disc = False
 
-    if (not meta.tv_pack and one_disc) or multi_screens == 0:
+    if cleanup_after_capture and ((not meta.tv_pack and one_disc) or multi_screens == 0):
         await cleanup_manager.cleanup()
+
+    complete_progress(
+        progress_id,
+        progress_label,
+        current=num_capture,
+        total=num_capture,
+        detail=f"{len(valid_results)}/{num_capture} frames captured",
+        group="media",
+        unit="frames",
+    )
 
     return valid_results if valid_results else None
 
@@ -2369,16 +2418,24 @@ class TakeScreensManager:
         ffdebug: bool = False,
         num_screens: int = 0,
         force_screenshots: bool = False,
+        cleanup_after_capture: bool = True,
     ) -> None:
-        await disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens, force_screenshots)
+        await disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens, force_screenshots, cleanup_after_capture)
 
     async def capture_disc_task(
         self, index: int, file: str, ss_time: str, image_path: str, keyframe: str, loglevel: str, hdr_tonemap: bool, meta: Meta
     ) -> tuple[int, str] | None:
         return await capture_disc_task(index, file, ss_time, image_path, keyframe, loglevel, hdr_tonemap, meta)
 
-    async def dvd_screenshots(self, meta: Meta, disc_num: int, num_screens: int = 0, retry_cap: bool = False) -> None:
-        await dvd_screenshots(meta, disc_num, num_screens, retry_cap)
+    async def dvd_screenshots(
+        self,
+        meta: Meta,
+        disc_num: int,
+        num_screens: int = 0,
+        retry_cap: bool = False,
+        cleanup_after_capture: bool = True,
+    ) -> None:
+        await dvd_screenshots(meta, disc_num, num_screens, retry_cap, cleanup_after_capture)
 
     async def capture_dvd_screenshot(self, task: tuple[int, str, str, str, Meta, float, float, float, float]) -> tuple[int, str | None]:
         return await capture_dvd_screenshot(task)
@@ -2393,8 +2450,9 @@ class TakeScreensManager:
         num_screens: int = 0,
         force_screenshots: bool = False,
         manual_frames: str | list[int] | list[str] = "",
+        cleanup_after_capture: bool = True,
     ) -> list[str] | None:
-        return await screenshots(path, filename, folder_id, base_dir, meta, num_screens, force_screenshots, manual_frames)
+        return await screenshots(path, filename, folder_id, base_dir, meta, num_screens, force_screenshots, manual_frames, cleanup_after_capture)
 
     async def prepare_book_cover(self, path: str, folder_id: str, base_dir: str, meta: Meta) -> str | None:
         return await prepare_book_cover(path, folder_id, base_dir, meta)

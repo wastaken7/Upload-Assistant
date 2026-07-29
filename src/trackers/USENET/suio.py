@@ -16,6 +16,7 @@ from PIL import Image
 from cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
+from src.temp_paths import posters_dir
 from src.trackers.common import Common
 from src.trackers.USENET.search_helpers import (
     build_newznab_search_query,
@@ -364,8 +365,8 @@ class Suio:
             files["nfo"] = (nfo_filename, nfo_content, "application/octet-stream")
         # Cover image file (optional)
         if meta.category not in ("TV", "MOVIE"):
-            cover_jpg_path = Path(nfo_dir) / "POSTER.jpg"
-            cover_png_path = Path(nfo_dir) / "POSTER.png"
+            cover_jpg_path = posters_dir(meta.base_dir, meta.uuid) / "POSTER.jpg"
+            cover_png_path = posters_dir(meta.base_dir, meta.uuid) / "POSTER.png"
             cover_path = None
             if Path(cover_jpg_path).exists():
                 cover_path = cover_jpg_path

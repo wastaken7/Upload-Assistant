@@ -1467,8 +1467,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                     cli_ui.info(f"Single match found: {close_matches[0]['title']} ({close_matches[0]['country']}) with score {best_score:.1f}/100")
                     while True:
-                        user_input_raw = cli_ui.ask_string("Do you want to use this release? (y/n): ")
-                        user_input = (user_input_raw or "").strip().lower()
+                        user_input = "y" if cli_ui.ask_yes_no("Do you want to use this release?", default=False) else "n"
                         try:
                             if user_input == "y":
                                 region_code = map_country_to_region_code(close_matches[0]["country"])
@@ -1590,8 +1589,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                             for log in release_logs:
                                 logger.info(log)
                     while True:
-                        user_input_raw = cli_ui.ask_string("Do you want to use this release? (y/n): ")
-                        user_input = (user_input_raw or "").strip().lower()
+                        user_input = "y" if cli_ui.ask_yes_no("Do you want to use this release?", default=False) else "n"
                         try:
                             if user_input == "y":
                                 region_code = map_country_to_region_code(best_release["country"])

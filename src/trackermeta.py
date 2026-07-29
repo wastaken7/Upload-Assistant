@@ -17,6 +17,7 @@ from src.bbcode import BBCODE
 from src.btnid import BtnIdManager
 from src.console import logger
 from src.meta import Meta
+from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
 from src.trackersetup import api_trackers
 from src.type_utils import to_int
@@ -80,9 +81,7 @@ class TrackerMetaManager:
 
 async def prompt_user_for_confirmation(message: str) -> bool:
     try:
-        response_raw = cli_ui.ask_string(f"{message} (Y/n): ")
-        response = (response_raw or "").strip().lower()
-        return response in ["y", "yes", ""]
+        return cli_ui.ask_yes_no(message, default=True)
     except EOFError:
         sys.exit(1)
 
@@ -740,7 +739,7 @@ async def handle_image_list(meta: Meta, tracker_name: str, valid_images: Sequenc
             if not keep_images:
                 meta.image_list = []
                 meta.image_sizes = {}
-                save_path = Path(meta.base_dir) / "tmp" / meta.uuid
+                save_path = screenshots_dir(meta.base_dir, meta.uuid)
                 try:
                     png_files = list(Path(save_path).glob("*.png"))
                     for png_file in png_files:

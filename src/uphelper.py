@@ -15,7 +15,7 @@ from rich.markup import escape
 from cogs.redaction import Redaction
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
-from src.console import console, logger
+from src.console import logger
 from src.meta import Meta
 from src.trackersetup import tracker_class_map
 
@@ -698,12 +698,11 @@ class UploadHelper:
             meta.keep_folder = False
 
         if meta.keep_folder and meta.isdir:
-            kf_confirm = (
-                console.input("[bold yellow]You specified --keep-folder. Uploading in folders might not be allowed.[/bold yellow] [green]Proceed? y/N: [/green]")
-                .strip()
-                .lower()
+            kf_confirm = cli_ui.ask_yes_no(
+                "You specified --keep-folder. Uploading in folders might not be allowed. Proceed?",
+                default=False,
             )
-            if kf_confirm != "y":
+            if not kf_confirm:
                 logger.info("[bold red]Aborting...[/bold red]")
                 exit()
         tracker_release_names: dict[str, str] = {}

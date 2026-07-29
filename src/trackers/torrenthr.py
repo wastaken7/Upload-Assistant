@@ -18,6 +18,7 @@ from cogs.redaction import Redaction
 from src.bbcode import BBCODE
 from src.console import console, logger
 from src.meta import Meta
+from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
 
 Config = dict[str, Any]
@@ -250,12 +251,12 @@ class TorrentHR:
             desc_parts.append("\n\n" + base)
 
         # REHOST IMAGES
-        tmp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+        tmp_dir = screenshots_dir(meta.base_dir, meta.uuid)
         image_patterns: list[str] = ["*.png", ".[!.]*.png"]
         for pattern in image_patterns:
             image_glob.extend(str(p) for p in tmp_dir.glob(pattern))
 
-        unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
+        unwanted_patterns = ["FILE*", "PLAYLIST*"]
         unwanted_files: set[str] = set()
         for pattern in unwanted_patterns:
             unwanted_files.update(str(p) for p in tmp_dir.glob(pattern))

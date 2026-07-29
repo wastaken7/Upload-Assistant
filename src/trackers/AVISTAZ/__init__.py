@@ -21,6 +21,7 @@ from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
+from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
 
 Config = dict[str, Any]
@@ -462,8 +463,8 @@ class AZTrackerBase:
             return None
 
     async def get_screenshots(self, meta: Meta) -> list[str] | None:
-        screenshot_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-        local_files = sorted(path for path in screenshot_dir.glob("*.png") if path.is_file() and not path.stem.upper().startswith(("POSTER", "COVER")))
+        screens_dir = screenshots_dir(meta.base_dir, meta.uuid)
+        local_files = sorted(path for path in screens_dir.glob("*.png") if path.is_file())
         results: list[str] = []
 
         limit = 3 if (meta.category == "TV" and meta.tv_pack == 0) else 15

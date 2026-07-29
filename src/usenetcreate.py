@@ -2,23 +2,24 @@
 import asyncio
 import contextlib
 import json
-import math
 import os
 import random
 import re
 import secrets
 import shutil
+import threading
 from pathlib import Path
 from typing import Any
 
 import aiofiles
 import aiofiles.os
 import aiofiles.ospath
+import psutil
 from rich.progress import BarColumn, Progress, TaskID, TaskProgressColumn, TextColumn
 
 from src.console import console, logger
 from src.meta import Meta
-from src.webui_progress import complete_progress, publish_progress
+from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
 
 def generate_random_poster() -> str:
@@ -161,27 +162,17 @@ async def run_command_with_logging(cmd: list[str], description: str) -> None:
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
 
 
-def parse_volume_size(vol_size: str) -> int:
-    """Parse volume size string (e.g. '100m', '1g') into bytes."""
-    if not vol_size:
-        return 0
-    vol_size = vol_size.lower().strip()
-    try:
-        if vol_size.endswith("g"):
-            return int(vol_size[:-1]) * 1024 * 1024 * 1024
-        if vol_size.endswith("m"):
-            return int(vol_size[:-1]) * 1024 * 1024
-        if vol_size.endswith("k"):
-            return int(vol_size[:-1]) * 1024
-        if vol_size.isdigit():
-            return int(vol_size)
-    except ValueError:
-        pass
-    return 0
+def format_byte_size(value: int) -> str:
+    """Return a compact binary byte-size string for progress details."""
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if value < 1024 or unit == "TiB":
+            return f"{value:.1f} {unit}" if unit != "B" else f"{value} B"
+        value /= 1024
+    return "0 B"
 
 
-async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, volume_size: str | None, total_size: int) -> None:
-    """Execute 7z archiving/splitting with real-time volume progress monitoring."""
+async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, _volume_size: str | None, total_size: int) -> None:
+    """Execute 7z archiving/splitting with byte-based real-time progress monitoring."""
     redacted_cmd = []
     skip_next = False
     for i, arg in enumerate(cmd):
@@ -199,10 +190,59 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
     logger.debug(f"[cyan]Running command: {redacted_str}[/cyan]")
 
     try:
-        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        # ``-bsp1`` makes 7z emit its own live percentage. File names and
+        # temporary-volume behavior vary by 7z build, so directory size alone
+        # is only a fallback for the structured Web UI progress.
+        progress_cmd = [cmd[0], cmd[1], "-bsp1", *cmd[2:]] if "-bsp1" not in cmd else cmd
+        process = await asyncio.create_subprocess_exec(*progress_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
 
-        vol_bytes = parse_volume_size(volume_size) if volume_size else 0
-        expected_volumes = math.ceil(total_size / vol_bytes) if vol_bytes > 0 else 1
+        progress_total = max(total_size, 1)
+        progress_id = "usenet-archive"
+        progress_label = "Creating Usenet archive"
+        publish_progress(progress_id, progress_label, current=0, total=100, detail="Starting 7z archive", group="media")
+
+        reported_percent = 0.0
+        bytes_written = 0
+        bytes_read = 0
+        archive_process: psutil.Process | None = None
+        read_bytes_start: int | None = None
+        try:
+            archive_process = psutil.Process(process.pid)
+            read_bytes_start = archive_process.io_counters().read_bytes
+        except psutil.AccessDenied, psutil.NoSuchProcess, OSError:
+            # 7z output and archive-size monitoring remain available on
+            # systems where the child process I/O counters cannot be read.
+            archive_process = None
+
+        async def read_7z_progress(stream: asyncio.StreamReader | None) -> str:
+            """Consume carriage-return 7z output and retain its latest percentage."""
+            nonlocal reported_percent
+            if stream is None:
+                return ""
+            chunks: list[bytes] = []
+            buffer = b""
+            while True:
+                chunk = await stream.read(4096)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                buffer += chunk
+                while True:
+                    boundaries = [index for index in (buffer.find(b"\r"), buffer.find(b"\n")) if index >= 0]
+                    if not boundaries:
+                        break
+                    boundary = min(boundaries)
+                    line = buffer[:boundary].decode(errors="replace")
+                    buffer = buffer[boundary + 1 :]
+                    for match in re.finditer(r"(?<!\d)(\d{1,3}(?:\.\d+)?)%", line):
+                        reported_percent = max(reported_percent, min(float(match.group(1)), 99.9))
+            # Some 7z builds only flush the last progress update at EOF.
+            for match in re.finditer(r"(?<!\d)(\d{1,3}(?:\.\d+)?)%", buffer.decode(errors="replace")):
+                reported_percent = max(reported_percent, min(float(match.group(1)), 99.9))
+            return b"".join(chunks).decode(errors="replace")
+
+        stdout_task = asyncio.create_task(read_7z_progress(process.stdout))
+        stderr_task = asyncio.create_task(read_7z_progress(process.stderr))
 
         with Progress(
             TextColumn("[progress.description]{task.description}"),
@@ -210,43 +250,62 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
             TaskProgressColumn(),
             console=console,
             transient=False,
+            disable=has_progress_callback(),
         ) as progress:
-            task = progress.add_task("Archiving/Splitting with 7z", total=expected_volumes)
+            task = progress.add_task("Archiving/Splitting with 7z", total=progress_total)
 
-            async def monitor_progress():
-                while process.returncode is None:
-                    with contextlib.suppress(Exception):
-                        files = [p.name for p in Path(usenet_dir).iterdir()]
-                        parts = []
-                        for f in files:
-                            if f.startswith(safe_name):
-                                if f == f"{safe_name}.7z":
-                                    parts.append(1)
-                                else:
-                                    m = re.search(r"\.7z\.(\d+)$", f)
-                                    if m:
-                                        parts.append(int(m.group(1)))
-                        current_part = max(parts) if parts else 0
-                        nonlocal expected_volumes
-                        if current_part > expected_volumes:
-                            expected_volumes = current_part
-                        progress.update(task, completed=current_part, total=expected_volumes)
-                    await asyncio.sleep(0.5)
+            # The Web UI confirmation prompt is synchronous: it blocks this
+            # event loop while waiting for the user.  Keep archive observation
+            # in a real thread so a running 7z process still updates SSE then.
+            monitor_stop = threading.Event()
 
-            monitor_task = asyncio.create_task(monitor_progress())
-            stdout, stderr = await process.communicate()
-            monitor_task.cancel()
+            def monitor_progress() -> None:
+                nonlocal archive_process, bytes_read, bytes_written
+                while not monitor_stop.is_set():
+                    if archive_process is not None and read_bytes_start is not None:
+                        try:
+                            bytes_read = max(archive_process.io_counters().read_bytes - read_bytes_start, 0)
+                        except psutil.AccessDenied, psutil.NoSuchProcess, OSError:
+                            archive_process = None
+                    try:
+                        archive_prefix = f"{safe_name}.7z"
+                        bytes_written = sum(entry.stat().st_size for entry in Path(usenet_dir).iterdir() if entry.is_file() and entry.name.startswith(archive_prefix))
+                    except OSError:
+                        # A volume can be renamed while it is inspected. Keep
+                        # the last known byte count and continue publishing 7z's
+                        # own percentage rather than dropping the SSE update.
+                        pass
+
+                    byte_percent = min((bytes_written / progress_total) * 100, 99.9)
+                    read_percent = min((bytes_read / progress_total) * 100, 99.9)
+                    percent = max(reported_percent, byte_percent, read_percent)
+                    processed_bytes = max(bytes_read, bytes_written)
+                    detail = f"{format_byte_size(processed_bytes)} / {format_byte_size(total_size)} processed"
+                    if reported_percent > max(byte_percent, read_percent):
+                        detail = f"{detail} | 7z: {reported_percent:.1f}%"
+                    publish_progress(progress_id, progress_label, current=percent, total=100, detail=detail, group="media")
+                    monitor_stop.wait(0.25)
+
+            monitor_thread = threading.Thread(target=monitor_progress, name="usenet-archive-progress", daemon=True)
+            monitor_thread.start()
+            try:
+                await process.wait()
+                stdout, stderr = await asyncio.gather(stdout_task, stderr_task)
+            finally:
+                monitor_stop.set()
+                await asyncio.to_thread(monitor_thread.join, 2)
 
             if process.returncode != 0:
                 logger.error(f"[red]Error running 7z Archiver (exit code {process.returncode}):[/red]")
                 if stdout:
-                    logger.info(f"[red]STDOUT:[/red]\n{stdout.decode(errors='replace')}")
+                    logger.info(f"[red]STDOUT:[/red]\n{stdout}")
                 if stderr:
-                    logger.info(f"[red]STDERR:[/red]\n{stderr.decode(errors='replace')}")
+                    logger.info(f"[red]STDERR:[/red]\n{stderr}")
                 raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
 
             # Finish progress display cleanly
-            progress.update(task, completed=expected_volumes, total=expected_volumes)
+            progress.update(task, completed=progress_total, total=progress_total)
+            complete_progress(progress_id, progress_label, current=100, total=100, detail="Archive created", group="media")
 
     except Exception as e:
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
@@ -278,6 +337,9 @@ async def run_par2_with_progress(cmd: list[str], cwd: str | None = None) -> None
     logger.debug(f"[cyan]Running command: {redacted_str}{cwd_str}[/cyan]")
 
     try:
+        progress_id = "usenet-par2"
+        progress_label = "Generating Usenet PAR2"
+        publish_progress(progress_id, progress_label, current=0, total=100, detail="Starting PAR2 generation", group="media")
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, cwd=cwd)
 
         stdout_accum = []
@@ -293,6 +355,7 @@ async def run_par2_with_progress(cmd: list[str], cwd: str | None = None) -> None
             TaskProgressColumn(),
             console=console,
             transient=False,
+            disable=has_progress_callback(),
         ) as progress:
             while True:
                 chunk = await process.stdout.read(4096)
@@ -328,6 +391,7 @@ async def run_par2_with_progress(cmd: list[str], cwd: str | None = None) -> None
                         if "par2" not in tasks:
                             tasks["par2"] = progress.add_task(action, total=100)
                         progress.update(tasks["par2"], description=action, completed=percent)
+                        publish_progress(progress_id, action, current=percent, total=100, detail=f"{percent:.1f}%", group="media")
 
             if "par2" in tasks:
                 progress.update(tasks["par2"], completed=100)
@@ -340,6 +404,7 @@ async def run_par2_with_progress(cmd: list[str], cwd: str | None = None) -> None
             if stdout_str:
                 logger.info(f"[red]OUTPUT:[/red]\n{stdout_str}")
             raise RuntimeError(f"Command '{redacted_str}' failed with exit code {process.returncode}")
+        complete_progress(progress_id, progress_label, current=100, total=100, detail="PAR2 files created", group="media")
 
     except Exception as e:
         raise RuntimeError(f"Failed to execute command '{redacted_str}': {e}") from e
@@ -787,7 +852,7 @@ async def verify_nzb_has_password(nzb_path: str) -> bool:
     return False
 
 
-async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str | None:
+async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepare_only: bool = False) -> str | None:
     """
     Prepare files (7z + PAR2) and upload them to Usenet via nyuu or pesto.
     Returns the absolute path to the generated NZB file if successful.
@@ -798,9 +863,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
         return None
 
     # Handle Usenet archive encryption/password
-    archive_password = usenet_cfg.get("archive_password")
+    archive_password = meta.archive_password or usenet_cfg.get("archive_password")
     if archive_password:
-        if str(archive_password).lower() == "random":
+        if str(archive_password).lower() == "random" and not meta.archive_password:
             while True:
                 archive_password = secrets.token_urlsafe(16)
                 if not archive_password.startswith("-"):
@@ -829,9 +894,10 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     safe_name = safe_name.replace(" ", ".")
 
     # Determine obfuscated archive name if password protection is enabled
-    archive_name = safe_name
-    if archive_password:
+    archive_name = str(meta.get("usenet_archive_name") or safe_name)
+    if archive_password and not meta.get("usenet_archive_name"):
         archive_name = secrets.token_hex(16)
+        meta.usenet_archive_name = archive_name
         logger.debug(f"[cyan]Obfuscating archive filenames to: {archive_name}[/cyan]")
 
     # NZB filename: prefer meta name (already properly constructed by UA).
@@ -901,14 +967,15 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
             return None
 
     if use_pesto:
-        try:
-            path_pesto = await check_binary("pesto", usenet_cfg.get("pesto_path"), meta=meta)
-        except FileNotFoundError as e:
-            if is_debug:
-                logger.warning(f"[yellow]Warning: {e} Using simulation mode for pesto.[/yellow]")
-            else:
-                logger.info(f"[bold red]Configuration Error: {e}[/bold red]")
-                return None
+        if not prepare_only:
+            try:
+                path_pesto = await check_binary("pesto", usenet_cfg.get("pesto_path"), meta=meta)
+            except FileNotFoundError as e:
+                if is_debug:
+                    logger.warning(f"[yellow]Warning: {e} Using simulation mode for pesto.[/yellow]")
+                else:
+                    logger.info(f"[bold red]Configuration Error: {e}[/bold red]")
+                    return None
     else:
         try:
             path_par2 = await check_binary("par2", usenet_cfg.get("par2_path"), meta=meta)
@@ -919,14 +986,15 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
                 logger.info(f"[bold red]Configuration Error: {e}[/bold red]")
                 return None
 
-        try:
-            path_nyuu = await check_binary("nyuu", usenet_cfg.get("nyuu_path"), meta=meta, path_7z=path_7z)
-        except FileNotFoundError as e:
-            if is_debug:
-                logger.warning(f"[yellow]Warning: {e} Using simulation mode for nyuu.[/yellow]")
-            else:
-                logger.info(f"[bold red]Configuration Error: {e}[/bold red]")
-                return None
+        if not prepare_only:
+            try:
+                path_nyuu = await check_binary("nyuu", usenet_cfg.get("nyuu_path"), meta=meta, path_7z=path_7z)
+            except FileNotFoundError as e:
+                if is_debug:
+                    logger.warning(f"[yellow]Warning: {e} Using simulation mode for nyuu.[/yellow]")
+                else:
+                    logger.info(f"[bold red]Configuration Error: {e}[/bold red]")
+                    return None
 
     # 2. Archive and Split with 7z (mx=0 to store without compression)
     skip_archive = usenet_cfg.get("skip_archive", False)
@@ -935,8 +1003,13 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     upload_root = usenet_dir
     cleanup_upload_root = True
     upload_files: list[Path] = []
+    prepared_files = meta.get("usenet_prepared_files", [])
+    use_prepared_files = not skip_archive and isinstance(prepared_files, list) and bool(prepared_files) and all(Path(str(file_path)).is_file() for file_path in prepared_files)
 
-    if skip_archive:
+    if use_prepared_files:
+        upload_files = [Path(str(file_path)) for file_path in prepared_files]
+        logger.info("[cyan]Reusing prepared Usenet archive and PAR2 files.[/cyan]")
+    elif skip_archive:
         if archive_password:
             logger.warning(
                 "[yellow]Warning: 'archive_password' is set but 'skip_archive' is enabled — no archive "
@@ -1002,7 +1075,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
     par2_percentage = usenet_cfg.get("par2_percentage", "10")
 
     # 3. PAR2 — only when using nyuu (pesto handles PAR2 internally)
-    if not use_pesto:
+    if not use_pesto and not use_prepared_files:
         target_files = [file_path for file_path in upload_files if file_path.is_file() and not file_path.name.endswith(".par2")]
 
         if target_files:
@@ -1024,6 +1097,13 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any]) -> str |
 
             generated_par2_files = [file_path for file_path in sorted(Path(par2_output_dir).glob(f"{archive_name}.par2*")) if file_path.is_file()]
             upload_files.extend(file_path for file_path in generated_par2_files if file_path not in upload_files)
+
+    if not skip_archive:
+        meta.usenet_prepared_files = [str(file_path) for file_path in upload_files]
+
+    if prepare_only:
+        logger.info("[cyan]Usenet archive and PAR2 preparation completed; posting will run later.[/cyan]")
+        return str(upload_root)
 
     # 4. Poster / From header
     random_poster = usenet_cfg.get("random_poster", True)

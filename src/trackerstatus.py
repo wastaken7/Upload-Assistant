@@ -170,8 +170,7 @@ class TrackerStatusManager:
                                     dupes = []
                                 else:
                                     try:
-                                        choice = cli_ui.ask_string(f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway? (y/N):")
-                                        if (choice or "").lower() == "y":
+                                        if cli_ui.ask_yes_no(f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway?", default=False):
                                             dupes = []
                                             # set trackers here so that they are not double checked later with cross seeding
                                             async with meta_lock:
@@ -214,8 +213,7 @@ class TrackerStatusManager:
                                     dupes = []
                                 else:
                                     try:
-                                        choice = cli_ui.ask_string(f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway? (y/N):")
-                                        if (choice or "").lower() == "y":
+                                        if cli_ui.ask_yes_no(f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway?", default=False):
                                             dupes = []
                                         else:
                                             local_tracker_status["skipped"] = True

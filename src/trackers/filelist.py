@@ -18,6 +18,7 @@ from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
+from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
 
 
@@ -394,11 +395,11 @@ class FileList:
                     }
                 if meta.imdb_id:
                     data["imdbURL"] = f"tt{meta.imdb_id}"
-                screen_glob = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.filename)}-*.png")]
+                screen_dir = screenshots_dir(meta.base_dir, meta.uuid)
+                screen_glob = [f.name for f in screen_dir.glob(f"{glob.escape(meta.filename)}-*.png")]
                 files: list[tuple[str, tuple[str, bytes, str]]] = []
                 for screen in screen_glob:
-                    screen_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{screen}"
-                    async with aiofiles.open(screen_path, "rb") as image_file:
+                    async with aiofiles.open(screen_dir / screen, "rb") as image_file:
                         image_bytes = await image_file.read()
                     files.append(("images", (Path(screen).name, image_bytes, "image/png")))
                 async with httpx.AsyncClient(timeout=30.0) as client:
@@ -421,11 +422,11 @@ class FileList:
                     final_desc += "[/pre][/quote]\n"  # Closed bbcode tags
                     # Upload screens and append to the end of the description
                     url = "https://up.img4k.net/api/description"
-                    screen_glob = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.filename)}-*.png")]
+                    screen_dir = screenshots_dir(meta.base_dir, meta.uuid)
+                    screen_glob = [f.name for f in screen_dir.glob(f"{glob.escape(meta.filename)}-*.png")]
                     files: list[tuple[str, tuple[str, bytes, str]]] = []
                     for screen in screen_glob:
-                        screen_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{screen}"
-                        async with aiofiles.open(screen_path, "rb") as image_file:
+                        async with aiofiles.open(screen_dir / screen, "rb") as image_file:
                             image_bytes = await image_file.read()
                         files.append(("images", (Path(screen).name, image_bytes, "image/png")))
                     async with httpx.AsyncClient(timeout=30.0) as client:
