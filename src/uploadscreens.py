@@ -730,6 +730,13 @@ async def _upload_screens(
         existing_images = [img for img in image_list if img.get("img_url") and img.get("web_url")]
         existing_count = len(existing_images)
 
+        uploaded_image_files = return_dict.get("_uploaded_image_files")
+        if isinstance(uploaded_image_files, set):
+            image_glob = [
+                file for file in image_glob
+                if str(Path(file).resolve()) not in uploaded_image_files
+            ]
+
     # Determine images needed
     images_needed = total_screens - existing_count if not retry_mode else total_screens
     logger.debug(f"[blue]Existing images: {existing_count}, Images needed: {images_needed}, Total screens: {total_screens}[/blue]")
@@ -744,6 +751,10 @@ async def _upload_screens(
     if existing_count >= total_screens and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
         logger.debug(f"[yellow]Skipping upload: {existing_count} existing, {total_screens} required.")
         return image_list, total_screens
+
+    if not image_glob:
+        logger.debug("[yellow]Skipping upload: no new source images available.[/yellow]")
+        return image_list, len(image_list)
 
     upload_tasks: list[tuple[int, str, str, dict[str, Any], Meta]] = [(index, image, img_host, config, meta) for index, image in enumerate(image_glob[:images_needed])]
 
@@ -791,6 +802,10 @@ async def _upload_screens(
                         running_tasks.discard(future)
 
                         if result.get("status") == "success":
+                            if not using_custom_img_list:
+                                uploaded_image_files = return_dict.setdefault("_uploaded_image_files", set())
+                                if isinstance(uploaded_image_files, set):
+                                    uploaded_image_files.add(str(Path(str(task_args[0])).resolve()))
                             return (index, result)
                         reason = result.get("reason", "Unknown error")
                         if "duplicate" in reason.lower():
@@ -857,6 +872,26 @@ async def _upload_screens(
         logger.debug(f"[blue]retry_mode: {retry_mode}, using_custom_img_list: {using_custom_img_list}[/blue]")
         logger.debug(f"[blue]successfully_uploaded={len(successfully_uploaded)}, meta.image_list={len(image_list)}, cutoff={meta.cutoff}[/blue]")
         if len(successfully_uploaded) < len(upload_tasks):
+            # Preserve partial successes before recursing so the next host only
+            # needs to handle failed source files and the accumulated list is
+            # not lost when fallback completes.
+            if not using_custom_img_list:
+                existing_raw_urls = {img["raw_url"] for img in image_list}
+                for _index, upload in successfully_uploaded:
+                    raw_url = upload["raw_url"]
+                    if raw_url in existing_raw_urls:
+                        continue
+                    new_image = {
+                        "img_url": upload["img_url"],
+                        "raw_url": raw_url,
+                        "web_url": upload["web_url"],
+                    }
+                    image_list.append(new_image)
+                    existing_raw_urls.add(raw_url)
+                    local_file_path = upload.get("local_file_path")
+                    if local_file_path:
+                        meta.image_sizes[raw_url] = Path(local_file_path).stat().st_size
+
             # Keep walking the configured hosts after a fallback also fails. The
             # previous retry_mode guard stopped the chain at img_host_2.
             next_host_num = img_host_num + 1
@@ -913,7 +948,7 @@ async def _upload_screens(
         if meta.debug and upload_start_time is not None:
             logger.info(f"Screenshot uploads processed in {time.time() - upload_start_time:.4f} seconds")
 
-        return (new_images, len(new_images)) if using_custom_img_list else (image_list, len(successfully_uploaded))
+        return (new_images, len(new_images)) if using_custom_img_list else (image_list, len(image_list))
 
     except asyncio.CancelledError:
         logger.info("\n[red]Upload process interrupted! Cancelling tasks...[/red]")
