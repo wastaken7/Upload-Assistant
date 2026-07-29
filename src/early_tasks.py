@@ -1,6 +1,7 @@
 """Background artifact preparation shared by prep and upload stages."""
 
 import asyncio
+import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -58,31 +59,40 @@ def is_usenet_only(meta: Meta) -> bool:
 
 async def create_base_torrents_early(meta: Meta, client: Clients) -> None:
     """Reuse or hash BASE torrents while metadata and screenshots are processed."""
+    task_started = time.perf_counter()
     if meta.nohash or meta.rehash or meta.force_recheck or is_usenet_only(meta):
+        logger.debug("[cyan]Skipping early torrent creation due to hashing or tracker settings.[/cyan]")
         return
 
     torrent_path = Path(meta.base_dir) / "tmp" / meta.uuid / "BASE.torrent"
     subs_torrent_path = Path(meta.base_dir) / "tmp" / meta.uuid / "BASE_SUBS.torrent"
     if torrent_path.exists():
+        logger.debug(f"[cyan]Skipping early torrent creation; BASE already exists at {torrent_path}[/cyan]")
         return
 
     try:
         reuse_torrent = meta.reuse_torrent_path
         if not reuse_torrent or not Path(reuse_torrent).exists():
+            logger.debug("[cyan]Early torrent creation has no cached reusable torrent; searching client.[/cyan]")
+            search_started = time.perf_counter()
             reuse_torrent = await client.find_existing_torrent(meta)
+            logger.debug(f"[cyan]Early client torrent search completed in {time.perf_counter() - search_started:.2f}s[/cyan]")
         if reuse_torrent and Path(reuse_torrent).exists():
             meta.reuse_torrent_path = reuse_torrent
-            logger.info("[cyan]Creating BASE torrent from the client copy while metadata and screenshots are processed.[/cyan]")
-            await TorrentCreator.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid)
+            logger.debug("[cyan]Creating torrent from the client copy while metadata and screenshots are processed.[/cyan]")
+            base_creation_started = time.perf_counter()
+            created_path = await TorrentCreator.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid)
+            logger.debug(f"[cyan]Early base torrent creation completed in {time.perf_counter() - base_creation_started:.2f}s: {created_path or 'no file created'}[/cyan]")
         else:
             logger.info("[cyan]No reusable client torrent found; creating BASE torrent while metadata and screenshots are processed.[/cyan]")
             await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
         if meta.subtitle_files and not subs_torrent_path.exists():
             await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS")
+        logger.debug(f"[cyan]Early torrent task completed in {time.perf_counter() - task_started:.2f}s[/cyan]")
     except asyncio.CancelledError:
         raise
     except Exception as error:
-        logger.warning(f"[yellow]Early BASE torrent creation failed; upload stage will retry: {error}[/yellow]")
+        logger.warning(f"[yellow]Early torrent creation failed; upload stage will retry: {error}[/yellow]")
 
 
 def needs_usenet_archive(meta: Meta) -> bool:

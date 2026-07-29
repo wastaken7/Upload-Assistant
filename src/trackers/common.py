@@ -3268,7 +3268,7 @@ class Common:
         # --nzb-password only tags NZB metadata, it doesn't encrypt), so a
         # configured password was never applied and won't be in the NZB.
         # That's expected, not an error.
-        password_applies = bool(usenet_cfg.get("archive_password")) and not usenet_cfg.get("skip_archive", False)
+        password_applies = bool(meta.archive_password or usenet_cfg.get("archive_password")) and not usenet_cfg.get("skip_archive", False)
         if password_applies and not await verify_nzb_has_password(nzb_path):
             logger.error(f"{tracker}: [red]Error: The NZB file does not contain the password in its metadata header. Aborting upload...[/red]")
             return False
