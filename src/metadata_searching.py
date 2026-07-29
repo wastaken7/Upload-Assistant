@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from src.console import logger
 from src.imdb import imdb_manager
 from src.meta import Meta
+from src.metadata_cache import cache_for, is_cache_miss
 from src.tmdb import TmdbManager
 from src.tvdb import TvdbData
 from src.tvmaze import tvmaze_manager
@@ -943,6 +944,11 @@ async def get_douban_id(meta: Meta) -> int:
     if not imdb_id:
         return douban_id
 
+    cache = cache_for(meta.base_dir)
+    cached = await cache.get("douban", "imdb_lookup", str(imdb_id))
+    if not is_cache_miss(cached) and isinstance(cached, dict):
+        return int(cached.get("id", 0) or 0)
+
     search_url = f"https://m.douban.com/search/?query={imdb_id}"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
 
@@ -980,9 +986,12 @@ async def get_douban_id(meta: Meta) -> int:
                 link_mobile = str(link_tag["href"])
                 match = re.search(r"subject/(\d+)", link_mobile)
                 if match:
-                    return int(match.group(1))
+                    douban_id = int(match.group(1))
+                    await cache.set("douban", "imdb_lookup", str(imdb_id), {"id": douban_id})
+                    return douban_id
 
         logger.info(f"[bold yellow]No Douban ID found for IMDb ID {imdb_id}.[/bold yellow]")
+        await cache.set("douban", "imdb_lookup", str(imdb_id), {"id": 0}, negative=True)
         return douban_id
 
     except Exception as e:

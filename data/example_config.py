@@ -14,6 +14,56 @@ config: dict[str, Any] = {
         # visit "https://www.themoviedb.org/settings/api" copy api key and insert below
         "tmdb_api": "",
 
+        # METADATA CACHE
+        # Temporarily saves responses from sites such as TMDB and IMDb. Future
+        # runs can reuse this data and make fewer API requests.
+        # Leave this as True in most cases. Use False only to test fresh data
+        # or troubleshoot an outdated result.
+        "metadata_cache_enabled": True,
+
+        # Folder where cached data is saved. Relative paths are created inside
+        # the Upload-Assistant folder. You normally do not need to change this.
+        "metadata_cache_dir": "data/cache/metadata",
+
+        # Number of hours a normal result can be reused.
+        # 168 = 7 days. Lower this for fresher data, or raise it to reduce API
+        # requests further.
+        "metadata_cache_default_ttl_hours": 168,
+
+        # Number of minutes a search with no result is remembered. This avoids
+        # repeating a query that an API did not find. 60 = 1 hour.
+        "metadata_cache_negative_ttl_minutes": 60,
+
+        # Optional settings for each service. "enabled": False disables caching
+        # only for that service. "ttl_hours" overrides the default above.
+        # You can remove services from this list to use the default duration.
+        "metadata_cache_services": {
+            # Movies and TV Shows. "localized_ttl_hours" controls data in other
+            # languages, such as a Portuguese overview and title.
+            "tmdb": {"enabled": True, "ttl_hours": 168, "localized_ttl_hours": 168},
+            # Movie and series information identified by tt1234567.
+            "imdb": {"enabled": True, "ttl_hours": 72},
+            # Episode guides and show names.
+            "tvdb": {"enabled": True, "ttl_hours": 168},
+            "tvmaze": {"enabled": True, "ttl_hours": 24},
+            # Anime information, including romaji titles and MAL IDs.
+            "anilist": {"enabled": True, "ttl_hours": 168},
+            "douban": {"enabled": True, "ttl_hours": 168},
+            "thexem": {"enabled": True, "ttl_hours": 168},
+            # Game information.
+            "igdb": {"enabled": True, "ttl_hours": 168},
+            "steam": {"enabled": True, "ttl_hours": 72},
+            # Book, audiobook, and comic metadata. This data changes rarely,
+            # so the default here is 30 days (720 hours).
+            "google_books": {"enabled": True, "ttl_hours": 720},
+            "openlibrary": {"enabled": True, "ttl_hours": 720},
+            # Data fetched from a MAM account; a shorter duration reflects changes.
+            "myanonamouse": {"enabled": True, "ttl_hours": 24},
+            # Music release metadata; it also uses 30 days because it changes rarely.
+            "musicbrainz": {"enabled": True, "ttl_hours": 720},
+            "discogs": {"enabled": True, "ttl_hours": 720},
+        },
+
         # Google Books API key. "" = disabled
         # You can get one here https://console.cloud.google.com/apis/library/books.googleapis.com
         "google_books_api_key": "",

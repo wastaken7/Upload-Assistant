@@ -14,6 +14,7 @@ import httpx
 
 from src.cleanup import cleanup_manager
 from src.console import logger
+from src.metadata_cache import cache_for, is_cache_miss
 
 anitopy_parse_fn: Any = cast(Any, anitopy).parse
 guessit_module: Any = cast(Any, guessit)
@@ -50,6 +51,12 @@ class ImdbManager:
         except Exception as e:
             logger.error(f"[red]Error:[/red] {e}")
             return imdb_info
+
+        cache = cache_for("")
+        cache_key = f"{imdb_id_str}|{manual_language!s}"
+        cached_info = await cache.get("imdb", "title", cache_key)
+        if not is_cache_miss(cached_info) and isinstance(cached_info, dict):
+            return cached_info
 
         query = {
             "query": f"""
@@ -456,7 +463,7 @@ class ImdbManager:
             imdb_info["tv_year"] = None
 
         logger.debug(f"[yellow]IMDb Response: {json.dumps(imdb_info, indent=2)[:1000]}...[/yellow]")
-
+        await cache.set("imdb", "title", cache_key, imdb_info)
         return imdb_info
 
     async def search_imdb(

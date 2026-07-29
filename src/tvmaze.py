@@ -7,6 +7,7 @@ import httpx
 
 from src.console import logger
 from src.meta import Meta
+from src.metadata_cache import cache_for, is_cache_miss
 
 
 class TvmazeManager:
@@ -146,15 +147,23 @@ class TvmazeManager:
         params: dict[str, Any],
     ) -> dict[str, Any] | list[dict[str, Any]] | None:
         """Sync function to make the request inside ThreadPoolExecutor."""
+        cache_key = json.dumps({"url": url, "params": params}, sort_keys=True, default=str)
+        cache = cache_for("")
+        cached = await cache.get("tvmaze", "response", cache_key)
+        if not is_cache_miss(cached) and isinstance(cached, (dict, list)):
+            return cast(dict[str, Any] | list[dict[str, Any]], cached)
         try:
             async with httpx.AsyncClient(follow_redirects=True) as client:
                 resp = await client.get(url, params=params, timeout=10)
                 if resp.status_code == 200:
                     data: Any = resp.json()
                     if isinstance(data, dict):
+                        await cache.set("tvmaze", "response", cache_key, data)
                         return cast(dict[str, Any], data)
                     if isinstance(data, list):
-                        return [cast(dict[str, Any], item) for item in data if isinstance(item, dict)]
+                        result = [cast(dict[str, Any], item) for item in data if isinstance(item, dict)]
+                        await cache.set("tvmaze", "response", cache_key, result, negative=not bool(result))
+                        return result
                     return None
                 return None
         except httpx.HTTPStatusError as e:
