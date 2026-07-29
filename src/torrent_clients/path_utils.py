@@ -1,3 +1,4 @@
+# Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import ast
 import os
 from pathlib import Path, PureWindowsPath
@@ -5,6 +6,7 @@ from typing import cast
 
 
 def coerce_str_list(value: object) -> list[str]:
+    """Coerce a configured path value into a list of non-empty strings."""
     if isinstance(value, (list, tuple)):
         values = cast(list[object] | tuple[object, ...], value)
         return [str(item) for item in values if item is not None and str(item)]
@@ -23,17 +25,12 @@ def coerce_str_list(value: object) -> list[str]:
 
 
 def is_path_under(path: str | Path, root: str | Path) -> bool:
-    path_parts = Path(os.path.normpath(str(path))).parts
-    root_parts = Path(os.path.normpath(str(root))).parts
-    if len(path_parts) < len(root_parts):
-        return False
-    return all(
-        os.path.normcase(path_part).casefold() == os.path.normcase(root_part).casefold()
-        for path_part, root_part in zip(path_parts[: len(root_parts)], root_parts, strict=True)
-    )
+    """Return whether path is within root using case-insensitive boundaries."""
+    return _relative_path_parts(path, root) is not None
 
 
 def _relative_path_parts(path: str | Path, root: str | Path) -> tuple[str, ...] | None:
+    """Return path components below root, or None when root is not a prefix."""
     path_parts = Path(os.path.normpath(str(path))).parts
     root_parts = Path(os.path.normpath(str(root))).parts
     if len(path_parts) < len(root_parts):
@@ -73,9 +70,10 @@ def map_save_path(
 
 
 def tracker_directory(link_target: str | Path, link_dir_name: str, tracker: str) -> Path:
+    """Build a safe tracker link directory and reject unsafe Windows names."""
     directory_name = link_dir_name.strip() or tracker
     windows_path = PureWindowsPath(directory_name)
-    windows_device_name = windows_path.stem.rstrip(" .").casefold()
+    windows_device_name = directory_name.split(".", 1)[0].rstrip(" .").casefold()
     reserved_device_names = {"con", "prn", "aux", "nul", *(f"com{index}" for index in range(1, 10)), *(f"lpt{index}" for index in range(1, 10))}
     unsafe_name = (
         not directory_name
