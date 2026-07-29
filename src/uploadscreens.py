@@ -23,6 +23,7 @@ type ImageDict = dict[str, Any]
 
 class UploadScreensManager:
     def __init__(self, config: dict[str, Any]) -> None:
+        """Initialize screenshot uploads with application configuration."""
         self.config = config
 
     async def upload_screens(
@@ -38,6 +39,7 @@ class UploadScreensManager:
         max_retries: int = 3,
         allowed_hosts: list[str] | None = None,
     ) -> tuple[list[ImageDict], int]:
+        """Upload selected screenshots and return their metadata."""
         return await _upload_screens(
             self.config,
             meta,
@@ -54,6 +56,7 @@ class UploadScreensManager:
 
 
 async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
+    """Upload one image and normalize the selected host's response URLs."""
     image, img_host, config, _meta = args
     try:
         timeout = 60  # Default timeout
@@ -603,6 +606,7 @@ async def _upload_screens(
     max_retries: int = 3,
     allowed_hosts: list[str] | None = None,
 ) -> tuple[list[ImageDict], int]:
+    """Select screenshots, throttle uploads, and collect successful results."""
     default_config = config.get("DEFAULT", {})
     if "image_list" not in meta:
         meta.image_list = []
@@ -685,6 +689,7 @@ async def _upload_screens(
                         menu_basenames.add(Path(local_path).name)
 
         def is_menu_screenshot(filename: str) -> bool:
+            """Return whether filename is a DVD menu screenshot."""
             if filename in menu_basenames:
                 return True
             return "-VIDEO_TS-" in filename or "-VTS_" in filename
@@ -693,6 +698,7 @@ async def _upload_screens(
 
         # Sort images by numeric suffix
         def extract_numeric_suffix(filename: str) -> float:
+            """Return the numeric suffix used to order screenshots."""
             match = re.search(r"-(\d+)\.png$", filename)
             return int(match.group(1)) if match else float("inf")
 
@@ -895,6 +901,7 @@ async def imgbox_upload(
     image_glob: list[str],
     return_dict: dict[str, Any],
 ) -> list[dict[str, str]]:
+    """Upload images to Imgbox and return their generated URLs."""
     try:
         os.chdir(chdir)
         image_list: list[dict[str, str]] = []
@@ -902,6 +909,7 @@ async def imgbox_upload(
         async with pyimgbox.Gallery(thumb_width=350, square_thumbs=False) as gallery:
 
             async def process_image(image: str) -> None:
+                """Upload one image through the active Imgbox gallery."""
                 try:
                     async for submission in cast(Any, gallery).add([image]):
                         submission_data = cast(dict[str, Any], submission)
