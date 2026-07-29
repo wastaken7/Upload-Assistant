@@ -22,10 +22,12 @@ type ImageDict = dict[str, Any]
 
 
 def _build_image_start_limiter(delay: float) -> Callable[[], Awaitable[None]]:
+    """Create an async wait function that spaces image-upload starts."""
     start_lock = asyncio.Lock()
     last_start = 0.0
 
     async def wait_for_start_slot() -> None:
+        """Wait until the next upload start interval is available."""
         nonlocal last_start
         if delay <= 0:
             return
@@ -41,6 +43,7 @@ def _build_image_start_limiter(delay: float) -> Callable[[], Awaitable[None]]:
 
 class UploadScreensManager:
     def __init__(self, config: dict[str, Any]) -> None:
+        """Initialize screenshot uploads with the application configuration."""
         self.config = config
 
     async def upload_screens(
@@ -56,6 +59,7 @@ class UploadScreensManager:
         max_retries: int = 3,
         allowed_hosts: list[str] | None = None,
     ) -> tuple[list[ImageDict], int]:
+        """Upload the selected screenshots and return uploaded image metadata."""
         return await _upload_screens(
             self.config,
             meta,
@@ -72,6 +76,7 @@ class UploadScreensManager:
 
 
 async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
+    """Upload one image to the selected host and return its generated URLs."""
     image, img_host, config, _meta = args
     try:
         timeout = 60  # Default timeout
@@ -599,6 +604,7 @@ async def _upload_screens(
     max_retries: int = 3,
     allowed_hosts: list[str] | None = None,
 ) -> tuple[list[ImageDict], int]:
+    """Select screenshots, throttle uploads, and collect successful results."""
     default_config = config.get("DEFAULT", {})
     if "image_list" not in meta:
         meta.image_list = []
@@ -681,6 +687,7 @@ async def _upload_screens(
                         menu_basenames.add(Path(local_path).name)
 
         def is_menu_screenshot(filename: str) -> bool:
+            """Return whether filename belongs to a DVD menu screenshot."""
             if filename in menu_basenames:
                 return True
             return "-VIDEO_TS-" in filename or "-VTS_" in filename
@@ -689,6 +696,7 @@ async def _upload_screens(
 
         # Sort images by numeric suffix
         def extract_numeric_suffix(filename: str) -> float:
+            """Return the numeric screenshot suffix for stable ordering."""
             match = re.search(r"-(\d+)\.png$", filename)
             return int(match.group(1)) if match else float("inf")
 
@@ -722,7 +730,7 @@ async def _upload_screens(
     configured_concurrency = default_config.get("image_upload_concurrency", 0)
     try:
         configured_concurrency = int(configured_concurrency)
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         configured_concurrency = 0
     pool_size = configured_concurrency if configured_concurrency > 0 else host_limits.get(img_host, default_pool_size)
     max_workers = min(len(upload_tasks), pool_size)
@@ -904,6 +912,7 @@ async def imgbox_upload(
     image_glob: list[str],
     return_dict: dict[str, Any],
 ) -> list[dict[str, str]]:
+    """Upload images to Imgbox and store their returned URLs."""
     try:
         os.chdir(chdir)
         image_list: list[dict[str, str]] = []
@@ -911,6 +920,7 @@ async def imgbox_upload(
         async with pyimgbox.Gallery(thumb_width=350, square_thumbs=False) as gallery:
 
             async def process_image(image: str) -> None:
+                """Upload one image through the active Imgbox gallery."""
                 try:
                     async for submission in cast(Any, gallery).add([image]):
                         submission_data = cast(dict[str, Any], submission)
