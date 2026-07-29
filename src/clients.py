@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import contextlib
 import os
 import re
 import shutil
@@ -25,15 +24,25 @@ defusedxml.xmlrpc.monkey_patch()
 class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, TransmissionClientMixin):
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
+        self._tracker_comment_hosts: dict[str, tuple[str, ...]] | None = None
+
+    @staticmethod
+    def _matches_tracker_host(host: str, tracker_hosts: dict[str, tuple[str, ...]]) -> str | None:
+        for tracker_name, domains in tracker_hosts.items():
+            if any(host == domain or host.endswith(f".{domain}") for domain in domains):
+                return tracker_name
+        return None
+
+    def _get_tracker_comment_hosts(self) -> dict[str, tuple[str, ...]]:
+        if self._tracker_comment_hosts is None:
+            from src.trackersetup import get_tracker_comment_hosts
+
+            self._tracker_comment_hosts = get_tracker_comment_hosts(self.config)
+        return self._tracker_comment_hosts
 
     def _extract_tracker_ids_from_comment(self, comment: str) -> dict[str, str]:
         if not comment:
             return {}
-
-        def _is_host(host: str, domain: str) -> bool:
-            host = host.lower()
-            domain = domain.lower()
-            return host == domain or host.endswith(f".{domain}")
 
         def _last_path_id(path: str) -> str | None:
             match = re.search(r"/(\d+)$", path)
@@ -44,58 +53,14 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             return values[0] if values else None
 
         tracker_ids: dict[str, str] = {}
-
-        from src.trackersetup import tracker_class_map
-
-        tracker_hosts: dict[str, tuple[str, ...]] = {}
-        for tracker_name in set(tracker_class_map.keys()) | {"PASSTHEPOPCORN", "BeyondHD", "BTN", "HDBITS"}:
-            # Check base_url from class
-            hostname = ""
-            if tracker_name in tracker_class_map:
-                with contextlib.suppress(Exception):
-                    tracker_instance = tracker_class_map[tracker_name](self.config)
-                    base_url = getattr(tracker_instance, "base_url", "")
-                    if base_url:
-                        hostname = urllib.parse.urlparse(base_url).hostname or ""
-            # Fallback to announce_url from config
-            if not hostname:
-                announce_url = self.config.get("TRACKERS", {}).get(tracker_name, {}).get("announce_url", "")
-                if announce_url:
-                    hostname = urllib.parse.urlparse(announce_url).hostname or ""
-            # Hardcoded fallbacks if config/class is not loaded yet or not configured
-            if not hostname:
-                hardcoded_hosts = {
-                    "PASSTHEPOPCORN": "passthepopcorn.me",
-                    "AITHER": "aither.cc",
-                    "LST": "lst.gg",
-                    "ONLYENCODES": "onlyencodes.cc",
-                    "BLUTOPIA": "blutopia.cc",
-                    "ULCX": "upload.cx",
-                    "HDBITS": "hdbits.org",
-                    "BTN": "broadcasthe.net",
-                    "BEYONDHD": "beyond-hd.me",
-                    "HAWKEUNO": "hawke.uno",
-                    "ORPHEUS": "orpheus.network",
-                }
-                hostname = hardcoded_hosts.get(tracker_name, "")
-            if hostname:
-                domains = (hostname.lower(),)
-                if tracker_name == "ORPHEUS":
-                    domains = tuple(dict.fromkeys((*domains, "orpheus.network", "home.opsfet.ch")))
-                tracker_hosts[tracker_name] = domains
-
         urls: list[str] = re.findall(r"https?://[^\s\"'<>]+", comment)
+        tracker_hosts = self._get_tracker_comment_hosts()
         for url in urls:
             parsed = urllib.parse.urlparse(url)
             host = (parsed.hostname or "").lower()
             path = parsed.path
 
-            # Match against tracker_hosts
-            matched_tracker = None
-            for name, domains in tracker_hosts.items():
-                if any(_is_host(host, domain) for domain in domains):
-                    matched_tracker = name
-                    break
+            matched_tracker = self._matches_tracker_host(host, tracker_hosts)
 
             if not matched_tracker:
                 continue
@@ -123,7 +88,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 btn_id = _query_id(parsed.query, "id")
                 if btn_id:
                     tracker_ids[tracker_key] = btn_id
-            elif matched_tracker == "BeyondHD":
+            elif matched_tracker in {"BeyondHD", "BEYONDHD"}:
                 match = re.search(r"/details/(\d+)", path)
                 if match:
                     tracker_ids[tracker_key] = match.group(1)

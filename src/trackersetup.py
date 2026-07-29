@@ -6,6 +6,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlparse
 
 import aiofiles
 import cli_ui
@@ -1412,6 +1413,46 @@ tracker_class_map: dict[str, Any] = {
     "YUSCENE": YUSCENE,
     "ZENITH": Zenith,
 }
+
+
+def get_tracker_comment_hosts(config: dict[str, Any]) -> dict[str, tuple[str, ...]]:
+    """Return tracker domains usable when parsing torrent-comment URLs.
+
+    Hosts are metadata of the registered tracker classes, so looking up a
+    comment never needs to instantiate every tracker. ``comment_hosts`` or
+    the existing ``tracker_urls`` class attribute covers additional domains;
+    configured ``base_url`` and ``announce_url`` cover runtime overrides.
+    """
+
+    def hostname(value: Any) -> str | None:
+        if not isinstance(value, str) or not value:
+            return None
+        parsed = urlparse(value if "://" in value else f"//{value}")
+        return parsed.hostname.lower() if parsed.hostname else None
+
+    trackers_config = config.get("TRACKERS", {})
+    tracker_config_map = trackers_config if isinstance(trackers_config, dict) else {}
+    tracker_hosts: dict[str, tuple[str, ...]] = {}
+
+    for tracker_name, tracker_class in tracker_class_map.items():
+        domains = [resolved_host for value in (getattr(tracker_class, "base_url", ""),) if (resolved_host := hostname(value))]
+
+        for attribute_name in ("comment_hosts", "tracker_urls"):
+            values = getattr(tracker_class, attribute_name, ())
+            if isinstance(values, str):
+                values = (values,)
+            if isinstance(values, tuple | list):
+                domains.extend(resolved_host for value in values if (resolved_host := hostname(value)))
+
+        tracker_config = tracker_config_map.get(tracker_name, {})
+        if isinstance(tracker_config, dict):
+            domains.extend(resolved_host for key in ("base_url", "announce_url") if (resolved_host := hostname(tracker_config.get(key, ""))))
+
+        if domains:
+            tracker_hosts[tracker_name] = tuple(dict.fromkeys(domains))
+
+    return tracker_hosts
+
 
 api_trackers: set[str] = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "unit3d_api"}
 other_api_trackers: set[str] = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "other_api"}

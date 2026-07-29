@@ -1907,6 +1907,20 @@ def _resolve_execution_screenshot_review(session_id: str) -> tuple[Path, Mapping
     return temp_dir, meta_data
 
 
+def _screenshot_review_meta(temp_dir: Path, meta_data: Mapping[str, object]) -> Mapping[str, object]:
+    """Include cached hosted images when a resumed run has not restored them into meta.json yet."""
+    result = dict(meta_data)
+    if result.get("image_list"):
+        return result
+    try:
+        cached = _json_load_dict((temp_dir / "image_data.json").read_text(encoding="utf-8"))
+    except Exception:
+        cached = None
+    if cached and isinstance(cached.get("image_list"), list):
+        result["image_list"] = cached["image_list"]
+    return result
+
+
 class BrowseItem(TypedDict, total=False):
     """Serialized representation of an entry returned by the browse API."""
 
@@ -4308,10 +4322,11 @@ def execution_screenshots():
     if resolved is None:
         return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
 
-    from src.screenshot_review import image_version, list_screenshots
+    from src.screenshot_review import image_version, list_review_items
 
     temp_dir, meta_data = resolved
-    items = list_screenshots(temp_dir, meta_data)
+    meta_data = _screenshot_review_meta(temp_dir, meta_data)
+    items = list_review_items(temp_dir, meta_data)
     return jsonify(
         {
             "success": True,
@@ -4319,10 +4334,16 @@ def execution_screenshots():
             "screenshots": [
                 {
                     "id": item.id,
-                    "filename": item.path.name,
-                    "size": item.path.stat().st_size,
-                    "image_url": f"/api/execution_screenshots/{item.id}/image?session_id={session_id}&v={image_version(temp_dir, item.id, item.path.stat().st_mtime_ns)}",
-                    "can_replace": not bool(meta_data.get("is_disc")),
+                    "filename": item.path.name if item.path else f"Remote image {item.index + 1}",
+                    "size": item.path.stat().st_size if item.path else None,
+                    "source": item.source,
+                    "image_url": (
+                        f"/api/execution_screenshots/{item.id}/image?session_id={session_id}&v={image_version(temp_dir, item.id, item.path.stat().st_mtime_ns)}"
+                        if item.path
+                        else str((item.remote_image or {}).get("img_url") or (item.remote_image or {}).get("raw_url") or "")
+                    ),
+                    "can_replace": not bool(meta_data.get("is_disc")) and item.source != "addition",
+                    "can_delete": item.source in {"local", "addition"},
                 }
                 for item in items
             ],
@@ -4337,11 +4358,12 @@ def execution_screenshot_image(screenshot_id: str):
     resolved = _resolve_execution_screenshot_review(session_id)
     if resolved is None:
         return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
-    from src.screenshot_review import list_screenshots
+    from src.screenshot_review import list_review_items
 
     temp_dir, meta_data = resolved
-    screenshot = next((item for item in list_screenshots(temp_dir, meta_data) if item.id == screenshot_id), None)
-    if screenshot is None:
+    meta_data = _screenshot_review_meta(temp_dir, meta_data)
+    screenshot = next((item for item in list_review_items(temp_dir, meta_data) if item.id == screenshot_id), None)
+    if screenshot is None or screenshot.path is None:
         return jsonify({"success": False, "error": "Screenshot not found"}), 404
     response = send_file(screenshot.path, mimetype="image/png", conditional=True, max_age=0)
     response.headers["Cache-Control"] = "no-store, max-age=0"  # type: ignore[attr-defined]
@@ -4359,8 +4381,7 @@ def add_execution_screenshot():
     if resolved is None:
         return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
     temp_dir, meta_data = resolved
-    if meta_data.get("image_list"):
-        return jsonify({"success": False, "error": "Screenshots can no longer be changed after image hosting starts"}), 409
+    meta_data = _screenshot_review_meta(temp_dir, meta_data)
 
     try:
         from src.screenshot_review import add_screenshot
@@ -4377,7 +4398,7 @@ def add_execution_screenshot():
 @app.route("/api/execution_screenshots/<screenshot_id>/<action>", methods=["POST"])
 def mutate_execution_screenshot(screenshot_id: str, action: str):
     """Delete or replace a reviewed frame with CSRF and same-origin protection."""
-    if action not in {"delete", "replace"}:
+    if action not in {"delete", "replace", "undo"}:
         return jsonify({"success": False, "error": "Unsupported screenshot action"}), 404
     if not _verify_csrf_header() or not _verify_same_origin():
         return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
@@ -4387,14 +4408,15 @@ def mutate_execution_screenshot(screenshot_id: str, action: str):
     if resolved is None:
         return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
     temp_dir, meta_data = resolved
-    if meta_data.get("image_list"):
-        return jsonify({"success": False, "error": "Screenshots can no longer be changed after image hosting starts"}), 409
+    meta_data = _screenshot_review_meta(temp_dir, meta_data)
 
     try:
-        from src.screenshot_review import delete_screenshot, replace_screenshot
+        from src.screenshot_review import delete_screenshot, replace_screenshot, undo_remote_replacement
 
         if action == "delete":
             delete_screenshot(temp_dir, meta_data, screenshot_id)
+        elif action == "undo":
+            undo_remote_replacement(temp_dir, screenshot_id)
         else:
             asyncio.run(replace_screenshot(temp_dir, meta_data, screenshot_id))
     except (FileNotFoundError, ValueError) as error:
