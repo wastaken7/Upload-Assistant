@@ -56,6 +56,7 @@ config: dict[str, Any] = {
             # Book, audiobook, and comic metadata. This data changes rarely,
             # so the default here is 30 days (720 hours).
             "google_books": {"enabled": True, "ttl_hours": 720},
+            # Work IDs, ISBNs, and author names from OpenLibrary.
             "openlibrary": {"enabled": True, "ttl_hours": 720},
             # Data fetched from a MAM account; a shorter duration reflects changes.
             "myanonamouse": {"enabled": True, "ttl_hours": 24},

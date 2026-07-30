@@ -294,7 +294,8 @@ class ImdbManager:
 
         title_data = self.safe_get(data, ["data", "title"], {})
         if not title_data:
-            await cache.set("imdb", "title", cache_key, imdb_info, negative=True)
+            if not data.get("errors"):
+                await cache.set("imdb", "title", cache_key, imdb_info, negative=True)
             return imdb_info  # Return empty if no data found
 
         imdb_info["imdbID"] = imdb_id_str
