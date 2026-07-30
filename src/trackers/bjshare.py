@@ -50,6 +50,7 @@ class BJShare:
     secret_token: str = ""
     already_has_the_info: bool = False
     database_title: str = ""
+    database_identifier: str = ""
     tmdb_localization_requirements: ClassVar = {
         "pt-BR": {
             "main": "credits,videos,content_ratings",
@@ -566,7 +567,7 @@ class BJShare:
             if BJShare.database_title:
                 original_title = BJShare.database_title
 
-            main_tmdb_data = meta.tmdb_localized_data.get("pt-BR", {}).get("main") or {}
+            main_tmdb_data = dict(meta.tmdb_localized_data.get("pt-BR", {}).get("main")) or {}
             tmdb_title = main_tmdb_data.get("name") or main_tmdb_data.get("title")
 
             original_titles_to_compare = (
@@ -700,24 +701,54 @@ class BJShare:
 
         return original_title
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
-        dupes: list[dict[str, str]] = []
+    def get_database_identifier(self, soup: BeautifulSoup) -> str:
+        """Return the IMDb or TMDb identifier used by an existing BJShare group."""
+        for box in soup.find_all("div", class_="box"):
+            header = box.find("div", class_="head")
+            if not header or "Informações" not in header.get_text():
+                continue
+
+            for row in box.find_all("tr"):
+                cells = row.find_all("td")
+                if len(cells) < 2:
+                    continue
+
+                label = cells[0].get_text(" ", strip=True).lower()
+                link = cells[1].find("a", href=True)
+                href = str(link.get("href", "")) if link else ""
+
+                if "imdb" in label:
+                    match = re.search(r"tt\d+", href, re.IGNORECASE)
+                    if match:
+                        return match.group(0).lower()
+
+                if "tmdb" in label:
+                    match = re.search(r"themoviedb\.org/(movie|tv)/(\d+)", href, re.IGNORECASE)
+                    if match:
+                        return f"{match.group(1).lower()}/{match.group(2)}"
+
+        return ""
+
+    async def search_existing(self, meta: Meta) -> list[dict[str, str | list[str]]]:
+        dupes: list[dict[str, str | list[str]]] = []
         category = meta.category
         title = meta.title
         if category == "BOOK" and meta.title:
             title = self.common.portuguese_title_capitalization(meta.title)
         search_url = f"{self.base_url}/torrents.php"
+        params = {"searchstr": title}
 
+        media_search_terms: list[str] = []
         if category in ("TV", "MOVIE"):
-            if not dict(meta.imdb_info).get("imdbID"):
-                logger.info(f"{self.tracker}: [bold red]IMDb ID not found in metadata. Skipping duplicate check.[/bold red]")
-                return dupes
+            imdb_id = str(dict(meta.imdb_info).get("imdbID", "")).strip()
+            if imdb_id:
+                media_search_terms.append(imdb_id)
 
-            params = {
-                "searchstr": meta.imdb_info["imdbID"],
-            }
+            tmdb_id = str(meta.tmdb_id or "").strip()
+            if tmdb_id:
+                media_search_terms.append(f"{category.lower()}/{tmdb_id}")
 
-        if category == "BOOK":
+        elif category == "BOOK":
             filter_cat = "11" if meta.audiobook else "10"
             params = {
                 "searchstr": title,
@@ -746,21 +777,59 @@ class BJShare:
 
         BJShare.already_has_the_info = False
         BJShare.database_title = ""
+        BJShare.database_identifier = ""
 
-        response = await self.session.get(search_url, params=params, follow_redirects=True)
-        response.raise_for_status()
-        if "login.php" in str(response.url) or "login.php" in response.text:
-            await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-            meta.skipping = f"{self.tracker}"
-            return dupes
+        search_params = [params]
+        title_already_queried = False
+        if category in ("TV", "MOVIE"):
+            # Query both exact IDs. The first group page found is retained, while
+            # a title search remains available for older groups lacking either ID.
+            search_params = [{"searchstr": term} for term in dict.fromkeys(media_search_terms)]
+            title_already_queried = not search_params
+            if not search_params:
+                search_params.append({"searchstr": title})
 
-        # Extract auth token if present
-        auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", response.text)
-        if auth_match:
+        response: httpx.Response | None = None
+        fallback_response: httpx.Response | None = None
+        for query_params in search_params:
+            candidate = await self.session.get(search_url, params=query_params, follow_redirects=True)
+            candidate.raise_for_status()
+            if "login.php" in str(candidate.url) or "login.php" in candidate.text:
+                await self.cookie_validator.handle_validation_failure(meta, self.tracker, candidate.text)
+                meta.skipping = f"{self.tracker}"
+                return dupes
+
+            auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", candidate.text)
+            if not auth_match:
+                logger.info(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
+                meta.skipping = f"{self.tracker}"
+                return dupes
             BJShare.secret_token = auth_match.group(1)
-        else:
-            logger.info(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
-            meta.skipping = f"{self.tracker}"
+
+            fallback_response = candidate
+            if response is None and BeautifulSoup(candidate.text, "html.parser").find("div", class_="main_column"):
+                response = candidate
+
+        if category in ("TV", "MOVIE") and response is None and title and not title_already_queried and title not in media_search_terms:
+            candidate = await self.session.get(search_url, params={"searchstr": title}, follow_redirects=True)
+            candidate.raise_for_status()
+            if "login.php" in str(candidate.url) or "login.php" in candidate.text:
+                await self.cookie_validator.handle_validation_failure(meta, self.tracker, candidate.text)
+                meta.skipping = f"{self.tracker}"
+                return dupes
+
+            auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", candidate.text)
+            if not auth_match:
+                logger.info(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
+                meta.skipping = f"{self.tracker}"
+                return dupes
+            BJShare.secret_token = auth_match.group(1)
+            fallback_response = candidate
+            if BeautifulSoup(candidate.text, "html.parser").find("div", class_="main_column"):
+                response = candidate
+
+        response = response or fallback_response
+        if response is None:
             return dupes
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -773,6 +842,7 @@ class BJShare:
         if torrent_details_table:
             BJShare.already_has_the_info = True
             BJShare.database_title = self.get_database_title(soup)
+            BJShare.database_identifier = self.get_database_identifier(soup)
 
             for row in torrent_details_table.find_all("tr"):
                 row_id = row.get("id")
@@ -815,7 +885,7 @@ class BJShare:
                         names.append(BJShare.database_title.strip())
 
                     for n in names:
-                        dupe_entry = {
+                        dupe_entry: dict[str, str | list[str]] = {
                             "name": n,
                             "size": size,
                             "link": link,
@@ -1656,12 +1726,16 @@ class BJShare:
     def get_imdblink(self, meta: Meta) -> str:
         """
         Get the media identifier for the upload.
-        Uses IMDb ID as primary source, falling back to TMDb ID if unavailable.
+        Uses the identifier from an existing BJShare group when available, then
+        falls back to IMDb and TMDb metadata.
 
         Accepted formats:
             IMDb: tt12345
             TMDb: movie/12345 or tv/12345
         """
+        if BJShare.database_identifier:
+            return BJShare.database_identifier
+
         imdb_info = dict(meta.imdb_info)
         imdbid = str(imdb_info.get("imdbID", ""))
         if imdbid:
