@@ -2,17 +2,23 @@
 
 import asyncio
 import time
-from collections.abc import Mapping
+from collections.abc import Awaitable, Mapping
 from pathlib import Path
 from typing import Any, cast
 
 from src.clients import Clients
-from src.console import logger
+from src.console import logger, suppress_cli_progress
 from src.meta import Meta
 from src.torrentcreate import TorrentCreator
 from src.trackersetup import tracker_class_map
 
 _early_artifact_tasks: dict[str, tuple[asyncio.Task[None], asyncio.Task[None]]] = {}
+
+
+async def _run_early_artifact_task(task: Awaitable[None]) -> None:
+    """Run preparatory work without rendering CLI progress bars."""
+    with suppress_cli_progress():
+        await task
 
 
 def start_early_artifact_tasks(meta: Meta, client: Clients, config: Mapping[str, Any]) -> tuple[asyncio.Task[None], asyncio.Task[None]]:
@@ -21,8 +27,8 @@ def start_early_artifact_tasks(meta: Meta, client: Clients, config: Mapping[str,
     tasks = _early_artifact_tasks.get(release_id)
     if tasks is None:
         tasks = (
-            asyncio.create_task(create_base_torrents_early(meta, client)),
-            asyncio.create_task(prepare_usenet_archive_early(meta, config)),
+            asyncio.create_task(_run_early_artifact_task(create_base_torrents_early(meta, client))),
+            asyncio.create_task(_run_early_artifact_task(prepare_usenet_archive_early(meta, config))),
         )
         _early_artifact_tasks[release_id] = tasks
     return tasks
@@ -114,7 +120,11 @@ async def prepare_usenet_archive_early(meta: Meta, config: Mapping[str, Any]) ->
         from src.usenetcreate import prepare_and_upload_usenet
 
         logger.debug("[cyan]Preparing Usenet archive and PAR2 files while metadata and screenshots are processed.[/cyan]")
-        prepared_path = await prepare_and_upload_usenet(meta, dict(config), prepare_only=True)
+        # Archive/PAR2 generation overlaps metadata and duplicate checking. Keep
+        # its Rich updates out of the CLI until the actual posting stage, while
+        # structured WebUI progress remains available.
+        with suppress_cli_progress():
+            prepared_path = await prepare_and_upload_usenet(meta, dict(config), prepare_only=True)
         if not prepared_path:
             logger.warning("[yellow]Early Usenet preparation did not complete; posting stage will retry.[/yellow]")
     except asyncio.CancelledError:
