@@ -674,6 +674,29 @@ async def _upload_screens(
     if "image_sizes" not in meta:
         meta.image_sizes = {}
 
+    existing_raw_urls = {img["raw_url"] for img in image_list}
+
+    def _record_uploaded_image(
+        upload_image_list: list[ImageDict],
+        upload_meta: Meta,
+        upload: dict[str, Any],
+        known_raw_urls: set[str],
+    ) -> None:
+        raw_url = upload["raw_url"]
+        if raw_url in known_raw_urls:
+            return
+
+        new_image: ImageDict = {
+            "img_url": upload["img_url"],
+            "raw_url": raw_url,
+            "web_url": upload["web_url"],
+        }
+        upload_image_list.append(new_image)
+        known_raw_urls.add(raw_url)
+        local_file_path = upload.get("local_file_path")
+        if local_file_path:
+            upload_meta.image_sizes[raw_url] = Path(local_file_path).stat().st_size
+
     # Handle image selection
 
     if using_custom_img_list:
@@ -738,7 +761,7 @@ async def _upload_screens(
             ]
 
     # Determine images needed
-    images_needed = total_screens - existing_count if not retry_mode else total_screens
+    images_needed = max(0, total_screens - existing_count) if not retry_mode else total_screens
     logger.debug(f"[blue]Existing images: {existing_count}, Images needed: {images_needed}, Total screens: {total_screens}[/blue]")
 
     # Some upload types (notably BOOK) legitimately have no screenshots.  The
@@ -750,6 +773,10 @@ async def _upload_screens(
 
     if existing_count >= total_screens and not retry_mode and img_host == initial_img_host and not using_custom_img_list:
         logger.debug(f"[yellow]Skipping upload: {existing_count} existing, {total_screens} required.")
+        return image_list, total_screens
+
+    if images_needed == 0:
+        logger.debug("[yellow]Skipping upload: no additional images required.[/yellow]")
         return image_list, total_screens
 
     if not image_glob:
@@ -876,21 +903,8 @@ async def _upload_screens(
             # needs to handle failed source files and the accumulated list is
             # not lost when fallback completes.
             if not using_custom_img_list:
-                existing_raw_urls = {img["raw_url"] for img in image_list}
                 for _index, upload in successfully_uploaded:
-                    raw_url = upload["raw_url"]
-                    if raw_url in existing_raw_urls:
-                        continue
-                    new_image = {
-                        "img_url": upload["img_url"],
-                        "raw_url": raw_url,
-                        "web_url": upload["web_url"],
-                    }
-                    image_list.append(new_image)
-                    existing_raw_urls.add(raw_url)
-                    local_file_path = upload.get("local_file_path")
-                    if local_file_path:
-                        meta.image_sizes[raw_url] = Path(local_file_path).stat().st_size
+                    _record_uploaded_image(image_list, meta, upload, existing_raw_urls)
 
             # Keep walking the configured hosts after a fallback also fails. The
             # previous retry_mode guard stopped the chain at img_host_2.
@@ -931,13 +945,10 @@ async def _upload_screens(
             raw_url = upload["raw_url"]
             new_image = {"img_url": upload["img_url"], "raw_url": raw_url, "web_url": upload["web_url"]}
             new_images.append(new_image)
-            if not using_custom_img_list and raw_url not in {img["raw_url"] for img in image_list}:
-                logger.debug(f"[blue]Adding {raw_url} to image_list")
-                image_list.append(new_image)
-                local_file_path = upload.get("local_file_path")
-                if local_file_path:
-                    image_size = Path(local_file_path).stat().st_size
-                    meta.image_sizes[raw_url] = image_size
+            if not using_custom_img_list:
+                if raw_url not in existing_raw_urls:
+                    logger.debug(f"[blue]Adding {raw_url} to image_list")
+                _record_uploaded_image(image_list, meta, upload, existing_raw_urls)
 
         if len(new_images) and len(new_images) > 0:
             if not using_custom_img_list:
