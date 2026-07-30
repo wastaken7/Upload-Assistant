@@ -356,7 +356,7 @@ class UploadHelper:
                 logger.info("[yellow]You will have the option to report the trumpable torrent if you upload.[/yellow]")
                 if meta.dupe is False:
                     try:
-                        upload = await self.prompt_yes_no("Are you trumping this release?", default=False)
+                        upload = await self.prompt_yes_no(f"Are you trumping this release on {tracker_name}?", default=False)
                         if upload:
                             meta.we_asked = True
                             meta.were_trumping = True
@@ -388,7 +388,7 @@ class UploadHelper:
                     try:
                         if tracker_name in ["AITHER", "LST"]:
                             logger.info(f"[yellow]{tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped.[/yellow]")
-                            upload = await self.prompt_yes_no("Are you trumping this exact match?", default=False)
+                            upload = await self.prompt_yes_no(f"Are you trumping this exact match on {tracker_name}?", default=False)
                             if upload:
                                 meta.we_asked = True
                                 meta.were_trumping = True

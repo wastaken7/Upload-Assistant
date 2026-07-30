@@ -94,6 +94,7 @@ async def process_trackers(
                 return
 
             tracker_label = f"{tracker.ljust(tracker_label_width)}:"
+            message: str | None = None
             if is_success:
                 result_parts = []
                 status_message = str(status.get("status_message", ""))
