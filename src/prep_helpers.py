@@ -1197,7 +1197,9 @@ async def finalize_metadata(
                         if series_imdb.isdigit() and int(series_imdb) != meta.imdb_id:
                             logger.debug(f"[yellow]Updating IMDb ID from episode data: {series_imdb}")
                             meta.imdb_id = int(series_imdb)
-                            imdb_info = await imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language, base_dir=meta.base_dir, config=prep_instance.config)
+                            imdb_info = await imdb_manager.get_imdb_info_api(
+                                meta.imdb_id, manual_language=meta.manual_language, base_dir=meta.base_dir, config=prep_instance.config
+                            )
                             meta.imdb_info = imdb_info
                             check_valid_data = meta.imdb_info.get("title", "")
                             if check_valid_data:

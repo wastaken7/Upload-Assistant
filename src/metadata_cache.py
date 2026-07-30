@@ -56,11 +56,11 @@ class MetadataCache:
         self.root = cache_dir if cache_dir.is_absolute() else root / cache_dir
         try:
             self.default_ttl = max(0, int(default.get("metadata_cache_default_ttl_hours", 168))) * 3600
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self.default_ttl = 168 * 3600
         try:
             self.negative_ttl = max(0, int(default.get("metadata_cache_negative_ttl_minutes", 60))) * 60
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self.negative_ttl = 60 * 60
         services = default.get("metadata_cache_services", {})
         self.services = services if isinstance(services, dict) else {}

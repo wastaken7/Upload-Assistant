@@ -5140,6 +5140,9 @@ def execute_command():
                     env = os.environ.copy()
                     env["PYTHONUNBUFFERED"] = "1"
                     env["PYTHONIOENCODING"] = "utf-8"
+                    # Preserve Rich OSC 8 links so ansi_to_html can turn them into
+                    # clickable anchors for the browser terminal.
+                    env["UA_WEBUI_FORCE_COLOR"] = "1"
                     # Disable Python output buffering
 
                     # Sanity-check the working directory used for the subprocess.

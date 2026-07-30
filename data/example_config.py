@@ -143,9 +143,9 @@ config: dict[str, Any] = {
         # Set true to suppress config warnings on startup
         "suppress_warnings": False,
 
-        # Set true to embed links in duplicate entries using terminal hyperlinks (OSC 8)
+        # Set true to embed terminal links using hyperlinks (OSC 8)
         # Set false to display the full raw URLs (recommended for terminals that do not support embedded links)
-        "embed_dupe_links": True,
+        "embed_links": True,
 
         # Set true to show size difference between duplicate and the upload in duplicate checks
         "show_dupe_size_diff": True,

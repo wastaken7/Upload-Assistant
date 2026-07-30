@@ -67,6 +67,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "console_debug_show_level": (bool,),
     "console_debug_show_path": (bool,),
     "console_debug_markup": (bool,),
+    "embed_links": (bool,),
     "embed_dupe_links": (bool,),
     "show_dupe_size_diff": (bool,),
     "dupe_size_difference_tolerance": (float, int),
@@ -491,6 +492,15 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
                     f"Invalid value '{upload_order}' for upload_order. Must be one of: 'concurrent', 'usenet', 'tracker'", key="upload_order", section="DEFAULT"
                 )
             )
+
+    if "embed_dupe_links" in default:
+        warnings.append(
+            ConfigValidationWarning(
+                "Deprecated; rename to 'embed_links'.",
+                key="embed_dupe_links",
+                section="DEFAULT",
+            )
+        )
 
     # Validate image hosts
     for i in range(1, 10):
