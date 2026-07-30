@@ -407,6 +407,36 @@ class UNIT3D:
 
         return merged
 
+    async def get_image_file(self, image_path: str | Path, max_size: int | None = None) -> tuple[str, bytes, str] | None:
+        """Read an image unchanged and return it with a content type verified from its signature."""
+        path = Path(image_path)
+        try:
+            if not path.is_file() or (max_size is not None and path.stat().st_size > max_size):
+                return None
+
+            async with aiofiles.open(path, "rb") as f:
+                image_bytes = await f.read()
+        except OSError as e:
+            logger.info(f"{self.tracker}: [yellow]Failed to read image {path}: {e}[/yellow]")
+            return None
+
+        image_type: tuple[str, str] | None = None
+        if image_bytes.startswith(b"\xff\xd8\xff"):
+            image_type = (".jpg", "image/jpeg")
+        elif image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            image_type = (".png", "image/png")
+        elif image_bytes.startswith((b"GIF87a", b"GIF89a")):
+            image_type = (".gif", "image/gif")
+        elif image_bytes.startswith(b"RIFF") and image_bytes[8:12] == b"WEBP":
+            image_type = (".webp", "image/webp")
+
+        if image_type is None:
+            logger.info(f"{self.tracker}: [yellow]Unsupported image format: {path}[/yellow]")
+            return None
+
+        extension, media_type = image_type
+        return (f"{path.stem}{extension}", image_bytes, media_type)
+
     async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
         files: dict[str, tuple[str, bytes, str]] = {}
         base_dir = meta.base_dir
@@ -424,20 +454,16 @@ class UNIT3D:
 
         if meta.category not in ("MOVIE", "TV", "GAME"):
             cover_path = meta.cover_path
-            if cover_path and Path(cover_path).exists():
-                try:
-                    async with aiofiles.open(cover_path, "rb") as f:
-                        files["torrent-cover"] = (Path(cover_path).name, await f.read(), "image/jpeg")
-                except Exception as e:
-                    logger.info(f"{self.tracker}: [yellow]Failed to read cover: {e}[/yellow]")
+            if cover_path:
+                cover_file = await self.get_image_file(cover_path)
+                if cover_file:
+                    files["torrent-cover"] = cover_file
 
             banner_path = meta.banner_path
-            if banner_path and Path(banner_path).exists():
-                try:
-                    async with aiofiles.open(banner_path, "rb") as f:
-                        files["torrent-banner"] = (Path(banner_path).name, await f.read(), "image/jpeg")
-                except Exception as e:
-                    logger.info(f"{self.tracker}: [yellow]Failed to read banner: {e}[/yellow]")
+            if banner_path:
+                banner_file = await self.get_image_file(banner_path)
+                if banner_file:
+                    files["torrent-banner"] = banner_file
 
         return files
 
