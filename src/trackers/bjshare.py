@@ -780,10 +780,12 @@ class BJShare:
         BJShare.database_identifier = ""
 
         search_params = [params]
+        title_already_queried = False
         if category in ("TV", "MOVIE"):
             # Query both exact IDs. The first group page found is retained, while
             # a title search remains available for older groups lacking either ID.
             search_params = [{"searchstr": term} for term in dict.fromkeys(media_search_terms)]
+            title_already_queried = not search_params
             if not search_params:
                 search_params.append({"searchstr": title})
 
@@ -808,7 +810,7 @@ class BJShare:
             if response is None and BeautifulSoup(candidate.text, "html.parser").find("div", class_="main_column"):
                 response = candidate
 
-        if category in ("TV", "MOVIE") and response is None and title and title not in media_search_terms:
+        if category in ("TV", "MOVIE") and response is None and title and not title_already_queried and title not in media_search_terms:
             candidate = await self.session.get(search_url, params={"searchstr": title}, follow_redirects=True)
             candidate.raise_for_status()
             if "login.php" in str(candidate.url) or "login.php" in candidate.text:

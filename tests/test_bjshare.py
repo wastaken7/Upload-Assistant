@@ -14,15 +14,20 @@ class FakeResponse:
         pass
 
 
+class FakeSearchResponse(FakeResponse):
+    text = '<a href="logout.php?auth=abcdef"></a><table id="torrent_table"></table>'
+
+
 class FakeSession:
-    def __init__(self):
+    def __init__(self, response=None):
         self.calls: list[dict[str, str]] = []
         self.cookies = None
+        self.response = response or FakeResponse()
 
     async def get(self, _url, *, params, follow_redirects):
         assert follow_redirects  # noqa: S101
         self.calls.append(params)
-        return FakeResponse()
+        return self.response
 
 
 class FakeCookieValidator:
@@ -63,3 +68,16 @@ def test_search_existing_queries_both_media_identifiers_before_title_fallback():
     asyncio.run(tracker.search_existing(meta))
 
     assert tracker.session.calls == [{"searchstr": "tt1234567"}, {"searchstr": "tv/76543"}]  # noqa: S101
+
+
+def test_search_existing_queries_title_once_without_media_identifiers():
+    tracker = object.__new__(BJShare)
+    tracker.session = FakeSession(FakeSearchResponse())
+    tracker.cookie_validator = FakeCookieValidator()
+    tracker.base_url = "https://bj-share.info"
+    tracker.tracker = "BJSHARE"
+    meta = SimpleNamespace(category="TV", title="Example", imdb_info={}, tmdb_id="")
+
+    asyncio.run(tracker.search_existing(meta))
+
+    assert tracker.session.calls == [{"searchstr": "Example"}]  # noqa: S101
