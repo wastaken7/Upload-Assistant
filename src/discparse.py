@@ -14,10 +14,10 @@ import cli_ui
 import defusedxml.ElementTree as ElementTree
 from langcodes import Language
 from pymediainfo import MediaInfo
-from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn
+from rich.progress import BarColumn, TaskProgressColumn, TextColumn
 
 from bin.get_playlist import MplsParser
-from src.console import console, logger
+from src.console import console, logger, progress_display
 from src.exportmi import setup_mediainfo_library
 from src.meta import Meta
 from src.webui_progress import complete_progress, publish_progress
@@ -102,7 +102,7 @@ class DiscParse:
         current = 0.0
         buffer = ""
         publish_progress(progress_id, "Scanning Blu-ray", current=0, total=100, detail="Starting go-bdinfo scan")
-        with Progress(
+        with progress_display(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),

@@ -84,7 +84,7 @@ async def create_base_torrents_early(meta: Meta, client: Clients) -> None:
             created_path = await TorrentCreator.create_base_from_existing_torrent(reuse_torrent, meta.base_dir, meta.uuid)
             logger.debug(f"[cyan]Early base torrent creation completed in {time.perf_counter() - base_creation_started:.2f}s: {created_path or 'no file created'}[/cyan]")
         else:
-            logger.info("[cyan]No reusable client torrent found; creating BASE torrent while metadata and screenshots are processed.[/cyan]")
+            logger.debug("[cyan]No reusable client torrent found; creating BASE torrent while metadata and screenshots are processed.[/cyan]")
             await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE")
         if meta.subtitle_files and not subs_torrent_path.exists():
             await TorrentCreator.create_torrent(meta, Path(cast(str, meta.path)), "BASE_SUBS")
@@ -113,7 +113,7 @@ async def prepare_usenet_archive_early(meta: Meta, config: Mapping[str, Any]) ->
     try:
         from src.usenetcreate import prepare_and_upload_usenet
 
-        logger.info("[cyan]Preparing Usenet archive and PAR2 files while metadata and screenshots are processed.[/cyan]")
+        logger.debug("[cyan]Preparing Usenet archive and PAR2 files while metadata and screenshots are processed.[/cyan]")
         prepared_path = await prepare_and_upload_usenet(meta, dict(config), prepare_only=True)
         if not prepared_path:
             logger.warning("[yellow]Early Usenet preparation did not complete; posting stage will retry.[/yellow]")

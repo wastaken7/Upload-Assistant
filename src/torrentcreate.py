@@ -18,10 +18,10 @@ from typing import Any
 
 import cli_ui
 import torf
-from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn
+from rich.progress import BarColumn, TaskProgressColumn, TextColumn
 from torf import Torrent
 
-from src.console import console, logger
+from src.console import console, logger, progress_display
 from src.meta import Meta
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
@@ -340,7 +340,7 @@ class TorrentCreator:
                             pieces_done = 0
                             mkbrr_start_time = time.time()
 
-                            with Progress(
+                            with progress_display(
                                 TextColumn("[progress.description]{task.description}"),
                                 BarColumn(),
                                 TaskProgressColumn(),

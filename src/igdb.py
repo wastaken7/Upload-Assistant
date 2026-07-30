@@ -9,6 +9,7 @@ import aiofiles
 import httpx
 
 from src.console import logger
+from src.metadata_cache import cache_for, is_cache_miss
 
 
 class IGDBAPI:
@@ -53,26 +54,15 @@ class IGDBAPI:
         return None
 
     async def search_game(self, title: str) -> list[dict[str, Any]] | None:
-        import asyncio
         import re
-        from pathlib import Path
 
         clean_title = re.sub(r"[^a-zA-Z0-9_\-]", "_", title).lower()
 
-        # Check local cache first (search results level)
-        cache_file = None
-        if self.base_dir:
-            cache_dir = Path(self.base_dir) / "tmp" / "igdb_cache" / "search"
-            with contextlib.suppress(Exception):
-                Path(cache_dir).mkdir(parents=True, exist_ok=True)
-                cache_file = Path(cache_dir) / f"{clean_title}.json"
-                if Path(cache_file).exists():
-                    with contextlib.suppress(Exception):
-                        cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
-                        cached_data = json.loads(cache_content)
-                        if cached_data is not None:
-                            logger.info(f"[cyan]IGDB: Using cached search results for '{title}'[/cyan]")
-                            return cached_data
+        cache = cache_for(self.base_dir)
+        cached_data = await cache.get("igdb", "search", clean_title)
+        if not is_cache_miss(cached_data) and isinstance(cached_data, list):
+            logger.info(f"[cyan]IGDB: Using cached search results for '{title}'[/cyan]")
+            return cached_data
 
         token = await self.get_access_token()
         if not token:
@@ -89,11 +79,8 @@ class IGDBAPI:
                 resp = await client.post(url, headers=headers, content=query)
                 if resp.status_code == 200:
                     data = resp.json()
-                    # Cache successful search results
-                    if cache_file and data is not None:
-                        with contextlib.suppress(Exception):
-                            cache_content = json.dumps(data, indent=4)
-                            await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
+                    if data is not None:
+                        await cache.set("igdb", "search", clean_title, data, negative=not bool(data))
                     return data
                 logger.info(f"[red]IGDB: API request failed. Status: {resp.status_code}, Body: {resp.text}[/red]")
         except Exception as e:
@@ -101,28 +88,17 @@ class IGDBAPI:
         return None
 
     async def fetch_game_by_id(self, igdb_id: str) -> dict[str, Any] | None:
-        import asyncio
-        from pathlib import Path
 
         igdb_id_str = igdb_id.strip()
         if not igdb_id_str.isdigit():
             logger.info(f"[red]IGDB: Invalid ID '{igdb_id}'[/red]")
             return None
 
-        # Check local cache first (games details level)
-        cache_file = None
-        if self.base_dir:
-            cache_dir = Path(self.base_dir) / "tmp" / "igdb_cache" / "games"
-            with contextlib.suppress(Exception):
-                Path(cache_dir).mkdir(parents=True, exist_ok=True)
-                cache_file = Path(cache_dir) / f"{igdb_id_str}.json"
-                if Path(cache_file).exists():
-                    with contextlib.suppress(Exception):
-                        cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
-                        cached_data = json.loads(cache_content)
-                        if cached_data is not None:
-                            logger.info(f"[cyan]IGDB: Using cached game details for ID '{igdb_id_str}'[/cyan]")
-                            return cached_data
+        cache = cache_for(self.base_dir)
+        cached_data = await cache.get("igdb", "game", igdb_id_str)
+        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+            logger.info(f"[cyan]IGDB: Using cached game details for ID '{igdb_id_str}'[/cyan]")
+            return cached_data
 
         token = await self.get_access_token()
         if not token:
@@ -141,11 +117,8 @@ class IGDBAPI:
                     data = resp.json()
                     if isinstance(data, list) and len(data) > 0:
                         game_data = data[0]
-                        # Cache successful game details
-                        if cache_file and game_data is not None:
-                            with contextlib.suppress(Exception):
-                                cache_content = json.dumps(game_data, indent=4)
-                                await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
+                        if game_data is not None:
+                            await cache.set("igdb", "game", igdb_id_str, game_data)
                         return game_data
                     logger.info(f"[red]IGDB: No game found with ID {igdb_id_str}[/red]")
                 else:
@@ -155,28 +128,17 @@ class IGDBAPI:
         return None
 
     async def fetch_game_by_steam_id(self, steam_id: str) -> dict[str, Any] | None:
-        import asyncio
-        from pathlib import Path
 
         steam_id_str = steam_id.strip()
         if not steam_id_str.isdigit():
             logger.info(f"[red]IGDB: Invalid Steam ID '{steam_id}'[/red]")
             return None
 
-        # Check local cache first (using steam id as cache key)
-        cache_file = None
-        if self.base_dir:
-            cache_dir = Path(self.base_dir) / "tmp" / "igdb_cache" / "steam"
-            with contextlib.suppress(Exception):
-                Path(cache_dir).mkdir(parents=True, exist_ok=True)
-                cache_file = Path(cache_dir) / f"{steam_id_str}.json"
-                if Path(cache_file).exists():
-                    with contextlib.suppress(Exception):
-                        cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
-                        cached_data = json.loads(cache_content)
-                        if cached_data is not None:
-                            logger.info(f"[cyan]IGDB: Using cached game details for Steam ID: {steam_id_str}[/cyan]")
-                            return cached_data
+        cache = cache_for(self.base_dir)
+        cached_data = await cache.get("igdb", "steam", steam_id_str)
+        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+            logger.info(f"[cyan]IGDB: Using cached game details for Steam ID: {steam_id_str}[/cyan]")
+            return cached_data
 
         token = await self.get_access_token()
         if not token:
@@ -195,11 +157,8 @@ class IGDBAPI:
                     data = resp.json()
                     if isinstance(data, list) and len(data) > 0:
                         game_data = data[0]
-                        # Cache successful game details for Steam ID
-                        if cache_file and game_data is not None:
-                            with contextlib.suppress(Exception):
-                                cache_content = json.dumps(game_data, indent=4)
-                                await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
+                        if game_data is not None:
+                            await cache.set("igdb", "steam", steam_id_str, game_data)
                         return game_data
                     logger.info(f"[red]IGDB: No game found with Steam ID {steam_id_str}[/red]")
                 else:
@@ -209,15 +168,8 @@ class IGDBAPI:
         return None
 
     async def cache_game_details(self, game_data: dict[str, Any]) -> None:
-        import asyncio
-        from pathlib import Path
 
         if not self.base_dir or not game_data or "id" not in game_data:
             return
         igdb_id = str(game_data["id"])
-        cache_dir = Path(self.base_dir) / "tmp" / "igdb_cache" / "games"
-        with contextlib.suppress(Exception):
-            Path(cache_dir).mkdir(parents=True, exist_ok=True)
-            cache_file = Path(cache_dir) / f"{igdb_id}.json"
-            cache_content = json.dumps(game_data, indent=4)
-            await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
+        await cache_for(self.base_dir).set("igdb", "game", igdb_id, game_data)
