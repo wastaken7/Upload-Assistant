@@ -7,11 +7,9 @@ import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
-from pathlib import Path
 from typing import Any
 from typing import cast as typing_cast
 
-import aiofiles
 import anitopy
 import cli_ui
 import guessit
@@ -22,6 +20,7 @@ from src.cleanup import cleanup_manager
 from src.console import console, logger
 from src.imdb import imdb_manager
 from src.meta import Meta
+from src.metadata_cache import cache_for, is_cache_miss
 
 default_config: dict[str, Any] = {}
 tmdb_api_key: str | None = None
@@ -53,10 +52,6 @@ GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 
 def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
     return typing_cast(dict[str, Any], guessit_module.guessit(value, options))
-
-
-# Module-level dict to store async locks for cache keys to prevent race conditions
-_cache_locks: dict[str, asyncio.Lock] = {}
 
 
 class TmdbManager:
@@ -135,6 +130,7 @@ class TmdbManager:
         tvdb_id: int | None = 0,
         quickie_search: bool = False,
         filename: str | None = None,
+        base_dir: str = "",
     ) -> dict[str, Any]:
         return await tmdb_other_meta(
             tmdb_id=tmdb_id,
@@ -153,6 +149,8 @@ class TmdbManager:
             tvdb_id=tvdb_id,
             quickie_search=quickie_search,
             filename=filename,
+            base_dir=base_dir,
+            config=self.config,
         )
 
     async def get_keywords(self, tmdb_id: int, category: str) -> list[str]:
@@ -949,6 +947,8 @@ async def tmdb_other_meta(
     tvdb_id: int | None = 0,
     quickie_search: bool = False,
     filename: str | None = None,
+    base_dir: str = "",
+    config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Fetch metadata from TMDB for a movie or TV show.
@@ -1025,18 +1025,24 @@ async def tmdb_other_meta(
     year = None
     original_imdb_id = imdb_id
 
+    cache = cache_for(base_dir, config)
     async with httpx.AsyncClient() as client:
         # Get main media details first (movie or TV show)
         main_url = f"{TMDB_BASE_URL}/{('movie' if category == 'MOVIE' else 'tv')}/{tmdb_id}"
 
-        # Make the main API call to get basic data
-        response = await client.get(main_url, params={"api_key": tmdb_api_key})
-        try:
-            response.raise_for_status()
-            media_data = typing_cast(dict[str, Any], response.json())
-        except Exception:
-            logger.info(f"[bold red]Failed to fetch media data: {response.status_code}[/bold red]")
-            return {}
+        cache_key = json.dumps({"category": category, "id": tmdb_id}, sort_keys=True)
+        cached_media = await cache.get("tmdb", "main", cache_key)
+        if not is_cache_miss(cached_media) and isinstance(cached_media, dict):
+            media_data = cached_media
+        else:
+            response = await client.get(main_url, params={"api_key": tmdb_api_key})
+            try:
+                response.raise_for_status()
+                media_data = typing_cast(dict[str, Any], response.json())
+            except Exception:
+                logger.info(f"[bold red]Failed to fetch media data: {response.status_code}[/bold red]")
+                return {}
+            await cache.set("tmdb", "main", cache_key, media_data)
 
         logger.debug(f"[cyan]TMDB Response: {json.dumps(media_data, indent=2)[:1200]}...")
 
@@ -1470,6 +1476,17 @@ async def get_romaji(tmdb_name: str, mal: int | None, meta: Meta) -> tuple[str, 
             variables = {"search": mal}
 
         url = "https://graphql.anilist.co"
+        anilist_cache = cache_for(meta.base_dir, {"DEFAULT": default_config})
+        anilist_key = json.dumps({"search": variables["search"], "mode": "mal" if mal not in (None, 0) else "title"}, sort_keys=True)
+        cached_anilist = await anilist_cache.get("anilist", "media", anilist_key)
+        if not is_cache_miss(cached_anilist) and isinstance(cached_anilist, dict):
+            cached_media = cached_anilist.get("media")
+            if isinstance(cached_media, list):
+                media = typing_cast(list[dict[str, Any]], cached_media)
+                demographic = str(cached_anilist.get("demographic", demographic))
+                if media:
+                    break
+                continue
         for attempt in range(3):
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:
@@ -1484,6 +1501,7 @@ async def get_romaji(tmdb_name: str, mal: int | None, meta: Meta) -> tuple[str, 
 
                 page_data = typing_cast(dict[str, Any], json_data.get("data", {}).get("Page", {}))
                 media = typing_cast(list[dict[str, Any]], page_data.get("media", []))
+                await anilist_cache.set("anilist", "media", anilist_key, {"media": media, "demographic": demographic}, negative=not bool(media))
                 break  # Success - exit retry loop
             except httpx.ReadTimeout, httpx.TimeoutException:
                 if attempt < 2:
@@ -1962,6 +1980,8 @@ async def set_tmdb_metadata(meta: Meta, filename: str | None = None) -> None:
                     tvdb_id=meta.tvdb_id,
                     quickie_search=meta.quickie_search,
                     filename=filename,
+                    base_dir=meta.base_dir,
+                    config=default_config,
                 )
 
                 if tmdb_metadata and all(tmdb_metadata.get(field) for field in ["title", "year"]):
@@ -2020,69 +2040,21 @@ async def get_tmdb_localized_data(meta: Meta, data_type: str, language: str, app
         f"Endpoint: '{endpoint}'[/green]\n"
     )
 
-    save_dir = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/"
-    category_str = meta.category.lower()
-    tmdb_str = str(meta.tmdb)
-    filename = f"{save_dir}tmdb_localized_data_{category_str}_{tmdb_str}.json"
+    cache = cache_for(meta.base_dir, {"DEFAULT": default_config})
+    cache_key = json.dumps({"id": meta.tmdb, "category": meta.category, "type": data_type, "language": language, "append": append_to_response}, sort_keys=True)
+    cached_result = await cache.get("tmdb", "localized", cache_key)
+    if not is_cache_miss(cached_result) and isinstance(cached_result, dict):
+        return cached_result
 
-    # Create a cache key for this specific request
-    cache_key = filename
-
-    # Get or create a lock for this cache key
-    if cache_key not in _cache_locks:
-        _cache_locks[cache_key] = asyncio.Lock()
-
-    cache_lock = _cache_locks[cache_key]
-
-    async with cache_lock:
-        # Re-read the cache file while holding the lock
-        localized_data: dict[str, Any] = {}
-        if Path(filename).exists():
-            try:
-                async with aiofiles.open(filename, encoding="utf-8") as f:
-                    content = await f.read()
-                    try:
-                        localized_data = json.loads(content)
-                    except json.JSONDecodeError as e:
-                        logger.warning(f"[red]Warning: JSON decode error in {filename}: {e}. Creating new file.[/red]")
-                        localized_data = {}
-            except Exception as e:
-                logger.error(f"[red]Error reading localized data file {filename}: {e}[/red]")
-                localized_data = {}
-
-        # Re-check if we have cached data for this specific language and data_type
-        cached_result: dict[str, Any] = localized_data.get(language, {}).get(data_type, {})
-        if cached_result:
-            return cached_result
-
-        # Fetch from API if not in cache
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(url, params=params)
-                if response.status_code == 200:
-                    tmdb_data = response.json()
-
-                    # Merge the fetched data into existing cache
-                    localized_data.setdefault(language, {})[data_type] = tmdb_data
-
-                    # Attempt to write to disk, but don't fail if write errors occur
-                    try:
-                        async with aiofiles.open(filename, "w", encoding="utf-8") as f:
-                            data_str = json.dumps(localized_data, ensure_ascii=False, indent=4)
-                            await f.write(data_str)
-                    except (OSError, Exception) as e:
-                        logger.warning(f"[red]Warning: Failed to write cache to {filename}: {e}[/red]")
-
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url, params=params)
+            if response.status_code == 200:
+                tmdb_data = response.json()
+                if isinstance(tmdb_data, dict):
+                    await cache.set("tmdb", "localized", cache_key, tmdb_data)
                     return tmdb_data
-                logger.info(f"[red]Request failed for {url}: Status code {response.status_code}[/red]")
-                return tmdb_data
-
-        except httpx.RequestError as e:
-            logger.info(f"[red]Request failed for {url}: {e}[/red]")
-            return tmdb_data
-        finally:
-            # Optional cleanup: remove the lock if it's no longer being used
-            # Only clean up if this is the only reference to avoid race conditions
-            if cache_key in _cache_locks and not cache_lock.locked():
-                with contextlib.suppress(KeyError):
-                    del _cache_locks[cache_key]
+            logger.info(f"[red]Request failed for {url}: Status code {response.status_code}[/red]")
+    except httpx.RequestError as e:
+        logger.info(f"[red]Request failed for {url}: {e}[/red]")
+    return tmdb_data
