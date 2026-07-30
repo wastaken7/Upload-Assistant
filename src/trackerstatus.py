@@ -377,6 +377,9 @@ class TrackerStatusManager:
                     cleanup_manager.reset_terminal()
                     sys.exit(1)
 
+                if upload_all:
+                    logger.info("[yellow]Processing approved uploads in the background...[/yellow]")
+
                 for tracker_name, _display_name, _tracker_class in passed_trackers:
                     if tracker_name in ("MANUAL", "USENET"):
                         tracker_status[tracker_name]["upload"] = True

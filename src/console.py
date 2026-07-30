@@ -71,6 +71,22 @@ console = Console(
 _live_progress_lock = threading.Lock()
 _shared_progress: Progress | None = None
 _shared_progress_users = 0
+_suppress_cli_progress = contextvars.ContextVar("suppress_cli_progress", default=False)
+
+
+@contextlib.contextmanager
+def suppress_cli_progress() -> Generator[None]:
+    """Temporarily hide terminal progress while background preparation runs."""
+    token = _suppress_cli_progress.set(True)
+    try:
+        yield
+    finally:
+        _suppress_cli_progress.reset(token)
+
+
+def is_cli_progress_suppressed() -> bool:
+    """Return whether the current task should avoid rendering terminal progress."""
+    return _suppress_cli_progress.get()
 
 
 @contextlib.contextmanager
@@ -78,7 +94,9 @@ def progress_display(*columns: Any, **kwargs: Any) -> Generator[Progress]:
     """Yield a progress panel that safely shares the console's single Live display."""
     global _shared_progress, _shared_progress_users
 
-    requested_disabled = bool(kwargs.get("disable", False))
+    requested_disabled = bool(kwargs.get("disable", False)) or is_cli_progress_suppressed()
+    if requested_disabled:
+        kwargs["disable"] = True
     shared = not requested_disabled
     if shared:
         with _live_progress_lock:
