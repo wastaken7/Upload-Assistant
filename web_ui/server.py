@@ -102,7 +102,12 @@ class _GLike(Protocol):
 
 class _LimiterLike(Protocol):
     def limit(
-        self, limit_value: str, *, key_func: Callable[[], str] | None = None, error_message: str | None = None
+        self,
+        limit_value: str,
+        *,
+        key_func: Callable[[], str] | None = None,
+        error_message: str | None = None,
+        override_defaults: bool = True,
     ) -> Callable[[Callable[..., object]], Callable[..., object]]: ...
 
 
@@ -4235,6 +4240,7 @@ def browse_search():
 
 
 @app.route("/api/execution_preview")
+@limiter.limit("7200 per hour", key_func=_rate_limit_key_func, override_defaults=True)
 def execution_preview():
     """Return the current media preview for an active execution session."""
 
@@ -4313,6 +4319,7 @@ def execution_preview_cover():
 
 
 @app.route("/api/execution_screenshots")
+@limiter.limit("7200 per hour", key_func=_rate_limit_key_func, override_defaults=True)
 def execution_screenshots():
     """List local FFmpeg screenshots belonging to the active execution only."""
     session_id = str(request.args.get("session_id", "")).strip()
