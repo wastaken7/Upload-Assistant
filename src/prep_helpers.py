@@ -1072,7 +1072,7 @@ async def search_metadata(
     # Ensure IMDb info is retrieved if it wasn't already fetched or was cleared.
     imdb_id_value = _to_int(meta.imdb_id)
     if not meta.imdb_info and imdb_id_value != 0 and meta.category not in ("BOOK", "GAME"):
-        imdb_info = await imdb_manager.get_imdb_info_api(imdb_id_value, manual_language=meta.manual_language)
+        imdb_info = await imdb_manager.get_imdb_info_api(imdb_id_value, manual_language=meta.manual_language, base_dir=meta.base_dir, config=prep_instance.config)
         meta.imdb_info = imdb_info
 
 
@@ -1142,6 +1142,7 @@ async def finalize_metadata(
                 meta.tvmaze_manual,
                 year=meta.year,
                 tv_movie=meta.tv_movie,
+                base_dir=meta.base_dir,
             )
             both_ids_searched = True
             if tvmaze:
@@ -1166,6 +1167,8 @@ async def finalize_metadata(
                 manual_date=meta.manual_date,
                 tvmaze_manual=meta.tvmaze_manual,
                 return_full_tuple=False,
+                base_dir=meta.base_dir,
+                config=prep_instance.config,
             )
             meta.tvmaze_id = tvmaze_res if isinstance(tvmaze_res, int) else tvmaze_res[0]
         if meta.tvdb_id == 0:
@@ -1194,7 +1197,9 @@ async def finalize_metadata(
                         if series_imdb.isdigit() and int(series_imdb) != meta.imdb_id:
                             logger.debug(f"[yellow]Updating IMDb ID from episode data: {series_imdb}")
                             meta.imdb_id = int(series_imdb)
-                            imdb_info = await imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language)
+                            imdb_info = await imdb_manager.get_imdb_info_api(
+                                meta.imdb_id, manual_language=meta.manual_language, base_dir=meta.base_dir, config=prep_instance.config
+                            )
                             meta.imdb_info = imdb_info
                             check_valid_data = meta.imdb_info.get("title", "")
                             if check_valid_data:

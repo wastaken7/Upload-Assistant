@@ -2,12 +2,16 @@
 import contextlib
 import contextvars
 import logging
+import os
 import re
+import threading
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.progress import Progress
 from rich.text import Text
 
 
@@ -53,7 +57,53 @@ def ansi_to_html(ansi_chunk: str, width: int = 120) -> str:
 # Create a shared Console instance used throughout the project.
 # Force terminal mode so that when other processes import `src.console.console`
 # they will emit ANSI color codes to stdout even when not attached to a real TTY.
-console = Console(force_terminal=True)
+_webui_force_color = bool(os.environ.get("UA_WEBUI_FORCE_COLOR", "").strip())
+console = Console(
+    force_terminal=True,
+    color_system="truecolor" if _webui_force_color else "auto",
+    legacy_windows=False if _webui_force_color else None,
+)
+
+# Rich permits one Live renderable per Console. Long-running local jobs can
+# overlap (for example, an early BASE torrent hash alongside Usenet archive
+# preparation), so they share one multi-row progress panel instead of raising
+# ``LiveError`` and forcing a slower fallback.
+_live_progress_lock = threading.Lock()
+_shared_progress: Progress | None = None
+_shared_progress_users = 0
+
+
+@contextlib.contextmanager
+def progress_display(*columns: Any, **kwargs: Any) -> Generator[Progress]:
+    """Yield a progress panel that safely shares the console's single Live display."""
+    global _shared_progress, _shared_progress_users
+
+    requested_disabled = bool(kwargs.get("disable", False))
+    shared = not requested_disabled
+    if shared:
+        with _live_progress_lock:
+            if _shared_progress is None:
+                new_progress = Progress(*columns, **kwargs)
+                new_progress.start()
+                _shared_progress = new_progress
+            progress = _shared_progress
+            _shared_progress_users += 1
+    else:
+        progress = Progress(*columns, **kwargs)
+        progress.start()
+
+    try:
+        yield progress
+    finally:
+        if shared:
+            with _live_progress_lock:
+                _shared_progress_users -= 1
+                if _shared_progress_users == 0 and _shared_progress is not None:
+                    _shared_progress.stop()
+                    _shared_progress = None
+        else:
+            progress.stop()
+
 
 # Configure logger integrated with Rich console
 logger = logging.getLogger("UploadAssistant")

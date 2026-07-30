@@ -15,9 +15,9 @@ import aiofiles
 import aiofiles.os
 import aiofiles.ospath
 import psutil
-from rich.progress import BarColumn, Progress, TaskID, TaskProgressColumn, TextColumn
+from rich.progress import BarColumn, TaskID, TaskProgressColumn, TextColumn
 
-from src.console import console, logger
+from src.console import console, logger, progress_display
 from src.meta import Meta
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
@@ -244,7 +244,7 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
         stdout_task = asyncio.create_task(read_7z_progress(process.stdout))
         stderr_task = asyncio.create_task(read_7z_progress(process.stderr))
 
-        with Progress(
+        with progress_display(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
@@ -349,7 +349,7 @@ async def run_par2_with_progress(cmd: list[str], cwd: str | None = None) -> None
 
         tasks: dict[str, TaskID] = {}
         buffer = b""
-        with Progress(
+        with progress_display(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
@@ -449,7 +449,7 @@ async def run_nyuu_with_progress(cmd: list[str], cwd: str | None = None) -> None
             raise RuntimeError("Process stdout is None")
 
         tasks: dict[str, TaskID] = {}
-        with Progress(
+        with progress_display(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
@@ -571,7 +571,7 @@ async def run_pesto_with_progress(cmd: list[str], cwd: str | None = None) -> Non
         # overwritten line, so they don't stomp on each other visually.
         tasks: dict[str, TaskID] = {}
         check_done_seen = False
-        with Progress(
+        with progress_display(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
@@ -876,9 +876,9 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
                 archive_password = secrets.token_urlsafe(16)
                 if not archive_password.startswith("-"):
                     break
-            logger.info("[cyan]Generated a random Usenet archive password for this upload.[/cyan]")
+            logger.debug("[cyan]Generated a random Usenet archive password for this upload.[/cyan]")
         elif random_archive_password:
-            logger.info("[cyan]Reusing the random Usenet archive password prepared for this upload.[/cyan]")
+            logger.debug("[cyan]Reusing the random Usenet archive password prepared for this upload.[/cyan]")
         else:
             logger.info("[cyan]Using configured static password for Usenet archive encryption.[/cyan]")
         meta.archive_password = archive_password
@@ -1017,7 +1017,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
 
     if use_prepared_files:
         upload_files = [Path(str(file_path)) for file_path in prepared_files]
-        logger.info("[cyan]Reusing prepared Usenet archive and PAR2 files.[/cyan]")
+        logger.debug("[cyan]Reusing prepared Usenet archive and PAR2 files.[/cyan]")
     elif skip_archive:
         if archive_password:
             logger.warning(
@@ -1088,7 +1088,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         target_files = [file_path for file_path in upload_files if file_path.is_file() and not file_path.name.endswith(".par2")]
 
         if target_files:
-            logger.info("[cyan]Generating PAR2 parity files...[/cyan]")
+            logger.debug("[cyan]Generating PAR2 parity files...[/cyan]")
             par2_output_dir = usenet_dir if skip_archive else upload_root
             par2_file = str(Path(par2_output_dir) / f"{archive_name}.par2")
             relative_target_files = [str(Path(f).relative_to(upload_root)) for f in target_files]
@@ -1148,7 +1148,7 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             continue
         all_upload_files.append(str(file_path))
 
-    logger.info(f"[yellow]Posting {len(all_upload_files)} files to Usenet via NNTP ({uploader})...[/yellow]")
+    logger.debug(f"[yellow]Posting {len(all_upload_files)} files to Usenet via NNTP ({uploader})...[/yellow]")
 
     # Build mock NZB content used in debug/simulation mode
     mock_nzb_password_tag = f'  <meta type="password">{archive_password}</meta>\n' if archive_password else ""

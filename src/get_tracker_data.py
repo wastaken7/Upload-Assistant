@@ -18,8 +18,29 @@ from src.btnid import BtnIdManager
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
+from src.metadata_cache import is_cache_miss, tracker_metadata_cache_for
 from src.trackermeta import TrackerMetaManager
 from src.trackersetup import tracker_class_map
+
+_TRACKER_ID_FIELDS = {
+    "AITHER": "aither",
+    "ANTHELION": "ant",
+    "BEYONDHD": "bhd",
+    "BLUTOPIA": "blu",
+    "BTN": "btn",
+    "DARKPEERS": "dp",
+    "HAWKEUNO": "huno",
+    "HDBITS": "hdb",
+    "LASTDIGITALUNDERGROUND": "ldu",
+    "LST": "lst",
+    "OLDTOONSWORLD": "otw",
+    "ONLYENCODES": "oe",
+    "PASSTHEPOPCORN": "ptp",
+    "REELFLIX": "rf",
+    "SEEDPOOL": "sp",
+    "ULCX": "ulcx",
+    "YUSCENE": "yus",
+}
 
 
 class TrackerDataManager:
@@ -37,6 +58,57 @@ class TrackerDataManager:
 
     def get_tracker_config(self, tracker_name: str) -> Mapping[str, Any]:
         return self.trackers_config.get(tracker_name, MappingProxyType({}))
+
+    async def update_metadata_from_explicit_tracker(
+        self,
+        tracker_name: str,
+        tracker_instance: Any,
+        meta: Meta,
+        search_term: str,
+        search_file_folder: str,
+        skip_tracker_descriptions: bool,
+    ) -> tuple[Meta, bool]:
+        """Reuse a cached tracker response only when the user supplied a torrent ID."""
+        tracker_field = _TRACKER_ID_FIELDS.get(tracker_name, tracker_name.lower())
+        tracker_id = str(meta.get(tracker_field, "") or meta.get(tracker_name.lower(), "") or "").strip()
+        if not tracker_id:
+            return await self.tracker_meta_manager.update_metadata_from_tracker(
+                tracker_name, tracker_instance, meta, search_term, search_file_folder, skip_tracker_descriptions
+            )
+
+        cache = tracker_metadata_cache_for(meta.base_dir, self.config)
+        cache_key = json.dumps(
+            {
+                "id": tracker_id,
+                "is_disc": bool(meta.is_disc),
+                "keep_images": bool(meta.keep_images),
+                "skip_descriptions": skip_tracker_descriptions,
+            },
+            sort_keys=True,
+        )
+        cached = await cache.get(tracker_name.lower(), "torrent", cache_key)
+        if not is_cache_miss(cached) and isinstance(cached, dict):
+            cached_metadata = cached.get("metadata")
+            if isinstance(cached_metadata, dict):
+                meta.update(cached_metadata)
+            match = bool(cached.get("match", False))
+            logger.debug(f"[cyan]{tracker_name}: using cached metadata for torrent ID {tracker_id}.[/cyan]")
+            return meta, match
+
+        before = meta.to_dict()
+        updated_meta, match = await self.tracker_meta_manager.update_metadata_from_tracker(
+            tracker_name, tracker_instance, meta, search_term, search_file_folder, skip_tracker_descriptions
+        )
+        after = updated_meta.to_dict()
+        metadata_patch = {key: value for key, value in after.items() if before.get(key) != value}
+        await cache.set(
+            tracker_name.lower(),
+            "torrent",
+            cache_key,
+            {"match": match, "metadata": metadata_patch},
+            negative=not match,
+        )
+        return updated_meta, match
 
     async def get_tracker_timestamps(self, base_dir: str | None = None) -> dict[str, float]:
         """Get tracker timestamps from the log file"""
@@ -197,7 +269,7 @@ class TrackerDataManager:
 
                     tracker_instance = tracker_factory(config=self.config)
                     try:
-                        updated_meta, match = await self.tracker_meta_manager.update_metadata_from_tracker(
+                        updated_meta, match = await self.update_metadata_from_explicit_tracker(
                             tracker_name,
                             tracker_instance,
                             meta,
@@ -344,7 +416,7 @@ class TrackerDataManager:
 
                     tracker_instance = tracker_factory(config=self.config)
                     try:
-                        updated_meta, match = await self.tracker_meta_manager.update_metadata_from_tracker(
+                        updated_meta, match = await self.update_metadata_from_explicit_tracker(
                             tracker_name,
                             tracker_instance,
                             meta,
@@ -464,14 +536,34 @@ class TrackerDataManager:
                     logger.debug(f"[cyan]Using {tracker_name} ID {tracker_id} to get {'/'.join(missing_info)} info[/cyan]")
 
                     tracker_instance = tracker_class_map[tracker_name](config=self.config)
+                    previous_region = meta.region
+                    previous_distributor = meta.distributor
+                    cache = tracker_metadata_cache_for(meta.base_dir, self.config)
+                    cache_key = json.dumps({"id": tracker_id}, sort_keys=True)
+                    cached = await cache.get(tracker_name.lower(), "region_distributor", cache_key)
+                    if not is_cache_miss(cached) and isinstance(cached, dict):
+                        cached_metadata = cached.get("metadata")
+                        if isinstance(cached_metadata, dict):
+                            meta.update(cached_metadata)
+                        logger.debug(f"[cyan]{tracker_name}: using cached region/distributor data for torrent ID {tracker_id}.[/cyan]")
+                    else:
+                        # Store initial state to detect changes
+                        await common.unit3d_region_distributor(meta, tracker_name, tracker_instance.torrent_url, str(tracker_id))
+                        metadata_patch: dict[str, Any] = {}
+                        if meta.region != previous_region:
+                            metadata_patch["region"] = meta.region
+                        if meta.distributor != previous_distributor:
+                            metadata_patch["distributor"] = meta.distributor
+                        await cache.set(
+                            tracker_name.lower(),
+                            "region_distributor",
+                            cache_key,
+                            {"metadata": metadata_patch},
+                            negative=not bool(metadata_patch),
+                        )
 
-                    # Store initial state to detect changes
-                    had_region = bool(meta.region)
-                    had_distributor = bool(meta.distributor)
-                    await common.unit3d_region_distributor(meta, tracker_name, tracker_instance.torrent_url, str(tracker_id))
-
-                    if meta.region and not had_region and meta.debug:
+                    if meta.region and not previous_region and meta.debug:
                         logger.info(f"[green]Found region '{meta.region}' from {tracker_name}[/green]")
 
-                    if meta.distributor and not had_distributor and meta.debug:
+                    if meta.distributor and not previous_distributor and meta.debug:
                         logger.info(f"[green]Found distributor '{meta.distributor}' from {tracker_name}[/green]")

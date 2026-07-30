@@ -42,6 +42,7 @@ from src.audio_spectrogram import process_audio_spectrograms
 from src.book_prep import detect_newspaper, is_valid_book_language, resolve_book_language
 from src.cleanup import cleanup_manager
 from src.clients import Clients
+from src.config_helpers import format_terminal_link
 from src.console import current_release_log_path, logger  # pyright: ignore[reportUnknownVariableType]
 from src.console import rich_handler as _rich_handler
 from src.disc_menus import process_disc_menus
@@ -1232,7 +1233,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         meta.skip_uploading = 10
 
     else:
-        logger.info(f"[green]Processing {meta.name} for upload...[/green]")
+        logger.info(f"Processing for upload: [green]{meta.name}[/green]...")
 
         # reset trackers after any removals
         trackers = meta.trackers
@@ -1365,7 +1366,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         videopath = file_list[0]
     elif meta.is_disc == "HDDVD" and meta.discs:
         videopath = meta.discs[0].get("largest_evo", "")
-    logger.info(f"Processing {filename} for upload.....")
+    logger.debug(f"Processing {filename} for upload.....")
 
     meta.frame_overlay = config["DEFAULT"].get("frame_overlay", False)
     tracker_status_map = cast(dict[str, dict[str, Any]], meta.tracker_status)
@@ -2239,7 +2240,7 @@ async def do_the_thing(base_dir: str) -> None:
 
                 logger.info("")
                 logger.info("[green]Web UI server started[/green]")
-                logger.info(f"[bold]Access at: [link={url}]{url}[/link][/bold]")
+                logger.info(f"[bold]Access at: {format_terminal_link(url, url, config['DEFAULT'])}[/bold]")
                 logger.info("[dim]Press Ctrl+C to stop the server[/dim]")
                 logger.info("")
 
@@ -2578,6 +2579,7 @@ async def do_the_thing(base_dir: str) -> None:
                                             tracker_class_map,
                                             list(http_trackers),
                                             list(other_api_trackers),
+                                            upload_target="usenet indexer",
                                         )
                                 else:
                                     logger.info("[bold red]Usenet upload failed.[/bold red]")

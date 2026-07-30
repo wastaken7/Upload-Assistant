@@ -170,7 +170,9 @@ class TrackerStatusManager:
                                     dupes = []
                                 else:
                                     try:
-                                        if cli_ui.ask_yes_no(f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway?", default=False):
+                                        if await helper.prompt_yes_no(
+                                            f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway?", default=False
+                                        ):
                                             dupes = []
                                             # set trackers here so that they are not double checked later with cross seeding
                                             async with meta_lock:
@@ -213,7 +215,9 @@ class TrackerStatusManager:
                                     dupes = []
                                 else:
                                     try:
-                                        if cli_ui.ask_yes_no(f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway?", default=False):
+                                        if await helper.prompt_yes_no(
+                                            f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway?", default=False
+                                        ):
                                             dupes = []
                                         else:
                                             local_tracker_status["skipped"] = True
@@ -366,7 +370,7 @@ class TrackerStatusManager:
                     prompt_msg = "Upload to all?"
 
                 try:
-                    upload_all = cli_ui.ask_yes_no(prompt_msg, default=False)
+                    upload_all = await helper.prompt_yes_no(prompt_msg, default=False)
                 except EOFError:
                     logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()

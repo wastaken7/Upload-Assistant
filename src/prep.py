@@ -7,6 +7,7 @@ from typing import Any, cast
 
 from cogs.redaction import PathAwareEncoder
 from src.meta import Meta
+from src.metadata_cache import set_run_disabled
 
 console: Any = None
 
@@ -118,6 +119,7 @@ class Prep:
 
     async def gather_prep(self, meta: Meta, mode: str) -> Meta:
         meta_start_time = time.time()
+        set_run_disabled(bool(getattr(meta, "no_metadata_cache", False)))
 
         # 1. Init metadata settings
         use_sonarr, use_radarr, client, skip_tracker_descriptions, hash_ids, tracker_ids = prep_helpers.init_meta(self, meta, mode)
