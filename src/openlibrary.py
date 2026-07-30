@@ -71,7 +71,7 @@ class OpenLibraryManager:
                             metadata["overview"] = re.sub(r"<[^>]+>", "", value).strip()
 
                         covers = data.get("covers")
-                        if covers and isinstance(covers, list) and covers[0] > 0:
+                        if covers and isinstance(covers, list) and isinstance(covers[0], int) and covers[0] > 0:
                             metadata["poster"] = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg"
 
                         author_names = []
@@ -86,7 +86,9 @@ class OpenLibraryManager:
 
                         subjects = data.get("subjects")
                         if subjects and isinstance(subjects, list):
-                            metadata["keywords"] = metadata["genres"] = [str(subject) for subject in subjects[:10] if subject]
+                            subject_list = [str(subject) for subject in subjects[:10] if subject]
+                            metadata["keywords"] = list(subject_list)
+                            metadata["genres"] = list(subject_list)
 
                         metadata["openlibrary"] = work_id
                         await cache.set("openlibrary", "work", work_id, metadata)

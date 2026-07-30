@@ -24,7 +24,7 @@ def format_terminal_link(text: str, url: str, default_config: Mapping[str, Any])
             safe_url = urlunsplit(
                 (
                     parsed_url.scheme,
-                    parsed_url.netloc,
+                    quote(parsed_url.netloc, safe=":@!$&'()*+,;=%"),
                     quote(parsed_url.path, safe="/:@!$&'()*+,;=%"),
                     quote(parsed_url.query, safe="/:@!$&'()*+,;=%"),
                     quote(parsed_url.fragment, safe="/:@!$&'()*+,;=%"),
