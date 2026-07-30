@@ -173,7 +173,7 @@ Implementation notes:
 ### UX / safety toggles
 
 - `sfx_on_prompt` (bool): Play a bell sound effect when asking for confirmation.
-- `embed_dupe_links` (bool): Set true to embed links in duplicate entries using terminal hyperlinks (OSC 8). Set false to display the full raw URLs.
+- `embed_links` (bool): Set true to embed terminal links using terminal hyperlinks (OSC 8). Set false to display the full raw URLs. `embed_dupe_links` remains supported temporarily as a deprecated alias.
 - `tracker_pass_checks` (str): Minimum number of trackers that must pass checks to continue upload.
 - `use_largest_playlist` (bool): Always use the largest Blu-ray playlist without prompting.
 - `keep_images` (bool): If false, do not pull images/screenshots from other tracker descriptions. If true, images are downloaded, validated for resolution, and used directly (if hosted on an approved host) or automatically rehosted to your configured image host.

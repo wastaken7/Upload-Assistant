@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
 import contextlib
 import json
 import re
@@ -15,6 +16,7 @@ from rich.markup import escape
 from cogs.redaction import Redaction
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
+from src.config_helpers import format_terminal_link
 from src.console import logger
 from src.meta import Meta
 from src.trackersetup import tracker_class_map
@@ -246,6 +248,12 @@ class UploadHelper:
         if not isinstance(self.default_config, dict):
             raise ValueError("'DEFAULT' config section must be a dict")
         self.tracker_class_map = cast(Mapping[str, Any], tracker_class_map)
+        self._prompt_lock = asyncio.Lock()
+
+    async def prompt_yes_no(self, question: str, *, default: bool = False) -> bool:
+        """Ask one interactive question at a time without blocking the event loop."""
+        async with self._prompt_lock:
+            return await asyncio.to_thread(cli_ui.ask_yes_no, question, default=default)
 
     async def dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str) -> tuple[bool, Meta]:
         def _format_dupe(entry: DupeEntry | str) -> str:
@@ -268,9 +276,7 @@ class UploadHelper:
                         size_diff_str = f" - [#{color_hex}][{diff_mb:+d} MB / {diff_pct:+d}%][/]"
 
                 if isinstance(link, str) and link:
-                    if self.default_config.get("embed_dupe_links", True):
-                        return f"[link={link}]{escape(name)}[/link]{size_diff_str}"
-                    return f"{name} - {link}{size_diff_str}"
+                    return f"{format_terminal_link(name, link, self.default_config)}{size_diff_str}"
                 return f"{name}{size_diff_str}"
             return entry
 
@@ -350,7 +356,7 @@ class UploadHelper:
                 logger.info("[yellow]You will have the option to report the trumpable torrent if you upload.[/yellow]")
                 if meta.dupe is False:
                     try:
-                        upload = cli_ui.ask_yes_no("Are you trumping this release?", default=False)
+                        upload = await self.prompt_yes_no(f"Are you trumping this release on {tracker_name}?", default=False)
                         if upload:
                             meta.we_asked = True
                             meta.were_trumping = True
@@ -382,7 +388,7 @@ class UploadHelper:
                     try:
                         if tracker_name in ["AITHER", "LST"]:
                             logger.info(f"[yellow]{tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped.[/yellow]")
-                            upload = cli_ui.ask_yes_no("Are you trumping this exact match?", default=False)
+                            upload = await self.prompt_yes_no(f"Are you trumping this exact match on {tracker_name}?", default=False)
                             if upload:
                                 meta.we_asked = True
                                 meta.were_trumping = True
@@ -390,7 +396,7 @@ class UploadHelper:
                                 if not meta.get(f"{tracker_name}_trumpable_id"):
                                     meta[f"{tracker_name}_trumpable_id"] = meta.get(f"{tracker_name}_matched_id", None)
                         else:
-                            upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
+                            upload = await self.prompt_yes_no(f"Upload to {tracker_name} anyway?", default=False)
                             meta.we_asked = True
                     except EOFError:
                         logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
@@ -404,13 +410,7 @@ class UploadHelper:
                         # Display only the matched season pack info from dupe_checking
                         season_pack_name = meta.season_pack_name
                         season_pack_link = meta.season_pack_link
-                        if season_pack_link:
-                            if self.default_config.get("embed_dupe_links", False):
-                                season_pack_text = f"[link={season_pack_link}]{escape(season_pack_name)}[/link]"
-                            else:
-                                season_pack_text = f"{season_pack_name} - {season_pack_link}"
-                        else:
-                            season_pack_text = season_pack_name
+                        season_pack_text = format_terminal_link(season_pack_name, season_pack_link, self.default_config) if season_pack_link else season_pack_name
                         logger.info(f"[yellow]Note: A season pack exists on {tracker_name}[/yellow]")
                         logger.info("[yellow]Ensure your upload is not part of that season pack, or is otherwise allowed.[/yellow]")
                         logger.info("")
@@ -422,8 +422,8 @@ class UploadHelper:
                     if meta.dupe is False:
                         try:
                             if meta.is_disc == "BDMV":
-                                self.ask_bdinfo_comparison(meta, dupes_list, tracker_name)
-                            upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
+                                await self.ask_bdinfo_comparison(meta, dupes_list, tracker_name)
+                            upload = await self.prompt_yes_no(f"Upload to {tracker_name} anyway?", default=False)
                             meta.we_asked = True
                         except EOFError:
                             logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
@@ -493,7 +493,7 @@ class UploadHelper:
 
         return False, meta
 
-    def ask_bdinfo_comparison(self, meta: Meta, dupes: list[DupeEntry | str], tracker_name: str) -> None:
+    async def ask_bdinfo_comparison(self, meta: Meta, dupes: list[DupeEntry | str], tracker_name: str) -> None:
         """
         Check if any duplicate has BDInfo content and ask the user
         if they want to perform a comparison.
@@ -504,7 +504,7 @@ class UploadHelper:
             return
 
         question = "\033[1;35mFound BDInfo content in potential duplicates.\033[0m Perform a comparison?"
-        if cli_ui.ask_yes_no(question, default=True):
+        if await self.prompt_yes_no(question, default=True):
             warnings: list[str] = []
             results: list[str] = []
 
@@ -698,7 +698,7 @@ class UploadHelper:
             meta.keep_folder = False
 
         if meta.keep_folder and meta.isdir:
-            kf_confirm = cli_ui.ask_yes_no(
+            kf_confirm = await self.prompt_yes_no(
                 "You specified --keep-folder. Uploading in folders might not be allowed. Proceed?",
                 default=False,
             )
@@ -743,7 +743,7 @@ class UploadHelper:
         else:
             logger.info(f"[bold]Base Name:[/bold] {meta.name}\n", extra={"highlighter": None})
 
-        confirm = cli_ui.ask_yes_no("Is this correct?")
+        confirm = await self.prompt_yes_no("Is this correct?")
         logger.info("")
 
         if confirm:

@@ -70,6 +70,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "console_debug_show_level": (bool,),
     "console_debug_show_path": (bool,),
     "console_debug_markup": (bool,),
+    "embed_links": (bool,),
     "embed_dupe_links": (bool,),
     "show_dupe_size_diff": (bool,),
     "dupe_size_difference_tolerance": (float, int),
@@ -107,6 +108,15 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "upload_order": (str,),
     "music_enrichment_enabled": (bool,),
     "music_discogs_token": (str,),
+    "metadata_cache_enabled": (bool,),
+    "metadata_cache_dir": (str,),
+    "metadata_cache_default_ttl_hours": (int,),
+    "metadata_cache_negative_ttl_minutes": (int,),
+    "metadata_cache_services": (dict,),
+    "tracker_metadata_cache_enabled": (bool,),
+    "tracker_metadata_cache_dir": (str,),
+    "tracker_metadata_cache_ttl_hours": (int,),
+    "tracker_metadata_cache_negative_ttl_minutes": (int,),
 }
 
 # Valid image hosts
@@ -488,6 +498,15 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
                     f"Invalid value '{upload_order}' for upload_order. Must be one of: 'concurrent', 'usenet', 'tracker'", key="upload_order", section="DEFAULT"
                 )
             )
+
+    if "embed_dupe_links" in default:
+        warnings.append(
+            ConfigValidationWarning(
+                "Deprecated; rename to 'embed_links'.",
+                key="embed_dupe_links",
+                section="DEFAULT",
+            )
+        )
 
     # Validate image hosts
     for i in range(1, 10):

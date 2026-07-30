@@ -1487,7 +1487,7 @@ function AudionutsUAGUI() {
 
     return (
       <div
-        className={`rounded-lg border p-3 shadow-xl backdrop-blur-sm ${isDarkMode ? "border-gray-700 bg-gray-800/90" : "border-gray-200 bg-white/95"}`}
+        className={`rounded-lg border p-3 shadow-xl backdrop-blur-sm ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white/95"}`}
       >
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
@@ -1545,7 +1545,7 @@ function AudionutsUAGUI() {
             return (
               <div
                 key={item.id}
-                className={`rounded-lg border px-3 py-2 ${isDarkMode ? "border-gray-700 bg-gray-900/80" : "border-gray-200 bg-gray-50"}`}
+                className={`rounded-lg border px-3 py-2 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gray-50"}`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -3750,7 +3750,8 @@ function AudionutsUAGUI() {
               <div
                 className={`rounded-lg border p-5 text-center text-sm ${isDarkMode ? "border-gray-700 bg-gray-800 text-gray-400" : "border-gray-200 bg-gray-50 text-gray-500"}`}
               >
-                Screenshots will appear here when local capture finishes.
+                If the media being uploaded requires screenshots, they will
+                appear here as soon as the local capture is complete.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -18,6 +18,7 @@ import pycountry
 from bs4 import BeautifulSoup
 
 from cogs.redaction import Redaction
+from src.config_helpers import format_terminal_link
 from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
@@ -1114,6 +1115,7 @@ class MakingOff:
             return duplicates
 
         processed_urls: set[str] = set()
+        default_config = cast(dict[str, Any], self.config.get("DEFAULT", {}))
         for title, url in results.items():
             if url in processed_urls:
                 continue
@@ -1124,12 +1126,12 @@ class MakingOff:
             if upload_year and url not in exact_imdb_urls:
                 year_int = int(upload_year)
                 if not any(f"({y})" in title for y in (year_int - 1, year_int, year_int + 1)):
-                    logger.info(f"{self.tracker}: [yellow]Skipping: different year in existing release:[/yellow] [link={url}]{title}[/link]")
+                    logger.info(f"{self.tracker}: [yellow]Skipping: different year in existing release:[/yellow] {format_terminal_link(title, url, default_config)}")
                     continue
 
             # Uploading SD while a Hidef exists → block immediately.
             if not uploading_hidef and existing_hidef:
-                logger.warning(f"{self.tracker}: [bold red]Aborting: A Hidef release exists:[/bold red] [link={url}]{title}[/link]")
+                logger.warning(f"{self.tracker}: [bold red]Aborting: A Hidef release exists:[/bold red] {format_terminal_link(title, url, default_config)}")
                 if not meta.debug:
                     meta.skipping = self.tracker
                 duplicates.append({"name": f"[url={url}]{title}[/url]", "size": "", "link": url})
@@ -1147,7 +1149,9 @@ class MakingOff:
                 upload_height = 0
 
             if resolution >= upload_height:
-                logger.warning(f"{self.tracker}: [bold red]Aborting: A better or equivalent Hidef release exists:[/bold red] [link={url}]{title}[/link]")
+                logger.warning(
+                    f"{self.tracker}: [bold red]Aborting: A better or equivalent Hidef release exists:[/bold red] {format_terminal_link(title, url, default_config)}"
+                )
                 if not meta.debug:
                     meta.skipping = self.tracker
                 duplicates.append({"name": f"[url={url}]{title}[/url]", "size": str(resolution), "link": url})
