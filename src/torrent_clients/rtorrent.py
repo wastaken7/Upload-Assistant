@@ -249,11 +249,11 @@ class RtorrentClientMixin:
             path_dir = str(Path(path).parent)
             path = map_save_path(path, local_path, remote_path, trailing_slash=False)
             shutil.copy(fr_file, f"{path_dir}/fr.torrent")
-            fr_file = f"{Path(path).parent}/fr.torrent"
+            fr_file = f"{Path(path).parent.as_posix()}/fr.torrent"
             modified_fr = True
             logger.debug(f"[cyan]Modified fast resume file path because path mapping: {fr_file}")
         if (meta.category in ("BOOK", "GAME") and len(filelist) > 1 and isdir) or isdir is False:
-            path = str(Path(path).parent)
+            path = Path(path).parent.as_posix()
         logger.debug(f"[cyan]Final path for rTorrent: {path}")
 
         logger.info("[bold yellow]Adding and starting torrent")

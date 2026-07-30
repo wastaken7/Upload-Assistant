@@ -20,7 +20,7 @@ class DelugeClientMixin:
             # Remote path mount
             path = map_save_path(path, local_path, remote_path, trailing_slash=False)
 
-            path = str(Path(path).parent)
+            path = Path(path).parent.as_posix()
 
             deluge_client.call("core.add_torrent_file", torrent_path, base64.b64encode(torrent.dump()), {"download_location": path, "seed_mode": True})
             logger.debug(f"[cyan]Path: {path}")
