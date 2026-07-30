@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import io
 import json
 import platform
 import re
@@ -9,7 +8,6 @@ from typing import Any
 
 import aiofiles
 import httpx
-from PIL import Image
 
 from cogs.redaction import Redaction
 from src.console import logger
@@ -409,6 +407,36 @@ class UNIT3D:
 
         return merged
 
+    async def get_image_file(self, image_path: str | Path, max_size: int | None = None) -> tuple[str, bytes, str] | None:
+        """Read an image unchanged and return it with a content type verified from its signature."""
+        path = Path(image_path)
+        try:
+            if not path.is_file() or (max_size is not None and path.stat().st_size > max_size):
+                return None
+
+            async with aiofiles.open(path, "rb") as f:
+                image_bytes = await f.read()
+        except OSError as e:
+            logger.info(f"{self.tracker}: [yellow]Failed to read image {path}: {e}[/yellow]")
+            return None
+
+        image_type: tuple[str, str] | None = None
+        if image_bytes.startswith(b"\xff\xd8\xff"):
+            image_type = (".jpg", "image/jpeg")
+        elif image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            image_type = (".png", "image/png")
+        elif image_bytes.startswith((b"GIF87a", b"GIF89a")):
+            image_type = (".gif", "image/gif")
+        elif image_bytes.startswith(b"RIFF") and image_bytes[8:12] == b"WEBP":
+            image_type = (".webp", "image/webp")
+
+        if image_type is None:
+            logger.info(f"{self.tracker}: [yellow]Unsupported image format: {path}[/yellow]")
+            return None
+
+        extension, media_type = image_type
+        return (f"{path.stem}{extension}", image_bytes, media_type)
+
     async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
         files: dict[str, tuple[str, bytes, str]] = {}
         base_dir = meta.base_dir
@@ -426,22 +454,16 @@ class UNIT3D:
 
         if meta.category not in ("MOVIE", "TV", "GAME"):
             cover_path = meta.cover_path
-            if cover_path and Path(cover_path).exists():
-                try:
-                    cover_bytes = await self.process_image_for_api(cover_path, 400, 600)
-                    if cover_bytes:
-                        files["torrent-cover"] = ("cover.jpg", cover_bytes, "image/jpeg")
-                except Exception as e:
-                    logger.info(f"{self.tracker}: [yellow]Failed to process cover: {e}[/yellow]")
+            if cover_path:
+                cover_file = await self.get_image_file(cover_path)
+                if cover_file:
+                    files["torrent-cover"] = cover_file
 
             banner_path = meta.banner_path
-            if banner_path and Path(banner_path).exists():
-                try:
-                    banner_bytes = await self.process_image_for_api(banner_path, 960, 540)
-                    if banner_bytes:
-                        files["torrent-banner"] = ("banner.jpg", banner_bytes, "image/jpeg")
-                except Exception as e:
-                    logger.info(f"{self.tracker}: [yellow]Failed to process banner: {e}[/yellow]")
+            if banner_path:
+                banner_file = await self.get_image_file(banner_path)
+                if banner_file:
+                    files["torrent-banner"] = banner_file
 
         return files
 
@@ -577,51 +599,3 @@ class UNIT3D:
         if error_msg:
             return f"API response: {error_msg}"
         return f"API response: {response_data}"
-
-    async def process_image_for_api(self, img_path: str, target_width: int, target_height: int) -> bytes | None:
-        def _process():
-            img_original = Image.open(img_path)
-            width_orig, height_orig = img_original.size
-
-            if img_original.mode in ("RGBA", "LA"):
-                fundo = Image.new("RGB", img_original.size, (255, 255, 255))
-                alpha = img_original.split()[-1]
-                fundo.paste(img_original, mask=alpha)
-                img_final = fundo
-            elif img_original.mode != "RGB":
-                img_final = img_original.convert("RGB")
-            else:
-                img_final = img_original
-
-            if width_orig != target_width or height_orig != target_height:
-                img_ratio = width_orig / height_orig
-                target_ratio = target_width / target_height
-
-                if img_ratio > target_ratio:
-                    new_h = target_height
-                    new_w = int(width_orig * (target_height / height_orig))
-                else:
-                    new_w = target_width
-                    new_h = int(height_orig * (target_width / width_orig))
-
-                img_resized = img_final.resize((new_w, new_h), Image.Resampling.LANCZOS)
-
-                left = (new_w - target_width) // 2
-                top = (_new_height := (new_h - target_height) // 2)
-                right = left + target_width
-                bottom = top + target_height
-
-                img_final = img_resized.crop((left, top, right, bottom))
-
-            buf = io.BytesIO()
-            img_final.save(buf, format="JPEG", quality=95)
-            img_bytes = buf.getvalue()
-
-            if len(img_bytes) > 5 * 1024 * 1024:
-                buf = io.BytesIO()
-                img_final.save(buf, format="JPEG", quality=85)
-                img_bytes = buf.getvalue()
-
-            return img_bytes if len(img_bytes) <= 5 * 1024 * 1024 else None
-
-        return await asyncio.to_thread(_process)
