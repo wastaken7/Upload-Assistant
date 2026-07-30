@@ -766,10 +766,17 @@ class AmigosShare:
             filename = unicodedata.normalize("NFKD", Path(str(subtitle_file)).stem.casefold())
             filename = "".join(char for char in filename if not unicodedata.combining(char))
             filename_tokens = re.findall(r"[a-z0-9]+", filename)
-            if filename_tokens and filename_tokens[-1] in {"por", "portuguese", "portugues", "pt", "ptbr"}:
-                return True
-            if len(filename_tokens) >= 2 and tuple(filename_tokens[-2:]) in {("pt", "br"), ("brazilian", "portuguese")}:
-                return True
+            portuguese_markers = {"por", "portuguese", "portugues", "pt", "ptbr"}
+            subtitle_flags = {"forced", "sdh"}
+            for index, token in enumerate(filename_tokens):
+                if token in portuguese_markers:
+                    trailing_tokens = filename_tokens[index + 1 :]
+                    if not trailing_tokens or all(flag in subtitle_flags for flag in trailing_tokens):
+                        return True
+                if tuple(filename_tokens[index : index + 2]) in {("pt", "br"), ("brazilian", "portuguese")}:
+                    trailing_tokens = filename_tokens[index + 2 :]
+                    if not trailing_tokens or all(flag in subtitle_flags for flag in trailing_tokens):
+                        return True
 
         return False
 
