@@ -49,6 +49,9 @@ from src.meta import Meta
 # File-list resolution
 # ---------------------------------------------------------------------------
 
+BOOK_EXTENSIONS = frozenset({".pdf", ".epub", ".mobi", ".azw", ".azw3", ".cbz", ".cbr"})
+AUDIOBOOK_EXTENSIONS = frozenset({".mp3", ".m4b", ".flac", ".aac", ".m4a", ".ogg", ".wav"})
+
 
 def resolve_book_filelist(
     meta: Meta,
@@ -64,9 +67,7 @@ def resolve_book_filelist(
         where *videopath* is the primary/largest file used as the "video"
         reference for downstream processing.
     """
-    book_extensions: set[str] = {".pdf", ".epub", ".mobi", ".cbz", ".cbr"}
-    audiobook_extensions: set[str] = {".mp3", ".m4b", ".flac", ".aac", ".m4a", ".ogg", ".wav"}
-    allowed_extensions = book_extensions | audiobook_extensions
+    allowed_extensions = BOOK_EXTENSIONS | AUDIOBOOK_EXTENSIONS
 
     filelist: list[str] = []
     if Path(videoloc).is_dir():
@@ -88,7 +89,7 @@ def resolve_book_filelist(
     meta.imdb_id = 0
 
     primary_ext = Path(videopath).suffix.lower()
-    meta.audiobook = primary_ext in audiobook_extensions
+    meta.audiobook = primary_ext in AUDIOBOOK_EXTENSIONS
 
     search_term = Path(filelist[0]).name if filelist else ""
     search_file_folder = "file"
@@ -255,8 +256,9 @@ async def gather_book_prep(
                         if key == "year":
                             meta.search_year = int(val)
 
-    # Extract MOBI metadata directly if the file is a MOBI
-    if videopath.lower().endswith(".mobi") and Path(videopath).is_file():
+    # AZW and AZW3 are Kindle variants of the MOBI family.  The extractor may
+    # not support every DRM/KFX variant, but it safely returns no metadata then.
+    if videopath.lower().endswith((".mobi", ".azw", ".azw3")) and Path(videopath).is_file():
         mobi_meta = _extract_mobi_metadata(videopath)
         if mobi_meta:
             logger.debug(f"[cyan]MOBI metadata extracted: {mobi_meta}[/cyan]")
