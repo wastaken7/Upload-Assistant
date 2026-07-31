@@ -503,7 +503,7 @@ class UploadHelper:
         if not possible:
             return
 
-        question = "\033[1;35mFound BDInfo content in potential duplicates.\033[0m Perform a comparison?"
+        question = "[bold magenta]Found BDInfo content in potential duplicates.[/bold magenta] Perform a comparison?"
         if await self.prompt_yes_no(question, default=True):
             warnings: list[str] = []
             results: list[str] = []

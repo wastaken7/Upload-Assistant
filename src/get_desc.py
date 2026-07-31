@@ -24,6 +24,7 @@ from src.bbcode import BBCODE
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
+from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
 from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
@@ -1507,25 +1508,9 @@ class DescriptionBuilder:
                             desc_parts.append("[/center]\n\n")
                             meta.retry_count += 1
                             meta[new_images_key] = []
-                            new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"PLAYLIST_{i}-*.png")]
+                            new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"PLAYLIST_{i}")]
                             if not new_screens:
-                                use_vs = meta.vapoursynth
-                                try:
-                                    await self.takescreens_manager.disc_screenshots(
-                                        meta,
-                                        f"PLAYLIST_{i}",
-                                        bdinfo,
-                                        meta.uuid,
-                                        meta.base_dir,
-                                        use_vs,
-                                        [],
-                                        meta.ffdebug,
-                                        multi_screens,
-                                        True,
-                                    )
-                                except Exception as e:
-                                    logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
-                                new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"PLAYLIST_{i}-*.png")]
+                                logger.warning(f"[yellow]Missing prepared screenshots for PLAYLIST_{i}; skipping its images in the description.[/yellow]")
                             if new_screens and not meta.skip_imghost_upload:
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
                                     meta,
@@ -1655,36 +1640,11 @@ class DescriptionBuilder:
                             # Check if new screenshots already exist before running prep.screenshots
                             new_screens: list[str] = []
                             if each["type"] == "BDMV":
-                                new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"FILE_{i}-*.png")]
+                                new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
                             elif each["type"] == "DVD":
                                 new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
                             if not new_screens:
-                                logger.debug(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
-                                # Run prep.screenshots if no screenshots are present
-                                if each["type"] == "BDMV":
-                                    use_vs = meta.vapoursynth
-                                    try:
-                                        await self.takescreens_manager.disc_screenshots(
-                                            meta,
-                                            f"FILE_{i}",
-                                            each["bdinfo"],
-                                            meta.uuid,
-                                            meta.base_dir,
-                                            use_vs,
-                                            [],
-                                            meta.ffdebug,
-                                            multi_screens,
-                                            True,
-                                        )
-                                    except Exception as e:
-                                        logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
-                                    new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"FILE_{i}-*.png")]
-                                if each["type"] == "DVD":
-                                    try:
-                                        await self.takescreens_manager.dvd_screenshots(meta, i, multi_screens, True)
-                                    except Exception as e:
-                                        logger.info(f"Error during DVD screenshot capture: {e}", extra={"markup": False})
-                                    new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
+                                logger.warning(f"[yellow]Missing prepared screenshots for {new_images_key}; skipping its images in the description.[/yellow]")
 
                             if new_screens and not meta.skip_imghost_upload:
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
@@ -1809,7 +1769,7 @@ class DescriptionBuilder:
                     if new_images_key not in meta or not meta[new_images_key]:
                         meta[new_images_key] = []
                         # Proceed with image generation if not already present
-                        new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"FILE_{i}-*.png")]
+                        new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
 
                         # If no screenshots exist, create them
                         if not new_screens:
@@ -1829,7 +1789,7 @@ class DescriptionBuilder:
                             except Exception as e:
                                 logger.info(f"Error during generic screenshot capture: {e}", extra={"markup": False})
 
-                        new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"FILE_{i}-*.png")]
+                        new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
 
                         # Upload generated screenshots
                         if new_screens and not meta.skip_imghost_upload:

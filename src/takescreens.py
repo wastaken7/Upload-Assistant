@@ -26,6 +26,8 @@ from data import config as data_config
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
+from src.screenshot_manifest import files as manifest_files
+from src.screenshot_manifest import register as register_screenshots
 from src.temp_paths import posters_dir, screenshots_dir
 from src.webui_progress import complete_progress, publish_progress
 
@@ -125,6 +127,7 @@ async def disc_screenshots(
     num_screens: int = 0,
     force_screenshots: bool = False,
     cleanup_after_capture: bool = True,
+    capture_group: str | None = None,
 ) -> None:
     img_host = await get_image_host(meta)
     screens = meta.screens
@@ -175,8 +178,7 @@ async def disc_screenshots(
     keyframe = "nokey" if "VC-1" in bdinfo["video"][0]["codec"] or bdinfo["video"][0]["hdr_dv"] != "" else "none"
     logger.debug(f"File: {file_path}, Length: {length}, Frame Rate: {frame_rate}", extra={"markup": False})
     screenshot_dir = screenshots_dir(base_dir, folder_id)
-    existing_screens = [p.name for p in screenshot_dir.glob(f"{glob.escape(sanitized_filename)}-*.png")]
-    existing_screens = [f for f in existing_screens if re.match(r"^-\d+\.png$", Path(f).name[len(sanitized_filename) :])]
+    existing_screens = [p.name for p in manifest_files(base_dir, folder_id, sanitized_filename)]
     total_existing = len(existing_screens) + len(existing_images)
     num_screens = max(0, screens - total_existing) if not force_screenshots else num_screens
 
@@ -227,7 +229,7 @@ async def disc_screenshots(
     else:
         loglevel = "verbose" if ffdebug else "quiet"
 
-        existing_indices = {int(p.split("-")[-1].split(".")[0]) for p in existing_screens}
+        existing_indices = set(range(len(existing_screens)))
 
         # Create semaphore to limit concurrent tasks
         semaphore = asyncio.Semaphore(task_limit)
@@ -357,6 +359,11 @@ async def disc_screenshots(
         finish_time = time.time()
         logger.debug(f"Screenshots processed in {finish_time - start_time:.4f} seconds")
 
+    # The temporary descriptive names above are only used while capture is in
+    # progress.  Publish completed frames under opaque UUID filenames.
+    if valid_results:
+        register_screenshots(base_dir, folder_id, valid_results, capture_group or sanitized_filename)
+
     multi_screens = int(default_config.get("multiScreens", 2))
     discs = meta.discs
     one_disc = True
@@ -475,8 +482,8 @@ async def dvd_screenshots(
 
     sanitized_disc_name = await sanitize_filename(meta.discs[disc_num]["name"])
     screenshot_dir = screenshots_dir(meta.base_dir, meta.uuid)
-    existing_screens = [str(p) for p in screenshot_dir.glob(f"{glob.escape(sanitized_disc_name)}-*.png")]
-    normal_screens = [f for f in existing_screens if re.match(r"^-\d+\.png$", Path(f).name[len(sanitized_disc_name) :])]
+    existing_screens = [str(p) for p in manifest_files(meta.base_dir, meta.uuid, sanitized_disc_name)]
+    normal_screens = existing_screens
     if len(normal_screens) >= num_screens:
         i = num_screens
         logger.info("[bold green]Reusing screenshots")
@@ -688,6 +695,9 @@ async def dvd_screenshots(
             valid_results.append(image)
     if remaining_retakes:
         logger.info(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
+
+    if valid_results:
+        register_screenshots(meta.base_dir, meta.uuid, valid_results, sanitized_disc_name)
 
     if not retry_cap and meta.debug:
         logger.info(f"[green]Successfully captured {len(valid_results)} screenshots.")
@@ -2419,8 +2429,9 @@ class TakeScreensManager:
         num_screens: int = 0,
         force_screenshots: bool = False,
         cleanup_after_capture: bool = True,
+        capture_group: str | None = None,
     ) -> None:
-        await disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens, force_screenshots, cleanup_after_capture)
+        await disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens, force_screenshots, cleanup_after_capture, capture_group)
 
     async def capture_disc_task(
         self, index: int, file: str, ss_time: str, image_path: str, keyframe: str, loglevel: str, hdr_tonemap: bool, meta: Meta
