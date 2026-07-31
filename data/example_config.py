@@ -1296,6 +1296,8 @@ config: dict[str, Any] = {
             "link_dir_name": "",
             "announce_url": "",
             "anon": True,
+            # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
+            "full_mediainfo": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1358,6 +1360,8 @@ config: dict[str, Any] = {
             # It also does not have the option to set the IMDb during upload.
             # Set this to True to edit the torrent after the upload to force the correct naming and IMDb.
             "force_data": False,
+            # Set to True if you want to include the full MediaInfo in your upload description or False to include only the most relevant parts.
+            "full_mediainfo": False,
             "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,

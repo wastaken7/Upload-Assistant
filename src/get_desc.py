@@ -361,7 +361,7 @@ class DescriptionBuilder:
         if meta.is_disc == "BDMV" or meta.category in ("GAME", "BOOK", "MUSIC"):
             return ""
 
-        if self._get_bool_config("full_mediainfo", False) or meta.is_disc:
+        if self._get_bool_config("full_mediainfo", True) or meta.is_disc:
             mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
             if await self.common.path_exists(mi_path):
                 async with aiofiles.open(mi_path, encoding="utf-8") as mi:
