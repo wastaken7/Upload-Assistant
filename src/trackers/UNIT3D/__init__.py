@@ -62,8 +62,6 @@ class UNIT3D:
         # Ensure tracker_status keys exist before any potential writes
         meta.setdefault("tracker_status", {})
         meta.tracker_status.setdefault(self.tracker, {})
-        category_id = (await self.get_category_id(meta))["category_id"]
-
         headers = {
             "authorization": f"Bearer {self.api_key}",
             "accept": "application/json",
@@ -71,12 +69,16 @@ class UNIT3D:
 
         if category in ("MOVIE", "TV"):
             params_dict: dict[str, str] = {
-                "categories[]": category_id,
                 "name": "",
                 "perPage": "100",
             }
             if meta.tmdb is not None:
                 params_dict["tmdbId"] = str(meta.tmdb)
+            else:
+                # TMDB identifies the work across tracker subcategories (for
+                # example, TV and Anime). Keep the category only as a fallback
+                # for manually constructed metadata without a TMDB ID.
+                params_dict["categories[]"] = (await self.get_category_id(meta))["category_id"]
 
             if self.tracker not in ["OLDTOONSWORLD"]:
                 resolutions = await self.get_resolution_id(meta)
@@ -107,7 +109,7 @@ class UNIT3D:
         else:
             params_dict = {
                 "name": meta.title or meta.name,
-                "categories[]": category_id,
+                "categories[]": (await self.get_category_id(meta))["category_id"],
                 "perPage": "100",
             }
 

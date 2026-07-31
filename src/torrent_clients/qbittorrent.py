@@ -279,9 +279,7 @@ class QbittorrentClientMixin:
             raise _RetryableProxyResponseError(f"proxy returned HTTP {response.status_code}")
         raise _ProxyResponseError(f"proxy returned HTTP {response.status_code}")
 
-    async def _add_torrent_via_proxy(
-        self, qbt_session: httpx.AsyncClient, qbt_proxy_url: str, infohash: str, data: dict[str, str], files: dict[str, Any]
-    ) -> None:
+    async def _add_torrent_via_proxy(self, qbt_session: httpx.AsyncClient, qbt_proxy_url: str, infohash: str, data: dict[str, str], files: dict[str, Any]) -> None:
         add_attempt = 0
 
         async def add_via_proxy() -> None:
