@@ -369,8 +369,7 @@ async def _capture_disc_review_frame(temp_dir: Path, meta_data: Mapping[str, obj
         raise ValueError("Interactive disc screenshots currently require BDMV metadata")
     token = uuid.uuid4().hex
     prefix = f"review-{token}"
-    await disc_screenshots(meta, prefix, bdinfo, meta.uuid, meta.base_dir, meta.vapoursynth, [], meta.ffdebug, 1, True, False, group)
-    generated = manifest_files(meta.base_dir, meta.uuid, group)
+    generated = await disc_screenshots(meta, prefix, bdinfo, meta.uuid, meta.base_dir, meta.vapoursynth, [], meta.ffdebug, 1, True, False, group)
     if not generated:
         raise RuntimeError("Disc capture did not produce a screenshot")
     source = generated[0]
@@ -389,7 +388,8 @@ def _disc_bdinfo_for_group(meta: Meta, group: str) -> dict[str, Any] | None:
         return meta.bdinfo if isinstance(meta.bdinfo, dict) else None
     if group.startswith("PLAYLIST_") and meta.discs:
         try:
-            return meta.discs[0].get(f"bdinfo_{int(group.removeprefix('PLAYLIST_'))}")
+            disc = meta.discs[0]
+            return disc.get(f"bdinfo_{int(group.removeprefix('PLAYLIST_'))}") if isinstance(disc, dict) else None
         except ValueError:
             return None
     if group.startswith("FILE_"):

@@ -1,7 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import contextlib
-import glob
 import html
 import json
 import os
@@ -26,7 +25,6 @@ from src.languages import languages_manager
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
-from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
 
@@ -1642,7 +1640,9 @@ class DescriptionBuilder:
                             if each["type"] == "BDMV":
                                 new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
                             elif each["type"] == "DVD":
-                                new_screens = [f.name for f in screenshots_dir(meta.base_dir, meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
+                                new_screens = [
+                                    f.name for f in manifest_files(meta.base_dir, meta.uuid, await self.takescreens_manager.sanitize_filename(meta.discs[i]["name"]))
+                                ]
                             if not new_screens:
                                 logger.warning(f"[yellow]Missing prepared screenshots for {new_images_key}; skipping its images in the description.[/yellow]")
 

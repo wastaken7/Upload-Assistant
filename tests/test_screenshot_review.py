@@ -80,7 +80,8 @@ def test_add_bdmv_screenshot_uses_disc_capture_and_opaque_id(tmp_path: Path, mon
     release_id = "release"
     screenshots_dir = tmp_path / "tmp" / release_id / "screenshots"
     screenshots_dir.mkdir(parents=True)
-    (screenshots_dir / "Movie-0.png").write_bytes(b"initial")
+    existing = screenshots_dir / "Movie-0.png"
+    existing.write_bytes(b"initial")
     meta_data = {"base_dir": str(tmp_path), "uuid": release_id, "is_disc": "BDMV", "bdinfo": {}, "filename": "Movie"}
 
     async def capture_stub(_meta, prefix, _bdinfo, folder_id, base_dir, *_args):
@@ -88,15 +89,19 @@ def test_add_bdmv_screenshot_uses_disc_capture_and_opaque_id(tmp_path: Path, mon
         path.write_bytes(b"new")
         from src.screenshot_manifest import register
 
-        register(base_dir, folder_id, [path], "main")
+        return register(base_dir, folder_id, [path], "main")
 
     monkeypatch.setattr("src.screenshot_review.disc_screenshots", capture_stub)
+    from src.screenshot_manifest import register
+
+    register(tmp_path, release_id, [existing], "main")
     addition = asyncio.run(add_screenshot(tmp_path / "tmp" / release_id, meta_data))
 
     assert addition.id.startswith("local-")
     assert addition.path is not None and addition.path.is_file()
     assert addition.path.name.endswith(".png")
     assert len(addition.path.stem) == 32
+    assert addition.path != screenshots_dir / existing.name
 
 
 def test_disc_review_keeps_late_local_playlist_frames_visible_with_remote_images(tmp_path: Path) -> None:

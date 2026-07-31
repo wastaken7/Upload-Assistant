@@ -3750,7 +3750,7 @@ function AudionutsUAGUI() {
                 </p>
               </div>
               <button
-                onClick={addExecutionScreenshot}
+                onClick={() => addExecutionScreenshot("main")}
                 disabled={isWorking || !canAddExecutionScreenshot}
                 className="p-2 rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
                 title="Capture an additional screenshot"

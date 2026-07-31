@@ -1076,20 +1076,20 @@ class PassThePopcorn:
                         new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
                         if not new_screens:
                             logger.warning(f"{self.tracker}: Missing prepared screenshots for FILE_{i}; skipping its images.")
-                            uploaded_images: list[dict[str, Any]] = []
-                            if new_screens and not meta.skip_imghost_upload:
-                                uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
-                                    meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts
+                        uploaded_images: list[dict[str, Any]] = []
+                        if new_screens and not meta.skip_imghost_upload:
+                            uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
+                                meta, multi_screens, 1, 0, multi_screens, new_screens, {new_images_key: meta[new_images_key]}, allowed_hosts=self.approved_image_hosts
+                            )
+                        if uploaded_images and not meta.skip_imghost_upload:
+                            await self.save_image_links(meta, new_images_key, uploaded_images)
+                            for img in uploaded_images:
+                                meta[new_images_key].append(
+                                    {"img_url": str(img.get("img_url", "")), "raw_url": str(img.get("raw_url", "")), "web_url": str(img.get("web_url", ""))}
                                 )
-                            if uploaded_images and not meta.skip_imghost_upload:
-                                await self.save_image_links(meta, new_images_key, uploaded_images)
-                                for img in uploaded_images:
-                                    meta[new_images_key].append(
-                                        {"img_url": str(img.get("img_url", "")), "raw_url": str(img.get("raw_url", "")), "web_url": str(img.get("web_url", ""))}
-                                    )
-                                    raw_url = str(img.get("raw_url", ""))
-                                    desc.write(f"[img]{raw_url}[/img]\n")
-                                desc.write("\n")
+                                raw_url = str(img.get("raw_url", ""))
+                                desc.write(f"[img]{raw_url}[/img]\n")
+                            desc.write("\n")
 
                             meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
                             async with aiofiles.open(meta_filename, "w", encoding="utf-8") as f:
