@@ -154,6 +154,12 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
         raise
     logger.debug(f"[blue]is_disc: [yellow]{meta.is_disc}[/yellow][/blue]")
 
+    # A CLI category is an explicit instruction, not only a signal to skip
+    # automatic detection.  Content-specific preparation below routes on
+    # ``meta.category``, so normalise the manual value before that routing.
+    if isinstance(meta.manual_category, str) and meta.manual_category.strip():
+        meta.category = meta.manual_category.strip().upper()
+
     # Auto-detect MUSIC before BOOK: music releases are commonly multi-file FLAC
     # directories, whereas audiobooks remain BOOK through their dedicated flow.
     if not meta.category and not meta.manual_category and not meta.is_disc:
