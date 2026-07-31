@@ -271,6 +271,42 @@ class QbittorrentClientMixin:
                     raise
         return None
 
+    @staticmethod
+    def _raise_for_proxy_response(response: httpx.Response) -> None:
+        if response.status_code == 200:
+            return
+        if response.status_code in (502, 503, 504):
+            raise _RetryableProxyResponseError(f"proxy returned HTTP {response.status_code}")
+        raise _ProxyResponseError(f"proxy returned HTTP {response.status_code}")
+
+    async def _add_torrent_via_proxy(
+        self, qbt_session: httpx.AsyncClient, qbt_proxy_url: str, infohash: str, data: dict[str, str], files: dict[str, Any]
+    ) -> None:
+        add_attempt = 0
+
+        async def add_via_proxy() -> None:
+            nonlocal add_attempt
+            # A timeout or 5xx response may mean qBittorrent accepted the first
+            # request while the proxy failed to return its response. Check before
+            # submitting the same infohash again.
+            if add_attempt:
+                info_response = await qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/info", params={"hashes": infohash})
+                self._raise_for_proxy_response(info_response)
+                if info_response.json():
+                    logger.info("[green]Torrent was added to qBittorrent despite the previous proxy failure.")
+                    return
+
+            add_attempt += 1
+            response = await qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/add", data=data, files=files)
+            self._raise_for_proxy_response(response)
+
+        await self.retry_qbt_operation(
+            add_via_proxy,
+            "Add torrent to qBittorrent via proxy",
+            initial_timeout=14.0,
+            retryable_errors=(TimeoutError, httpx.HTTPError, _RetryableProxyResponseError),
+        )
+
     async def init_qbittorrent_client(self, client: dict[str, Any]) -> qbittorrentapi.Client | None:
         # Creates and logs into a qbittorrent client, with caching to avoid redundant logins
         # If login fails, returns None
@@ -876,33 +912,7 @@ class QbittorrentClientMixin:
                     f"[cyan]POSTing to {Redaction.redact_private_info(qbt_proxy_url)}/api/v2/torrents/add with data: savepath={save_path}, autoTMM={auto_management}, skip_checking={skip_checking}, paused={paused_on_add}, contentLayout={content_layout}, category={qbt_category}, tags={tag}"
                 )
 
-                add_attempt = 0
-
-                async def add_via_proxy() -> None:
-                    nonlocal add_attempt
-                    # A timeout or 5xx response may mean qBittorrent accepted the first
-                    # request while the proxy failed to return its response. Check before
-                    # submitting the same infohash again.
-                    if add_attempt:
-                        info_response = await qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/info", params={"hashes": torrent.infohash})
-                        if info_response.status_code == 200 and info_response.json():
-                            logger.info("[green]Torrent was added to qBittorrent despite the previous proxy failure.")
-                            return
-
-                    add_attempt += 1
-                    response = await qbt_session.post(f"{qbt_proxy_url}/api/v2/torrents/add", data=data, files=files)
-                    if response.status_code == 200:
-                        return
-                    if response.status_code in (502, 503, 504):
-                        raise _RetryableProxyResponseError(f"proxy returned HTTP {response.status_code}")
-                    raise _ProxyResponseError(f"proxy returned HTTP {response.status_code}")
-
-                await self.retry_qbt_operation(
-                    add_via_proxy,
-                    "Add torrent to qBittorrent via proxy",
-                    initial_timeout=14.0,
-                    retryable_errors=(TimeoutError, httpx.HTTPError, _RetryableProxyResponseError),
-                )
+                await self._add_torrent_via_proxy(qbt_session, qbt_proxy_url, torrent.infohash, data, files)
             else:
                 if qbt_client is None:
                     raise RuntimeError("qbt_client cannot be None")
