@@ -34,3 +34,22 @@ async def test_prompt_yes_no_serializes_concurrent_prompts(monkeypatch: pytest.M
     release_first.set()
     assert await asyncio.gather(first, second) == [False, True]
     assert second_started.is_set()
+
+
+@pytest.mark.asyncio
+async def test_bdinfo_comparison_prompt_uses_rich_markup(monkeypatch: pytest.MonkeyPatch) -> None:
+    question: str | None = None
+
+    async def prompt_yes_no(value: str, *, default: bool = False) -> bool:
+        nonlocal question
+        question = value
+        return False
+
+    monkeypatch.setattr("src.uphelper.has_bdinfo_content", lambda _entry: True)
+    helper = UploadHelper({"DEFAULT": {}})
+    monkeypatch.setattr(helper, "prompt_yes_no", prompt_yes_no)
+
+    await helper.ask_bdinfo_comparison({}, [{}], "AITHER")
+
+    assert question == "[bold magenta]Found BDInfo content in potential duplicates.[/bold magenta] Perform a comparison?"
+    assert "\033" not in question
