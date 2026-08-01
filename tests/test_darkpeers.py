@@ -60,15 +60,33 @@ def test_darkpeers_audiobook_name_includes_format_bitrate_isbn_and_tag():
     assert _name(meta) == "Ernest Cline - Ready Player One 2011 MP3 64 9780307887436-GROUP"
 
 
+def test_darkpeers_book_name_never_uses_publisher_as_author():
+    meta = Meta(category="BOOK", publisher="Publisher Name", title="Book Title", year=2026, type="EPUB", isbn="978-0-123456-47-2")
+
+    assert _name(meta) == "Book Title 2026 EPUB 9780123456472"
+
+
+def test_darkpeers_replaces_generic_dual_audio_with_rule_matrix_label():
+    meta = Meta(category="MOVIE", name="Anime 2026 1080p WEB-DL Dual-Audio-TEAM", language_checked=True, original_language="Japanese", audio_languages=["Japanese", "French"])
+
+    assert _name(meta) == "Anime 2026 1080p WEB-DL French MULTi-TEAM"
+
+
+def test_darkpeers_preserves_detected_original_scene_name():
+    meta = Meta(category="MOVIE", name="Generated Name", scene=True, scene_name="Original.Release.2026-GRP", language_checked=True)
+
+    assert _name(meta) == "Original.Release.2026-GRP"
+
+
 def _additional_checks(meta: Meta) -> bool:
-    config = {"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}}
+    config = {"DEFAULT": {"tmdb_api": "test-key", "thumbnail_size": "350"}, "TRACKERS": {"DARKPEERS": {}}}
     return asyncio.run(DarkPeers(config).get_additional_checks(meta))
 
 
 def test_darkpeers_evo_webdl_allowed_and_non_webdl_blocked():
-    evo_webdl = Meta(category="MOVIE", type="WEBDL", tag="-EVO", audio_languages=["English"])
-    evo_encode = Meta(category="MOVIE", type="ENCODE", tag="-EVO", audio_languages=["English"])
-    evo_remux = Meta(category="MOVIE", type="REMUX", tag="EVO", audio_languages=["English"])
+    evo_webdl = Meta(category="MOVIE", type="WEBDL", tag="-EVO", audio_languages=["English"], resolution="1080p", screens=3)
+    evo_encode = Meta(category="MOVIE", type="ENCODE", tag="-EVO", audio_languages=["English"], resolution="1080p", screens=3)
+    evo_remux = Meta(category="MOVIE", type="REMUX", tag="EVO", audio_languages=["English"], resolution="1080p", screens=3)
 
     assert _additional_checks(evo_webdl) is True
     assert _additional_checks(evo_encode) is False
@@ -76,9 +94,9 @@ def test_darkpeers_evo_webdl_allowed_and_non_webdl_blocked():
 
 
 def test_darkpeers_hdt_remux_allowed_and_non_remux_blocked():
-    hdt_remux = Meta(category="MOVIE", type="REMUX", tag="-HDT", audio_languages=["English"])
-    hdt_webdl = Meta(category="MOVIE", type="WEBDL", tag="-HDT", audio_languages=["English"])
-    hdt_encode = Meta(category="MOVIE", type="ENCODE", tag="HDT", audio_languages=["English"])
+    hdt_remux = Meta(category="MOVIE", type="REMUX", tag="-HDT", audio_languages=["English"], resolution="1080p", screens=3)
+    hdt_webdl = Meta(category="MOVIE", type="WEBDL", tag="-HDT", audio_languages=["English"], resolution="1080p", screens=3)
+    hdt_encode = Meta(category="MOVIE", type="ENCODE", tag="HDT", audio_languages=["English"], resolution="1080p", screens=3)
 
     assert _additional_checks(hdt_remux) is True
     assert _additional_checks(hdt_webdl) is False
@@ -86,11 +104,59 @@ def test_darkpeers_hdt_remux_allowed_and_non_remux_blocked():
 
 
 def test_darkpeers_hardcoded_subs_blocked_in_interactive_and_unattended():
-    subs_interactive = Meta(category="MOVIE", type="WEBDL", tag="-GRP", hardcoded_subs=True, unattended=False, audio_languages=["English"])
-    subs_unattended = Meta(category="MOVIE", type="WEBDL", tag="-GRP", hardcoded_subs=True, unattended=True, audio_languages=["English"])
-    no_subs_unattended = Meta(category="MOVIE", type="WEBDL", tag="-GRP", hardcoded_subs=False, unattended=True, audio_languages=["English"])
+    subs_interactive = Meta(category="MOVIE", type="WEBDL", tag="-GRP", hardcoded_subs=True, unattended=False, audio_languages=["English"], resolution="1080p", screens=3)
+    subs_unattended = Meta(category="MOVIE", type="WEBDL", tag="-GRP", hardcoded_subs=True, unattended=True, audio_languages=["English"], resolution="1080p", screens=3)
+    no_subs_unattended = Meta(category="MOVIE", type="WEBDL", tag="-GRP", hardcoded_subs=False, unattended=True, audio_languages=["English"], resolution="1080p", screens=3)
 
     assert _additional_checks(subs_interactive) is False
     assert _additional_checks(subs_unattended) is False
     assert _additional_checks(no_subs_unattended) is True
 
+
+def test_darkpeers_video_language_rule_requires_original_audio_with_accepted_subtitles():
+    original_with_subtitles = Meta(
+        category="MOVIE", unattended=True, audio_languages=["jpn"], subtitle_languages=["Swedish"], original_language="Japanese", resolution="1080p", screens=3
+    )
+    foreign_dub_with_subtitles = Meta(
+        category="MOVIE", unattended=True, audio_languages=["Spanish"], subtitle_languages=["English"], original_language="Japanese", resolution="1080p", screens=3
+    )
+
+    assert _additional_checks(original_with_subtitles) is True
+    assert _additional_checks(foreign_dub_with_subtitles) is False
+
+
+def test_darkpeers_rejects_unsupported_resolution():
+    unsupported = Meta(category="MOVIE", unattended=True, audio_languages=["English"], resolution="1440p", screens=3)
+
+    assert _additional_checks(unsupported) is False
+
+
+def test_darkpeers_rejects_multi_season_and_video_archives():
+    seasons = Meta(category="TV", unattended=True, audio_languages=["English"], resolution="1080p", screens=3, filelist=["Show.S01E01.mkv", "Show.S02E01.mkv"])
+    archive = Meta(category="MOVIE", unattended=True, audio_languages=["English"], resolution="1080p", screens=3, filelist=["Movie.part01.rar"])
+
+    assert _additional_checks(seasons) is False
+    assert _additional_checks(archive) is False
+
+
+def test_darkpeers_book_language_is_unrestricted_but_author_is_required_unattended():
+    portuguese = Meta(category="BOOK", unattended=True, author="Autor", publisher="Editora", type="EPUB", isbn="978-0-123456-47-2", book_language="Portuguese")
+    no_author = Meta(category="BOOK", unattended=True, publisher="Editora", type="EPUB", isbn="978-0-123456-47-2")
+
+    assert _additional_checks(portuguese) is True
+    assert _additional_checks(no_author) is False
+
+
+def test_darkpeers_game_requires_scene_rars_nfo_and_instructions():
+    valid_game = Meta(
+        category="GAME",
+        unattended=True,
+        scene=True,
+        scene_nfo_file="release.nfo",
+        filelist=["release.r00", "release.rar"],
+        description="Installation instructions: mount and install.",
+    )
+    iso = Meta(category="GAME", unattended=True, scene=True, scene_nfo_file="release.nfo", filelist=["release.iso"], description="Installation instructions")
+
+    assert _additional_checks(valid_game) is True
+    assert _additional_checks(iso) is False
