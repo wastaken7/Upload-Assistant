@@ -502,7 +502,7 @@ class MoreThanTV:
 
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if not await aiofiles.os.path.exists(cookiefile):
-            await self.login(cookiefile)
+            await self.login(cookiefile, meta)
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
             logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your username and password is valid.")
@@ -513,7 +513,7 @@ class MoreThanTV:
             if recreate is True:
                 if await aiofiles.os.path.exists(cookiefile):
                     await aiofiles.os.remove(cookiefile)  # Using async file removal
-                await self.login(cookiefile)
+                await self.login(cookiefile, meta)
                 return await self.validate_cookies(meta, cookiefile)
             return False
 
@@ -580,7 +580,7 @@ class MoreThanTV:
             logger.error(f"{self.tracker}: [red]Error loading cookies or parsing JSON: {escape(str(e))}")
             return ""
 
-    async def login(self, cookiefile: str) -> bool:
+    async def login(self, cookiefile: str, meta: Meta | None = None) -> bool:
         try:
             async with httpx.AsyncClient(timeout=25, follow_redirects=True) as client:
                 url = f"{self.base_url}/login"
@@ -612,8 +612,14 @@ class MoreThanTV:
                                 otp = pyotp.parse_uri(otp_uri)
                                 mfa_code = pyotp.TOTP(otp.secret).now()
                             except ValueError, TypeError:
+                                if meta and meta.unattended and not meta.unattended_confirm:
+                                    logger.error(f"{self.tracker}: [red]Unattended mode: 2FA required. Skipping login.[/red]")
+                                    return False
                                 mfa_code = console.input(f"[yellow]{self.tracker} 2FA Code: ")
                         else:
+                            if meta and meta.unattended and not meta.unattended_confirm:
+                                logger.error(f"{self.tracker}: [red]Unattended mode: 2FA required. Skipping login.[/red]")
+                                return False
                             mfa_code = console.input(f"[yellow]{self.tracker} 2FA Code: ")
 
                         two_factor_token = resp.text.rsplit('name="token" value="', 1)[1][:48]

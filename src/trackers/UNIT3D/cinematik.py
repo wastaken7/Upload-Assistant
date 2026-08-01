@@ -388,17 +388,20 @@ class Cinematik(UNIT3D):
         description = "".join(desc_text)
 
         # Ask user if they want to edit or keep the description
-        logger.info(f"{self.tracker}: Current description: {description}", extra={"markup": False})
-        logger.info(f"{self.tracker}: [cyan]Do you want to edit or keep the description?[/cyan]")
-        edit_choice = cli_ui.ask_string("Enter 'e' to edit, or press Enter to keep it as is: ")
+        if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+            logger.info(f"{self.tracker}: Current description: {description}", extra={"markup": False})
+            logger.info(f"{self.tracker}: [cyan]Do you want to edit or keep the description?[/cyan]")
+            edit_choice = cli_ui.ask_string("Enter 'e' to edit, or press Enter to keep it as is: ")
 
-        if (edit_choice or "").lower() == "e":
-            edited_description = cast(str | None, click.edit(description))  # pyrefly: ignore [bad-argument-type]
-            if edited_description:
-                description = edited_description.strip()
-            logger.info(f"{self.tracker}: Final description after editing: {description}", extra={"markup": False})
+            if (edit_choice or "").lower() == "e":
+                edited_description = cast(str | None, click.edit(description))  # pyrefly: ignore [bad-argument-type]
+                if edited_description:
+                    description = edited_description.strip()
+                logger.info(f"{self.tracker}: Final description after editing: {description}", extra={"markup": False})
+            else:
+                logger.info(f"{self.tracker}: [green]Keeping the original description.[/green]")
         else:
-            logger.info(f"{self.tracker}: [green]Keeping the original description.[/green]")
+            logger.info(f"{self.tracker}: [green]Unattended mode: Keeping the original description.[/green]")
 
         # Write the final description to the file
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as desc_file:

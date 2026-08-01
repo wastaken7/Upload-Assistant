@@ -12,7 +12,7 @@ import cli_ui
 import httpx
 from bs4 import BeautifulSoup
 
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
@@ -458,7 +458,11 @@ class AmigosShare:
         # Overview
         overview: str = season_tmdb.get("overview", "") or main_tmdb.get("overview", "")
         if not overview:
-            user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f"{self.tracker}: Sinopse não encontrada no TMDb. Por favor, insira manualmente.")
+            if meta.unattended and not meta.unattended_confirm:
+                logger.info(f"{self.tracker}: [yellow]Sinopse não encontrada no TMDb em modo unattended. Plando upload para {self.tracker}.[/yellow]")
+                meta.skipping = f"{self.tracker}"
+                return ""
+            user_input_raw = await prompt_in_thread(cli_ui.ask_string, f"{self.tracker}: Sinopse não encontrada no TMDb. Por favor, insira manualmente.")
             user_input = (user_input_raw or "").strip()
             overview = user_input or "Sinopse não encontrada."
         await append_section("BARRINHA_SINOPSE", overview)
@@ -598,7 +602,11 @@ class AmigosShare:
         )
 
         if not tags:
-            tags_raw = meta.genre or await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
+            if not meta.genre and meta.unattended and not meta.unattended_confirm:
+                logger.info(f"{self.tracker}: [yellow]Gêneros não encontrados em modo unattended. Plando upload para {self.tracker}.[/yellow]")
+                meta.skipping = f"{self.tracker}"
+                return ""
+            tags_raw = meta.genre or await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
             tags = (tags_raw or "").strip()
 
         return tags
@@ -1210,6 +1218,8 @@ class AmigosShare:
         return data
 
     async def upload(self, meta: Meta) -> bool:
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
         if meta.category == "BOOK" and meta.source_size <= 1024 * 1024:
             logger.info(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
             return False
@@ -1217,6 +1227,8 @@ class AmigosShare:
         if cookie_jar is not None:
             self.session.cookies = cast(Any, cookie_jar)
         data = await self.get_data(meta)
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
         upload_url = await self.get_upload_url(meta)
 
         is_uploaded = await self.cookie_auth_uploader.handle_upload(

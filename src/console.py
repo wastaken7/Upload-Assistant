@@ -1,11 +1,12 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
 import contextlib
 import contextvars
 import logging
 import os
 import re
 import threading
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Callable, Generator
 from pathlib import Path
 from typing import Any
 
@@ -147,6 +148,47 @@ rich_handler = RichHandler(
 )
 rich_handler.setFormatter(logging.Formatter("%(message)s"))
 logger.addHandler(rich_handler)
+
+
+class LogBufferHandler(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__()
+        self.buffer: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.buffer.append(record)
+
+
+_log_buffer_lock = asyncio.Lock()
+
+
+@contextlib.asynccontextmanager
+async def buffer_console_logs() -> AsyncGenerator[None]:
+    """Temporarily hold console log output in memory while user prompts are active."""
+    async with _log_buffer_lock:
+        root_logger = logger
+        original_rich_handlers = [h for h in root_logger.handlers if isinstance(h, RichHandler)]
+        buffer_handler = LogBufferHandler()
+
+        for h in original_rich_handlers:
+            root_logger.removeHandler(h)
+        root_logger.addHandler(buffer_handler)
+
+        try:
+            yield
+        finally:
+            root_logger.removeHandler(buffer_handler)
+            for h in original_rich_handlers:
+                root_logger.addHandler(h)
+            for record in buffer_handler.buffer:
+                for h in original_rich_handlers:
+                    h.handle(record)
+
+
+async def prompt_in_thread[PromptResult](callback: Callable[..., PromptResult], /, *args: Any, **kwargs: Any) -> PromptResult:
+    """Run an interactive prompt without blocking the event loop or interleaving logs."""
+    async with buffer_console_logs():
+        return await asyncio.to_thread(callback, *args, **kwargs)
 
 
 # Context variable to hold the path to the current release's log file (e.g. /tmp/<uuid>/upload.log)

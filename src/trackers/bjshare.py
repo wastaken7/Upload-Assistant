@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup, Tag
 from langcodes.tag_parser import LanguageTagError
 from unidecode import unidecode
 
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder
@@ -668,7 +668,12 @@ class BJShare:
             return unidecode(", ".join(matched_tags))
 
         # Final fallback: ask user
-        tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
+        if meta.unattended and not meta.unattended_confirm:
+            logger.info(f"{self.tracker}: [yellow]Unattended mode: Gêneros não encontrados. Plando upload para {self.tracker}.[/yellow]")
+            meta.skipping = f"{self.tracker}"
+            return ""
+
+        tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
         return unidecode((tags_raw or "").strip())
 
     def get_database_title(self, soup: BeautifulSoup) -> str:
@@ -1371,10 +1376,15 @@ class BJShare:
             return ", ".join(unique_names)
 
         display_name = prompt_labels.get(role, role.capitalize())
+        if meta.unattended and not meta.unattended_confirm:
+            logger.info(f"{self.tracker}: [yellow]Unattended mode: {display_name} não encontrado(s). Plando upload para {self.tracker}.[/yellow]")
+            meta.skipping = f"{self.tracker}"
+            return "skipped"
+
         suffix = " (apenas uma pessoa)" if role in ("director", "creator") else " (separados por vírgula)"
         prompt_message = f"{display_name} não encontrado(s).\nPor favor, insira manualmente{suffix}: "
 
-        user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f"{prompt_message}")
+        user_input_raw = await prompt_in_thread(cli_ui.ask_string, f"{prompt_message}")
         user_input = (user_input_raw or "").strip()
         if user_input:
             entered_names = [name.strip() for name in user_input.split(",")]
@@ -1579,7 +1589,7 @@ class BJShare:
                     "remaster_title": self.build_remaster_title(meta),
                     "resolucaoh": height,
                     "resolucaow": width,
-                    "sinopse": await self.get_overview(),
+                    "sinopse": await self.get_overview(meta),
                     "tags": await self.get_tags(meta),
                     "tipolegenda": await self.get_subtitle(meta),
                     "title": original_title,
@@ -1767,7 +1777,7 @@ class BJShare:
 
         return ""
 
-    async def get_overview(self) -> str:
+    async def get_overview(self, meta: Meta | None = None) -> str:
         database_overview = BJShare.database_overview
         if database_overview:
             logger.debug(f"{self.tracker}: Using database overview: {database_overview[:50]}...")
@@ -1777,8 +1787,13 @@ class BJShare:
         if isinstance(overview, str) and overview.strip():
             return overview
 
+        if meta and meta.unattended and not meta.unattended_confirm:
+            logger.info(f"{self.tracker}: [yellow]Sinopse não encontrada em modo unattended. Plando upload para {self.tracker}.[/yellow]")
+            meta.skipping = f"{self.tracker}"
+            return ""
+
         logger.info(f"{self.tracker}: [bold red]Sinopse não encontrada no TMDb. Por favor, insira manualmente.[/bold red]")
-        user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f'"{self.tracker}: [green]Digite a sinopse:[/green]"')
+        user_input_raw = await prompt_in_thread(cli_ui.ask_string, f'"{self.tracker}: [green]Digite a sinopse:[/green]"')
         user_input = (user_input_raw or "").strip()
         if user_input:
             return user_input
@@ -1808,7 +1823,12 @@ class BJShare:
         return ""
 
     async def upload(self, meta: Meta):
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
+
         data = await self.get_data(meta)
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
 
         issue = self.check_data(meta, data)
         if issue:

@@ -19,7 +19,7 @@ from rich.markup import escape
 
 from cogs.redaction import PathAwareEncoder, Redaction
 from src.bbcode import BBCODE
-from src.console import console, logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
 from src.exceptions import UploadError
@@ -285,7 +285,7 @@ class PassThePopcorn:
             if not meta.skipit and not meta.unattended:
                 # Allow user to edit or discard the description
                 logger.info(f"{self.tracker}: [cyan]Do you want to edit, discard or keep the description?[/cyan]")
-                edit_choice = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
+                edit_choice = await prompt_in_thread(cli_ui.ask_string, "Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is: ")
 
                 if (edit_choice or "").lower() == "e":
                     edited_description = cast(str | None, click.edit(cast(Any, desc)))
@@ -359,7 +359,7 @@ class PassThePopcorn:
                 choices.append("Skip - Don't use any of these matches")
 
                 try:
-                    selected = cli_ui.ask_choice("Select the correct movie:", choices=choices)
+                    selected = await prompt_in_thread(cli_ui.ask_choice, "Select the correct movie:", choices=choices)
                     if selected == "Skip - Don't use any of these matches":
                         logger.info(f"{self.tracker}: [yellow]User chose to skip all matches[/yellow]")
                         return None
@@ -1391,8 +1391,10 @@ class PassThePopcorn:
             try:
                 resp = loginresponse.json()
                 if resp["Result"] == "TfaRequired":
+                    if meta.unattended and not meta.unattended_confirm:
+                        raise LoginError(f"{self.tracker}: 2FA is required in unattended mode.")  # noqa: F405
                     data["TfaType"] = "normal"
-                    data["TfaCode"] = cli_ui.ask_string("2FA Required: Please enter PassThePopcorn 2FA code")
+                    data["TfaCode"] = await prompt_in_thread(cli_ui.ask_string, "2FA Required: Please enter PassThePopcorn 2FA code")
                     loginresponse = await client.post(f"{self.base_url}/ajax.php?action=login", data=data, headers=headers)
                     await asyncio.sleep(2)
                     resp = loginresponse.json()
@@ -1491,11 +1493,11 @@ class PassThePopcorn:
 
         elif no_audio_found and (not any(x in [3, 50] for x in ptp_subtitles)):
             cli_ui.info("No English subs and no audio tracks found should this be trumpable?")
-            if cli_ui.ask_yes_no("Mark trumpable?", default=True):
+            if (not meta.unattended or meta.unattended_confirm) and await prompt_in_thread(cli_ui.ask_yes_no, "Mark trumpable?", default=True):
                 ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
         elif not english_audio and (not any(x in [3, 50] for x in ptp_subtitles)):
             cli_ui.info("No English subs and English audio is not the first audio track, should this be trumpable?")
-            if cli_ui.ask_yes_no("Mark trumpable?", default=True):
+            if (not meta.unattended or meta.unattended_confirm) and await prompt_in_thread(cli_ui.ask_yes_no, "Mark trumpable?", default=True):
                 ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
 
         logger.debug(f"{self.tracker}: ptp_trumpable: {ptp_trumpable}")
@@ -1545,7 +1547,9 @@ class PassThePopcorn:
                 youtube = (
                     ""
                     if meta.unattended
-                    else cli_ui.ask_string("Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)", default="")
+                    else await prompt_in_thread(
+                        cli_ui.ask_string, "Unable to find youtube trailer, please link one e.g.(https://www.youtube.com/watch?v=dQw4w9WgXcQ)", default=""
+                    )
                 )
                 meta.youtube = youtube
             cover = meta.imdb_info.get("cover")
@@ -1556,7 +1560,10 @@ class PassThePopcorn:
             elif isinstance(cover, str):
                 cover = None
             while cover is None:
-                cover_input = cli_ui.ask_string("No Cover was found. Please input a link to a cover: \n", default="") or "".strip()
+                if meta.unattended and not meta.unattended_confirm:
+                    meta.skipping = self.tracker
+                    raise UploadError(f"{self.tracker}: Cover is required in unattended mode.")
+                cover_input = await prompt_in_thread(cli_ui.ask_string, "No Cover was found. Please input a link to a cover: \n", default="") or "".strip()
                 if not cover_input:
                     continue
                 if not cover_input.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
@@ -1575,10 +1582,14 @@ class PassThePopcorn:
                 new_data["year"] = meta.manual_year
             if not new_data["tags"]:
                 if (meta.mode if meta.mode is not None else "non_cli") == "cli":
+                    if meta.unattended and not meta.unattended_confirm:
+                        logger.info(f"{self.tracker}: [yellow]Unattended mode: Unable to match any tags. Skipping {self.tracker} upload.[/yellow]")
+                        meta.skipping = f"{self.tracker}"
+                        raise UploadError(f"{self.tracker}: Unable to match any tags in unattended mode.")
                     while not new_data["tags"]:
                         logger.info(f"{self.tracker}: [yellow]Unable to match any tags")
                         logger.info(f"{self.tracker}: Valid tags can be found on the PassThePopcorn upload form")
-                        new_data["tags"] = console.input("Please enter at least one tag. Comma separated (action, animation, short):")
+                        new_data["tags"] = await prompt_in_thread(cli_ui.ask_string, "Please enter at least one tag. Comma separated (action, animation, short):")
                 else:
                     raise UploadError("PassThePopcorn requires at least one valid tag.")
             data.update(new_data)

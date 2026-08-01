@@ -22,7 +22,7 @@ from langcodes import tag_parser
 from torf import Torrent
 
 from src.bbcode import BBCODE
-from src.console import console, logger
+from src.console import buffer_console_logs, console, logger
 from src.exportmi import export_info
 from src.languages import languages_manager
 from src.meta import Meta
@@ -2440,7 +2440,8 @@ class Common:
             logger.info(f"Filename: {filename}")  # Ensure filename is printed if available
 
         if not meta.unattended:
-            selection = (await asyncio.to_thread(input, f"Do you want to use these IDs from {tracker_name}? (Y/n): ")).strip().lower()
+            async with buffer_console_logs():
+                selection = (await asyncio.to_thread(input, f"Do you want to use these IDs from {tracker_name}? (Y/n): ")).strip().lower()
             try:
                 return selection == "" or selection == "y" or selection == "yes"
             except KeyboardInterrupt, EOFError:
@@ -2448,8 +2449,11 @@ class Common:
         else:
             return True
 
-    async def prompt_user_for_confirmation(self, message: str) -> bool:
-        response = (await asyncio.to_thread(input, f"{message} (Y/n): ")).strip().lower()
+    async def prompt_user_for_confirmation(self, message: str, meta: Meta | None = None) -> bool:
+        if meta and meta.unattended and not meta.unattended_confirm:
+            return False
+        async with buffer_console_logs():
+            response = (await asyncio.to_thread(input, f"{message} (Y/n): ")).strip().lower()
         return response == "" or response == "y"
 
     async def _apply_region_distributor(self, meta: Meta, attributes: dict[str, Any]) -> None:
@@ -2723,10 +2727,16 @@ class Common:
                             raise KeyError("No data in response")
                     except KeyError, IndexError, TypeError:
                         logger.info("[red]Unable to get data from ptgen using IMDb")
-                        params["url"] = console.input("[red]Please enter [yellow]Douban[/yellow] link: ")
+                        if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                            params["url"] = console.input("[red]Please enter [yellow]Douban[/yellow] link: ")
+                        else:
+                            params["url"] = ""
                 else:
                     logger.info("[red]No IMDb id was found.")
-                    params["url"] = console.input("[red]Please enter [yellow]Douban[/yellow] link: ")
+                    if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                        params["url"] = console.input("[red]Please enter [yellow]Douban[/yellow] link: ")
+                    else:
+                        params["url"] = ""
 
                 # Fetch with douban URL
                 ptgen_json = await fetch_ptgen(client, url, params)

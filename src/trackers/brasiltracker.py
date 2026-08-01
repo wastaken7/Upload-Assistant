@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
 import contextlib
 import platform
 import re
@@ -18,7 +17,7 @@ from langcodes.tag_parser import LanguageTagError
 from rich.markup import escape
 from unidecode import unidecode
 
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder, html_to_bbcode
@@ -688,7 +687,12 @@ class BrasilTracker:
             return unidecode(", ".join(matched_tags))
 
         # Final fallback: ask user
-        tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
+        if meta.unattended and not meta.unattended_confirm:
+            logger.info(f"{self.tracker}: [yellow]Gêneros não encontrados em modo unattended. Plando upload para {self.tracker}.[/yellow]")
+            meta.skipping = f"{self.tracker}"
+            return ""
+
+        tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
         return unidecode((tags_raw or "").strip())
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
@@ -1264,11 +1268,15 @@ class BrasilTracker:
         return ""
 
     async def upload(self, meta: Meta) -> bool:
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar is None:
             return False
         self.session.cookies = cast(Any, cookie_jar)
         data = await self.get_data(meta)
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
 
         return await self.cookie_auth_uploader.handle_upload(
             meta=meta,
