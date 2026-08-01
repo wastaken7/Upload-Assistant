@@ -308,12 +308,13 @@ class FileList:
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
             logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
-            recreate = cli_ui.ask_yes_no("Log in again and create new session?")
-            if recreate is True:
-                if Path(cookiefile).exists():
-                    Path(cookiefile).unlink()
-                await self.login(cookiefile)
-                return await self.validate_cookies(meta, cookiefile)
+            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                recreate = cli_ui.ask_yes_no("Log in again and create new session?")
+                if recreate is True:
+                    if Path(cookiefile).exists():
+                        Path(cookiefile).unlink()
+                    await self.login(cookiefile)
+                    return await self.validate_cookies(meta, cookiefile)
             return False
         return True
 

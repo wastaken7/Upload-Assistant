@@ -15,7 +15,7 @@ from PIL import Image
 
 from src.bbcode import BBCODE
 from src.btnid import BtnIdManager
-from src.console import logger
+from src.console import buffer_console_logs, logger
 from src.meta import Meta
 from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
@@ -79,9 +79,12 @@ class TrackerMetaManager:
         await handle_image_list(meta, tracker_name, valid_images)
 
 
-async def prompt_user_for_confirmation(message: str) -> bool:
+async def prompt_user_for_confirmation(message: str, meta: Meta | None = None) -> bool:
+    if meta and meta.unattended and not meta.unattended_confirm:
+        return False
     try:
-        return cli_ui.ask_yes_no(message, default=True)
+        with buffer_console_logs():
+            return cli_ui.ask_yes_no(message, default=True)
     except EOFError:
         sys.exit(1)
 

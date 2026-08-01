@@ -124,7 +124,7 @@ class CathodeRayTube:
             return meta.poster
 
         if isinstance(meta.covers, list) and len(meta.covers) > 0:
-            raw_url = meta.covers[0].get('raw_url')
+            raw_url = meta.covers[0].get("raw_url")
             return str(raw_url) if raw_url else ""
 
         return ""
@@ -348,7 +348,7 @@ class CathodeRayTube:
             if screens_count == 0 and hasattr(meta, "screens"):
                 try:
                     screens_count = int(meta.screens or 0)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     screens_count = 0
 
             if screens_count < 6:
@@ -372,13 +372,13 @@ class CathodeRayTube:
             if category == "MOVIE" and getattr(meta, "release_date", None):
                 try:
                     date_to_check = datetime.date.fromisoformat(str(meta.release_date).strip()[:10])
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     date_to_check = None
             elif category == "TV" and (getattr(meta, "last_air_date", None) or getattr(meta, "release_date", None)):
                 raw_date = getattr(meta, "last_air_date", None) or getattr(meta, "release_date", None)
                 try:
                     date_to_check = datetime.date.fromisoformat(str(raw_date).strip()[:10])
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     date_to_check = None
 
             if date_to_check is not None:

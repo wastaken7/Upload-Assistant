@@ -195,6 +195,10 @@ class Anthelion:
                 meta.ant_user_tags = True
 
         if not tags:
+            if meta.unattended and not meta.unattended_confirm:
+                logger.info(f"{self.tracker}: [yellow]Unattended mode: No genres found for tagging. Skipping {self.tracker} upload.[/yellow]")
+                meta.skipping = f"{self.tracker}"
+                return ""
             logger.info(f"{self.tracker}: [yellow]No genres found for tagging. Tag required.")
             logger.info(f"{self.tracker}: [yellow]Only use a tag in the approved list found in the site search box.")
             logger.info(

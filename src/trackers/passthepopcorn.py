@@ -1575,6 +1575,10 @@ class PassThePopcorn:
                 new_data["year"] = meta.manual_year
             if not new_data["tags"]:
                 if (meta.mode if meta.mode is not None else "non_cli") == "cli":
+                    if meta.unattended and not meta.unattended_confirm:
+                        logger.info(f"{self.tracker}: [yellow]Unattended mode: Unable to match any tags. Skipping {self.tracker} upload.[/yellow]")
+                        meta.skipping = f"{self.tracker}"
+                        return False
                     while not new_data["tags"]:
                         logger.info(f"{self.tracker}: [yellow]Unable to match any tags")
                         logger.info(f"{self.tracker}: Valid tags can be found on the PassThePopcorn upload form")

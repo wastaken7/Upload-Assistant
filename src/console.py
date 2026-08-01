@@ -149,6 +149,41 @@ rich_handler.setFormatter(logging.Formatter("%(message)s"))
 logger.addHandler(rich_handler)
 
 
+class LogBufferHandler(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__()
+        self.buffer: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.buffer.append(record)
+
+
+_log_buffer_lock = threading.Lock()
+
+
+@contextlib.contextmanager
+def buffer_console_logs() -> Generator[None]:
+    """Temporarily hold console log output in memory while user prompts are active."""
+    with _log_buffer_lock:
+        root_logger = logger
+        original_rich_handlers = [h for h in root_logger.handlers if isinstance(h, RichHandler)]
+        buffer_handler = LogBufferHandler()
+
+        for h in original_rich_handlers:
+            root_logger.removeHandler(h)
+        root_logger.addHandler(buffer_handler)
+
+        try:
+            yield
+        finally:
+            root_logger.removeHandler(buffer_handler)
+            for h in original_rich_handlers:
+                root_logger.addHandler(h)
+            for record in buffer_handler.buffer:
+                for h in original_rich_handlers:
+                    h.handle(record)
+
+
 # Context variable to hold the path to the current release's log file (e.g. /tmp/<uuid>/upload.log)
 current_release_log_path: contextvars.ContextVar[str | None] = contextvars.ContextVar("current_release_log_path", default=None)
 

@@ -127,14 +127,19 @@ class AZTrackerBase:
 
             if attempt == 0 and not self.media_code:
                 logger.info(f"{self.tracker}: \nThe media [[yellow]IMDB:{imdb_id}[/yellow]] [[blue]TMDB:{tmdb_id}[/blue]] appears to be missing from the site's database.")
-                if cli_ui.ask_yes_no(f"{self.tracker}: Do you want to add it to the site database?\n"):
-                    added_successfully = await self.add_media_to_db(meta, title, category, imdb_id, tmdb_id)
-                    if not added_successfully:
-                        logger.info(f"{self.tracker}: Failed to add media. Aborting.")
+                if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                    if cli_ui.ask_yes_no(f"{self.tracker}: Do you want to add it to the site database?\n"):
+                        added_successfully = await self.add_media_to_db(meta, title, category, imdb_id, tmdb_id)
+                        if not added_successfully:
+                            logger.info(f"{self.tracker}: Failed to add media. Aborting.")
+                            break
+                    else:
+                        logger.info(f"{self.tracker}: User chose not to add media. Aborting.")
                         break
                 else:
-                    logger.info(f"{self.tracker}: User chose not to add media. Aborting.")
-                    break
+                    logger.info(f"{self.tracker}: [yellow]Unattended mode: Media missing from site database. Skipping {self.tracker} upload.[/yellow]")
+                    meta.skipping = f"{self.tracker}"
+                    return False
 
         if not self.media_code:
             logger.info(f"{self.tracker}: Unable to get media code.")
@@ -410,6 +415,10 @@ class AZTrackerBase:
                             missing_audio_languages.append(track)
 
                 if missing_audio_languages:
+                    if meta.unattended and not meta.unattended_confirm:
+                        logger.info(f"{self.tracker}: [yellow]Unattended mode: Missing audio languages. Skipping {self.tracker} upload.[/yellow]")
+                        meta.skipping = f"{self.tracker}"
+                        return set()
                     logger.info(f"{self.tracker}: No audio language/s found.")
                     logger.info(f"{self.tracker}: You must enter (comma-separated) languages for all audio tracks, eg: English, Spanish: ")
                     user_input_raw = cli_ui.ask_string("[bold yellow]Enter languages: [/bold yellow]")

@@ -1371,6 +1371,10 @@ class MakingOff:
             "9": (31, "Oceania"),
             "10": (30, "Oriente Médio"),
         }
+        if meta.unattended and not meta.unattended_confirm:
+            logger.info(f"{self.tracker}: [yellow]Unattended mode: Unmapped origin country ({origin_countries}), using North-American (26) as default.[/yellow]")
+            return 26
+
         for k, (fid, name) in forum_options.items():
             logger.info(f"{self.tracker}:   {k}) {name} (ID: {fid})")
 
@@ -1548,6 +1552,10 @@ class MakingOff:
             return "Embutidas"
 
         # Fallback to asking
+        if meta.unattended and not meta.unattended_confirm:
+            logger.info(f"{self.tracker}: [yellow]Unattended mode: Subtitles not determined, defaulting to 'Sem Legenda'.[/yellow]")
+            return "Sem Legenda"
+
         options = {
             "1": "No torrent",
             "2": "Anexas",
