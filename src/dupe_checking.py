@@ -904,10 +904,15 @@ class DupeChecker:
 
         # 5. Check if both have file lists
         if local_files and candidate_files:
-            return files_match
+            return files_match and same_size
 
         # 6. If file list unavailable for one or both (e.g. disc release)
         if same_size and same_file_count:
+            return True
+
+        # Disc releases have no reliable local file count, so compare their
+        # total size when neither side provides a file list.
+        if not local_files and not candidate_files and same_size:
             return True
 
         # 7. Exact name match fallback

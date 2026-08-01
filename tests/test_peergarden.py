@@ -171,6 +171,28 @@ def test_peergarden_filter_dupes_blocks_exact_renamed_release():
     assert result[0]["id"] == 202
 
 
+def test_peergarden_filter_dupes_allows_same_filename_with_different_size():
+    from src.dupe_checking import DupeChecker
+
+    meta = Meta()
+    meta.name = "Awesome.Movie.2024.1080p"
+    meta.filelist = ["/path/to/movie.2024.1080p.web-dl.x264-release.mkv"]
+    meta.source_size = 4000000000
+
+    candidate = {
+        "name": "Renamed.Movie.Title.2024",
+        "size": 4100000000,
+        "files": ["movie.2024.1080p.web-dl.x264-release.mkv"],
+        "file_count": 1,
+        "id": 203,
+    }
+
+    dupe_checker = DupeChecker({"DEFAULT": {}})
+    result = asyncio.run(dupe_checker.filter_dupes([candidate], meta, "PEERGARDEN"))
+
+    assert result == []
+
+
 def test_peergarden_filter_dupes_blocks_exact_disc_release():
     from src.dupe_checking import DupeChecker
 
@@ -194,6 +216,29 @@ def test_peergarden_filter_dupes_blocks_exact_disc_release():
     assert result[0]["id"] == 303
 
 
+def test_peergarden_filter_dupes_blocks_exact_renamed_disc_release():
+    from src.dupe_checking import DupeChecker
+
+    meta = Meta()
+    meta.is_disc = "BDMV"
+    meta.name = "Movie.2024.UHD.COMPLETE.BLURAY"
+    meta.source_size = 45000000000
+
+    candidate = {
+        "name": "Renamed.Movie.2024.UHD.COMPLETE.BLURAY",
+        "size": 45000000000,
+        "files": [],
+        "file_count": 120,
+        "id": 305,
+    }
+
+    dupe_checker = DupeChecker({"DEFAULT": {}})
+    result = asyncio.run(dupe_checker.filter_dupes([candidate], meta, "PEERGARDEN"))
+
+    assert len(result) == 1
+    assert result[0]["id"] == 305
+
+
 def test_peergarden_filter_dupes_allows_different_size_disc_release():
     from src.dupe_checking import DupeChecker
 
@@ -214,7 +259,3 @@ def test_peergarden_filter_dupes_allows_different_size_disc_release():
     result = asyncio.run(dupe_checker.filter_dupes([candidate], meta, "PEERGARDEN"))
 
     assert result == []
-
-
-
-
