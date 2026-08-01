@@ -30,6 +30,8 @@ class PeerGarden(UNIT3D):
         "MUSIC",
     )
     tracker_urls = ("peergarden",)
+    allows_dupes = True
+    exact_match_only = True
 
     def __init__(self, config: Config) -> None:
         """Initialize the PeerGarden tracker adapter."""
