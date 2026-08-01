@@ -84,3 +84,18 @@ def test_peergarden_get_data_pops_prohibited_fields():
         assert result["imdb"] == "0"
         assert result["other_field"] == "val"
 
+
+def test_peergarden_get_keywords_truncated_to_255():
+    tracker = PeerGarden({"DEFAULT": {}, "TRACKERS": {"PEERGARDEN": {}}})
+
+    meta = Meta()
+    meta.keywords = ["action", "b" * 240, "adventure"]
+
+    keywords_data = asyncio.run(tracker.get_keywords(meta))
+    res = keywords_data["keywords"]
+    assert len(res) <= 255
+    assert res == f"action, {'b' * 240}"
+    assert "adventure" not in res
+
+
+
