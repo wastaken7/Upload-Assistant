@@ -98,4 +98,27 @@ def test_peergarden_get_keywords_truncated_to_255():
     assert "adventure" not in res
 
 
+def test_peergarden_anime_tv_uses_anime_category():
+    tracker = PeerGarden({"DEFAULT": {}, "TRACKERS": {"PEERGARDEN": {}}})
+
+    meta = Meta()
+    meta.category = "TV"
+    meta.anime = True
+
+    category_data = asyncio.run(tracker.get_category_id(meta))
+    assert category_data == {"category_id": "11"}
+
+
+def test_peergarden_anime_movie_uses_movie_category():
+    tracker = PeerGarden({"DEFAULT": {}, "TRACKERS": {"PEERGARDEN": {}}})
+
+    meta = Meta()
+    meta.category = "MOVIE"
+    meta.anime = True
+
+    category_data = asyncio.run(tracker.get_category_id(meta))
+    assert category_data == {"category_id": "1"}
+
+
+
 
