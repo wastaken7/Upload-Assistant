@@ -944,8 +944,10 @@ class AZTrackerBase:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar:
             self.session.cookies = cookie_jar
-        task_info = await self.create_task_id(meta)
         lang_info = await self.get_lang(meta) or {}
+        if getattr(meta, "skipping", None) == self.tracker:
+            return {}
+        task_info = await self.create_task_id(meta)
 
         data: dict[str, Any] = {
             "_token": self.az_class.secret_token,

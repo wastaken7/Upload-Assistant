@@ -1391,6 +1391,8 @@ class PassThePopcorn:
             try:
                 resp = loginresponse.json()
                 if resp["Result"] == "TfaRequired":
+                    if meta.unattended and not meta.unattended_confirm:
+                        raise LoginError(f"{self.tracker}: 2FA is required in unattended mode.")  # noqa: F405
                     data["TfaType"] = "normal"
                     data["TfaCode"] = await prompt_in_thread(cli_ui.ask_string, "2FA Required: Please enter PassThePopcorn 2FA code")
                     loginresponse = await client.post(f"{self.base_url}/ajax.php?action=login", data=data, headers=headers)
@@ -1491,11 +1493,11 @@ class PassThePopcorn:
 
         elif no_audio_found and (not any(x in [3, 50] for x in ptp_subtitles)):
             cli_ui.info("No English subs and no audio tracks found should this be trumpable?")
-            if await prompt_in_thread(cli_ui.ask_yes_no, "Mark trumpable?", default=True):
+            if (not meta.unattended or meta.unattended_confirm) and await prompt_in_thread(cli_ui.ask_yes_no, "Mark trumpable?", default=True):
                 ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
         elif not english_audio and (not any(x in [3, 50] for x in ptp_subtitles)):
             cli_ui.info("No English subs and English audio is not the first audio track, should this be trumpable?")
-            if await prompt_in_thread(cli_ui.ask_yes_no, "Mark trumpable?", default=True):
+            if (not meta.unattended or meta.unattended_confirm) and await prompt_in_thread(cli_ui.ask_yes_no, "Mark trumpable?", default=True):
                 ptp_trumpable, ptp_subtitles = self.get_trumpable(ptp_subtitles)
 
         logger.debug(f"{self.tracker}: ptp_trumpable: {ptp_trumpable}")
@@ -1558,6 +1560,9 @@ class PassThePopcorn:
             elif isinstance(cover, str):
                 cover = None
             while cover is None:
+                if meta.unattended and not meta.unattended_confirm:
+                    meta.skipping = self.tracker
+                    raise UploadError(f"{self.tracker}: Cover is required in unattended mode.")
                 cover_input = await prompt_in_thread(cli_ui.ask_string, "No Cover was found. Please input a link to a cover: \n", default="") or "".strip()
                 if not cover_input:
                     continue

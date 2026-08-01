@@ -81,7 +81,11 @@ class Ptskit:
         mandarin = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["mandarin", "chinese"], check_audio=True, check_subtitle=True)
 
         if not mandarin:
-            user_input = await prompt_in_thread(cli_ui.ask_string, "Warning: Mandarin subtitle or audio not found. Do you want to continue with the upload anyway? (y/n): ")
+            if meta.unattended and not meta.unattended_confirm:
+                return False
+            user_input = await prompt_in_thread(
+                cli_ui.ask_string, "Warning: Mandarin subtitle or audio not found. Do you want to continue with the upload anyway? (y/n): ", default=""
+            )
             if user_input.lower() not in ["y", "yes"]:
                 logger.info(f"{self.tracker}: Upload cancelled by user.", extra={"markup": False})
                 return False
