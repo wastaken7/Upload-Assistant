@@ -318,7 +318,26 @@ class UNIT3D:
         return {"sd": f"{meta.sd}"}
 
     async def get_keywords(self, meta: Meta) -> dict[str, str]:
-        return {"keywords": ", ".join(meta.keywords)}
+        """
+        Enforces a 255-character limit on the keywords payload without cutting off individual words.
+        This complies with the UNIT3D database schema (VARCHAR(255)) and API validation rules
+        ('keywords' => 'nullable|string|max:255').
+        """
+        keywords_list: list[str] = []
+        current_len = 0
+        for kw in meta.keywords:
+            kw_str = kw.strip()
+            if not kw_str:
+                continue
+            needed = len(kw_str) + (2 if keywords_list else 0)
+            if current_len + needed > 255:
+                if not keywords_list and len(kw_str) > 255:
+                    keywords_list.append(kw_str[:255])
+                break
+            keywords_list.append(kw_str)
+            current_len += needed
+
+        return {"keywords": ", ".join(keywords_list)}
 
     async def get_personal_release(self, meta: Meta) -> dict[str, str]:
         personal_release = "1" if meta.personalrelease else "0"
