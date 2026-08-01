@@ -16,6 +16,7 @@ import rarfile
 from bs4 import BeautifulSoup
 from langcodes.tag_parser import LanguageTagError
 from rich.markup import escape
+from unidecode import unidecode
 
 from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
@@ -684,11 +685,11 @@ class BrasilTracker:
 
         # If we have matched tags, return them
         if matched_tags:
-            return ", ".join(matched_tags)
+            return unidecode(", ".join(matched_tags))
 
         # Final fallback: ask user
         tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
-        return (tags_raw or "").strip()
+        return unidecode((tags_raw or "").strip())
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
