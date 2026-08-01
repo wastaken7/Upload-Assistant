@@ -12,6 +12,7 @@ from typing import Any, ClassVar, cast
 from urllib.parse import urljoin
 
 import aiofiles
+import cli_ui
 import httpx
 import langcodes
 import pycountry
@@ -19,7 +20,7 @@ from bs4 import BeautifulSoup
 
 from cogs.redaction import Redaction
 from src.config_helpers import format_terminal_link
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.languages import languages_manager
@@ -1378,7 +1379,7 @@ class MakingOff:
         for k, (fid, name) in forum_options.items():
             logger.info(f"{self.tracker}:   {k}) {name} (ID: {fid})")
 
-        choice = (await asyncio.to_thread(input, "Escolha: ")).strip()
+        choice = (await prompt_in_thread(cli_ui.ask_string, "Escolha: ")).strip()
         if choice in forum_options:
             return forum_options[choice][0]
 
@@ -1566,7 +1567,7 @@ class MakingOff:
         logger.info(f"{self.tracker}: [yellow]Any subtitles?[/yellow]")
         for k, v in options.items():
             logger.info(f"{self.tracker}:   {k}) {v}")
-        selection = (await asyncio.to_thread(input, "Choose: ")).strip()
+        selection = (await prompt_in_thread(cli_ui.ask_string, "Choose: ")).strip()
         return options.get(selection, "Sem Legenda")
 
     async def generate_description(self, meta: Meta) -> str:

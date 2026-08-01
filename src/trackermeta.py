@@ -45,8 +45,8 @@ class TrackerMetaManager:
         self.config = config
         _apply_config(config)
 
-    async def prompt_user_for_confirmation(self, message: str) -> bool:
-        return await prompt_user_for_confirmation(message)
+    async def prompt_user_for_confirmation(self, message: str, meta: Meta | None = None) -> bool:
+        return await prompt_user_for_confirmation(message, meta)
 
     async def check_images_concurrently(self, imagelist: Sequence[ImageDict], meta: Meta) -> list[ImageDict]:
         return await check_images_concurrently(imagelist, meta)
@@ -83,7 +83,7 @@ async def prompt_user_for_confirmation(message: str, meta: Meta | None = None) -
     if meta and meta.unattended and not meta.unattended_confirm:
         return False
     try:
-        with buffer_console_logs():
+        async with buffer_console_logs():
             return cli_ui.ask_yes_no(message, default=True)
     except EOFError:
         sys.exit(1)

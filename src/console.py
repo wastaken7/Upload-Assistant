@@ -1,11 +1,12 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
 import contextlib
 import contextvars
 import logging
 import os
 import re
 import threading
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Callable, Generator
 from pathlib import Path
 from typing import Any
 
@@ -158,13 +159,13 @@ class LogBufferHandler(logging.Handler):
         self.buffer.append(record)
 
 
-_log_buffer_lock = threading.Lock()
+_log_buffer_lock = asyncio.Lock()
 
 
-@contextlib.contextmanager
-def buffer_console_logs() -> Generator[None]:
+@contextlib.asynccontextmanager
+async def buffer_console_logs() -> AsyncGenerator[None]:
     """Temporarily hold console log output in memory while user prompts are active."""
-    with _log_buffer_lock:
+    async with _log_buffer_lock:
         root_logger = logger
         original_rich_handlers = [h for h in root_logger.handlers if isinstance(h, RichHandler)]
         buffer_handler = LogBufferHandler()
@@ -182,6 +183,12 @@ def buffer_console_logs() -> Generator[None]:
             for record in buffer_handler.buffer:
                 for h in original_rich_handlers:
                     h.handle(record)
+
+
+async def prompt_in_thread[PromptResult](callback: Callable[..., PromptResult], /, *args: Any, **kwargs: Any) -> PromptResult:
+    """Run an interactive prompt without blocking the event loop or interleaving logs."""
+    async with buffer_console_logs():
+        return await asyncio.to_thread(callback, *args, **kwargs)
 
 
 # Context variable to hold the path to the current release's log file (e.g. /tmp/<uuid>/upload.log)

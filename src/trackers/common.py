@@ -2440,7 +2440,7 @@ class Common:
             logger.info(f"Filename: {filename}")  # Ensure filename is printed if available
 
         if not meta.unattended:
-            with buffer_console_logs():
+            async with buffer_console_logs():
                 selection = (await asyncio.to_thread(input, f"Do you want to use these IDs from {tracker_name}? (Y/n): ")).strip().lower()
             try:
                 return selection == "" or selection == "y" or selection == "yes"
@@ -2452,7 +2452,7 @@ class Common:
     async def prompt_user_for_confirmation(self, message: str, meta: Meta | None = None) -> bool:
         if meta and meta.unattended and not meta.unattended_confirm:
             return False
-        with buffer_console_logs():
+        async with buffer_console_logs():
             response = (await asyncio.to_thread(input, f"{message} (Y/n): ")).strip().lower()
         return response == "" or response == "y"
 

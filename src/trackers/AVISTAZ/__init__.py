@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 
 import bbcode
 from cogs.redaction import Redaction
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
@@ -128,7 +128,7 @@ class AZTrackerBase:
             if attempt == 0 and not self.media_code:
                 logger.info(f"{self.tracker}: \nThe media [[yellow]IMDB:{imdb_id}[/yellow]] [[blue]TMDB:{tmdb_id}[/blue]] appears to be missing from the site's database.")
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    if cli_ui.ask_yes_no(f"{self.tracker}: Do you want to add it to the site database?\n"):
+                    if await prompt_in_thread(cli_ui.ask_yes_no, f"{self.tracker}: Do you want to add it to the site database?\n"):
                         added_successfully = await self.add_media_to_db(meta, title, category, imdb_id, tmdb_id)
                         if not added_successfully:
                             logger.info(f"{self.tracker}: Failed to add media. Aborting.")
@@ -203,7 +203,7 @@ class AZTrackerBase:
             if warnings:
                 logger.info(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n{warnings}")
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    if not cli_ui.ask_yes_no("Do you want to continue anyway?", default=False):
+                    if not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to continue anyway?", default=False):
                         return False
                 else:
                     return False
@@ -211,7 +211,7 @@ class AZTrackerBase:
         if meta.type not in ["WEBDL"] and self.tracker == "PRIVATEHD" and meta.tag in ["FGT", "EVO"]:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
-                if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                if not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
                     return False
             else:
                 return False
@@ -418,10 +418,10 @@ class AZTrackerBase:
                     if meta.unattended and not meta.unattended_confirm:
                         logger.info(f"{self.tracker}: [yellow]Unattended mode: Missing audio languages. Skipping {self.tracker} upload.[/yellow]")
                         meta.skipping = f"{self.tracker}"
-                        return set()
+                        return {}
                     logger.info(f"{self.tracker}: No audio language/s found.")
                     logger.info(f"{self.tracker}: You must enter (comma-separated) languages for all audio tracks, eg: English, Spanish: ")
-                    user_input_raw = cli_ui.ask_string("[bold yellow]Enter languages: [/bold yellow]")
+                    user_input_raw = await prompt_in_thread(cli_ui.ask_string, "[bold yellow]Enter languages: [/bold yellow]")
                     user_input = (user_input_raw or "").strip()
                     langs = [lang.strip() for lang in user_input.split(",")]
                     for lang in langs:
@@ -1013,6 +1013,8 @@ class AZTrackerBase:
 
     async def upload(self, meta: Meta) -> bool:
         data = await self.fetch_data(meta)
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
         status_message = ""
 
         issue = self.check_data(meta, data)

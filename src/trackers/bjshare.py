@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup, Tag
 from langcodes.tag_parser import LanguageTagError
 from unidecode import unidecode
 
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder
@@ -675,7 +675,7 @@ class BJShare:
             meta.skipping = f"{self.tracker}"
             return ""
 
-        tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
+        tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
         return (tags_raw or "").strip()
 
     def get_database_title(self, soup: BeautifulSoup) -> str:
@@ -1366,7 +1366,7 @@ class BJShare:
         suffix = " (apenas uma pessoa)" if role in ("director", "creator") else " (separados por vírgula)"
         prompt_message = f"{display_name} não encontrado(s).\nPor favor, insira manualmente{suffix}: "
 
-        user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f"{prompt_message}")
+        user_input_raw = await prompt_in_thread(cli_ui.ask_string, f"{prompt_message}")
         user_input = (user_input_raw or "").strip()
         if user_input:
             entered_names = [name.strip() for name in user_input.split(",")]
@@ -1773,7 +1773,7 @@ class BJShare:
             return ""
 
         logger.info(f"{self.tracker}: [bold red]Sinopse não encontrada no TMDb. Por favor, insira manualmente.[/bold red]")
-        user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f'"{self.tracker}: [green]Digite a sinopse:[/green]"')
+        user_input_raw = await prompt_in_thread(cli_ui.ask_string, f'"{self.tracker}: [green]Digite a sinopse:[/green]"')
         user_input = (user_input_raw or "").strip()
         if user_input:
             return user_input

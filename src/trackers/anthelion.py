@@ -11,7 +11,7 @@ import httpx
 from rich.markup import escape
 
 from cogs.redaction import Redaction
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.torrentcreate import TorrentCreator
@@ -205,7 +205,7 @@ class Anthelion:
                 f"{self.tracker}: [yellow]api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
             )
             await asyncio.sleep(3)
-            user_tag = cli_ui.ask_string("Please enter at least one tag (genre) to use for the upload", default="")
+            user_tag = await prompt_in_thread(cli_ui.ask_string, "Please enter at least one tag (genre) to use for the upload", default="")
             if user_tag:
                 tags.append(user_tag.replace(" ", ".").lower())
                 meta.ant_user_tags = True
@@ -240,7 +240,7 @@ class Anthelion:
         if ant_type is None:
             if not meta.unattended:
                 ant_type_list = ["Feature Film", "Short Film", "Miniseries", "Other"]
-                choice = cli_ui.ask_choice("Select the proper type for ANTHELION", choices=ant_type_list)
+                choice = await prompt_in_thread(cli_ui.ask_choice, "Select the proper type for ANTHELION", choices=ant_type_list)
                 # Map the choice back to the integer
                 type_map = {"Feature Film": 0, "Short Film": 1, "Miniseries": 2, "Other": 3}
                 ant_type = type_map.get(choice, 0)
@@ -302,6 +302,8 @@ class Anthelion:
             data["censored"] = 1
 
         tags = await self.get_tags(meta)
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
         if tags != "":
             data.update({"tags": ",".join(tags)})
 
@@ -314,7 +316,7 @@ class Anthelion:
         if meta.adult_media:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 logger.info(f"{self.tracker}: [bold red]Adult content detected[/bold red]")
-                if cli_ui.ask_yes_no("Are the screenshots safe?", default=False):
+                if await prompt_in_thread(cli_ui.ask_yes_no, "Are the screenshots safe?", default=False):
                     data.update({"screenshots": "\n".join([x["raw_url"] for x in meta.image_list][:4])})
                     if not meta.ant_user_tags:
                         data.update({"flagchangereason": f"Adult with screens uploaded with {meta.ua_name}"})
