@@ -143,6 +143,7 @@ class Meta:
     filename_match: str | bool = False
     filename: str = ""
     first_air_date: str | None = None
+    last_air_date: str | None = None
     flux: bool = False
     folder_id: int | None = None
     force_recheck: bool = False
