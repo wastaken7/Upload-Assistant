@@ -38,6 +38,8 @@ class DarkPeers(UNIT3D):
         "FiSTER",
         "flower",
         "GalaxyTV",
+        "Goki",
+        "H4XO",
         "HD2DVD",
         "HDTime",
         "HorribleSubs",
@@ -62,6 +64,7 @@ class DarkPeers(UNIT3D):
         "Rifftrax",
         "ROCKETRACCOON",
         "SANTi",
+        "SARTRE",
         "SasukeducK",
         "SEEDSTER",
         "ShAaNiG",
@@ -114,13 +117,20 @@ class DarkPeers(UNIT3D):
         if not await self.common.check_language_requirements(meta, self.tracker, languages_to_check=nordic_languages, check_audio=True, check_subtitle=True):
             return False
 
-        if meta.type not in ["WEBDL"] and meta.tag in ["EVO"]:
-            if not meta.unattended:
-                logger.info(f"{self.tracker}: [bold red]does not allow EVO for non-WEBDL types, skipping upload.")
+        group = str(meta.tag or "").lstrip("-").strip().upper()
+        release_type = str(meta.type or "").strip().upper()
+        category = str(meta.category or "").strip().upper()
+
+        if group == "EVO" and release_type != "WEBDL":
+            logger.info(f"{self.tracker}: [bold red]only allows EVO releases when they are WEB-DLs. Skipping upload.")
             return False
 
-        if meta.hardcoded_subs and not meta.unattended:
-            logger.info(f"{self.tracker}: [bold red]does not allow hardcoded subtitles.")
+        if group == "HDT" and release_type != "REMUX":
+            logger.info(f"{self.tracker}: [bold red]only allows HDT releases when they are Remuxes. Skipping upload.")
+            return False
+
+        if category in {"MOVIE", "TV"} and meta.hardcoded_subs:
+            logger.info(f"{self.tracker}: [bold red]does not allow Movies or TV releases with hardcoded subtitles. Skipping upload.")
             return False
 
         return should_continue
