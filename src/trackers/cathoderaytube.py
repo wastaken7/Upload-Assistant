@@ -105,12 +105,15 @@ class CathodeRayTube:
         """Convert Upload Assistant season tokens into CRT's human-readable labels."""
         if not season:
             return ""
-        if season.upper() == "S00":
+        season_str = str(season).strip()
+        if season_str.upper() == "S00":
             return "Specials"
-        match = re.fullmatch(r"S(\d{1,2})", season, re.IGNORECASE)
-        if not match:
-            return season
-        return f"Season {int(match.group(1))}"
+        match = re.fullmatch(r"S(\d{1,2})", season_str, re.IGNORECASE)
+        if match:
+            return f"Season {int(match.group(1))}"
+        if season_str.isdigit():
+            return f"Season {int(season_str)}"
+        return season_str
 
     def get_cover(self, meta: Meta) -> str:
         """Return the first cover image URL from the metadata."""
@@ -121,7 +124,8 @@ class CathodeRayTube:
             return meta.poster
 
         if isinstance(meta.covers, list) and len(meta.covers) > 0:
-            return f"{meta.covers[0].get('raw_url')}"
+            raw_url = meta.covers[0].get('raw_url')
+            return str(raw_url) if raw_url else ""
 
         return ""
 
@@ -344,7 +348,7 @@ class CathodeRayTube:
             if screens_count == 0 and hasattr(meta, "screens"):
                 try:
                     screens_count = int(meta.screens or 0)
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     screens_count = 0
 
             if screens_count < 6:
@@ -359,21 +363,22 @@ class CathodeRayTube:
                 return False
 
         # 10-Year Age Limit Rule (release date for movies, last air date for TV must be at least 10 years old)
-        is_exempt = bool(meta.edition or getattr(meta, "re_release", False) or (category == "GAME" and getattr(meta, "extras", False)))
+        is_exempt = bool(meta.edition or (category == "GAME" and getattr(meta, "extras", False)))
         if not is_exempt:
-            ten_years_ago = datetime.datetime.now(datetime.UTC).date() - datetime.timedelta(days=365 * 10 + 3)
+            today = datetime.datetime.now(datetime.UTC).date()
+            ten_years_ago = today.replace(year=today.year - 10)
             date_to_check: datetime.date | None = None
 
             if category == "MOVIE" and getattr(meta, "release_date", None):
                 try:
                     date_to_check = datetime.date.fromisoformat(str(meta.release_date).strip()[:10])
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     date_to_check = None
             elif category == "TV" and (getattr(meta, "last_air_date", None) or getattr(meta, "release_date", None)):
                 raw_date = getattr(meta, "last_air_date", None) or getattr(meta, "release_date", None)
                 try:
                     date_to_check = datetime.date.fromisoformat(str(raw_date).strip()[:10])
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     date_to_check = None
 
             if date_to_check is not None:
@@ -511,7 +516,7 @@ class CathodeRayTube:
         if meta.debug:
             logger.info(f"{self.tracker}: [cyan]Request Data:[/cyan]")
             logger.info(Redaction.redact_private_info(await self.get_upload_data(meta, "DEBUG_AUTH")))
-            meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading. Description generation is not implemented."
+            meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             return True
 
         auth = CathodeRayTube.auth_token
@@ -522,7 +527,6 @@ class CathodeRayTube:
             async with aiofiles.open(torrent_path, "rb") as torrent_file:
                 files = {"file_input": (torrent_path.name, await torrent_file.read(), "application/x-bittorrent")}
             response = await self.session.post(self.upload_url, data=await self.get_upload_data(meta, auth), files=files)
-            print(response.text)  # DEBUG for first upload, delete latter
         except (OSError, httpx.HTTPError) as error:
             meta.tracker_status[self.tracker]["status_message"] = f"data error: CRT upload request failed: {error}"
             return False

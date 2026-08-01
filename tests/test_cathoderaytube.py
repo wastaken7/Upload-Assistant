@@ -159,40 +159,44 @@ def test_builds_simple_advanced_search_params():
 
 def test_search_existing_uses_advanced_results_table():
     async def run_search():
-        CathodeRayTube.auth_token = ""
-        site = tracker()
-        site.cookie_validator.load_session_cookies = AsyncMock(return_value=httpx.Cookies({"session": "test"}))
-        search_html = """
-        <script>var authkey = 'search-csrf-token';</script>
-        <table id="torrent_table"><tbody>
-          <tr class="torrent row0"><td><a href="/torrents.php?id=1">Matching Release</a></td><td class="nobr">1.25 GiB</td><td><a href="torrents.php?action=download&amp;id=1&amp;authkey=auth&amp;torrent_pass=pass">DL</a></td></tr>
-          <tr class="torrent row1"><td><a href="/torrents.php?id=2">Ignored Result</a></td></tr>
-        </tbody></table>
-        """
-        detail_html = """
-        <div id="files_1"><table>
-          <tr class="smallhead"><td colspan="2">/Release.Directory/</td></tr>
-          <tr><td>file.mkv</td><td>1.25 GiB</td></tr>
-        </table></div>
-        <div class="section-details">Disc Title: RELEASE DISC<br>Disc Size: 25,000,000,000 bytes<br>Video: MPEG-4 AVC Video / 1080p<br>Audio: English / DTS-HD Master Audio</div>
-        """
+        original_auth_token = CathodeRayTube.auth_token
+        try:
+            CathodeRayTube.auth_token = ""
+            site = tracker()
+            site.cookie_validator.load_session_cookies = AsyncMock(return_value=httpx.Cookies({"session": "test"}))
+            search_html = """
+            <script>var authkey = 'search-csrf-token';</script>
+            <table id="torrent_table"><tbody>
+              <tr class="torrent row0"><td><a href="/torrents.php?id=1">Matching Release</a></td><td class="nobr">1.25 GiB</td><td><a href="torrents.php?action=download&amp;id=1&amp;authkey=auth&amp;torrent_pass=pass">DL</a></td></tr>
+              <tr class="torrent row1"><td><a href="/torrents.php?id=2">Ignored Result</a></td></tr>
+            </tbody></table>
+            """
+            detail_html = """
+            <div id="files_1"><table>
+              <tr class="smallhead"><td colspan="2">/Release.Directory/</td></tr>
+              <tr><td>file.mkv</td><td>1.25 GiB</td></tr>
+            </table></div>
+            <div class="section-details">Disc Title: RELEASE DISC<br>Disc Size: 25,000,000,000 bytes<br>Video: MPEG-4 AVC Video / 1080p<br>Audio: English / DTS-HD Master Audio</div>
+            """
 
-        requests: list[httpx.Request] = []
+            requests: list[httpx.Request] = []
 
-        async def handler(request):
-            requests.append(request)
-            html = detail_html if request.url.params.get("id") == "1" else search_html
-            return httpx.Response(200, text=html, request=request)
+            async def handler(request):
+                requests.append(request)
+                html = detail_html if request.url.params.get("id") == "1" else search_html
+                return httpx.Response(200, text=html, request=request)
 
-        site.session = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-        results = await site.search_existing(meta(is_disc="BDMV"))
-        assert len(requests) == 3  # noqa: S101
-        assert dict(requests[0].url.params) == {"action": "advanced", "filter_cat[1]": "1", "title": "Example Movie"}  # noqa: S101
-        assert str(requests[1].url) == "https://www.cathode-ray.tube/torrents.php?id=1"  # noqa: S101
-        assert dict(requests[2].url.params) == {"action": "advanced", "searchtext": "tt1234567"}  # noqa: S101
-        assert CathodeRayTube.auth_token == "search-csrf-token"  # noqa: S101, S105
-        await site.session.aclose()
-        return results
+            site.session = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+            results = await site.search_existing(meta(is_disc="BDMV"))
+            assert len(requests) == 3  # noqa: S101
+            assert dict(requests[0].url.params) == {"action": "advanced", "filter_cat[1]": "1", "title": "Example Movie"}  # noqa: S101
+            assert str(requests[1].url) == "https://www.cathode-ray.tube/torrents.php?id=1"  # noqa: S101
+            assert dict(requests[2].url.params) == {"action": "advanced", "searchtext": "tt1234567"}  # noqa: S101
+            assert CathodeRayTube.auth_token == "search-csrf-token"  # noqa: S101, S105
+            await site.session.aclose()
+            return results
+        finally:
+            CathodeRayTube.auth_token = original_auth_token
 
     assert asyncio.run(run_search()) == [  # noqa: S101
         {
