@@ -51,6 +51,7 @@ class BJShare:
     already_has_the_info: bool = False
     database_title: str = ""
     database_identifier: str = ""
+    database_overview: str = ""
     tmdb_localization_requirements: ClassVar = {
         "pt-BR": {
             "main": "credits,videos,content_ratings",
@@ -640,9 +641,6 @@ class BJShare:
 
     async def get_tags(self, meta: Meta) -> str:
         """Map genres from meta.genres or TMDB to Portuguese tags."""
-        if BJShare.already_has_the_info:
-            return ""
-
         matched_tags: list[str] = []
 
         genres_list = meta.genres or meta.keywords or []
@@ -667,7 +665,7 @@ class BJShare:
 
         # If we have matched tags, return them
         if matched_tags:
-            return ", ".join(matched_tags)
+            return unidecode(", ".join(matched_tags))
 
         # Final fallback: ask user
         if meta.unattended and not meta.unattended_confirm:
@@ -676,7 +674,7 @@ class BJShare:
             return ""
 
         tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
-        return (tags_raw or "").strip()
+        return unidecode((tags_raw or "").strip())
 
     def get_database_title(self, soup: BeautifulSoup) -> str:
         """
@@ -734,6 +732,24 @@ class BJShare:
 
         return ""
 
+    def get_database_overview(self, soup: BeautifulSoup) -> str:
+        """Extract the existing overview/synopsis from a BJShare group details page."""
+        desc_box = soup.find("div", class_="torrent_description")
+        if not desc_box:
+            return ""
+
+        for bq in desc_box.find_all("blockquote"):
+            if bq.find("iframe") or "center" in bq.get("class", []):
+                continue
+            text = bq.get_text(strip=True)
+            if text:
+                return text
+
+        body = desc_box.find("div", class_="body") or desc_box
+        for tag in body.find_all(["iframe", "script", "style"]):
+            tag.decompose()
+        return body.get_text(strip=True)
+
     async def search_existing(self, meta: Meta) -> list[dict[str, str | list[str]]]:
         dupes: list[dict[str, str | list[str]]] = []
         category = meta.category
@@ -783,6 +799,7 @@ class BJShare:
         BJShare.already_has_the_info = False
         BJShare.database_title = ""
         BJShare.database_identifier = ""
+        BJShare.database_overview = ""
 
         search_params = [params]
         title_already_queried = False
@@ -848,6 +865,7 @@ class BJShare:
             BJShare.already_has_the_info = True
             BJShare.database_title = self.get_database_title(soup)
             BJShare.database_identifier = self.get_database_identifier(soup)
+            BJShare.database_overview = self.get_database_overview(soup)
 
             for row in torrent_details_table.find_all("tr"):
                 row_id = row.get("id")
@@ -1759,9 +1777,11 @@ class BJShare:
 
         return ""
 
-    async def get_overview(self, meta: Meta) -> str:
-        if BJShare.already_has_the_info:
-            return ""
+    async def get_overview(self, meta: Meta | None = None) -> str:
+        database_overview = BJShare.database_overview
+        if database_overview:
+            logger.debug(f"{self.tracker}: Using database overview: {database_overview[:50]}...")
+            return database_overview
 
         overview = self.main_tmdb_data.get("overview", "")
         if isinstance(overview, str) and overview.strip():
