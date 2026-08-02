@@ -59,12 +59,50 @@ def test_registered_main_screenshots_are_reused_when_title_changes(tmp_path: Pat
         image.write_bytes(b"image")
         original_paths.append(image)
     registered = register(tmp_path, release_id, original_paths, "main")
-    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=2, imghost="imgbb")
+    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=6, imghost="imgbb")
 
     with patch("src.takescreens.get_image_host", new=AsyncMock(return_value="imgbb")):
-        result = asyncio.run(screenshots("unused.mkv", "Punctuated, Title", release_id, str(tmp_path), meta))
+        result = asyncio.run(screenshots("unused.mkv", "Punctuated, Title", release_id, str(tmp_path), meta, manual_frames=[100, 200]))
 
     assert set(result or []) == {str(path) for path in registered}
+
+
+def test_partial_registered_group_captures_only_missing_screenshots(tmp_path: Path) -> None:
+    release_id = "release"
+    release_dir = tmp_path / "tmp" / release_id
+    screenshot_dir = release_dir / "screenshots"
+    screenshot_dir.mkdir(parents=True)
+    (release_dir / "MediaInfo.json").write_text(
+        '{"media": {"track": [{"Duration": "100"}, {"Duration": "100", "Width": "1920", "Height": "1080", "PixelAspectRatio": "1", "DisplayAspectRatio": "1.777", "FrameRate": "24"}]}}',
+        encoding="utf-8",
+    )
+    existing = []
+    for index in range(2):
+        image = screenshot_dir / f"existing-{index}.png"
+        image.write_bytes(b"image")
+        existing.append(image)
+    register(tmp_path, release_id, existing, "main")
+    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=3, imghost="imgbb")
+    capture_calls: list[object] = []
+
+    async def capture_stub(args: tuple[object, ...]):
+        capture_calls.append(args)
+        output = Path(str(args[3]))
+        output.write_bytes(b"image")
+        return args[0], str(output)
+
+    async def no_op() -> None:
+        return None
+
+    with (
+        patch("src.takescreens.get_image_host", new=AsyncMock(return_value="imgbb")),
+        patch("src.takescreens.capture_screenshot", new=capture_stub),
+        patch("src.takescreens.kill_all_child_processes", new=no_op),
+    ):
+        result = asyncio.run(screenshots("unused.mkv", "Punctuated, Title", release_id, str(tmp_path), meta, manual_frames=[100, 200, 300]))
+
+    assert len(capture_calls) == 1
+    assert len(result or []) == 3
 
 
 def test_upload_uses_only_registered_main_screenshots(tmp_path: Path, monkeypatch) -> None:

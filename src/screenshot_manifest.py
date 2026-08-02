@@ -83,6 +83,23 @@ def files(base_dir: str | Path, release_id: str, group: str | None = None) -> li
     return sorted(result, key=lambda path: path.name)
 
 
+def clear_group(base_dir: str | Path, release_id: str, group: str) -> None:
+    """Delete the active files and manifest entries for one capture group."""
+    with _lock(base_dir, release_id):
+        manifest = _load(base_dir, release_id)
+        entries = manifest.get("screenshots")
+        if not isinstance(entries, dict):
+            return
+        directory = screenshots_dir(base_dir, release_id)
+        for screenshot_id, value in list(entries.items()):
+            if not isinstance(value, dict) or value.get("group") != group:
+                continue
+            path = directory / str(value.get("file", f"{screenshot_id}.png"))
+            path.unlink(missing_ok=True)
+            entries.pop(screenshot_id)
+        _save(base_dir, release_id, manifest)
+
+
 def group_for(base_dir: str | Path, release_id: str, path: Path) -> str:
     """Return the logical capture group for a local screenshot."""
     entries = _load(base_dir, release_id).get("screenshots", {})

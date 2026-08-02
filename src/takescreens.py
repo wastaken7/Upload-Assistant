@@ -27,6 +27,7 @@ from data import config as data_config
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
+from src.screenshot_manifest import clear_group as clear_screenshot_group
 from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import register as register_screenshots
 from src.temp_paths import posters_dir, screenshots_dir
@@ -1517,16 +1518,24 @@ async def screenshots(
         return None
 
     group = capture_group or "main"
-    requested_screens = num_screens or (len([frame for frame in manual_frames.split(",") if frame.strip()]) if isinstance(manual_frames, str) and manual_frames else screens)
+    if num_screens:
+        requested_screens = num_screens
+    elif isinstance(manual_frames, str):
+        requested_screens = len([frame for frame in manual_frames.split(",") if frame.strip()]) if manual_frames else screens
+    elif manual_frames:
+        requested_screens = len(manual_frames)
+    else:
+        requested_screens = screens
+    if meta.retake:
+        clear_screenshot_group(base_dir, folder_id, group)
+    registered_screens = manifest_files(base_dir, folder_id, group)
     # Metadata enrichment can alter the display title (for example, by adding
     # punctuation). Reuse the logical capture group rather than deriving
     # identity from a display-derived filename. This must happen before reading
     # MediaInfo so an already-complete early capture is a true no-op.
-    if not force_screenshots and not meta.retake:
-        registered_screens = manifest_files(base_dir, folder_id, group)
-        if len(registered_screens) >= requested_screens:
-            logger.debug(f"[yellow]Reusing {len(registered_screens)} registered screenshots from group '{group}'.[/yellow]")
-            return [str(screen) for screen in registered_screens[:requested_screens]]
+    if not force_screenshots and not meta.retake and len(registered_screens) >= requested_screens:
+        logger.debug(f"[yellow]Reusing {len(registered_screens)} registered screenshots from group '{group}'.[/yellow]")
+        return [str(screen) for screen in registered_screens[:requested_screens]]
 
     try:
         mi_text = await asyncio.to_thread(Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/MediaInfo.json").read_text, encoding="utf-8")
@@ -1599,8 +1608,10 @@ async def screenshots(
 
     if num_screens <= 0:
         num_screens = screens - len(existing_images)
+    if not force_screenshots and not meta.retake:
+        num_screens = max(0, num_screens - len(registered_screens))
     if num_screens <= 0:
-        return None
+        return [str(screen) for screen in registered_screens] or None
 
     sanitized_filename = await sanitize_filename(filename)
     screenshot_dir = screenshots_dir(base_dir, folder_id)
@@ -1917,8 +1928,10 @@ async def screenshots(
         unit="frames",
     )
 
-    registered_screens = register_screenshots(base_dir, folder_id, valid_results, group) if valid_results else []
-    return [str(screen) for screen in registered_screens] or None
+    new_screens = register_screenshots(base_dir, folder_id, valid_results, group) if valid_results else []
+    if not force_screenshots and not meta.retake:
+        return [str(screen) for screen in manifest_files(base_dir, folder_id, group)[:requested_screens]]
+    return [str(screen) for screen in new_screens] or None
 
 
 async def capture_screenshot(args: tuple[int, str, float, str, float, float, float, float, str, bool, Meta]) -> tuple[int, str | None] | None:
