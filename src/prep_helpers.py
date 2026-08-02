@@ -16,6 +16,7 @@ import guessit
 from torf import Torrent
 
 from src.bluray_com import get_bluray_releases
+from src.book_prep import AUDIOBOOK_EXTENSIONS, BOOK_EXTENSIONS
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.console import logger
@@ -153,6 +154,12 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
         raise
     logger.debug(f"[blue]is_disc: [yellow]{meta.is_disc}[/yellow][/blue]")
 
+    # A CLI category is an explicit instruction, not only a signal to skip
+    # automatic detection.  Content-specific preparation below routes on
+    # ``meta.category``, so normalise the manual value before that routing.
+    if isinstance(meta.manual_category, str) and meta.manual_category.strip():
+        meta.category = meta.manual_category.strip().upper()
+
     # Auto-detect MUSIC before BOOK: music releases are commonly multi-file FLAC
     # directories, whereas audiobooks remain BOOK through their dedicated flow.
     if not meta.category and not meta.manual_category and not meta.is_disc:
@@ -174,8 +181,6 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
     # Auto-detect BOOK category if category/manual_category is not already set and it's not a disc
     if not meta.category and not meta.manual_category and not meta.is_disc:
         is_book = False
-        book_extensions = {".pdf", ".epub", ".mobi", ".cbz", ".cbr"}
-        audiobook_extensions = {".mp3", ".m4b", ".flac", ".aac", ".m4a", ".ogg", ".wav"}
         video_extensions = {".mkv", ".mp4", ".ts"}
 
         path_to_check = meta.path
@@ -187,9 +192,9 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                 for _root, _, files in os.walk(path_to_check):
                     for file in files:
                         ext = Path(file).suffix.lower()
-                        if ext in book_extensions:
+                        if ext in BOOK_EXTENSIONS:
                             has_books = True
-                        elif ext in audiobook_extensions:
+                        elif ext in AUDIOBOOK_EXTENSIONS:
                             has_audio = True
                         elif ext in video_extensions:
                             has_video = True
@@ -198,7 +203,7 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                     is_book = True
             else:
                 ext = Path(path_to_check).suffix.lower()
-                if ext in book_extensions or ext in audiobook_extensions:
+                if ext in BOOK_EXTENSIONS or ext in AUDIOBOOK_EXTENSIONS:
                     is_book = True
 
         if is_book:

@@ -49,6 +49,12 @@ from src.meta import Meta
 # File-list resolution
 # ---------------------------------------------------------------------------
 
+BOOK_EXTENSIONS = frozenset(
+    {".pdf", ".epub", ".mobi", ".azw", ".azw3", ".fb2", ".html", ".htm", ".chm", ".djvu", ".doc", ".docx", ".kfx", ".lit", ".pdb", ".txt", ".rtf", ".cbz", ".cbr"}
+)
+AUDIOBOOK_EXTENSIONS = frozenset({".mp3", ".m4b", ".flac", ".alac", ".aac", ".m4a", ".ogg", ".opus", ".wav"})
+_TEXT_SIDECAR_STEMS = frozenset({"cover", "folder", "index", "info", "readme"})
+
 
 def resolve_book_filelist(
     meta: Meta,
@@ -64,9 +70,7 @@ def resolve_book_filelist(
         where *videopath* is the primary/largest file used as the "video"
         reference for downstream processing.
     """
-    book_extensions: set[str] = {".pdf", ".epub", ".mobi", ".cbz", ".cbr"}
-    audiobook_extensions: set[str] = {".mp3", ".m4b", ".flac", ".aac", ".m4a", ".ogg", ".wav"}
-    allowed_extensions = book_extensions | audiobook_extensions
+    allowed_extensions = BOOK_EXTENSIONS | AUDIOBOOK_EXTENSIONS
 
     filelist: list[str] = []
     if Path(videoloc).is_dir():
@@ -79,6 +83,9 @@ def resolve_book_filelist(
         if not filelist:
             logger.info("[bold red]No Book or Audiobook files found!")
             sys.exit(1)
+        richer_book_files = [file for file in filelist if Path(file).suffix.lower() in BOOK_EXTENSIONS - {".txt", ".html", ".htm"}]
+        if richer_book_files:
+            filelist = [file for file in filelist if not (Path(file).suffix.lower() in {".txt", ".html", ".htm"} and Path(file).stem.casefold() in _TEXT_SIDECAR_STEMS)]
         videopath = sorted(filelist, key=os.path.getsize, reverse=True)[0]
     else:
         videopath = videoloc
@@ -88,7 +95,7 @@ def resolve_book_filelist(
     meta.imdb_id = 0
 
     primary_ext = Path(videopath).suffix.lower()
-    meta.audiobook = primary_ext in audiobook_extensions
+    meta.audiobook = primary_ext in AUDIOBOOK_EXTENSIONS
 
     search_term = Path(filelist[0]).name if filelist else ""
     search_file_folder = "file"
@@ -255,8 +262,9 @@ async def gather_book_prep(
                         if key == "year":
                             meta.search_year = int(val)
 
-    # Extract MOBI metadata directly if the file is a MOBI
-    if videopath.lower().endswith(".mobi") and Path(videopath).is_file():
+    # AZW and AZW3 are Kindle variants of the MOBI family.  The extractor may
+    # not support every DRM/KFX variant, but it safely returns no metadata then.
+    if videopath.lower().endswith((".mobi", ".azw", ".azw3")) and Path(videopath).is_file():
         mobi_meta = _extract_mobi_metadata(videopath)
         if mobi_meta:
             logger.debug(f"[cyan]MOBI metadata extracted: {mobi_meta}[/cyan]")
@@ -563,9 +571,9 @@ async def gather_book_prep(
                         ):
                             is_override = True
 
-                        # Do not overwrite fields already populated by MAM, except for the poster/cover image (prefer Google Books cover)
+                        # Do not overwrite fields already populated by MAM, except for artwork (prefer Google Books cover)
                         if (
-                            key != "poster"
+                            key != "artwork_url"
                             and mam_data
                             and (key in mam_data or (key == "book_language_iso" and "book_language" in mam_data) or (key == "search_year" and "year" in mam_data))
                         ):
@@ -762,7 +770,7 @@ async def get_audiobook_duration(filelist: list[str]) -> tuple[float, str]:
     """Calculate the sum of durations of all audio files in the file list using MediaInfo."""
     from pymediainfo import MediaInfo
 
-    audiobook_extensions = (".mp3", ".m4b", ".flac", ".aac", ".m4a", ".ogg", ".wav")
+    audiobook_extensions = (".mp3", ".m4b", ".flac", ".alac", ".aac", ".m4a", ".ogg", ".opus", ".wav")
     audio_files = [f for f in filelist if f.lower().endswith(audiobook_extensions)]
 
     if not audio_files:
@@ -798,7 +806,7 @@ async def get_audiobook_bitrate(filelist: list[str]) -> int | None:
     """Calculate the average bitrate (in kbps) of a sample of audio files (max 5) in the file list using MediaInfo."""
     from pymediainfo import MediaInfo
 
-    audiobook_extensions = (".mp3", ".m4b", ".flac", ".aac", ".m4a", ".ogg", ".wav")
+    audiobook_extensions = (".mp3", ".m4b", ".flac", ".alac", ".aac", ".m4a", ".ogg", ".opus", ".wav")
     audio_files = [f for f in filelist if f.lower().endswith(audiobook_extensions)]
 
     # Limit to a maximum of 5 files to optimize performance

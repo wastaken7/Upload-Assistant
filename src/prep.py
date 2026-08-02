@@ -221,7 +221,52 @@ class Prep:
                     meta.ffdebug,
                     0,
                     cleanup_after_capture=False,
+                    capture_group="main",
                 )
+                # Capture every additional playlist/disc before the WebUI
+                # review. Description generation must only render hosted
+                # images, never create new local media artifacts.
+                multi_screens = int(self.config.get("DEFAULT", {}).get("multiScreens", 2))
+                if multi_screens > 0:
+                    discs = list(meta.discs or [])
+                    if len(discs) == 1:
+                        disc = discs[0]
+                        playlist_keys = [key for key in disc if key.startswith("bdinfo")]
+                        for index, key in enumerate(playlist_keys[1:], start=1):
+                            playlist_bdinfo = disc.get(key)
+                            if isinstance(playlist_bdinfo, dict):
+                                await self.takescreens_manager.disc_screenshots(
+                                    meta,
+                                    f"PLAYLIST_{index}",
+                                    playlist_bdinfo,
+                                    meta.uuid,
+                                    meta.base_dir,
+                                    meta.vapoursynth,
+                                    [],
+                                    meta.ffdebug,
+                                    multi_screens,
+                                    True,
+                                    False,
+                                    f"PLAYLIST_{index}",
+                                )
+                    else:
+                        for index, disc in enumerate(discs[1:], start=1):
+                            disc_bdinfo = disc.get("bdinfo")
+                            if disc.get("type") == "BDMV" and isinstance(disc_bdinfo, dict):
+                                await self.takescreens_manager.disc_screenshots(
+                                    meta,
+                                    f"FILE_{index}",
+                                    disc_bdinfo,
+                                    meta.uuid,
+                                    meta.base_dir,
+                                    meta.vapoursynth,
+                                    [],
+                                    meta.ffdebug,
+                                    multi_screens,
+                                    True,
+                                    False,
+                                    f"FILE_{index}",
+                                )
             elif meta.is_disc == "DVD":
                 await self.takescreens_manager.dvd_screenshots(
                     meta,

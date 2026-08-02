@@ -26,6 +26,8 @@ from data import config as data_config
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
+from src.screenshot_manifest import files as manifest_files
+from src.screenshot_manifest import register as register_screenshots
 from src.temp_paths import posters_dir, screenshots_dir
 from src.webui_progress import complete_progress, publish_progress
 
@@ -72,6 +74,22 @@ def _apply_config(config: Mapping[str, Any]) -> None:
 
 
 async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
+    cmd_list = list(command.compile())
+    process_env = os.environ.copy()
+
+    # FFREPORT defaults to a timestamped file in the current working
+    # directory.  The last argument is the output path for ffmpeg-python
+    # commands that write a file, so keep the report beside that output
+    # instead of beside the source video.  Commands writing to stdout (for
+    # example, the libplacebo warm-up) do not need a report file.
+    output_path = cmd_list[-1] if cmd_list else ""
+    if output_path and output_path not in {"-", "pipe:"} and not output_path.startswith("pipe:"):
+        report_path = Path(output_path).resolve().parent / "ffmpeg.log"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        process_env["FFREPORT"] = f"file={report_path}:level=32"
+    else:
+        process_env.pop("FFREPORT", None)
+
     # On Linux prefer bundled amd/arm binary when present; otherwise fall back to system ffmpeg.
     if platform.system() == "Linux":
         base_dir = str(Path(__file__).parent.parent)
@@ -88,15 +106,24 @@ async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
         if arch:
             candidate = Path(ff_bin_dir) / arch / "ffmpeg"
             if Path(candidate).exists():
-                cmd_list = list(command.compile())
                 cmd_list[0] = str(candidate)
 
-                process = await asyncio.create_subprocess_exec(*cmd_list, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                process = await asyncio.create_subprocess_exec(
+                    *cmd_list,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    env=process_env,
+                )
                 stdout, stderr = await process.communicate()
                 return (process.returncode if process.returncode is not None else -1), stdout, stderr
 
     # Fallback: use system/default ffmpeg (command.compile())
-    process = await asyncio.create_subprocess_exec(*command.compile(), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    process = await asyncio.create_subprocess_exec(
+        *cmd_list,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=process_env,
+    )
     stdout, stderr = await process.communicate()
     return process.returncode, stdout, stderr
 
@@ -125,7 +152,8 @@ async def disc_screenshots(
     num_screens: int = 0,
     force_screenshots: bool = False,
     cleanup_after_capture: bool = True,
-) -> None:
+    capture_group: str | None = None,
+) -> list[Path]:
     img_host = await get_image_host(meta)
     screens = meta.screens
     start_time = time.time() if meta.debug else 0.0
@@ -136,12 +164,12 @@ async def disc_screenshots(
 
     if len(existing_images) >= cutoff and not force_screenshots:
         logger.info(f"[yellow]There are already at least {cutoff} images in the image list. Skipping additional screenshots.")
-        return
+        return []
 
     if not num_screens:
         num_screens = screens
     if num_screens == 0 or (image_list and len(image_list) >= num_screens):
-        return
+        return []
 
     sanitized_filename = await sanitize_filename(filename)
     length: float = 0.0
@@ -175,14 +203,13 @@ async def disc_screenshots(
     keyframe = "nokey" if "VC-1" in bdinfo["video"][0]["codec"] or bdinfo["video"][0]["hdr_dv"] != "" else "none"
     logger.debug(f"File: {file_path}, Length: {length}, Frame Rate: {frame_rate}", extra={"markup": False})
     screenshot_dir = screenshots_dir(base_dir, folder_id)
-    existing_screens = [p.name for p in screenshot_dir.glob(f"{glob.escape(sanitized_filename)}-*.png")]
-    existing_screens = [f for f in existing_screens if re.match(r"^-\d+\.png$", Path(f).name[len(sanitized_filename) :])]
+    existing_screens = [p.name for p in manifest_files(base_dir, folder_id, capture_group or sanitized_filename)]
     total_existing = len(existing_screens) + len(existing_images)
     num_screens = max(0, screens - total_existing) if not force_screenshots else num_screens
 
     if num_screens == 0 and not force_screenshots:
         logger.info("[bold green]Reusing existing screenshots. No additional screenshots needed.")
-        return
+        return []
 
     if meta.debug and not force_screenshots:
         logger.info(f"[bold yellow]Saving Screens... Total needed: {screens}, Existing: {total_existing}, To capture: {num_screens}")
@@ -223,11 +250,13 @@ async def disc_screenshots(
     if use_vs:
         from src.vs import vs_screengn
 
+        before = {path.resolve() for path in screenshot_dir.glob("*.png")}
         vs_screengn(source=file_path, encode=None, num=num_screens, dir=f"{screenshot_dir}/")
+        valid_results = [str(path) for path in screenshot_dir.glob("*.png") if path.resolve() not in before]
     else:
         loglevel = "verbose" if ffdebug else "quiet"
 
-        existing_indices = {int(p.split("-")[-1].split(".")[0]) for p in existing_screens}
+        existing_indices = set(range(len(existing_screens)))
 
         # Create semaphore to limit concurrent tasks
         semaphore = asyncio.Semaphore(task_limit)
@@ -357,6 +386,10 @@ async def disc_screenshots(
         finish_time = time.time()
         logger.debug(f"Screenshots processed in {finish_time - start_time:.4f} seconds")
 
+    # The temporary descriptive names above are only used while capture is in
+    # progress.  Publish completed frames under opaque UUID filenames.
+    registered = register_screenshots(base_dir, folder_id, valid_results, capture_group or sanitized_filename) if valid_results else []
+
     multi_screens = int(default_config.get("multiScreens", 2))
     discs = meta.discs
     one_disc = True
@@ -367,6 +400,7 @@ async def disc_screenshots(
 
     if cleanup_after_capture and ((not meta.tv_pack and one_disc) or multi_screens == 0):
         await cleanup_manager.cleanup()
+    return registered
 
 
 async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str, keyframe: str, loglevel: str, hdr_tonemap: bool, meta: Meta) -> tuple[int, str] | None:
@@ -475,8 +509,8 @@ async def dvd_screenshots(
 
     sanitized_disc_name = await sanitize_filename(meta.discs[disc_num]["name"])
     screenshot_dir = screenshots_dir(meta.base_dir, meta.uuid)
-    existing_screens = [str(p) for p in screenshot_dir.glob(f"{glob.escape(sanitized_disc_name)}-*.png")]
-    normal_screens = [f for f in existing_screens if re.match(r"^-\d+\.png$", Path(f).name[len(sanitized_disc_name) :])]
+    existing_screens = [str(p) for p in manifest_files(meta.base_dir, meta.uuid, sanitized_disc_name)]
+    normal_screens = existing_screens
     if len(normal_screens) >= num_screens:
         i = num_screens
         logger.info("[bold green]Reusing screenshots")
@@ -688,6 +722,9 @@ async def dvd_screenshots(
             valid_results.append(image)
     if remaining_retakes:
         logger.info(f"[red]The following images could not be retaken successfully: {remaining_retakes}[/red]")
+
+    if valid_results:
+        register_screenshots(meta.base_dir, meta.uuid, valid_results, sanitized_disc_name)
 
     if not retry_cap and meta.debug:
         logger.info(f"[green]Successfully captured {len(valid_results)} screenshots.")
@@ -903,23 +940,23 @@ async def extract_embedded_cover_from_audiobook(meta: Meta, dest_path: str, conf
         return False
 
 
-async def download_poster_from_meta(meta: Meta, cover_path: str, *, force: bool = False) -> bool:
-    poster_url = meta.poster
-    if not poster_url:
+async def download_artwork_from_meta(meta: Meta, artwork_path: str, *, force: bool = False) -> bool:
+    artwork_url = meta.artwork_url
+    if not artwork_url:
         return False
 
     min_size = 20480
-    if poster_url.startswith("http://books.google.com/") or poster_url.startswith("https://covers.openlibrary.org/b/id/"):
+    if artwork_url.startswith("http://books.google.com/") or artwork_url.startswith("https://covers.openlibrary.org/b/id/"):
         min_size = 10240
-    if not force and Path(cover_path).exists() and Path(cover_path).stat().st_size >= min_size:
-        meta.cover_path = cover_path
+    if not force and Path(artwork_path).exists() and Path(artwork_path).stat().st_size >= min_size:
+        meta.artwork_path = artwork_path
         return True
     try:
         import httpx
 
         cookies = {}
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-        parsed_poster_url = urllib.parse.urlparse(poster_url)
+        parsed_poster_url = urllib.parse.urlparse(artwork_url)
         poster_host = (parsed_poster_url.hostname or "").lower()
         if poster_host == "myanonamouse.net" or poster_host.endswith(".myanonamouse.net"):
             api_key = (
@@ -932,16 +969,16 @@ async def download_poster_from_meta(meta: Meta, cover_path: str, *, force: bool 
                 cookies["mam_id"] = api_key
 
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            response = await client.get(poster_url, cookies=cookies, headers=headers)
+            response = await client.get(artwork_url, cookies=cookies, headers=headers)
             if response.status_code == 200:
                 if len(response.content) < min_size:
                     logger.info(
-                        f"[yellow]Warning: Downloaded poster from {poster_url} is too small ({len(response.content)} bytes < {min_size} bytes) and will be ignored.[/yellow]"
+                        f"[yellow]Warning: Downloaded artwork from {artwork_url} is too small ({len(response.content)} bytes < {min_size} bytes) and will be ignored.[/yellow]"
                     )
                     return False
-                await asyncio.to_thread(Path(cover_path).write_bytes, response.content)
-                meta.cover_path = cover_path
-                logger.info(f"[green]Successfully downloaded poster from {poster_url}[/green]")
+                await asyncio.to_thread(Path(artwork_path).write_bytes, response.content)
+                meta.artwork_path = artwork_path
+                logger.info(f"[green]Successfully downloaded artwork from {artwork_url}[/green]")
                 return True
             logger.warning(f"[yellow]Warning: Failed to download poster, status code {response.status_code}[/yellow]")
     except Exception as e:
@@ -1208,57 +1245,57 @@ async def extract_document_cover(path: str, dest_path: str) -> bool:
 
 async def prepare_book_cover(path: str, folder_id: str, base_dir: str, meta: Meta) -> str | None:
     output_dir = posters_dir(base_dir, folder_id)
-    cover_path = output_dir / "POSTER.png"
+    artwork_path = output_dir / "POSTER.png"
 
-    if Path(cover_path).exists() and Path(cover_path).stat().st_size >= 20480 and not meta.retake:
-        meta.cover_path = str(cover_path)
-        return str(cover_path)
+    if Path(artwork_path).exists() and Path(artwork_path).stat().st_size >= 20480 and not meta.retake:
+        meta.artwork_path = str(artwork_path)
+        return str(artwork_path)
 
-    if await load_local_cover_if_exists(path, str(cover_path)):
-        meta.cover_path = str(cover_path)
-        return str(cover_path)
+    if await load_local_cover_if_exists(path, str(artwork_path)):
+        meta.artwork_path = str(artwork_path)
+        return str(artwork_path)
 
     if meta.audiobook:
-        extracted_confirmed = await extract_embedded_cover_from_audiobook(meta, str(cover_path), confirmed_only=True)
+        extracted_confirmed = await extract_embedded_cover_from_audiobook(meta, str(artwork_path), confirmed_only=True)
         if extracted_confirmed:
-            meta.cover_path = str(cover_path)
+            meta.artwork_path = str(artwork_path)
             logger.debug("[green]Audiobook confirmed cover extracted. Skipping API download.[/green]")
-            return str(cover_path)
+            return str(artwork_path)
 
-        downloaded_poster = await download_poster_from_meta(meta, str(cover_path), force=meta.retake)
-        if downloaded_poster:
-            meta.cover_path = str(cover_path)
-            return str(cover_path)
+        downloaded_artwork = await download_artwork_from_meta(meta, str(artwork_path), force=meta.retake)
+        if downloaded_artwork:
+            meta.artwork_path = str(artwork_path)
+            return str(artwork_path)
 
-        extracted_unconfirmed = await extract_embedded_cover_from_audiobook(meta, str(cover_path), confirmed_only=False)
+        extracted_unconfirmed = await extract_embedded_cover_from_audiobook(meta, str(artwork_path), confirmed_only=False)
         if extracted_unconfirmed:
-            meta.cover_path = str(cover_path)
-            return str(cover_path)
+            meta.artwork_path = str(artwork_path)
+            return str(artwork_path)
         return None
 
     extension = Path(path).suffix.lower().lstrip(".")
     if extension == "epub":
-        extracted_confirmed = await extract_epub_cover(path, str(cover_path), confirmed_only=True)
+        extracted_confirmed = await extract_epub_cover(path, str(artwork_path), confirmed_only=True)
         if extracted_confirmed:
-            meta.cover_path = str(cover_path)
+            meta.artwork_path = str(artwork_path)
             logger.debug("[green]EPUB confirmed cover extracted. Skipping API download.[/green]")
-            return str(cover_path)
+            return str(artwork_path)
 
-    downloaded_poster = await download_poster_from_meta(meta, str(cover_path), force=meta.retake)
-    if downloaded_poster:
-        meta.cover_path = str(cover_path)
-        return str(cover_path)
+    downloaded_artwork = await download_artwork_from_meta(meta, str(artwork_path), force=meta.retake)
+    if downloaded_artwork:
+        meta.artwork_path = str(artwork_path)
+        return str(artwork_path)
 
     if extension == "epub":
-        extracted_unconfirmed = await extract_epub_cover(path, str(cover_path), confirmed_only=False)
+        extracted_unconfirmed = await extract_epub_cover(path, str(artwork_path), confirmed_only=False)
         if extracted_unconfirmed:
-            meta.cover_path = str(cover_path)
-            return str(cover_path)
+            meta.artwork_path = str(artwork_path)
+            return str(artwork_path)
     elif extension in {"pdf", "cbr", "cbz"}:
-        extracted_document_cover = await extract_document_cover(path, str(cover_path))
+        extracted_document_cover = await extract_document_cover(path, str(artwork_path))
         if extracted_document_cover:
-            meta.cover_path = str(cover_path)
-            return str(cover_path)
+            meta.artwork_path = str(artwork_path)
+            return str(artwork_path)
 
     return None
 
@@ -1305,7 +1342,7 @@ async def generate_ebook_screenshots(
 
     prepared_cover = await prepare_book_cover(path, folder_id, base_dir, meta)
     local_found = bool(prepared_cover)
-    downloaded_poster = bool(prepared_cover)
+    prepared_artwork = bool(prepared_cover)
 
     if extension in ["cbr", "cbz"]:
         temp_extract = Path(output_dir) / "temp_compressed_extract"
@@ -1364,15 +1401,15 @@ async def generate_ebook_screenshots(
                 scr_path = await process_compressed_image(img_idx, f"{sanitized_filename}-{i}")
                 screenshots.append(scr_path)
 
-            if not local_found and not downloaded_poster:
+            if not local_found and not prepared_artwork:
                 await process_compressed_image(0, "POSTER")
             if not banner_cached:
                 await process_compressed_image(len(image_files) - 1, "POSTER_BANNER")
             else:
-                meta.banner_path = banner_path
+                meta.artwork_banner_path = str(banner_path)
 
-            meta.cover_path = cover_path
-            meta.banner_path = banner_path
+            meta.artwork_path = str(cover_path)
+            meta.artwork_banner_path = str(banner_path)
 
             compressed_file.close()
 
@@ -1382,12 +1419,12 @@ async def generate_ebook_screenshots(
 
     elif extension in ["pdf", "mobi", "epub"]:
         try:
-            if extension == "epub" and not local_found and not downloaded_poster:
+            if extension == "epub" and not local_found and not prepared_artwork:
                 try:
                     epub_cover_extracted = await extract_epub_cover(path, cover_path, confirmed_only=False)
                     if epub_cover_extracted:
-                        downloaded_poster = True
-                        meta.cover_path = cover_path
+                        prepared_artwork = True
+                        meta.artwork_path = str(cover_path)
                 except Exception as e:
                     logger.debug(f"[yellow]Warning: EPUB cover extraction failed: {e}[/yellow]")
 
@@ -1416,15 +1453,15 @@ async def generate_ebook_screenshots(
                 scr_path = await process_page(page_num, f"{sanitized_filename}-{i}")
                 screenshots.append(scr_path)
 
-            if not local_found and not downloaded_poster:
+            if not local_found and not prepared_artwork:
                 await process_page(0, "POSTER")
             if not banner_cached:
                 await process_page(total_pages - 1, "POSTER_BANNER")
             else:
-                meta.banner_path = banner_path
+                meta.artwork_banner_path = str(banner_path)
 
-            meta.cover_path = cover_path
-            meta.banner_path = banner_path
+            meta.artwork_path = str(cover_path)
+            meta.artwork_banner_path = str(banner_path)
 
             doc.close()
         except Exception as e:
@@ -1875,7 +1912,6 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
 
         def set_ffmpeg_threads() -> list[str]:
             threads_value = "1"
-            os.environ["FFREPORT"] = "level=32"  # Reduce ffmpeg logging overhead
             return ["-threads", threads_value]
 
         if width <= 0 or height <= 0:
@@ -2419,8 +2455,11 @@ class TakeScreensManager:
         num_screens: int = 0,
         force_screenshots: bool = False,
         cleanup_after_capture: bool = True,
-    ) -> None:
-        await disc_screenshots(meta, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens, force_screenshots, cleanup_after_capture)
+        capture_group: str | None = None,
+    ) -> list[Path]:
+        return await disc_screenshots(
+            meta, filename, bdinfo, folder_id, base_dir, use_vs, image_list, ffdebug, num_screens, force_screenshots, cleanup_after_capture, capture_group
+        )
 
     async def capture_disc_task(
         self, index: int, file: str, ss_time: str, image_path: str, keyframe: str, loglevel: str, hdr_tonemap: bool, meta: Meta

@@ -212,7 +212,7 @@ class MTeam:
         logger.info(f"{self.tracker}: Douban information is unavailable, using an alternative English version for the description.")
         imdb = meta.imdb_info or {}
 
-        tmdb_poster_path = meta.tmdb_poster or "".strip()
+        tmdb_poster_path = meta.tmdb_poster_path or "".strip()
         tmdb_poster = f"https://image.tmdb.org/t/p/w200{tmdb_poster_path}" if tmdb_poster_path else ""
         poster_url = tmdb_poster or str(imdb.get("cover") or "")
         title = meta.title if meta.title is not None else "N/A"
@@ -331,7 +331,7 @@ class MTeam:
         if "upscale" in uuid.lower() and "upscale" not in meta.title:
             logger.info(f"{self.tracker}: Uploading upscaled files created by converting low-bitrate videos to high-bitrate versions might be prohibited.")
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                user_input = self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ")
+                user_input = await self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ", meta)
                 if not user_input:
                     return False
             else:
@@ -352,7 +352,7 @@ class MTeam:
                 f"{self.tracker}: [bold yellow]LGBT content detected. Please ensure the cover photo does not contain depictions of genitalia per tracker rules.[/bold yellow]"
             )
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                user_input = self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ")
+                user_input = await self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ", meta)
                 if not user_input:
                     return False
             else:

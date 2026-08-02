@@ -17,7 +17,7 @@ from cogs.redaction import Redaction
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
 from src.config_helpers import format_terminal_link
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.meta import Meta
 from src.trackersetup import tracker_class_map
 
@@ -119,9 +119,9 @@ def _music_confirmation_lines(meta: Meta, missing_warning: str) -> list[tuple[st
         edition_details = " / ".join(part for part in (edition, edition_year) if part)
         lines.append(("Edition", edition_details))
 
-    if re.match(r"^https?://[^/]+", str(meta.cover or "").strip(), flags=re.IGNORECASE):
+    if re.match(r"^https?://[^/]+", str(meta.artwork_url or "").strip(), flags=re.IGNORECASE):
         artwork = "public URL supplied"
-    elif Path(str(meta.cover_path or "")).is_file():
+    elif Path(str(meta.artwork_path or "")).is_file():
         artwork = "local/embedded artwork available"
         if meta.debug:
             artwork += "; host upload skipped in debug"
@@ -253,7 +253,7 @@ class UploadHelper:
     async def prompt_yes_no(self, question: str, *, default: bool = False) -> bool:
         """Ask one interactive question at a time without blocking the event loop."""
         async with self._prompt_lock:
-            return await asyncio.to_thread(cli_ui.ask_yes_no, question, default=default)
+            return await prompt_in_thread(cli_ui.ask_yes_no, question, default=default)
 
     async def dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str) -> tuple[bool, Meta]:
         def _format_dupe(entry: DupeEntry | str) -> str:
@@ -503,7 +503,7 @@ class UploadHelper:
         if not possible:
             return
 
-        question = "\033[1;35mFound BDInfo content in potential duplicates.\033[0m Perform a comparison?"
+        question = "[bold magenta]Found BDInfo content in potential duplicates.[/bold magenta] Perform a comparison?"
         if await self.prompt_yes_no(question, default=True):
             warnings: list[str] = []
             results: list[str] = []
@@ -550,7 +550,7 @@ class UploadHelper:
             asin = meta.asin or ""  # not essential
             narrator = meta.narrator or missing_warning
             audiobook_duration_formatted = meta.audiobook_duration_formatted or missing_warning
-            poster = meta.poster or "[yellow][italic]not found online - will be auto-generated[/italic][/yellow]"
+            poster = meta.artwork_url or meta.artwork_path or "[yellow][italic]not found online - will be auto-generated[/italic][/yellow]"
             comic = meta.comic
             manga = meta.manga
             magazine = meta.magazine
@@ -589,7 +589,7 @@ class UploadHelper:
             developer = meta.developer or missing_warning
             publisher = meta.publisher or missing_warning
             platform = meta.platform or missing_warning
-            poster = meta.poster or missing_warning
+            poster = meta.artwork_url or meta.artwork_path or missing_warning
             igdb_id = meta.igdb_id or "0"
             steam_url = meta.steam_url
             languages = len(meta.languages) if meta.languages else missing_warning

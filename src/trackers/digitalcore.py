@@ -228,7 +228,7 @@ class DigitalCore:
 
     async def get_firstpic(self, meta: Meta) -> str:
         if meta.category in ("BOOK", "MUSIC"):
-            covers = meta.covers
+            covers = meta.hosted_artwork
             if isinstance(covers, list) and len(covers) > 0:
                 raw_url = covers[0].get("raw_url")
                 if raw_url:

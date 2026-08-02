@@ -252,7 +252,8 @@ class HawkeUno(UNIT3D):
             data["internal"] = 1
 
         data["edition"] = meta.edition
-        data["repack"] = meta.repack
+        if meta.repack:
+            data["release_tag"] = meta.repack
 
         if meta.is_disc:
             region = meta.region

@@ -108,7 +108,7 @@ class MyAnonamouseManager:
                 ext = "png"
             elif "gif" in str(poster_type).lower():
                 ext = "gif"
-            metadata["poster"] = f"https://cdn.myanonamouse.net/t/p/large/{mam_id}.{ext}"
+            metadata["artwork_url"] = f"https://cdn.myanonamouse.net/t/p/large/{mam_id}.{ext}"
 
         # Comic / Manga detection
         catname = str(item.get("catname") or "").lower()

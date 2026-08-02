@@ -1,4 +1,4 @@
-"""Regression tests for MidnightScene MUSIC support."""
+"""Regression tests for MidnightScene naming support."""
 
 import asyncio
 
@@ -45,3 +45,29 @@ def test_midnightscene_non_scene_music_name_uses_directory_style():
     )
 
     assert asyncio.run(_tracker().get_name(meta)) == {"name": "Björk - Vespertine (2001) [TPLP101CD] [CD - FLAC]"}
+
+
+def test_midnightscene_removes_dual_audio_without_english_audio():
+    meta = Meta(
+        category="TV",
+        name="Example Show S01 1080p BluRay Dual-Audio FLAC 2.0 x265-ExampleGroup",
+        resolution="1080p",
+        type="ENCODE",
+        audio_languages=["japanese", "portuguese"],
+        language_checked=True,
+    )
+
+    assert asyncio.run(_tracker().get_name(meta)) == {"name": "Example Show S01 JAPANESE 1080p BluRay FLAC 2.0 x265-ExampleGroup"}
+
+
+def test_midnightscene_keeps_dual_audio_with_english_audio():
+    meta = Meta(
+        category="TV",
+        name="Example Show S01 1080p BluRay Dual-Audio FLAC 2.0 x265-ExampleGroup",
+        resolution="1080p",
+        type="ENCODE",
+        audio_languages=["japanese", "english"],
+        language_checked=True,
+    )
+
+    assert asyncio.run(_tracker().get_name(meta)) == {"name": "Example Show S01 1080p BluRay Dual-Audio FLAC 2.0 x265-ExampleGroup"}

@@ -279,7 +279,7 @@ class SpeedApp:
             "description": str(meta.genres),
             "name": await self.get_name(meta),
             "nfo": await self.get_nfo(meta),
-            "poster": meta.poster or meta.cover,
+            "poster": meta.artwork_url,
             "technicalDetails": await self.edit_desc(meta),
             "screenshots": await self.get_screenshots(meta),
             "type": await self.get_cat_id(meta),

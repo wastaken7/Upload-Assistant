@@ -14,7 +14,7 @@ from rich.markup import escape
 from unidecode import unidecode
 
 from cogs.redaction import Redaction
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
@@ -196,9 +196,9 @@ class FileList:
         # Confirm the correct naming order for FILELIST
         cli_ui.info(f"Filelist name: {fl_name}")
         if meta.unattended is False:
-            fl_confirm = cli_ui.ask_yes_no("Correct?", default=False)
+            fl_confirm = await prompt_in_thread(cli_ui.ask_yes_no, "Correct?", default=False)
             if fl_confirm is not True:
-                fl_name_manually = cli_ui.ask_string("Please enter a proper name", default="")
+                fl_name_manually = await prompt_in_thread(cli_ui.ask_string, "Please enter a proper name", default="")
                 if fl_name_manually == "":
                     logger.info(f"{self.tracker}: No proper name given")
                     logger.info(f"{self.tracker}: Aborting...")
@@ -308,12 +308,13 @@ class FileList:
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
             logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
-            recreate = cli_ui.ask_yes_no("Log in again and create new session?")
-            if recreate is True:
-                if Path(cookiefile).exists():
-                    Path(cookiefile).unlink()
-                await self.login(cookiefile)
-                return await self.validate_cookies(meta, cookiefile)
+            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                recreate = await prompt_in_thread(cli_ui.ask_yes_no, "Log in again and create new session?")
+                if recreate is True:
+                    if Path(cookiefile).exists():
+                        Path(cookiefile).unlink()
+                    await self.login(cookiefile)
+                    return await self.validate_cookies(meta, cookiefile)
             return False
         return True
 

@@ -671,8 +671,7 @@ async def gather_game_prep(
         if cover_url.startswith("//"):
             cover_url = "https:" + cover_url
         cover_url = cover_url.replace("t_thumb", "t_cover_big")
-        meta.poster = cover_url
-        meta.cover_path = cover_url
+        meta.artwork_url = cover_url
 
         # Download and save cover locally as POSTER.png
         poster_png_path = posters_dir(base_dir, meta.uuid) / "POSTER.png"
@@ -682,7 +681,7 @@ async def gather_game_prep(
                 if response.status_code == 200:
                     img = Image.open(io.BytesIO(response.content))
                     img.save(poster_png_path, "PNG")
-                    meta.cover_path = poster_png_path
+                    meta.artwork_path = str(poster_png_path)
                     logger.info("[green]IGDB: Cover downloaded and saved to POSTER.png[/green]")
                 else:
                     logger.info(f"[yellow]IGDB: Failed to download cover. Status: {response.status_code}[/yellow]")

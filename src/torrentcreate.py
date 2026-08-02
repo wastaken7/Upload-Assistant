@@ -21,7 +21,7 @@ import torf
 from rich.progress import BarColumn, TaskProgressColumn, TextColumn
 from torf import Torrent
 
-from src.console import console, logger, progress_display
+from src.console import console, is_cli_progress_suppressed, logger, progress_display
 from src.meta import Meta
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
@@ -527,7 +527,7 @@ class TorrentCreator:
             speed_str = "-- MB/s"
 
         # Display progress with percentage, speed, and ETA
-        if not has_progress_callback():
+        if not has_progress_callback() and not is_cli_progress_suppressed():
             cli_ui.info_progress(f"Hashing... {speed_str} | ETA: {eta}", int(percentage_done), 100)
         progress_id = getattr(torrent, "_webui_progress_id", "torrent-hash")
         progress_label = getattr(torrent, "_webui_progress_label", "Hashing torrent")

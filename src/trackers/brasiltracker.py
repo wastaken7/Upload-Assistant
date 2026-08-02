@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
 import contextlib
 import platform
 import re
@@ -16,8 +15,9 @@ import rarfile
 from bs4 import BeautifulSoup
 from langcodes.tag_parser import LanguageTagError
 from rich.markup import escape
+from unidecode import unidecode
 
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder, html_to_bbcode
@@ -684,11 +684,16 @@ class BrasilTracker:
 
         # If we have matched tags, return them
         if matched_tags:
-            return ", ".join(matched_tags)
+            return unidecode(", ".join(matched_tags))
 
         # Final fallback: ask user
-        tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
-        return (tags_raw or "").strip()
+        if meta.unattended and not meta.unattended_confirm:
+            logger.info(f"{self.tracker}: [yellow]Gêneros não encontrados em modo unattended. Plando upload para {self.tracker}.[/yellow]")
+            meta.skipping = f"{self.tracker}"
+            return ""
+
+        tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
+        return unidecode((tags_raw or "").strip())
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
@@ -986,11 +991,11 @@ class BrasilTracker:
 
             # Cover image
             cover_url = ""
-            cover_path = meta.cover_path
+            cover_path = meta.artwork_path
             if isinstance(cover_path, str) and cover_path.startswith(("http://", "https://")):
                 cover_url = cover_path
-            elif meta.poster and meta.poster.startswith(("http://", "https://")):
-                cover_url = meta.poster
+            elif meta.artwork_url and meta.artwork_url.startswith(("http://", "https://")):
+                cover_url = meta.artwork_url
 
             data.update(
                 {
@@ -1100,7 +1105,7 @@ class BrasilTracker:
                     "especificas": description,
                     "format": await self.get_container(meta),
                     "idioma_ori": await self.get_languages(meta) or meta.original_language,
-                    "image": f"https://image.tmdb.org/t/p/w500{self.main_tmdb_data.get('poster_path', '') or meta.tmdb_poster}",
+                    "image": f"https://image.tmdb.org/t/p/w500{self.main_tmdb_data.get('poster_path', '') or meta.tmdb_poster_path}",
                     "legenda": has_pt_subtitles,
                     "mediainfo": await self.get_media_info(meta),
                     "resolucao_1": resolution_width,
@@ -1201,14 +1206,14 @@ class BrasilTracker:
         return builder._build_book_desc_section(meta, header_size=3, table=False)
 
     async def get_book_cover(self, meta: Meta) -> str:
-        covers = meta.covers
+        covers = meta.hosted_artwork
         if isinstance(covers, list) and len(covers) > 0:
             raw_url = covers[0].get("raw_url")
             if raw_url:
                 return str(raw_url)
 
         # Fallback to poster URL if remote
-        poster_url = meta.poster
+        poster_url = meta.artwork_url
         if isinstance(poster_url, str) and poster_url.startswith(("http://", "https://")):
             return poster_url
 
@@ -1263,11 +1268,15 @@ class BrasilTracker:
         return ""
 
     async def upload(self, meta: Meta) -> bool:
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar is None:
             return False
         self.session.cookies = cast(Any, cookie_jar)
         data = await self.get_data(meta)
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
 
         return await self.cookie_auth_uploader.handle_upload(
             meta=meta,

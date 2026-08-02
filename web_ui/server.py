@@ -4334,22 +4334,24 @@ def execution_screenshots():
     temp_dir, meta_data = resolved
     meta_data = _screenshot_review_meta(temp_dir, meta_data)
     items = list_review_items(temp_dir, meta_data)
+    can_capture = not meta_data.get("is_disc") or meta_data.get("is_disc") == "BDMV"
     return jsonify(
         {
             "success": True,
-            "can_add": bool(items) and not bool(meta_data.get("is_disc")),
+            "can_add": bool(items) and can_capture,
             "screenshots": [
                 {
                     "id": item.id,
                     "filename": item.path.name if item.path else f"Remote image {item.index + 1}",
                     "size": item.path.stat().st_size if item.path else None,
                     "source": item.source,
+                    "group": item.group,
                     "image_url": (
                         f"/api/execution_screenshots/{item.id}/image?session_id={session_id}&v={image_version(temp_dir, item.id, item.path.stat().st_mtime_ns)}"
                         if item.path
                         else str((item.remote_image or {}).get("img_url") or (item.remote_image or {}).get("raw_url") or "")
                     ),
-                    "can_replace": not bool(meta_data.get("is_disc")) and item.source != "addition",
+                    "can_replace": can_capture and item.source != "addition",
                     "can_delete": item.source in {"local", "addition"},
                 }
                 for item in items
@@ -4384,6 +4386,7 @@ def add_execution_screenshot():
         return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
     payload = _request_json_dict()
     session_id = _stringify_preview_value(payload.get("session_id"))
+    group = _stringify_preview_value(payload.get("group")) or "main"
     resolved = _resolve_execution_screenshot_review(session_id)
     if resolved is None:
         return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
@@ -4393,7 +4396,7 @@ def add_execution_screenshot():
     try:
         from src.screenshot_review import add_screenshot
 
-        asyncio.run(add_screenshot(temp_dir, meta_data))
+        asyncio.run(add_screenshot(temp_dir, meta_data, group))
     except (FileNotFoundError, ValueError) as error:
         return jsonify({"success": False, "error": str(error)}), 404
     except Exception as error:
