@@ -25,6 +25,7 @@ from src.languages import languages_manager
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
+from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
 
@@ -531,7 +532,8 @@ class DescriptionBuilder:
     async def menu_screenshot_header(self, meta: Meta) -> str:
         """Returns the screenshot header for menus if applicable."""
         try:
-            if meta.is_disc and meta.menu_images:
+            menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
+            if meta.is_disc and menu_images:
                 disc_menu_header = self._get_str_config("disc_menu_header", "")
                 if disc_menu_header:
                     return disc_menu_header
@@ -614,7 +616,7 @@ class DescriptionBuilder:
             if not add_spec:
                 return ""
 
-            spectrograms_images = meta.spectrograms_images
+            spectrograms_images = get_tracker_image_collection(meta, self.tracker, "spectrograms_images")
             if not spectrograms_images:
                 return ""
             audio_spectrogram_header = self._get_str_config("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]")
@@ -1076,7 +1078,7 @@ class DescriptionBuilder:
         signature: str = "",
         desc_header: str = "",
     ) -> str:
-        image_list = meta.get(f"{self.tracker}_images_key", meta.image_list)
+        image_list = get_tracker_image_collection(meta, self.tracker, "screenshots")
         image_list = cast(list[Any], image_list)
 
         if image_list is None:
@@ -1917,7 +1919,7 @@ class DescriptionBuilder:
             screens_per_row = await self.get_screens_per_row()
             if meta.is_disc:
                 menu_parts: list[str] = []
-                menu_images = meta.menu_images
+                menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
                 if disc_menu_header and menu_images:
                     menu_parts.append(disc_menu_header + "\n")
                 if menu_images:

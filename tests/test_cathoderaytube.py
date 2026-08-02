@@ -49,6 +49,7 @@ def meta(**overrides):
         "image_list": [],
         "menu_images": [],
         "spectrograms_images": [],
+        "tracker_image_collections": {},
         "screens": 6,
         "base_dir": ".",
         "uuid": "test",
@@ -103,8 +104,8 @@ def test_formats_titles_to_crt_conventions():
 def test_uses_the_image_hosts_approved_by_crt():
     site = tracker()
     assert site.approved_image_hosts == ("ptpimg", "catbox", "imgbb", "postimages", "freeimage", "imgbox")  # noqa: S101
-    assert site.image_host_mapping["catbox.moe"] == "catbox"  # noqa: S101
-    assert site.image_host_mapping["postimg.cc"] == "postimages"  # noqa: S101
+    assert site.image_host_policy.url_host_mapping["catbox.moe"] == "catbox"  # noqa: S101
+    assert site.image_host_policy.url_host_mapping["postimg.cc"] == "postimages"  # noqa: S101
 
 
 def test_builds_common_category_tags_from_meta():

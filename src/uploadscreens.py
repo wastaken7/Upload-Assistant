@@ -856,11 +856,16 @@ async def _upload_screens(
         for _index, upload in successfully_uploaded:
             raw_url = upload["raw_url"]
             new_image = {"img_url": upload["img_url"], "raw_url": raw_url, "web_url": upload["web_url"]}
+            # Custom uploads (disc menus and spectrograms) are not added to
+            # ``meta.image_list``.  Keep their local source so a tracker that
+            # rejects the initially selected host can re-upload the same asset.
+            local_file_path = upload.get("local_file_path")
+            if local_file_path:
+                new_image["local_file_path"] = str(local_file_path)
             new_images.append(new_image)
             if not using_custom_img_list and raw_url not in {img["raw_url"] for img in image_list}:
                 logger.debug(f"[blue]Adding {raw_url} to image_list")
                 image_list.append(new_image)
-                local_file_path = upload.get("local_file_path")
                 if local_file_path:
                     image_size = Path(local_file_path).stat().st_size
                     meta.image_sizes[raw_url] = image_size
