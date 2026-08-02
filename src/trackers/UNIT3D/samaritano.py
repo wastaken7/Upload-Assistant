@@ -162,15 +162,7 @@ class Samaritano(UNIT3D):
         if meta.category == "BOOK":
             return True
 
-        if not bool(meta.subtitle_files):
-            subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
-            if not subtitles and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
-                return await self.common.prompt_user_for_confirmation(
-                    f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
-                )
-            return subtitles
-
-        return True
+        return await self.common.check_portuguese_video_requirements(meta, self.tracker)
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/size][/url][/right]"

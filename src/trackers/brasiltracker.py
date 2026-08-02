@@ -240,6 +240,9 @@ class BrasilTracker:
                 logger.info(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
                 return False
 
+            if meta.category in ("MOVIE", "TV"):
+                return await self.common.check_portuguese_video_requirements(meta, self.tracker)
+
         return True
 
     async def get_type(self, meta: Meta) -> str | None:

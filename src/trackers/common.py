@@ -30,6 +30,45 @@ from src.usenetcreate import verify_nzb_has_password
 
 
 class Common:
+    PORTUGUESE_SUBTITLE_EXTENSIONS: frozenset[str] = frozenset({".ass", ".ssa", ".srt", ".sub", ".vtt"})
+    PORTUGUESE_SUBTITLE_WORDS: frozenset[str] = frozenset(
+        {
+            "agora",
+            "aqui",
+            "bem",
+            "como",
+            "com",
+            "entao",
+            "essa",
+            "esse",
+            "esta",
+            "estao",
+            "isso",
+            "muito",
+            "nao",
+            "obrigada",
+            "obrigado",
+            "onde",
+            "para",
+            "porque",
+            "posso",
+            "pode",
+            "quando",
+            "que",
+            "senhor",
+            "senhora",
+            "sua",
+            "suas",
+            "seu",
+            "seus",
+            "tambem",
+            "tenho",
+            "temos",
+            "uma",
+            "voce",
+            "vamos",
+        }
+    )
     LANGUAGE_EQUIVALENCE_GROUPS: tuple[set[str], ...] = (
         {"chinese", "mandarin", "zh", "zho", "chi", "cmn", "chinese simplified", "chinese traditional", "zh hans", "zh hant"},
         {"english", "eng", "en", "en us", "en gb", "english cc", "english sdh", "english forced"},
@@ -109,6 +148,64 @@ class Common:
         for value in values:
             expanded.update(self._expand_language_candidates(value, alias_lookup))
         return expanded
+
+    @staticmethod
+    def _read_subtitle_text(path: Path) -> str:
+        for encoding in ("utf-8-sig", "utf-16", "cp1252"):
+            try:
+                return path.read_text(encoding=encoding)
+            except UnicodeError:
+                continue
+            except OSError:
+                return ""
+        return ""
+
+    async def has_portuguese_external_subtitle(self, meta: Meta) -> bool:
+        """Check external subtitle filenames and textual content for Portuguese."""
+        aliases = {
+            "brazilian",
+            "brazilian portuguese",
+            "por",
+            "portuguese",
+            "portugues",
+            "pt",
+            "pt br",
+            "ptbr",
+            "pt brasil",
+        }
+        normalized_aliases = {self._normalize_language_token(alias) for alias in aliases}
+        text_paths: list[Path] = []
+
+        for subtitle_file in meta.subtitle_files or []:
+            path = Path(str(subtitle_file))
+            filename = self._normalize_language_token(path.stem)
+            if any(filename == alias or filename.endswith(f" {alias}") for alias in normalized_aliases):
+                return True
+            if path.suffix.casefold() in self.PORTUGUESE_SUBTITLE_EXTENSIONS:
+                text_paths.append(path)
+
+        for path in text_paths:
+            text = await asyncio.to_thread(self._read_subtitle_text, path)
+            words = set(re.findall(r"[a-z]+", self._normalize_language_token(text)))
+            if len(words & self.PORTUGUESE_SUBTITLE_WORDS) >= 3:
+                return True
+
+        return False
+
+    async def check_portuguese_video_requirements(self, meta: Meta, tracker: str) -> bool:
+        if await self.has_portuguese_external_subtitle(meta):
+            return True
+
+        subtitles = await self.check_language_requirements(
+            meta,
+            tracker,
+            languages_to_check=["portuguese", "português", "por", "pt", "pt-br", "pt br", "brazilian portuguese"],
+            check_audio=True,
+            check_subtitle=True,
+        )
+        if not subtitles and (not meta.unattended or meta.unattended_confirm):
+            return await self.prompt_user_for_confirmation(f"{tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?")
+        return subtitles
 
     def _format_language_for_display(self, language: str) -> str:
         if not language:

@@ -3,10 +3,12 @@
 import asyncio
 import sys
 import types
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 data_config = types.ModuleType("data.config")
+data_config.__file__ = str(Path(__file__).parents[1] / "data" / "config.py")
 data_config.DEFAULT = {}
 data_config.config = {}
 sys.modules.setdefault("data.config", data_config)
