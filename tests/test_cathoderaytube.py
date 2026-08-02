@@ -1,9 +1,11 @@
 import asyncio
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import httpx
 
+import src.trackers.cathoderaytube as cathoderaytube_module
 from src.trackers.cathoderaytube import CathodeRayTube
 
 
@@ -106,6 +108,61 @@ def test_uses_the_image_hosts_approved_by_crt():
     assert site.approved_image_hosts == ("ptpimg", "catbox", "imgbb", "postimages", "freeimage", "imgbox")  # noqa: S101
     assert site.image_host_policy.url_host_mapping["catbox.moe"] == "catbox"  # noqa: S101
     assert site.image_host_policy.url_host_mapping["postimg.cc"] == "postimages"  # noqa: S101
+
+
+def test_cover_uses_only_an_approved_image_host():
+    site = tracker()
+    assert site.get_cover(meta(tmdb_poster_path="/poster.jpg", artwork_url="https://image.tmdb.org/t/p/w500/poster.jpg")) == ""  # noqa: S101
+    assert site.get_cover(  # noqa: S101
+        meta(
+            tmdb_poster_path="/poster.jpg",
+            artwork_url="https://image.tmdb.org/t/p/w500/poster.jpg",
+            hosted_artwork=[{"raw_url": "https://iili.io/approved.png"}],
+        )
+    ) == "https://iili.io/approved.png"
+
+
+def test_extracts_matching_upload_from_site_log():
+    html = """
+    <table><tr><td>2 mins ago</td><td>Torrent 22015 (A Beautiful Mind (2001)) (41 GiB) was uploaded by User</td>
+    <td><a href="/details.php?id=22015">22015</a></td></tr></table>
+    """
+    assert CathodeRayTube._log_upload_url(html, "A Beautiful Mind (2001)") == "https://www.cathode-ray.tube/torrents.php?id=22015"  # noqa: S101
+
+
+def test_hosts_local_cover_on_an_approved_image_host(tmp_path):
+    async def run():
+        site = tracker()
+        site.config["DEFAULT"].update({"img_host_1": "freeimage"})
+        cover_path = tmp_path / "POSTER.png"
+        cover_path.write_bytes(b"cover")
+        uploaded = {"raw_url": "https://iili.io/hosted.png"}
+        site.rehost_images_manager.uploadscreens_manager.upload_screens = AsyncMock(return_value=([uploaded], 1))
+        item = meta(artwork_path=str(cover_path))
+        assert await site._host_cover(item) == uploaded["raw_url"]  # noqa: S101
+        assert item.rehosted_artwork_url == uploaded["raw_url"]  # noqa: S101
+
+    asyncio.run(run())
+
+
+def test_hosts_tmdb_cover_when_no_local_artwork_exists(tmp_path, monkeypatch):
+    async def run():
+        site = tracker()
+        site.config["DEFAULT"].update({"img_host_1": "freeimage"})
+        uploaded = {"raw_url": "https://iili.io/tmdb-hosted.png"}
+        site.rehost_images_manager.uploadscreens_manager.upload_screens = AsyncMock(return_value=([uploaded], 1))
+
+        async def download(_meta, artwork_path):
+            Path(artwork_path).write_bytes(b"cover")
+            _meta.artwork_path = artwork_path
+            return True
+
+        monkeypatch.setattr(cathoderaytube_module, "download_artwork_from_meta", download)
+        item = meta(artwork_url="", tmdb_poster_path="/poster.jpg", base_dir=str(tmp_path))
+        assert await site._host_cover(item) == uploaded["raw_url"]  # noqa: S101
+        assert item.artwork_url == ""  # noqa: S101
+
+    asyncio.run(run())
 
 
 def test_builds_common_category_tags_from_meta():

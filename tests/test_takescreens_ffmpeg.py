@@ -26,7 +26,7 @@ async def test_run_ffmpeg_writes_report_next_to_output(tmp_path, monkeypatch):
 
     class Command:
         def compile(self):
-            return ["ffmpeg", "-i", "source.mkv", str(output)]
+            return ["ffmpeg", "-i", output.with_name("source.mkv"), output]
 
     process = await takescreens.run_ffmpeg(Command())
     second_process = await takescreens.run_ffmpeg(Command())
@@ -44,3 +44,4 @@ async def test_run_ffmpeg_writes_report_next_to_output(tmp_path, monkeypatch):
     assert second_report.endswith(".log:level=32")
     assert first_report != second_report
     assert "FFREPORT" not in takescreens.os.environ
+    assert all(isinstance(argument, str) for argument in captured[0]["args"])

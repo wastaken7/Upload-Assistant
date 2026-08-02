@@ -589,7 +589,7 @@ class UploadHelper:
             developer = meta.developer or missing_warning
             publisher = meta.publisher or missing_warning
             platform = meta.platform or missing_warning
-            poster = "Found" if bool(meta.artwork_url or meta.artwork_path or missing_warning) else missing_warning
+            poster = "Found" if bool(meta.artwork_url or meta.artwork_path) else missing_warning
             igdb_id = meta.igdb_id or "0"
             steam_url = meta.steam_url
             languages = len(meta.languages) if meta.languages else missing_warning
