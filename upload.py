@@ -54,6 +54,7 @@ from src.get_name import NameManager
 from src.get_tracker_data import TrackerDataManager
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
+from src.rehostimages import check_tracker_image_hosts
 from src.takescreens import TakeScreensManager
 from src.temp_paths import covers_dir, posters_dir, screenshots_dir
 from src.torrentcreate import TorrentCreator
@@ -1783,7 +1784,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                             logger.debug(
                                 f"[cyan]Image host debug: post-upload before {tracker_name}.check_image_hosts() image_list={len(meta.image_list or [])} {key}={len(getattr(meta, key, []) or [])}[/cyan]"
                             )
-                        await tracker_instance.check_image_hosts(meta)
+                        await check_tracker_image_hosts(meta, tracker_instance)
                         if meta.debug:
                             key = f"{tracker_name}_images_key"
                             logger.debug(
