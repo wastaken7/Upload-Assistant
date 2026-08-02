@@ -2757,7 +2757,7 @@ class Common:
                 ptgen_text = ptgen_json.get("format", "")
                 if "[/img]" in ptgen_text:
                     ptgen_text = ptgen_text.split("[/img]")[1]
-                ptgen_text = f"[img]{meta.imdb_info.get('cover', meta.cover)}[/img]{ptgen_text}"
+                ptgen_text = f"[img]{meta.imdb_info.get('cover', meta.artwork_url)}[/img]{ptgen_text}"
 
         except Exception:
             console.print_exception()

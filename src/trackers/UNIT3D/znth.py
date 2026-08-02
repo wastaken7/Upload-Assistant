@@ -492,8 +492,8 @@ class Zenith(UNIT3D):
     async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
         files = await super().get_additional_files(meta)
         # Zenith only accepts the original audiobook cover when it is at most 5 MiB.
-        if meta.audiobook and meta.cover_path:
-            cover_file = await self.get_image_file(meta.cover_path, max_size=5 * 1024 * 1024)
+        if meta.audiobook and meta.artwork_path:
+            cover_file = await self.get_image_file(meta.artwork_path, max_size=5 * 1024 * 1024)
             if cover_file:
                 files["torrent-cover"] = cover_file
         return files

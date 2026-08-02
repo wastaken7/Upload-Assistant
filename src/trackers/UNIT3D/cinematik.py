@@ -190,7 +190,7 @@ class Cinematik(UNIT3D):
         country_name = self.country_code_to_name(str(meta.region))
 
         # Rehost poster if tmdb_poster is available
-        poster_url = f"https://image.tmdb.org/t/p/original{meta.tmdb_poster}"
+        poster_url = f"https://image.tmdb.org/t/p/original{meta.tmdb_poster_path}"
 
         # Define the paths for both jpg and png poster images
         poster_dir = posters_dir(meta.base_dir, meta.uuid)

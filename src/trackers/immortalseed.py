@@ -283,14 +283,14 @@ class ImmortalSeed:
         return meta.basename_no_ext
 
     async def get_cover(self, meta: Meta) -> str:
-        covers = meta.covers
+        covers = meta.hosted_artwork
         if isinstance(covers, list) and len(covers) > 0:
             raw_url = covers[0].get("raw_url")
             if raw_url:
                 return str(raw_url)
 
         # Fallback to poster URL if remote
-        poster_url = meta.poster
+        poster_url = meta.artwork_url
         if isinstance(poster_url, str) and poster_url.startswith(("http://", "https://")):
             return poster_url
 
@@ -298,7 +298,7 @@ class ImmortalSeed:
 
     async def get_data(self, meta: Meta) -> dict[str, Any]:
         message = f"{meta.overview}\n\n[youtube]{meta.youtube}[/youtube]"
-        cover = meta.poster
+        cover = meta.artwork_url
         if meta.category in ("BOOK", "MUSIC"):
             message = meta.overview
             cover = await self.get_cover(meta)

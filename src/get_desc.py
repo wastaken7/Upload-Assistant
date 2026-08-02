@@ -577,7 +577,7 @@ class DescriptionBuilder:
             if meta.is_disc in ["BDMV", "DVD"] and bluray_link and meta.release_url:
                 release_url = meta.release_url
 
-            cover_data = meta.covers
+            cover_data = meta.hosted_artwork
             if not cover_data and await self.common.path_exists(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/covers.json"):
                 try:
                     async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/covers.json", encoding="utf-8") as f:
