@@ -474,13 +474,13 @@ class UNIT3D:
             files["nfo"] = ("nfo_file.nfo", nfo_bytes, "text/plain")
 
         if meta.category not in ("MOVIE", "TV", "GAME"):
-            cover_path = meta.cover_path
+            cover_path = meta.artwork_path
             if cover_path:
                 cover_file = await self.get_image_file(cover_path)
                 if cover_file:
                     files["torrent-cover"] = cover_file
 
-            banner_path = meta.banner_path
+            banner_path = meta.artwork_banner_path
             if banner_path:
                 banner_file = await self.get_image_file(banner_path)
                 if banner_file:

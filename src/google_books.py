@@ -29,7 +29,7 @@ class GoogleBooksManager:
 
         # Cover URL (Google Books cover image)
         if volume_id and image_link:
-            metadata["poster"] = image_link
+            metadata["artwork_url"] = image_link
 
         # Title & Subtitle
         title = volume_info.get("title")

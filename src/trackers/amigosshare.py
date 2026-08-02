@@ -348,14 +348,14 @@ class AmigosShare:
         return f"{base_name}"
 
     def get_book_cover(self, meta: Meta) -> str:
-        covers = meta.covers
+        covers = meta.hosted_artwork
         if isinstance(covers, list) and len(covers) > 0:
             raw_url = covers[0].get("raw_url")
             if raw_url:
                 return str(raw_url)
 
         # Fallback to poster URL if remote
-        poster_url = meta.poster
+        poster_url = meta.artwork_url
         if isinstance(poster_url, str) and poster_url.startswith(("http://", "https://")):
             return poster_url
 
@@ -451,7 +451,7 @@ class AmigosShare:
         season_tmdb = dict(localized_tmdb.get("season", {})) or {}
         main_tmdb = dict(localized_tmdb.get("main", {})) or {}
         episode_tmdb = dict(localized_tmdb.get("episode", {})) or {}
-        poster_path = season_tmdb.get("poster_path") or main_tmdb.get("poster_path") or meta.tmdb_poster
+        poster_path = season_tmdb.get("poster_path") or main_tmdb.get("poster_path") or meta.tmdb_poster_path
         poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ""
         await append_section("BARRINHA_CAPA", await self.format_image(poster))
 
@@ -1159,7 +1159,7 @@ class AmigosShare:
         if meta.category == "GAME":
             data.update(
                 {
-                    "capa": meta.poster,
+                    "capa": meta.artwork_url,
                     "genero": self.get_game_genre(meta),
                     "idioma": self.get_game_idioma(meta),
                     "type": upload_type,
@@ -1183,7 +1183,7 @@ class AmigosShare:
             {
                 "altura": resolution["height"],
                 "audio": await self.get_audio(meta),
-                "capa": f"https://image.tmdb.org/t/p/w500{meta.tmdb_localized_data.get('pt-BR', {}).get('main', {}).get('poster_path') or meta.tmdb_poster}",
+                "capa": f"https://image.tmdb.org/t/p/w500{meta.tmdb_localized_data.get('pt-BR', {}).get('main', {}).get('poster_path') or meta.tmdb_poster_path}",
                 "codecaudio": await self.get_audio_codec(meta),
                 "codecvideo": await self.get_video_codec(meta),
                 "extencao": await self.get_container(meta),

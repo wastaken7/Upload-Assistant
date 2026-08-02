@@ -1137,7 +1137,7 @@ class BJShare:
         category = meta.category
 
         if category in ("MOVIE", "TV"):
-            cover_path = self.main_tmdb_data.get("poster_path") or meta.tmdb_poster
+            cover_path = self.main_tmdb_data.get("poster_path") or meta.tmdb_poster_path
             if not cover_path:
                 logger.info(f"{self.tracker}: Nenhum poster_path encontrado nos dados do TMDB.", extra={"markup": False})
                 return None
@@ -1158,7 +1158,7 @@ class BJShare:
                 return None
 
         if category in ("BOOK", "GAME"):
-            cover_path = meta.cover_path
+            cover_path = meta.artwork_path
             if not cover_path or not await self.common.path_exists(cover_path):
                 logger.info("Nenhum cover_path válido encontrado.", extra={"markup": False})
                 return None

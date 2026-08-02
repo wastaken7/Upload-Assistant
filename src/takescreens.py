@@ -940,23 +940,23 @@ async def extract_embedded_cover_from_audiobook(meta: Meta, dest_path: str, conf
         return False
 
 
-async def download_poster_from_meta(meta: Meta, cover_path: str, *, force: bool = False) -> bool:
-    poster_url = meta.poster
-    if not poster_url:
+async def download_artwork_from_meta(meta: Meta, artwork_path: str, *, force: bool = False) -> bool:
+    artwork_url = meta.artwork_url
+    if not artwork_url:
         return False
 
     min_size = 20480
-    if poster_url.startswith("http://books.google.com/") or poster_url.startswith("https://covers.openlibrary.org/b/id/"):
+    if artwork_url.startswith("http://books.google.com/") or artwork_url.startswith("https://covers.openlibrary.org/b/id/"):
         min_size = 10240
-    if not force and Path(cover_path).exists() and Path(cover_path).stat().st_size >= min_size:
-        meta.cover_path = cover_path
+    if not force and Path(artwork_path).exists() and Path(artwork_path).stat().st_size >= min_size:
+        meta.artwork_path = artwork_path
         return True
     try:
         import httpx
 
         cookies = {}
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
-        parsed_poster_url = urllib.parse.urlparse(poster_url)
+        parsed_poster_url = urllib.parse.urlparse(artwork_url)
         poster_host = (parsed_poster_url.hostname or "").lower()
         if poster_host == "myanonamouse.net" or poster_host.endswith(".myanonamouse.net"):
             api_key = (
@@ -969,16 +969,16 @@ async def download_poster_from_meta(meta: Meta, cover_path: str, *, force: bool 
                 cookies["mam_id"] = api_key
 
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            response = await client.get(poster_url, cookies=cookies, headers=headers)
+            response = await client.get(artwork_url, cookies=cookies, headers=headers)
             if response.status_code == 200:
                 if len(response.content) < min_size:
                     logger.info(
-                        f"[yellow]Warning: Downloaded poster from {poster_url} is too small ({len(response.content)} bytes < {min_size} bytes) and will be ignored.[/yellow]"
+                        f"[yellow]Warning: Downloaded artwork from {artwork_url} is too small ({len(response.content)} bytes < {min_size} bytes) and will be ignored.[/yellow]"
                     )
                     return False
-                await asyncio.to_thread(Path(cover_path).write_bytes, response.content)
-                meta.cover_path = cover_path
-                logger.info(f"[green]Successfully downloaded poster from {poster_url}[/green]")
+                await asyncio.to_thread(Path(artwork_path).write_bytes, response.content)
+                meta.artwork_path = artwork_path
+                logger.info(f"[green]Successfully downloaded artwork from {artwork_url}[/green]")
                 return True
             logger.warning(f"[yellow]Warning: Failed to download poster, status code {response.status_code}[/yellow]")
     except Exception as e:
@@ -1245,57 +1245,57 @@ async def extract_document_cover(path: str, dest_path: str) -> bool:
 
 async def prepare_book_cover(path: str, folder_id: str, base_dir: str, meta: Meta) -> str | None:
     output_dir = posters_dir(base_dir, folder_id)
-    cover_path = output_dir / "POSTER.png"
+    artwork_path = output_dir / "POSTER.png"
 
-    if Path(cover_path).exists() and Path(cover_path).stat().st_size >= 20480 and not meta.retake:
-        meta.cover_path = str(cover_path)
-        return str(cover_path)
+    if Path(artwork_path).exists() and Path(artwork_path).stat().st_size >= 20480 and not meta.retake:
+        meta.artwork_path = str(artwork_path)
+        return str(artwork_path)
 
-    if await load_local_cover_if_exists(path, str(cover_path)):
-        meta.cover_path = str(cover_path)
-        return str(cover_path)
+    if await load_local_cover_if_exists(path, str(artwork_path)):
+        meta.artwork_path = str(artwork_path)
+        return str(artwork_path)
 
     if meta.audiobook:
-        extracted_confirmed = await extract_embedded_cover_from_audiobook(meta, str(cover_path), confirmed_only=True)
+        extracted_confirmed = await extract_embedded_cover_from_audiobook(meta, str(artwork_path), confirmed_only=True)
         if extracted_confirmed:
-            meta.cover_path = str(cover_path)
+            meta.artwork_path = str(artwork_path)
             logger.debug("[green]Audiobook confirmed cover extracted. Skipping API download.[/green]")
-            return str(cover_path)
+            return str(artwork_path)
 
-        downloaded_poster = await download_poster_from_meta(meta, str(cover_path), force=meta.retake)
-        if downloaded_poster:
-            meta.cover_path = str(cover_path)
-            return str(cover_path)
+        downloaded_artwork = await download_artwork_from_meta(meta, str(artwork_path), force=meta.retake)
+        if downloaded_artwork:
+            meta.artwork_path = str(artwork_path)
+            return str(artwork_path)
 
-        extracted_unconfirmed = await extract_embedded_cover_from_audiobook(meta, str(cover_path), confirmed_only=False)
+        extracted_unconfirmed = await extract_embedded_cover_from_audiobook(meta, str(artwork_path), confirmed_only=False)
         if extracted_unconfirmed:
-            meta.cover_path = str(cover_path)
-            return str(cover_path)
+            meta.artwork_path = str(artwork_path)
+            return str(artwork_path)
         return None
 
     extension = Path(path).suffix.lower().lstrip(".")
     if extension == "epub":
-        extracted_confirmed = await extract_epub_cover(path, str(cover_path), confirmed_only=True)
+        extracted_confirmed = await extract_epub_cover(path, str(artwork_path), confirmed_only=True)
         if extracted_confirmed:
-            meta.cover_path = str(cover_path)
+            meta.artwork_path = str(artwork_path)
             logger.debug("[green]EPUB confirmed cover extracted. Skipping API download.[/green]")
-            return str(cover_path)
+            return str(artwork_path)
 
-    downloaded_poster = await download_poster_from_meta(meta, str(cover_path), force=meta.retake)
-    if downloaded_poster:
-        meta.cover_path = str(cover_path)
-        return str(cover_path)
+    downloaded_artwork = await download_artwork_from_meta(meta, str(artwork_path), force=meta.retake)
+    if downloaded_artwork:
+        meta.artwork_path = str(artwork_path)
+        return str(artwork_path)
 
     if extension == "epub":
-        extracted_unconfirmed = await extract_epub_cover(path, str(cover_path), confirmed_only=False)
+        extracted_unconfirmed = await extract_epub_cover(path, str(artwork_path), confirmed_only=False)
         if extracted_unconfirmed:
-            meta.cover_path = str(cover_path)
-            return str(cover_path)
+            meta.artwork_path = str(artwork_path)
+            return str(artwork_path)
     elif extension in {"pdf", "cbr", "cbz"}:
-        extracted_document_cover = await extract_document_cover(path, str(cover_path))
+        extracted_document_cover = await extract_document_cover(path, str(artwork_path))
         if extracted_document_cover:
-            meta.cover_path = str(cover_path)
-            return str(cover_path)
+            meta.artwork_path = str(artwork_path)
+            return str(artwork_path)
 
     return None
 
@@ -1342,7 +1342,7 @@ async def generate_ebook_screenshots(
 
     prepared_cover = await prepare_book_cover(path, folder_id, base_dir, meta)
     local_found = bool(prepared_cover)
-    downloaded_poster = bool(prepared_cover)
+    prepared_artwork = bool(prepared_cover)
 
     if extension in ["cbr", "cbz"]:
         temp_extract = Path(output_dir) / "temp_compressed_extract"
@@ -1401,15 +1401,15 @@ async def generate_ebook_screenshots(
                 scr_path = await process_compressed_image(img_idx, f"{sanitized_filename}-{i}")
                 screenshots.append(scr_path)
 
-            if not local_found and not downloaded_poster:
+            if not local_found and not prepared_artwork:
                 await process_compressed_image(0, "POSTER")
             if not banner_cached:
                 await process_compressed_image(len(image_files) - 1, "POSTER_BANNER")
             else:
-                meta.banner_path = banner_path
+                meta.artwork_banner_path = str(banner_path)
 
-            meta.cover_path = cover_path
-            meta.banner_path = banner_path
+            meta.artwork_path = str(cover_path)
+            meta.artwork_banner_path = str(banner_path)
 
             compressed_file.close()
 
@@ -1419,12 +1419,12 @@ async def generate_ebook_screenshots(
 
     elif extension in ["pdf", "mobi", "epub"]:
         try:
-            if extension == "epub" and not local_found and not downloaded_poster:
+            if extension == "epub" and not local_found and not prepared_artwork:
                 try:
                     epub_cover_extracted = await extract_epub_cover(path, cover_path, confirmed_only=False)
                     if epub_cover_extracted:
-                        downloaded_poster = True
-                        meta.cover_path = cover_path
+                        prepared_artwork = True
+                        meta.artwork_path = str(cover_path)
                 except Exception as e:
                     logger.debug(f"[yellow]Warning: EPUB cover extraction failed: {e}[/yellow]")
 
@@ -1453,15 +1453,15 @@ async def generate_ebook_screenshots(
                 scr_path = await process_page(page_num, f"{sanitized_filename}-{i}")
                 screenshots.append(scr_path)
 
-            if not local_found and not downloaded_poster:
+            if not local_found and not prepared_artwork:
                 await process_page(0, "POSTER")
             if not banner_cached:
                 await process_page(total_pages - 1, "POSTER_BANNER")
             else:
-                meta.banner_path = banner_path
+                meta.artwork_banner_path = str(banner_path)
 
-            meta.cover_path = cover_path
-            meta.banner_path = banner_path
+            meta.artwork_path = str(cover_path)
+            meta.artwork_banner_path = str(banner_path)
 
             doc.close()
         except Exception as e:

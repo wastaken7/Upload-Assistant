@@ -1554,7 +1554,7 @@ class PassThePopcorn:
                 meta.youtube = youtube
             cover = meta.imdb_info.get("cover")
             if cover is None:
-                cover = meta.poster
+                cover = meta.artwork_url
             if isinstance(cover, str) and cover.strip():
                 cover = await self.rehost_poster_to_selected_host(meta, cover)
             elif isinstance(cover, str):

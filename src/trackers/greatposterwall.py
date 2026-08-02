@@ -718,7 +718,7 @@ class GreatPosterWall:
             "data_source": data_source,
             "identifier": identifier,
             "desc": self.tmdb_data.get("overview", ""),
-            "image": f"https://image.tmdb.org/t/p/original{meta.tmdb_poster}",
+            "image": f"https://image.tmdb.org/t/p/original{meta.tmdb_poster_path}",
             "maindesc": meta.overview,
             "name": meta.title,
             "releasetype": self._get_movie_type(meta),

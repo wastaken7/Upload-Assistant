@@ -212,7 +212,7 @@ class MTeam:
         logger.info(f"{self.tracker}: Douban information is unavailable, using an alternative English version for the description.")
         imdb = meta.imdb_info or {}
 
-        tmdb_poster_path = meta.tmdb_poster or "".strip()
+        tmdb_poster_path = meta.tmdb_poster_path or "".strip()
         tmdb_poster = f"https://image.tmdb.org/t/p/w200{tmdb_poster_path}" if tmdb_poster_path else ""
         poster_url = tmdb_poster or str(imdb.get("cover") or "")
         title = meta.title if meta.title is not None else "N/A"

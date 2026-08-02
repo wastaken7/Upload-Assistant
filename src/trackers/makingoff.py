@@ -1591,7 +1591,7 @@ class MakingOff:
         ptbr_main = dict(meta.tmdb_localized_data.get("pt-BR", {})).get("main", {})
         en_main = dict(meta.tmdb_localized_data.get("en-US", {})).get("main", {})
 
-        poster_raw = ptbr_main.get("poster_path") or meta.tmdb_poster
+        poster_raw = ptbr_main.get("poster_path") or meta.tmdb_poster_path
         poster_url = poster_raw if poster_raw.startswith("http") else f"https://image.tmdb.org/t/p/original{poster_raw}" if poster_raw else ""
 
         pt_overview = ""

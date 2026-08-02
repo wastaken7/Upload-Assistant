@@ -119,9 +119,9 @@ def _music_confirmation_lines(meta: Meta, missing_warning: str) -> list[tuple[st
         edition_details = " / ".join(part for part in (edition, edition_year) if part)
         lines.append(("Edition", edition_details))
 
-    if re.match(r"^https?://[^/]+", str(meta.cover or "").strip(), flags=re.IGNORECASE):
+    if re.match(r"^https?://[^/]+", str(meta.artwork_url or "").strip(), flags=re.IGNORECASE):
         artwork = "public URL supplied"
-    elif Path(str(meta.cover_path or "")).is_file():
+    elif Path(str(meta.artwork_path or "")).is_file():
         artwork = "local/embedded artwork available"
         if meta.debug:
             artwork += "; host upload skipped in debug"
@@ -550,7 +550,7 @@ class UploadHelper:
             asin = meta.asin or ""  # not essential
             narrator = meta.narrator or missing_warning
             audiobook_duration_formatted = meta.audiobook_duration_formatted or missing_warning
-            poster = meta.poster or "[yellow][italic]not found online - will be auto-generated[/italic][/yellow]"
+            poster = meta.artwork_url or meta.artwork_path or "[yellow][italic]not found online - will be auto-generated[/italic][/yellow]"
             comic = meta.comic
             manga = meta.manga
             magazine = meta.magazine
@@ -589,7 +589,7 @@ class UploadHelper:
             developer = meta.developer or missing_warning
             publisher = meta.publisher or missing_warning
             platform = meta.platform or missing_warning
-            poster = meta.poster or missing_warning
+            poster = meta.artwork_url or meta.artwork_path or missing_warning
             igdb_id = meta.igdb_id or "0"
             steam_url = meta.steam_url
             languages = len(meta.languages) if meta.languages else missing_warning

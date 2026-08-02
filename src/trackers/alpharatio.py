@@ -361,7 +361,7 @@ class AlphaRatio:
 
         # Handle cover image input
         imdb_info = cast(dict[str, Any], meta.imdb_info or {})
-        cover = meta.poster or imdb_info.get("cover", None)
+        cover = meta.artwork_url or imdb_info.get("cover", None)
         if cover is None:
             if meta.unattended and not meta.unattended_confirm:
                 logger.info(f"{self.tracker}: [yellow]Unattended mode: No cover image found. Skipping {self.tracker} upload.[/yellow]")

@@ -64,9 +64,9 @@ def meta(**overrides):
         "season": 0,
         "episode": "",
         "platform": "",
-        "tmdb_poster": "",
-        "poster": "",
-        "covers": [],
+        "tmdb_poster_path": "",
+        "artwork_url": "",
+        "hosted_artwork": [],
     }
     values.update(overrides)
     result = SimpleNamespace(**values)

@@ -571,9 +571,9 @@ async def gather_book_prep(
                         ):
                             is_override = True
 
-                        # Do not overwrite fields already populated by MAM, except for the poster/cover image (prefer Google Books cover)
+                        # Do not overwrite fields already populated by MAM, except for artwork (prefer Google Books cover)
                         if (
-                            key != "poster"
+                            key != "artwork_url"
                             and mam_data
                             and (key in mam_data or (key == "book_language_iso" and "book_language" in mam_data) or (key == "search_year" and "year" in mam_data))
                         ):

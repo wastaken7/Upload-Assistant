@@ -117,14 +117,14 @@ class CathodeRayTube:
 
     def get_cover(self, meta: Meta) -> str:
         """Return the first cover image URL from the metadata."""
-        if meta.tmdb_poster:
-            return f"https://image.tmdb.org/t/p/w500{meta.tmdb_poster}"
+        if meta.tmdb_poster_path:
+            return f"https://image.tmdb.org/t/p/w500{meta.tmdb_poster_path}"
 
-        if meta.poster:
-            return meta.poster
+        if meta.artwork_url:
+            return meta.artwork_url
 
-        if isinstance(meta.covers, list) and len(meta.covers) > 0:
-            raw_url = meta.covers[0].get("raw_url")
+        if isinstance(meta.hosted_artwork, list) and len(meta.hosted_artwork) > 0:
+            raw_url = meta.hosted_artwork[0].get("raw_url")
             return str(raw_url) if raw_url else ""
 
         return ""
