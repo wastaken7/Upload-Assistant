@@ -114,8 +114,12 @@ class DarkPeers(UNIT3D):
                 return False
             if not self.validate_video_files(meta):
                 return False
-            if meta.keep_folder and (category == "MOVIE" or not self._is_single_tv_season(meta)):
-                return await self._confirm_or_skip("does not allow an individual video file in an unnecessary folder.", meta)
+            if (
+                meta.keep_folder
+                and (category == "MOVIE" or not self._is_single_tv_season(meta))
+                and not await self._confirm_or_skip("does not allow an individual video file in an unnecessary folder.", meta)
+            ):
+                return False
 
         if category == "TV" and not self.validate_tv_scope(meta):
             return False
@@ -180,6 +184,7 @@ class DarkPeers(UNIT3D):
         "swe": "swedish",
     }
     _BOOK_FORMATS: ClassVar[set[str]] = {
+        "AZW",
         "AZW3",
         "CBR",
         "CBZ",
@@ -256,7 +261,7 @@ class DarkPeers(UNIT3D):
         return True
 
     def validate_tv_scope(self, meta: Meta) -> bool:
-        name = " ".join((str(meta.name or ""), str(meta.path or ""))).casefold()
+        name = " ".join((str(meta.name or ""), Path(str(meta.path or "")).name)).casefold()
         if re.search(r"\b(?:complete[ ._-]*series|all[ ._-]*seasons?|seasons?[ ._-]*\d+[ ._-]*(?:-|to)[ ._-]*\d+|s\d{1,2}[ ._-]*-[ ._-]*s?\d{1,2})\b", name):
             logger.info(f"{self.tracker}: [bold red]only individual seasons or episodes are allowed. Skipping multi-season/complete-series upload.")
             return False
@@ -269,7 +274,7 @@ class DarkPeers(UNIT3D):
     def _is_single_tv_season(self, meta: Meta) -> bool:
         if meta.episode:
             return False
-        seasons = {match for item in meta.filelist or [] for match in re.findall(r"\bS(\d{1,2})\b", Path(str(item)).name, re.IGNORECASE)}
+        seasons = {match for item in meta.filelist or [] for match in re.findall(r"\bS(\d{1,2})(?:E\d{1,3})?\b", Path(str(item)).name, re.IGNORECASE)}
         return len(seasons) == 1 or bool(meta.season)
 
     async def validate_book(self, meta: Meta) -> bool:
@@ -319,9 +324,12 @@ class DarkPeers(UNIT3D):
 
     @staticmethod
     def _book_identifier(meta: Meta) -> str:
-        identifier = str(meta.isbn or meta.book_isbn or meta.asin or meta.book_asin or "").strip()
-        cleaned = re.sub(r"[^0-9Xx]", "", identifier)
-        return cleaned[:-1] + cleaned[-1:].upper() if cleaned else ""
+        isbn = str(meta.isbn or meta.book_isbn or "").strip()
+        if isbn:
+            cleaned = re.sub(r"[^0-9Xx]", "", isbn)
+            return cleaned[:-1] + cleaned[-1:].upper() if cleaned else ""
+        asin = str(meta.asin or meta.book_asin or "").strip()
+        return re.sub(r"[^0-9A-Za-z]", "", asin).upper()
 
     def validate_music(self, meta: Meta) -> bool:
         release_data = meta.music_release if isinstance(meta.music_release, dict) else {}
@@ -330,7 +338,8 @@ class DarkPeers(UNIT3D):
         if errors:
             logger.info(f"{self.tracker}: [bold red]{' '.join(errors)} Skipping upload.")
             return False
-        paths = [track.relative_path for track in release.tracks] or [str(item) for item in meta.filelist or []]
+        audio_suffixes = {".flac", ".mp3", ".m4a", ".aac", ".ogg", ".opus", ".wav", ".alac"}
+        paths = [track.relative_path for track in release.tracks] or [str(item) for item in meta.filelist or [] if Path(str(item)).suffix.lower() in audio_suffixes]
         for path in paths:
             relative = str(path).replace("\\", "/")
             filename = Path(relative).name
@@ -576,6 +585,7 @@ class DarkPeers(UNIT3D):
                     "EPUB",
                     "PDF",
                     "MOBI",
+                    "AZW",
                     "AZW3",
                     "KFX",
                     "FB2",

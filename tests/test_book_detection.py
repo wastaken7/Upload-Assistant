@@ -48,3 +48,18 @@ def test_new_audiobook_formats_are_detected(extension, tmp_path):
 
     assert filelist == [str(audiobook.resolve())]
     assert meta.audiobook is True
+
+
+def test_text_sidecars_are_excluded_when_a_richer_book_format_exists(tmp_path):
+    book = tmp_path / "book.epub"
+    readme = tmp_path / "README.txt"
+    cover = tmp_path / "cover.html"
+    book.write_bytes(b"ebook")
+    readme.write_text("release notes")
+    cover.write_text("cover page")
+    meta = Meta()
+
+    videopath, filelist, _, _ = resolve_book_filelist(meta, str(tmp_path))
+
+    assert videopath == str(book.resolve())
+    assert filelist == [str(book.resolve())]

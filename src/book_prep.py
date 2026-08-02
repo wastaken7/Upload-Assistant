@@ -53,6 +53,7 @@ BOOK_EXTENSIONS = frozenset(
     {".pdf", ".epub", ".mobi", ".azw", ".azw3", ".fb2", ".html", ".htm", ".chm", ".djvu", ".doc", ".docx", ".kfx", ".lit", ".pdb", ".txt", ".rtf", ".cbz", ".cbr"}
 )
 AUDIOBOOK_EXTENSIONS = frozenset({".mp3", ".m4b", ".flac", ".alac", ".aac", ".m4a", ".ogg", ".opus", ".wav"})
+_TEXT_SIDECAR_STEMS = frozenset({"cover", "folder", "index", "info", "readme"})
 
 
 def resolve_book_filelist(
@@ -82,6 +83,9 @@ def resolve_book_filelist(
         if not filelist:
             logger.info("[bold red]No Book or Audiobook files found!")
             sys.exit(1)
+        richer_book_files = [file for file in filelist if Path(file).suffix.lower() in BOOK_EXTENSIONS - {".txt", ".html", ".htm"}]
+        if richer_book_files:
+            filelist = [file for file in filelist if not (Path(file).suffix.lower() in {".txt", ".html", ".htm"} and Path(file).stem.casefold() in _TEXT_SIDECAR_STEMS)]
         videopath = sorted(filelist, key=os.path.getsize, reverse=True)[0]
     else:
         videopath = videoloc

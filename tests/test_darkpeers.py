@@ -1,6 +1,7 @@
 """Regression tests for DarkPeers-specific BOOK and MUSIC title rules."""
 
 import asyncio
+from unittest.mock import AsyncMock
 
 from src.meta import Meta
 from src.trackers.UNIT3D.darkpeers import DarkPeers
@@ -64,6 +65,12 @@ def test_darkpeers_book_name_never_uses_publisher_as_author():
     meta = Meta(category="BOOK", publisher="Publisher Name", title="Book Title", year=2026, type="EPUB", isbn="978-0-123456-47-2")
 
     assert _name(meta) == "Book Title 2026 EPUB 9780123456472"
+
+
+def test_darkpeers_book_name_preserves_alphanumeric_asin():
+    meta = Meta(category="BOOK", author="Author", title="Book Title", year=2026, type="EPUB", asin="B01N5AX3TQ")
+
+    assert _name(meta) == "Author - Book Title 2026 EPUB B01N5AX3TQ"
 
 
 def test_darkpeers_replaces_generic_dual_audio_with_rule_matrix_label():
@@ -137,6 +144,22 @@ def test_darkpeers_rejects_multi_season_and_video_archives():
 
     assert _additional_checks(seasons) is False
     assert _additional_checks(archive) is False
+
+
+def test_darkpeers_tv_scope_ignores_parent_directory_and_detects_episode_season():
+    meta = Meta(category="TV", name="Show S01", path="C:/media/Complete Series/Show S01", filelist=["Show.S01E01.mkv"])
+    adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
+
+    assert adapter.validate_tv_scope(meta) is True
+    assert adapter._is_single_tv_season(meta) is True
+
+
+def test_darkpeers_confirmed_folder_check_continues_to_evo_validation():
+    meta = Meta(category="MOVIE", type="ENCODE", tag="-EVO", keep_folder=True, audio_languages=["English"], resolution="1080p", screens=3)
+    adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
+    adapter._confirm_or_skip = AsyncMock(return_value=True)
+
+    assert asyncio.run(adapter.get_additional_checks(meta)) is False
 
 
 def test_darkpeers_book_language_is_unrestricted_but_author_is_required_unattended():
