@@ -482,7 +482,7 @@ async def get_bluray_releases(meta: Meta) -> list[Release]:
                                 selected_release = await fetch_release_details(selected_release, meta)
 
                                 if selected_release.get("cover_images"):
-                                    meta.cover_images = selected_release["cover_images"]
+                                    meta.bluray_cover_urls = selected_release["cover_images"]
                                     await download_cover_images(meta)
 
                             return [selected_release]
@@ -680,7 +680,7 @@ async def parse_release_details(response_text: str, release: Release, meta: Meta
 
 
 async def download_cover_images(meta: Meta) -> bool:
-    if "cover_images" not in meta or not meta.cover_images:
+    if "bluray_cover_urls" not in meta or not meta.bluray_cover_urls:
         logger.info("[yellow]No cover images to download[/yellow]")
         return False
 
@@ -720,7 +720,7 @@ async def download_cover_images(meta: Meta) -> bool:
     logger.info("[blue]Downloading cover images...[/blue]")
 
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-        cover_images = cast(Mapping[str, str], meta.cover_images)
+        cover_images = cast(Mapping[str, str], meta.bluray_cover_urls)
         for img_type, url in cover_images.items():
             file_ext = Path(url).suffix
             local_filename = f"{temp_dir}/cover_{img_type}{file_ext}"
@@ -739,7 +739,7 @@ async def download_cover_images(meta: Meta) -> bool:
                 logger.error(f"[red]Error downloading {img_type} cover: {e!s}[/red]")
 
     if downloaded_images:
-        meta.downloaded_cover_images = downloaded_images
+        meta.downloaded_bluray_cover_paths = downloaded_images
         logger.info(f"[green]Successfully downloaded {len(downloaded_images)} cover images[/green]")
         return True
     logger.info("[yellow]No cover images were downloaded[/yellow]")
@@ -1459,7 +1459,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                 meta.distributor = best_release["publisher"].upper()
                 meta.release_url = best_release["url"]
                 if "cover_images" in best_release:
-                    meta.cover_images = best_release["cover_images"]
+                    meta.bluray_cover_urls = best_release["cover_images"]
                     await download_cover_images(meta)
                 logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
 
@@ -1475,7 +1475,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                                 meta.distributor = close_matches[0]["publisher"].upper()
                                 meta.release_url = close_matches[0]["url"]
                                 if "cover_images" in close_matches[0]:
-                                    meta.cover_images = close_matches[0]["cover_images"]
+                                    meta.bluray_cover_urls = close_matches[0]["cover_images"]
                                     await download_cover_images(meta)
                                 logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {close_matches[0]['publisher'].upper()}")
                                 break
@@ -1496,7 +1496,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                     meta.distributor = best_release["publisher"].upper()
                     meta.release_url = best_release["url"]
                     if "cover_images" in best_release:
-                        meta.cover_images = best_release["cover_images"]
+                        meta.bluray_cover_urls = best_release["cover_images"]
                         await download_cover_images(meta)
                     logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}")
                 else:
@@ -1555,7 +1555,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                                     meta.distributor = selected_release["publisher"].upper()
                                     meta.release_url = selected_release["url"]
                                     if "cover_images" in selected_release:
-                                        meta.cover_images = selected_release["cover_images"]
+                                        meta.bluray_cover_urls = selected_release["cover_images"]
                                         await download_cover_images(meta)
                                     logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {selected_release['publisher'].upper()}[/yellow]")
                                     break
@@ -1572,7 +1572,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                     meta.distributor = best_release["publisher"].upper()
                     meta.release_url = best_release["url"]
                     if "cover_images" in best_release:
-                        meta.cover_images = best_release["cover_images"]
+                        meta.bluray_cover_urls = best_release["cover_images"]
                         await download_cover_images(meta)
                     logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
                 else:
@@ -1597,7 +1597,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                                 meta.distributor = best_release["publisher"].upper()
                                 meta.release_url = best_release["url"]
                                 if "cover_images" in best_release:
-                                    meta.cover_images = best_release["cover_images"]
+                                    meta.bluray_cover_urls = best_release["cover_images"]
                                     await download_cover_images(meta)
                                 logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
                                 break
@@ -1618,7 +1618,7 @@ async def process_all_releases(releases: Sequence[Release], meta: Meta) -> list[
                     meta.distributor = best_release["publisher"].upper()
                     meta.release_url = best_release["url"]
                     if "cover_images" in best_release:
-                        meta.cover_images = best_release["cover_images"]
+                        meta.bluray_cover_urls = best_release["cover_images"]
                         await download_cover_images(meta)
                     logger.info(f"[yellow]Set region code to: {region_code}, distributor to: {best_release['publisher'].upper()}[/yellow]")
                 else:

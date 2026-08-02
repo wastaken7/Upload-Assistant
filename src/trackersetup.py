@@ -26,6 +26,7 @@ from src.trackers.beyondhd import BEYONDHD
 from src.trackers.bithdtv import BitHDTV
 from src.trackers.bjshare import BJShare
 from src.trackers.brasiltracker import BrasilTracker
+from src.trackers.cathoderaytube import CathodeRayTube
 from src.trackers.common import Common
 from src.trackers.digitalcore import DigitalCore
 from src.trackers.filelist import FileList
@@ -1344,6 +1345,7 @@ tracker_class_map: dict[str, Any] = {
     "BLUTOPIA": Blutopia,
     "BRASILTRACKER": BrasilTracker,
     "CAPYBARABR": CapybaraBR,
+    "CATHODERAYTUBE": CathodeRayTube,
     "CURUPIRA": Curupira,
     "CINEMAZ": CinemaZ,
     "DIGITALCORE": DigitalCore,

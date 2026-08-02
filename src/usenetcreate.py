@@ -1095,7 +1095,11 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
             # No -n/-u/-l flag: par2cmdline falls back to its default scheme of
             # exponentially-sized recovery volumes, matching standard Usenet posts
             # and letting repair tools fetch only as much recovery data as needed.
-            cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", par2_file, *[str(f) for f in relative_target_files]]
+            # The PAR2 file may be staged outside ``upload_root`` when
+            # ``skip_archive`` posts source files directly.  Explicitly set
+            # the data-file base path so par2 does not infer it from the
+            # output file's directory and reject the source files.
+            cmd_par2 = [path_par2 or "par2", "c", f"-r{par2_percentage}", f"-B{upload_root}", par2_file, *[str(f) for f in relative_target_files]]
             if is_debug and not path_par2:
                 logger.info(f"[yellow][DEBUG SIMULATION] Would run: {' '.join(cmd_par2)}[/yellow]")
                 mock_par2 = os.path.normpath(par2_file)

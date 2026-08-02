@@ -42,7 +42,7 @@ class Meta:
     auto_nfo: bool = False
     available_platforms: list[Any] = field(default_factory=list)
     backdrop: str = ""
-    banner_path: str | None = None
+    artwork_banner_path: str | None = None
     base_dir: str = ""
     base_torrent_created: bool | None = None
     base_torrent_piece_mb: int = 0
@@ -82,10 +82,10 @@ class Meta:
     console_game: bool = False
     container: str = ""
     country: int | None = None
-    cover_images: dict[str, Any] = field(default_factory=dict)
-    cover_path: str = ""
-    cover: str = ""
-    covers: list[dict[str, Any]] | None = None
+    bluray_cover_urls: dict[str, Any] = field(default_factory=dict)
+    artwork_path: str = ""
+    artwork_url: str = ""
+    hosted_artwork: list[dict[str, Any]] | None = None
     current_version: str = ""
     cutoff: int = 1
     daily_episode_title: str = ""
@@ -113,7 +113,7 @@ class Meta:
     douban_manual: int | str | None = None
     douban_rating: float | str | None = None
     douban_votes: int | str | None = None
-    downloaded_cover_images: dict[str, str] = field(default_factory=dict)
+    downloaded_bluray_cover_paths: dict[str, str] = field(default_factory=dict)
     draft: bool | None = None
     dual_audio: bool = False
     dupe_again: bool = False
@@ -143,6 +143,7 @@ class Meta:
     filename_match: str | bool = False
     filename: str = ""
     first_air_date: str | None = None
+    last_air_date: str | None = None
     flux: bool = False
     folder_id: int | None = None
     force_recheck: bool = False
@@ -313,7 +314,6 @@ class Meta:
     personalrelease: bool = False
     piece_size_constraints_enabled: str | bool = False
     platform: str = ""
-    poster: str = ""
     potential_missing: list[Any] = field(default_factory=list)
     prefer_small_pieces: bool = False
     print_tracker_links: bool = True
@@ -322,7 +322,6 @@ class Meta:
     production_countries: list[Any] = field(default_factory=list)
     ptgen: dict[str, Any] = field(default_factory=dict)
     ptp_groupid: str | None = None
-    PTP_images_key: list[dict[str, Any]] = field(default_factory=list)
     ptp: str | int | None = None
     publisher: str = ""
     upload_order: str | None = None
@@ -339,7 +338,7 @@ class Meta:
     regex_year: str = ""
     region: str = ""
     rehash: bool = False
-    rehosted_poster: str | None = None
+    rehosted_artwork_url: str | None = None
     release_date: str = ""
     release_dates: dict[str, Any] | None = None
     release_url: str = ""
@@ -420,13 +419,14 @@ class Meta:
     tmdb_localized_data: dict[str, Any] = field(default_factory=dict)
     tmdb_logo: str = ""
     tmdb_manual: int | str | None = None
-    tmdb_poster: str = ""
+    tmdb_poster_path: str = ""
     tmdb_season_data: dict[str, Any] | None = None
     tmdb_type: str = ""
     tmdb: int | None = None
     tonemapped: bool = False
     torrent_comments: list[Any] = field(default_factory=list)
     tracker_status: dict[str, Any] = field(default_factory=dict)
+    tracker_image_collections: dict[str, dict[str, list[dict[str, Any]]]] = field(default_factory=dict)
     trackers_pass: int | None = None
     trackers_remove: str | bool = False
     trackers: list[str] | str = field(default_factory=list)
@@ -436,7 +436,6 @@ class Meta:
     trumping_trackers: list[Any] = field(default_factory=list)
     tv_movie: bool = False
     tv_pack: bool = False
-    TVC_images_key: list[dict[str, Any]] = field(default_factory=list)
     tvdb_episode_data: dict[str, Any] = field(default_factory=dict)
     tvdb_episode_id: int | None = None
     tvdb_episode_int: int | None = None

@@ -12,7 +12,7 @@ def test_music_cover_reuses_cached_hosted_url_before_downloading(tmp_path):
     cache_path = tmp_path / "tmp" / "music-cover" / "covers.json"
     cache_path.parent.mkdir(parents=True)
     cache_path.write_text(json.dumps([{"raw_url": "https://images.example/cover.jpg"}]), encoding="utf-8")
-    meta = Meta(base_dir=str(tmp_path), uuid="music-cover", cover="https://unavailable.example/cover.jpg", music_release={"fields": {}})
+    meta = Meta(base_dir=str(tmp_path), uuid="music-cover", artwork_url="https://unavailable.example/cover.jpg", music_release={"fields": {}})
     manager = AsyncMock()
 
     with patch("upload._download_music_cover") as download:
@@ -20,8 +20,8 @@ def test_music_cover_reuses_cached_hosted_url_before_downloading(tmp_path):
 
     download.assert_not_called()
     manager.upload_screens.assert_not_called()
-    assert meta.cover == "https://images.example/cover.jpg"  # noqa: S101
-    assert meta.music_release["fields"]["cover_url"]["value"] == meta.cover  # noqa: S101
+    assert meta.artwork_url == "https://images.example/cover.jpg"  # noqa: S101
+    assert meta.music_release["fields"]["cover_url"]["value"] == meta.artwork_url  # noqa: S101
 
 
 def test_music_cover_rejects_private_download_host():

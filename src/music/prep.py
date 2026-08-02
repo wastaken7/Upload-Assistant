@@ -88,19 +88,19 @@ async def prepare_music_cover(meta: Meta, release: Any) -> str:
     This phase never uploads an image and never alters source files.  Hosting is
     deliberately deferred until the user has confirmed the upload workflow.
     """
-    configured = Path(str(meta.cover_path or ""))
+    configured = Path(str(meta.artwork_path or ""))
     if configured.is_file():
         return str(configured)
     local_cover = _preferred_artwork(release)
     if local_cover:
-        meta.cover_path = str(local_cover)
-        return meta.cover_path
+        meta.artwork_path = str(local_cover)
+        return meta.artwork_path
 
     output_dir = covers_dir(meta.base_dir, str(meta.uuid))
     extracted = await asyncio.to_thread(_extract_embedded_artwork, [track.path for track in release.tracks], output_dir)
     if extracted:
-        meta.cover_path = str(extracted)
-        return meta.cover_path
+        meta.artwork_path = str(extracted)
+        return meta.artwork_path
     return ""
 
 
@@ -211,12 +211,12 @@ def _apply_music_cli_overrides(meta: Meta, release: Any) -> None:
 
     cover = str(meta.music_cover or "").strip()
     if cover.startswith(("http://", "https://")):
-        meta.cover = cover
+        meta.artwork_url = cover
         set_user("cover_url", cover)
     elif cover:
         cover_path = Path(cover).expanduser()
         if cover_path.is_file():
-            meta.cover_path = str(cover_path.resolve())
+            meta.artwork_path = str(cover_path.resolve())
         else:
             logger.warning("[yellow]MUSIC: --music-cover is neither a public HTTP(S) URL nor an existing image file; ignoring it.[/yellow]")
 
@@ -456,10 +456,10 @@ async def enrich_music_from_orpheus(meta: Meta, config: dict[str, Any]) -> bool:
         if match:
             release.external_ids.setdefault(key, match.group(1))
 
-    if not meta.cover and not meta.cover_path:
+    if not meta.artwork_url and not meta.artwork_path:
         cover = str(group.get("wikiImage", "")).strip()
         if cover.startswith(("https://", "http://")):
-            meta.cover = cover
+            meta.artwork_url = cover
             _set_tracker_field(release, "cover_url", cover, 0.75)
 
     _sync_release_to_meta(meta, release)

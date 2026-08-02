@@ -17,6 +17,7 @@ import pyimgbox
 
 from src.console import logger
 from src.meta import Meta
+from src.screenshot_manifest import files as manifest_files
 from src.temp_paths import screenshots_dir
 
 type ImageDict = dict[str, Any]
@@ -352,11 +353,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     response = await client.post(url, files={"file": (filename, file_bytes)}, headers=headers, timeout=timeout)
                     if response.status_code == 200:
                         zipline_response_data: object = response.json()
-                        zipline_response_mapping = (
-                            cast(dict[str, Any], zipline_response_data)
-                            if isinstance(zipline_response_data, dict)
-                            else {}
-                        )
+                        zipline_response_mapping = cast(dict[str, Any], zipline_response_data) if isinstance(zipline_response_data, dict) else {}
                         zipline_files_value = zipline_response_mapping.get("files")
                         if not isinstance(zipline_files_value, list) or not zipline_files_value:
                             return {"status": "failed", "reason": "No valid URL returned from Zipline"}
@@ -704,24 +701,28 @@ async def _upload_screens(
         existing_images: list[ImageDict] = []
         existing_count = 0
     else:
-        image_patterns = ["*.png", ".[!.]*.png"]
-        image_glob: list[str] = []
-        for pattern in image_patterns:
-            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
-            image_glob.extend(glob_results)
+        registered_screens = manifest_files(meta.base_dir, meta.uuid, "main")
+        if registered_screens:
+            image_glob = [str(path.relative_to(Path.cwd())) for path in registered_screens]
+        else:
+            image_patterns = ["*.png", ".[!.]*.png"]
+            image_glob = []
+            for pattern in image_patterns:
+                glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
+                image_glob.extend(glob_results)
 
-        unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
-        unwanted_files: set[str] = set()
-        for pattern in unwanted_patterns:
-            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
-            unwanted_files.update(glob_results)
-            if pattern.startswith("FILE") or pattern.startswith("PLAYLIST") or pattern.startswith("POSTER"):
-                hidden_pattern = "." + pattern
-                hidden_glob_results = await asyncio.to_thread(lambda hp=hidden_pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(hp)])
-                unwanted_files.update(hidden_glob_results)
+            unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
+            unwanted_files: set[str] = set()
+            for pattern in unwanted_patterns:
+                glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
+                unwanted_files.update(glob_results)
+                if pattern.startswith("FILE") or pattern.startswith("PLAYLIST") or pattern.startswith("POSTER"):
+                    hidden_pattern = "." + pattern
+                    hidden_glob_results = await asyncio.to_thread(lambda hp=hidden_pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(hp)])
+                    unwanted_files.update(hidden_glob_results)
 
-        image_glob = [file for file in image_glob if file not in unwanted_files]
-        image_glob = list(set(image_glob))
+            image_glob = [file for file in image_glob if file not in unwanted_files]
+            image_glob = list(set(image_glob))
 
         # Filter out menu screenshots from normal screenshot upload
         menu_basenames = set()
@@ -733,7 +734,6 @@ async def _upload_screens(
                         menu_basenames.add(Path(local_path).name)
 
         def is_menu_screenshot(filename: str) -> bool:
-            """Return whether filename belongs to a DVD menu screenshot."""
             if filename in menu_basenames:
                 return True
             return "-VIDEO_TS-" in filename or "-VTS_" in filename
@@ -742,7 +742,6 @@ async def _upload_screens(
 
         # Sort images by numeric suffix
         def extract_numeric_suffix(filename: str) -> float:
-            """Return the numeric screenshot suffix for stable ordering."""
             match = re.search(r"-(\d+)\.png$", filename)
             return int(match.group(1)) if match else float("inf")
 
@@ -755,10 +754,7 @@ async def _upload_screens(
 
         uploaded_image_files = return_dict.get("_uploaded_image_files")
         if isinstance(uploaded_image_files, set):
-            image_glob = [
-                file for file in image_glob
-                if str(Path(file).resolve()) not in uploaded_image_files
-            ]
+            image_glob = [file for file in image_glob if str(Path(file).resolve()) not in uploaded_image_files]
 
     # Determine images needed
     images_needed = max(0, total_screens - existing_count) if not retry_mode else total_screens
@@ -791,7 +787,7 @@ async def _upload_screens(
     configured_concurrency = default_config.get("image_upload_concurrency", 0)
     try:
         configured_concurrency = int(configured_concurrency)
-    except (OverflowError, TypeError, ValueError):
+    except OverflowError, TypeError, ValueError:
         configured_concurrency = 0
     pool_size = configured_concurrency if configured_concurrency > 0 else host_limits.get(img_host, default_pool_size)
     max_workers = min(len(upload_tasks), pool_size)
@@ -801,7 +797,7 @@ async def _upload_screens(
     try:
         parsed_delay = float(configured_delay)
         image_upload_delay = max(0.0, parsed_delay) if math.isfinite(parsed_delay) else 0.0
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         image_upload_delay = 0.0
     wait_for_image_start_slot = _build_image_start_limiter(image_upload_delay)
 
@@ -944,6 +940,12 @@ async def _upload_screens(
         for _index, upload in successfully_uploaded:
             raw_url = upload["raw_url"]
             new_image = {"img_url": upload["img_url"], "raw_url": raw_url, "web_url": upload["web_url"]}
+            # Custom uploads (disc menus and spectrograms) are not added to
+            # ``meta.image_list``.  Keep their local source so a tracker that
+            # rejects the initially selected host can re-upload the same asset.
+            local_file_path = upload.get("local_file_path")
+            if local_file_path:
+                new_image["local_file_path"] = str(local_file_path)
             new_images.append(new_image)
             if not using_custom_img_list:
                 if raw_url not in existing_raw_urls:
@@ -982,7 +984,6 @@ async def imgbox_upload(
     image_glob: list[str],
     return_dict: dict[str, Any],
 ) -> list[dict[str, str]]:
-    """Upload images to Imgbox and store their returned URLs."""
     try:
         os.chdir(chdir)
         image_list: list[dict[str, str]] = []

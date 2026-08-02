@@ -18,7 +18,7 @@ from cogs.redaction import Redaction
 from src.console import console, logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.torrentcreate import TorrentCreator
 from src.trackers.common import Common
 
@@ -36,6 +36,7 @@ class MoreThanTV:
     reject_english_original_bloat = True
     source_flag = "MTV"
     approved_image_hosts = ("imgbox", "imgbb")
+    image_host_policy = ImageHostPolicy({"ibb.co": "imgbb", "imgbox.com": "imgbox"}, approved_image_hosts)
     banned_groups = (
         "[Oj]",
         "3LTON",
@@ -107,21 +108,6 @@ class MoreThanTV:
     async def async_json_dumps(self, obj: Any) -> str:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, json.dumps, obj)
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "imgbox.com": "imgbox",
-        }
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            url_host_mapping=url_host_mapping,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
 
     async def upload(self, meta: Meta) -> bool | None:
         common = Common(config=self.config)
@@ -502,7 +488,7 @@ class MoreThanTV:
 
         cookiefile = find_cookie_file(meta.base_dir, self.tracker, self.config)
         if not await aiofiles.os.path.exists(cookiefile):
-            await self.login(cookiefile)
+            await self.login(cookiefile, meta)
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
             logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your username and password is valid.")
@@ -513,7 +499,7 @@ class MoreThanTV:
             if recreate is True:
                 if await aiofiles.os.path.exists(cookiefile):
                     await aiofiles.os.remove(cookiefile)  # Using async file removal
-                await self.login(cookiefile)
+                await self.login(cookiefile, meta)
                 return await self.validate_cookies(meta, cookiefile)
             return False
 
@@ -580,7 +566,7 @@ class MoreThanTV:
             logger.error(f"{self.tracker}: [red]Error loading cookies or parsing JSON: {escape(str(e))}")
             return ""
 
-    async def login(self, cookiefile: str) -> bool:
+    async def login(self, cookiefile: str, meta: Meta | None = None) -> bool:
         try:
             async with httpx.AsyncClient(timeout=25, follow_redirects=True) as client:
                 url = f"{self.base_url}/login"
@@ -612,8 +598,14 @@ class MoreThanTV:
                                 otp = pyotp.parse_uri(otp_uri)
                                 mfa_code = pyotp.TOTP(otp.secret).now()
                             except ValueError, TypeError:
+                                if meta and meta.unattended and not meta.unattended_confirm:
+                                    logger.error(f"{self.tracker}: [red]Unattended mode: 2FA required. Skipping login.[/red]")
+                                    return False
                                 mfa_code = console.input(f"[yellow]{self.tracker} 2FA Code: ")
                         else:
+                            if meta and meta.unattended and not meta.unattended_confirm:
+                                logger.error(f"{self.tracker}: [red]Unattended mode: 2FA required. Skipping login.[/red]")
+                                return False
                             mfa_code = console.input(f"[yellow]{self.tracker} 2FA Code: ")
 
                         two_factor_token = resp.text.rsplit('name="token" value="', 1)[1][:48]

@@ -1,9 +1,6 @@
 import re
 import unicodedata
-from pathlib import Path
 from typing import Any, cast
-
-import aiofiles
 
 from src.book_prep import extract_first_author as _primary_name
 from src.console import logger
@@ -494,12 +491,9 @@ class Zenith(UNIT3D):
 
     async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
         files = await super().get_additional_files(meta)
-        # audiobook: send the original uncropped cover, real format sniffed; base cover if >5MB
-        if meta.audiobook and meta.cover_path and Path(meta.cover_path).exists() and Path(meta.cover_path).stat().st_size <= 5 * 1024 * 1024:
-            async with aiofiles.open(meta.cover_path, "rb") as f:
-                raw = await f.read()
-            if raw[:3] == b"\xff\xd8\xff":
-                files["torrent-cover"] = ("cover.jpg", raw, "image/jpeg")
-            elif raw[:8] == b"\x89PNG\r\n\x1a\n":
-                files["torrent-cover"] = ("cover.png", raw, "image/png")
+        # Zenith only accepts the original audiobook cover when it is at most 5 MiB.
+        if meta.audiobook and meta.artwork_path:
+            cover_file = await self.get_image_file(meta.artwork_path, max_size=5 * 1024 * 1024)
+            if cover_file:
+                files["torrent-cover"] = cover_file
         return files
