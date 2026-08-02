@@ -1,19 +1,23 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
 import datetime
+import platform
 import re
 from pathlib import Path
 from typing import Any, ClassVar, cast
+from urllib.parse import parse_qs, urlparse
 
 import aiofiles
 import httpx
 from bs4 import BeautifulSoup
 
-from cogs.redaction import Redaction
 from src.console import logger
-from src.cookie_auth import CookieValidator, extract_upload_error
+from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
+from src.takescreens import download_artwork_from_meta
+from src.temp_paths import artwork_dir
 from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 
@@ -52,8 +56,13 @@ class CathodeRayTube:
         self.config = config
         self.common = Common(config)
         self.cookie_validator = CookieValidator(config)
+        self.cookie_auth_uploader = CookieAuthUploader(config)
         self.rehost_images_manager = RehostImagesManager(config)
-        self.session = httpx.AsyncClient(timeout=60.0, follow_redirects=True)
+        self.session = httpx.AsyncClient(
+            headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"},
+            timeout=60.0,
+            follow_redirects=True,
+        )
 
     async def validate_credentials(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -110,17 +119,81 @@ class CathodeRayTube:
         return season_str
 
     def get_cover(self, meta: Meta) -> str:
-        """Return the first cover image URL from the metadata."""
-        if meta.tmdb_poster_path:
-            return f"https://image.tmdb.org/t/p/w500{meta.tmdb_poster_path}"
+        """Return a cover URL hosted by one of CRT's approved image hosts."""
+        candidates: list[Any] = []
+        if isinstance(meta.hosted_artwork, list):
+            candidates.extend(entry.get("raw_url") for entry in meta.hosted_artwork if isinstance(entry, dict))
+        candidates.extend((getattr(meta, "rehosted_artwork_url", ""), meta.artwork_url))
 
-        if meta.artwork_url:
-            return meta.artwork_url
+        for candidate in candidates:
+            if not isinstance(candidate, str) or not candidate:
+                continue
+            hostname = (urlparse(candidate).hostname or "").lower()
+            if any(hostname == approved or hostname.endswith(f".{approved}") for approved in self.image_host_policy.url_host_mapping):
+                return candidate
 
-        if isinstance(meta.hosted_artwork, list) and len(meta.hosted_artwork) > 0:
-            raw_url = meta.hosted_artwork[0].get("raw_url")
-            return str(raw_url) if raw_url else ""
+        return ""
 
+    @staticmethod
+    def _is_approved_cover_url(url: str) -> bool:
+        """Check whether a cover URL belongs to a CRT-approved host."""
+        hostname = (urlparse(url).hostname or "").lower()
+        return any(hostname == approved or hostname.endswith(f".{approved}") for approved in CathodeRayTube.image_host_policy.url_host_mapping)
+
+    async def _host_cover(self, meta: Meta) -> str:
+        """Host the release cover on an image host accepted by CRT."""
+        existing_cover = self.get_cover(meta)
+        if existing_cover:
+            return existing_cover
+        if getattr(meta, "skip_imghost_upload", False):
+            return ""
+
+        cover_path = Path(str(getattr(meta, "artwork_path", "") or ""))
+        if not cover_path.is_file():
+            cover_path = artwork_dir(meta.base_dir, meta.uuid) / "POSTER.png"
+            artwork_url = getattr(meta, "artwork_url", "") or ""
+            if not artwork_url and getattr(meta, "tmdb_poster_path", ""):
+                artwork_url = f"https://image.tmdb.org/t/p/w500{meta.tmdb_poster_path}"
+            if not cover_path.is_file() and artwork_url:
+                original_artwork_url = meta.artwork_url
+                meta.artwork_url = artwork_url
+                try:
+                    await download_artwork_from_meta(meta, str(cover_path))
+                finally:
+                    meta.artwork_url = original_artwork_url
+        if not cover_path.is_file():
+            logger.warning(f"{self.tracker}: no local cover is available to host.")
+            return ""
+
+        default_config = self.config.get("DEFAULT", {})
+        configured_indices = sorted(
+            int(match.group(1)) for key, value in default_config.items() if (match := re.fullmatch(r"img_host_(\d+)", key)) and value in self.approved_image_hosts
+        )
+        if not configured_indices:
+            logger.warning(f"{self.tracker}: no approved image host is configured for the cover.")
+            return ""
+
+        original_imghost = getattr(meta, "imghost", "")
+        try:
+            for img_host_num in configured_indices:
+                uploaded, _ = await self.rehost_images_manager.uploadscreens_manager.upload_screens(
+                    meta,
+                    1,
+                    img_host_num,
+                    0,
+                    1,
+                    [str(cover_path)],
+                    {},
+                    allowed_hosts=list(self.approved_image_hosts),
+                )
+                raw_url = uploaded[0].get("raw_url") if uploaded else ""
+                if isinstance(raw_url, str) and self._is_approved_cover_url(raw_url):
+                    meta.rehosted_artwork_url = raw_url
+                    return raw_url
+        finally:
+            meta.imghost = original_imghost
+
+        logger.warning(f"{self.tracker}: failed to host the cover on an approved image host.")
         return ""
 
     @staticmethod
@@ -507,34 +580,70 @@ class CathodeRayTube:
                 return str(httpx.URL(url).join(str(href)))
         return ""
 
-    async def upload(self, meta: Meta) -> bool:
-        await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
-        torrent_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}].torrent"
-        if meta.debug:
-            logger.info(f"{self.tracker}: [cyan]Request Data:[/cyan]")
-            logger.info(Redaction.redact_private_info(await self.get_upload_data(meta, "DEBUG_AUTH")))
-            meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
-            return True
+    @staticmethod
+    def _log_upload_url(html: str, torrent_name: str) -> str:
+        """Extract the newest matching uploaded torrent from CRT's site log."""
+        soup = BeautifulSoup(html, "html.parser")
+        for row in soup.select("tr"):
+            row_text = row.get_text(" ", strip=True)
+            if torrent_name not in row_text or "was uploaded" not in row_text.lower():
+                continue
+            for link in row.select("a[href]"):
+                href = str(link.get("href", ""))
+                if "details.php" not in href and "torrents.php" not in href:
+                    continue
+                torrent_id = parse_qs(urlparse(href).query).get("id", [""])[0]
+                if torrent_id.isdigit():
+                    return f"{CathodeRayTube.base_url}/torrents.php?id={torrent_id}"
+        return ""
 
+    async def _find_log_upload(self, meta: Meta) -> str:
+        """Find the uploaded torrent in CRT's authenticated site log."""
+        try:
+            response = await self.session.get(f"{self.base_url}/log.php")
+            response.raise_for_status()
+            return self._log_upload_url(response.text, await self.get_name(meta))
+        except httpx.HTTPError as error:
+            logger.warning(f"{self.tracker}: could not verify upload in site log: {error}")
+            return ""
+
+    async def upload(self, meta: Meta) -> bool:
+        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if cookie_jar:
+            self.session.cookies = cookie_jar
+
+        await self._host_cover(meta)
         auth = CathodeRayTube.auth_token
         if not auth:
             meta.tracker_status[self.tracker]["status_message"] = "data error: Failed to load authenticated upload form."
             return False
-        try:
-            async with aiofiles.open(torrent_path, "rb") as torrent_file:
-                files = {"file_input": (torrent_path.name, await torrent_file.read(), "application/x-bittorrent")}
-            response = await self.session.post(self.upload_url, data=await self.get_upload_data(meta, auth), files=files)
-        except (OSError, httpx.HTTPError) as error:
-            meta.tracker_status[self.tracker]["status_message"] = f"data error: CRT upload request failed: {error}"
+        uploaded = await self.cookie_auth_uploader.handle_upload(
+            meta=meta,
+            tracker=self.tracker,
+            source_flag=self.source_flag,
+            torrent_url=f"{self.base_url}/torrents.php?id=",
+            data=await self.get_upload_data(meta, auth),
+            torrent_field_name="file_input",
+            upload_cookies=self.session.cookies,
+            upload_url=self.upload_url,
+            id_pattern=r"torrents\.php\?(?:[^#]*&)?id=(\d+)",
+            success_status_code="500",
+        )
+        if not uploaded:
             return False
 
-        torrent_url = self._uploaded_torrent_url(response)
+        # CRT can return an empty HTTP 500 after creating the torrent, so use
+        # the authenticated site log to confirm the upload and recover its ID.
+        await asyncio.sleep(5)  # Wait a few seconds to allow the site log to update before checking for the upload
+        torrent_url = await self._find_log_upload(meta)
         if torrent_url:
-            meta.tracker_status[self.tracker]["status_message"] = "Upload successful"
-            meta.tracker_status[self.tracker]["torrent_id"] = torrent_url
+            torrent_id = parse_qs(urlparse(torrent_url).query).get("id", [""])[0]
+            if not torrent_id:
+                logger.warning(f"{self.tracker}: site log returned an invalid torrent URL: {torrent_url}")
+                return True
+            meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
             announce_url = self.config.get("TRACKERS", {}).get(self.tracker, {}).get("announce_url", "")
             await self.common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, str(announce_url), torrent_url)
-            return True
-        error = extract_upload_error(response.text) or f"HTTP {response.status_code}; CRT did not return a torrent URL."
-        meta.tracker_status[self.tracker]["status_message"] = f"Upload failed: {error}"
-        return False
+        else:
+            logger.warning(f"{self.tracker}: upload was accepted, but no matching entry was found in site log.")
+        return True

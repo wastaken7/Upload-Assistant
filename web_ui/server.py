@@ -19,6 +19,7 @@ import subprocess
 import sys
 import threading
 import traceback
+import urllib.parse
 from contextlib import suppress
 from datetime import datetime, timedelta, UTC
 from types import ModuleType
@@ -1329,8 +1330,14 @@ def _book_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: s
     tmp_dir = Path(__file__).parent.parent / "tmp" / meta_uuid / "artwork"
     for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg", "cover.jpg", "cover.png"):
         if (tmp_dir / filename).exists():
-            return f"/api/execution_preview_cover?session_id={preview_session_id}"
+            return _execution_preview_cover_url(preview_session_id, meta_uuid)
     return ""
+
+
+def _execution_preview_cover_url(preview_session_id: str, cache_key: str) -> str:
+    """Return a per-item cover URL so the browser cannot reuse the prior cover."""
+    version = urllib.parse.quote(str(cache_key), safe="")
+    return f"/api/execution_preview_cover?session_id={urllib.parse.quote(preview_session_id, safe='')}&v={version}"
 
 
 def _music_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: str) -> str:
@@ -1340,7 +1347,8 @@ def _music_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: 
         if _is_http_url(candidate):
             return candidate
     if _find_execution_preview_cover_file(preview_session_id) is not None:
-        return f"/api/execution_preview_cover?session_id={preview_session_id}"
+        cache_key = _stringify_preview_value(meta_data.get("uuid")) or _stringify_preview_value(meta_data.get("path"))
+        return _execution_preview_cover_url(preview_session_id, cache_key)
     return ""
 
 

@@ -2092,6 +2092,14 @@ function AudionutsUAGUI() {
           { cache: "no-store", signal: controller.signal },
         );
         if (!response.ok) {
+          // Do not keep showing the previous queue item when the backend has
+          // already moved on (or the session was briefly unavailable).
+          if (response.status === 404 && !cancelled) {
+            setExecutionPreview(null);
+            setProgressItems([]);
+            setExecutionScreenshots([]);
+            setCanAddExecutionScreenshot(false);
+          }
           return;
         }
         const data = await response.json();

@@ -42,6 +42,13 @@ ffmpeg_is_good = False
 use_libplacebo = True
 tone_map = False
 ffmpeg_compression = "6"
+
+
+def compile_ffmpeg_command(command: Any) -> list[str]:
+    """Compile an ffmpeg-python command into subprocess-safe string arguments."""
+    return [str(argument) for argument in command.compile()]
+
+
 algorithm = "mobius"
 desat = 10.0
 
@@ -77,7 +84,7 @@ def _apply_config(config: Mapping[str, Any]) -> None:
 
 
 async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
-    cmd_list = list(command.compile())
+    cmd_list = compile_ffmpeg_command(command)
     process_env = os.environ.copy()
 
     # FFREPORT defaults to a timestamped file in the current working
@@ -469,7 +476,7 @@ async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str
         )
 
         if loglevel == "verbose" or (meta and meta.debug):
-            logger.info(f"[cyan]FFmpeg command: {' '.join(info_command.compile())}[/cyan]")
+            logger.info(f"[cyan]FFmpeg command: {' '.join(compile_ffmpeg_command(info_command))}[/cyan]")
 
         returncode, stdout, stderr = await run_ffmpeg(info_command)
 
@@ -823,7 +830,7 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
         )
 
         if loglevel == "verbose" or (meta and meta.debug):
-            logger.info(f"[cyan]FFmpeg command: {' '.join(info_command.compile())}[/cyan]")
+            logger.info(f"[cyan]FFmpeg command: {' '.join(compile_ffmpeg_command(info_command))}[/cyan]")
 
         returncode, _stdout, stderr = await run_ffmpeg(info_command)
 
@@ -2063,7 +2070,7 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
             if loglevel == "verbose" or (meta and meta.debug):
                 # Disable emoji translation so 0:v:0 stays literal
                 try:
-                    compiled = cast(list[str], cmd.compile())
+                    compiled = compile_ffmpeg_command(cmd)
                     logger.info(f"[cyan]FFmpeg command: {' '.join(compiled)}[/cyan]")
                 except Exception:
                     logger.info("[cyan]FFmpeg command: (unable to render command)[/cyan]")
@@ -2077,7 +2084,7 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
 
             info_cmd = build_cmd(use_libplacebo=True)
             if loglevel == "verbose" or (meta and meta.debug):
-                logger.info(f"[cyan]FFmpeg command: {' '.join(info_cmd.compile())}[/cyan]")
+                logger.info(f"[cyan]FFmpeg command: {' '.join(compile_ffmpeg_command(info_cmd))}[/cyan]")
 
             returncode, stdout, stderr = await run_cmd(info_cmd, 140)  # a bit longer for first pass
             if returncode != 0 and hdr_tonemap and meta.libplacebo:
@@ -2100,7 +2107,7 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
                 vf_chain = ",".join(z_vf_filters)
                 info_cmd = build_cmd(use_libplacebo=False)
                 if loglevel == "verbose" or meta.debug:
-                    logger.info(f"[cyan]Fallback FFmpeg command: {' '.join(info_cmd.compile())}[/cyan]")
+                    logger.info(f"[cyan]Fallback FFmpeg command: {' '.join(compile_ffmpeg_command(info_cmd))}[/cyan]")
                 returncode, stdout, stderr = await run_cmd(info_cmd, 140)
                 cmd = info_cmd  # for logging below
 
@@ -2190,7 +2197,7 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
                 info_cmd = info_cmd.global_args("-threads", threads_val)
 
             if loglevel == "verbose":
-                logger.info(f"[cyan]FFmpeg command: {' '.join(info_cmd.compile())}[/cyan]")
+                logger.info(f"[cyan]FFmpeg command: {' '.join(compile_ffmpeg_command(info_cmd))}[/cyan]")
 
             returncode, stdout, stderr = await run_ffmpeg(info_cmd)
             # Print stdout and stderr if in verbose mode
@@ -2301,7 +2308,7 @@ async def get_frame_info(path: str, ss_time: str | float, meta: Meta) -> dict[st
         info_command = filtered.output("-", format="null", vframes=1).global_args("-loglevel", "info")
 
         # Print the actual FFmpeg command for debugging
-        cmd = cast(list[str], info_command.compile())
+        cmd = compile_ffmpeg_command(info_command)
         logger.debug(f"[cyan]FFmpeg showinfo command: {' '.join(cmd)}[/cyan]")
 
         returncode, _, stderr = await run_ffmpeg(info_command)
@@ -2392,7 +2399,7 @@ async def check_libplacebo_compatibility(
             info_cmd: Any = cast(Any, ffmpeg).input(path, ss=ss_time).output(test_image_path, vframes=1, vf=vf_chain, pix_fmt="rgb24").global_args("-y", "-loglevel", "quiet")
 
         if loglevel == "verbose" or (meta and meta.debug):
-            logger.info(f"[cyan]libplacebo compatibility test command: {' '.join(info_cmd.compile())}[/cyan]")
+            logger.info(f"[cyan]libplacebo compatibility test command: {' '.join(compile_ffmpeg_command(info_cmd))}[/cyan]")
 
         try:
             retcode, _stdout, _stderr = await run_ffmpeg(info_cmd)
