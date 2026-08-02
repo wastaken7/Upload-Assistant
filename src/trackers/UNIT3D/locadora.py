@@ -132,12 +132,4 @@ class Locadora(UNIT3D):
         return {"resolution_id": resolution_id}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if not bool(meta.subtitle_files):
-            subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
-            if not subtitles and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
-                return await self.common.prompt_user_for_confirmation(
-                    f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
-                )
-            return subtitles
-
-        return True
+        return await self.common.check_portuguese_video_requirements(meta, self.tracker)

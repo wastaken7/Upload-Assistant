@@ -331,11 +331,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                     response = await client.post(url, files={"file": (filename, file_bytes)}, headers=headers, timeout=timeout)
                     if response.status_code == 200:
                         zipline_response_data: object = response.json()
-                        zipline_response_mapping = (
-                            cast(dict[str, Any], zipline_response_data)
-                            if isinstance(zipline_response_data, dict)
-                            else {}
-                        )
+                        zipline_response_mapping = cast(dict[str, Any], zipline_response_data) if isinstance(zipline_response_data, dict) else {}
                         zipline_files_value = zipline_response_mapping.get("files")
                         if not isinstance(zipline_files_value, list) or not zipline_files_value:
                             return {"status": "failed", "reason": "No valid URL returned from Zipline"}

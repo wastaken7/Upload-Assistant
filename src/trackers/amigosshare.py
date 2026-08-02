@@ -763,9 +763,15 @@ class AmigosShare:
             logger.info(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
             return False
 
-        if meta.category not in ("BOOK", "GAME") and not meta.imdb_id and not meta.anime:
+        if meta.category in ("BOOK", "GAME"):
+            return True
+
+        if not meta.imdb_id and not meta.anime:
             logger.info(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
             return False
+
+        if meta.category in ("MOVIE", "TV"):
+            return await self.common.check_portuguese_video_requirements(meta, self.tracker)
 
         return True
 
