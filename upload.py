@@ -38,6 +38,7 @@ from bin.get_mkbrr import MkbrrBinaryManager
 from cogs.redaction import PathAwareEncoder, Redaction
 from src.add_comparison import ComparisonManager
 from src.args import Args
+from src.artwork import is_valid_cover_image
 from src.audio_spectrogram import process_audio_spectrograms
 from src.book_prep import detect_newspaper, is_valid_book_language, resolve_book_language
 from src.cleanup import cleanup_manager
@@ -55,8 +56,8 @@ from src.get_tracker_data import TrackerDataManager
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
 from src.rehostimages import check_tracker_image_hosts
-from src.takescreens import TakeScreensManager
-from src.temp_paths import covers_dir, posters_dir, screenshots_dir
+from src.takescreens import TakeScreensManager, download_artwork_from_meta
+from src.temp_paths import artwork_dir, screenshots_dir
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
 from src.trackers.alpharatio import AlphaRatio
@@ -546,6 +547,10 @@ async def _prompt_book_meta(meta: Meta) -> None:
             iso = meta.book_language_iso
             if not is_valid_book_language(str(val), iso):
                 book_missing.append(f)
+    has_artwork = bool(is_valid_cover_image(meta.artwork_path) or _is_http_url(meta.artwork_url))
+    if not has_artwork:
+        book_missing.append("artwork")
+
     if not book_missing:
         return
 
@@ -553,7 +558,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
         logger.info(
             f"[yellow]BOOK upload: the following required fields are missing: "
             f"{', '.join(book_missing)}. "
-            f"Re-run with -btitle / -author / -year / -blang to supply them, "
+            f"Re-run with -btitle / -author / -year / -blang / --book-cover to supply them, "
             f"or trackers that require them will be skipped.[/yellow]"
         )
         return
@@ -562,7 +567,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
     name_needs_rebuild = False
     try:
         for field in book_missing:
-            prompt_label = "language" if field == "book_language" else field
+            prompt_label = "language" if field == "book_language" else ("cover artwork (path to image file or URL)" if field == "artwork" else field)
             if field == "book_language":
                 while True:
                     value = (CLI_UI.ask_string("Enter language (leave blank to skip): ") or "").strip()
@@ -587,6 +592,20 @@ async def _prompt_book_meta(meta: Meta) -> None:
                         name_needs_rebuild = True
                         break
                     logger.info("[red]Invalid year (must be a 4-digit number between 1000 and 3000). Please try again.[/red]")
+            elif field == "artwork":
+                while True:
+                    value = (CLI_UI.ask_string("Enter path to cover artwork image (or public image URL) for BOOK: ") or "").strip()
+                    if not value:
+                        logger.info("[red]Artwork is required for BOOK uploads. Please enter a valid file path or image URL.[/red]")
+                        continue
+                    if _is_http_url(value):
+                        meta.artwork_url = value
+                        break
+                    path_obj = Path(value).expanduser()
+                    if path_obj.is_file():
+                        meta.artwork_path = str(path_obj.resolve())
+                        break
+                    logger.info("[red]Invalid artwork path or URL. The file does not exist or URL is invalid. Please try again.[/red]")
             else:
                 value = (CLI_UI.ask_string(f"Enter {prompt_label} (leave blank to skip): ") or "").strip()
                 if value:
@@ -937,10 +956,11 @@ async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensMana
 
     artwork_path = Path(str(meta.artwork_path or ""))
     if not artwork_path.is_file() and _is_http_url(meta.artwork_url):
-        artwork_path = covers_dir(meta.base_dir, str(meta.uuid)) / "music_cover.jpg"
+        artwork_path = artwork_dir(meta.base_dir, str(meta.uuid)) / "music_cover.jpg"
         content = await asyncio.to_thread(_download_music_cover, meta.artwork_url)
         if content is None:
             return
+
         try:
             artwork_path.parent.mkdir(parents=True, exist_ok=True)
             await asyncio.to_thread(artwork_path.write_bytes, content)
@@ -969,6 +989,20 @@ async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensMana
     await _write_music_snapshot(meta)
 
 
+async def _ensure_valid_book_artwork(meta: Meta) -> bool:
+    """Ensure every BOOK upload has a local, decodable image before tracker checks."""
+    if is_valid_cover_image(meta.artwork_path):
+        return True
+
+    if not _is_http_url(meta.artwork_url):
+        return False
+
+    destination = artwork_dir(meta.base_dir, meta.uuid) / "manual_cover.jpg"
+    if await download_artwork_from_meta(meta, str(destination), force=True):
+        return is_valid_cover_image(meta.artwork_path)
+    return False
+
+
 async def _prompt_music_meta(meta: Meta) -> None:
     """Ask for minimum Orpheus music metadata, never technical stream fields."""
     required = list(MUSIC_REQUIRED_FIELDS)
@@ -977,6 +1011,10 @@ async def _prompt_music_meta(meta: Meta) -> None:
         for field in required
         if (field == "cover_url" and not _is_http_url(_music_field(meta, field))) or (field != "cover_url" and not str(_music_field(meta, field) or "").strip())
     ]
+    has_artwork = bool((meta.artwork_path and Path(meta.artwork_path).is_file()) or (_is_http_url(meta.artwork_url) or _is_http_url(_music_field(meta, "cover_url"))))
+    if not has_artwork and "artwork" not in missing:
+        missing.append("artwork")
+
     conflicts = meta.music_release.get("conflicts", {}) if isinstance(meta.music_release, dict) else {}
     contextual: list[str] = []
     if isinstance(conflicts, dict) and conflicts.get("year") and "year" not in missing:
@@ -1029,16 +1067,24 @@ async def _prompt_music_meta(meta: Meta) -> None:
                 if value:
                     _set_music_field(meta, field, value)
                     changed = True
-            elif field == "cover_url":
+            elif field in ("artwork", "cover_url"):
                 while True:
-                    value = (CLI_UI.ask_string("Enter public album-art URL for Orpheus (https://...; leave blank to skip): ") or "").strip()
+                    value = (CLI_UI.ask_string("Enter path to cover artwork image (or public image URL) for MUSIC: ") or "").strip()
                     if not value:
-                        break
+                        logger.info("[red]Artwork is required for MUSIC uploads. Please enter a valid file path or image URL.[/red]")
+                        continue
                     if _is_http_url(value):
-                        _set_music_field(meta, field, value)
+                        _set_music_field(meta, "cover_url", value)
+                        meta.artwork_url = value
                         changed = True
                         break
-                    logger.info("[red]Invalid artwork URL (must be an HTTP or HTTPS link).[/red]")
+                    path_obj = Path(value).expanduser()
+                    if path_obj.is_file():
+                        meta.artwork_path = str(path_obj.resolve())
+                        _set_music_field(meta, "cover_url", meta.artwork_path, source="user")
+                        changed = True
+                        break
+                    logger.info("[red]Invalid artwork path or URL. The file does not exist or URL is invalid. Please try again.[/red]")
     except EOFError:
         logger.info("[yellow]Input cancelled — continuing with missing music fields.[/yellow]")
         return
@@ -1144,6 +1190,14 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     # and into get_name (which runs again below if any field was filled in).
     if meta.category == "BOOK":
         await _prompt_book_meta(meta)
+        while not await _ensure_valid_book_artwork(meta):
+            if meta.unattended:
+                logger.info("[yellow]BOOK upload: no valid cover could be obtained. Skipping all selected trackers.[/yellow]")
+                meta.trackers = []
+                break
+            meta.artwork_path = ""
+            meta.artwork_url = ""
+            await _prompt_book_meta(meta)
 
     if meta.category == "GAME":
         await _prompt_game_meta(meta)
@@ -1811,7 +1865,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                     if Path(artwork_url).exists():
                         artwork_path = artwork_url
                     else:
-                        poster_jpg_path = str(posters_dir(meta.base_dir, meta.uuid) / "poster.jpg")
+                        poster_jpg_path = str(artwork_dir(meta.base_dir, meta.uuid) / "poster.jpg")
                         try:
                             import urllib.parse
                             import urllib.request
@@ -1836,7 +1890,10 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                                 if isinstance(loaded_covers, list) and len(loaded_covers) > 0 and loaded_covers[0].get("raw_url"):
                                     use_cached_cover = True
                                     meta.hosted_artwork = loaded_covers
-                                    logger.debug(f"[green]Using cached cover from covers.json: {loaded_covers[0]['raw_url']}")
+                                    raw_url = loaded_covers[0]["raw_url"]
+                                    meta.artwork_url = raw_url
+                                    meta.rehosted_artwork_url = raw_url
+                                    logger.debug(f"[green]Using cached cover from covers.json: {raw_url}")
                         except Exception as e:
                             logger.debug(f"[red]Error reading covers.json cache: {e}")
 
@@ -1848,7 +1905,11 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                                 async with aiofiles.open(covers_file, "w", encoding="utf-8") as f:
                                     await f.write(json.dumps(uploaded_cover, indent=4))
                                 meta.hosted_artwork = uploaded_cover
-                                logger.debug(f"[green]Successfully uploaded book cover and saved to covers.json: {uploaded_cover[0].get('raw_url')}")
+                                raw_url = uploaded_cover[0].get("raw_url", uploaded_cover[0].get("img_url", ""))
+                                if raw_url:
+                                    meta.artwork_url = raw_url
+                                    meta.rehosted_artwork_url = raw_url
+                                logger.debug(f"[green]Successfully uploaded book cover and saved to covers.json: {raw_url}")
                             else:
                                 logger.error("[red]Failed to upload book cover: upload_screens returned empty result")
                         except Exception as e:

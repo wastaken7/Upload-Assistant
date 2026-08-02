@@ -26,12 +26,9 @@ def screenshots_dir(base_dir: str | Path, release_id: str) -> Path:
     return image_dir(base_dir, release_id, "screenshots")
 
 
-def posters_dir(base_dir: str | Path, release_id: str) -> Path:
-    return image_dir(base_dir, release_id, "posters")
-
-
-def covers_dir(base_dir: str | Path, release_id: str) -> Path:
-    return image_dir(base_dir, release_id, "covers")
+def artwork_dir(base_dir: str | Path, release_id: str) -> Path:
+    """Return the per-release directory for all local artwork assets."""
+    return image_dir(base_dir, release_id, "artwork")
 
 
 def menu_screenshots_dir(base_dir: str | Path, release_id: str) -> Path:

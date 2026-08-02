@@ -1326,7 +1326,7 @@ def _book_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: s
     if not meta_uuid:
         return ""
 
-    tmp_dir = Path(__file__).parent.parent / "tmp" / meta_uuid / "posters"
+    tmp_dir = Path(__file__).parent.parent / "tmp" / meta_uuid / "artwork"
     for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg", "cover.jpg", "cover.png"):
         if (tmp_dir / filename).exists():
             return f"/api/execution_preview_cover?session_id={preview_session_id}"
@@ -1849,9 +1849,9 @@ def _find_execution_preview_cover_file(session_id: str) -> Path | None:
     candidate_dirs: list[Path] = []
     if meta_uuid:
         release_tmp = Path(__file__).parent.parent / "tmp" / meta_uuid
-        candidate_dirs.extend((release_tmp / "covers", release_tmp / "posters"))
+        candidate_dirs.append(release_tmp / "artwork")
     release_tmp = Path(__file__).parent.parent / "tmp" / Path(execution_path).name
-    candidate_dirs.extend((release_tmp / "covers", release_tmp / "posters"))
+    candidate_dirs.append(release_tmp / "artwork")
 
     # A music sidecar cover may stay beside the release, while embedded art is
     # extracted into tmp/MUSIC_COVER.*.  Never serve an arbitrary configured

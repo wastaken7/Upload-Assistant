@@ -27,7 +27,7 @@ from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
-from src.temp_paths import posters_dir, screenshots_dir
+from src.temp_paths import artwork_dir, screenshots_dir
 from src.torrentcreate import TorrentCreator
 from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
@@ -550,7 +550,7 @@ class PassThePopcorn:
         if self._poster_already_on_selected_host(image_url, selected_host):
             return image_url
 
-        tmp_dir = posters_dir(meta.base_dir, meta.uuid)
+        tmp_dir = artwork_dir(meta.base_dir, meta.uuid)
         try:
             tmp_dir.mkdir(parents=True, exist_ok=True)
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:

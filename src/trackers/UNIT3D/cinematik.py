@@ -15,7 +15,7 @@ from rich.markup import escape
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.temp_paths import posters_dir
+from src.temp_paths import artwork_dir
 from src.trackers.UNIT3D import UNIT3D
 from src.uploadscreens import UploadScreensManager
 
@@ -193,7 +193,7 @@ class Cinematik(UNIT3D):
         poster_url = f"https://image.tmdb.org/t/p/original{meta.tmdb_poster_path}"
 
         # Define the paths for both jpg and png poster images
-        poster_dir = posters_dir(meta.base_dir, meta.uuid)
+        poster_dir = artwork_dir(meta.base_dir, meta.uuid)
         poster_jpg_path = str(poster_dir / "poster.jpg")
         poster_png_path = str(poster_dir / "poster.png")
 

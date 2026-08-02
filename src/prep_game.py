@@ -21,7 +21,7 @@ from src.console import logger
 from src.igdb import IGDBAPI
 from src.meta import Meta
 from src.metadata_cache import cache_for, is_cache_miss
-from src.temp_paths import posters_dir
+from src.temp_paths import artwork_dir
 
 
 def normalize_version(version_str: str) -> str:
@@ -674,7 +674,7 @@ async def gather_game_prep(
         meta.artwork_url = cover_url
 
         # Download and save cover locally as POSTER.png
-        poster_png_path = posters_dir(base_dir, meta.uuid) / "POSTER.png"
+        poster_png_path = artwork_dir(base_dir, meta.uuid) / "POSTER.png"
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(cover_url)

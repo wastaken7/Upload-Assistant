@@ -64,8 +64,9 @@ def test_list_screenshots_includes_disc_video_frames_with_stable_opaque_ids(tmp_
     screenshots_dir = tmp_path / "screenshots"
     screenshots_dir.mkdir()
     (screenshots_dir / "Release-0.png").write_bytes(b"png")
-    (tmp_path / "posters").mkdir()
-    (tmp_path / "posters" / "POSTER.png").write_bytes(b"png")
+    artwork_dir = tmp_path / "artwork"
+    artwork_dir.mkdir()
+    (artwork_dir / "POSTER.png").write_bytes(b"png")
     (screenshots_dir / "Release-libplacebo-test.png").write_bytes(b"png")
 
     regular = list_screenshots(tmp_path, {"is_disc": ""})
