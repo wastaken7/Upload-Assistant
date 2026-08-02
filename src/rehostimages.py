@@ -17,7 +17,11 @@ from src.console import logger
 from src.meta import Meta
 from src.takescreens import TakeScreensManager
 from src.temp_paths import covers_dir, menu_screenshots_dir, screenshots_dir, spectrograms_dir
-from src.tracker_images import get_tracker_image_collection, set_tracker_image_collection
+from src.tracker_images import (
+    get_tracker_image_collection,
+    has_tracker_image_collection,
+    set_tracker_image_collection,
+)
 from src.type_utils import to_int
 from src.uploadscreens import UploadScreensManager
 
@@ -280,6 +284,7 @@ async def _check_hosts(
         logger.debug(f"[yellow]Skipping image host upload for {tracker} as per meta.skip_imghost_upload setting.")
         return get_tracker_image_collection(meta, tracker, "screenshots"), False, False
 
+    has_tracker_override = has_tracker_image_collection(meta, tracker, "screenshots")
     tracker_images = get_tracker_image_collection(meta, tracker, "screenshots")
 
     logger.debug(
@@ -288,7 +293,7 @@ async def _check_hosts(
     )
 
     # Check if we have main image_list but no tracker-specific images yet
-    if meta.image_list and not tracker_images:
+    if meta.image_list and not has_tracker_override:
         logger.debug(f"[yellow]Checking if existing images in meta.image_list can be used for {tracker}...")
         # Check if the URLs in image_list are from approved hosts
         approved_images: list[dict[str, str]] = []

@@ -314,11 +314,14 @@ async def process_trackers(
                     if manual_tracker != "MANUAL":
                         manual_tracker = manual_tracker.replace(" ", "").upper().strip()
                         tracker_class = tracker_class_map[manual_tracker](config=config)
-                        await check_tracker_image_hosts(tracker_class)
-                        if manual_tracker in api_trackers:
-                            await DescriptionBuilder(manual_tracker, config).unit3d_edit_desc(meta, manual_tracker)
-                        else:
-                            await tracker_class.edit_desc(meta)
+                        try:
+                            await check_tracker_image_hosts(tracker_class)
+                            if manual_tracker in api_trackers:
+                                await DescriptionBuilder(manual_tracker, config).unit3d_edit_desc(meta, manual_tracker)
+                            else:
+                                await tracker_class.edit_desc(meta)
+                        except Exception as e:
+                            logger.info(f"[red]{manual_tracker}: Error preparing manual upload files: {e}[/red]")
                 url = await manual_packager.package(meta)
                 if url is False:
                     logger.info(f"[yellow]Unable to upload prep files, they can be found at `tmp/{meta.uuid}")

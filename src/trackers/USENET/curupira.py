@@ -343,11 +343,11 @@ class Curupira:
         return ""
 
     async def get_screens(self, meta: Meta) -> list[str]:
-        menu_images = [cast(dict[str, Any], img) for img in meta.menu_images if isinstance(img, dict)]
+        menu_images = [cast(dict[str, Any], img) for img in get_tracker_image_collection(meta, self.tracker, "menu_images") if isinstance(img, dict)]
         images_value = get_tracker_image_collection(meta, self.tracker, "screenshots")
         image_entries: list[Any] = cast(list[Any], images_value) if isinstance(images_value, list) else []
         images_list = [cast(dict[str, Any], img) for img in image_entries if isinstance(img, dict)]
-        spectrograms_images = [cast(dict[str, Any], img) for img in meta.spectrograms_images if isinstance(img, dict)]
+        spectrograms_images = [cast(dict[str, Any], img) for img in get_tracker_image_collection(meta, self.tracker, "spectrograms_images") if isinstance(img, dict)]
 
         combined_images: list[dict[str, Any]] = []
         if menu_images:

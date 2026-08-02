@@ -24,6 +24,11 @@ def get_tracker_image_collection(meta: Meta, tracker: str, collection: ImageColl
     return images if isinstance(images, list) else []
 
 
+def has_tracker_image_collection(meta: Meta, tracker: str, collection: ImageCollection) -> bool:
+    """Return whether a tracker has an explicit collection override."""
+    return collection in meta.tracker_image_collections.get(tracker, {})
+
+
 def set_tracker_image_collection(meta: Meta, tracker: str, collection: ImageCollection, images: Sequence[ImageDict]) -> None:
     """Store a tracker-local image collection without mutating shared metadata."""
-    meta.tracker_image_collections.setdefault(tracker, {})[collection] = list(images)
+    meta.tracker_image_collections.setdefault(tracker, {})[collection] = [dict(image) for image in images]

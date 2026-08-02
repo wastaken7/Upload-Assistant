@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
-from src.tracker_images import get_tracker_image_collection
+from src.tracker_images import get_tracker_image_collection, has_tracker_image_collection
 
 
 def test_rehosts_menu_and_spectrogram_images_without_touching_main_screens(tmp_path: Path):
@@ -33,6 +33,8 @@ def test_rehosts_menu_and_spectrogram_images_without_touching_main_screens(tmp_p
         spectrograms_images=[{"raw_url": "https://lostimg.cc/spectrogram.png", "local_file_path": str(spectrogram_source)}],
     )
 
+    assert not has_tracker_image_collection(meta, "TEST", "screenshots")
+
     result, _, _ = asyncio.run(
         manager.check_policy(
             meta,
@@ -46,6 +48,10 @@ def test_rehosts_menu_and_spectrogram_images_without_touching_main_screens(tmp_p
     assert meta.menu_images[0]["raw_url"] == "https://lostimg.cc/menu.png"
     assert meta.spectrograms_images[0]["raw_url"] == "https://lostimg.cc/spectrogram.png"
     tracker_images = meta.tracker_image_collections["TEST"]
+    assert has_tracker_image_collection(meta, "TEST", "screenshots")
+    assert tracker_images["screenshots"] == meta.image_list
+    assert tracker_images["screenshots"] is not meta.image_list
+    assert tracker_images["screenshots"][0] is not meta.image_list[0]
     assert tracker_images["menu_images"][0]["raw_url"] == "https://i.ibb.co/menu.png"
     assert tracker_images["menu_images"][0]["local_file_path"] == str(menu_source)
     assert tracker_images["spectrograms_images"][0]["raw_url"] == "https://i.ibb.co/spectrogram.png"

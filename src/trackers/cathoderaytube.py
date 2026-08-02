@@ -340,7 +340,9 @@ class CathodeRayTube:
 
             # Minimum 6 screenshots requirement
             images = get_tracker_image_collection(meta, self.tracker, "screenshots")
-            screens_count = len(meta.menu_images or []) + len(images) + len(meta.spectrograms_images or [])
+            menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
+            spectrograms_images = get_tracker_image_collection(meta, self.tracker, "spectrograms_images")
+            screens_count = len(menu_images) + len(images) + len(spectrograms_images)
             if screens_count == 0 and hasattr(meta, "screens"):
                 try:
                     screens_count = int(meta.screens or 0)
