@@ -1,11 +1,26 @@
 """Shared artwork validation helpers."""
 
+import ipaddress
+import socket
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import urlparse
 
 from PIL import Image
 
 _SUPPORTED_COVER_FORMATS = {"GIF", "JPEG", "PNG", "WEBP"}
+
+
+def is_public_http_url(value: str | None) -> bool:
+    """Return whether an HTTP(S) URL resolves exclusively to public IPs."""
+    parsed = urlparse(str(value or "").strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    try:
+        addresses = {result[4][0] for result in socket.getaddrinfo(parsed.hostname, None, type=socket.SOCK_STREAM)}
+        return bool(addresses) and all(ipaddress.ip_address(address).is_global for address in addresses)
+    except OSError, ValueError:
+        return False
 
 
 def is_valid_image_bytes(image_bytes: bytes) -> bool:

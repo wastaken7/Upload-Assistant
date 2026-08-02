@@ -37,7 +37,7 @@ async def test_prompt_book_meta_accepts_url() -> None:
 @pytest.mark.asyncio
 async def test_prompt_music_meta_accepts_file_path(tmp_path: Path) -> None:
     cover_file = tmp_path / "album_cover.png"
-    cover_file.write_bytes(b"fake album cover")
+    Image.new("RGB", (32, 48), "purple").save(cover_file)
 
     meta = Meta(
         category="MUSIC",
@@ -52,6 +52,28 @@ async def test_prompt_music_meta_accepts_file_path(tmp_path: Path) -> None:
         await _prompt_music_meta(meta)
 
     assert meta.artwork_path == str(cover_file.resolve())
+
+
+@pytest.mark.asyncio
+async def test_prompt_music_meta_rejects_invalid_file_before_accepting_cover(tmp_path: Path) -> None:
+    invalid_file = tmp_path / "invalid.png"
+    invalid_file.write_bytes(b"not an image")
+    valid_file = tmp_path / "valid.png"
+    Image.new("RGB", (32, 48), "orange").save(valid_file)
+
+    meta = Meta(
+        category="MUSIC",
+        artist="Test Artist",
+        title="Test Album",
+        year=2024,
+        source="CD",
+        music_release={"fields": {"release_type": {"value": "Album"}}},
+    )
+
+    with patch("upload.CLI_UI.ask_string", side_effect=[str(invalid_file), str(valid_file)]):
+        await _prompt_music_meta(meta)
+
+    assert meta.artwork_path == str(valid_file.resolve())
 
 
 def test_book_cover_cli_arg(tmp_path: Path) -> None:

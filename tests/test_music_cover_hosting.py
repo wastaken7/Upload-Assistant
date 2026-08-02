@@ -25,5 +25,5 @@ def test_music_cover_reuses_cached_hosted_url_before_downloading(tmp_path):
 
 
 def test_music_cover_rejects_private_download_host():
-    with patch("upload.socket.getaddrinfo", return_value=[(None, None, None, None, ("127.0.0.1", 0))]):
+    with patch("src.artwork.socket.getaddrinfo", return_value=[(None, None, None, None, ("127.0.0.1", 0))]):
         assert not _is_public_music_cover_url("http://localhost/cover.jpg")  # noqa: S101

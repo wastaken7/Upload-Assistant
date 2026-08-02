@@ -5,7 +5,6 @@ import asyncio
 import contextlib
 import filecmp
 import gc
-import ipaddress
 import json
 import os
 import platform
@@ -13,7 +12,6 @@ import re
 import shlex
 import shutil
 import signal
-import socket
 import sys
 import threading
 import time
@@ -38,7 +36,7 @@ from bin.get_mkbrr import MkbrrBinaryManager
 from cogs.redaction import PathAwareEncoder, Redaction
 from src.add_comparison import ComparisonManager
 from src.args import Args
-from src.artwork import is_valid_cover_image
+from src.artwork import is_public_http_url, is_valid_cover_image
 from src.audio_spectrogram import process_audio_spectrograms
 from src.book_prep import detect_newspaper, is_valid_book_language, resolve_book_language
 from src.cleanup import cleanup_manager
@@ -854,19 +852,7 @@ MUSIC_COVER_MAX_REDIRECTS = 3
 
 def _is_public_music_cover_url(value: Any) -> bool:
     """Allow artwork downloads only from public HTTP(S) hosts."""
-    if not _is_http_url(value):
-        return False
-    host = urlparse(str(value).strip()).hostname
-    if not host:
-        return False
-    try:
-        addresses = {result[4][0] for result in socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)}
-    except OSError:
-        return False
-    try:
-        return bool(addresses) and all(ipaddress.ip_address(address).is_global for address in addresses)
-    except ValueError:
-        return False
+    return is_public_http_url(str(value or ""))
 
 
 def _download_music_cover(url: str) -> bytes | None:
@@ -968,7 +954,8 @@ async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensMana
         except OSError as error:
             logger.warning(f"[yellow]MUSIC: could not save downloaded artwork for image hosting: {error}[/yellow]")
             return
-    if not artwork_path.is_file():
+    if not is_valid_cover_image(artwork_path):
+        logger.warning("[yellow]MUSIC: local artwork is not a valid supported image.[/yellow]")
         return
 
     try:
@@ -1011,7 +998,7 @@ async def _prompt_music_meta(meta: Meta) -> None:
         for field in required
         if (field == "cover_url" and not _is_http_url(_music_field(meta, field))) or (field != "cover_url" and not str(_music_field(meta, field) or "").strip())
     ]
-    has_artwork = bool((meta.artwork_path and Path(meta.artwork_path).is_file()) or (_is_http_url(meta.artwork_url) or _is_http_url(_music_field(meta, "cover_url"))))
+    has_artwork = bool(is_valid_cover_image(meta.artwork_path) or (_is_http_url(meta.artwork_url) or _is_http_url(_music_field(meta, "cover_url"))))
     if not has_artwork and "artwork" not in missing:
         missing.append("artwork")
 
@@ -1079,7 +1066,7 @@ async def _prompt_music_meta(meta: Meta) -> None:
                         changed = True
                         break
                     path_obj = Path(value).expanduser()
-                    if path_obj.is_file():
+                    if is_valid_cover_image(path_obj):
                         meta.artwork_path = str(path_obj.resolve())
                         _set_music_field(meta, "cover_url", meta.artwork_path, source="user")
                         changed = True

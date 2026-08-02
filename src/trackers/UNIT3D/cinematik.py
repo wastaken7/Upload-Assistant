@@ -194,19 +194,16 @@ class Cinematik(UNIT3D):
 
         # Define the paths for both jpg and png poster images
         poster_dir = artwork_dir(meta.base_dir, meta.uuid)
-        poster_jpg_path = str(poster_dir / "poster.jpg")
-        poster_png_path = str(poster_dir / "poster.png")
+        poster_paths = [poster_dir / filename for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg")]
 
         # Check if either poster.jpg or poster.png already exists
-        if Path(poster_jpg_path).exists():
-            poster_path = poster_jpg_path
-            logger.info(f"{self.tracker}: [green]Cover already exists as poster.jpg, skipping download.[/green]")
-        elif Path(poster_png_path).exists():
-            poster_path = poster_png_path
-            logger.info(f"{self.tracker}: [green]Cover already exists as poster.png, skipping download.[/green]")
+        existing_poster = next((path for path in poster_paths if path.is_file()), None)
+        if existing_poster is not None:
+            poster_path = str(existing_poster)
+            logger.info(f"{self.tracker}: [green]Cover already exists as {existing_poster.name}, skipping download.[/green]")
         else:
             # No poster file exists, download the poster image
-            poster_path = poster_jpg_path  # Default to saving as poster.jpg
+            poster_path = str(poster_dir / "poster.jpg")  # Default to saving as poster.jpg
             try:
                 parsed_url = urlparse(poster_url)
                 if parsed_url.scheme not in ("http", "https"):

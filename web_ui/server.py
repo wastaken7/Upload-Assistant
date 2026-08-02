@@ -1886,6 +1886,8 @@ def _find_execution_preview_cover_file(session_id: str) -> Path | None:
             "cover.jpg",
             "cover.png",
             "cover.webp",
+            "manual_cover.jpg",
+            "music_cover.jpg",
         ):
             candidate = tmp_dir / filename
             if candidate.is_file():

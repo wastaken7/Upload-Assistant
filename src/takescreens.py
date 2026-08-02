@@ -24,7 +24,7 @@ import psutil
 from pymediainfo import MediaInfo
 
 from data import config as data_config
-from src.artwork import is_valid_cover_image, is_valid_image_bytes
+from src.artwork import is_public_http_url, is_valid_cover_image, is_valid_image_bytes
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
@@ -971,19 +971,32 @@ async def download_artwork_from_meta(meta: Meta, artwork_path: str, *, force: bo
             if api_key:
                 cookies["mam_id"] = api_key
 
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            response = await client.get(artwork_url, cookies=cookies, headers=headers)
-            if response.status_code == 200:
-                if not is_valid_image_bytes(response.content):
-                    logger.info("[yellow]Warning: Downloaded artwork is not a valid supported image and will be ignored.[/yellow]")
+        current_url = artwork_url
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
+            for _ in range(4):
+                if not is_public_http_url(current_url):
+                    logger.warning("[yellow]Warning: Artwork download target is not a public HTTP(S) URL.[/yellow]")
                     return False
-                await asyncio.to_thread(Path(artwork_path).write_bytes, response.content)
-                if not is_valid_cover_image(artwork_path):
-                    return False
-                meta.artwork_path = artwork_path
-                logger.info(f"[green]Successfully downloaded artwork from {artwork_url}[/green]")
-                return True
-            logger.warning(f"[yellow]Warning: Failed to download poster, status code {response.status_code}[/yellow]")
+                response = await client.get(current_url, cookies=cookies, headers=headers)
+                if response.is_redirect:
+                    location = response.headers.get("Location")
+                    if not location:
+                        return False
+                    current_url = urllib.parse.urljoin(current_url, location)
+                    continue
+                if response.status_code == 200:
+                    if not is_valid_image_bytes(response.content):
+                        logger.info("[yellow]Warning: Downloaded artwork is not a valid supported image and will be ignored.[/yellow]")
+                        return False
+                    await asyncio.to_thread(Path(artwork_path).write_bytes, response.content)
+                    if not is_valid_cover_image(artwork_path):
+                        return False
+                    meta.artwork_path = artwork_path
+                    logger.info(f"[green]Successfully downloaded artwork from {current_url}[/green]")
+                    return True
+                logger.warning(f"[yellow]Warning: Failed to download poster, status code {response.status_code}[/yellow]")
+                return False
+            logger.warning("[yellow]Warning: Artwork download exceeded the redirect limit.[/yellow]")
     except Exception as e:
         logger.warning(f"[yellow]Warning: Error downloading poster: {e}[/yellow]")
     return False
