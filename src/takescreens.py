@@ -12,6 +12,7 @@ import sys
 import time
 import traceback
 import urllib.parse
+import uuid
 import xml.etree.ElementTree as ET
 import zipfile
 from collections.abc import Awaitable, Mapping
@@ -78,15 +79,16 @@ async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
     process_env = os.environ.copy()
 
     # FFREPORT defaults to a timestamped file in the current working
-    # directory.  The last argument is the output path for ffmpeg-python
-    # commands that write a file, so keep the report beside that output
-    # instead of beside the source video.  Commands writing to stdout (for
-    # example, the libplacebo warm-up) do not need a report file.
+    # directory.  Keep each report beside its output, with a unique name so
+    # concurrent or repeated runs do not overwrite an earlier report.
     output_path = cmd_list[-1] if cmd_list else ""
     if output_path and output_path not in {"-", "pipe:"} and not output_path.startswith("pipe:"):
-        report_path = Path(output_path).resolve().parent / "ffmpeg.log"
+        report_path = Path(output_path).resolve().parent / f"ffmpeg-{uuid.uuid4().hex}.log"
         report_path.parent.mkdir(parents=True, exist_ok=True)
-        process_env["FFREPORT"] = f"file={report_path}:level=32"
+        # FFREPORT uses ':' as a field separator, so escape the drive-letter
+        # colon in Windows paths after converting separators to '/'.
+        report_path_value = report_path.as_posix().replace(":", r"\:")
+        process_env["FFREPORT"] = f"file={report_path_value}:level=32"
     else:
         process_env.pop("FFREPORT", None)
 
