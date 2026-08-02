@@ -327,15 +327,17 @@ class Curupira:
 
     def get_cover(self, meta: Meta) -> str:
         covers = meta.hosted_artwork
-        if isinstance(covers, list) and len(covers) > 0:
-            raw_url = covers[0].get("raw_url")
-            if raw_url:
-                return str(raw_url)
+        if isinstance(covers, list):
+            for entry in covers:
+                if not isinstance(entry, dict):
+                    continue
+                raw_url = entry.get("raw_url")
+                if isinstance(raw_url, str) and raw_url.startswith("https://"):
+                    return raw_url
 
-        # Fallback to poster URL if remote
-        poster_url = meta.artwork_url
-        if isinstance(poster_url, str) and poster_url.startswith(("http://", "https://")):
-            return poster_url
+        artwork_url = meta.artwork_url
+        if isinstance(artwork_url, str) and artwork_url.startswith("https://"):
+            return artwork_url
 
         return ""
 

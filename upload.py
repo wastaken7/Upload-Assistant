@@ -1818,7 +1818,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                             parsed_url = urllib.parse.urlparse(artwork_url)
                             if parsed_url.scheme in ("http", "https"):
                                 Path(poster_jpg_path).parent.mkdir(parents=True, exist_ok=True)
-                                urllib.request.urlretrieve(artwork_url, poster_jpg_path)  # noqa: S310
+                                await asyncio.to_thread(urllib.request.urlretrieve, artwork_url, poster_jpg_path)
                                 artwork_path = poster_jpg_path
                                 meta.artwork_path = artwork_path
                         except Exception as e:
