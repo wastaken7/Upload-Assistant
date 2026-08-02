@@ -62,6 +62,7 @@ class Meta:
     book_language_iso: str = ""
     book_language: str = ""
     book_publisher: str | None = None
+    book_overview: str | None = None
     book_series: str = ""
     book_series_index: str = ""
     book_title: str | None = None

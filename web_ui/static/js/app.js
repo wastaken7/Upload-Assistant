@@ -409,6 +409,11 @@ const argumentCategories = [
         placeholder: "TITLE",
         description: "Override detected book title",
       },
+      {
+        label: "--book-overview",
+        placeholder: "SYNOPSIS",
+        description: "Book/Audiobook overview/synopsis (overrides auto-detected value)",
+      },
       { label: "--comic", description: "Mark upload as comic" },
       { label: "--manga", description: "Mark upload as manga" },
       { label: "--magazine", description: "Mark upload as magazine" },

@@ -57,6 +57,7 @@ Common options:
   --queue (queue name)       Process an entire folder (including files/subfolders) in a queue
   -mf, --manual_frames       Comma-separated list of frame numbers to use for screenshots
   -df, --descfile            Path to custom description file
+  -boverview, --book-overview  Book/Audiobook overview/synopsis (overrides auto-detected value)
   -serv, --service           Streaming service
   --no-aka                   Remove AKA from title
   -daily, --daily            Air date of a daily type episode (YYYY-MM-DD)
@@ -443,6 +444,17 @@ class Args:
             nargs=1,
             required=False,
             help="Custom description block to insert (path to file OR filename in current working directory). This is added as a section inside the final description and does NOT replace the auto-generated description (MediaInfo, screenshots, etc.)",
+        )
+        parser.add_argument(
+            "-boverview",
+            "--book-overview",
+            "-ov",
+            "--overview",
+            dest="book_overview",
+            nargs="*",
+            required=False,
+            help="Book/Audiobook overview/synopsis (overrides auto-detected value)",
+            type=str,
         )
         parser.add_argument(
             "-menus",
@@ -1023,6 +1035,15 @@ class Args:
         *langcodes* so both a human-readable name and the ISO 639-3 code are stored.
         Falls back gracefully when *langcodes* is unavailable or the code is unknown.
         """
+        book_overview_arg = meta.book_overview or meta.overview
+        if book_overview_arg not in (None, "", []):
+            overview_str = " ".join(str(x) for x in book_overview_arg if str(x)).strip() if isinstance(book_overview_arg, list) else str(book_overview_arg).strip()
+            meta.overview = overview_str
+            meta.book_overview = overview_str
+        else:
+            meta.overview = ""
+            meta.book_overview = ""
+
         book_author_arg = meta.book_author
         if book_author_arg not in (None, ""):
             meta.author = str(book_author_arg).strip()
