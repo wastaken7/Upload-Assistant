@@ -130,6 +130,19 @@ class RehostImagesManager:
         )
 
 
+async def check_tracker_image_hosts(meta: Meta, tracker_class: Any) -> None:
+    """Apply a tracker's image-host policy when it defines one."""
+    policy = getattr(tracker_class, "image_host_policy", None)
+    rehost_manager = getattr(tracker_class, "rehost_images_manager", None)
+    if isinstance(policy, ImageHostPolicy) and rehost_manager is not None:
+        await rehost_manager.check_policy(meta, tracker_class.tracker, policy)
+        return
+
+    check_hosts = getattr(tracker_class, "check_image_hosts", None)
+    if callable(check_hosts):
+        await check_hosts(meta)
+
+
 def _image_host(raw_url: str, url_host_mapping: Mapping[str, str]) -> str:
     hostname = (urlparse(raw_url).hostname or "").lower()
     for source_host, mapped_host in url_host_mapping.items():
