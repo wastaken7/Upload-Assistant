@@ -18,6 +18,7 @@ from src.get_desc import DescriptionBuilder
 from src.manualpackage import ManualPackageManager
 from src.meta import Meta
 from src.qbitwait import Wait
+from src.rehostimages import ImageHostPolicy
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackers.torrenthr import TorrentHR
 from src.trackersetup import TrackerSetup
@@ -130,6 +131,17 @@ async def process_trackers(
         except Exception as e:
             logger.error(f"[red]Error printing {tracker} result: {e}[/red]")
 
+    async def check_tracker_image_hosts(tracker_class: Any) -> None:
+        """Run an adapter's optional host policy before it builds upload data."""
+        policy = getattr(tracker_class, "image_host_policy", None)
+        rehost_manager = getattr(tracker_class, "rehost_images_manager", None)
+        if isinstance(policy, ImageHostPolicy) and rehost_manager is not None:
+            await rehost_manager.check_policy(meta, tracker_class.tracker, policy)
+            return
+        check_hosts = getattr(tracker_class, "check_image_hosts", None)
+        if callable(check_hosts):
+            await check_hosts(meta)
+
     async def process_single_tracker(tracker: str) -> None:
         """
         try:
@@ -218,6 +230,7 @@ async def process_trackers(
                             status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
+                        await check_tracker_image_hosts(tracker_class)
                         upload_start_time = time.time()
                         is_uploaded = await tracker_class.upload(meta)
                         upload_duration = time.time() - upload_start_time
@@ -257,6 +270,7 @@ async def process_trackers(
                             status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
+                        await check_tracker_image_hosts(tracker_class)
                         upload_start_time = time.time()
                         is_uploaded = await tracker_class.upload(meta)
                         upload_duration = time.time() - upload_start_time
@@ -300,6 +314,7 @@ async def process_trackers(
                     if manual_tracker != "MANUAL":
                         manual_tracker = manual_tracker.replace(" ", "").upper().strip()
                         tracker_class = tracker_class_map[manual_tracker](config=config)
+                        await check_tracker_image_hosts(tracker_class)
                         if manual_tracker in api_trackers:
                             await DescriptionBuilder(manual_tracker, config).unit3d_edit_desc(meta, manual_tracker)
                         else:
@@ -345,6 +360,7 @@ async def process_trackers(
                 try:
                     ptp = PassThePopcorn(config=config)
                     group_id = meta.ptp_groupid
+                    await check_tracker_image_hosts(ptp)
                     ptp_url, ptp_data = await ptp.fill_upload_form(group_id, meta)
                     is_uploaded = False
                     try:

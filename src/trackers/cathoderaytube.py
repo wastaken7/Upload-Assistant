@@ -13,7 +13,8 @@ from src.console import logger
 from src.cookie_auth import CookieValidator, extract_upload_error
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
+from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 
 
@@ -33,14 +34,17 @@ class CathodeRayTube:
     banned_groups: tuple[str, ...] = ()
     auth_token: ClassVar[str] = ""
     approved_image_hosts = ("ptpimg", "catbox", "imgbb", "postimages", "freeimage", "imgbox")
-    image_host_mapping: ClassVar = {
-        "ptpimg.me": "ptpimg",
-        "catbox.moe": "catbox",
-        "ibb.co": "imgbb",
-        "postimg.cc": "postimages",
-        "iili.io": "freeimage",
-        "imgbox.com": "imgbox",
-    }
+    image_host_policy = ImageHostPolicy(
+        {
+            "ptpimg.me": "ptpimg",
+            "catbox.moe": "catbox",
+            "ibb.co": "imgbb",
+            "postimg.cc": "postimages",
+            "iili.io": "freeimage",
+            "imgbox.com": "imgbox",
+        },
+        approved_image_hosts,
+    )
 
     category_map: ClassVar = {"MOVIE": "1", "TV": "2", "GAME": "13"}
 
@@ -50,16 +54,6 @@ class CathodeRayTube:
         self.cookie_validator = CookieValidator(config)
         self.rehost_images_manager = RehostImagesManager(config)
         self.session = httpx.AsyncClient(timeout=60.0, follow_redirects=True)
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-        """Reuse CRT-approved images or rehost them through a configured approved host."""
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            url_host_mapping=self.image_host_mapping,
-            img_host_index=1,
-            approved_image_hosts=list(self.approved_image_hosts),
-        )
 
     async def validate_credentials(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -259,8 +253,10 @@ class CathodeRayTube:
         links = self._metadata_links(meta)
         overview = meta.overview or meta.overview_meta
         notes = "\n\n".join(part for part in (meta.description.strip(), await builder.get_user_description(meta)) if part)
-        images = meta.get(f"{self.tracker}_images_key", meta.image_list)
-        screenshots = "\n".join(image["raw_url"] for image in (meta.menu_images + images + meta.spectrograms_images) if image.get("raw_url"))
+        images = get_tracker_image_collection(meta, self.tracker, "screenshots")
+        menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
+        spectrograms_images = get_tracker_image_collection(meta, self.tracker, "spectrograms_images")
+        screenshots = "\n".join(image["raw_url"] for image in (menu_images + images + spectrograms_images) if image.get("raw_url"))
 
         sections: list[str] = []
         if links:
@@ -343,7 +339,7 @@ class CathodeRayTube:
                 return False
 
             # Minimum 6 screenshots requirement
-            images = list(meta.get(f"{self.tracker}_images_key", meta.image_list)) or []
+            images = get_tracker_image_collection(meta, self.tracker, "screenshots")
             screens_count = len(meta.menu_images or []) + len(images) + len(meta.spectrograms_images or [])
             if screens_count == 0 and hasattr(meta, "screens"):
                 try:
@@ -510,7 +506,6 @@ class CathodeRayTube:
         return ""
 
     async def upload(self, meta: Meta) -> bool:
-        await self.check_image_hosts(meta)
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         torrent_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}].torrent"
         if meta.debug:

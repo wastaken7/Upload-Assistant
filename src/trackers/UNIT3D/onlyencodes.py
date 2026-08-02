@@ -4,7 +4,7 @@ from typing import Any, cast
 
 from src.languages import languages_manager
 from src.meta import Meta
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
@@ -21,6 +21,17 @@ class OnlyEncodes(UNIT3D):
     allows_bloated_audio = True
     base_url = "https://onlyencodes.cc"
     approved_image_hosts = ("imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage")
+    image_host_policy = ImageHostPolicy(
+        {
+            "ibb.co": "imgbb",
+            "imgbox.com": "imgbox",
+            "onlyimage.org": "onlyimage",
+            "imagebam.com": "bam",
+            "ptscreens.com": "ptscreens",
+            "img.passtheima.ge": "passtheimage",
+        },
+        approved_image_hosts,
+    )
     banned_groups = (
         "[Oj]",
         "$andra",
@@ -178,25 +189,6 @@ class OnlyEncodes(UNIT3D):
             meta.is_disc != "BDMV"
             and not await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True)
         )
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "imgbox.com": "imgbox",
-            "onlyimage.org": "onlyimage",
-            "imagebam.com": "bam",
-            "ptscreens.com": "ptscreens",
-            "img.passtheima.ge": "passtheimage",
-        }
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            url_host_mapping=url_host_mapping,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         oe_name = meta.name

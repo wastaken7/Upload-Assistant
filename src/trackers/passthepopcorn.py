@@ -24,11 +24,12 @@ from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
 from src.exceptions import UploadError
 from src.meta import Meta
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
 from src.temp_paths import posters_dir, screenshots_dir
 from src.torrentcreate import TorrentCreator
+from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
 
@@ -80,6 +81,7 @@ class PassThePopcorn:
         "WORLD",
     )
     approved_image_hosts = ("pixhost",)
+    image_host_policy = ImageHostPolicy({"pixhost.to": "pixhost"}, approved_image_hosts)
     sub_lang_map: ClassVar[dict[tuple[str, ...], int]] = {
         ("Arabic", "ara", "ar"): 22,
         ("Brazilian Portuguese", "Brazilian", "Portuguese-BR", "pt-br", "pt-BR"): 49,
@@ -822,20 +824,6 @@ class PassThePopcorn:
         desc = desc.replace("[ol]", "").replace("[/ol]", "")
         return re.sub(r"\[img=[^\]]+\]", "[img]", desc)
 
-    async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "pixhost.to": "pixhost",
-        }
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            url_host_mapping=url_host_mapping,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
-
     async def edit_desc(self, meta: Meta) -> None:
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt", encoding="utf-8") as base_file:
             base = await base_file.read()
@@ -853,7 +841,7 @@ class PassThePopcorn:
             multi_screens = 2
             logger.info(f"{self.tracker}: [yellow]requires at least 2 screenshots for multi disc/file content, overriding config")
 
-        image_list_value: Any = (meta.PTP_images_key if "PTP_images_key" in meta else meta.image_list) if not meta.skip_imghost_upload else []
+        image_list_value: Any = get_tracker_image_collection(meta, self.tracker, "screenshots") if not meta.skip_imghost_upload else []
         image_list = cast(list[dict[str, Any]], image_list_value) if isinstance(image_list_value, list) else []
         images: list[dict[str, Any]] = image_list
 

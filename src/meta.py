@@ -322,7 +322,6 @@ class Meta:
     production_countries: list[Any] = field(default_factory=list)
     ptgen: dict[str, Any] = field(default_factory=dict)
     ptp_groupid: str | None = None
-    PTP_images_key: list[dict[str, Any]] = field(default_factory=list)
     ptp: str | int | None = None
     publisher: str = ""
     upload_order: str | None = None
@@ -427,6 +426,7 @@ class Meta:
     tonemapped: bool = False
     torrent_comments: list[Any] = field(default_factory=list)
     tracker_status: dict[str, Any] = field(default_factory=dict)
+    tracker_image_collections: dict[str, dict[str, list[dict[str, Any]]]] = field(default_factory=dict)
     trackers_pass: int | None = None
     trackers_remove: str | bool = False
     trackers: list[str] | str = field(default_factory=list)
@@ -436,7 +436,6 @@ class Meta:
     trumping_trackers: list[Any] = field(default_factory=list)
     tv_movie: bool = False
     tv_pack: bool = False
-    TVC_images_key: list[dict[str, Any]] = field(default_factory=list)
     tvdb_episode_data: dict[str, Any] = field(default_factory=dict)
     tvdb_episode_id: int | None = None
     tvdb_episode_int: int | None = None

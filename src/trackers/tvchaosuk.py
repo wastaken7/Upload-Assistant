@@ -18,7 +18,8 @@ from cogs.redaction import Redaction
 from src.bbcode import BBCODE
 from src.console import logger
 from src.meta import Meta
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
+from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 
 Config = dict[str, Any]
@@ -39,6 +40,16 @@ class TVChaosUK:
     signature = ""
     banned_groups = ()
     approved_image_hosts = ("imgbb", "imgbox", "pixhost", "bam", "onlyimage")
+    image_host_policy = ImageHostPolicy(
+        {
+            "ibb.co": "imgbb",
+            "imgbox.com": "imgbox",
+            "pixhost.to": "pixhost",
+            "imagebam.com": "bam",
+            "onlyimage.org": "onlyimage",
+        },
+        approved_image_hosts,
+    )
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
@@ -435,22 +446,10 @@ class TVChaosUK:
 
         return await asyncio.to_thread(_read)
 
-    async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "imgbox.com": "imgbox",
-            "pixhost.to": "pixhost",
-            "imagebam.com": "bam",
-            "onlyimage.org": "onlyimage",
-        }
-
-        await self.rehost_images_manager.check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=self.approved_image_hosts)
-        return
-
     async def upload(self, meta: Meta) -> bool | None:
         common = Common(config=self.config)
 
-        raw_images = meta.TVC_images_key if meta.TVC_images_key is not None else meta.get("image_list", [])
+        raw_images = get_tracker_image_collection(meta, self.tracker, "screenshots")
         image_list_seq: list[Any]
         if isinstance(raw_images, list):
             image_list_seq = raw_images

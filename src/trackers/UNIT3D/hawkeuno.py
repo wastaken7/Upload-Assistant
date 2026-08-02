@@ -11,7 +11,7 @@ from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
@@ -80,6 +80,19 @@ class HawkeUno(UNIT3D):
         "ptscreens",
         "passtheimage",
         "hawke.pics",
+    )
+    image_host_policy = ImageHostPolicy(
+        {
+            "ibb.co": "imgbb",
+            "pixhost.to": "pixhost",
+            "imgbox.com": "imgbox",
+            "imagebam.com": "bam",
+            "hawke.pics": "hawke.pics",
+            "onlyimage.org": "onlyimage",
+            "ptscreens.com": "ptscreens",
+            "passtheimage.me": "passtheimage",
+        },
+        approved_image_hosts,
     )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
@@ -151,25 +164,6 @@ class HawkeUno(UNIT3D):
                                         return False
 
         return should_continue
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "pixhost.to": "pixhost",
-            "imgbox.com": "imgbox",
-            "imagebam.com": "bam",
-            "hawke.pics": "hawke.pics",
-            "onlyimage.org": "onlyimage",
-            "ptscreens.com": "ptscreens",
-            "passtheimage.me": "passtheimage",
-        }
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            url_host_mapping=url_host_mapping,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
 
     async def get_description(self, meta: Meta) -> None:
         desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(

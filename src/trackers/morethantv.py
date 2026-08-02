@@ -18,7 +18,7 @@ from cogs.redaction import Redaction
 from src.console import console, logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.torrentcreate import TorrentCreator
 from src.trackers.common import Common
 
@@ -36,6 +36,7 @@ class MoreThanTV:
     reject_english_original_bloat = True
     source_flag = "MTV"
     approved_image_hosts = ("imgbox", "imgbb")
+    image_host_policy = ImageHostPolicy({"ibb.co": "imgbb", "imgbox.com": "imgbox"}, approved_image_hosts)
     banned_groups = (
         "[Oj]",
         "3LTON",
@@ -107,21 +108,6 @@ class MoreThanTV:
     async def async_json_dumps(self, obj: Any) -> str:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, json.dumps, obj)
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "imgbox.com": "imgbox",
-        }
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            url_host_mapping=url_host_mapping,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
 
     async def upload(self, meta: Meta) -> bool | None:
         common = Common(config=self.config)
