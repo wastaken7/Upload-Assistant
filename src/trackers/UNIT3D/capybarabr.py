@@ -296,9 +296,6 @@ class CapybaraBR(UNIT3D):
                         else:
                             audio_tag = ""
 
-                if not audio_tag and (meta.dual_audio or "dual-audio" in (meta.audio or "").lower()):
-                    audio_tag = " DUAL"
-
                 if audio_tag:
                     if "-" in cbr_name:
                         parts = cbr_name.rsplit("-", 1)

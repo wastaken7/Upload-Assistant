@@ -30,6 +30,8 @@ class PeerGarden(UNIT3D):
         "MUSIC",
     )
     tracker_urls = ("peergarden",)
+    allows_dupes = True
+    exact_match_only = True
 
     def __init__(self, config: Config) -> None:
         """Initialize the PeerGarden tracker adapter."""
@@ -69,7 +71,7 @@ class PeerGarden(UNIT3D):
         resolved_category = category if category else meta.category
         if resolved_category == "BOOK":
             resolved_category = "AUDIOBOOK" if meta.audiobook else "BOOK"
-        if meta.anime:
+        if meta.anime and resolved_category == "TV":
             resolved_category = "ANIME"
 
         return {"category_id": category_id.get(resolved_category, "0")}

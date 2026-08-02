@@ -357,7 +357,9 @@ def test_album_title_containing_ost_letters_is_not_a_soundtrack():
 
 def test_orpheus_preserves_multiple_artists_and_release_namespace():
     release = MusicRelease(root=".")
-    release.tracks.append(AudioTrack(path="track.flac", relative_path="track.flac", format="FLAC", codec="FLAC", bit_depth=16, sample_rate=44_100, title="No Church in the Wild", track_number=1))
+    release.tracks.append(
+        AudioTrack(path="track.flac", relative_path="track.flac", format="FLAC", codec="FLAC", bit_depth=16, sample_rate=44_100, title="No Church in the Wild", track_number=1)
+    )
     for field, value in {
         "artists": ["Jay-Z", "Kanye West"],
         "artist": "Jay-Z & Kanye West",
@@ -371,7 +373,7 @@ def test_orpheus_preserves_multiple_artists_and_release_namespace():
         release.set_field(field, value, MetadataSource.FILE_TAG, 1.0)
 
     adapter = Orpheus({"TRACKERS": {"ORPHEUS": {}}})
-    payload = adapter.build_upload_payload(Meta(category="MUSIC", cover="https://images.example/cover.jpg"), release)
+    payload = adapter.build_upload_payload(Meta(category="MUSIC", artwork_url="https://images.example/cover.jpg"), release)
 
     assert payload["artists[]"] == ["Jay-Z", "Kanye West"]
     assert payload["importance[]"] == [1, 1]
@@ -442,7 +444,9 @@ def test_orpheus_album_description_includes_track_and_total_durations():
 def test_orpheus_debug_renders_payload_without_public_cover_url():
     """Debug must inspect an embedded/local cover without hosting or blocking."""
     release = MusicRelease(root=".")
-    release.tracks.append(AudioTrack(path="single.flac", relative_path="single.flac", format="FLAC", codec="FLAC", bit_depth=16, sample_rate=44_100, title="Single", track_number=1))
+    release.tracks.append(
+        AudioTrack(path="single.flac", relative_path="single.flac", format="FLAC", codec="FLAC", bit_depth=16, sample_rate=44_100, title="Single", track_number=1)
+    )
     for field, value in {"artist": "Artist", "artists": ["Artist"], "album": "Album", "year": "2024", "media": "WEB", "release_type": "Single"}.items():
         release.set_field(field, value, MetadataSource.FILE_TAG, 1.0)
     meta = Meta(category="MUSIC", debug=True, music_release=release.to_dict())
@@ -462,7 +466,9 @@ def test_orpheus_form_values_include_ogg_and_current_release_types():
 
 def test_orpheus_uses_concrete_release_year_for_required_edition_year():
     release = MusicRelease(root=".")
-    release.tracks.append(AudioTrack(path="track.flac", relative_path="track.flac", format="FLAC", codec="FLAC", bit_depth=16, sample_rate=44_100, title="Track", track_number=1))
+    release.tracks.append(
+        AudioTrack(path="track.flac", relative_path="track.flac", format="FLAC", codec="FLAC", bit_depth=16, sample_rate=44_100, title="Track", track_number=1)
+    )
     for field, value in {
         "artist": "Artist",
         "artists": ["Artist"],
@@ -504,7 +510,21 @@ def test_nfo_enrichment_is_auxiliary_and_sidecars_are_checked_without_hashing(tm
     (tmp_path / "release.m3u").write_text("01-track.flac\n", encoding="utf-8")
     (tmp_path / "release.sfv").write_text("01-track.flac 1234ABCD\n", encoding="utf-8")
     release = MusicRelease(root=str(tmp_path))
-    release.tracks.append(AudioTrack(path=str(tmp_path / "01-track.flac"), relative_path="01-track.flac", format="FLAC", codec="FLAC", bit_depth=24, sample_rate=48_000, artist="Artist", album_artist="Artist", album="Album", title="Track", date="2026"))
+    release.tracks.append(
+        AudioTrack(
+            path=str(tmp_path / "01-track.flac"),
+            relative_path="01-track.flac",
+            format="FLAC",
+            codec="FLAC",
+            bit_depth=24,
+            sample_rate=48_000,
+            artist="Artist",
+            album_artist="Artist",
+            album="Album",
+            title="Track",
+            date="2026",
+        )
+    )
     analyzer = MusicReleaseAnalyzer()
     for path in (tmp_path / "release.nfo", tmp_path / "release.m3u", tmp_path / "release.sfv"):
         analyzer._classify_auxiliary(release, path, tmp_path)
@@ -649,7 +669,7 @@ def test_musicbrainz_prefers_matching_cd_barcode_over_same_track_count_vinyl():
                 "title": "Seventh Son of a Seventh Son",
                 "score": "100",
                 "barcode": "881034121455",
-                "media": [{"format": '12\" Vinyl', "track-count": 8}],
+                "media": [{"format": '12" Vinyl', "track-count": 8}],
             },
             {
                 "id": "correct-cd",
@@ -672,10 +692,7 @@ def test_musicbrainz_prefers_matching_cd_barcode_over_same_track_count_vinyl():
 
 def test_external_single_cannot_override_an_album_length_local_release():
     release = MusicRelease(root=".")
-    release.tracks = [
-        AudioTrack(path=f"{index}.flac", relative_path=f"{index}.flac", format="FLAC", codec="FLAC", duration=150)
-        for index in range(18)
-    ]
+    release.tracks = [AudioTrack(path=f"{index}.flac", relative_path=f"{index}.flac", format="FLAC", codec="FLAC", duration=150) for index in range(18)]
     release.set_field("artist", "RiN", MetadataSource.FILE_TAG, 1.0)
     release.set_field("album", "NOSTALGIA", MetadataSource.FILE_TAG, 1.0)
     release.set_field("release_type", "Album", MetadataSource.INFERRED, 0.65)
@@ -689,9 +706,7 @@ def test_external_single_cannot_override_an_album_length_local_release():
 
 
 def test_music_discogs_cli_ids_keep_user_requested_identifiers(tmp_path):
-    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse(
-        [str(tmp_path), "--music-discogs-id", "master/67890", "--music-discogs-release-id", "12345"], Meta()
-    )
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--music-discogs-id", "master/67890", "--music-discogs-release-id", "12345"], Meta())
     release = MusicRelease(root=str(tmp_path))
 
     release_id, master_id = _discogs_ids(meta, release)
@@ -936,9 +951,9 @@ def test_orpheus_async_multipart_uses_mapping_and_repeats_list_fields():
 
 
 def test_gather_music_prep_generates_mediainfo(tmp_path):
-    from src.music.prep import gather_music_prep
     from src.music.models import AudioTrack, MusicRelease
-    
+    from src.music.prep import gather_music_prep
+
     meta = Meta(
         category="MUSIC",
         path=str(tmp_path),
@@ -946,7 +961,7 @@ def test_gather_music_prep_generates_mediainfo(tmp_path):
         base_dir=str(tmp_path),
         edit=False,
     )
-    
+
     release = MusicRelease(root=str(tmp_path))
     track = AudioTrack(
         path=str(tmp_path / "01.flac"),
@@ -957,16 +972,16 @@ def test_gather_music_prep_generates_mediainfo(tmp_path):
     dummy_file = tmp_path / "01.flac"
     dummy_file.write_bytes(b"dummy audio content")
     release.tracks.append(track)
-    
+
     mock_mi = {"media": {"track": [{"@type": "General", "Format": "FLAC"}]}}
-    
+
     with (
         patch.object(MusicReleaseAnalyzer, "analyze", return_value=release),
         patch("src.exportmi.export_info", new=AsyncMock(return_value=mock_mi)) as mock_export_info,
         patch("src.music.prep.prepare_music_cover", new=AsyncMock(return_value="")),
     ):
         asyncio.run(gather_music_prep(meta, {"DEFAULT": {}}))
-        
+
     assert meta.mediainfo == mock_mi
     mock_export_info.assert_awaited_once_with(
         str(dummy_file),
@@ -975,4 +990,3 @@ def test_gather_music_prep_generates_mediainfo(tmp_path):
         meta.base_dir,
         is_dvd=False,
     )
-

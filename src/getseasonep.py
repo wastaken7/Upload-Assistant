@@ -8,10 +8,11 @@ from pathlib import Path
 from typing import Any, cast
 
 import anitopy
+import cli_ui
 import guessit
 import httpx
 
-from src.console import console, logger
+from src.console import console, logger, prompt_in_thread
 from src.exceptions import *  # noqa: F403
 from src.meta import Meta
 from src.tags import get_tag
@@ -358,11 +359,13 @@ class SeasonEpisodeManager:
                     logger.info(f"[yellow]... and {remaining_files} more files")
 
                     if remaining_files > batch_size:
-                        response = await asyncio.to_thread(
-                            input, f"Show (n)ext {batch_size} files, (a)ll remaining files, (c)ontinue with incomplete pack, or (q)uit? (n/a/c/Q): "
+                        response = await prompt_in_thread(
+                            cli_ui.ask_string, f"Show (n)ext {batch_size} files, (a)ll remaining files, (c)ontinue with incomplete pack, or (q)uit? (n/a/c/Q): "
                         )
                     else:
-                        response = await asyncio.to_thread(input, f"Show (a)ll remaining {remaining_files} files, (c)ontinue with incomplete pack, or (q)uit? (a/c/Q): ")
+                        response = await prompt_in_thread(
+                            cli_ui.ask_string, f"Show (a)ll remaining {remaining_files} files, (c)ontinue with incomplete pack, or (q)uit? (a/c/Q): "
+                        )
 
                     if response.lower() == "n" and remaining_files > batch_size:
                         # Show next batch of files
@@ -385,7 +388,7 @@ class SeasonEpisodeManager:
 
                 # Final confirmation if not in unattended mode
                 if (not unattended or unattended_confirm) and not just_go:
-                    response = await asyncio.to_thread(input, "Continue with incomplete season pack? (y/N): ")
+                    response = await prompt_in_thread(cli_ui.ask_string, "Continue with incomplete season pack? (y/N): ")
                     if response.lower() != "y":
                         logger.info("[red]Aborting torrent creation due to incomplete season pack")
                         sys.exit(1)

@@ -377,7 +377,6 @@ const argumentCategories = [
       },
       { label: "--untouched", description: "Mark as untouched disc" },
       { label: "--menus", description: "Path to menus screenshots (PNGs)" },
-      { label: "--menu", description: "Path to menus screenshots (alias)" },
       {
         label: "--manual_dvds",
         placeholder: "2xDVD9+DVD5",
@@ -2171,14 +2170,14 @@ function AudionutsUAGUI() {
     }
   };
 
-  const addExecutionScreenshot = async () => {
+  const addExecutionScreenshot = async (group = "main") => {
     if (!sessionId || screenshotActionId || !canAddExecutionScreenshot) return;
     setScreenshotActionId("add");
     try {
       const response = await apiFetch(`${API_BASE}/execution_screenshots/add`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId }),
+        body: JSON.stringify({ session_id: sessionId, group }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.success) {
@@ -3713,6 +3712,22 @@ function AudionutsUAGUI() {
     const expandedItem = executionScreenshots.find(
       (screenshot) => screenshot.id === expandedScreenshot,
     );
+    const screenshotGroups = executionScreenshots.reduce(
+      (groups, screenshot) => {
+        const group = screenshot.group || "main";
+        (groups[group] ||= []).push(screenshot);
+        return groups;
+      },
+      {},
+    );
+    const screenshotGroupLabel = (group) => {
+      if (group === "main") return "Main";
+      return group.startsWith("PLAYLIST_")
+        ? `Extra playlist ${group.slice("PLAYLIST_".length)}`
+        : group.startsWith("FILE_")
+          ? `Extra disc ${group.slice("FILE_".length)}`
+          : "Extra disc";
+    };
     return (
       <>
         <div className="flex flex-col h-full">
@@ -3735,7 +3750,7 @@ function AudionutsUAGUI() {
                 </p>
               </div>
               <button
-                onClick={addExecutionScreenshot}
+                onClick={() => addExecutionScreenshot("main")}
                 disabled={isWorking || !canAddExecutionScreenshot}
                 className="p-2 rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
                 title="Capture an additional screenshot"
@@ -3754,119 +3769,153 @@ function AudionutsUAGUI() {
                 appear here as soon as the local capture is complete.
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {executionScreenshots.map((screenshot, index) => {
-                  const replacing =
-                    screenshotActionId === `replace:${screenshot.id}`;
-                  const deleting =
-                    screenshotActionId === `delete:${screenshot.id}`;
-                  const undoing =
-                    screenshotActionId === `undo:${screenshot.id}`;
-                  const screenshotState =
-                    screenshot.source === "remote"
-                      ? "Remote"
-                      : screenshot.source === "replacement"
-                        ? "Pending upload"
-                        : screenshot.source === "addition"
-                          ? "Pending upload"
-                          : "Local";
-                  const screenshotStateClass =
-                    screenshot.source === "remote"
-                      ? isDarkMode
-                        ? "bg-sky-950 text-sky-300"
-                        : "bg-sky-100 text-sky-700"
-                      : screenshot.source === "replacement"
-                        ? isDarkMode
-                          ? "bg-amber-950 text-amber-300"
-                          : "bg-amber-100 text-amber-700"
-                        : screenshot.source === "addition"
-                          ? isDarkMode
-                            ? "bg-emerald-950 text-emerald-300"
-                            : "bg-emerald-100 text-emerald-700"
-                          : isDarkMode
-                            ? "bg-gray-700 text-gray-300"
-                            : "bg-gray-100 text-gray-600";
-                  return (
-                    <article
-                      key={screenshot.id}
-                      className={`rounded-xl overflow-hidden border ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
-                    >
-                      <img
-                        src={screenshot.image_url}
-                        alt={`Screenshot ${index + 1}`}
-                        className={`w-full aspect-video object-contain bg-black transition-all duration-300 ${replacing ? "opacity-35 brightness-50" : "opacity-100 brightness-100"}`}
-                        loading="lazy"
-                      />
-                      <div className="p-2.5 flex items-center justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${screenshotStateClass}`}
-                          >
-                            {screenshotState}
-                          </span>
-                          <span
-                            className={`mt-1 block truncate text-[11px] font-mono ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                            title={screenshot.filename}
-                          >
-                            {screenshot.filename}
-                          </span>
-                        </div>
-                        <div className="flex gap-1.5 flex-shrink-0">
-                          {screenshot.can_replace && (
-                            <button
-                              onClick={() =>
-                                changeExecutionScreenshot(
-                                  screenshot.id,
-                                  "replace",
-                                )
-                              }
-                              disabled={isWorking}
-                              className="px-2 py-1 text-xs rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
-                            >
-                              {replacing ? "Generating…" : "Replace"}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => setExpandedScreenshot(screenshot.id)}
-                            disabled={isWorking}
-                            className={`p-1.5 rounded-md disabled:opacity-50 ${isDarkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
-                            title={`Expand ${screenshot.filename}`}
-                            aria-label={`Expand ${screenshot.filename}`}
-                          >
-                            <ExpandIcon />
-                          </button>
-                          {screenshot.can_delete && (
-                            <button
-                              onClick={() =>
-                                changeExecutionScreenshot(
-                                  screenshot.id,
-                                  "delete",
-                                )
-                              }
-                              disabled={isWorking}
-                              className="p-1.5 rounded-md text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-50"
-                              title={`Delete ${screenshot.filename}`}
-                            >
-                              {deleting ? <SpinnerIcon /> : <TrashIcon />}
-                            </button>
-                          )}
-                          {screenshot.source === "replacement" && (
-                            <button
-                              onClick={() =>
-                                changeExecutionScreenshot(screenshot.id, "undo")
-                              }
-                              disabled={isWorking}
-                              className={`px-2 py-1 text-xs rounded-md disabled:opacity-50 ${isDarkMode ? "bg-gray-700 text-gray-100 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
-                              title="Restore the original remote screenshot"
-                            >
-                              {undoing ? "Restoring…" : "Undo"}
-                            </button>
-                          )}
-                        </div>
+              <div className="space-y-5">
+                {Object.entries(screenshotGroups).map(
+                  ([group, screenshots]) => (
+                    <section key={group}>
+                      <div
+                        className={`mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+                      >
+                        <span>{screenshotGroupLabel(group)}</span>
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 normal-case tracking-normal ${isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"}`}
+                        >
+                          {screenshots.length}
+                        </span>
+                        <button
+                          onClick={() => addExecutionScreenshot(group)}
+                          disabled={isWorking || !canAddExecutionScreenshot}
+                          className="ml-auto rounded-md bg-purple-600 px-2 py-1 normal-case tracking-normal text-white hover:bg-purple-700 disabled:opacity-50"
+                        >
+                          Add to this group
+                        </button>
                       </div>
-                    </article>
-                  );
-                })}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {screenshots.map((screenshot, index) => {
+                          const replacing =
+                            screenshotActionId === `replace:${screenshot.id}`;
+                          const deleting =
+                            screenshotActionId === `delete:${screenshot.id}`;
+                          const undoing =
+                            screenshotActionId === `undo:${screenshot.id}`;
+                          const screenshotState =
+                            screenshot.source === "remote"
+                              ? "Remote"
+                              : screenshot.source === "replacement"
+                                ? "Pending upload"
+                                : screenshot.source === "addition"
+                                  ? "Pending upload"
+                                  : "Local";
+                          const screenshotStateClass =
+                            screenshot.source === "remote"
+                              ? isDarkMode
+                                ? "bg-sky-950 text-sky-300"
+                                : "bg-sky-100 text-sky-700"
+                              : screenshot.source === "replacement"
+                                ? isDarkMode
+                                  ? "bg-amber-950 text-amber-300"
+                                  : "bg-amber-100 text-amber-700"
+                                : screenshot.source === "addition"
+                                  ? isDarkMode
+                                    ? "bg-emerald-950 text-emerald-300"
+                                    : "bg-emerald-100 text-emerald-700"
+                                  : isDarkMode
+                                    ? "bg-gray-700 text-gray-300"
+                                    : "bg-gray-100 text-gray-600";
+                          return (
+                            <article
+                              key={screenshot.id}
+                              className={`rounded-xl overflow-hidden border ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
+                            >
+                              <img
+                                src={screenshot.image_url}
+                                alt={`Screenshot ${index + 1}`}
+                                className={`w-full aspect-video object-contain bg-black transition-all duration-300 ${replacing ? "opacity-35 brightness-50" : "opacity-100 brightness-100"}`}
+                                loading="lazy"
+                              />
+                              <div className="p-2.5 flex items-center justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <span
+                                    className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${screenshotStateClass}`}
+                                  >
+                                    {screenshotState}
+                                  </span>
+                                  <span
+                                    className={`mt-1 block truncate text-[11px] font-mono ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                                    title={screenshot.filename}
+                                  >
+                                    {screenshot.filename}
+                                  </span>
+                                </div>
+                                <div className="flex gap-1.5 flex-shrink-0">
+                                  {screenshot.can_replace && (
+                                    <button
+                                      onClick={() =>
+                                        changeExecutionScreenshot(
+                                          screenshot.id,
+                                          "replace",
+                                        )
+                                      }
+                                      disabled={isWorking}
+                                      className="px-2 py-1 text-xs rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
+                                    >
+                                      {replacing ? "Generating…" : "Replace"}
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() =>
+                                      setExpandedScreenshot(screenshot.id)
+                                    }
+                                    disabled={isWorking}
+                                    className={`p-1.5 rounded-md disabled:opacity-50 ${isDarkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
+                                    title={`Expand ${screenshot.filename}`}
+                                    aria-label={`Expand ${screenshot.filename}`}
+                                  >
+                                    <ExpandIcon />
+                                  </button>
+                                  {screenshot.can_delete && (
+                                    <button
+                                      onClick={() =>
+                                        changeExecutionScreenshot(
+                                          screenshot.id,
+                                          "delete",
+                                        )
+                                      }
+                                      disabled={isWorking}
+                                      className="p-1.5 rounded-md text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-50"
+                                      title={`Delete ${screenshot.filename}`}
+                                    >
+                                      {deleting ? (
+                                        <SpinnerIcon />
+                                      ) : (
+                                        <TrashIcon />
+                                      )}
+                                    </button>
+                                  )}
+                                  {screenshot.source === "replacement" && (
+                                    <button
+                                      onClick={() =>
+                                        changeExecutionScreenshot(
+                                          screenshot.id,
+                                          "undo",
+                                        )
+                                      }
+                                      disabled={isWorking}
+                                      className={`px-2 py-1 text-xs rounded-md disabled:opacity-50 ${isDarkMode ? "bg-gray-700 text-gray-100 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                                      title="Restore the original remote screenshot"
+                                    >
+                                      {undoing ? "Restoring…" : "Undo"}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ),
+                )}
               </div>
             )}
           </div>

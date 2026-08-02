@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import re
 from typing import Any
 
 from src.languages import languages_manager
@@ -232,8 +233,13 @@ class MidnightScene(UNIT3D):
 
         if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
+
         audio_languages: list[str] = [] if not meta.audio_languages else meta.audio_languages
-        if audio_languages and not await languages_manager.has_english_language(audio_languages):
+        has_english_audio = await languages_manager.has_english_language(audio_languages)
+
+        if audio_languages and not has_english_audio:
+            ms_name = re.sub(r"\bDual-Audio\b", "", ms_name, flags=re.IGNORECASE)
+            ms_name = " ".join(ms_name.split())
             foreign_lang = audio_languages[0].upper()
             if name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
                 if meta.year:

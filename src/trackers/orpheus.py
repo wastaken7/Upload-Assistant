@@ -554,7 +554,7 @@ class Orpheus:
         Facebook CDN and Photobucket hosts.  Invalid or disallowed URLs are
         omitted rather than being submitted as a local path.
         """
-        value = str(meta.cover or "").strip()
+        value = str(meta.artwork_url or "").strip()
         parsed = urlparse(value)
         host = (parsed.hostname or "").casefold()
         banned_hosts = ("discogs.com", "fbcdn.net", "photobucket.com")

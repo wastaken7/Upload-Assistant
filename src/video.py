@@ -189,7 +189,7 @@ class VideoManager:
             except IndexError:
                 logger.info("[bold red]No Video files found")
                 if mode == "cli":
-                    exit()
+                    raise SystemExit(1) from None
                 return "", []
         else:
             video = videoloc

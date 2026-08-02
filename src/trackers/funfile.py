@@ -431,7 +431,7 @@ class FunFile:
         }
 
     async def get_poster(self, meta: Meta) -> tuple[str, bytes, str] | None:
-        poster_url = meta.poster
+        poster_url = meta.artwork_url
 
         if poster_url:
             async with httpx.AsyncClient() as client:

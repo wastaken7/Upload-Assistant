@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 from rich.markup import escape
 
 from cogs.redaction import Redaction
-from src.console import logger
+from src.console import buffer_console_logs, logger
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
@@ -355,7 +355,12 @@ class GreatPosterWall:
                 tags = ", ".join(unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("utf-8").replace(" ", ".").lower() for name in genre_names)
 
         if not tags:
-            tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Enter the genres (in {self.tracker} format): ")
+            if meta.unattended and not meta.unattended_confirm:
+                logger.info(f"{self.tracker}: [yellow]Unattended mode: Enter genres not available. Skipping {self.tracker} upload.[/yellow]")
+                meta.skipping = f"{self.tracker}"
+                return ""
+            async with buffer_console_logs():
+                tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Enter the genres (in {self.tracker} format): ")
             tags = (tags_raw or "").strip()
 
         return tags
@@ -713,7 +718,7 @@ class GreatPosterWall:
             "data_source": data_source,
             "identifier": identifier,
             "desc": self.tmdb_data.get("overview", ""),
-            "image": f"https://image.tmdb.org/t/p/original{meta.tmdb_poster}",
+            "image": f"https://image.tmdb.org/t/p/original{meta.tmdb_poster_path}",
             "maindesc": meta.overview,
             "name": meta.title,
             "releasetype": self._get_movie_type(meta),
@@ -815,23 +820,30 @@ class GreatPosterWall:
             english_name = first_director_name
             chinese_name = ""
         else:
+            if meta.unattended and not meta.unattended_confirm:
+                logger.info(f"{self.tracker}: [yellow]Unattended mode: Director details required for movie missing in database. Skipping {self.tracker} upload.[/yellow]")
+                meta.skipping = f"{self.tracker}"
+                return {}
             logger.info(f"{self.tracker}: This movie is not registered in the {self.tracker} database, please enter the details of 1 director")
 
             imdb_id = ""
             while not re.match(r"^nm\d+$", imdb_id):
-                imdb_id_raw = await asyncio.to_thread(cli_ui.ask_string, "Enter Director IMDb ID (e.g., nm0000138): ")
+                async with buffer_console_logs():
+                    imdb_id_raw = await asyncio.to_thread(cli_ui.ask_string, "Enter Director IMDb ID (e.g., nm0000138): ")
                 imdb_id = (imdb_id_raw or "").strip()
                 if not re.match(r"^nm\d+$", imdb_id):
                     logger.info(f"{self.tracker}: [red]Invalid IMDb person ID. Format must be like nm0000138.[/red]")
 
             english_name = ""
             while not english_name:
-                english_name_raw = await asyncio.to_thread(cli_ui.ask_string, "Enter Director English name: ")
+                async with buffer_console_logs():
+                    english_name_raw = await asyncio.to_thread(cli_ui.ask_string, "Enter Director English name: ")
                 english_name = (english_name_raw or "").strip()
                 if not english_name:
                     logger.info(f"{self.tracker}: [red]Director English name cannot be empty.[/red]")
 
-            chinese_name_raw = await asyncio.to_thread(cli_ui.ask_string, "Enter Director Chinese name (optional, press Enter to skip): ")
+            async with buffer_console_logs():
+                chinese_name_raw = await asyncio.to_thread(cli_ui.ask_string, "Enter Director Chinese name (optional, press Enter to skip): ")
             chinese_name = (chinese_name_raw or "").strip()
 
         artists: list[str] = [english_name]
@@ -1105,8 +1117,12 @@ class GreatPosterWall:
         return data
 
     async def upload(self, meta: Meta) -> bool:
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         data = await self.fetch_data(meta)
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
 
         if not meta.debug:
             response_data = ""
