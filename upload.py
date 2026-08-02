@@ -54,6 +54,7 @@ from src.get_name import NameManager
 from src.get_tracker_data import TrackerDataManager
 from src.qbitwait import Wait
 from src.queuemanage import QueueManager
+from src.rehostimages import check_tracker_image_hosts
 from src.takescreens import TakeScreensManager
 from src.temp_paths import covers_dir, posters_dir, screenshots_dir
 from src.torrentcreate import TorrentCreator
@@ -789,7 +790,7 @@ def _music_field(meta: Meta, field: str) -> Any:
     value = entry.get("value")
     if value not in (None, ""):
         return value
-    return {"artist": meta.artist, "album": meta.title, "year": meta.year, "media": meta.source, "cover_url": meta.cover}.get(field, "")
+    return {"artist": meta.artist, "album": meta.title, "year": meta.year, "media": meta.source, "cover_url": meta.artwork_url}.get(field, "")
 
 
 def _music_field_source(meta: Meta, field: str) -> str:
@@ -820,7 +821,7 @@ def _set_music_field(meta: Meta, field: str, value: str | int, *, source: str = 
     elif field == "media":
         meta.source = str(value)
     elif field == "cover_url":
-        meta.cover = str(value)
+        meta.artwork_url = str(value)
 
 
 def _is_http_url(value: Any) -> bool:
@@ -912,7 +913,7 @@ def _music_cover_allowed_hosts(config: Mapping[str, Any], trackers: Iterable[Any
 
 
 async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensManager, allowed_hosts: list[str] | None = None) -> None:
-    """Host MUSIC artwork and publish it through the shared ``meta.covers`` API."""
+    """Host MUSIC artwork and publish it through the shared artwork API."""
     if meta.debug:
         logger.info("[yellow]MUSIC debug: image-host upload skipped.[/yellow]")
         return
@@ -927,31 +928,31 @@ async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensMana
             cached_cover = cached[0] if isinstance(cached, list) and cached else {}
             cached_url = cached_cover.get("raw_url", "") if isinstance(cached_cover, dict) else ""
             if _is_http_url(cached_url):
-                meta.cover = str(cached_url)
-                meta.covers = cached
-                _set_music_field(meta, "cover_url", meta.cover, source="external")
+                meta.artwork_url = str(cached_url)
+                meta.hosted_artwork = cached
+                _set_music_field(meta, "cover_url", meta.artwork_url, source="external")
                 return
     except (OSError, ValueError, TypeError) as error:
         logger.debug(f"[yellow]MUSIC: ignored unusable artwork cache: {error}[/yellow]")
 
-    cover_path = Path(str(meta.cover_path or ""))
-    if not cover_path.is_file() and _is_http_url(meta.cover):
-        cover_path = covers_dir(meta.base_dir, str(meta.uuid)) / "music_cover.jpg"
-        content = await asyncio.to_thread(_download_music_cover, meta.cover)
+    artwork_path = Path(str(meta.artwork_path or ""))
+    if not artwork_path.is_file() and _is_http_url(meta.artwork_url):
+        artwork_path = covers_dir(meta.base_dir, str(meta.uuid)) / "music_cover.jpg"
+        content = await asyncio.to_thread(_download_music_cover, meta.artwork_url)
         if content is None:
             return
         try:
-            cover_path.parent.mkdir(parents=True, exist_ok=True)
-            await asyncio.to_thread(cover_path.write_bytes, content)
-            meta.cover_path = str(cover_path)
+            artwork_path.parent.mkdir(parents=True, exist_ok=True)
+            await asyncio.to_thread(artwork_path.write_bytes, content)
+            meta.artwork_path = str(artwork_path)
         except OSError as error:
             logger.warning(f"[yellow]MUSIC: could not save downloaded artwork for image hosting: {error}[/yellow]")
             return
-    if not cover_path.is_file():
+    if not artwork_path.is_file():
         return
 
     try:
-        uploaded, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [str(cover_path)], {}, allowed_hosts=allowed_hosts)
+        uploaded, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [str(artwork_path)], {}, allowed_hosts=allowed_hosts)
     except Exception as error:
         logger.warning(f"[yellow]MUSIC: artwork host upload failed: {error}[/yellow]")
         return
@@ -959,9 +960,9 @@ async def _host_music_cover(meta: Meta, uploadscreens_manager: UploadScreensMana
         logger.warning("[yellow]MUSIC: image host did not return a usable artwork URL.[/yellow]")
         return
 
-    meta.cover = str(uploaded[0]["raw_url"])
-    meta.covers = uploaded
-    _set_music_field(meta, "cover_url", meta.cover, source="external")
+    meta.artwork_url = str(uploaded[0]["raw_url"])
+    meta.hosted_artwork = uploaded
+    _set_music_field(meta, "cover_url", meta.artwork_url, source="external")
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     async with aiofiles.open(cache_path, "w", encoding="utf-8") as file:
         await file.write(json.dumps(uploaded, indent=2))
@@ -1097,16 +1098,16 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
     # Load covers.json if it exists and not already present in meta
     covers_file = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/covers.json"
-    if Path(covers_file).exists() and not meta.covers:
+    if Path(covers_file).exists() and not meta.hosted_artwork:
         try:
             async with aiofiles.open(covers_file, encoding="utf-8") as f:
                 content = await f.read()
                 loaded_covers: list[dict[str, Any]] | None = json.loads(content)
                 if isinstance(loaded_covers, list):
-                    meta.covers = loaded_covers
-                    logger.debug(f"[green]Loaded {len(loaded_covers)} covers from covers.json into meta.covers")
+                    meta.hosted_artwork = loaded_covers
+                    logger.debug(f"[green]Loaded {len(loaded_covers)} hosted artwork records from covers.json")
         except Exception as e:
-            logger.debug(f"[red]Error loading covers.json into meta.covers: {e}")
+            logger.debug(f"[red]Error loading covers.json into meta.hosted_artwork: {e}")
 
     parser: Any = Args(config)
     helper: Any = UploadHelper(config)
@@ -1783,7 +1784,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                             logger.debug(
                                 f"[cyan]Image host debug: post-upload before {tracker_name}.check_image_hosts() image_list={len(meta.image_list or [])} {key}={len(getattr(meta, key, []) or [])}[/cyan]"
                             )
-                        await tracker_instance.check_image_hosts(meta)
+                        await check_tracker_image_hosts(meta, tracker_instance)
                         if meta.debug:
                             key = f"{tracker_name}_images_key"
                             logger.debug(
@@ -1804,27 +1805,27 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
 
             # Host book cover if it's a BOOK and save to covers.json
             if meta.category == "BOOK":
-                cover_path = meta.cover_path
-                poster_url = meta.poster
-                if not cover_path and poster_url:
-                    if Path(poster_url).exists():
-                        cover_path = poster_url
+                artwork_path = meta.artwork_path
+                artwork_url = meta.artwork_url
+                if not artwork_path and artwork_url:
+                    if Path(artwork_url).exists():
+                        artwork_path = artwork_url
                     else:
                         poster_jpg_path = str(posters_dir(meta.base_dir, meta.uuid) / "poster.jpg")
                         try:
                             import urllib.parse
                             import urllib.request
 
-                            parsed_url = urllib.parse.urlparse(poster_url)
+                            parsed_url = urllib.parse.urlparse(artwork_url)
                             if parsed_url.scheme in ("http", "https"):
                                 Path(poster_jpg_path).parent.mkdir(parents=True, exist_ok=True)
-                                urllib.request.urlretrieve(poster_url, poster_jpg_path)  # noqa: S310
-                                cover_path = poster_jpg_path
-                                meta.cover_path = cover_path
+                                await asyncio.to_thread(urllib.request.urlretrieve, artwork_url, poster_jpg_path)
+                                artwork_path = poster_jpg_path
+                                meta.artwork_path = artwork_path
                         except Exception as e:
-                            logger.error(f"[red]Error downloading cover from {poster_url}: {e}[/red]")
+                            logger.error(f"[red]Error downloading artwork from {artwork_url}: {e}[/red]")
 
-                if cover_path and Path(cover_path).exists():
+                if artwork_path and Path(artwork_path).exists():
                     covers_file = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/covers.json"
                     use_cached_cover = False
                     if Path(covers_file).exists():
@@ -1834,19 +1835,19 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                                 loaded_covers = json.loads(content)
                                 if isinstance(loaded_covers, list) and len(loaded_covers) > 0 and loaded_covers[0].get("raw_url"):
                                     use_cached_cover = True
-                                    meta.covers = loaded_covers
+                                    meta.hosted_artwork = loaded_covers
                                     logger.debug(f"[green]Using cached cover from covers.json: {loaded_covers[0]['raw_url']}")
                         except Exception as e:
                             logger.debug(f"[red]Error reading covers.json cache: {e}")
 
                     if not use_cached_cover:
                         try:
-                            uploaded_cover, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [cover_path], {})
+                            uploaded_cover, _ = await uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [artwork_path], {})
                             if uploaded_cover and len(uploaded_cover) > 0:
                                 Path(covers_file).parent.mkdir(parents=True, exist_ok=True)
                                 async with aiofiles.open(covers_file, "w", encoding="utf-8") as f:
                                     await f.write(json.dumps(uploaded_cover, indent=4))
-                                meta.covers = uploaded_cover
+                                meta.hosted_artwork = uploaded_cover
                                 logger.debug(f"[green]Successfully uploaded book cover and saved to covers.json: {uploaded_cover[0].get('raw_url')}")
                             else:
                                 logger.error("[red]Failed to upload book cover: upload_screens returned empty result")

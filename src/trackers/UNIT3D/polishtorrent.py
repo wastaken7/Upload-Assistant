@@ -29,6 +29,21 @@ class PolishTorrent(UNIT3D):
         self.config: Config = config
         self.common = Common(config)
 
+    async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        category_id = {
+            "MOVIE": "1",
+            "TV": "9",
+        }
+        if mapping_only:
+            return category_id
+        if reverse:
+            return {v: k for k, v in category_id.items()}
+        if category:
+            return {"category_id": category_id.get(category, "0")}
+        meta_category = meta.category
+        resolved_id = category_id.get(meta_category, "0")
+        return {"category_id": resolved_id}
+
     async def get_name(self, meta: Meta) -> dict[str, str]:
         ptt_name = meta.name
         imdb_info = meta.imdb_info

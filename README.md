@@ -102,6 +102,7 @@ This branch introduces new media categories and automation features not present 
 | <img src="web_ui/static/img/trackers/bjshare.png" width="16" height="16" />                | BrasilJapão-Share      | BJSHARE                | MOVIE, TV, BOOK, GAME        |
 | <img src="web_ui/static/img/trackers/brasiltracker.png" width="16" height="16" />          | BrasilTracker          | BRASILTRACKER          | MOVIE, TV, BOOK, GAME        |
 | <img src="web_ui/static/img/trackers/capybarabr.png" width="16" height="16" />             | CapybaraBR             | CAPYBARABR             | MOVIE, TV, BOOK, GAME        |
+| <img src="web_ui/static/img/trackers/cathoderaytube.png" width="16" height="16" />       | Cathode-Ray.Tube       | CATHODERAYTUBE         | MOVIE, TV, GAME              |
 | <img src="web_ui/static/img/trackers/cinematik.png" width="16" height="16" />              | Cinematik              | CINEMATIK              | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/cinemaz.png" width="16" height="16" />                | CinemaZ                | CINEMAZ                | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/darkpeers.png" width="16" height="16" />              | DarkPeers              | DARKPEERS              | MOVIE, TV, BOOK, GAME, MUSIC |

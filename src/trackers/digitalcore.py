@@ -9,7 +9,7 @@ from cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.trackers.common import Common
 
 Config = dict[str, Any]
@@ -27,6 +27,18 @@ class DigitalCore:
     api_base_url = f"{base_url}/api/v1/torrents"
     banned_groups = ("",)
     approved_image_hosts = ("imgbox", "imgbb", "bhd", "imgur", "postimg", "sharex")
+    image_host_policy = ImageHostPolicy(
+        {
+            "ibb.co": "imgbb",
+            "imgbox.com": "imgbox",
+            "beyondhd.co": "bhd",
+            "imgur.com": "imgur",
+            "postimg.cc": "postimg",
+            "digitalcore.club": "sharex",
+            "img.digitalcore.club": "sharex",
+        },
+        approved_image_hosts,
+    )
     torrent_url = f"{base_url}/torrent/"
     supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
     tracker_urls = ("tracker.digitalcore.club", "trackerprxy.digitalcore.club")
@@ -207,28 +219,9 @@ class DigitalCore:
 
         return tracker_name
 
-    async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "imgbox.com": "imgbox",
-            "beyondhd.co": "bhd",
-            "imgur.com": "imgur",
-            "postimg.cc": "postimg",
-            "digitalcore.club": "sharex",
-            "img.digitalcore.club": "sharex",
-        }
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            url_host_mapping=url_host_mapping,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
-
     async def get_firstpic(self, meta: Meta) -> str:
         if meta.category in ("BOOK", "MUSIC"):
-            covers = meta.covers
+            covers = meta.hosted_artwork
             if isinstance(covers, list) and len(covers) > 0:
                 raw_url = covers[0].get("raw_url")
                 if raw_url:

@@ -94,7 +94,9 @@ class TorrentHR:
         if subs:
             payload["subs[]"] = tuple(subs)
 
-        thr_upload_prompt = True if not meta.debug else cli_ui.ask_yes_no("send to takeupload.php?", default=False)
+        thr_upload_prompt = (
+            True if not meta.debug else (False if (meta.unattended and not meta.unattended_confirm) else cli_ui.ask_yes_no("send to takeupload.php?", default=False))
+        )
 
         if thr_upload_prompt is True:
             await asyncio.sleep(0.5)

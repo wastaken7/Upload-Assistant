@@ -235,16 +235,17 @@ class ToTheGlory:
     async def validate_credentials(self, meta: Meta) -> bool:
         cookiefile = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.pkl").resolve())
         if not Path(cookiefile).exists():
-            await self.login(cookiefile)
+            await self.login(cookiefile, meta)
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
             logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
-            recreate = cli_ui.ask_yes_no("Log in again and create new session?")
-            if recreate is True:
-                if Path(cookiefile).exists():
-                    Path(cookiefile).unlink()
-                await self.login(cookiefile)
-                return await self.validate_cookies(meta, cookiefile)
+            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                recreate = cli_ui.ask_yes_no("Log in again and create new session?")
+                if recreate is True:
+                    if Path(cookiefile).exists():
+                        Path(cookiefile).unlink()
+                    await self.login(cookiefile, meta)
+                    return await self.validate_cookies(meta, cookiefile)
             return False
         return True
 
@@ -261,7 +262,7 @@ class ToTheGlory:
         else:
             return False
 
-    async def login(self, cookiefile: str) -> None:
+    async def login(self, cookiefile: str, meta: Meta | None = None) -> None:
         url = f"{self.base_url}/takelogin.php"
         data: dict[str, Any] = {"username": self.username, "password": self.password, "passid": self.passid, "passan": self.passan}
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
@@ -273,6 +274,9 @@ class ToTheGlory:
                 auth_token = token_input.get("value") if token_input else None
                 if not auth_token:
                     raise UploadError(f"Missing authenticity token during {self.tracker} login", "red")  # noqa #F405
+                if meta and meta.unattended and not meta.unattended_confirm:
+                    logger.error(f"{self.tracker}: [red]Unattended mode: 2FA required. Skipping login.[/red]")
+                    return
                 two_factor_data = {"otp": console.input(f"[yellow]{self.tracker} 2FA Code: "), "authenticity_token": auth_token, "uid": self.uid}
                 two_factor_url = f"{self.base_url}/take2fa.php"
                 response = await client.post(two_factor_url, data=two_factor_data)

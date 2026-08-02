@@ -1,6 +1,7 @@
 # ruff: noqa: S101
 
 import asyncio
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -42,7 +43,7 @@ def test_clients_remote_path_map_parses_stringified_path_lists() -> None:
             {"local_path": "['/local', '/other']", "remote_path": "['/remote', '/elsewhere']"},
         )
 
-    assert asyncio.run(exercise()) == ("/local", "/remote")
+    assert asyncio.run(exercise()) == (os.path.normpath("/local"), os.path.normpath("/remote"))
 
 
 def test_rtorrent_coerce_str_list_parses_stringified_paths() -> None:

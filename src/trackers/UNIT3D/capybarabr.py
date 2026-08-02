@@ -296,9 +296,6 @@ class CapybaraBR(UNIT3D):
                         else:
                             audio_tag = ""
 
-                if not audio_tag and (meta.dual_audio or "dual-audio" in (meta.audio or "").lower()):
-                    audio_tag = " DUAL"
-
                 if audio_tag:
                     if "-" in cbr_name:
                         parts = cbr_name.rsplit("-", 1)
@@ -360,14 +357,6 @@ class CapybaraBR(UNIT3D):
                 )
                 return False
 
-            if not bool(meta.subtitle_files):
-                subtitles = await self.common.check_language_requirements(
-                    meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True
-                )
-                if not subtitles and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
-                    return await self.common.prompt_user_for_confirmation(
-                        f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
-                    )
-                return subtitles
+            return await self.common.check_portuguese_video_requirements(meta, self.tracker)
 
         return True

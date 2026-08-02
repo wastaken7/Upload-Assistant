@@ -29,7 +29,7 @@ class TransmissionClientMixin:
         # Remote path mount
         path = map_save_path(path, local_path, remote_path, trailing_slash=False)
 
-        path = str(Path(path).parent)
+        path = Path(path).parent.as_posix()
 
         if meta.transmission_label is not None:
             label = [meta.transmission_label]

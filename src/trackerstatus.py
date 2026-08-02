@@ -11,7 +11,7 @@ from torf import Torrent
 
 from src.cleanup import cleanup_manager
 from src.clients import Clients
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.dupe_checking import DupeChecker
 from src.imdb import imdb_manager
 from src.meta import Meta
@@ -59,7 +59,9 @@ class TrackerStatusManager:
             if needs_imdb:
                 while True:
                     try:
-                        imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567) or press Enter to skip uploading to trackers requiring it:")
+                        imdb_id = await prompt_in_thread(
+                            cli_ui.ask_string, "Unable to find IMDB id, please enter e.g.(tt1234567) or press Enter to skip uploading to trackers requiring it:"
+                        )
                     except EOFError:
                         logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                         await cleanup_manager.cleanup()
@@ -376,6 +378,9 @@ class TrackerStatusManager:
                     await cleanup_manager.cleanup()
                     cleanup_manager.reset_terminal()
                     sys.exit(1)
+
+                if upload_all:
+                    logger.info("[yellow]Processing approved uploads in the background...[/yellow]")
 
                 for tracker_name, _display_name, _tracker_class in passed_trackers:
                     if tracker_name in ("MANUAL", "USENET"):

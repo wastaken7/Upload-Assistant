@@ -19,6 +19,7 @@ from src.metadata_cache import cache_for, is_cache_miss
 anitopy_parse_fn: Any = cast(Any, anitopy).parse
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
+IMDB_GRAPHQL_HEADERS = {"Content-Type": "application/json", "Referer": "https://www.imdb.com/"}
 
 
 def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -280,7 +281,7 @@ class ImdbManager:
                 response = await client.post(
                     "https://api.graphql.imdb.com/",
                     json=query,
-                    headers={"Content-Type": "application/json"},
+                    headers=IMDB_GRAPHQL_HEADERS,
                     timeout=10,
                 )
                 response.raise_for_status()
@@ -563,7 +564,7 @@ class ImdbManager:
 
             try:
                 async with httpx.AsyncClient() as client:
-                    response = await client.post(url, json=query, headers={"Content-Type": "application/json"}, timeout=10)
+                    response = await client.post(url, json=query, headers=IMDB_GRAPHQL_HEADERS, timeout=10)
                     response.raise_for_status()
                     data = response.json()
             except Exception as e:
@@ -903,7 +904,7 @@ class ImdbManager:
 
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post("https://api.graphql.imdb.com/", json=query, headers={"Content-Type": "application/json"}, timeout=10)
+                response = await client.post("https://api.graphql.imdb.com/", json=query, headers=IMDB_GRAPHQL_HEADERS, timeout=10)
                 response.raise_for_status()
                 data = response.json()
             except Exception as e:

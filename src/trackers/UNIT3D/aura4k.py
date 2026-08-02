@@ -6,7 +6,7 @@ import cli_ui
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
@@ -23,6 +23,17 @@ class Aura4K(UNIT3D):
     allows_bloated_audio = True
     base_url = "https://aura4k.net"
     approved_image_hosts = ("onlyimage", "imgbox", "ptscreens", "imgbb", "imgur", "postimg")
+    image_host_policy = ImageHostPolicy(
+        {
+            "ibb.co": "imgbb",
+            "imgbox.com": "imgbox",
+            "imgur.com": "imgur",
+            "postimg.cc": "postimg",
+            "ptscreens.com": "ptscreens",
+            "onlyimage.org": "onlyimage",
+        },
+        approved_image_hosts,
+    )
     banned_groups = ("BiTOR", "DepraveD", "Flights", "SasukeducK", "SPDVD", "TEKNO3D")
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
@@ -148,24 +159,6 @@ class Aura4K(UNIT3D):
         return {
             "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "imgbox.com": "imgbox",
-            "imgur.com": "imgur",
-            "postimg.cc": "postimg",
-            "ptscreens.com": "ptscreens",
-            "onlyimage.org": "onlyimage",
-        }
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            url_host_mapping=url_host_mapping,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         a4k_name: str = meta.name

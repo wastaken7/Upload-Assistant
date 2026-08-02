@@ -18,6 +18,7 @@ from src.get_desc import DescriptionBuilder
 from src.manualpackage import ManualPackageManager
 from src.meta import Meta
 from src.qbitwait import Wait
+from src.rehostimages import check_tracker_image_hosts
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackers.torrenthr import TorrentHR
 from src.trackersetup import TrackerSetup
@@ -218,6 +219,7 @@ async def process_trackers(
                             status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
+                        await check_tracker_image_hosts(meta, tracker_class)
                         upload_start_time = time.time()
                         is_uploaded = await tracker_class.upload(meta)
                         upload_duration = time.time() - upload_start_time
@@ -257,6 +259,7 @@ async def process_trackers(
                             status["status_message"] = "Skipped due to new dupe found after bandwidth wait"
                             print_tracker_result(tracker, tracker_class, status, False)
                             return
+                        await check_tracker_image_hosts(meta, tracker_class)
                         upload_start_time = time.time()
                         is_uploaded = await tracker_class.upload(meta)
                         upload_duration = time.time() - upload_start_time
@@ -300,10 +303,14 @@ async def process_trackers(
                     if manual_tracker != "MANUAL":
                         manual_tracker = manual_tracker.replace(" ", "").upper().strip()
                         tracker_class = tracker_class_map[manual_tracker](config=config)
-                        if manual_tracker in api_trackers:
-                            await DescriptionBuilder(manual_tracker, config).unit3d_edit_desc(meta, manual_tracker)
-                        else:
-                            await tracker_class.edit_desc(meta)
+                        try:
+                            await check_tracker_image_hosts(meta, tracker_class)
+                            if manual_tracker in api_trackers:
+                                await DescriptionBuilder(manual_tracker, config).unit3d_edit_desc(meta, manual_tracker)
+                            else:
+                                await tracker_class.edit_desc(meta)
+                        except Exception as e:
+                            logger.info(f"[red]{manual_tracker}: Error preparing manual upload files: {e}[/red]")
                 url = await manual_packager.package(meta)
                 if url is False:
                     logger.info(f"[yellow]Unable to upload prep files, they can be found at `tmp/{meta.uuid}")
@@ -345,6 +352,7 @@ async def process_trackers(
                 try:
                     ptp = PassThePopcorn(config=config)
                     group_id = meta.ptp_groupid
+                    await check_tracker_image_hosts(meta, ptp)
                     ptp_url, ptp_data = await ptp.fill_upload_form(group_id, meta)
                     is_uploaded = False
                     try:

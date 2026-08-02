@@ -72,7 +72,7 @@ class OpenLibraryManager:
 
                         covers = data.get("covers")
                         if covers and isinstance(covers, list) and isinstance(covers[0], int) and covers[0] > 0:
-                            metadata["poster"] = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg"
+                            metadata["artwork_url"] = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg"
 
                         author_names = []
                         for author_entry in data.get("authors", []):
@@ -189,7 +189,7 @@ class OpenLibraryManager:
         self._add_year(metadata, details.get("publish_date"))
         thumbnail_url = book_data.get("thumbnail_url")
         if thumbnail_url:
-            metadata["poster"] = thumbnail_url.replace("-S.jpg", "-L.jpg")
+            metadata["artwork_url"] = thumbnail_url.replace("-S.jpg", "-L.jpg")
         return metadata
 
 

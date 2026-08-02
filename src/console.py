@@ -1,11 +1,12 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
 import contextlib
 import contextvars
 import logging
 import os
 import re
 import threading
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Callable, Generator
 from pathlib import Path
 from typing import Any
 
@@ -71,6 +72,22 @@ console = Console(
 _live_progress_lock = threading.Lock()
 _shared_progress: Progress | None = None
 _shared_progress_users = 0
+_suppress_cli_progress = contextvars.ContextVar("suppress_cli_progress", default=False)
+
+
+@contextlib.contextmanager
+def suppress_cli_progress() -> Generator[None]:
+    """Temporarily hide terminal progress while background preparation runs."""
+    token = _suppress_cli_progress.set(True)
+    try:
+        yield
+    finally:
+        _suppress_cli_progress.reset(token)
+
+
+def is_cli_progress_suppressed() -> bool:
+    """Return whether the current task should avoid rendering terminal progress."""
+    return _suppress_cli_progress.get()
 
 
 @contextlib.contextmanager
@@ -78,7 +95,9 @@ def progress_display(*columns: Any, **kwargs: Any) -> Generator[Progress]:
     """Yield a progress panel that safely shares the console's single Live display."""
     global _shared_progress, _shared_progress_users
 
-    requested_disabled = bool(kwargs.get("disable", False))
+    requested_disabled = bool(kwargs.get("disable", False)) or is_cli_progress_suppressed()
+    if requested_disabled:
+        kwargs["disable"] = True
     shared = not requested_disabled
     if shared:
         with _live_progress_lock:
@@ -129,6 +148,47 @@ rich_handler = RichHandler(
 )
 rich_handler.setFormatter(logging.Formatter("%(message)s"))
 logger.addHandler(rich_handler)
+
+
+class LogBufferHandler(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__()
+        self.buffer: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.buffer.append(record)
+
+
+_log_buffer_lock = asyncio.Lock()
+
+
+@contextlib.asynccontextmanager
+async def buffer_console_logs() -> AsyncGenerator[None]:
+    """Temporarily hold console log output in memory while user prompts are active."""
+    async with _log_buffer_lock:
+        root_logger = logger
+        original_rich_handlers = [h for h in root_logger.handlers if isinstance(h, RichHandler)]
+        buffer_handler = LogBufferHandler()
+
+        for h in original_rich_handlers:
+            root_logger.removeHandler(h)
+        root_logger.addHandler(buffer_handler)
+
+        try:
+            yield
+        finally:
+            root_logger.removeHandler(buffer_handler)
+            for h in original_rich_handlers:
+                root_logger.addHandler(h)
+            for record in buffer_handler.buffer:
+                for h in original_rich_handlers:
+                    h.handle(record)
+
+
+async def prompt_in_thread[PromptResult](callback: Callable[..., PromptResult], /, *args: Any, **kwargs: Any) -> PromptResult:
+    """Run an interactive prompt without blocking the event loop or interleaving logs."""
+    async with buffer_console_logs():
+        return await asyncio.to_thread(callback, *args, **kwargs)
 
 
 # Context variable to hold the path to the current release's log file (e.g. /tmp/<uuid>/upload.log)

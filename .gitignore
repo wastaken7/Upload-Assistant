@@ -42,3 +42,5 @@ venv/*
 web_ui/static/js/node_modules/
 .stfolder
 .stignore
+AGENTS.md
+CLAUDE.md
