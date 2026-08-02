@@ -16,6 +16,7 @@ import pyimgbox
 
 from src.console import logger
 from src.meta import Meta
+from src.screenshot_manifest import files as manifest_files
 from src.temp_paths import screenshots_dir
 
 type ImageDict = dict[str, Any]
@@ -656,24 +657,28 @@ async def _upload_screens(
         existing_images: list[ImageDict] = []
         existing_count = 0
     else:
-        image_patterns = ["*.png", ".[!.]*.png"]
-        image_glob: list[str] = []
-        for pattern in image_patterns:
-            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
-            image_glob.extend(glob_results)
+        registered_screens = manifest_files(meta.base_dir, meta.uuid, "main")
+        if registered_screens:
+            image_glob = [str(path.relative_to(Path.cwd())) for path in registered_screens]
+        else:
+            image_patterns = ["*.png", ".[!.]*.png"]
+            image_glob = []
+            for pattern in image_patterns:
+                glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
+                image_glob.extend(glob_results)
 
-        unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
-        unwanted_files: set[str] = set()
-        for pattern in unwanted_patterns:
-            glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
-            unwanted_files.update(glob_results)
-            if pattern.startswith("FILE") or pattern.startswith("PLAYLIST") or pattern.startswith("POSTER"):
-                hidden_pattern = "." + pattern
-                hidden_glob_results = await asyncio.to_thread(lambda hp=hidden_pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(hp)])
-                unwanted_files.update(hidden_glob_results)
+            unwanted_patterns = ["FILE*", "PLAYLIST*", "POSTER*"]
+            unwanted_files: set[str] = set()
+            for pattern in unwanted_patterns:
+                glob_results = await asyncio.to_thread(lambda p=pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(p)])
+                unwanted_files.update(glob_results)
+                if pattern.startswith("FILE") or pattern.startswith("PLAYLIST") or pattern.startswith("POSTER"):
+                    hidden_pattern = "." + pattern
+                    hidden_glob_results = await asyncio.to_thread(lambda hp=hidden_pattern: [str(path.relative_to(Path.cwd())) for path in Path.cwd().glob(hp)])
+                    unwanted_files.update(hidden_glob_results)
 
-        image_glob = [file for file in image_glob if file not in unwanted_files]
-        image_glob = list(set(image_glob))
+            image_glob = [file for file in image_glob if file not in unwanted_files]
+            image_glob = list(set(image_glob))
 
         # Filter out menu screenshots from normal screenshot upload
         menu_basenames = set()

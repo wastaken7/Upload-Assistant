@@ -284,6 +284,7 @@ class Prep:
                     meta,
                     manual_frames=meta.manual_frames or "",
                     cleanup_after_capture=False,
+                    capture_group="main",
                 )
             logger.debug("[cyan]Early screenshot generation completed.[/cyan]")
         except asyncio.CancelledError:

@@ -15,6 +15,7 @@ from aiofiles import os as aio_os
 
 from src.console import logger
 from src.meta import Meta
+from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
 from src.temp_paths import covers_dir, menu_screenshots_dir, screenshots_dir, spectrograms_dir
 from src.tracker_images import (
@@ -481,7 +482,7 @@ async def _handle_image_upload(
 
     screenshot_path = screenshots_dir(base_dir, folder_id)
     logger.debug(f"[yellow]Searching for screenshots in {screenshot_path}...")
-    all_screenshots: list[str] = []
+    all_screenshots: list[str] = [str(path) for path in manifest_files(base_dir, folder_id, "main")]
 
     # First check if there are any saved screenshots matching those in the image_list
     if meta.image_list and isinstance(meta.image_list, list):
@@ -603,7 +604,9 @@ async def _handle_image_upload(
 
         try:
             if meta.is_disc == "BDMV":
-                await takescreens_manager.disc_screenshots(meta, filename, meta.bdinfo, folder_id, base_dir, meta.vapoursynth, [], meta.ffdebug, needed_screenshots, True)
+                await takescreens_manager.disc_screenshots(
+                    meta, filename, meta.bdinfo, folder_id, base_dir, meta.vapoursynth, [], meta.ffdebug, needed_screenshots, True, capture_group="main"
+                )
             elif meta.is_disc == "DVD":
                 await takescreens_manager.dvd_screenshots(meta, disc_num=0, retry_cap=True)
             else:
@@ -617,6 +620,7 @@ async def _handle_image_upload(
                         needed_screenshots,
                         True,
                         "",
+                        capture_group="main",
                     )
                 else:
                     logger.info("[red]No valid path available for screenshot generation.[/red]")
@@ -624,13 +628,7 @@ async def _handle_image_upload(
             if meta.is_disc == "DVD":
                 new_screens = await asyncio.to_thread(lambda: [str(p) for p in screenshots_dir(meta.base_dir, meta.uuid).glob(f"{glob.escape(meta.discs[0]['name'])}-*.png")])
             else:
-                # Use a more generic pattern to find any PNG files that aren't already in all_screenshots
-                new_screens = await asyncio.to_thread(lambda: [str(p) for p in screenshot_path.glob("*.png")])
-                indexed_pattern = re.compile(r".*-\d+\.png$")
-                new_screens = [s for s in new_screens if indexed_pattern.match(Path(s).name)]
-
-                # Filter out files we already have
-                new_screens = [screen for screen in new_screens if screen not in all_screenshots]
+                new_screens = [str(path) for path in manifest_files(base_dir, folder_id, "main")]
 
             # Add any new screenshots to our list (only those not already in all_screenshots)
             if new_screens and meta.debug:
