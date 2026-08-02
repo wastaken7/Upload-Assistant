@@ -38,7 +38,7 @@ def test_azw_files_are_included_when_resolving_book_directories(extension, tmp_p
     assert meta.audiobook is False
 
 
-@pytest.mark.parametrize("extension", [".opus", ".alac"])
+@pytest.mark.parametrize("extension", [".opus", ".alac", ".aax", ".aaxc"])
 def test_new_audiobook_formats_are_detected(extension, tmp_path):
     audiobook = tmp_path / f"chapter01{extension}"
     audiobook.write_bytes(b"audiobook")

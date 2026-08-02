@@ -208,16 +208,19 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                             "Choose category for audio release:",
                             choices=["1. Music", "2. Audiobook"],
                         )
-                        if choice.startswith("1") or choice.lower() == "music":
-                            meta.category = "MUSIC"
-                            meta.audiobook = False
-                        else:
-                            meta.category = "BOOK"
-                            meta.audiobook = True
-                        logger.info(f"[cyan]Category selected interactively: {meta.category}[/cyan]")
-                    except Exception:
+                    except EOFError, KeyboardInterrupt:
                         logger.error("[bold red]Category selection cancelled or failed.[/bold red]")
                         sys.exit(1)
+                    if choice is None:
+                        logger.error("[bold red]Category selection cancelled or failed.[/bold red]")
+                        sys.exit(1)
+                    if choice.startswith("1") or choice.lower() == "music":
+                        meta.category = "MUSIC"
+                        meta.audiobook = False
+                    else:
+                        meta.category = "BOOK"
+                        meta.audiobook = True
+                    logger.info(f"[cyan]Category selected interactively: {meta.category}[/cyan]")
                 else:
                     logger.error("[bold red]Could not confidently distinguish MUSIC from AUDIOBOOK in unattended mode.[/bold red]")
                     logger.error("[yellow]Specify one of: -c book or -c music[/yellow]")

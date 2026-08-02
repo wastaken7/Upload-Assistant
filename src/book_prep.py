@@ -52,7 +52,27 @@ from src.meta import Meta
 BOOK_EXTENSIONS = frozenset(
     {".pdf", ".epub", ".mobi", ".azw", ".azw3", ".fb2", ".html", ".htm", ".chm", ".djvu", ".doc", ".docx", ".kfx", ".lit", ".pdb", ".txt", ".rtf", ".cbz", ".cbr"}
 )
-AUDIOBOOK_EXTENSIONS = frozenset({".mp3", ".m4b", ".flac", ".alac", ".aac", ".m4a", ".ogg", ".opus", ".wav"})
+AUDIOBOOK_EXTENSIONS = frozenset(
+    {
+        ".mp3",
+        ".m4b",
+        ".flac",
+        ".alac",
+        ".aac",
+        ".m4a",
+        ".ogg",
+        ".opus",
+        ".wav",
+        ".ac3",
+        ".dts",
+        ".aiff",
+        ".ape",
+        ".wv",
+        ".wma",
+        ".aax",
+        ".aaxc",
+    }
+)
 _TEXT_SIDECAR_STEMS = frozenset({"cover", "folder", "index", "info", "readme"})
 
 
@@ -770,8 +790,7 @@ async def get_audiobook_duration(filelist: list[str]) -> tuple[float, str]:
     """Calculate the sum of durations of all audio files in the file list using MediaInfo."""
     from pymediainfo import MediaInfo
 
-    audiobook_extensions = (".mp3", ".m4b", ".flac", ".alac", ".aac", ".m4a", ".ogg", ".opus", ".wav")
-    audio_files = [f for f in filelist if f.lower().endswith(audiobook_extensions)]
+    audio_files = [f for f in filelist if Path(f).suffix.lower() in AUDIOBOOK_EXTENSIONS]
 
     if not audio_files:
         return 0.0, ""
@@ -806,8 +825,7 @@ async def get_audiobook_bitrate(filelist: list[str]) -> int | None:
     """Calculate the average bitrate (in kbps) of a sample of audio files (max 5) in the file list using MediaInfo."""
     from pymediainfo import MediaInfo
 
-    audiobook_extensions = (".mp3", ".m4b", ".flac", ".alac", ".aac", ".m4a", ".ogg", ".opus", ".wav")
-    audio_files = [f for f in filelist if f.lower().endswith(audiobook_extensions)]
+    audio_files = [f for f in filelist if Path(f).suffix.lower() in AUDIOBOOK_EXTENSIONS]
 
     # Limit to a maximum of 5 files to optimize performance
     audio_files = audio_files[:5]

@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from src.audio_classifier import detect_audio_category
+
 from src.meta import Meta
 from src.prep_helpers import detect_disc_and_category
 
@@ -96,6 +96,19 @@ def test_ambiguous_audio_folder_prompts_in_interactive_mode(tmp_path):
 
     assert meta.category == "BOOK"
     assert meta.audiobook is True
+
+
+def test_ambiguous_audio_prompt_does_not_hide_unexpected_errors(tmp_path):
+    t1 = tmp_path / "track_alpha.mp3"
+    t2 = tmp_path / "track_beta.mp3"
+    t1.write_bytes(b"dummy mp3 1")
+    t2.write_bytes(b"dummy mp3 2")
+
+    meta = Meta(path=str(tmp_path), unattended=False)
+    prep = SimpleNamespace(disc_info_manager=SimpleNamespace(get_disc=AsyncMock(return_value=("", str(tmp_path), {}, []))))
+
+    with patch("cli_ui.ask_choice", side_effect=RuntimeError("unexpected prompt failure")), pytest.raises(RuntimeError, match="unexpected prompt failure"):
+        asyncio.run(detect_disc_and_category(prep, meta))
 
 
 def test_ambiguous_audio_folder_fails_in_unattended_mode(tmp_path):
