@@ -14,7 +14,7 @@ from torf import Torrent
 
 from src.console import logger
 from src.meta import Meta
-from src.temp_paths import posters_dir
+from src.temp_paths import artwork_dir
 from src.uploadscreens import UploadScreensManager
 
 
@@ -48,7 +48,7 @@ class ManualPackageManager:
                 await generic.write(f"TVDB: https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series\n")
             if "tvmaze_id" in meta and meta.tvmaze_id != 0:
                 await generic.write(f"TVMaze: https://www.tvmaze.com/shows/{meta.tvmaze_id}\n")
-            poster_img = str(posters_dir(meta.base_dir, meta.uuid) / "POSTER.png")
+            poster_img = str(artwork_dir(meta.base_dir, meta.uuid) / "POSTER.png")
             if meta.artwork_url not in ["", None] and not Path(poster_img).exists():
                 if meta.rehosted_artwork_url is None:
                     async with httpx.AsyncClient(timeout=30.0) as client:

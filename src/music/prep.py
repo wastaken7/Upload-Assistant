@@ -19,7 +19,7 @@ from src.music.analyzer import MusicReleaseAnalyzer
 from src.music.models import MetadataSource, MusicRelease
 from src.music.sources import DiscogsEnricher, MusicBrainzEnricher
 from src.music.validation import MusicValidator
-from src.temp_paths import covers_dir
+from src.temp_paths import artwork_dir
 
 
 def _preferred_artwork(release: Any) -> Path | None:
@@ -96,7 +96,7 @@ async def prepare_music_cover(meta: Meta, release: Any) -> str:
         meta.artwork_path = str(local_cover)
         return meta.artwork_path
 
-    output_dir = covers_dir(meta.base_dir, str(meta.uuid))
+    output_dir = artwork_dir(meta.base_dir, str(meta.uuid))
     extracted = await asyncio.to_thread(_extract_embedded_artwork, [track.path for track in release.tracks], output_dir)
     if extracted:
         meta.artwork_path = str(extracted)

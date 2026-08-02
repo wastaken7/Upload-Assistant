@@ -17,7 +17,7 @@ from src.console import logger
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
-from src.temp_paths import covers_dir, menu_screenshots_dir, screenshots_dir, spectrograms_dir
+from src.temp_paths import artwork_dir, menu_screenshots_dir, screenshots_dir, spectrograms_dir
 from src.tracker_images import (
     get_tracker_image_collection,
     has_tracker_image_collection,
@@ -597,7 +597,7 @@ async def _handle_image_upload(
 
     if tracker == "covers":
         all_screenshots = []
-        existing_screens = await asyncio.to_thread(lambda: [str(p) for p in covers_dir(meta.base_dir, meta.uuid).glob("cover_*.jpg")])
+        existing_screens = await asyncio.to_thread(lambda: [str(p) for p in artwork_dir(meta.base_dir, meta.uuid).glob("cover_*.jpg")])
         for screen in existing_screens:
             if screen not in all_screenshots:
                 all_screenshots.append(screen)

@@ -410,6 +410,11 @@ const argumentCategories = [
         description: "Override detected book title",
       },
       {
+        label: "--book-cover",
+        placeholder: "PATH_OR_URL",
+        description: "Required BOOK cover image path or public image URL",
+      },
+      {
         label: "--book-overview",
         placeholder: "SYNOPSIS",
         description: "Book/Audiobook overview/synopsis (overrides auto-detected value)",

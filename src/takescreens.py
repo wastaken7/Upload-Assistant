@@ -24,13 +24,14 @@ import psutil
 from pymediainfo import MediaInfo
 
 from data import config as data_config
+from src.artwork import is_public_http_url, is_valid_cover_image, is_valid_image_bytes
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
 from src.screenshot_manifest import clear_group as clear_screenshot_group
 from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import register as register_screenshots
-from src.temp_paths import posters_dir, screenshots_dir
+from src.temp_paths import artwork_dir, screenshots_dir
 from src.webui_progress import complete_progress, publish_progress
 
 default_config: dict[str, Any] = {}
@@ -850,8 +851,10 @@ async def load_local_cover_if_exists(path: str, dest_path: str) -> bool:
             for f in (p.name for p in Path(search_dir).iterdir()):
                 if f.lower() in valid_names:
                     local_file = Path(search_dir) / f
+                    if not is_valid_cover_image(local_file):
+                        continue
                     shutil.copy2(local_file, dest_path)
-                    return True
+                    return is_valid_cover_image(dest_path)
         return False
 
     try:
@@ -948,10 +951,7 @@ async def download_artwork_from_meta(meta: Meta, artwork_path: str, *, force: bo
     if not artwork_url:
         return False
 
-    min_size = 20480
-    if artwork_url.startswith("http://books.google.com/") or artwork_url.startswith("https://covers.openlibrary.org/b/id/"):
-        min_size = 10240
-    if not force and Path(artwork_path).exists() and Path(artwork_path).stat().st_size >= min_size:
+    if not force and is_valid_cover_image(artwork_path):
         meta.artwork_path = artwork_path
         return True
     try:
@@ -971,19 +971,32 @@ async def download_artwork_from_meta(meta: Meta, artwork_path: str, *, force: bo
             if api_key:
                 cookies["mam_id"] = api_key
 
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            response = await client.get(artwork_url, cookies=cookies, headers=headers)
-            if response.status_code == 200:
-                if len(response.content) < min_size:
-                    logger.info(
-                        f"[yellow]Warning: Downloaded artwork from {artwork_url} is too small ({len(response.content)} bytes < {min_size} bytes) and will be ignored.[/yellow]"
-                    )
+        current_url = artwork_url
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
+            for _ in range(4):
+                if not is_public_http_url(current_url):
+                    logger.warning("[yellow]Warning: Artwork download target is not a public HTTP(S) URL.[/yellow]")
                     return False
-                await asyncio.to_thread(Path(artwork_path).write_bytes, response.content)
-                meta.artwork_path = artwork_path
-                logger.info(f"[green]Successfully downloaded artwork from {artwork_url}[/green]")
-                return True
-            logger.warning(f"[yellow]Warning: Failed to download poster, status code {response.status_code}[/yellow]")
+                response = await client.get(current_url, cookies=cookies, headers=headers)
+                if response.is_redirect:
+                    location = response.headers.get("Location")
+                    if not location:
+                        return False
+                    current_url = urllib.parse.urljoin(current_url, location)
+                    continue
+                if response.status_code == 200:
+                    if not is_valid_image_bytes(response.content):
+                        logger.info("[yellow]Warning: Downloaded artwork is not a valid supported image and will be ignored.[/yellow]")
+                        return False
+                    await asyncio.to_thread(Path(artwork_path).write_bytes, response.content)
+                    if not is_valid_cover_image(artwork_path):
+                        return False
+                    meta.artwork_path = artwork_path
+                    logger.info(f"[green]Successfully downloaded artwork from {current_url}[/green]")
+                    return True
+                logger.warning(f"[yellow]Warning: Failed to download poster, status code {response.status_code}[/yellow]")
+                return False
+            logger.warning("[yellow]Warning: Artwork download exceeded the redirect limit.[/yellow]")
     except Exception as e:
         logger.warning(f"[yellow]Warning: Error downloading poster: {e}[/yellow]")
     return False
@@ -1247,10 +1260,13 @@ async def extract_document_cover(path: str, dest_path: str) -> bool:
 
 
 async def prepare_book_cover(path: str, folder_id: str, base_dir: str, meta: Meta) -> str | None:
-    output_dir = posters_dir(base_dir, folder_id)
+    if meta.artwork_path and is_valid_cover_image(meta.artwork_path) and not meta.retake:
+        return meta.artwork_path
+
+    output_dir = artwork_dir(base_dir, folder_id)
     artwork_path = output_dir / "POSTER.png"
 
-    if Path(artwork_path).exists() and Path(artwork_path).stat().st_size >= 20480 and not meta.retake:
+    if is_valid_cover_image(artwork_path) and not meta.retake:
         meta.artwork_path = str(artwork_path)
         return str(artwork_path)
 
@@ -1337,7 +1353,7 @@ async def generate_ebook_screenshots(
     extension = Path(path).suffix.lower().lstrip(".")
     screenshots = []
 
-    poster_dir = posters_dir(base_dir, folder_id)
+    poster_dir = artwork_dir(base_dir, folder_id)
     cover_path = poster_dir / "POSTER.png"
     banner_path = poster_dir / "POSTER_BANNER.png"
 

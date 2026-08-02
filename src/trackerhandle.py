@@ -10,6 +10,7 @@ import cli_ui
 from rich.markup import escape
 
 from cogs.redaction import Redaction
+from src.artwork import is_valid_cover_image
 from src.cleanup import cleanup_manager
 from src.config_helpers import format_terminal_link
 from src.console import logger
@@ -146,6 +147,13 @@ async def process_trackers(
             meta.name = meta.name.replace(" DUPE?", "")
 
         tracker = tracker.replace(" ", "").upper().strip()
+
+        if meta.category == "BOOK" and not is_valid_cover_image(meta.artwork_path):
+            status = meta.tracker_status.setdefault(tracker, {})
+            status["upload"] = False
+            status["status_message"] = "Skipped: BOOK uploads require a valid cover image"
+            logger.info(f"[yellow]{tracker}: skipped because BOOK uploads require a valid cover image.[/yellow]")
+            return
 
         async def check_bandwidth_and_dupes(tracker_name: str, t_class: Any) -> bool:
             if t_class and getattr(t_class, "is_usenet", False):

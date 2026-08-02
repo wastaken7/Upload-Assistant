@@ -10,6 +10,7 @@ import aiofiles
 import httpx
 
 from cogs.redaction import Redaction
+from src.artwork import is_valid_image_bytes
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -439,6 +440,10 @@ class UNIT3D:
                 image_bytes = await f.read()
         except OSError as e:
             logger.info(f"{self.tracker}: [yellow]Failed to read image {path}: {e}[/yellow]")
+            return None
+
+        if not is_valid_image_bytes(image_bytes):
+            logger.info(f"{self.tracker}: [yellow]Invalid or unsupported image: {path}[/yellow]")
             return None
 
         image_type: tuple[str, str] | None = None

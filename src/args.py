@@ -270,6 +270,7 @@ class Args:
         parser.add_argument("-year", "--year", dest="manual_year", nargs=1, required=False, help="Override the year found", type=int, default=0)
         parser.add_argument("-author", "--author", nargs="*", required=False, help="Book/Audiobook author name (overrides auto-detected value)", type=str, dest="book_author")
         parser.add_argument("-btitle", "--book-title", nargs="*", required=False, help="Book/Audiobook title (overrides auto-detected value)", type=str, dest="book_title")
+        parser.add_argument("--book-cover", nargs=1, required=False, help="BOOK: public artwork URL or local cover image path", dest="book_cover")
         parser.add_argument("--comic", "-comic", action="store_true", required=False, help="Identify the book upload as a Comic", dest="comic", default=False)
         parser.add_argument("--manga", "-manga", action="store_true", required=False, help="Identify the book upload as a Manga", dest="manga", default=False)
         parser.add_argument("--magazine", "-magazine", action="store_true", required=False, help="Identify the book upload as a Magazine", dest="magazine", default=False)
@@ -1067,6 +1068,18 @@ class Args:
         book_publisher_arg = meta.book_publisher
         if book_publisher_arg not in (None, ""):
             meta.publisher = str(book_publisher_arg).strip()
+
+        book_cover_arg = meta.book_cover
+        if book_cover_arg not in (None, "", []):
+            cover = " ".join(str(x) for x in book_cover_arg if str(x)).strip() if isinstance(book_cover_arg, list) else str(book_cover_arg).strip()
+            if cover.startswith(("http://", "https://")):
+                meta.artwork_url = cover
+            elif cover:
+                cover_path = Path(cover).expanduser()
+                if cover_path.is_file():
+                    meta.artwork_path = str(cover_path.resolve())
+                else:
+                    logger.warning("[yellow]BOOK: --book-cover is neither a public HTTP(S) URL nor an existing image file; ignoring it.[/yellow]")
 
         book_translator_arg = meta.book_translator
         if book_translator_arg not in (None, ""):
