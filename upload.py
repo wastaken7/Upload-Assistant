@@ -2424,7 +2424,11 @@ async def do_the_thing(base_dir: str) -> None:
                             if option_strings and not any(arg == opt or arg.startswith(opt + "=") for opt in option_strings for arg in args_list):
                                 meta[key] = val
 
-                    path = meta.path or ""
+                    # QueueManager already resolved the first positional
+                    # argument into the queue item.  Use that authoritative
+                    # value for the preview and processing target instead of
+                    # relying on a partially parsed Meta copy.
+                    path = str(queue_item_mapping.get("path") or meta.path or "")
                     current_item_path = str(queue_item_mapping.get("line") or path or "")
                     meta.item_args = args_list
                 else:

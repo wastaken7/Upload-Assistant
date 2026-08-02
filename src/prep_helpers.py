@@ -185,13 +185,13 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
             if audio_res.category in ("BOOK", "MUSIC"):
                 meta.category = audio_res.category
                 meta.audiobook = audio_res.is_audiobook
-                logger.info(f"[cyan]Auto-detected category: {meta.category}[/cyan]")
+                logger.debug(f"[cyan]Auto-detected category: {meta.category}[/cyan]")
                 if audio_res.is_audiobook:
-                    logger.info("[cyan]Subtype: AUDIOBOOK[/cyan]")
+                    logger.debug("[cyan]Subtype: AUDIOBOOK[/cyan]")
                 if audio_res.evidence:
-                    logger.info("[cyan]Evidence:[/cyan]")
+                    logger.debug("[cyan]Evidence:[/cyan]")
                     for ev in audio_res.evidence:
-                        logger.info(f"[cyan]- {ev}[/cyan]")
+                        logger.debug(f"[cyan]- {ev}[/cyan]")
             elif audio_res.category == "AMBIGUOUS":
                 unattended = getattr(meta, "unattended", False)
                 unattended_confirm = getattr(meta, "unattended_confirm", False)
