@@ -95,7 +95,7 @@ def resolve_book_filelist(
     meta.imdb_id = 0
 
     primary_ext = Path(videopath).suffix.lower()
-    meta.audiobook = primary_ext in AUDIOBOOK_EXTENSIONS
+    meta.audiobook = bool(meta.audiobook or (primary_ext in AUDIOBOOK_EXTENSIONS) or any(Path(f).suffix.lower() in AUDIOBOOK_EXTENSIONS for f in filelist))
 
     search_term = Path(filelist[0]).name if filelist else ""
     search_file_folder = "file"
