@@ -4,6 +4,7 @@ Config validation helper for Upload Assistant.
 Validates the user's config.py against expected structure and types.
 """
 
+import math
 from typing import Any, cast
 
 # Required top-level sections
@@ -28,6 +29,8 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "img_host_1": (str,),
     "img_host_2": (str,),
     "img_host_3": (str,),
+    "image_upload_concurrency": (str, int),
+    "image_upload_delay": (str, float, int),
     "imgbb_api": (str,),
     "lostimg_api": (str,),
     "lensdump_api": (str,),
@@ -214,11 +217,13 @@ class ConfigValidationWarning:
     """Represents a non-critical config warning."""
 
     def __init__(self, message: str, key: str = "", section: str = ""):
+        """Create a warning with optional config location metadata."""
         self.message = message
         self.key = key
         self.section = section
 
     def __str__(self) -> str:
+        """Render the warning with its section and key when available."""
         location = ""
         if self.section:
             location = f"[{self.section}]"
@@ -231,6 +236,7 @@ class ConfigValidationWarning:
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
+    """Return value as a typed dictionary, or an empty dictionary."""
     return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
@@ -538,6 +544,50 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
                     int(value)
                 except ValueError:
                     warnings.append(ConfigValidationWarning(f"Cannot parse '{value}' as integer", key=key, section="DEFAULT"))
+
+    image_upload_concurrency = default.get("image_upload_concurrency")
+    if image_upload_concurrency is not None:
+        try:
+            parsed_concurrency = int(image_upload_concurrency)
+        except (OverflowError, TypeError, ValueError):
+            warnings.append(
+                ConfigValidationWarning(
+                    f"Cannot parse '{image_upload_concurrency}' as integer",
+                    key="image_upload_concurrency",
+                    section="DEFAULT",
+                )
+            )
+        else:
+            if parsed_concurrency < 0:
+                warnings.append(
+                    ConfigValidationWarning(
+                        "Value must be >= 0",
+                        key="image_upload_concurrency",
+                        section="DEFAULT",
+                    )
+                )
+
+    image_upload_delay = default.get("image_upload_delay")
+    if image_upload_delay is not None:
+        try:
+            parsed_delay = float(image_upload_delay)
+        except (TypeError, ValueError):
+            warnings.append(
+                ConfigValidationWarning(
+                    f"Cannot parse '{image_upload_delay}' as number",
+                    key="image_upload_delay",
+                    section="DEFAULT",
+                )
+            )
+        else:
+            if not math.isfinite(parsed_delay) or parsed_delay < 0:
+                warnings.append(
+                    ConfigValidationWarning(
+                        "Value must be finite and >= 0",
+                        key="image_upload_delay",
+                        section="DEFAULT",
+                    )
+                )
 
     return errors, warnings
 

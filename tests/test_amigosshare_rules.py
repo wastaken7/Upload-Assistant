@@ -7,6 +7,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+import pytest
+
 data_config = types.ModuleType("data.config")
 data_config.__file__ = str(Path(__file__).parents[1] / "data" / "config.py")
 data_config.DEFAULT = {}
@@ -96,6 +98,16 @@ def test_movie_passes_with_portuguese_external_subtitles():
 
 def test_movie_passes_with_accented_portuguese_external_subtitles():
     meta = make_meta(subtitle_files=["movie.português.srt"])
+
+    assert asyncio.run(run_checks(meta, guard_language_call=True))
+
+
+@pytest.mark.parametrize(
+    "subtitle_file",
+    ["movie.pt-BR.forced.srt", "movie.portuguese.sdh.srt"],
+)
+def test_movie_passes_with_tagged_portuguese_external_subtitles(subtitle_file: str) -> None:
+    meta = make_meta(subtitle_files=[subtitle_file])
 
     assert asyncio.run(run_checks(meta, guard_language_call=True))
 

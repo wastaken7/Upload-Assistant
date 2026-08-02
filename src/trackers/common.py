@@ -179,7 +179,11 @@ class Common:
         for subtitle_file in meta.subtitle_files or []:
             path = Path(str(subtitle_file))
             filename = self._normalize_language_token(path.stem)
-            if any(filename == alias or filename.endswith(f" {alias}") for alias in normalized_aliases):
+            filename_tokens = filename.split()
+            while filename_tokens and filename_tokens[-1] in {"forced", "sdh"}:
+                filename_tokens.pop()
+            filename_without_flags = " ".join(filename_tokens)
+            if any(filename_without_flags == alias or filename_without_flags.endswith(f" {alias}") for alias in normalized_aliases):
                 return True
             if path.suffix.casefold() in self.PORTUGUESE_SUBTITLE_EXTENSIONS:
                 text_paths.append(path)

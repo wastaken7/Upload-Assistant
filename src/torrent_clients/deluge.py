@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import base64
-import os
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +7,7 @@ from deluge_client import DelugeRPCClient
 from torf import Torrent
 
 from src.console import logger
+from src.torrent_clients.path_utils import map_save_path
 
 
 class DelugeClientMixin:
@@ -18,11 +18,9 @@ class DelugeClientMixin:
         if deluge_client.connected:
             logger.info("Connected to Deluge")
             # Remote path mount
-            if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():
-                path = path.replace(local_path, remote_path)
-                path = path.replace(os.sep, "/")
+            path = map_save_path(path, local_path, remote_path, trailing_slash=False)
 
-            path = str(Path(path).parent)
+            path = Path(path).parent.as_posix()
 
             deluge_client.call("core.add_torrent_file", torrent_path, base64.b64encode(torrent.dump()), {"download_location": path, "seed_mode": True})
             logger.debug(f"[cyan]Path: {path}")
