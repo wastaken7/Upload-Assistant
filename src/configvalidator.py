@@ -549,7 +549,7 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
     if image_upload_concurrency is not None:
         try:
             parsed_concurrency = int(image_upload_concurrency)
-        except (OverflowError, TypeError, ValueError):
+        except OverflowError, TypeError, ValueError:
             warnings.append(
                 ConfigValidationWarning(
                     f"Cannot parse '{image_upload_concurrency}' as integer",
@@ -571,7 +571,7 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
     if image_upload_delay is not None:
         try:
             parsed_delay = float(image_upload_delay)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             warnings.append(
                 ConfigValidationWarning(
                     f"Cannot parse '{image_upload_delay}' as number",

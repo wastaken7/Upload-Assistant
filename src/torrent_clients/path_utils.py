@@ -15,7 +15,7 @@ def coerce_str_list(value: object) -> list[str]:
         if value.startswith("[") and value.endswith("]"):
             try:
                 parsed = ast.literal_eval(value)
-            except (SyntaxError, ValueError):
+            except SyntaxError, ValueError:
                 parsed = None
             if isinstance(parsed, (list, tuple)):
                 parsed_values = cast(list[object] | tuple[object, ...], parsed)
@@ -36,8 +36,7 @@ def _relative_path_parts(path: str | Path, root: str | Path) -> tuple[str, ...] 
     if len(path_parts) < len(root_parts):
         return None
     if not all(
-        os.path.normcase(path_part).casefold() == os.path.normcase(root_part).casefold()
-        for path_part, root_part in zip(path_parts[: len(root_parts)], root_parts, strict=True)
+        os.path.normcase(path_part).casefold() == os.path.normcase(root_part).casefold() for path_part, root_part in zip(path_parts[: len(root_parts)], root_parts, strict=True)
     ):
         return None
     return path_parts[len(root_parts) :]
@@ -63,7 +62,7 @@ def map_save_path(
             mapped_path_obj /= Path(*relative_parts)
         mapped_path = str(mapped_path_obj)
 
-    mapped_path = mapped_path.replace(os.sep, "/")
+    mapped_path = mapped_path.replace("\\", "/").replace(os.sep, "/")
     if not trailing_slash:
         return mapped_path
     return mapped_path if mapped_path.endswith("/") else f"{mapped_path}/"

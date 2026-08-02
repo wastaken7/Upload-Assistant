@@ -734,6 +734,7 @@ async def _upload_screens(
                         menu_basenames.add(Path(local_path).name)
 
         def is_menu_screenshot(filename: str) -> bool:
+            """Return whether filename belongs to a DVD menu screenshot."""
             if filename in menu_basenames:
                 return True
             return "-VIDEO_TS-" in filename or "-VTS_" in filename
@@ -742,6 +743,7 @@ async def _upload_screens(
 
         # Sort images by numeric suffix
         def extract_numeric_suffix(filename: str) -> float:
+            """Return the numeric screenshot suffix for stable ordering."""
             match = re.search(r"-(\d+)\.png$", filename)
             return int(match.group(1)) if match else float("inf")
 
@@ -984,6 +986,7 @@ async def imgbox_upload(
     image_glob: list[str],
     return_dict: dict[str, Any],
 ) -> list[dict[str, str]]:
+    """Upload images to Imgbox and store their returned URLs."""
     try:
         os.chdir(chdir)
         image_list: list[dict[str, str]] = []
