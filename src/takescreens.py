@@ -74,6 +74,22 @@ def _apply_config(config: Mapping[str, Any]) -> None:
 
 
 async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
+    cmd_list = list(command.compile())
+    process_env = os.environ.copy()
+
+    # FFREPORT defaults to a timestamped file in the current working
+    # directory.  The last argument is the output path for ffmpeg-python
+    # commands that write a file, so keep the report beside that output
+    # instead of beside the source video.  Commands writing to stdout (for
+    # example, the libplacebo warm-up) do not need a report file.
+    output_path = cmd_list[-1] if cmd_list else ""
+    if output_path and output_path not in {"-", "pipe:"} and not output_path.startswith("pipe:"):
+        report_path = Path(output_path).resolve().parent / "ffmpeg.log"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        process_env["FFREPORT"] = f"file={report_path}:level=32"
+    else:
+        process_env.pop("FFREPORT", None)
+
     # On Linux prefer bundled amd/arm binary when present; otherwise fall back to system ffmpeg.
     if platform.system() == "Linux":
         base_dir = str(Path(__file__).parent.parent)
@@ -90,15 +106,24 @@ async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
         if arch:
             candidate = Path(ff_bin_dir) / arch / "ffmpeg"
             if Path(candidate).exists():
-                cmd_list = list(command.compile())
                 cmd_list[0] = str(candidate)
 
-                process = await asyncio.create_subprocess_exec(*cmd_list, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                process = await asyncio.create_subprocess_exec(
+                    *cmd_list,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    env=process_env,
+                )
                 stdout, stderr = await process.communicate()
                 return (process.returncode if process.returncode is not None else -1), stdout, stderr
 
     # Fallback: use system/default ffmpeg (command.compile())
-    process = await asyncio.create_subprocess_exec(*command.compile(), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    process = await asyncio.create_subprocess_exec(
+        *cmd_list,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=process_env,
+    )
     stdout, stderr = await process.communicate()
     return process.returncode, stdout, stderr
 
@@ -1887,7 +1912,6 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
 
         def set_ffmpeg_threads() -> list[str]:
             threads_value = "1"
-            os.environ["FFREPORT"] = "level=32"  # Reduce ffmpeg logging overhead
             return ["-threads", threads_value]
 
         if width <= 0 or height <= 0:
