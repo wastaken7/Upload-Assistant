@@ -15,6 +15,7 @@ from aiofiles import os as aio_os
 
 from src.console import logger
 from src.meta import Meta
+from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
 from src.temp_paths import covers_dir, menu_screenshots_dir, screenshots_dir, spectrograms_dir
 from src.tracker_images import (
@@ -481,7 +482,7 @@ async def _handle_image_upload(
 
     screenshot_path = screenshots_dir(base_dir, folder_id)
     logger.debug(f"[yellow]Searching for screenshots in {screenshot_path}...")
-    all_screenshots: list[str] = []
+    all_screenshots: list[str] = [str(path) for path in manifest_files(base_dir, folder_id, "main")]
 
     # First check if there are any saved screenshots matching those in the image_list
     if meta.image_list and isinstance(meta.image_list, list):
@@ -617,6 +618,7 @@ async def _handle_image_upload(
                         needed_screenshots,
                         True,
                         "",
+                        capture_group="main",
                     )
                 else:
                     logger.info("[red]No valid path available for screenshot generation.[/red]")

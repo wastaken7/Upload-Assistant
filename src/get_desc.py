@@ -1786,6 +1786,7 @@ class DescriptionBuilder:
                                     meta,
                                     multi_screens,
                                     True,
+                                    capture_group=f"FILE_{i}",
                                 )
                                 await asyncio.sleep(0.1)
                             except Exception as e:

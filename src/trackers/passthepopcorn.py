@@ -1247,7 +1247,9 @@ class PassThePopcorn:
                         new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
                         if not new_screens:
                             try:
-                                await self.takescreens_manager.screenshots(file, f"FILE_{i}", meta.uuid, meta.base_dir, meta, multi_screens, True, "")
+                                await self.takescreens_manager.screenshots(
+                                    file, f"FILE_{i}", meta.uuid, meta.base_dir, meta, multi_screens, True, "", capture_group=f"FILE_{i}"
+                                )
                             except Exception as e:
                                 logger.info(f"{self.tracker}: Error during generic screenshot capture: {e}", extra={"markup": False})
                         new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]

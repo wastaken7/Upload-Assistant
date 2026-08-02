@@ -1485,6 +1485,7 @@ async def screenshots(
     force_screenshots: bool = False,
     manual_frames: str | list[int] | list[str] = "",
     cleanup_after_capture: bool = True,
+    capture_group: str | None = None,
 ) -> list[str] | None:
     if meta.category == "GAME":
         return []
@@ -1514,6 +1515,18 @@ async def screenshots(
     if len(existing_images) >= cutoff and not force_screenshots:
         logger.info(f"[yellow]There are already at least {cutoff} images in the image list. Skipping additional screenshots.")
         return None
+
+    group = capture_group or "main"
+    requested_screens = num_screens or (len([frame for frame in manual_frames.split(",") if frame.strip()]) if isinstance(manual_frames, str) and manual_frames else screens)
+    # Metadata enrichment can alter the display title (for example, by adding
+    # punctuation). Reuse the logical capture group rather than deriving
+    # identity from a display-derived filename. This must happen before reading
+    # MediaInfo so an already-complete early capture is a true no-op.
+    if not force_screenshots and not meta.retake:
+        registered_screens = manifest_files(base_dir, folder_id, group)
+        if len(registered_screens) >= requested_screens:
+            logger.debug(f"[yellow]Reusing {len(registered_screens)} registered screenshots from group '{group}'.[/yellow]")
+            return [str(screen) for screen in registered_screens[:requested_screens]]
 
     try:
         mi_text = await asyncio.to_thread(Path(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/MediaInfo.json").read_text, encoding="utf-8")
@@ -1904,7 +1917,8 @@ async def screenshots(
         unit="frames",
     )
 
-    return valid_results if valid_results else None
+    registered_screens = register_screenshots(base_dir, folder_id, valid_results, group) if valid_results else []
+    return [str(screen) for screen in registered_screens] or None
 
 
 async def capture_screenshot(args: tuple[int, str, float, str, float, float, float, float, str, bool, Meta]) -> tuple[int, str | None] | None:
@@ -2492,8 +2506,9 @@ class TakeScreensManager:
         force_screenshots: bool = False,
         manual_frames: str | list[int] | list[str] = "",
         cleanup_after_capture: bool = True,
+        capture_group: str | None = None,
     ) -> list[str] | None:
-        return await screenshots(path, filename, folder_id, base_dir, meta, num_screens, force_screenshots, manual_frames, cleanup_after_capture)
+        return await screenshots(path, filename, folder_id, base_dir, meta, num_screens, force_screenshots, manual_frames, cleanup_after_capture, capture_group)
 
     async def prepare_book_cover(self, path: str, folder_id: str, base_dir: str, meta: Meta) -> str | None:
         return await prepare_book_cover(path, folder_id, base_dir, meta)
