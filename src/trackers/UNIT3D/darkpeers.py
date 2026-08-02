@@ -2,7 +2,7 @@
 import re
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 
 from src.console import logger
 from src.languages import languages_manager
@@ -224,7 +224,7 @@ class DarkPeers(UNIT3D):
     @classmethod
     def _languages(cls, value: list[str] | str | None) -> set[str]:
         values = [value] if isinstance(value, str) else (value or [])
-        return {cls._normalise_language(item) for item in values if cls._normalise_language(item)}
+        return {norm for item in values if (norm := cls._normalise_language(item))}
 
     @classmethod
     def _accepted_languages(cls) -> set[str]:
@@ -295,7 +295,7 @@ class DarkPeers(UNIT3D):
             return await self._missing_required("publisher", meta)
         if meta.audiobook and not str(meta.narrator or "").strip():
             return await self._missing_required("audiobook narrator", meta)
-        if not meta.audiobook and format_name == "PDF" and not self._has_page_count(meta):
+        if not meta.audiobook and format_name == "PDF" and not bool(meta.get("page_count", None) or meta.get("book_page_count", None)):
             return await self._missing_required("PDF page count", meta)
         return True
 
@@ -305,22 +305,19 @@ class DarkPeers(UNIT3D):
         format_name = str(meta.type or meta.format or "").upper().strip()
         if not meta.audiobook or format_name not in {"M4A", "OGG", "WAV"}:
             return format_name
-        media = DarkPeers._object_dict(meta.mediainfo).get("media")
-        tracks = DarkPeers._object_list(DarkPeers._object_dict(media).get("track"))
+        media = (meta.mediainfo if isinstance(meta.mediainfo, dict) else {}).get("media")
+        raw_tracks = (media if isinstance(media, dict) else {}).get("track")
+        tracks = raw_tracks if isinstance(raw_tracks, list) else []
         audio_text = " ".join(
             str(track.get("Format") or track.get("format") or track.get("CodecID") or track.get("codec") or "")
             for track_value in tracks
-            if (track := DarkPeers._object_dict(track_value)) and str(track.get("@type") or track.get("type") or "").casefold() == "audio"
+            if (track := track_value if isinstance(track_value, dict) else {}) and str(track.get("@type") or track.get("type") or "").casefold() == "audio"
         ).casefold()
         if format_name == "M4A":
             return "ALAC" if "alac" in audio_text else "AAC" if "aac" in audio_text else format_name
         if format_name == "OGG":
             return "OPUS" if "opus" in audio_text else "VORBIS" if "vorbis" in audio_text else format_name
         return "PCM" if "pcm" in audio_text else format_name
-
-    @staticmethod
-    def _has_page_count(meta: Meta) -> bool:
-        return bool(meta.get("page_count", None) or meta.get("book_page_count", None))
 
     @staticmethod
     def _book_identifier(meta: Meta) -> str:
@@ -433,55 +430,40 @@ class DarkPeers(UNIT3D):
 
         return {"name": dp_name}
 
-    @staticmethod
-    def _object_dict(value: object) -> dict[str, object]:
-        return cast(dict[str, object], value) if isinstance(value, dict) else {}
-
-    @staticmethod
-    def _object_list(value: object) -> list[object]:
-        return cast(list[object], value) if isinstance(value, list) else []
-
-    @staticmethod
-    def _integer(value: object) -> int | None:
-        if not isinstance(value, (int, str, bytes, bytearray)):
-            return None
-        with suppress(TypeError, ValueError):
-            return int(value)
-        return None
-
     @classmethod
-    def _release_field(cls, release: dict[str, object], name: str, default: object = "") -> object:
+    def _release_field(cls, release: dict[str, Any], name: str, default: Any = "") -> Any:
         """Read a value from the serialized music release model."""
-        fields = cls._object_dict(release.get("fields"))
-        value = cls._object_dict(fields.get(name))
-        return value.get("value", default)
+        fields = release.get("fields") if isinstance(release, dict) else {}
+        value = fields.get(name) if isinstance(fields, dict) else {}
+        return value.get("value", default) if isinstance(value, dict) else default
 
     @classmethod
     def _music_name(cls, meta: Meta) -> str:
         """Format music as ``Artist - Album (Year) - Format`` for DarkPeers."""
-        release = cls._object_dict(meta.music_release)
+        release = meta.music_release if isinstance(meta.music_release, dict) else {}
         artist = str(cls._release_field(release, "artist", meta.artist)).strip()
         album = str(cls._release_field(release, "album", meta.title)).strip()
         year = str(cls._release_field(release, "release_year", cls._release_field(release, "year", meta.year or ""))).strip()
         media = str(cls._release_field(release, "media", meta.source)).strip()
-        tracks = cls._object_list(release.get("tracks"))
-        first_track = cls._object_dict(tracks[0]) if tracks else {}
+        raw_tracks = release.get("tracks")
+        tracks = raw_tracks if isinstance(raw_tracks, list) else []
+        first_track = tracks[0] if tracks and isinstance(tracks[0], dict) else {}
         codec = str(first_track.get("codec") or first_track.get("format") or meta.format or meta.type).upper().strip()
 
         format_parts = [media, codec]
         if codec in {"FLAC", "ALAC", "PCM"}:
             depth = first_track.get("bit_depth") or cls._release_field(release, "nfo_bit_depth")
             rate = first_track.get("sample_rate") or cls._release_field(release, "nfo_sample_rate")
-            depth_value = cls._integer(depth)
-            rate_value = cls._integer(rate)
-            if depth_value is not None and rate_value is not None:
-                format_parts.append(f"{depth_value}-{rate_value / 1000:g}")
+            if depth is not None and rate is not None:
+                with suppress(TypeError, ValueError):
+                    format_parts.append(f"{int(depth)}-{int(rate) / 1000:g}")
         elif codec in {"MP3", "AAC", "OPUS", "VORBIS"}:
             bitrate = first_track.get("bitrate") or meta.audio_bitrate
-            bitrate_value = cls._integer(bitrate)
-            if bitrate_value is not None:
-                bitrate_kbps = bitrate_value // 1000 if bitrate_value >= 1000 else bitrate_value
-                format_parts.append(str(bitrate_kbps))
+            if bitrate is not None:
+                with suppress(TypeError, ValueError):
+                    b = int(bitrate)
+                    bitrate_kbps = b // 1000 if b >= 1000 else b
+                    format_parts.append(str(bitrate_kbps))
             bitrate_mode = str(first_track.get("bitrate_mode") or "").upper().strip()
             if bitrate_mode:
                 format_parts.append(bitrate_mode)
@@ -543,11 +525,7 @@ class DarkPeers(UNIT3D):
             return category_id
         if reverse:
             return {v: k for k, v in category_id.items()}
-        if category:
-            return {"category_id": category_id.get(category, "0")}
-        meta_category = meta.category
-        resolved_id = category_id.get(meta_category, "0")
-        return {"category_id": resolved_id}
+        return {"category_id": category_id.get(category or meta.category, "0")}
 
     async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         type_id = {
@@ -604,13 +582,12 @@ class DarkPeers(UNIT3D):
                 elif t_upper in ("MP3", "M4B", "FLAC", "AAC", "M4A", "OGG", "WAV", "OPUS", "ALAC", "VORBIS", "PCM"):
                     t_upper = "AUDIOBOOK"
                 return {"type_id": type_id.get(t_upper, type_id.get(type, "0"))}
-            if meta.category == "BOOK":
-                if meta.audiobook:
-                    meta_type = "AUDIOBOOK"
-                elif meta.comic or meta_type in ("CBR", "CBZ"):
-                    meta_type = "COMIC"
-                else:
-                    meta_type = "EBOOK"
+            if meta.audiobook:
+                meta_type = "AUDIOBOOK"
+            elif meta.comic or meta_type in ("CBR", "CBZ"):
+                meta_type = "COMIC"
+            else:
+                meta_type = "EBOOK"
 
         if meta.category == "GAME":
             meta_type = "CONSOLE" if meta.console_game else meta.platform.upper()
