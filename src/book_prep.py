@@ -239,6 +239,7 @@ async def gather_book_prep(
         "book_language": bool(meta.book_language),
         "year": "manual_year" in meta and (meta.manual_year or 0) > 0,
         "keywords": bool(meta.keywords),
+        "overview": bool(meta.overview),
     }
 
     # Extract EPUB metadata directly if the file is an EPUB
@@ -550,6 +551,7 @@ async def gather_book_prep(
                             or (key in ("book_language", "book_language_iso") and cli_overrides["book_language"])
                             or (key in ("year", "search_year") and cli_overrides["year"])
                             or (key == "keywords" and cli_overrides["keywords"])
+                            or (key == "overview" and cli_overrides["overview"])
                         ):
                             is_override = True
 
@@ -588,6 +590,7 @@ async def gather_book_prep(
                             or (key in ("book_language", "book_language_iso") and cli_overrides["book_language"])
                             or (key in ("year", "search_year") and cli_overrides["year"])
                             or (key == "keywords" and cli_overrides["keywords"])
+                            or (key == "overview" and cli_overrides["overview"])
                         ):
                             is_override = True
 
@@ -635,6 +638,7 @@ async def gather_book_prep(
                     or (key in ("book_language", "book_language_iso") and cli_overrides["book_language"])
                     or (key in ("year", "search_year") and cli_overrides["year"])
                     or (key == "keywords" and cli_overrides["keywords"])
+                    or (key == "overview" and cli_overrides["overview"])
                 ):
                     is_override = True
 
