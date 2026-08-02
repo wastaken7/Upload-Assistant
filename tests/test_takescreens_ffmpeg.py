@@ -11,10 +11,10 @@ from src import takescreens
 @pytest.mark.asyncio
 async def test_run_ffmpeg_writes_report_next_to_output(tmp_path, monkeypatch):
     output = tmp_path / "release" / "screenshots" / "frame.png"
-    captured: dict[str, object] = {}
+    captured: list[dict[str, object]] = []
 
     async def fake_create_subprocess_exec(*args, **kwargs):
-        captured.update(args=args, kwargs=kwargs)
+        captured.append({"args": args, "kwargs": kwargs})
 
         async def fake_communicate():
             return b"", b""
@@ -29,8 +29,18 @@ async def test_run_ffmpeg_writes_report_next_to_output(tmp_path, monkeypatch):
             return ["ffmpeg", "-i", "source.mkv", str(output)]
 
     process = await takescreens.run_ffmpeg(Command())
+    second_process = await takescreens.run_ffmpeg(Command())
 
     assert process == (0, b"", b"")
-    env = captured["kwargs"]["env"]
-    assert env["FFREPORT"] == f"file={output.parent.resolve() / 'ffmpeg.log'}:level=32"
+    assert second_process == (0, b"", b"")
+    first_env = captured[0]["kwargs"]["env"]
+    second_env = captured[1]["kwargs"]["env"]
+    first_report = first_env["FFREPORT"]
+    second_report = second_env["FFREPORT"]
+    expected_prefix = f"file={output.parent.resolve().as_posix().replace(':', r'\:')}/ffmpeg-"
+    assert first_report.startswith(expected_prefix)
+    assert first_report.endswith(".log:level=32")
+    assert second_report.startswith(expected_prefix)
+    assert second_report.endswith(".log:level=32")
+    assert first_report != second_report
     assert "FFREPORT" not in takescreens.os.environ
