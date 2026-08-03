@@ -49,10 +49,10 @@ Python LSP was unavailable at generation time; reference counts below come from 
 | `process_meta` | async function | `upload.py:1106` | 1 direct | Per-release preparation and upload pipeline |
 | `Meta` | dataclass-like state | `src/meta.py` | ~183 files | Shared metadata and mutable pipeline contract |
 | `Prep` | class | `src/prep.py` | core pipeline | Media/category-specific preparation dispatch |
-| `TrackerSetup` | class | `src/trackersetup.py:107` | ~18 files | Registry lookup, filtering, claims, requests, auth groups |
+| `TrackerSetup` | class | `src/trackersetup.py:107` | 5 Python files | Registry lookup, filtering, claims, requests, auth groups |
 | `tracker_class_map` | mapping | `src/trackersetup.py:1334` | all adapters | Tracker name to concrete class registry |
 | `Common` | class | `src/trackers/common.py:32` | high fan-in | Shared torrent, language, media, and description helpers |
-| `release_temp_dir` | function | `src/temp_paths.py` | ~21 files | Release-scoped artifact root and typed image paths |
+| `release_temp_dir` | function | `src/temp_paths.py` | 1 internal call | Root used by the typed image-directory helpers |
 | `app` | Flask app | `web_ui/server.py:332` | `upload.py` | Web pages, APIs, auth middleware, execution control |
 
 ## CONVENTIONS

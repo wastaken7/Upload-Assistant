@@ -15,7 +15,7 @@
 | Metadata search | `metadata_searching.py`, provider modules | Provider caching goes through `metadata_cache.py` |
 | Artifact paths | `temp_paths.py`, `screenshot_manifest.py`, `tracker_images.py` | Typed image directories and per-tracker collections |
 | Progress bridge | `webui_progress.py` | Thread-safe callback and `ProgressEvent` schema |
-| Output creation | `torrentcreate.py`, `usenetcreate.py`, `manualpackage.py` | Consume finalized metadata and release artifacts |
+| Output creation | `torrentcreate.py`, `usenetcreate.py`, `manualpackage.py` | Torrent/Usenet local work can start before metadata finalization; manual packaging occurs during tracker handling |
 | Client integration | `clients.py`, `torrent_clients/` | `Clients` composes protocol-specific mixins |
 | Tracker lifecycle | `trackersetup.py`, `trackerstatus.py`, `trackerhandle.py` | Enable/filter/check/upload phases are separate |
 
