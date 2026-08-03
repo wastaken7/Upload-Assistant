@@ -315,6 +315,7 @@ const trackerNameMap = {
   MORETHANTV: "MoreThanTV",
   MTEAM: "MTeam",
   NEBULANCE: "Nebulance",
+  NORDICQUALITY: "NordicQuality",
   OLDTOONSWORLD: "OldToonsWorld",
   ONLYENCODES: "OnlyEncodes+",
   PASSTHEPOPCORN: "PassThePopcorn",

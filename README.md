@@ -150,6 +150,7 @@ This branch introduces new media categories and automation features not present 
 | <img src="web_ui/static/img/trackers/morethantv.png" width="16" height="16" />             | MoreThanTV             | MORETHANTV             | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/mteam.png" width="16" height="16" />                  | M-Team                 | MTEAM                  | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/nebulance.png" width="16" height="16" />              | Nebulance              | NEBULANCE              | TV                           |
+| <img src="web_ui/static/img/trackers/nordicquality.png" width="16" height="16" />          | NordicQuality          | NORDICQUALITY          | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/oldtoonsworld.png" width="16" height="16" />          | OldToonsWorld          | OLDTOONSWORLD          | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/onlyencodes.png" width="16" height="16" />            | OnlyEncodes+           | ONLYENCODES            | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/orpheus.png" width="16" height="16" />                | Orpheus                | ORPHEUS                | MUSIC                        |
