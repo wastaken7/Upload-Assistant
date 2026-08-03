@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | Shared release state | `meta.py` | `Meta` supports attribute and dict-like access; ~183 files import it |
 | Pipeline entry | `prep.py` | `Prep.gather_prep()` selects music, book, game, disc, or video work |
-| Pipeline stages | `prep_helpers.py` | Initialization -> detection -> media -> metadata -> tracker/torrent -> finalization |
+| Pipeline stages | `prep.py`, `prep_helpers.py` | Init -> detection -> media -> size/validation -> tracker/torrent -> local artifacts -> metadata -> finalization |
 | CLI schema | `args.py`, `apply_overrides.py` | Runtime overrides ultimately land on `Meta` |
 | Metadata search | `metadata_searching.py`, provider modules | Provider caching goes through `metadata_cache.py` |
 | Artifact paths | `temp_paths.py`, `screenshot_manifest.py`, `tracker_images.py` | Typed image directories and per-tracker collections |
@@ -28,7 +28,7 @@
 - Publish long-running work through `webui_progress.py` without changing event keys, group IDs, units, or reset/complete lifecycle.
 - Preserve async boundaries around network, screenshot, torrent, and Usenet work. Some existing filesystem calls remain synchronous by explicit Ruff exception.
 - Provider caches use version/TTL validation and atomic writes; a cache miss or stale entry must remain recoverable.
-- `takescreens.py` reads some configuration at import time. Tests changing screenshot config must patch the imported module state, not only `data.config`.
+- `TakeScreensManager` applies its supplied config to module-level screenshot limits at construction through `_apply_config`; tests changing those settings must instantiate a fresh manager with the patched config.
 
 ## ANTI-PATTERNS
 
