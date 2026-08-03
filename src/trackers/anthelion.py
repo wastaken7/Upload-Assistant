@@ -10,7 +10,7 @@ import cli_ui
 import httpx
 from rich.markup import escape
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta

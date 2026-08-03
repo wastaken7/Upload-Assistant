@@ -5,7 +5,7 @@ from pathlib import Path
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 from typing import Any, cast
 
-from cogs.redaction import PathAwareEncoder
+from src.cogs.redaction import PathAwareEncoder
 from src.meta import Meta
 from src.metadata_cache import set_run_disabled
 

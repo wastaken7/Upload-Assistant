@@ -12,7 +12,7 @@ import aiofiles
 import cli_ui
 import mutagen
 
-from cogs.redaction import PathAwareEncoder
+from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
 from src.meta import Meta
 from src.music.analyzer import MusicReleaseAnalyzer

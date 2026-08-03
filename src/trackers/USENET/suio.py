@@ -13,7 +13,7 @@ import aiofiles
 import httpx
 from PIL import Image
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.temp_paths import artwork_dir

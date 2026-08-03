@@ -12,7 +12,7 @@ import httpx
 from bs4 import BeautifulSoup
 from rich.markup import escape
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import buffer_console_logs, logger
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager

@@ -17,8 +17,8 @@ import httpx
 from pymediainfo import MediaInfo
 from rich.markup import escape
 
-from cogs.redaction import PathAwareEncoder, Redaction
 from src.bbcode import BBCODE
+from src.cogs.redaction import PathAwareEncoder, Redaction
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403

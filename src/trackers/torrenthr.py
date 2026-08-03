@@ -14,8 +14,8 @@ from bs4 import BeautifulSoup
 from bs4.element import AttributeValueList
 from unidecode import unidecode
 
-from cogs.redaction import Redaction
 from src.bbcode import BBCODE
+from src.cogs.redaction import Redaction
 from src.console import console, logger
 from src.meta import Meta
 from src.temp_paths import screenshots_dir

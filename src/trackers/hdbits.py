@@ -11,8 +11,8 @@ import httpx
 from rich.markup import escape
 from unidecode import unidecode
 
-from cogs.redaction import Redaction
 from src.bbcode import BBCODE
+from src.cogs.redaction import Redaction
 from src.console import console, logger
 from src.exceptions import *  # noqa F403
 from src.meta import Meta

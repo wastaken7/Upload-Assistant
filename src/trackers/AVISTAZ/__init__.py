@@ -15,7 +15,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 import bbcode
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder

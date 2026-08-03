@@ -33,7 +33,6 @@ import requests
 from torf import Torrent as _Torrent  # pyright: ignore[reportMissingImports,reportUnknownVariableType]
 
 from bin.get_mkbrr import MkbrrBinaryManager
-from cogs.redaction import PathAwareEncoder, Redaction
 from src.add_comparison import ComparisonManager
 from src.args import Args
 from src.artwork import is_public_http_url, is_valid_cover_image
@@ -41,6 +40,7 @@ from src.audio_spectrogram import process_audio_spectrograms
 from src.book_prep import detect_newspaper, is_valid_book_language, resolve_book_language
 from src.cleanup import cleanup_manager
 from src.clients import Clients
+from src.cogs.redaction import PathAwareEncoder, Redaction
 from src.config_helpers import format_terminal_link
 from src.console import current_release_log_path, logger  # pyright: ignore[reportUnknownVariableType]
 from src.console import rich_handler as _rich_handler
