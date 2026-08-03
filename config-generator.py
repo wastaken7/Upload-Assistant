@@ -189,6 +189,7 @@ def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
         "PTGTK": "PTGTK",
         "RPT": "RAILGUNPT",
         "RTF": "RETROFLIX",
+        "RMC": "RETROMOVIESCLUB",
         "SPD": "SPEEDAPP",
         "SN": "SWARMAZON",
         "TTG": "TOTHEGLORY",

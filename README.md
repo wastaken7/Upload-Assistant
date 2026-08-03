@@ -168,6 +168,7 @@ This branch introduces new media categories and automation features not present 
 | <img src="web_ui/static/img/trackers/rastastugan.png" width="16" height="16" />            | Rastastugan            | RASTASTUGAN            | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/reelflix.png" width="16" height="16" />               | ReelFLiX               | REELFLIX               | MOVIE                        |
 | <img src="web_ui/static/img/trackers/retroflix.png" width="16" height="16" />              | RetroFlix              | RETROFLIX              | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/retromoviesclub.png" width="16" height="16" />       | RetroMoviesClub        | RETROMOVIESCLUB        | MOVIE                        |
 | <img src="web_ui/static/img/trackers/samaritano.png" width="16" height="16" />             | Samaritano             | SAMARITANO             | MOVIE, TV, BOOK, GAME        |
 | <img src="web_ui/static/img/trackers/seedpool.png" width="16" height="16" />               | seedpool               | SEEDPOOL               | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/shareisland.png" width="16" height="16" />            | ShareIsland            | SHAREISLAND            | MOVIE, TV                    |
