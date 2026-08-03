@@ -9,8 +9,8 @@ from typing import Any
 import aiofiles
 import httpx
 
-from cogs.redaction import Redaction
 from src.artwork import is_valid_image_bytes
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta

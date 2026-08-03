@@ -4,7 +4,7 @@ from typing import Any, cast
 import aiofiles
 import httpx
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import console, logger
 from src.meta import Meta
 from src.trackers.common import Common

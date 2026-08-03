@@ -8,7 +8,7 @@ As unraid is completely focused on docker, i was having issues installing Upload
 
 So here are the steps you will need to take to get Upload Assistant to work directly on unraid.
 
-```
+```text
 1. You will need the nerd tools package, this can be installed from CA app.
 After that enable this packages
 ```
@@ -17,20 +17,20 @@ After that enable this packages
 
 \*Not sure which ones are absolutely essential but i got it working with the ones shown in screenshot, you can probably check by uninstalling some and see if it still works.
 
-```
+```text
 2. open a terminal on unraid, cd to the directory you want to install Upload Assistant or make a directory.
-"git clone https://github.com/Audionut/Upload-Assistant.git" run the command,
+"git clone https://github.com/wastaken7/Upload-Assistant.git" run the command,
 the other stuff is standard steps you have to follow as per audionuts guide that can be found
-here https://github.com/Audionut/Upload-Assistant
+here https://github.com/wastaken7/Upload-Assistant
 ```
 
-```
+```text
 3. you will need some missing packages that are not included with nerdtools.
 First is grabbing libffi and the steps you have to follow are here
 https://forums.unraid.net/topic/129200-plug-in-nerdtools/page/7/#comment-1192737
 ```
 
-```
+```text
 4. Youre almost there, the final thing you need is ffmpeg and the steps to install are
 as follows make a directory you want to download ffmpeg to then
 "wget https://johnvansickle.com/ffmpeg/builds/ffmpeg-git-amd64-static.tar.xz" this
@@ -47,14 +47,14 @@ Thank you to noraa for all your help, shoutout to deeznuts and ringbear
 
 ## Since people were asking how to do it in Unraid when still wanting CLI options, here goes:
 
-    * create /mnt/user/appdata/upload-assistant
-    * cd into folder, nano run-cli.sh, paste contents
-    * adjust contents to match your setup
-    * Ctrl+X to save
-    * do chmod +x run-cli.sh
-    * place config.py in here
+* create /mnt/user/appdata/upload-assistant
+* cd into folder, nano run-cli.sh, paste contents
+* adjust contents to match your setup
+* Ctrl+X to save
+* do chmod +x run-cli.sh
+* place config.py in here
 
-```
+```bash
 #!/bin/sh
 docker rm upload-assistant-cli
 docker run \
@@ -75,7 +75,7 @@ docker exec -it upload-assistant-cli /bin/sh
 
 DO:
 
-```
+```bash
 ./run-cli.sh
 ```
 
@@ -95,7 +95,7 @@ You want to name this container "upload-assistant-cli" without the "" and remove
 
 Next replace it with
 
-```
+```yaml
 services:
   upload-assistant-cli:
     image: ghcr.io/wastaken7/upload-assistant:latest

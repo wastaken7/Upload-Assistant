@@ -9,7 +9,7 @@ import aiofiles
 import httpx
 from rich.markup import escape
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import console, logger
 from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager

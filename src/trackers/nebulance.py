@@ -8,7 +8,7 @@ import aiofiles
 import cli_ui
 import httpx
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.trackers.common import Common

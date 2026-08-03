@@ -13,9 +13,9 @@ import aiofiles
 import cli_ui
 from rich.markup import escape
 
-from cogs.redaction import Redaction
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
+from src.cogs.redaction import Redaction
 from src.config_helpers import format_terminal_link
 from src.console import logger, prompt_in_thread
 from src.meta import Meta

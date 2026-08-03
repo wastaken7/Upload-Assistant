@@ -92,7 +92,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # Pass arguments via CMD or `docker run ... <args>`.
 #   WebUI : docker run ... image --webui 0.0.0.0:5000
 #   CLI   : docker run ... image /data/content --trackers BHD
-COPY docker-entrypoint.sh /usr/local/bin/
+COPY scripts/docker-entrypoint.sh /usr/local/bin/
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh \
     && chmod +x /usr/local/bin/docker-entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

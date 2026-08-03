@@ -18,8 +18,8 @@ from jinja2 import Template
 from langcodes.tag_parser import LanguageTagError
 from pymediainfo import MediaInfo
 
-from cogs.redaction import PathAwareEncoder
 from src.bbcode import BBCODE
+from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta

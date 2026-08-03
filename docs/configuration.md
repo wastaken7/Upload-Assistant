@@ -26,7 +26,7 @@
 
 - Default Trackers: `default_trackers` **REQUIRED**
   - A comma separated list of trackers to upload to
-  - Currently Supported: `BLUTOPIA, BEYONDHD, MANUAL`
+  - See the [supported sites](../README.md#supported-sites) table for the current tracker registry.
   - `MANUAL` = passing `-m` / `--manual`
 
 - API Key: `api_key`
@@ -39,14 +39,14 @@
   - Most commonly found on the site's upload page
 
 - Draft Default: `draft_default`
-  - If the site has a draft system, setting `"True"` will send to drafts by default
-  - Setting `"False"` will go live by default
+  - If the site has a draft system, setting `True` will send to drafts by default
+  - Setting `False` will go live by default
 
 - Anonymous: `anon` **OPTIONAL**
   - This is the ability to upload anonymous, on a per-tracker basis.
   - You will need to uncomment this line for it to take effect
-  - Setting `"False"` will upload publicly
-  - Setting `"True"` will upload anonymously
+  - Setting `False` will upload publicly
+  - Setting `True` will upload anonymously
 
 ## Torrent Clients
 
@@ -62,19 +62,19 @@ NOTE: If using Windows paths, change `\` into `\\`. For example `C:\Downloads\TV
 - Each client has a `remote_path` and `local_path` option:
   - These are used if the path to your data is different than what your client sees. e.g. "D:\Downloads" on the system running the script and "/data/downloads" on the system running your client
   - If this script and your client are running on the same system, set these values to paths that don't exist OR make them the same
-    ```
+    ```python
     "local_path" : r"M:\Seeding",
     "remote_path" : r"M:\Seeding"
     ```
     OR if you have multiple remote path mappings:
-    ```
+    ```python
     "local_path" : [
-        r'E:\Path1",
-        r'F:\Path2"
+        r'E:\Path1',
+        r'F:\Path2',
         ],
     "remote_path" : [
-        '/data/downloads1'
-        '/data/downloads2'
+        '/data/downloads1',
+        '/data/downloads2',
         ],
     ```
 
@@ -86,7 +86,7 @@ NOTE: If using Windows paths, change `\` into `\\`. For example `C:\Downloads\TV
     - [whatbox](https://whatbox.ca/wiki/Using_XMLRPC_with_Python) : `https://user:(Your password)@server.whatbox.ca:443/xmlrpc`
     - `https://user:password@127.0.0.1/rutorrent/plugins/httprpc/action.php`
 
-  ```
+  ```python
   "NAME" : {
               "torrent_client" : "rtorrent",
               "rtorrent_url" : "https://user:password@server.host.tld:443/username/rutorrent/plugins/httprpc/action.php",
@@ -95,7 +95,7 @@ NOTE: If using Windows paths, change `\` into `\\`. For example `C:\Downloads\TV
 
 - Example qbittorrent config:
 
-  ```
+  ```python
   "NAME" : {
               "torrent_client" : "qbit",
               "qbit_url" : "http://127.0.0.1",
@@ -107,7 +107,7 @@ NOTE: If using Windows paths, change `\` into `\\`. For example `C:\Downloads\TV
 
 - Example deluge config:
 
-  ```
+  ```python
   "NAME" : {
              "torrent_client" : "deluge",
              "deluge_url" : "localhost",
@@ -119,7 +119,7 @@ NOTE: If using Windows paths, change `\` into `\\`. For example `C:\Downloads\TV
 
 - Example watch folder config:
 
-  ```
+  ```python
   "NAME" : {
              "torrent_client" : "watch",
              "watch_folder" : "/Path/To/Watch/Folder"

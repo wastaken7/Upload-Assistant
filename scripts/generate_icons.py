@@ -6,7 +6,7 @@ from PIL import Image
 from resvg_py import svg_to_bytes
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-SOURCE_SVG = BASE_DIR / "logo.svg"
+SOURCE_SVG = BASE_DIR / "docs" / "assets" / "logo.svg"
 APP_ICON_BACKGROUND = (16, 14, 13, 255)
 
 
@@ -56,8 +56,8 @@ def main():
 
     # Save PNG versions
     master_logo.save(web_static_img / "logo.png", "PNG")
-    master_logo.save(base_dir / "logo.png", "PNG")
-    print("Saved logo.png (512x512) to web_ui/static/img/ and root.")
+    master_logo.save(base_dir / "docs" / "assets" / "logo.png", "PNG")
+    print("Saved logo.png (512x512) to web_ui/static/img/ and docs/assets/.")
 
     app_icon_path = web_static_img / "apple-touch-icon.png"
     app_icon.save(app_icon_path, "PNG")

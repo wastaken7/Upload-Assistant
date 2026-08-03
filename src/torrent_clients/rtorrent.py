@@ -15,7 +15,7 @@ import bencode
 import defusedxml.xmlrpc
 from torf import Torrent
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.torrent_clients.path_utils import coerce_str_list, is_path_under, map_save_path, tracker_directory
