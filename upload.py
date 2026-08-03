@@ -1571,7 +1571,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                         gc.collect()
                         cleanup_manager.reset_terminal()
                         if "workers" in str(e):
-                            logger.info("[red]max workers issue, see https://github.com/Audionut/Upload-Assistant/wiki/ffmpeg---max-workers-issues[/red]")
+                            logger.info("[red]max workers issue, see https://github.com/wastaken7/Upload-Assistant/blob/development/docs/ffmpeg-max-workers-issues.md[/red]")
                         raise Exception(f"Error during screenshot capture: {e}") from e
 
             except asyncio.CancelledError as e:
