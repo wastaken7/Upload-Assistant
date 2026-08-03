@@ -35,7 +35,7 @@ web_ui/
 ## CONVENTIONS
 
 - `upload.py` is the server launcher. WebUI execution later invokes `upload.main()` in-process or starts `upload.py` as a subprocess.
-- Browse roots come only from `UA_BROWSE_ROOTS` or runtime setup. Resolve real paths and require exact-root/descendant membership before reading or writing.
+- Configured browse roots come from `UA_BROWSE_ROOTS` or runtime setup. For `webui_queue_*.txt`, `_resolve_user_path` narrowly adds repository `tmp/` before the empty-root check. Resolve real paths and require exact-root/descendant membership before reading or writing.
 - API auth supports persisted-user session, Basic auth, or bearer API token as defined by middleware; keep IP access control ahead of authentication.
 - Session secrets must be at least 32 bytes and stable. Never overwrite an unreadable existing secret: encrypted WebUI credentials would become unrecoverable.
 - State-changing session requests use same-origin and CSRF protections. Route additions should follow neighboring decorators/helpers and response shapes.
@@ -46,7 +46,7 @@ web_ui/
 
 ## ANTI-PATTERNS
 
-- Do not default an empty browse-root set to repository root or filesystem root; empty means browsing is disabled.
+- Do not default an empty browse-root set to repository root or filesystem root. Outside the queue-file exception, empty means browsing is disabled; `tmp/` is mutable runtime state, not source.
 - Do not accept arbitrary config paths or execute config Python. The editor confines files to `data` and parses the `config` literal with AST rules.
 - Do not bypass auth/CSRF helpers for a new JSON endpoint or mark a write endpoint as health/public traffic.
 - Do not render SSE, tracker, provider, or user-controlled HTML without the shared sanitizer and dangerous-scheme filtering.

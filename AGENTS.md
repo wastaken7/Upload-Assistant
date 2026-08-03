@@ -87,6 +87,7 @@ Python LSP was unavailable at generation time; reference counts below come from 
 ```bash
 python -m pip install -r requirements.txt
 python upload.py <path> [arguments]
+python -m pip install pytest pytest-asyncio
 PYTHONPATH=. python -m pytest -q
 python -m compileall src web_ui upload.py config-generator.py
 ruff check .

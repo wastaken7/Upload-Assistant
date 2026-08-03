@@ -45,4 +45,4 @@ trackers/
 - Do not change constructor shape, class attributes, or async method names without tracing the static registry and dispatcher.
 - Do not move site-specific forbidden-category, codec, container, language, or naming policy into `Common` unless multiple independent adapters share it.
 - Do not edit one family adapter by copying an entire base method when a narrow hook or mapping override exists.
-- Do not treat `MANUAL` and `USENET` as ordinary torrent adapter classes; dispatch has explicit branches.
+- Preserve `trackerhandle`'s explicit `MANUAL`, `TORRENTHR`, and `PASSTHEPOPCORN` branches; keep `USENET` separate from ordinary torrent adapter classes.
