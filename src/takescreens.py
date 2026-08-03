@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import ffmpeg
-import psutil
 from pymediainfo import MediaInfo
 
 from data import config as data_config
@@ -119,23 +118,26 @@ async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
             if Path(candidate).exists():
                 cmd_list[0] = str(candidate)
 
-                process = await asyncio.create_subprocess_exec(
-                    *cmd_list,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    env=process_env,
-                )
-                stdout, stderr = await process.communicate()
-                return (process.returncode if process.returncode is not None else -1), stdout, stderr
-
-    # Fallback: use system/default ffmpeg (command.compile())
+    # Spawn the selected bundled binary or the system/default command.
     process = await asyncio.create_subprocess_exec(
         *cmd_list,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=process_env,
     )
-    stdout, stderr = await process.communicate()
+    try:
+        stdout, stderr = await process.communicate()
+    except asyncio.CancelledError:
+        if process.returncode is None:
+            with contextlib.suppress(ProcessLookupError):
+                process.terminate()
+            try:
+                await asyncio.wait_for(process.wait(), timeout=3)
+            except TimeoutError:
+                with contextlib.suppress(ProcessLookupError):
+                    process.kill()
+                await process.wait()
+        raise
     return process.returncode, stdout, stderr
 
 
@@ -1764,26 +1766,22 @@ async def screenshots(
     except KeyboardInterrupt:
         logger.info("\n[red]CTRL+C detected. Cancelling capture tasks...[/red]")
         await asyncio.sleep(0.1)
-        await kill_all_child_processes()
         logger.info("[red]All tasks cancelled. Exiting.[/red]")
         gc.collect()
         cleanup_manager.reset_terminal()
         sys.exit(1)
     except asyncio.CancelledError:
         await asyncio.sleep(0.1)
-        await kill_all_child_processes()
         gc.collect()
         cleanup_manager.reset_terminal()
         sys.exit(1)
     except Exception:
         await asyncio.sleep(0.1)
-        await kill_all_child_processes()
         gc.collect()
         cleanup_manager.reset_terminal()
         sys.exit(1)
     finally:
         await asyncio.sleep(0.1)
-        await kill_all_child_processes()
         logger.debug("[yellow]All capture tasks finished. Cleaning up...[/yellow]")
 
     if not force_screenshots and meta.debug:
@@ -2276,27 +2274,6 @@ async def valid_ss_time(ss_times: list[str], num_screens: int, length: float, fr
     return sorted(result_times)
 
 
-async def kill_all_child_processes() -> None:
-    """Ensures all child processes are terminated."""
-    try:
-        current_process = psutil.Process()
-        children = current_process.children(recursive=True)  # Get child processes once
-
-        for child in children:
-            logger.info(f"[red]Killing stuck worker process: {child.pid}[/red]")
-            child.terminate()
-
-        _gone, still_alive = psutil.wait_procs(children, timeout=3)  # Wait for termination
-        for process in still_alive:
-            logger.info(f"[red]Force killing stubborn process: {process.pid}[/red]")
-            process.kill()
-    except (psutil.AccessDenied, PermissionError) as e:
-        # Handle restricted environments like Termux/Android where /proc/stat is inaccessible
-        logger.warning(f"[yellow]Warning: Unable to access process information (restricted environment): {e}[/yellow]")
-    except Exception as e:
-        logger.warning(f"[yellow]Warning: Error during child process cleanup: {e}[/yellow]")
-
-
 async def get_frame_info(path: str, ss_time: str | float, meta: Meta) -> dict[str, Any]:
     """Get frame information (type, exact timestamp) for a specific frame"""
     try:
@@ -2554,9 +2531,6 @@ class TakeScreensManager:
 
     async def valid_ss_time(self, ss_times: list[str], num_screens: int, length: float, frame_rate: float, meta: Meta, retake: bool = False) -> list[str]:
         return await valid_ss_time(ss_times, num_screens, length, frame_rate, meta, retake)
-
-    async def kill_all_child_processes(self) -> None:
-        await kill_all_child_processes()
 
     async def get_frame_info(self, path: str, ss_time: str, meta: Meta) -> dict[str, Any]:
         return await get_frame_info(path, ss_time, meta)
