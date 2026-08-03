@@ -27,7 +27,7 @@ web_ui/
 | Request security | `server.py` | IP controls -> auth -> same-origin/CSRF -> route handler |
 | Browse/path safety | `server.py` | `_sanitize_relpath`, `_get_browse_roots`, `_assert_safe_resolved_path` |
 | Secrets and users | `auth.py` | Secret resolution, password/TOTP/recovery/API-token storage |
-| Config mutations | `server.py` | Restricts config files to repository `data/*.py`; writes audit log |
+| Config mutations | `server.py` | Restricts config files to repository `data/*.py`; `/api/config_update` writes audit records |
 | Main browser flow | `templates/index.html`, `static/js/app.js` | SSE/output, browse, arguments, queue, screenshots |
 | Security/config UI | `templates/config.html`, `static/js/config_app.js` | Config, 2FA, tokens, access logs, IP controls |
 | Shared browser API | `static/js/shared_utils.js` | CSRF-aware same-origin fetch and sanitizer |
