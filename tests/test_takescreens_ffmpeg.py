@@ -9,7 +9,7 @@ from src import takescreens
 
 
 @pytest.mark.asyncio
-async def test_run_ffmpeg_writes_report_next_to_output(tmp_path, monkeypatch):
+async def test_run_ffmpeg_writes_report_next_to_explicit_output(tmp_path, monkeypatch):
     output = tmp_path / "release" / "screenshots" / "frame.png"
     captured: list[dict[str, object]] = []
 
@@ -26,10 +26,10 @@ async def test_run_ffmpeg_writes_report_next_to_output(tmp_path, monkeypatch):
 
     class Command:
         def compile(self):
-            return ["ffmpeg", "-i", output.with_name("source.mkv"), output]
+            return ["ffmpeg", "-i", output.with_name("source.mkv"), output, "-y", "-loglevel", "quiet", "-hide_banner"]
 
-    process = await takescreens.run_ffmpeg(Command())
-    second_process = await takescreens.run_ffmpeg(Command())
+    process = await takescreens.run_ffmpeg(Command(), output)
+    second_process = await takescreens.run_ffmpeg(Command(), output)
 
     assert process == (0, b"", b"")
     assert second_process == (0, b"", b"")
@@ -45,3 +45,28 @@ async def test_run_ffmpeg_writes_report_next_to_output(tmp_path, monkeypatch):
     assert first_report != second_report
     assert "FFREPORT" not in takescreens.os.environ
     assert all(isinstance(argument, str) for argument in captured[0]["args"])
+
+
+@pytest.mark.asyncio
+async def test_run_ffmpeg_does_not_guess_output_from_trailing_global_args(tmp_path, monkeypatch):
+    captured: list[dict[str, object]] = []
+
+    async def fake_create_subprocess_exec(*args, **kwargs):
+        captured.append({"args": args, "kwargs": kwargs})
+
+        async def fake_communicate():
+            return b"", b""
+
+        return SimpleNamespace(returncode=0, communicate=fake_communicate)
+
+    monkeypatch.setattr(takescreens.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(takescreens.asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+    monkeypatch.setenv("FFREPORT", "file=should-not-be-used.log")
+
+    class Command:
+        def compile(self):
+            return ["ffmpeg", "-i", tmp_path / "source.mkv", tmp_path / "frame.png", "-y", "-hide_banner"]
+
+    await takescreens.run_ffmpeg(Command())
+
+    assert "FFREPORT" not in captured[0]["kwargs"]["env"]
