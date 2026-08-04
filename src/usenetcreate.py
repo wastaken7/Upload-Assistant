@@ -1053,6 +1053,11 @@ async def prepare_and_upload_usenet(meta: Meta, config: dict[str, Any], *, prepa
         archive_out = Path(usenet_dir) / f"{archive_name}.7z"
 
         if await aiofiles.ospath.isdir(input_path) or volume_size or archive_password:
+            archive_artifact_pattern = re.compile(rf"{re.escape(archive_out.name)}(?:\.\d+)?")
+            for stale_archive in usenet_dir.iterdir():
+                if stale_archive.is_file() and archive_artifact_pattern.fullmatch(stale_archive.name):
+                    stale_archive.unlink()
+
             cmd_7z = [path_7z or "7z", "a", "-mx=0"]
             if volume_size:
                 cmd_7z.append(f"-v{volume_size.lower()}")

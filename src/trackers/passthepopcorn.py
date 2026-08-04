@@ -132,9 +132,9 @@ class PassThePopcorn:
         self.rehost_images_manager = RehostImagesManager(config)
         self.takescreens_manager = TakeScreensManager(config)
         self.uploadscreens_manager = UploadScreensManager(config)
-        self.api_user = config["TRACKERS"]["PassThePopcorn"].get("ApiUser", "").strip()
-        self.api_key = config["TRACKERS"]["PassThePopcorn"].get("api_key", "").strip()
-        announce_url = config["TRACKERS"]["PassThePopcorn"].get("announce_url", "").strip()
+        self.api_user = config["TRACKERS"][self.tracker].get("ApiUser", "").strip()
+        self.api_key = config["TRACKERS"][self.tracker].get("api_key", "").strip()
+        announce_url = config["TRACKERS"][self.tracker].get("announce_url", "").strip()
         if announce_url and announce_url.startswith("http://"):
             logger.info(f"{self.tracker}: [red]announce URL is using plaintext HTTP.\n")
             logger.info(
@@ -144,9 +144,9 @@ class PassThePopcorn:
             self.announce_url = announce_url.replace("http://", "https://").replace(":2710", "")
         else:
             self.announce_url = announce_url
-        self.username = config["TRACKERS"]["PassThePopcorn"].get("username", "").strip()
-        self.password = config["TRACKERS"]["PassThePopcorn"].get("password", "").strip()
-        self.web_source = self._is_true(config["TRACKERS"]["PassThePopcorn"].get("add_web_source_to_desc", True))
+        self.username = config["TRACKERS"][self.tracker].get("username", "").strip()
+        self.password = config["TRACKERS"][self.tracker].get("password", "").strip()
+        self.web_source = self._is_true(config["TRACKERS"][self.tracker].get("add_web_source_to_desc", True))
         self.user_agent = f"Upload-Assistant/2.3 ({platform.system()} {platform.release()})"
 
         self.cookie_validator = CookieValidator(config)
