@@ -2,12 +2,8 @@
 import re
 import unicodedata
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
-import cli_ui
-
-from src.console import console
-from src.languages import languages_manager
 from src.meta import Meta
 from src.trackers.UNIT3D import UNIT3D
 
@@ -25,77 +21,113 @@ class NordicQuality(UNIT3D):
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
-    supported_categories = ("TV", "MOVIE")
+    supported_categories = ("TV", "MOVIE", "MUSIC", "BOOK", "GAME")
     tracker_urls = (base_url,)
-    NORDIC_LANGUAGE_TOKENS = frozenset(
-        {
-            "da",
-            "dan",
-            "danish",
-            "fi",
-            "fin",
-            "finnish",
-            "ice",
-            "icelandic",
-            "is",
-            "isl",
-            "no",
-            "nno",
-            "nob",
-            "nor",
-            "norwegian",
-            "sv",
-            "swe",
-            "swedish",
-        }
-    )
+    NORDIC_SUBTITLE_LANGUAGES: ClassVar[list[str]] = [
+        "da",
+        "dan",
+        "danish",
+        "fi",
+        "fin",
+        "finnish",
+        "ice",
+        "icelandic",
+        "is",
+        "isl",
+        "no",
+        "nno",
+        "nob",
+        "nor",
+        "norwegian",
+        "sv",
+        "swe",
+        "swedish",
+    ]
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name=self.tracker)
-
-    @staticmethod
-    def _language_values(languages: Any) -> list[str]:
-        if isinstance(languages, str):
-            return [languages]
-        if isinstance(languages, list):
-            return [language for language in languages if isinstance(language, str)]
-        return []
-
-    @classmethod
-    def _language_tokens(cls, languages: Any) -> set[str]:
-        tokens: set[str] = set()
-        for language in cls._language_values(languages):
-            normalized = unicodedata.normalize("NFKD", language)
-            normalized = "".join(character for character in normalized if not unicodedata.combining(character))
-            tokens.update(re.findall(r"[a-z0-9]+", normalized.casefold()))
-        return tokens
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category not in {"MOVIE", "TV"}:
             return True
 
-        if not meta.language_checked:
-            await languages_manager.process_desc_language(meta, tracker=self.tracker)
-
-        console.print(f"[yellow]{self.tracker}: Checking file for approved Nordic subtitles...[/yellow]")
-        subtitle_languages = meta.subtitle_languages
-        subtitle_tokens = self._language_tokens(subtitle_languages)
-
-        if self.NORDIC_LANGUAGE_TOKENS.intersection(subtitle_tokens):
-            nordic_subtitles = [
-                subtitle
-                for subtitle in self._language_values(subtitle_languages)
-                if self.NORDIC_LANGUAGE_TOKENS.intersection(self._language_tokens(subtitle))
-            ]
-            console.print(f"[green]{self.tracker}: Nordic subtitle requirement met: {', '.join(nordic_subtitles)}[/green]")
-            return meta.unattended or cli_ui.ask_yes_no("Do you wish to continue uploading?", default=False)
-
-        subtitle_display = ", ".join(subtitle_languages) if isinstance(subtitle_languages, list) else str(subtitle_languages or "None")
-        console.print(
-            f"[bold red]{self.tracker} requires at least one Nordic subtitle for Movie and TV uploads.\n"
-            f"Found Subtitles: {subtitle_display}[/bold red]"
+        return await self.common.check_language_requirements(
+            meta,
+            self.tracker,
+            languages_to_check=self.NORDIC_SUBTITLE_LANGUAGES,
+            check_subtitle=True,
         )
-        return False
+
+    async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        category_id = {
+            "MOVIE": "1",
+            "TV": "2",
+            "MUSIC": "3",
+            "GAME": "4",
+            "BOOK": "7",
+            "AUDIOBOOK": "8",
+        }
+        if mapping_only:
+            return category_id
+        if reverse:
+            return {value: key for key, value in category_id.items()}
+
+        resolved_category = category or meta.category
+        if resolved_category == "BOOK" and meta.audiobook:
+            resolved_category = "AUDIOBOOK"
+        return {"category_id": category_id.get(resolved_category, "0")}
+
+    async def get_type_id(self, meta: Meta, type: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
+        type_id = {
+            "DISC": "1",
+            "REMUX": "2",
+            "ENCODE": "3",
+            "DVDRIP": "3",
+            "WEBDL": "4",
+            "WEBRIP": "5",
+            "HDTV": "6",
+            "MP3": "7",
+            "FLAC": "8",
+            "EPUB": "9",
+            "PDF": "10",
+            "WINDOWS": "11",
+            "MAC": "12",
+            "MACOS": "12",
+            "ANDROID": "13",
+            "IOS": "14",
+            "OTHER": "15",
+            "LINUX": "17",
+            "CONSOLE": "18",
+        }
+        if mapping_only:
+            return type_id
+        if reverse:
+            return {value: key for key, value in type_id.items()}
+        if type:
+            return {"type_id": type_id.get(type.upper().strip().lstrip("."), "0")}
+
+        if meta.category in {"MUSIC", "BOOK"}:
+            resolved_type = meta.format.upper().strip().lstrip(".")
+        elif meta.category == "GAME":
+            platform = meta.platform.lower()
+            if meta.console_game:
+                resolved_type = "CONSOLE"
+            elif "windows" in platform or "pc" in platform:
+                resolved_type = "WINDOWS"
+            elif "linux" in platform:
+                resolved_type = "LINUX"
+            elif "mac" in platform:
+                resolved_type = "MAC"
+            elif "android" in platform:
+                resolved_type = "ANDROID"
+            elif "ios" in platform:
+                resolved_type = "IOS"
+            else:
+                resolved_type = "OTHER"
+        else:
+            resolved_type = meta.type.upper().strip().lstrip(".") if meta.type else ""
+
+        return {"type_id": type_id.get(resolved_type, "15" if meta.category in {"MUSIC", "BOOK", "GAME"} else "0")}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         name = Path(meta.uuid).stem.replace(" ", ".")
@@ -125,5 +157,4 @@ class NordicQuality(UNIT3D):
         name = re.sub(r"[^A-Za-z0-9._()\-]+", ".", name)
         name = re.sub(r"\.{2,}", ".", name).strip(".")
 
-        console.print(f"[cyan]Name: {name}")
         return {"name": name}
