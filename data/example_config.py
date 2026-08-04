@@ -981,6 +981,7 @@ config: dict[str, Any] = {
             "add_bluray_link": True,
             "use_bluray_images": True,
             "bluray_image_size": "",
+            # Audio spectrograms will only be added for music uploads, as requested by the tracker staff.
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
