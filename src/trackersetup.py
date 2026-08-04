@@ -76,6 +76,7 @@ from src.trackers.UNIT3D.locadora import Locadora
 from src.trackers.UNIT3D.lst import LST
 from src.trackers.UNIT3D.luminarr import Luminarr
 from src.trackers.UNIT3D.midnightscene import MidnightScene
+from src.trackers.UNIT3D.nordicquality import NordicQuality
 from src.trackers.UNIT3D.oldtoonsworld import OldToonsWorld
 from src.trackers.UNIT3D.onlyencodes import OnlyEncodes
 from src.trackers.UNIT3D.peergarden import PeerGarden
@@ -1378,6 +1379,7 @@ tracker_class_map: dict[str, Any] = {
     "MTEAM": MTeam,
     "MORETHANTV": MoreThanTV,
     "NEBULANCE": Nebulance,
+    "NORDICQUALITY": NordicQuality,
     "ONLYENCODES": OnlyEncodes,
     "OLDTOONSWORLD": OldToonsWorld,
     "ORPHEUS": Orpheus,
