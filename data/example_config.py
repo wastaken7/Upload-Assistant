@@ -1788,7 +1788,6 @@ config: dict[str, Any] = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-
         "OLDTOONSWORLD": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
