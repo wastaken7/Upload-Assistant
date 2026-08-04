@@ -76,6 +76,7 @@ from src.trackers.UNIT3D.locadora import Locadora
 from src.trackers.UNIT3D.lst import LST
 from src.trackers.UNIT3D.luminarr import Luminarr
 from src.trackers.UNIT3D.midnightscene import MidnightScene
+from src.trackers.UNIT3D.nordicquality import NordicQuality
 from src.trackers.UNIT3D.oldtoonsworld import OldToonsWorld
 from src.trackers.UNIT3D.onlyencodes import OnlyEncodes
 from src.trackers.UNIT3D.peergarden import PeerGarden
@@ -84,6 +85,7 @@ from src.trackers.UNIT3D.portugas import Portugas
 from src.trackers.UNIT3D.racing4everyone import Racing4Everyone
 from src.trackers.UNIT3D.rastastugan import Rastastugan
 from src.trackers.UNIT3D.reelflix import ReelFlix
+from src.trackers.UNIT3D.retromoviesclub import RetroMoviesClub
 from src.trackers.UNIT3D.samaritano import Samaritano
 from src.trackers.UNIT3D.seedpool import Seedpool
 from src.trackers.UNIT3D.shareisland import ShareIsland
@@ -1377,6 +1379,7 @@ tracker_class_map: dict[str, Any] = {
     "MTEAM": MTeam,
     "MORETHANTV": MoreThanTV,
     "NEBULANCE": Nebulance,
+    "NORDICQUALITY": NordicQuality,
     "ONLYENCODES": OnlyEncodes,
     "OLDTOONSWORLD": OldToonsWorld,
     "ORPHEUS": Orpheus,
@@ -1395,6 +1398,7 @@ tracker_class_map: dict[str, Any] = {
     "REELFLIX": ReelFlix,
     "RAILGUNPT": RailgunPT,
     "RETROFLIX": RetroFlix,
+    "RETROMOVIESCLUB": RetroMoviesClub,
     "SAMARITANO": Samaritano,
     "SHAREISLAND": ShareIsland,
     "SWARMAZON": Swarmazon,

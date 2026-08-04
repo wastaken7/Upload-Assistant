@@ -1,7 +1,7 @@
 """Regression tests for DarkPeers-specific BOOK and MUSIC title rules."""
 
 import asyncio
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
 from src.meta import Meta
 from src.trackers.UNIT3D.darkpeers import DarkPeers
@@ -27,6 +27,31 @@ def test_darkpeers_music_name_uses_required_folder_style():
     )
 
     assert _name(meta) == "Taylor Swift - Red (2012) - WEB FLAC 16-44.1"
+
+
+def test_darkpeers_only_includes_audio_spectrograms_for_music():
+    config = {
+        "DEFAULT": {"tmdb_api": "test-key"},
+        "TRACKERS": {
+            "DARKPEERS": {
+                "add_audio_spectrogram": True,
+                "audio_spectrogram_header": "[h2]Audio Spectrogram[/h2]",
+            }
+        },
+    }
+    adapter = DarkPeers(config)
+    spectrogram = {"web_url": "https://example.com/page", "raw_url": "https://example.com/spectrogram.png"}
+
+    for category in ("MOVIE", "TV", "BOOK", "GAME"):
+        meta = Meta(category=category, audio_spectrogram=True, spectrograms_images=[spectrogram])
+        description = asyncio.run(adapter.get_description(meta))["description"]
+        assert "Audio Spectrogram" not in description
+        assert "spectrogram.png" not in description
+
+    music = Meta(category="MUSIC", audio_spectrogram=True, spectrograms_images=[spectrogram])
+    music_description = asyncio.run(adapter.get_description(music))["description"]
+    assert "[h2]Audio Spectrogram[/h2]" in music_description
+    assert "spectrogram.png" in music_description
 
 
 def test_darkpeers_ebook_name_includes_book_elements():
@@ -83,6 +108,55 @@ def test_darkpeers_preserves_detected_original_scene_name():
     meta = Meta(category="MOVIE", name="Generated Name", scene=True, scene_name="Original.Release.2026-GRP", language_checked=True)
 
     assert _name(meta) == "Original.Release.2026-GRP"
+
+
+def test_darkpeers_tv_name_omits_year_without_an_exact_title_match():
+    meta = Meta(category="TV", title="BLACK TORCH", year=2026, name="BLACK TORCH 2026 S01E05 1080p CR WEB-DL DD+ 2.0 H.264-AnoZu")
+    adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
+    adapter._tv_title_needs_year = AsyncMock(return_value=False)
+
+    assert asyncio.run(adapter.get_name(meta))["name"] == "BLACK TORCH S01E05 1080p CR WEB-DL DD+ 2.0 H.264-AnoZu"
+
+
+def test_darkpeers_tv_name_keeps_year_for_an_exact_title_match():
+    meta = Meta(category="TV", title="The Flash", year=2014, name="The Flash 2014 S01E01 1080p WEB-DL")
+    adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
+    adapter._tv_title_needs_year = AsyncMock(return_value=True)
+
+    assert asyncio.run(adapter.get_name(meta))["name"] == "The Flash 2014 S01E01 1080p WEB-DL"
+
+
+def test_darkpeers_tv_year_rule_preserves_aka():
+    meta = Meta(category="TV", title="Localized Title", year=2020, aka="AKA Original Title", name="Localized Title 2020 AKA Original Title S01E01 1080p WEB-DL")
+    adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
+    adapter._tv_title_needs_year = AsyncMock(return_value=False)
+
+    assert asyncio.run(adapter.get_name(meta))["name"] == "Localized Title AKA Original Title S01E01 1080p WEB-DL"
+
+
+def test_darkpeers_tv_year_rule_detects_a_distinct_exact_tmdb_title():
+    meta = Meta(category="TV", title="The Flash", tmdb_id=60735)
+    adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
+    response = Mock()
+    response.json.return_value = {
+        "results": [
+            {"id": 60735, "name": "The Flash", "original_name": "The Flash"},
+            {"id": 236, "name": "The Flash", "original_name": "The Flash"},
+        ]
+    }
+
+    with patch("src.trackers.UNIT3D.darkpeers.httpx.AsyncClient.get", new=AsyncMock(return_value=response)):
+        assert asyncio.run(adapter._tv_title_needs_year(meta)) is True
+
+
+def test_darkpeers_tv_year_rule_does_not_count_the_only_tmdb_result_as_a_duplicate():
+    meta = Meta(category="TV", title="BLACK TORCH")
+    adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
+    response = Mock()
+    response.json.return_value = {"results": [{"id": 279807, "name": "BLACK TORCH", "original_name": "BLACK TORCH"}]}
+
+    with patch("src.trackers.UNIT3D.darkpeers.httpx.AsyncClient.get", new=AsyncMock(return_value=response)):
+        assert asyncio.run(adapter._tv_title_needs_year(meta)) is False
 
 
 def _additional_checks(meta: Meta) -> bool:
