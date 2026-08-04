@@ -17,9 +17,27 @@ upload.py [path...] [options]
   - Quoting is recommended (single or double quotes) especially when paths contain spaces.
   - The parser has a small recovery mechanism: if extra “unknown” tokens were provided and the joined `path` doesn’t exist, it will append those tokens into the path until it finds an existing path.
 
+### Pasting multiple full paths
+
+Use `--paths-from-stdin` when copying multiple full paths from a torrent client or another application. This keeps spaces, parentheses, and other shell-sensitive characters inside each path instead of letting the shell interpret them.
+
+```console
+python upload.py -ua -sda --paths-from-stdin
+Paste one full path per line, then press Enter on an empty line to start.
+/home/seedbox/data/torrents/sonarr/First.Release.mkv
+/home/seedbox/data/torrents/sonarr/Release With Spaces (2026).mkv
+
+```
+
+After pasting the paths, press Enter on the empty line. For scripts and pipes, input is read until EOF instead:
+
+```console
+printf '%s\n' "/path/First.mkv" "/path/Release With Spaces (2026).mkv" | python upload.py -ua -sda --paths-from-stdin
+```
+
 ### Validation rules
 
-- You must provide either at least one `path` OR `--site-upload`.
+- You must provide either at least one `path`, paths through `--paths-from-stdin`, OR `--site-upload`.
 - If `--site-upload` is provided without a `path`, the parser injects a dummy path internally (so downstream code can continue).
 
 ## Modes / workflows

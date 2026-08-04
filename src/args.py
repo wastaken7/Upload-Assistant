@@ -6,7 +6,7 @@ import sys
 import urllib.parse
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 from src.book_prep import detect_newspaper, sanitize_book_author, sanitize_book_language
 from src.console import logger
@@ -32,6 +32,35 @@ MUSIC_RELEASE_TYPE_CHOICES = (
     "dj mix",
     "unknown",
 )
+
+PATHS_FROM_STDIN_OPTION = "--paths-from-stdin"
+
+
+def read_paths_from_stdin(argv: Sequence[str], stream: TextIO) -> tuple[list[str], list[str]]:
+    args = list(argv)
+    option_count = args.count(PATHS_FROM_STDIN_OPTION)
+    if option_count == 0 or "-h" in args or "--help" in args:
+        return args, []
+    if option_count > 1:
+        raise ValueError(f"{PATHS_FROM_STDIN_OPTION} may only be specified once")
+
+    args.remove(PATHS_FROM_STDIN_OPTION)
+    interactive = stream.isatty()
+    if interactive:
+        logger.info("[cyan]Paste one full path per line, then press Enter on an empty line to start.[/cyan]")
+
+    paths: list[str] = []
+    for line in stream:
+        path = line.rstrip("\r\n")
+        if not path.strip():
+            if interactive:
+                break
+            continue
+        paths.append(path)
+
+    if not paths:
+        raise ValueError(f"{PATHS_FROM_STDIN_OPTION} did not receive any paths")
+    return args, paths
 
 
 class ShortHelpFormatter(argparse.HelpFormatter):
@@ -104,6 +133,12 @@ class Args:
         )
 
         parser.add_argument("path", nargs="*", help="Path to file/directory (in single/double quotes is best)")
+        parser.add_argument(
+            PATHS_FROM_STDIN_OPTION,
+            action="store_true",
+            required=False,
+            help="Read one full path per line from standard input (finish an interactive paste with an empty line)",
+        )
         parser.add_argument("--queue", nargs=1, required=False, help="(--queue queue_name) Process an entire folder (files/subfolders) in a queue")
         parser.add_argument("-lq", "--limit-queue", dest="limit_queue", nargs=1, required=False, help="Limit the amount of queue files processed", type=int, default=0)
         parser.add_argument(
