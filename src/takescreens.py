@@ -445,6 +445,7 @@ async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str
             # Get the resolution and convert it to integer
             resol = int("".join(filter(str.isdigit, (meta.resolution if meta.resolution is not None else "1080p"))))
             font_size = round(text_size * resol / 1080)
+            border_width = round(2 * resol/1080)
             x_all = round(10 * resol / 1080)
 
             # Scale vertical spacing based on font size
@@ -454,14 +455,14 @@ async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str
             y_hdr = y_type + line_spacing
 
             # Frame number
-            vf_filters.append(f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:box=1:boxcolor=black@0.5")
+            vf_filters.append(f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:borderw={border_width}:bordercolor=black")
 
             # Frame type
-            vf_filters.append(f"drawtext=text='Frame Type\\: {frame_type}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_type}:box=1:boxcolor=black@0.5")
+            vf_filters.append(f"drawtext=text='Frame Type\\: {frame_type}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_type}:borderw={border_width}:bordercolor=black")
 
             # HDR status
             if hdr_tonemap:
-                vf_filters.append(f"drawtext=text='Tonemapped HDR':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_hdr}:box=1:boxcolor=black@0.5")
+                vf_filters.append(f"drawtext=text='Tonemapped HDR':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_hdr}:borderw={border_width}:bordercolor=black")
 
         # Build command
         # Always ensure at least format filter is present for PNG compression to work
@@ -804,6 +805,7 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
             # Get the resolution and convert it to integer
             resol = int("".join(filter(str.isdigit, (meta.resolution if meta.resolution is not None else "576p"))))
             font_size = round(text_size * resol / 576)
+            border_width = round(2 * resol/576)
             x_all = round(10 * resol / 576)
 
             # Scale vertical spacing based on font size
@@ -812,10 +814,10 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
             y_type = y_number + line_spacing
 
             # Frame number
-            vf_filters.append(f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:box=1:boxcolor=black@0.5")
+            vf_filters.append(f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:borderw={border_width}:bordercolor=black")
 
             # Frame type
-            vf_filters.append(f"drawtext=text='Frame Type\\: {frame_type}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_type}:box=1:boxcolor=black@0.5")
+            vf_filters.append(f"drawtext=text='Frame Type\\: {frame_type}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_type}:borderw={border_width}:bordercolor=black")
 
         # Build command
         # Always ensure at least format filter is present for PNG compression to work
@@ -2161,6 +2163,7 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
             # Get the resolution and convert it to integer
             resol = int("".join(filter(str.isdigit, (meta.resolution if meta.resolution is not None else "1080p"))))
             font_size = round(text_size * resol / 1080)
+            border_width = round(2 * resol/1080)
             x_all = round(10 * resol / 1080)
 
             # Scale vertical spacing based on font size
@@ -2170,14 +2173,14 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
             y_hdr = y_type + line_spacing
 
             # Frame number
-            vf_filters.append(f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:box=1:boxcolor=black@0.5")
+            vf_filters.append(f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:borderw={border_width}:bordercolor=black")
 
             # Frame type
-            vf_filters.append(f"drawtext=text='Frame Type\\: {frame_type}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_type}:box=1:boxcolor=black@0.5")
+            vf_filters.append(f"drawtext=text='Frame Type\\: {frame_type}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_type}:borderw={border_width}:bordercolor=black")
 
             # HDR status
             if hdr_tonemap:
-                vf_filters.append(f"drawtext=text='Tonemapped HDR':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_hdr}:box=1:boxcolor=black@0.5")
+                vf_filters.append(f"drawtext=text='Tonemapped HDR':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_hdr}:borderw={border_width}:bordercolor=black")
 
         # Build command
         # Always ensure at least format filter is present for PNG compression to work
