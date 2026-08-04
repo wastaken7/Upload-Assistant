@@ -1316,10 +1316,11 @@ class DescriptionBuilder:
         signature: str = "",
         desc_header: str = "",
         approved_image_hosts: list[str] | None = None,
+        audio_spectrogram: bool = True,
     ) -> str:
         return await self.general_description_generator(
             meta,
-            audio_spectrogram=True,
+            audio_spectrogram=audio_spectrogram,
             bluray=True,
             book=True,
             custom_header=True,
