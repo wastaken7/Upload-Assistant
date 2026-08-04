@@ -454,6 +454,7 @@ class DarkPeers(UNIT3D):
         if not title or not api_key:
             return False
         try:
+            logger.info(f"{self.tracker}: Checking if TMDb has multiple shows with the title '{title}'...")
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     "https://api.themoviedb.org/3/search/tv",
