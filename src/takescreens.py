@@ -83,16 +83,22 @@ def _apply_config(config: Mapping[str, Any]) -> None:
         desat = 10.0
 
 
-async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
+async def run_ffmpeg(command: Any, output_path: str | Path | None = None) -> tuple[int | None, bytes, bytes]:
+    """Run FFmpeg and, when applicable, write its report next to the output.
+
+    ``ffmpeg-python`` appends ``global_args`` after the output filename, so the
+    final compiled argument cannot reliably be used to locate the output.  The
+    screenshot caller supplies the known output path explicitly instead.
+    """
     cmd_list = compile_ffmpeg_command(command)
     process_env = os.environ.copy()
 
     # FFREPORT defaults to a timestamped file in the current working
-    # directory.  Keep each report beside its output, with a unique name so
+    # directory. Keep each report beside its output, with a unique name so
     # concurrent or repeated runs do not overwrite an earlier report.
-    output_path = cmd_list[-1] if cmd_list else ""
-    if output_path and output_path not in {"-", "pipe:"} and not output_path.startswith("pipe:"):
-        report_path = Path(output_path).resolve().parent / f"ffmpeg-{uuid.uuid4().hex}.log"
+    output_path_value = str(output_path) if output_path is not None else ""
+    if output_path_value and output_path_value not in {"-", "pipe:"} and not output_path_value.startswith("pipe:"):
+        report_path = Path(output_path_value).resolve().parent / f"ffmpeg-{uuid.uuid4().hex}.log"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         # FFREPORT uses ':' as a field separator, so escape the drive-letter
         # colon in Windows paths after converting separators to '/'.
@@ -478,7 +484,7 @@ async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str
         if loglevel == "verbose" or (meta and meta.debug):
             logger.info(f"[cyan]FFmpeg command: {' '.join(compile_ffmpeg_command(info_command))}[/cyan]")
 
-        returncode, stdout, stderr = await run_ffmpeg(info_command)
+        returncode, stdout, stderr = await run_ffmpeg(info_command, image_path)
 
         # Print stdout and stderr if in verbose mode
         if loglevel == "verbose":
@@ -832,7 +838,7 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
         if loglevel == "verbose" or (meta and meta.debug):
             logger.info(f"[cyan]FFmpeg command: {' '.join(compile_ffmpeg_command(info_command))}[/cyan]")
 
-        returncode, _stdout, stderr = await run_ffmpeg(info_command)
+        returncode, _stdout, stderr = await run_ffmpeg(info_command, image)
 
         if returncode != 0:
             logger.error(f"[red]Error capturing screenshot for {input_file} at {seek_time}s:[/red]\n{stderr.decode()}")
@@ -2078,7 +2084,7 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
             # --- Execute with retry/fallback if libplacebo fails ---
             async def run_cmd(info_command: Any, timeout_sec: float) -> tuple[int | None, bytes, bytes]:
                 try:
-                    return await asyncio.wait_for(run_ffmpeg(info_command), timeout=timeout_sec)
+                    return await asyncio.wait_for(run_ffmpeg(info_command, image_path), timeout=timeout_sec)
                 except TimeoutError:
                     return -1, b"", b"Timeout"
 
@@ -2199,7 +2205,7 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
             if loglevel == "verbose":
                 logger.info(f"[cyan]FFmpeg command: {' '.join(compile_ffmpeg_command(info_cmd))}[/cyan]")
 
-            returncode, stdout, stderr = await run_ffmpeg(info_cmd)
+            returncode, stdout, stderr = await run_ffmpeg(info_cmd, image_path)
             # Print stdout and stderr if in verbose mode
             if loglevel == "verbose":
                 if stdout:
@@ -2402,7 +2408,7 @@ async def check_libplacebo_compatibility(
             logger.info(f"[cyan]libplacebo compatibility test command: {' '.join(compile_ffmpeg_command(info_cmd))}[/cyan]")
 
         try:
-            retcode, _stdout, _stderr = await run_ffmpeg(info_cmd)
+            retcode, _stdout, _stderr = await run_ffmpeg(info_cmd, test_image_path)
             return retcode == 0
         except Exception:
             return False
@@ -2488,8 +2494,8 @@ class TakeScreensManager:
         self.config = config
         _apply_config(config)
 
-    async def run_ffmpeg(self, command: Any) -> tuple[int | None, bytes, bytes]:
-        return await run_ffmpeg(command)
+    async def run_ffmpeg(self, command: Any, output_path: str | Path | None = None) -> tuple[int | None, bytes, bytes]:
+        return await run_ffmpeg(command, output_path)
 
     async def sanitize_filename(self, filename: str) -> str:
         return await sanitize_filename(filename)
