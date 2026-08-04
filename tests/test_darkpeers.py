@@ -101,17 +101,12 @@ def test_darkpeers_tv_name_keeps_year_for_an_exact_title_match():
     assert asyncio.run(adapter.get_name(meta))["name"] == "The Flash 2014 S01E01 1080p WEB-DL"
 
 
-def test_darkpeers_bleach_tv_name_omits_year_and_aka():
-    meta = Meta(
-        category="TV",
-        title="Bleach",
-        year=2004,
-        aka="AKA Bleach: Sennen Kessen-hen",
-        name="Bleach 2004 AKA Bleach: Sennen Kessen-hen S17E42 1080p DSNP WEB-DL AAC 2.0 H.264-AnoZu",
-    )
+def test_darkpeers_tv_year_rule_preserves_aka():
+    meta = Meta(category="TV", title="Localized Title", year=2020, aka="AKA Original Title", name="Localized Title 2020 AKA Original Title S01E01 1080p WEB-DL")
     adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
+    adapter._tv_title_needs_year = AsyncMock(return_value=False)
 
-    assert asyncio.run(adapter.get_name(meta))["name"] == "Bleach S17E42 1080p DSNP WEB-DL AAC 2.0 H.264-AnoZu"
+    assert asyncio.run(adapter.get_name(meta))["name"] == "Localized Title AKA Original Title S01E01 1080p WEB-DL"
 
 
 def test_darkpeers_tv_year_rule_detects_a_distinct_exact_tmdb_title():

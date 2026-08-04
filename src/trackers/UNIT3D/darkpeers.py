@@ -438,12 +438,8 @@ class DarkPeers(UNIT3D):
     async def _tv_name(self, meta: Meta, name: str) -> str:
         title = str(meta.title or "").strip()
         year = str(meta.year or "").strip()
-        omit_year = title.casefold() == "bleach" or not await self._tv_title_needs_year(meta)
-        if year and omit_year:
+        if year and not await self._tv_title_needs_year(meta):
             name = re.sub(rf"^({re.escape(title)})\s+{re.escape(year)}(?=\s|$)", r"\1", name, count=1, flags=re.IGNORECASE)
-        if title.casefold() == "bleach" and meta.aka:
-            aka = str(meta.aka).strip()
-            name = re.sub(rf"^({re.escape(title)})\s+{re.escape(aka)}(?=\s|$)", r"\1", name, count=1, flags=re.IGNORECASE)
         return " ".join(name.split())
 
     async def _tv_title_needs_year(self, meta: Meta) -> bool:
