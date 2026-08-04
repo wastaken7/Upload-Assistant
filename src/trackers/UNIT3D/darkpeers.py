@@ -2,7 +2,9 @@
 import re
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
+
+import httpx
 
 from src.console import logger
 from src.get_desc import DescriptionBuilder
@@ -430,11 +432,55 @@ class DarkPeers(UNIT3D):
         # release, submit its recorded release name rather than rebuilding it.
         dp_name = str(meta.scene_name or meta.name or "")
 
+        if meta.category == "TV":
+            dp_name = await self._tv_name(meta, dp_name)
+
         audio = await self.get_audio(meta)
         if audio and audio != "SKIPPED" and "Dual-Audio" in dp_name:
             dp_name = dp_name.replace("Dual-Audio", audio)
 
         return {"name": dp_name}
+
+    async def _tv_name(self, meta: Meta, name: str) -> str:
+        title = str(meta.title or "").strip()
+        year = str(meta.year or "").strip()
+        if year and not await self._tv_title_needs_year(meta):
+            name = re.sub(rf"^({re.escape(title)})\s+{re.escape(year)}(?=\s|$)", r"\1", name, count=1, flags=re.IGNORECASE)
+        return " ".join(name.split())
+
+    async def _tv_title_needs_year(self, meta: Meta) -> bool:
+        title = str(meta.title or "").strip()
+        api_key = str(self.config.get("DEFAULT", {}).get("tmdb_api", "")).strip()
+        if not title or not api_key:
+            return False
+        try:
+            logger.info(f"{self.tracker}: Checking if TMDb has multiple shows with the title '{title}'...")
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    "https://api.themoviedb.org/3/search/tv",
+                    params={"api_key": api_key, "query": title, "language": "en-US", "include_adult": "true"},
+                )
+                response.raise_for_status()
+                payload_raw: Any = response.json()
+        except (httpx.HTTPError, ValueError, TypeError):
+            return False
+
+        title_key = " ".join(title.casefold().split())
+        current_id = str(meta.tmdb_id or "")
+        payload = cast(dict[str, Any], payload_raw) if isinstance(payload_raw, dict) else {}
+        results_raw: Any = payload.get("results", [])
+        results = cast(list[Any], results_raw) if isinstance(results_raw, list) else []
+        matching_ids: set[str] = set()
+        for result_raw in results:
+            if not isinstance(result_raw, dict):
+                continue
+            result = cast(dict[str, Any], result_raw)
+            result_id = str(result.get("id", ""))
+            names = (result.get("name"), result.get("original_name"))
+            if any(" ".join(str(candidate or "").casefold().split()) == title_key for candidate in names):
+                matching_ids.add(result_id)
+        matching_ids.discard("")
+        return bool(matching_ids - {current_id}) if current_id else len(matching_ids) > 1
 
     @classmethod
     def _release_field(cls, release: dict[str, Any], name: str, default: Any = "") -> Any:
