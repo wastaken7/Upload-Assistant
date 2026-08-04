@@ -18,7 +18,7 @@ from typing import Any
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import forget_file, group_for
-from src.takescreens import capture_screenshot, disc_screenshots, get_frame_info, tone_map
+from src.takescreens import capture_screenshot, disc_screenshots, get_frame_info, screenshot_par_scale_factors, tone_map
 
 _SCREENSHOT_FILE = re.compile(r"^(?P<prefix>.+)-(?P<index>\d+)\.png$", re.IGNORECASE)
 _EXCLUDED_NAMES = {"poster.png", "cover.png", "music_cover.png"}
@@ -494,11 +494,8 @@ def _video_properties(temp_dir: Path) -> tuple[float, float, float, float, float
     par = number(video.get("PixelAspectRatio"), 1.0)
     dar = number(video.get("DisplayAspectRatio"), 16.0 / 9.0)
     frame_rate = number(video.get("FrameRate"), 24.0)
-    if par == 1:
-        return width, height, 1.0, 1.0, duration, frame_rate
-    if par < 1:
-        return width, height, 1.0, width / (dar * height), duration, frame_rate
-    return width, height, par, 1.0, duration, frame_rate
+    w_sar, h_sar = screenshot_par_scale_factors(width, height, par, dar)
+    return width, height, w_sar, h_sar, duration, frame_rate
 
 
 def _string(value: object) -> str:

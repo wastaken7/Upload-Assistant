@@ -104,6 +104,7 @@ Implementation notes:
 - `screens_per_row` (str): Screenshots per row in description (only for some trackers).
 - `frame_overlay` (bool): Overlay frame number/type and “Tonemapped” (if applicable) on screenshots.
 - `overlay_text_size` (str): Overlay text size (scales with resolution).
+- `scale_screenshots_for_par` (bool): When `False` (the default), preserve MediaInfo's coded dimensions. Set to `True` only to apply pixel-aspect-ratio correction for non-square-pixel sources; this can change a PNG from `1920x1040` to `1924x1040`.
 
 Implementation notes:
 
