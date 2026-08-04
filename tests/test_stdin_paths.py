@@ -6,6 +6,7 @@ import pytest
 from src.args import read_paths_from_stdin
 from src.meta import Meta
 from src.queuemanage import QueueManager
+from web_ui.server import _validate_upload_assistant_args
 
 
 class InteractiveInput(io.StringIO):
@@ -34,6 +35,11 @@ def test_read_paths_from_piped_stdin_ignores_blank_lines() -> None:
 def test_read_paths_from_stdin_rejects_empty_input() -> None:
     with pytest.raises(ValueError, match="did not receive any paths"):
         read_paths_from_stdin(["--paths-from-stdin"], io.StringIO("\n"))
+
+
+def test_webui_rejects_paths_from_stdin_instead_of_reading_process_stdin() -> None:
+    with pytest.raises(ValueError, match="only available in CLI mode"):
+        _validate_upload_assistant_args(["--paths-from-stdin"])
 
 
 @pytest.mark.asyncio

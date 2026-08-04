@@ -332,7 +332,7 @@ To run the assistant, use the command for your system:
   python3 upload.py "/path/to/content" --args
   ```
 
-Args are OPTIONAL and ALWAYS follow the path. For a list of all available arguments, pass `--help`.
+Arguments are optional and normally follow the path. Input modes such as `--paths-from-stdin` may omit the positional path. For a list of all available arguments, pass `--help`.
 The file/folder path works best enclosed in double quotes.
 
 - CLI arguments: [docs/cli-args.md](docs/cli-args.md)

@@ -35,9 +35,11 @@ After pasting the paths, press Enter on the empty line. For scripts and pipes, i
 printf '%s\n' "/path/First.mkv" "/path/Release With Spaces (2026).mkv" | python upload.py -ua -sda --paths-from-stdin
 ```
 
+This option is available in the CLI only. In the Web UI, select paths with the built-in browser or queue controls.
+
 ### Validation rules
 
-- You must provide either at least one `path`, paths through `--paths-from-stdin`, OR `--site-upload`.
+- You must provide at least one `path`, paths through `--paths-from-stdin`, `--site-upload`, or `--webui`.
 - If `--site-upload` is provided without a `path`, the parser injects a dummy path internally (so downstream code can continue).
 
 ## Modes / workflows
