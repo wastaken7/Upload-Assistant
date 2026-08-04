@@ -538,7 +538,7 @@ config: dict[str, Any] = {
 
         # Available tracker: AURA4K, ASIANCINEMA, AITHER, ANTHELION, ALPHARATIO, AMIGOSSHARE, AVISTAZ, BEYONDHD, BITHDTV, BJSHARE, BLUTOPIA, BRASILTRACKER, CAPYBARABR, CURUPIRA, SUIO, CINEMAZ, DIGITALCORE, DRUNKENSLUG, DARKPEERS, DESITORRENTS, EMUWAREZ, FUNFILE, FILELIST,
         # GREATPOSTERWALL, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK, HAWKEUNO, INFINITYHD, IMMORTALSEED, ITATORRENTS, LAJIDUI, LOCADORA, LASTDIGITALUNDERGROUND, LONGPT, LST, LATTEAM, LUMINARR, MIDNIGHTSCENE, MTEAM, MORETHANTV, NEBULANCE, ONLYENCODES,
-        # OLDTOONSWORLD, PRIVATEHD, PORTUGAS, PTCAFE, PTERCLUB, PTFANS, PTGTK, PASSTHEPOPCORN, PEERGARDEN, PTSKIT, POLISHTORRENT, RACING4EVERYONE, RASTASTUGAN, REELFLIX, RAILGUNPT, RETROFLIX, SAMARITANO, SHAREISLAND, SWARMAZON, SEEDPOOL, SPEEDAPP, SKIPTHECOMMERCIALS, TORRENTHR,
+        # OLDTOONSWORLD, PRIVATEHD, PORTUGAS, PTCAFE, PTERCLUB, PTFANS, PTGTK, PASSTHEPOPCORN, PEERGARDEN, PTSKIT, POLISHTORRENT, RACING4EVERYONE, RASTASTUGAN, REELFLIX, RAILGUNPT, RETROFLIX, RETROMOVIESCLUB, SAMARITANO, SHAREISLAND, SWARMAZON, SEEDPOOL, SPEEDAPP, SKIPTHECOMMERCIALS, TORRENTHR,
         # CINEMATIK, ORPHEUS, TORRENTLEECH, THELEACHZONE, THEOLDSCHOOL, TOTHEGLORY, TORRENTEROS, TVCHAOSUK, ULCX, UTOPIA, YUSCENE, ZENITH
 
         # Only add the trackers you want to upload to on a regular basis
@@ -2217,6 +2217,38 @@ config: dict[str, Any] = {
             "screenshot_header": "",
             "disc_menu_header": "",
             "audio_spectrogram_header": "",
+            "custom_signature": "",
+            "add_bluray_link": True,
+            "use_bluray_images": True,
+            "bluray_image_size": "",
+            "add_audio_spectrogram": True,
+            "inject_delay": 0,
+        },
+        "RETROMOVIESCLUB": {
+            # Instead of using the tracker name for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # "use_for_search": False, set to True if you want to use Retro Movies Club for automatic ID searching or description parsing
+            "use_for_search": False,
+            "api_key": "",
+            "anon": True,
+            # Send uploads to Retro Movies Club modq for staff approval
+            "modq": False,
+            # The configurations below override the DEFAULT configuration
+            "add_logo": True,
+            "logo_size": "",
+            "thumbnail_size": "",
+            "screens_per_row": "",
+            "episode_overview": True,
+            "tonemapped_header": "[note]Screenshots have been adapted for SDR viewing, for reference only.[/note]",
+            "multiScreens": "",
+            "pack_thumb_size": "",
+            "charLimit": "",
+            "fileLimit": "",
+            "processLimit": "",
+            "custom_description_header": "",
+            "screenshot_header": "[h2]Screenshots[/h2]",
+            "disc_menu_header": "[h2]Disc Menu Screenshots[/h2]",
+            "audio_spectrogram_header": "[h2]Audio Spectrogram[/h2]",
             "custom_signature": "",
             "add_bluray_link": True,
             "use_bluray_images": True,
