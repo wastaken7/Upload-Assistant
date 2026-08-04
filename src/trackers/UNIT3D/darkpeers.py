@@ -21,6 +21,7 @@ class DarkPeers(UNIT3D):
     tracker = "DARKPEERS"
     display_name = "DarkPeers"
     allows_bloated_audio = True
+    prefers_repack = True
     base_url = "https://darkpeers.org"
     banned_groups = (
         "ARCADE",

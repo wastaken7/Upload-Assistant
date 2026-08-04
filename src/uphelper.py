@@ -300,6 +300,39 @@ class UploadHelper:
             return False, meta
         tracker_class_factory = cast(Callable[..., Any], self.tracker_class_map[tracker_name])
         tracker_class = tracker_class_factory(config=self.config)
+
+        def _format_repack_result(entry: DupeEntry | str) -> str:
+            def terminal_safe(value: object) -> str:
+                without_osc = re.sub(r"\x1b\][^\x07]*(?:\x07|\x1b\\)", "", str(value))
+                return "".join(character for character in without_osc if character.isprintable())
+
+            if not isinstance(entry, dict):
+                return escape(terminal_safe(entry))
+            entry_map = cast(dict[str, object], entry)
+            name = terminal_safe(entry_map.get("name", ""))
+            raw_id = str(entry_map.get("id", ""))
+            torrent_id = int(raw_id) if raw_id.isascii() and raw_id.isdecimal() and len(raw_id) <= 20 else 0
+            torrent_url = str(getattr(tracker_class, "torrent_url", ""))
+            if torrent_id > 0 and torrent_url:
+                return format_terminal_link(name, f"{torrent_url}{torrent_id}", self.default_config)
+            return escape(name)
+
+        if getattr(tracker_class, "prefers_repack", False):
+            preferred_repack = meta.get(f"{tracker_name}_preferred_repack")
+            if preferred_repack:
+                logger.info(f"[bold red]{tracker_name}: a matching REPACK is already available. The non-REPACK release will be skipped.[/bold red]")
+                logger.info(f"[bold cyan]{_format_repack_result(cast(DupeEntry | str, preferred_repack))}[/bold cyan]")
+                return True, meta
+
+            replaced_release = meta.get(f"{tracker_name}_repack_replaces")
+            if replaced_release:
+                logger.info(f"[bold green]{tracker_name}: this REPACK supersedes an existing release and may be uploaded.[/bold green]")
+                logger.info(
+                    f"[yellow]After the upload succeeds, report the old release manually so staff can remove it:[/yellow] "
+                    f"{_format_repack_result(cast(DupeEntry | str, replaced_release))}"
+                )
+                return False, meta
+
         try:
             tracker_rename = await tracker_class.get_name(meta)
         except Exception:
