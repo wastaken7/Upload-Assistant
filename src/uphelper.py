@@ -312,7 +312,7 @@ class UploadHelper:
             elif isinstance(tracker_rename, str):
                 display_name = tracker_rename
 
-        if meta.season_pack_exists and bool(getattr(tracker_class, "reject_episode_if_season_pack_exists", False)):
+        if meta.dupe is False and meta.season_pack_exists and bool(getattr(tracker_class, "reject_episode_if_season_pack_exists", False)):
             pack_name = meta.season_pack_name or "matching season pack"
             logger.info(f"[bold red]{tracker_name}: {pack_name} already contains this episode. Skipping individual episode upload.[/bold red]")
             return True, meta

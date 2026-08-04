@@ -77,6 +77,24 @@ async def test_dupe_check_rejects_episode_when_tracker_prefers_existing_season_p
 
 
 @pytest.mark.asyncio
+async def test_dupe_check_honors_skip_dupe_check_for_existing_season_pack() -> None:
+    class SeasonPackTracker:
+        reject_episode_if_season_pack_exists = True
+
+        async def get_name(self, meta: Meta) -> dict[str, str]:
+            return {"name": meta.name}
+
+    helper = UploadHelper({"DEFAULT": {}})
+    helper.tracker_class_map = {"DARKPEERS": lambda **_kwargs: SeasonPackTracker()}
+    meta = Meta(category="TV", name="Yowayowa Sensei S01E01", dupe=True, season_pack_exists=True, season_pack_name="Yowayowa Sensei S01 1080p WEB-DL")
+
+    is_dupe, result_meta = await helper.dupe_check([meta.season_pack_name], meta, "DARKPEERS")
+
+    assert is_dupe is False
+    assert result_meta is meta
+
+
+@pytest.mark.asyncio
 async def test_dupe_check_keeps_existing_prompt_policy_for_other_trackers(monkeypatch: pytest.MonkeyPatch) -> None:
     class SeasonPackTracker:
         reject_episode_if_season_pack_exists = False
