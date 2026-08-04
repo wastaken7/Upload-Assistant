@@ -14,8 +14,8 @@ import httpx
 import requests
 import tmdbsimple as tmdb
 
-from cogs.redaction import Redaction
 from src.bbcode import BBCODE
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager

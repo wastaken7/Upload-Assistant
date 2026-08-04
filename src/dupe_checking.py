@@ -4,7 +4,7 @@ from collections.abc import Callable, MutableMapping, Sequence
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.trackers.UNIT3D.hawkeuno import HawkeUno
