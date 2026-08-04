@@ -9,9 +9,9 @@ from typing import Any, cast
 import cli_ui
 from rich.markup import escape
 
-from cogs.redaction import Redaction
 from src.artwork import is_valid_cover_image
 from src.cleanup import cleanup_manager
+from src.cogs.redaction import Redaction
 from src.config_helpers import format_terminal_link
 from src.console import logger
 from src.dupe_checking import DupeChecker

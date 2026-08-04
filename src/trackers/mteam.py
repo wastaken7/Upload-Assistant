@@ -7,7 +7,7 @@ from urllib.parse import urlparse, urlunparse
 import aiofiles
 import httpx
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta

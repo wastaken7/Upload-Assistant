@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="logo.svg" alt="Upload Assistant Logo" width="160" height="160" />
+  <img src="docs/assets/logo.svg" alt="Upload Assistant Logo" width="160" height="160" />
   <h1>Upload-Assistant</h1>
   <p>Streamline media preparation and uploads across private trackers & usenet indexers.</p>
 
@@ -12,13 +12,16 @@
 
 ## Table of Contents
 
-- [Fork Features & Differences](#fork-features--differences-from-upstream-audionutupload-assistant)
+- [Fork Features & Differences from Upstream (Audionut/Upload-Assistant)](#fork-features--differences-from-upstream-audionutupload-assistant)
   - [1. New Media Category Support](#1-new-media-category-support)
   - [2. Audio Stream Spectrogram Generation](#2-audio-stream-spectrogram-generation)
   - [3. qBittorrent Bandwidth Control](#3-qbittorrent-bandwidth-control)
   - [4. Argument-Embedded Text Queue](#4-argument-embedded-text-queue)
   - [5. Extended Tracker Support](#5-extended-tracker-support)
   - [6. Usenet & Indexer Posting](#6-usenet--indexer-posting)
+  - [7. Interactive Screenshot Review Workflow](#7-interactive-screenshot-review-workflow)
+  - [8. Persistent TTL-Based Metadata Cache](#8-persistent-ttl-based-metadata-cache)
+  - [9. Modern Web UI & Real-Time Engine](#9-modern-web-ui--real-time-engine)
 - [Supported Sites](#supported-sites)
 - [Setup Guide](#setup-guide)
   - [Step 1: Install Required Tools](#step-1-install-required-tools)
@@ -81,6 +84,20 @@ This branch introduces new media categories and automation features not present 
 - **Usenet Upload Support**: Automatically archives and splits files/folders (via `7z`), generates parity recovery blocks (via `par2`), and uploads them to Usenet (via `nyuu`).
 - **Anonymity & Privacy**: Generates randomized poster details and obfuscates post subject lines to protect privacy.
 - **Indexer Integration**: Automatically uploads the generated `.nzb` file to configured Usenet indexers.
+
+### 7. Interactive Screenshot Review Workflow
+
+- **Manual Screenshot Review**: Inspect, add, delete, or replace/recapture individual frames before uploading through the interactive Web UI.
+
+### 8. Persistent TTL-Based Metadata Cache
+
+- **Provider-Scoped API Caching**: Disk-cached metadata for TMDb, IMDb, TVDB, TVmaze, OpenLibrary, IGDB, Discogs, and MusicBrainz.
+- **Performance & Rate Limit Protection**: Configurable TTL and negative caching reuse fetched metadata across runs, avoiding redundant API calls and preventing rate-limiting bans.
+
+### 9. Modern Web UI & Real-Time Engine
+
+- **Full Parity Web UI**: Modern interface providing full feature parity with CLI options (`--webui`).
+- **Real-Time Execution & Presets**: Live log streams, real-time preparation preview, preset saving, and interactive screenshot management.
 
 ## Supported Sites
 
@@ -199,7 +216,7 @@ For a manual Linux/macOS/Windows installation, Upload Assistant needs a few tool
      - Debian/Ubuntu: `sudo apt install mediainfo ffmpeg`
      - Arch Linux: `sudo pacman -S mediainfo ffmpeg`
      - RedHat/Fedora: `sudo dnf install mediainfo ffmpeg`
-   - _Having issues with FFmpeg? Check out our [FFmpeg troubleshooting guide](docs/ffmpeg---max-workers-issues.md)._
+   - _Having issues with FFmpeg? Check out our [FFmpeg troubleshooting guide](docs/ffmpeg-max-workers-issues.md)._
 
 ---
 
@@ -282,10 +299,10 @@ In your terminal, run the command for your operating system and follow the on-sc
 
 **Additional Resources:**
 
-- Check out our [Wiki Help Page](docs/Home.md).
+- Check out our [Wiki Help Page](docs/home.md).
 - Windows installation and basic commands: see [Windows Install](docs/windows-install.md).
 - Need a no-root Linux or seedbox setup? See [Seedbox / Linux Install](docs/seedbox.md).
-- Feel free to contact me if you need help, I'm not that hard to find.
+- Found an issue or need help? Please [open a GitHub Issue](https://github.com/wastaken7/Upload-Assistant/issues) so we can track and resolve it.
 
 ## **Updating:**
 
@@ -323,11 +340,11 @@ The file/folder path works best enclosed in double quotes.
 
 ## **Docker Usage:**
 
-Visit our wonderful [docker usage](docs/docker-wiki-full.md)
+Visit our wonderful [docker usage](docs/docker.md)
 
 Also see this excellent video put together by a community member <https://videos.badkitty.zone/ua>
 
-Web UI setup (Docker GUI / Unraid): [docs/docker-gui-wiki-full.md](docs/docker-gui-wiki-full.md)
+Web UI setup (Docker GUI / Unraid): [docs/docker-gui.md](docs/docker-gui.md)
 Web UI docs: [docs/web-ui.md](docs/web-ui.md)
 
 ## **Attributions:**

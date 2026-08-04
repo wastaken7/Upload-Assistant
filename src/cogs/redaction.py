@@ -72,7 +72,7 @@ class Redaction:
                     string_char = None
                 continue
 
-            if ch in ('"', "'"):
+            if ch == '"':
                 in_string = True
                 string_char = ch
                 continue
@@ -121,7 +121,7 @@ class Redaction:
             # Redact content between /proxy/ and /api (e.g. /proxy/<secret>/api)
             val = re.sub(r"(?<=/proxy/)[^/]+(?=/api)", "[REDACTED]", val)
             # Redact query params like ?passkey=... or &token=...
-            val = re.sub(r"([?&](passkey|key|token|auth|info_hash|torrent_pass)=)[^&]+", r"\1[REDACTED]", val, flags=re.I)
+            val = re.sub(r"([?&](passkey|key|token|api_key|auth|info_hash|torrent_pass)=)[^&]+", r"\1[REDACTED]", val, flags=re.I)
             # Redact long hex or base64-like strings (common for tokens)
             val = re.sub(r"\b[a-fA-F0-9]{32,}\b", "[REDACTED]", val)
         return val
@@ -169,7 +169,9 @@ class Redaction:
 
         output_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
         async with aiofiles.open(output_path, "w", encoding="utf-8") as f:
-            await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+            export_data = meta.to_dict()
+            export_data.pop("archive_password", None)
+            await f.write(json.dumps(export_data, indent=4, cls=PathAwareEncoder))
 
         return meta
 

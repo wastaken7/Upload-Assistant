@@ -9,7 +9,7 @@ import aiofiles
 import httpx
 import langcodes
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.tracker_images import get_tracker_image_collection

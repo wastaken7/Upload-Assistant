@@ -6,7 +6,7 @@ from typing import Any, cast
 import aiofiles
 import httpx
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder

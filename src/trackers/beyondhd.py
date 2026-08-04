@@ -9,7 +9,7 @@ import cli_ui
 import httpx
 from rich.markup import escape
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager

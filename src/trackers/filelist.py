@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 from rich.markup import escape
 from unidecode import unidecode
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
