@@ -29,6 +29,31 @@ def test_darkpeers_music_name_uses_required_folder_style():
     assert _name(meta) == "Taylor Swift - Red (2012) - WEB FLAC 16-44.1"
 
 
+def test_darkpeers_only_includes_audio_spectrograms_for_music():
+    config = {
+        "DEFAULT": {"tmdb_api": "test-key"},
+        "TRACKERS": {
+            "DARKPEERS": {
+                "add_audio_spectrogram": True,
+                "audio_spectrogram_header": "[h2]Audio Spectrogram[/h2]",
+            }
+        },
+    }
+    adapter = DarkPeers(config)
+    spectrogram = {"web_url": "https://example.com/page", "raw_url": "https://example.com/spectrogram.png"}
+
+    for category in ("MOVIE", "TV", "BOOK", "GAME"):
+        meta = Meta(category=category, audio_spectrogram=True, spectrograms_images=[spectrogram])
+        description = asyncio.run(adapter.get_description(meta))["description"]
+        assert "Audio Spectrogram" not in description
+        assert "spectrogram.png" not in description
+
+    music = Meta(category="MUSIC", audio_spectrogram=True, spectrograms_images=[spectrogram])
+    music_description = asyncio.run(adapter.get_description(music))["description"]
+    assert "[h2]Audio Spectrogram[/h2]" in music_description
+    assert "spectrogram.png" in music_description
+
+
 def test_darkpeers_ebook_name_includes_book_elements():
     meta = Meta(
         category="BOOK",

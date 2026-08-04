@@ -7,6 +7,7 @@ from typing import Any, ClassVar, cast
 import httpx
 
 from src.console import logger
+from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
 from src.music.models import MusicRelease
@@ -103,6 +104,11 @@ class DarkPeers(UNIT3D):
         super().__init__(config, tracker_name="DARKPEERS")
         self.config = config
         self.tmdb_manager = TmdbManager(config)
+
+    async def get_description(self, meta: Meta) -> dict[str, str]:
+        audio_spectrogram = str(meta.category or "").strip().upper() == "MUSIC"
+        description = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, audio_spectrogram=audio_spectrogram)
+        return {"description": description}
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         group = str(meta.tag or "").lstrip("-").strip().upper()
