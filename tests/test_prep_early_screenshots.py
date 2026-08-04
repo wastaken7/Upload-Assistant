@@ -1,8 +1,11 @@
 # ruff: noqa: S101
 
 import asyncio
+import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from src.meta import Meta
 from src.prep import Prep
@@ -91,18 +94,54 @@ def test_partial_registered_group_captures_only_missing_screenshots(tmp_path: Pa
         output.write_bytes(b"image")
         return args[0], str(output)
 
-    async def no_op() -> None:
-        return None
-
     with (
         patch("src.takescreens.get_image_host", new=AsyncMock(return_value="imgbb")),
         patch("src.takescreens.capture_screenshot", new=capture_stub),
-        patch("src.takescreens.kill_all_child_processes", new=no_op),
     ):
         result = asyncio.run(screenshots("unused.mkv", "Punctuated, Title", release_id, str(tmp_path), meta, manual_frames=[100, 200, 300]))
 
     assert len(capture_calls) == 1
     assert len(result or []) == 3
+
+
+@pytest.mark.asyncio
+async def test_successful_screenshot_capture_preserves_unrelated_child(tmp_path: Path) -> None:
+    release_id = "release"
+    release_dir = tmp_path / "tmp" / release_id
+    release_dir.mkdir(parents=True)
+    (release_dir / "MediaInfo.json").write_text(
+        '{"media": {"track": [{"Duration": "100"}, {"Duration": "100", "Width": "1920", "Height": "1080", "PixelAspectRatio": "1", "DisplayAspectRatio": "1.777", "FrameRate": "24"}]}}',
+        encoding="utf-8",
+    )
+    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=1, imghost="imgbb")
+
+    async def capture_stub(args: tuple[object, ...]):
+        output = Path(str(args[3]))
+        output.write_bytes(b"image" * 20000)
+        return args[0], str(output)
+
+    unrelated = await asyncio.create_subprocess_exec(sys.executable, "-c", "import time; time.sleep(60)")
+    try:
+        with (
+            patch("src.takescreens.get_image_host", new=AsyncMock(return_value="imgbb")),
+            patch("src.takescreens.capture_screenshot", new=capture_stub),
+        ):
+            result = await screenshots("unused.mkv", "Release", release_id, str(tmp_path), meta, manual_frames=[100], cleanup_after_capture=False)
+
+        assert len(result or []) == 1
+        for _ in range(100):
+            if unrelated.returncode is not None:
+                break
+            await asyncio.sleep(0.01)
+        assert unrelated.returncode is None, "successful screenshot capture terminated an unrelated child process"
+    finally:
+        if unrelated.returncode is None:
+            unrelated.terminate()
+        try:
+            await asyncio.wait_for(unrelated.wait(), timeout=3)
+        except TimeoutError:
+            unrelated.kill()
+            await unrelated.wait()
 
 
 def test_upload_uses_only_registered_main_screenshots(tmp_path: Path, monkeypatch) -> None:

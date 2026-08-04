@@ -636,6 +636,13 @@ class QueueManager:
                 await _write_json_file(log_file, queue, indent=4)
                 logger.info(f"[bold green]Queue log file created: {log_file}[/bold green]")
 
+        elif len(paths) > 1:
+            queue = list(dict.fromkeys(paths))
+            md_text = "\n - ".join(queue)
+            logger.info("\n[bold green]Queuing these files:[/bold green]")
+            logger.info(f"- {md_text.rstrip()}\n\n")
+            logger.info("\n\n")
+
         elif Path(path).exists():
             queue = [path]
 

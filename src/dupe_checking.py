@@ -67,6 +67,10 @@ class DupeChecker:
                 logger.debug(dupes)
 
         meta.trumpable_id = None
+        meta.season_pack_exists = False
+        meta.season_pack_id = None
+        meta.season_pack_link = None
+        meta.season_pack_name = ""
         processed_dupes: list[DupeEntry] = []
         for d in dupes:
             if isinstance(d, str):

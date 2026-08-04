@@ -973,6 +973,8 @@ def _validate_upload_assistant_args(args: Sequence[object]) -> list[str]:
     for a in args:
         if not isinstance(a, str):
             raise ValueError("Invalid arg type")
+        if a == "--paths-from-stdin":
+            raise ValueError("--paths-from-stdin is only available in CLI mode")
         if any(ch in a for ch in forbidden):
             raise ValueError("Invalid characters in arg")
         # Disallow arguments that are just parent-directory references

@@ -166,12 +166,7 @@ class BJShare:
             return True
 
         if not bool(meta.subtitle_files):
-            subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
-            if not subtitles and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
-                return await self.common.prompt_user_for_confirmation(
-                    f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
-                )
-            return subtitles
+            return await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
 
         return True
 

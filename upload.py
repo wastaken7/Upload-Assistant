@@ -34,7 +34,7 @@ from torf import Torrent as _Torrent  # pyright: ignore[reportMissingImports,rep
 
 from bin.get_mkbrr import MkbrrBinaryManager
 from src.add_comparison import ComparisonManager
-from src.args import Args
+from src.args import Args, read_paths_from_stdin
 from src.artwork import is_public_http_url, is_valid_cover_image
 from src.audio_spectrogram import process_audio_spectrograms
 from src.book_prep import detect_newspaper, is_valid_book_language, resolve_book_language
@@ -2205,6 +2205,22 @@ async def do_the_thing(base_dir: str) -> None:
                 Path(subdir_path).chmod(0o700)
 
     meta = Meta()
+    try:
+        remaining_args, pasted_paths = read_paths_from_stdin(sys.argv[1:], sys.stdin)
+    except ValueError as exc:
+        logger.error(f"[red]Error: {exc}.[/red]")
+        raise SystemExit(2) from exc
+
+    if pasted_paths:
+        missing_paths = [path for path in pasted_paths if not Path(path).expanduser().exists()]
+        if missing_paths:
+            logger.error("[red]Error: The following pasted paths do not exist:[/red]")
+            for missing_path in missing_paths:
+                logger.error(f"[red]  - {missing_path}[/red]")
+            raise SystemExit(2)
+        resolved_pasted_paths = [str(Path(path).expanduser().resolve()) for path in pasted_paths]
+        sys.argv[1:] = [*resolved_pasted_paths, *remaining_args]
+
     paths: list[str] = []
     for each in sys.argv[1:]:
         if Path(each).exists():
