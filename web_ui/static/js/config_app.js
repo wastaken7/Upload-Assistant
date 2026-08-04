@@ -332,6 +332,7 @@ const trackerNameMap = {
   RASTASTUGAN: "Rastastugan",
   REELFLIX: "ReelFLiX",
   RETROFLIX: "RetroFlix",
+  RETROMOVIESCLUB: "RetroMoviesClub",
   SAMARITANO: "Samaritano",
   SEEDPOOL: "seedpool",
   SHAREISLAND: "ShareIsland",
