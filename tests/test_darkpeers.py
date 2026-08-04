@@ -1,7 +1,7 @@
 """Regression tests for DarkPeers-specific BOOK and MUSIC title rules."""
 
 import asyncio
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
 from src.meta import Meta
 from src.trackers.UNIT3D.darkpeers import DarkPeers
@@ -83,6 +83,60 @@ def test_darkpeers_preserves_detected_original_scene_name():
     meta = Meta(category="MOVIE", name="Generated Name", scene=True, scene_name="Original.Release.2026-GRP", language_checked=True)
 
     assert _name(meta) == "Original.Release.2026-GRP"
+
+
+def test_darkpeers_tv_name_omits_year_without_an_exact_title_match():
+    meta = Meta(category="TV", title="BLACK TORCH", year=2026, name="BLACK TORCH 2026 S01E05 1080p CR WEB-DL DD+ 2.0 H.264-AnoZu")
+    adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
+    adapter._tv_title_needs_year = AsyncMock(return_value=False)
+
+    assert asyncio.run(adapter.get_name(meta))["name"] == "BLACK TORCH S01E05 1080p CR WEB-DL DD+ 2.0 H.264-AnoZu"
+
+
+def test_darkpeers_tv_name_keeps_year_for_an_exact_title_match():
+    meta = Meta(category="TV", title="The Flash", year=2014, name="The Flash 2014 S01E01 1080p WEB-DL")
+    adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
+    adapter._tv_title_needs_year = AsyncMock(return_value=True)
+
+    assert asyncio.run(adapter.get_name(meta))["name"] == "The Flash 2014 S01E01 1080p WEB-DL"
+
+
+def test_darkpeers_bleach_tv_name_omits_year_and_aka():
+    meta = Meta(
+        category="TV",
+        title="Bleach",
+        year=2004,
+        aka="AKA Bleach: Sennen Kessen-hen",
+        name="Bleach 2004 AKA Bleach: Sennen Kessen-hen S17E42 1080p DSNP WEB-DL AAC 2.0 H.264-AnoZu",
+    )
+    adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
+
+    assert asyncio.run(adapter.get_name(meta))["name"] == "Bleach S17E42 1080p DSNP WEB-DL AAC 2.0 H.264-AnoZu"
+
+
+def test_darkpeers_tv_year_rule_detects_a_distinct_exact_tmdb_title():
+    meta = Meta(category="TV", title="The Flash", tmdb_id=60735)
+    adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
+    response = Mock()
+    response.json.return_value = {
+        "results": [
+            {"id": 60735, "name": "The Flash", "original_name": "The Flash"},
+            {"id": 236, "name": "The Flash", "original_name": "The Flash"},
+        ]
+    }
+
+    with patch("src.trackers.UNIT3D.darkpeers.httpx.AsyncClient.get", new=AsyncMock(return_value=response)):
+        assert asyncio.run(adapter._tv_title_needs_year(meta)) is True
+
+
+def test_darkpeers_tv_year_rule_does_not_count_the_only_tmdb_result_as_a_duplicate():
+    meta = Meta(category="TV", title="BLACK TORCH")
+    adapter = DarkPeers({"DEFAULT": {"tmdb_api": "test-key"}, "TRACKERS": {"DARKPEERS": {}}})
+    response = Mock()
+    response.json.return_value = {"results": [{"id": 279807, "name": "BLACK TORCH", "original_name": "BLACK TORCH"}]}
+
+    with patch("src.trackers.UNIT3D.darkpeers.httpx.AsyncClient.get", new=AsyncMock(return_value=response)):
+        assert asyncio.run(adapter._tv_title_needs_year(meta)) is False
 
 
 def _additional_checks(meta: Meta) -> bool:
