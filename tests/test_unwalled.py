@@ -1,5 +1,6 @@
 import asyncio
 import io
+import os
 import wave
 import zipfile
 from collections.abc import Callable
@@ -368,30 +369,39 @@ def test_unwalled_rejects_windows_unsafe_or_blank_names(filename: str) -> None:
 
 
 def test_unwalled_rejects_invalid_nested_paths_and_missing_announce(tmp_path: Path) -> None:
-    invalid_dir = tmp_path / "bad:name"
-    invalid_dir.mkdir()
-    episode = invalid_dir / "episode.mp3"
-    episode.write_bytes(b"audio")
     cover = tmp_path / "cover.jpg"
     banner = tmp_path / "banner.jpg"
     _jpg(cover, (500, 500), "red")
     _jpg(banner, (960, 540), "blue")
+    if os.name != "nt":
+        invalid_dir = tmp_path / "bad:name"
+        invalid_dir.mkdir()
+        invalid_episode = invalid_dir / "episode.mp3"
+        invalid_episode.write_bytes(b"audio")
+        invalid_meta = Meta(
+            path=str(tmp_path),
+            category="PODCAST",
+            name="Example Show [2026/MP3 - 128kbps]",
+            filelist=[str(invalid_episode)],
+            artwork_path=str(cover),
+            artwork_banner_path=str(banner),
+            unwalled_category="14",
+            unwalled_type="3",
+        )
+        assert asyncio.run(_tracker().get_additional_checks(invalid_meta)) is False  # noqa: S101
+
+    valid_episode = tmp_path / "episode.mp3"
+    valid_episode.write_bytes(b"audio")
     meta = Meta(
         path=str(tmp_path),
         category="PODCAST",
         name="Example Show [2026/MP3 - 128kbps]",
-        filelist=[str(episode)],
+        filelist=[str(valid_episode)],
         artwork_path=str(cover),
         artwork_banner_path=str(banner),
         unwalled_category="14",
         unwalled_type="3",
     )
-
-    assert asyncio.run(_tracker().get_additional_checks(meta)) is False  # noqa: S101
-
-    valid_episode = tmp_path / "episode.mp3"
-    valid_episode.write_bytes(b"audio")
-    meta.filelist = [str(valid_episode)]
     assert asyncio.run(_tracker(announce_url="").get_additional_checks(meta)) is False  # noqa: S101
 
 
