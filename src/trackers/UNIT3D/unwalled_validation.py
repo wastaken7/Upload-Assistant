@@ -199,6 +199,8 @@ class UnwalledValidationMixin:
                 if not isinstance(raw_path, list) or not isinstance(length, int):
                     return False
                 components = tuple(component.decode("utf-8", errors="strict") for component in cast(list[bytes], raw_path))
+                if components in actual:
+                    return False
                 actual[components] = length
             return actual == expected
         except (OSError, UnicodeDecodeError, ValueError):

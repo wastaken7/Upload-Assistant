@@ -27,6 +27,7 @@ class Unwalled(UnwalledValidationMixin, UNIT3D):
     max_torrent_download_size = 1024 * 1024
     max_json_response_size = 2 * 1024 * 1024
     follow_upload_redirects = False
+    follow_search_redirects = False
     expose_remote_error_details = False
     banned_groups: tuple[str, ...] = ()
 
@@ -66,7 +67,7 @@ class Unwalled(UnwalledValidationMixin, UNIT3D):
         headers = {"authorization": f"Bearer {self.api_key}", "accept": "application/json"}
         max_size = self.max_json_response_size or 2 * 1024 * 1024
         try:
-            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=self.follow_search_redirects) as client:
                 for page in range(1, 101):
                     async with client.stream("GET", self.search_url, headers=headers, params={"name": "", "perPage": "100", "page": str(page)}) as response:
                         response.raise_for_status()

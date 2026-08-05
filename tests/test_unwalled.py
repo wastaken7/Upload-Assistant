@@ -425,6 +425,25 @@ def test_unwalled_rejects_huge_v1_lengths_without_overflow(tmp_path: Path) -> No
     assert _tracker()._torrent_is_v1(torrent_path) is False  # noqa: S101
 
 
+def test_unwalled_rejects_duplicate_v1_file_paths(tmp_path: Path) -> None:
+    root = tmp_path / "show"
+    root.mkdir()
+    episode = root / "episode.mp3"
+    episode.write_bytes(b"a")
+    meta = Meta(path=str(root), filelist=[str(episode)])
+    info: dict[bytes, object] = {
+        b"name": b"show",
+        b"piece length": 16384,
+        b"pieces": b"x" * 20,
+        b"files": [
+            {b"length": 1, b"path": [b"episode.mp3"]},
+            {b"length": 1, b"path": [b"episode.mp3"]},
+        ],
+    }
+
+    assert _tracker()._torrent_matches_files(info, meta) is False  # noqa: S101
+
+
 @pytest.mark.asyncio
 async def test_unwalled_rejects_cross_host_torrent_download_redirect(tmp_path: Path) -> None:
     requests: list[httpx.Request] = []
@@ -449,6 +468,25 @@ async def test_unwalled_rejects_cross_host_torrent_download_redirect(tmp_path: P
     assert result is None  # noqa: S101
     assert [request.url.host for request in requests] == ["unwalled.cc"]  # noqa: S101
     assert not (tmp_path / "tmp" / meta.uuid / "[UNWALLED].torrent").exists()  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_unwalled_option_discovery_does_not_follow_redirects() -> None:
+    requests: list[httpx.Request] = []
+    async_client_class = httpx.AsyncClient
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(302, headers={"location": "https://attacker.invalid/options"})
+
+    def client_factory(**kwargs: object) -> httpx.AsyncClient:
+        assert kwargs["follow_redirects"] is False  # noqa: S101
+        return async_client_class(transport=httpx.MockTransport(handler), follow_redirects=False)
+
+    with patch("src.trackers.UNIT3D.unwalled.httpx.AsyncClient", side_effect=client_factory):
+        assert await _tracker().discover_options() == {"categories": {}, "types": {}}  # noqa: S101
+
+    assert [request.url.host for request in requests] == ["unwalled.cc"]  # noqa: S101
 
 
 @pytest.mark.asyncio

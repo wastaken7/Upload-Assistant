@@ -32,6 +32,7 @@ class UNIT3D:
     max_torrent_download_size: int | None = None
     max_json_response_size: int | None = None
     follow_upload_redirects = True
+    follow_search_redirects = True
     expose_remote_error_details = True
 
     def __init__(self, config: dict[str, Any], tracker_name: str):
@@ -128,7 +129,7 @@ class UNIT3D:
 
         urls_to_check = await self.get_search_urls(meta, request_params)
 
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=self.follow_search_redirects) as client:
             for url, params, check_pending in urls_to_check:
                 logger.debug(f"{self.tracker}: Searching URL: {url} with params: {params} (pending={check_pending})")
                 response = await client.get(url=url, headers=headers, params=params)
