@@ -29,6 +29,8 @@ class UNIT3D:
     pending_url: str = ""
     search_url: str = ""
     upload_url: str = ""
+    download_url_hosts: tuple[str, ...] = ()
+    max_torrent_download_size: int | None = None
 
     def __init__(self, config: dict[str, Any], tracker_name: str):
         self.config = config
@@ -590,8 +592,21 @@ class UNIT3D:
                     return False  # JSON parsing error
 
             if post_succeeded:
+                if not download_url:
+                    meta.tracker_status[self.tracker]["status_message"] = "data error: Upload succeeded but the API returned no torrent download URL"
+                    return False
                 # Download is outside the retry loop — a POST timeout/error cannot cause re-submission
-                await self.common.download_tracker_torrent(meta, self.tracker, headers=headers, downurl=download_url)
+                downloaded_torrent = await self.common.download_tracker_torrent(
+                    meta,
+                    self.tracker,
+                    headers=headers,
+                    downurl=download_url,
+                    allowed_hosts=self.download_url_hosts,
+                    max_size=self.max_torrent_download_size,
+                )
+                if self.download_url_hosts and downloaded_torrent is None:
+                    meta.tracker_status[self.tracker]["status_message"] = "data error: Upload succeeded but the torrent download was rejected or failed"
+                    return False
                 return True
         else:
             logger.info(f"{self.tracker}: Request Data:")

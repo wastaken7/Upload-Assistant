@@ -11,6 +11,7 @@ import unicodedata
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urljoin, urlsplit
 
 import aiofiles
 import bencodepy
@@ -333,6 +334,8 @@ class Common:
         downurl: str = "",
         hash_is_id: bool = False,
         cross: bool = False,
+        allowed_hosts: tuple[str, ...] = (),
+        max_size: int | None = None,
     ) -> str | None:
         path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{tracker}_cross].torrent" if cross else f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{tracker}].torrent"
         if downurl:
@@ -347,23 +350,51 @@ class Common:
                         cookie_validator = CookieValidator(self.config)
                         cookie_jar = await cookie_validator.load_session_cookies(meta, tracker)
 
-                async with (
-                    httpx.AsyncClient(headers=headers, params=params, cookies=cookie_jar, follow_redirects=True, timeout=30.0) as session,
-                    session.stream("GET", downurl) as r,
-                ):
-                    r.raise_for_status()
-                    async with aiofiles.open(path, "wb") as f:
-                        async for chunk in r.aiter_bytes():
-                            await f.write(chunk)
+                normalized_hosts = {host.casefold() for host in allowed_hosts}
+                current_url = downurl
+                async with httpx.AsyncClient(headers=headers, params=params, cookies=cookie_jar, follow_redirects=not normalized_hosts, timeout=30.0) as session:
+                    for _redirect in range(6):
+                        parsed_url = urlsplit(current_url)
+                        if normalized_hosts and (
+                            parsed_url.scheme != "https"
+                            or (parsed_url.hostname or "").casefold() not in normalized_hosts
+                            or parsed_url.port not in (None, 443)
+                            or parsed_url.username is not None
+                            or parsed_url.password is not None
+                        ):
+                            raise ValueError("Tracker download URL is outside the allowed HTTPS hosts")
+                        async with session.stream("GET", current_url) as response:
+                            if normalized_hosts and response.is_redirect:
+                                location = response.headers.get("location")
+                                if not location:
+                                    raise ValueError("Tracker download redirect is missing a location")
+                                current_url = urljoin(current_url, location)
+                                continue
+                            response.raise_for_status()
+                            content_length = response.headers.get("content-length", "")
+                            if max_size is not None and content_length.isdigit() and int(content_length) > max_size:
+                                raise ValueError("Tracker torrent download exceeds the configured size limit")
+                            downloaded = 0
+                            async with aiofiles.open(path, "wb") as torrent_file:
+                                async for chunk in response.aiter_bytes():
+                                    downloaded += len(chunk)
+                                    if max_size is not None and downloaded > max_size:
+                                        raise ValueError("Tracker torrent download exceeds the configured size limit")
+                                    await torrent_file.write(chunk)
+                            break
+                    else:
+                        raise ValueError("Tracker torrent download exceeded the redirect limit")
 
                 if cross:
                     return None
 
                 if hash_is_id:
                     return await self.get_torrent_hash(meta, tracker)
-                return None
+                return path
 
             except Exception as e:
+                if allowed_hosts or max_size is not None:
+                    Path(path).unlink(missing_ok=True)
                 logger.warning(f"[yellow]Warning: Could not download torrent file: {e!s}[/yellow]")
                 logger.info("[yellow]Download manually from the tracker.[/yellow]")
                 return None

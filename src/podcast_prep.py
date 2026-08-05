@@ -15,9 +15,31 @@ ARCHIVE_EXTENSIONS = frozenset({".7z", ".bz2", ".cbr", ".cbz", ".gz", ".rar", ".
 mutagen_module: Any = cast(Any, mutagen)
 
 
-def _media_files(root: Path) -> tuple[list[Path], list[Path]]:
-    candidates = [root] if root.is_file() else [path for path in root.rglob("*") if path.is_file()]
-    archives = [path for path in candidates if path.suffix.casefold() in ARCHIVE_EXTENSIONS]
+def _source_files(root: Path) -> list[Path]:
+    if root.is_symlink():
+        raise ValueError("Podcast uploads cannot contain symbolic links")
+    if root.is_file():
+        return [root]
+    candidates: list[Path] = []
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            raise ValueError("Podcast uploads cannot contain symbolic links")
+        if path.is_file():
+            candidates.append(path)
+    return candidates
+
+
+def _has_archive_signature(path: Path) -> bool:
+    with path.open("rb") as source:
+        header = source.read(512)
+    return (
+        header.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08", b"Rar!\x1a\x07", b"7z\xbc\xaf\x27\x1c", b"\x1f\x8b", b"BZh", b"\xfd7zXZ\x00", b"\x28\xb5\x2f\xfd"))
+        or header[257:262] == b"ustar"
+    )
+
+
+def _media_files(candidates: list[Path]) -> tuple[list[Path], list[Path]]:
+    archives = [path for path in candidates if path.suffix.casefold() in ARCHIVE_EXTENSIONS or _has_archive_signature(path)]
     if archives:
         raise ValueError("Podcast uploads cannot contain compressed archive files")
     audio = sorted((path.resolve() for path in candidates if path.suffix.casefold() in AUDIO_EXTENSIONS), key=str)
@@ -64,16 +86,19 @@ def _generated_title(meta: Meta, root: Path, files: list[Path], audio: bool) -> 
 
 async def gather_podcast_prep(meta: Meta) -> None:
     root = Path(str(meta.path or ""))
+    if root.is_symlink():
+        raise ValueError("Podcast uploads cannot contain symbolic links")
     if not root.exists():
         raise ValueError(f"Podcast path does not exist: {root}")
 
-    audio_files, video_files = _media_files(root)
+    source_files = _source_files(root)
+    audio_files, video_files = _media_files(source_files)
     if audio_files and video_files:
         raise ValueError("Podcast torrents cannot contain mixed audio and video media")
     media_files = audio_files or video_files
     if not media_files:
         raise ValueError("Podcast upload contains no supported audio or video files")
-    torrent_files = [root.resolve()] if root.is_file() else sorted((path.resolve() for path in root.rglob("*") if path.is_file()), key=str)
+    torrent_files = sorted((path.resolve() for path in source_files), key=str)
 
     meta.category = "PODCAST"
     meta.filelist = [str(path) for path in torrent_files]
