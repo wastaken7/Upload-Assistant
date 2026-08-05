@@ -113,13 +113,16 @@ def test_uses_the_image_hosts_approved_by_crt():
 def test_cover_uses_only_an_approved_image_host():
     site = tracker()
     assert site.get_cover(meta(tmdb_poster_path="/poster.jpg", artwork_url="https://image.tmdb.org/t/p/w500/poster.jpg")) == ""  # noqa: S101
-    assert site.get_cover(  # noqa: S101
-        meta(
-            tmdb_poster_path="/poster.jpg",
-            artwork_url="https://image.tmdb.org/t/p/w500/poster.jpg",
-            hosted_artwork=[{"raw_url": "https://iili.io/approved.png"}],
+    assert (
+        site.get_cover(
+            meta(
+                tmdb_poster_path="/poster.jpg",
+                artwork_url="https://image.tmdb.org/t/p/w500/poster.jpg",
+                hosted_artwork=[{"raw_url": "https://iili.io/approved.png"}],
+            )
         )
-    ) == "https://iili.io/approved.png"
+        == "https://iili.io/approved.png"
+    )
 
 
 def test_extracts_matching_upload_from_site_log():

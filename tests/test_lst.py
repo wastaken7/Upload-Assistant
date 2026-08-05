@@ -50,7 +50,19 @@ def test_lst_music_name_uses_technical_fields_for_lossless_releases():
 
 
 def test_lst_music_name_ignores_invalid_sample_rate():
-    meta = Meta(category="MUSIC", music_release={"fields": {"artist": {"value": "Artist"}, "album": {"value": "Album"}, "release_year": {"value": "2000"}, "media": {"value": "CD"}, "nfo_sample_rate": {"value": "unknown"}}, "tracks": [{"codec": "FLAC", "bit_depth": 16}]})
+    meta = Meta(
+        category="MUSIC",
+        music_release={
+            "fields": {
+                "artist": {"value": "Artist"},
+                "album": {"value": "Album"},
+                "release_year": {"value": "2000"},
+                "media": {"value": "CD"},
+                "nfo_sample_rate": {"value": "unknown"},
+            },
+            "tracks": [{"codec": "FLAC", "bit_depth": 16}],
+        },
+    )
 
     name = asyncio.run(LST({"DEFAULT": {}, "TRACKERS": {"LST": {}}}).get_name(meta))["name"]
 
