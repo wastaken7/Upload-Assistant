@@ -1,4 +1,7 @@
 import asyncio
+import io
+import wave
+import zipfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import cast
@@ -151,6 +154,51 @@ def test_podcast_prep_rejects_symlinks_and_disguised_archives(tmp_path: Path) ->
     with pytest.raises(ValueError, match="compressed archive"):
         asyncio.run(gather_podcast_prep(meta))
 
+
+def test_podcast_prep_rejects_audio_archive_polyglot(tmp_path: Path) -> None:
+    polyglot = tmp_path / "episode.wav"
+    with wave.open(str(polyglot), "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(8000)
+        audio.writeframes(b"\0\0" * 800)
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w") as zipped:
+        zipped.writestr("hidden.txt", "archive payload")
+    with polyglot.open("ab") as audio:
+        audio.write(archive.getvalue())
+    meta = Meta(path=str(polyglot), base_dir=str(tmp_path), uuid="polyglot", category="PODCAST")
+
+    assert zipfile.is_zipfile(polyglot)  # noqa: S101
+    with pytest.raises(ValueError, match="compressed archive"):
+        asyncio.run(gather_podcast_prep(meta))
+
+
+def test_podcast_prep_rejects_symlinked_ancestors_and_artwork(tmp_path: Path) -> None:
+    real_dir = tmp_path / "real"
+    real_dir.mkdir()
+    episode = real_dir / "episode.mp3"
+    episode.write_bytes(b"audio")
+    linked_dir = tmp_path / "linked"
+    linked_dir.symlink_to(real_dir, target_is_directory=True)
+    ancestor_meta = Meta(path=str(linked_dir / episode.name), base_dir=str(tmp_path), uuid="ancestor-link", category="PODCAST")
+
+    with pytest.raises(ValueError, match="symbolic links"):
+        asyncio.run(gather_podcast_prep(ancestor_meta))
+
+    real_cover = tmp_path / "real-cover.jpg"
+    _jpg(real_cover, (500, 500), "red")
+    linked_cover = tmp_path / "cover.jpg"
+    linked_cover.symlink_to(real_cover)
+    artwork_meta = Meta(
+        path=str(episode),
+        base_dir=str(tmp_path),
+        uuid="artwork-link",
+        category="PODCAST",
+        podcast_cover=str(linked_cover),
+    )
+    with patch("src.podcast_prep._detected_media_kind", return_value="audio"), pytest.raises(ValueError, match="symbolic links"):
+        asyncio.run(gather_podcast_prep(artwork_meta))
 
 def test_podcast_prep_rejects_media_with_a_mismatched_extension(tmp_path: Path) -> None:
     disguised_video = tmp_path / "video.mp3"
@@ -346,6 +394,22 @@ async def test_unwalled_builds_private_v1_torrent_with_source_and_announce(tmp_p
     assert torrent.metainfo["info"].get("source") == "Unwalled"  # noqa: S101
     assert "file tree" not in torrent.metainfo["info"]  # noqa: S101
 
+    mismatched = tmp_path / "other.mp3"
+    mismatched.write_bytes(b"different")
+    meta.filelist = [str(mismatched)]
+    assert _tracker(announce_url=announce)._valid_upload_bundle(meta, release_dir / f"{filename}.torrent") is False  # noqa: S101
+
+
+def test_unwalled_rejects_inconsistent_v1_piece_count() -> None:
+    info: dict[bytes, object] = {
+        b"name": b"episode.mp3",
+        b"piece length": 16384,
+        b"pieces": b"x" * 40,
+        b"length": 1,
+    }
+
+    assert _tracker()._valid_v1_info(info) is False  # noqa: S101
+
 
 @pytest.mark.asyncio
 async def test_unwalled_rejects_cross_host_torrent_download_redirect(tmp_path: Path) -> None:
@@ -453,6 +517,33 @@ async def test_unwalled_upload_does_not_follow_redirects(tmp_path: Path) -> None
         assert await tracker.upload(meta) is False  # noqa: S101
 
     assert [request.url.host for request in requests] == ["unwalled.cc"]  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_unwalled_omits_tracker_controlled_error_messages(tmp_path: Path) -> None:
+    sentinel = "reflected-sensitive-value"
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"success": False, "message": sentinel})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    release_dir = tmp_path / "tmp" / "redacted-error"
+    release_dir.mkdir(parents=True)
+    (release_dir / "[UNWALLED].torrent").write_bytes(b"private torrent")
+    meta = Meta(base_dir=str(tmp_path), uuid="redacted-error", tracker_status={"UNWALLED": {}})
+    tracker = _tracker()
+
+    with (
+        patch("src.trackers.UNIT3D.httpx.AsyncClient", return_value=client),
+        patch.object(tracker, "get_data", new=AsyncMock(return_value={})),
+        patch.object(tracker, "get_upload_torrent_filename", new=AsyncMock(return_value="[UNWALLED]")),
+        patch.object(tracker, "get_additional_files", new=AsyncMock(return_value={})),
+        patch("src.trackers.UNIT3D.logger.info") as log_info,
+    ):
+        assert await tracker.upload(meta) is False  # noqa: S101
+
+    assert sentinel not in str(meta.tracker_status)  # noqa: S101
+    assert all(sentinel not in str(call) for call in log_info.call_args_list)  # noqa: S101
 
 
 @pytest.mark.asyncio

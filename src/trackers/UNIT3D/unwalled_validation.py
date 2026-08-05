@@ -1,4 +1,5 @@
 import hashlib
+import math
 import re
 import warnings
 from collections.abc import Callable
@@ -19,6 +20,11 @@ class UnwalledValidationMixin:
     tracker: str
 
     @staticmethod
+    def _has_symlink_component(path: Path) -> bool:
+        absolute = path.expanduser().absolute()
+        return any(component.is_symlink() for component in (*reversed(absolute.parents), absolute))
+
+    @staticmethod
     def _valid_filename(name: str) -> bool:
         if len(name.encode("utf-8")) > 255 or not name or name != name.strip() or set(name) == {"."} or name.endswith("."):
             return False
@@ -35,7 +41,7 @@ class UnwalledValidationMixin:
     def _image_details(path_value: str) -> tuple[Path, str, tuple[int, int]] | None:
         path = Path(path_value)
         try:
-            if path.is_symlink() or not path.is_file() or path.stat().st_size >= 1024 * 1024:
+            if UnwalledValidationMixin._has_symlink_component(path) or not path.is_file() or path.stat().st_size >= 1024 * 1024:
                 return None
             with warnings.catch_warnings():
                 warnings.simplefilter("error", Image.DecompressionBombWarning)
@@ -52,7 +58,7 @@ class UnwalledValidationMixin:
     @classmethod
     def _valid_torrent_paths(cls, meta: Meta) -> bool:
         root = Path(str(meta.path or ""))
-        if root.is_symlink() or not root.exists():
+        if cls._has_symlink_component(root) or not root.exists():
             return False
         base = root if root.is_dir() else root.parent
         try:
@@ -63,7 +69,7 @@ class UnwalledValidationMixin:
             return False
         for file_value in meta.filelist:
             file_path = Path(str(file_value))
-            if file_path.is_symlink() or not file_path.is_file():
+            if cls._has_symlink_component(file_path) or not file_path.is_file():
                 return False
             try:
                 relative_path = file_path.resolve(strict=True).relative_to(resolved_base)
@@ -132,10 +138,13 @@ class UnwalledValidationMixin:
             return False
         if has_length:
             length = info.get(b"length")
-            return isinstance(length, int) and not isinstance(length, bool) and length >= 0
+            if not isinstance(length, int) or isinstance(length, bool) or length < 0:
+                return False
+            return len(pieces) // 20 == math.ceil(length / piece_length)
         raw_files = info.get(b"files")
         if not isinstance(raw_files, list) or not raw_files:
             return False
+        total_length = 0
         for raw_file in cast(list[object], raw_files):
             if not isinstance(raw_file, dict):
                 return False
@@ -147,6 +156,7 @@ class UnwalledValidationMixin:
                 return False
             if isinstance(attr, bytes) and b"l" in attr:
                 return False
+            total_length += length
             for raw_component in cast(list[object], raw_path):
                 if not isinstance(raw_component, bytes):
                     return False
@@ -156,7 +166,44 @@ class UnwalledValidationMixin:
                     return False
                 if component in {".", ".."} or not cls._valid_filename(component):
                     return False
-        return True
+        return len(pieces) // 20 == math.ceil(total_length / piece_length)
+
+    @classmethod
+    def _torrent_matches_files(cls, info: dict[bytes, object], meta: Meta) -> bool:
+        root = Path(str(meta.path or ""))
+        try:
+            if cls._has_symlink_component(root) or not root.exists():
+                return False
+            raw_name = info.get(b"name")
+            if not isinstance(raw_name, bytes) or raw_name.decode("utf-8", errors="strict") != root.name:
+                return False
+            if root.is_file():
+                length = info.get(b"length")
+                return len(meta.filelist) == 1 and Path(str(meta.filelist[0])).resolve(strict=True) == root.resolve(strict=True) and length == root.stat().st_size
+            expected = {
+                tuple(path.resolve(strict=True).relative_to(root.resolve(strict=True)).parts): path.stat().st_size
+                for value in meta.filelist
+                if (path := Path(str(value))).is_file() and not cls._has_symlink_component(path)
+            }
+            if len(expected) != len(meta.filelist):
+                return False
+            actual: dict[tuple[str, ...], int] = {}
+            raw_files = info.get(b"files")
+            if not isinstance(raw_files, list):
+                return False
+            for raw_file in cast(list[object], raw_files):
+                if not isinstance(raw_file, dict):
+                    return False
+                entry = cast(dict[bytes, object], raw_file)
+                raw_path = entry.get(b"path")
+                length = entry.get(b"length")
+                if not isinstance(raw_path, list) or not isinstance(length, int):
+                    return False
+                components = tuple(component.decode("utf-8", errors="strict") for component in cast(list[bytes], raw_path))
+                actual[components] = length
+            return actual == expected
+        except (OSError, UnicodeDecodeError, ValueError):
+            return False
 
     @classmethod
     def _torrent_is_v1(cls, path: Path) -> bool:
@@ -185,7 +232,7 @@ class UnwalledValidationMixin:
 
     def _valid_upload_bundle(self, meta: Meta, torrent_path: Path) -> bool:
         torrent = self._torrent_metainfo(torrent_path)
-        if torrent is None or not self._valid_v1_info(torrent[1]):
+        if torrent is None or not self._valid_v1_info(torrent[1]) or not self._torrent_matches_files(torrent[1], meta):
             logger.info(f"{self.tracker}: [bold red]Unwalled requires a valid V1 torrent.[/bold red]")
             return False
         metainfo, info = torrent
@@ -201,7 +248,7 @@ class UnwalledValidationMixin:
         if not self._valid_artwork(meta):
             return False
         paths = (torrent_path, Path(meta.artwork_path), Path(str(meta.artwork_banner_path or "")))
-        if any(path.is_symlink() or not path.is_file() for path in paths) or sum(path.stat().st_size for path in paths) >= 1024 * 1024:
+        if any(self._has_symlink_component(path) or not path.is_file() for path in paths) or sum(path.stat().st_size for path in paths) >= 1024 * 1024:
             logger.info(f"{self.tracker}: [bold red]Torrent, cover and banner must total less than 1 MiB.[/bold red]")
             return False
         return True

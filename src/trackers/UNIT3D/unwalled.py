@@ -27,6 +27,7 @@ class Unwalled(UnwalledValidationMixin, UNIT3D):
     max_torrent_download_size = 1024 * 1024
     max_json_response_size = 2 * 1024 * 1024
     follow_upload_redirects = False
+    expose_remote_error_details = False
     banned_groups: tuple[str, ...] = ()
 
     def __init__(self, config: dict[str, Any]) -> None:

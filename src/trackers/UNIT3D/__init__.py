@@ -32,6 +32,7 @@ class UNIT3D:
     max_torrent_download_size: int | None = None
     max_json_response_size: int | None = None
     follow_upload_redirects = True
+    expose_remote_error_details = True
 
     def __init__(self, config: dict[str, Any], tracker_name: str):
         self.config = config
@@ -50,6 +51,11 @@ class UNIT3D:
     async def get_additional_checks(self, meta: Meta) -> bool:
         _meta = meta
         return True
+
+    def _remote_error(self, value: object) -> str:
+        if not self.expose_remote_error_details:
+            return "[tracker response omitted]"
+        return str(Redaction.redact_private_info(value))
 
     async def get_search_urls(self, meta: Meta, request_params: ParamsList) -> list[tuple[str, ParamsList, bool]]:
         _ = meta
@@ -538,12 +544,13 @@ class UNIT3D:
 
                         # Verify API success before proceeding
                         if not response_data.get("success"):
-                            error_msg = response_data.get("message", "Unknown error")
+                            error_msg = self._remote_error(response_data.get("message", "Unknown error"))
                             meta.tracker_status[self.tracker]["status_message"] = f"API error: {error_msg}"
                             logger.info(f"{self.tracker}: [yellow]Upload to {self.tracker} failed: {error_msg}[/yellow]")
                             return False
 
-                        meta.tracker_status[self.tracker]["status_message"] = await self.process_response_data(response_data)
+                        processed_message = await self.process_response_data(response_data)
+                        meta.tracker_status[self.tracker]["status_message"] = processed_message if self.expose_remote_error_details else "Upload successful"
                         torrent_id = await self.get_torrent_id(response_data)
                         meta.tracker_status[self.tracker]["torrent_id"] = torrent_id
                         download_url = response_data.get("data")
@@ -558,15 +565,15 @@ class UNIT3D:
                         # Don't retry auth/permission errors
                         if e.response.status_code == 403:
                             meta.tracker_status[self.tracker]["status_message"] = (
-                                f"data error: Forbidden (403). This may indicate that you do not have upload permission. {e.response.text}"
+                                f"data error: Forbidden (403). This may indicate that you do not have upload permission. {self._remote_error(e.response.text)}"
                             )
                         else:
                             meta.tracker_status[self.tracker]["status_message"] = (
-                                f"data error: Redirect (302). This may indicate a problem with authentication. {e.response.text}"
+                                f"data error: Redirect (302). This may indicate a problem with authentication. {self._remote_error(e.response.text)}"
                             )
                         return False  # Auth/permission error
                     if e.response.status_code in [401, 404, 422]:
-                        meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {e.response.text}"
+                        meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {self._remote_error(e.response.text)}"
                     else:
                         # Retry other HTTP errors
                         if attempt < max_retries - 1:
@@ -579,7 +586,7 @@ class UNIT3D:
                         if e.response.status_code == 520:
                             meta.tracker_status[self.tracker]["status_message"] = "data error: Error (520). This is probably a cloudflare issue on the tracker side."
                         else:
-                            meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {e.response.text}"
+                            meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {e.response.status_code} - {self._remote_error(e.response.text)}"
                         return False  # HTTP error after all retries
                 except httpx.TimeoutException:
                     if attempt < max_retries - 1:
@@ -596,7 +603,7 @@ class UNIT3D:
                         logger.info(f"{self.tracker}: [yellow]Request error, retrying in {retry_delay} seconds... (attempt {attempt + 1}/{max_retries})[/yellow]")
                         await asyncio.sleep(retry_delay)
                         continue
-                    meta.tracker_status[self.tracker]["status_message"] = f"data error: Unable to upload. Error: {e}.\nResponse: {response_data}"
+                    meta.tracker_status[self.tracker]["status_message"] = f"data error: Unable to upload. Error: {e}.\nResponse: {self._remote_error(response_data)}"
                     return False  # Request error after all retries
                 except ValueError as e:
                     meta.tracker_status[self.tracker]["status_message"] = f"data error: Invalid JSON response from {self.tracker}. Error: {e}"

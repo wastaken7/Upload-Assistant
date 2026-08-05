@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import tarfile
+import zipfile
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
@@ -37,8 +39,13 @@ mutagen_file = cast(Callable[[str], _AudioFile | None], vars(mutagen)["File"])
 mutagen_error = cast(type[Exception], vars(mutagen)["MutagenError"])
 
 
+def _has_symlink_component(path: Path) -> bool:
+    absolute = path.expanduser().absolute()
+    return any(component.is_symlink() for component in (*reversed(absolute.parents), absolute))
+
+
 def _source_files(root: Path) -> list[Path]:
-    if root.is_symlink():
+    if _has_symlink_component(root):
         raise ValueError("Podcast uploads cannot contain symbolic links")
     if root.is_file():
         return [root]
@@ -54,7 +61,7 @@ def _source_files(root: Path) -> list[Path]:
 def _has_archive_signature(path: Path) -> bool:
     with path.open("rb") as source:
         header = source.read(512)
-    return (
+    has_header = (
         header.startswith(
             (
                 b"PK\x03\x04",
@@ -76,6 +83,12 @@ def _has_archive_signature(path: Path) -> bool:
         )
         or header[257:262] == b"ustar"
     )
+    if has_header or zipfile.is_zipfile(path):
+        return True
+    try:
+        return tarfile.is_tarfile(path)
+    except OSError:
+        return False
 
 
 def _detected_media_kind(path: Path) -> str | None:
@@ -160,7 +173,7 @@ def _generated_title(meta: Meta, root: Path, files: list[Path], audio: bool) -> 
 
 async def gather_podcast_prep(meta: Meta) -> None:
     root = Path(str(meta.path or ""))
-    if root.is_symlink():
+    if _has_symlink_component(root):
         raise ValueError("Podcast uploads cannot contain symbolic links")
     if not root.exists():
         raise ValueError(f"Podcast path does not exist: {root}")
@@ -196,9 +209,15 @@ async def gather_podcast_prep(meta: Meta) -> None:
     meta.source = "WEB"
 
     if meta.podcast_cover:
-        meta.artwork_path = str(Path(meta.podcast_cover).expanduser().resolve())
+        cover = Path(meta.podcast_cover).expanduser()
+        if _has_symlink_component(cover):
+            raise ValueError("Podcast uploads cannot contain symbolic links")
+        meta.artwork_path = str(cover.resolve())
     if meta.podcast_banner:
-        meta.artwork_banner_path = str(Path(meta.podcast_banner).expanduser().resolve())
+        banner = Path(meta.podcast_banner).expanduser()
+        if _has_symlink_component(banner):
+            raise ValueError("Podcast uploads cannot contain symbolic links")
+        meta.artwork_banner_path = str(banner.resolve())
 
     primary = max(media_files, key=lambda path: path.stat().st_size)
     meta.mediainfo = await export_info(str(primary), meta.isdir, meta.uuid, meta.base_dir, is_dvd=False)
