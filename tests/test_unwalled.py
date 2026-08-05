@@ -343,6 +343,9 @@ def test_unwalled_requires_valid_distinct_jpeg_cover_and_banner(tmp_path: Path) 
 
 
 def test_unwalled_rejects_invalid_torrent_file_names(tmp_path: Path) -> None:
+    assert _tracker()._valid_filename("bad:name.mp3") is False  # noqa: S101
+    if os.name == "nt":
+        return
     cover = tmp_path / "cover.jpg"
     banner = tmp_path / "banner.jpg"
     _jpg(cover, (500, 500), "red")
@@ -363,7 +366,7 @@ def test_unwalled_rejects_invalid_torrent_file_names(tmp_path: Path) -> None:
     assert asyncio.run(_tracker().get_additional_checks(meta)) is False  # noqa: S101
 
 
-@pytest.mark.parametrize("filename", ["   ", "episode.mp3.", "episode.mp3 "])
+@pytest.mark.parametrize("filename", ["   ", "bad:name.mp3", "episode.mp3.", "episode.mp3 "])
 def test_unwalled_rejects_windows_unsafe_or_blank_names(filename: str) -> None:
     assert _tracker()._valid_filename(filename) is False  # noqa: S101
 
