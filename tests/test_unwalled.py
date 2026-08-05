@@ -278,6 +278,46 @@ def test_unwalled_resolves_names_or_explicit_numeric_ids() -> None:
     assert asyncio.run(tracker.get_type_id(numeric)) == {"type_id": "42"}  # noqa: S101
 
 
+@pytest.mark.asyncio
+async def test_unwalled_video_payload_omits_unknown_resolution() -> None:
+    tracker = _tracker()
+    meta = Meta(category="PODCAST", type="VIDEO", resolution="", name="Video Show", podcast_title="Video Show", unwalled_category="14", unwalled_type="3")
+
+    with (
+        patch.object(tracker, "get_description", new=AsyncMock(return_value={})),
+        patch.object(tracker, "get_mediainfo", new=AsyncMock(return_value={})),
+        patch.object(tracker, "get_bdinfo", new=AsyncMock(return_value={})),
+    ):
+        payload = await tracker.get_data(meta)
+
+    assert "resolution_id" not in payload  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_unwalled_duplicate_search_uses_upload_title_and_bounds_json() -> None:
+    seen_names: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen_names.append(request.url.params["name"])
+        return httpx.Response(200, json={"data": []})
+
+    meta = Meta(category="PODCAST", title="source-folder", name="Final Podcast Title", podcast_title="Final Podcast Title", unwalled_category="14", unwalled_type="3")
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    with patch("src.trackers.UNIT3D.httpx.AsyncClient", return_value=client):
+        assert await _tracker().search_existing(meta) == []  # noqa: S101
+
+    assert seen_names == ["Final Podcast Title"]  # noqa: S101
+
+    oversized = b'{"data":[],"padding":"' + b"x" * (2 * 1024 * 1024) + b'"}'
+
+    async def oversized_handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=oversized)
+
+    oversized_client = httpx.AsyncClient(transport=httpx.MockTransport(oversized_handler))
+    with patch("src.trackers.UNIT3D.httpx.AsyncClient", return_value=oversized_client), pytest.raises(ValueError, match="size limit"):
+        await _tracker().search_existing(meta)
+
+
 def test_unwalled_requires_valid_distinct_jpeg_cover_and_banner(tmp_path: Path) -> None:
     cover = tmp_path / "cover.jpg"
     banner = tmp_path / "banner.jpg"

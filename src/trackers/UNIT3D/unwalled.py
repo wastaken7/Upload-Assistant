@@ -120,9 +120,12 @@ class Unwalled(UnwalledValidationMixin, UNIT3D):
         return {"type_id": await self._resolve_option(requested, "types")}
 
     async def get_resolution_id(self, meta: Meta, resolution: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
-        if meta.type == "AUDIO" and not mapping_only and not reverse and not resolution:
+        if meta.category == "PODCAST" and not mapping_only and not reverse and not resolution:
             return {}
         return await super().get_resolution_id(meta, resolution, reverse, mapping_only)
+
+    def get_search_name(self, meta: Meta) -> str:
+        return re.sub(r"\s+", " ", (meta.podcast_title or meta.name).replace("&", "and")).strip()
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         name = re.sub(r"\s+", " ", (meta.podcast_title or meta.name).replace("&", "and")).strip()

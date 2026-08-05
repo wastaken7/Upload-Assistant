@@ -65,6 +65,9 @@ class UNIT3D:
             urls.append((self.pending_url, request_params, True))
         return urls
 
+    def get_search_name(self, meta: Meta) -> str:
+        return meta.title or meta.name
+
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
         params_list: ParamsList | None = None
@@ -119,7 +122,7 @@ class UNIT3D:
 
         else:
             params_dict = {
-                "name": meta.title or meta.name,
+                "name": self.get_search_name(meta),
                 "categories[]": (await self.get_category_id(meta))["category_id"],
                 "perPage": "100",
             }
@@ -132,7 +135,11 @@ class UNIT3D:
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=self.follow_search_redirects) as client:
             for url, params, check_pending in urls_to_check:
                 logger.debug(f"{self.tracker}: Searching URL: {url} with params: {params} (pending={check_pending})")
-                response = await client.get(url=url, headers=headers, params=params)
+                if self.max_json_response_size is None:
+                    response = await client.get(url=url, headers=headers, params=params)
+                else:
+                    async with client.stream("GET", url, headers=headers, params=params) as streamed_response:
+                        response = await self._bounded_response(streamed_response, self.max_json_response_size)
                 response.raise_for_status()
 
                 if response.status_code == 200:
