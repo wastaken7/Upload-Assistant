@@ -163,7 +163,7 @@ config: dict[str, Any] = {
         # IMAGE HOSTING SETTINGS
 
         # Order of image hosts. primary host as first with others as backup
-        # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, passtheimage, seedpool_cdn, sharex, utppm, lostimg
+        # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, midnightscene, passtheimage, seedpool_cdn, sharex, utppm, lostimg
         "img_host_1": "",
         "img_host_2": "",
         "img_host_3": "",
@@ -186,6 +186,9 @@ config: dict[str, Any] = {
         # custom zipline url
         "zipline_url": "",
         "zipline_api_key": "",
+        # MidnightScene (Zipline) API key. Sign in, click your avatar, then choose
+        # "Copy token" (or open Settings > User). Never share or commit this token.
+        "midnightscene_api_key": "",
         # SEEDPOOL CDN API key
         "seedpool_cdn_api": "",
         # ShareX-style image host (IMageHosting) token
