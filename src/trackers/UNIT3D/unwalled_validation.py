@@ -125,7 +125,7 @@ class UnwalledValidationMixin:
             not isinstance(raw_name, bytes)
             or not isinstance(piece_length, int)
             or isinstance(piece_length, bool)
-            or not 16 * 1024 <= piece_length <= 32 * 1024 * 1024
+            or not 16 * 1024 <= piece_length <= 128 * 1024 * 1024
             or piece_length & (piece_length - 1) != 0
         ):
             return False

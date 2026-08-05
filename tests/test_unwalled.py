@@ -435,6 +435,19 @@ def test_unwalled_rejects_huge_v1_lengths_without_overflow(tmp_path: Path) -> No
     assert _tracker()._torrent_is_v1(torrent_path) is False  # noqa: S101
 
 
+@pytest.mark.parametrize("piece_length", [16 * 1024, 32 * 1024 * 1024, 64 * 1024 * 1024, 128 * 1024 * 1024])
+def test_unwalled_accepts_supported_v1_piece_sizes(piece_length: int) -> None:
+    info: dict[bytes, object] = {b"name": b"episode.mp3", b"piece length": piece_length, b"pieces": b"x" * 20, b"length": 1}
+
+    assert _tracker()._valid_v1_info(info) is True  # noqa: S101
+
+
+@pytest.mark.parametrize("piece_length", [8 * 1024, 24 * 1024, 256 * 1024 * 1024])
+def test_unwalled_rejects_unsupported_v1_piece_sizes(piece_length: int) -> None:
+    info: dict[bytes, object] = {b"name": b"episode.mp3", b"piece length": piece_length, b"pieces": b"x" * 20, b"length": 1}
+
+    assert _tracker()._valid_v1_info(info) is False  # noqa: S101
+
 def test_unwalled_rejects_duplicate_v1_file_paths(tmp_path: Path) -> None:
     root = tmp_path / "show"
     root.mkdir()
