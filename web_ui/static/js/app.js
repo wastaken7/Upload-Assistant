@@ -33,7 +33,10 @@ const isSafePreviewUrl = (value) => {
 };
 
 const getSafeBbcodeColor = (params) => {
-  const color = String(params || "").replace(/^=/, "").trim().toLowerCase();
+  const color = String(params || "")
+    .replace(/^=/, "")
+    .trim()
+    .toLowerCase();
   if (/^#[0-9a-f]{6}$/i.test(color)) return color;
   if (/^[a-z]{3,20}$/i.test(color)) return color;
   return "";
@@ -46,11 +49,42 @@ const sanitizeBbcodePreview = (html) => {
 
   const sanitized = window.DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [
-      "a", "b", "blockquote", "br", "code", "details", "div", "em", "hr", "i", "img",
-      "li", "ol", "p", "pre", "span", "strong", "summary", "table", "tbody", "td", "th",
-      "thead", "tr", "u", "ul",
+      "a",
+      "b",
+      "blockquote",
+      "br",
+      "code",
+      "details",
+      "div",
+      "em",
+      "hr",
+      "i",
+      "img",
+      "li",
+      "ol",
+      "p",
+      "pre",
+      "span",
+      "strong",
+      "summary",
+      "table",
+      "tbody",
+      "td",
+      "th",
+      "thead",
+      "tr",
+      "u",
+      "ul",
     ],
-    ALLOWED_ATTR: ["alt", "class", "colspan", "data-bbcode-color", "href", "src", "title"],
+    ALLOWED_ATTR: [
+      "alt",
+      "class",
+      "colspan",
+      "data-bbcode-color",
+      "href",
+      "src",
+      "title",
+    ],
   });
   const preview = new DOMParser().parseFromString(sanitized, "text/html");
 
@@ -60,7 +94,9 @@ const sanitizeBbcodePreview = (html) => {
     if (color) element.style.color = color;
   });
   preview.querySelectorAll("[class*='xbbcode-size-']").forEach((element) => {
-    const size = Number(element.className.match(/(?:^|\s)xbbcode-size-(\d+)(?:\s|$)/)?.[1]);
+    const size = Number(
+      element.className.match(/(?:^|\s)xbbcode-size-(\d+)(?:\s|$)/)?.[1],
+    );
     if (Number.isInteger(size) && size >= 4 && size <= 40) {
       element.style.fontSize = `${size}px`;
     }
@@ -97,7 +133,8 @@ const configureBbcodePreview = () => {
       closeTag: () => "</span>",
     },
     spoiler: {
-      openTag: () => "<details class=\"xbbcode-spoiler\"><summary>Spoiler</summary>",
+      openTag: () =>
+        '<details class="xbbcode-spoiler"><summary>Spoiler</summary>',
       closeTag: () => "</details>",
     },
   });
@@ -524,7 +561,8 @@ const argumentCategories = [
       {
         label: "--book-overview",
         placeholder: "SYNOPSIS",
-        description: "Book/Audiobook overview/synopsis (overrides auto-detected value)",
+        description:
+          "Book/Audiobook overview/synopsis (overrides auto-detected value)",
       },
       { label: "--comic", description: "Mark upload as comic" },
       { label: "--manga", description: "Mark upload as manga" },
@@ -1402,6 +1440,7 @@ function AudionutsUAGUI() {
   const [descriptionDirty, setDescriptionDirty] = useState(false);
   const descriptionDirtyRef = useRef(false);
   const descriptionVersionRef = useRef(0);
+  const descriptionEditorRef = useRef(null);
   const [descriptionAction, setDescriptionAction] = useState("");
   const [canAddExecutionScreenshot, setCanAddExecutionScreenshot] =
     useState(false);
@@ -2081,7 +2120,7 @@ function AudionutsUAGUI() {
                 key={tracker.name}
                 onClick={() => handleTrackerToggle(tracker.name)}
                 disabled={isExecuting}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition-all ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium border transition-all ${
                   isSelected
                     ? isDarkMode
                       ? "bg-purple-900/60 border-purple-500 text-purple-200 hover:bg-purple-900/80"
@@ -2103,16 +2142,16 @@ function AudionutsUAGUI() {
                         return next;
                       });
                     }}
-                    className="w-3.5 h-3.5 rounded-sm object-contain"
+                    className="w-4 h-4 rounded-sm object-contain"
                   />
                 ) : (
                   <span
-                    className="w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[9px] font-bold text-white uppercase select-none"
+                    className="w-4 h-4 rounded-sm flex items-center justify-center text-[9px] font-bold text-white uppercase select-none"
                     style={{
                       backgroundColor: getInitialsColor(tracker.display_name),
-                      minWidth: "14px",
-                      height: "14px",
-                      lineHeight: "14px",
+                      minWidth: "16px",
+                      height: "16px",
+                      lineHeight: "16px",
                     }}
                   >
                     {tracker.display_name.charAt(0)}
@@ -2200,7 +2239,9 @@ function AudionutsUAGUI() {
       setExpandedScreenshot(null);
       setIsScreenshotReviewOpen(false);
       setIsDescriptionReviewOpen(false);
-      setActivePanel((panel) => (["screenshots", "description"].includes(panel) ? "main" : panel));
+      setActivePanel((panel) =>
+        ["screenshots", "description"].includes(panel) ? "main" : panel,
+      );
       return undefined;
     }
 
@@ -2260,8 +2301,15 @@ function AudionutsUAGUI() {
         );
         if (descriptionResponse.ok) {
           const descriptionData = await descriptionResponse.json();
-          const polledVersion = Number.isInteger(descriptionData?.version) ? descriptionData.version : null;
-          if (!cancelled && descriptionData?.success && polledVersion !== null && polledVersion >= descriptionVersionRef.current) {
+          const polledVersion = Number.isInteger(descriptionData?.version)
+            ? descriptionData.version
+            : null;
+          if (
+            !cancelled &&
+            descriptionData?.success &&
+            polledVersion !== null &&
+            polledVersion >= descriptionVersionRef.current
+          ) {
             descriptionVersionRef.current = polledVersion;
             setExecutionDescription(descriptionData);
             if (!descriptionDirtyRef.current) {
@@ -3876,14 +3924,21 @@ function AudionutsUAGUI() {
       const response = await apiFetch(`${API_BASE}/execution_description`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, content, version: descriptionVersion }),
+        body: JSON.stringify({
+          session_id: sessionId,
+          content,
+          version: descriptionVersion,
+        }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.success) {
         if (response.status === 409 && Number.isInteger(data?.version)) {
           descriptionVersionRef.current = data.version;
           setDescriptionVersion(data.version);
-          setExecutionDescription((current) => ({ ...current, version: data.version }));
+          setExecutionDescription((current) => ({
+            ...current,
+            version: data.version,
+          }));
         }
         window.alert(data?.error || "Could not save the description.");
         return;
@@ -3892,7 +3947,11 @@ function AudionutsUAGUI() {
       descriptionVersionRef.current = data.version || 0;
       setDescriptionVersion(data.version || 0);
       setDescriptionDirty(false);
-      setExecutionDescription((current) => ({ ...current, content: data.content, version: data.version }));
+      setExecutionDescription((current) => ({
+        ...current,
+        content: data.content,
+        version: data.version,
+      }));
     } catch (error) {
       console.error("Could not save the description:", error);
       window.alert("Could not save the description.");
@@ -3905,19 +3964,31 @@ function AudionutsUAGUI() {
     if (!sessionId || descriptionAction) return;
     setDescriptionAction(`reset:${sourceKey}`);
     try {
-      const response = await apiFetch(`${API_BASE}/execution_description/reset`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, source_key: sourceKey, version: descriptionVersion }),
-      });
+      const response = await apiFetch(
+        `${API_BASE}/execution_description/reset`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: sessionId,
+            source_key: sourceKey,
+            version: descriptionVersion,
+          }),
+        },
+      );
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.success) {
         if (response.status === 409 && Number.isInteger(data?.version)) {
           descriptionVersionRef.current = data.version;
           setDescriptionVersion(data.version);
-          setExecutionDescription((current) => ({ ...current, version: data.version }));
+          setExecutionDescription((current) => ({
+            ...current,
+            version: data.version,
+          }));
         }
-        window.alert(data?.error || "Could not restore the description source.");
+        window.alert(
+          data?.error || "Could not restore the description source.",
+        );
         return;
       }
       setDescriptionDraft(data.content || "");
@@ -3932,46 +4003,184 @@ function AudionutsUAGUI() {
     }
   };
 
+  const applyDescriptionBbcode = (openingTag, closingTag) => {
+    const editor = descriptionEditorRef.current;
+    if (!editor) return;
+
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const selectedText = descriptionDraft.slice(start, end);
+    const nextDraft = `${descriptionDraft.slice(0, start)}${openingTag}${selectedText}${closingTag}${descriptionDraft.slice(end)}`;
+    const selectionStart = start + openingTag.length;
+    const selectionEnd = selectionStart + selectedText.length;
+
+    descriptionVersionRef.current = Math.max(
+      descriptionVersionRef.current,
+      descriptionVersion,
+    );
+    setDescriptionDraft(nextDraft);
+    setDescriptionDirty(true);
+    window.requestAnimationFrame(() => {
+      editor.focus();
+      editor.setSelectionRange(selectionStart, selectionEnd);
+    });
+  };
+
   const renderDescriptionPanel = () => {
-    const sources = Array.isArray(executionDescription?.sources) ? executionDescription.sources : [];
+    const sources = Array.isArray(executionDescription?.sources)
+      ? executionDescription.sources
+      : [];
     return (
       <div className="flex h-full flex-col">
-        <div className={`border-b p-3 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-sky-50 to-indigo-50"}`}>
-          <h2 className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}>Description review</h2>
-          <p className={`mt-1 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Edit the base description before tracker-specific formatting is applied.</p>
+        <div
+          className={`border-b p-3 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-sky-50 to-indigo-50"}`}
+        >
+          <h2
+            className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}
+          >
+            Description review
+          </h2>
+          <p
+            className={`mt-1 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+          >
+            Edit the base description before tracker-specific formatting is
+            applied.
+          </p>
         </div>
         <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden p-3">
-          <section className={`rounded-lg border p-2 ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}>
-            <p className={`mb-2 text-xs font-bold uppercase tracking-wide ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>Sources</p>
+          <section
+            className={`rounded-lg border p-2 ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
+          >
+            <p
+              className={`mb-2 text-xs font-bold uppercase tracking-wide ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+            >
+              Sources
+            </p>
             {sources.length ? (
               <div className="overflow-x-auto pb-1">
                 <div className="flex w-max gap-2">
                   {sources.map((source) => (
-                    <button key={source.key} onClick={() => resetExecutionDescription(source.key)} disabled={Boolean(descriptionAction)} className={`whitespace-nowrap rounded px-3 py-2 text-left text-xs ${isDarkMode ? "bg-gray-700 text-gray-200 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`} title={`Restore ${source.label}`}>
-                      {descriptionAction === `reset:${source.key}` ? "Restoring…" : source.label}
+                    <button
+                      key={source.key}
+                      onClick={() => resetExecutionDescription(source.key)}
+                      disabled={Boolean(descriptionAction)}
+                      className={`whitespace-nowrap rounded px-3 py-2 text-left text-xs ${isDarkMode ? "bg-gray-700 text-gray-200 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                      title={`Restore ${source.label}`}
+                    >
+                      {descriptionAction === `reset:${source.key}`
+                        ? "Restoring…"
+                        : source.label}
                     </button>
                   ))}
                 </div>
               </div>
-            ) : <p className="text-xs text-gray-500">No description sources are available yet.</p>}
+            ) : (
+              <p className="text-xs text-gray-500">
+                No description sources are available yet.
+              </p>
+            )}
           </section>
           <section className="flex min-h-[24rem] flex-1 flex-col">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <div className={`inline-flex rounded-md p-1 ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}>
+              <div
+                className={`inline-flex rounded-md p-1 ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}
+              >
                 {["edit", "preview"].map((view) => (
-                  <button key={view} onClick={() => setDescriptionView(view)} aria-pressed={descriptionView === view} className={`rounded px-3 py-1 text-xs font-semibold capitalize ${descriptionView === view ? "bg-purple-600 text-white" : isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-white"}`}>{view}</button>
+                  <button
+                    key={view}
+                    onClick={() => setDescriptionView(view)}
+                    aria-pressed={descriptionView === view}
+                    className={`rounded px-3 py-1 text-xs font-semibold capitalize ${descriptionView === view ? "bg-purple-600 text-white" : isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-white"}`}
+                  >
+                    {view}
+                  </button>
                 ))}
               </div>
-              {descriptionView === "preview" && <span className={`text-right text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Preview only; tracker formatting is applied later.</span>}
+              {descriptionView === "preview" && (
+                <span
+                  className={`text-right text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                >
+                  Preview only. Other elements such as logos and screenshots
+                  will be added later.
+                </span>
+              )}
             </div>
             {descriptionView === "edit" ? (
-              <textarea value={descriptionDraft} onChange={(event) => { descriptionVersionRef.current = Math.max(descriptionVersionRef.current, descriptionVersion); setDescriptionDraft(event.target.value); setDescriptionDirty(true); }} onBlur={() => { if (descriptionDirty) saveExecutionDescription(); }} spellCheck={false} aria-label="Base description" className={`min-h-[20rem] flex-1 resize-y rounded-lg border p-3 font-mono text-xs leading-5 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-300 bg-white text-gray-800"}`} placeholder="The editable base description will appear here." />
+              <>
+                <div
+                  role="toolbar"
+                  aria-label="Description formatting"
+                  className={`mb-2 flex flex-wrap gap-1 rounded-lg border p-1.5 ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}
+                >
+                  {[
+                    ["Bold", "B", "[b]", "[/b]"],
+                    ["Italic", "I", "[i]", "[/i]"],
+                    ["Underline", "U", "[u]", "[/u]"],
+                    ["Strikethrough", "S", "[s]", "[/s]"],
+                    ["Code", "Code", "[code]", "[/code]"],
+                    ["Quote", "Quote", "[quote]", "[/quote]"],
+                    ["Spoiler", "Spoiler", "[spoiler]", "[/spoiler]"],
+                    ["Align left", "Left", "[left]", "[/left]"],
+                    ["Align center", "Center", "[center]", "[/center]"],
+                    ["Align right", "Right", "[right]", "[/right]"],
+                  ].map(([label, text, openingTag, closingTag]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      title={label}
+                      aria-label={label}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() =>
+                        applyDescriptionBbcode(openingTag, closingTag)
+                      }
+                      className={`rounded px-2 py-1 text-xs font-semibold hover:bg-purple-600 hover:text-white ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  ref={descriptionEditorRef}
+                  value={descriptionDraft}
+                  onChange={(event) => {
+                    descriptionVersionRef.current = Math.max(
+                      descriptionVersionRef.current,
+                      descriptionVersion,
+                    );
+                    setDescriptionDraft(event.target.value);
+                    setDescriptionDirty(true);
+                  }}
+                  onBlur={() => {
+                    if (descriptionDirty) saveExecutionDescription();
+                  }}
+                  spellCheck={false}
+                  aria-label="Base description"
+                  className={`min-h-[20rem] flex-1 resize-y rounded-lg border p-3 font-mono text-xs leading-5 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-300 bg-white text-gray-800"}`}
+                  placeholder="The editable base description will appear here."
+                />
+              </>
             ) : (
-              <div className={`bbcode-preview min-h-[20rem] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm leading-6 [&_a]:text-sky-400 [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-purple-500 [&_blockquote]:pl-3 [&_details]:my-3 [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded [&_pre]:overflow-auto [&_pre]:font-mono [&_table]:my-3 [&_table]:border-collapse [&_td]:border [&_td]:p-2 [&_th]:border [&_th]:p-2 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100 [&_td]:border-gray-700 [&_th]:border-gray-700" : "border-gray-300 bg-white text-gray-800 [&_td]:border-gray-300 [&_th]:border-gray-300"}`} dangerouslySetInnerHTML={{ __html: renderBbcodePreview(descriptionDraft) }} />
+              <div
+                className={`bbcode-preview min-h-[20rem] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm leading-6 [&_a]:text-sky-400 [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-purple-500 [&_blockquote]:pl-3 [&_details]:my-3 [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded [&_pre]:overflow-auto [&_pre]:font-mono [&_table]:my-3 [&_table]:border-collapse [&_td]:border [&_td]:p-2 [&_th]:border [&_th]:p-2 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100 [&_td]:border-gray-700 [&_th]:border-gray-700" : "border-gray-300 bg-white text-gray-800 [&_td]:border-gray-300 [&_th]:border-gray-300"}`}
+                dangerouslySetInnerHTML={{
+                  __html: renderBbcodePreview(descriptionDraft),
+                }}
+              />
             )}
             <div className="mt-2 flex items-center justify-between gap-3">
-              <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>{descriptionDraft.length.toLocaleString()} characters {descriptionDirty ? "· Unsaved changes" : "· Saved"}</span>
-              <button onClick={() => saveExecutionDescription()} disabled={Boolean(descriptionAction) || !descriptionDirty} className="rounded-md bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-50">{descriptionAction === "save" ? "Saving…" : "Save description"}</button>
+              <span
+                className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+              >
+                {descriptionDraft.length.toLocaleString()} characters{" "}
+                {descriptionDirty ? "· Unsaved changes" : "· Saved"}
+              </span>
+              <button
+                onClick={() => saveExecutionDescription()}
+                disabled={Boolean(descriptionAction) || !descriptionDirty}
+                className="rounded-md bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-50"
+              >
+                {descriptionAction === "save" ? "Saving…" : "Save description"}
+              </button>
             </div>
           </section>
         </div>
@@ -5367,7 +5576,8 @@ function AudionutsUAGUI() {
               <ScreenshotsIcon />,
               `Screens${executionScreenshots.length ? ` (${executionScreenshots.length})` : ""}`,
             )}
-          {isExecuting && navButton("description", <TerminalIcon />, "Description")}
+          {isExecuting &&
+            navButton("description", <TerminalIcon />, "Description")}
         </div>
       </div>
     );
