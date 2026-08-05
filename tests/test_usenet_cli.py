@@ -37,5 +37,3 @@ def test_overview_cli_override_alias_flag(tmp_path):
 
     assert meta.overview == "Alias synopsis"
     assert meta.book_overview == "Alias synopsis"
-
-

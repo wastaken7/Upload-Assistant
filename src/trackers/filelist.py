@@ -16,6 +16,7 @@ from unidecode import unidecode
 from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
+from src.description_review import get_base_description
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
 from src.temp_paths import screenshots_dir
@@ -373,9 +374,7 @@ class FileList:
         return
 
     async def edit_desc(self, meta: Meta) -> None:
-        base_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt"
-        async with aiofiles.open(base_path, encoding="utf-8") as base_file:
-            base = await base_file.read()
+        base = get_base_description(meta)
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", newline="", encoding="utf-8") as descfile:
             from src.bbcode import BBCODE
 

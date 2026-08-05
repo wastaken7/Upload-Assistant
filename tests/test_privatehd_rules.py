@@ -55,7 +55,11 @@ def test_crf_above_twenty_is_reported():
         source="BluRay",
         video_encode="x264",
         video_bitrate=6000,
-        mediainfo={"media": {"track": [{"@type": "Video", "BitRate": "6000000", "Encoded_Library_Settings": "cabac=1 / crf=21.5"}, {"@type": "Audio", "Format": "AAC", "Language": "en"}]}},
+        mediainfo={
+            "media": {
+                "track": [{"@type": "Video", "BitRate": "6000000", "Encoded_Library_Settings": "cabac=1 / crf=21.5"}, {"@type": "Audio", "Format": "AAC", "Language": "en"}]
+            }
+        },
     )
 
     warnings = tracker().rules(meta)

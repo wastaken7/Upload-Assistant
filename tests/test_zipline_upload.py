@@ -78,9 +78,7 @@ def _run_upload(
             )
         )
 
-    with patch("src.uploadscreens.aiofiles.open", return_value=_FakeFile()), patch(
-        "src.uploadscreens.httpx.AsyncClient", return_value=_FakeHttpClient(payload, request_log)
-    ):
+    with patch("src.uploadscreens.aiofiles.open", return_value=_FakeFile()), patch("src.uploadscreens.httpx.AsyncClient", return_value=_FakeHttpClient(payload, request_log)):
         return asyncio.run(exercise())
 
 

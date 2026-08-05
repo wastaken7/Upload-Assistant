@@ -14,6 +14,7 @@ from unidecode import unidecode
 from src.bbcode import BBCODE
 from src.cogs.redaction import Redaction
 from src.console import console, logger
+from src.description_review import get_base_description
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
 from src.torrentcreate import TorrentCreator
@@ -486,8 +487,7 @@ class HDBits:
         return
 
     async def edit_desc(self, meta: Meta) -> None:
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt", encoding="utf-8") as base_file:
-            base = await base_file.read()
+        base = get_base_description(meta)
 
         desc_parts: list[str] = []
         # Add This line for all web-dls

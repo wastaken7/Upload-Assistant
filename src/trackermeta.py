@@ -18,6 +18,7 @@ from src.btnid import BtnIdManager
 from src.console import buffer_console_logs, logger
 from src.meta import Meta
 from src.temp_paths import screenshots_dir
+from src.tracker_descriptions import DescriptionCandidate, add_candidate, description_fingerprint, resolve_description_mode, score_release_name
 from src.trackers.common import Common
 from src.trackersetup import api_trackers
 from src.type_utils import to_int
@@ -268,7 +269,7 @@ async def check_image_link(url: str, timeout: httpx.Timeout | None = None) -> bo
         return False
 
 
-async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], tracker_name: str, skip_tracker_descriptions: bool = False) -> bool:
+async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], tracker_name: str, _skip_tracker_descriptions: bool = False) -> bool:
     # Unpack the expected 9 elements, ignoring any additional ones
     tmdb, imdb, tvdb, mal, desc, category, _infohash, imagelist, filename, *_rest = tracker_data
     if tmdb:
@@ -283,12 +284,27 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
     if mal:
         meta.mal_id = mal
         logger.debug(f"set MAL ID: {meta.mal_id}")
-    if desc and not skip_tracker_descriptions:
+    mode = resolve_description_mode(meta.tracker_description_mode)
+    if desc:
+        raw_descriptions = getattr(meta, "tracker_description_raw", {}) or {}
+        raw_description = str(raw_descriptions.get(tracker_name, desc))
+        candidate = DescriptionCandidate(
+            source=tracker_name,
+            release_id=str(meta.get(tracker_name.lower(), "") or ""),
+            release_name=str(filename or ""),
+            raw_description=raw_description,
+            cleaned_description=str(desc),
+            image_count=len(imagelist or []),
+            score=score_release_name(
+                getattr(meta, "tracker_search_term", ""),
+                filename,
+                explicit_id=bool(meta.get(tracker_name.lower())),
+            ),
+        )
+        add_candidate(meta, candidate, selected=mode.imports_text)
+    if desc and mode.imports_text:
         meta.description = desc
         meta.saved_description = True
-        description_path = Path(meta.base_dir) / "tmp" / meta.uuid / "DESCRIPTION.txt"
-        if len(desc) > 0:
-            await asyncio.to_thread(description_path.write_text, (desc or "") + "\n", encoding="utf8")
     if category and not meta.manual_category:
         cat_upper = category.upper()
         if "MOVIE" in cat_upper:
@@ -298,12 +314,15 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
         logger.debug(f"set Category: {meta.category}")
 
     imagelist_typed = cast(list[ImageDict] | None, imagelist)
-    if imagelist_typed:  # Ensure imagelist is not empty before setting
+    if imagelist_typed and mode.imports_images:  # Ensure imagelist is not empty before setting
         valid_images = await check_images_concurrently(imagelist_typed, meta)
         if valid_images:
             meta.image_list = valid_images
             if meta.image_list and (not any(meta.get(t.lower()) for t in api_trackers) or meta.unattended):
                 await handle_image_list(meta, tracker_name, valid_images)
+
+    if desc and mode.imports_text:
+        meta.description_fingerprint = description_fingerprint(meta, tracker_name)
 
     if filename:
         meta[f"{tracker_name.lower()}_filename"] = filename
@@ -321,6 +340,7 @@ async def update_metadata_from_tracker(
     skip_tracker_descriptions: bool = False,
 ) -> tuple[Meta, bool]:
     tracker_key = tracker_name.lower()
+    meta.tracker_search_term = search_term
     manual_key = f"{tracker_key}_manual"
     found_match = False
 
