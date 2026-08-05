@@ -13,6 +13,113 @@ const getStoredTheme = window.getUAStoredTheme;
 const colorThemes = window.UAThemes || [];
 const getStoredColorTheme = window.getUAStoredColorTheme;
 const setColorTheme = window.setUAColorTheme;
+let bbcodePreviewConfigured = false;
+
+const escapePreviewHtml = (value) =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const isSafePreviewUrl = (value) => {
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch (_error) {
+    return false;
+  }
+};
+
+const getSafeBbcodeColor = (params) => {
+  const color = String(params || "").replace(/^=/, "").trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/i.test(color)) return color;
+  if (/^[a-z]{3,20}$/i.test(color)) return color;
+  return "";
+};
+
+const sanitizeBbcodePreview = (html) => {
+  if (!window.DOMPurify) {
+    return `<div>${escapePreviewHtml(html).replace(/\n/g, "<br>")}</div>`;
+  }
+
+  const sanitized = window.DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      "a", "b", "blockquote", "br", "code", "details", "div", "em", "hr", "i", "img",
+      "li", "ol", "p", "pre", "span", "strong", "summary", "table", "tbody", "td", "th",
+      "thead", "tr", "u", "ul",
+    ],
+    ALLOWED_ATTR: ["alt", "class", "colspan", "data-bbcode-color", "href", "src", "title"],
+  });
+  const preview = new DOMParser().parseFromString(sanitized, "text/html");
+
+  preview.querySelectorAll("[data-bbcode-color]").forEach((element) => {
+    const color = getSafeBbcodeColor(element.getAttribute("data-bbcode-color"));
+    element.removeAttribute("data-bbcode-color");
+    if (color) element.style.color = color;
+  });
+  preview.querySelectorAll("[class*='xbbcode-size-']").forEach((element) => {
+    const size = Number(element.className.match(/(?:^|\s)xbbcode-size-(\d+)(?:\s|$)/)?.[1]);
+    if (Number.isInteger(size) && size >= 4 && size <= 40) {
+      element.style.fontSize = `${size}px`;
+    }
+  });
+
+  preview.querySelectorAll("a[href]").forEach((link) => {
+    if (!isSafePreviewUrl(link.getAttribute("href"))) {
+      link.removeAttribute("href");
+      return;
+    }
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+  });
+  preview.querySelectorAll("img[src]").forEach((image) => {
+    if (!isSafePreviewUrl(image.getAttribute("src"))) {
+      image.remove();
+      return;
+    }
+    image.loading = "lazy";
+  });
+
+  return preview.body.innerHTML;
+};
+
+const configureBbcodePreview = () => {
+  if (!window.XBBCODE?.addTags || bbcodePreviewConfigured) return;
+
+  window.XBBCODE.addTags({
+    color: {
+      openTag: (params) => {
+        const color = getSafeBbcodeColor(params);
+        return color ? `<span data-bbcode-color="${color}">` : "<span>";
+      },
+      closeTag: () => "</span>",
+    },
+    spoiler: {
+      openTag: () => "<details class=\"xbbcode-spoiler\"><summary>Spoiler</summary>",
+      closeTag: () => "</details>",
+    },
+  });
+  bbcodePreviewConfigured = true;
+};
+
+const renderBbcodePreview = (content) => {
+  const text = String(content || "");
+  if (!window.XBBCODE?.process) {
+    return `<div>${escapePreviewHtml(text).replace(/\n/g, "<br>")}</div>`;
+  }
+
+  configureBbcodePreview();
+  return sanitizeBbcodePreview(
+    window.XBBCODE.process({
+      text,
+      addInLineBreaks: true,
+      removeMisalignedTags: false,
+      escapeHtml: true,
+    }).html,
+  );
+};
 
 const getStoredSidebarWidth = (key, defaultWidth, maxWidth) => {
   const storedWidth = Number(storage.get(key));
@@ -1288,6 +1395,12 @@ function AudionutsUAGUI() {
   );
   const [executionPreview, setExecutionPreview] = useState(null);
   const [executionScreenshots, setExecutionScreenshots] = useState([]);
+  const [executionDescription, setExecutionDescription] = useState(null);
+  const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [descriptionView, setDescriptionView] = useState("edit");
+  const [descriptionVersion, setDescriptionVersion] = useState(0);
+  const [descriptionDirty, setDescriptionDirty] = useState(false);
+  const [descriptionAction, setDescriptionAction] = useState("");
   const [canAddExecutionScreenshot, setCanAddExecutionScreenshot] =
     useState(false);
   const [screenshotActionId, setScreenshotActionId] = useState("");
@@ -1296,6 +1409,7 @@ function AudionutsUAGUI() {
   const screenshotModalRef = useRef(null);
   const screenshotModalCloseRef = useRef(null);
   const [isScreenshotReviewOpen, setIsScreenshotReviewOpen] = useState(false);
+  const [isDescriptionReviewOpen, setIsDescriptionReviewOpen] = useState(false);
   const [progressItems, setProgressItems] = useState([]);
   const [selectedPaths, setSelectedPaths] = useState([]);
   const [sortBy, setSortBy] = useState("name");
@@ -2070,10 +2184,16 @@ function AudionutsUAGUI() {
       setExecutionPreview(null);
       setProgressItems([]);
       setExecutionScreenshots([]);
+      setExecutionDescription(null);
+      setDescriptionDraft("");
+      setDescriptionView("edit");
+      setDescriptionVersion(0);
+      setDescriptionDirty(false);
       setCanAddExecutionScreenshot(false);
       setExpandedScreenshot(null);
       setIsScreenshotReviewOpen(false);
-      setActivePanel((panel) => (panel === "screenshots" ? "main" : panel));
+      setIsDescriptionReviewOpen(false);
+      setActivePanel((panel) => (["screenshots", "description"].includes(panel) ? "main" : panel));
       return undefined;
     }
 
@@ -2099,6 +2219,7 @@ function AudionutsUAGUI() {
             setProgressItems([]);
             setExecutionScreenshots([]);
             setCanAddExecutionScreenshot(false);
+            setExecutionDescription(null);
           }
           return;
         }
@@ -2126,6 +2247,20 @@ function AudionutsUAGUI() {
             setCanAddExecutionScreenshot(Boolean(screenshotsData.can_add));
           }
         }
+        const descriptionResponse = await apiFetch(
+          `${API_BASE}/execution_description?session_id=${encodeURIComponent(sessionId)}`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        if (descriptionResponse.ok) {
+          const descriptionData = await descriptionResponse.json();
+          if (!cancelled && descriptionData?.success) {
+            setExecutionDescription(descriptionData);
+            if (!descriptionDirty) {
+              setDescriptionDraft(descriptionData.content || "");
+              setDescriptionVersion(descriptionData.version || 0);
+            }
+          }
+        }
       } catch (_error) {
         // Ignore preview polling failures while execution continues.
       } finally {
@@ -2147,7 +2282,7 @@ function AudionutsUAGUI() {
       }
       activeController?.abort();
     };
-  }, [API_BASE, isExecuting, sessionId]);
+  }, [API_BASE, descriptionDirty, isExecuting, sessionId]);
 
   const refreshExecutionScreenshots = async () => {
     const refreshed = await apiFetch(
@@ -3725,6 +3860,104 @@ function AudionutsUAGUI() {
 
   const filteredCategories = getFilteredCategories();
 
+  const saveExecutionDescription = async (content = descriptionDraft) => {
+    if (!sessionId || descriptionAction) return;
+    setDescriptionAction("save");
+    try {
+      const response = await apiFetch(`${API_BASE}/execution_description`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, content, version: descriptionVersion }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        window.alert(data?.error || "Could not save the description.");
+        return;
+      }
+      setDescriptionDraft(data.content || "");
+      setDescriptionVersion(data.version || 0);
+      setDescriptionDirty(false);
+      setExecutionDescription((current) => ({ ...current, content: data.content, version: data.version }));
+    } catch (error) {
+      console.error("Could not save the description:", error);
+      window.alert("Could not save the description.");
+    } finally {
+      setDescriptionAction("");
+    }
+  };
+
+  const resetExecutionDescription = async (sourceKey) => {
+    if (!sessionId || descriptionAction) return;
+    setDescriptionAction(`reset:${sourceKey}`);
+    try {
+      const response = await apiFetch(`${API_BASE}/execution_description/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, source_key: sourceKey, version: descriptionVersion }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        window.alert(data?.error || "Could not restore the description source.");
+        return;
+      }
+      setDescriptionDraft(data.content || "");
+      setDescriptionVersion(data.version || 0);
+      setDescriptionDirty(false);
+    } catch (error) {
+      console.error("Could not restore the description source:", error);
+      window.alert("Could not restore the description source.");
+    } finally {
+      setDescriptionAction("");
+    }
+  };
+
+  const renderDescriptionPanel = () => {
+    const sources = Array.isArray(executionDescription?.sources) ? executionDescription.sources : [];
+    return (
+      <div className="flex h-full flex-col">
+        <div className={`border-b p-3 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-sky-50 to-indigo-50"}`}>
+          <h2 className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}>Description review</h2>
+          <p className={`mt-1 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Edit the base description before tracker-specific formatting is applied.</p>
+        </div>
+        <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden p-3">
+          <section className={`rounded-lg border p-2 ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}>
+            <p className={`mb-2 text-xs font-bold uppercase tracking-wide ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>Sources</p>
+            {sources.length ? (
+              <div className="overflow-x-auto pb-1">
+                <div className="flex w-max gap-2">
+                  {sources.map((source) => (
+                    <button key={source.key} onClick={() => resetExecutionDescription(source.key)} disabled={Boolean(descriptionAction)} className={`whitespace-nowrap rounded px-3 py-2 text-left text-xs ${isDarkMode ? "bg-gray-700 text-gray-200 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`} title={`Restore ${source.label}`}>
+                      {descriptionAction === `reset:${source.key}` ? "Restoring…" : source.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : <p className="text-xs text-gray-500">No description sources are available yet.</p>}
+          </section>
+          <section className="flex min-h-[24rem] flex-1 flex-col">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className={`inline-flex rounded-md p-1 ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}>
+                {["edit", "preview"].map((view) => (
+                  <button key={view} onClick={() => setDescriptionView(view)} className={`rounded px-3 py-1 text-xs font-semibold capitalize ${descriptionView === view ? "bg-purple-600 text-white" : isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-white"}`}>{view}</button>
+                ))}
+              </div>
+              {descriptionView === "preview" && <span className={`text-right text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Preview only; tracker formatting is applied later.</span>}
+            </div>
+            {descriptionView === "edit" ? (
+              <textarea value={descriptionDraft} onChange={(event) => { setDescriptionDraft(event.target.value); setDescriptionDirty(true); }} onBlur={() => { if (descriptionDirty) saveExecutionDescription(); }} spellCheck={false} className={`min-h-[20rem] flex-1 resize-y rounded-lg border p-3 font-mono text-xs leading-5 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-300 bg-white text-gray-800"}`} placeholder="The editable base description will appear here." />
+            ) : (
+              <div className={`bbcode-preview min-h-[20rem] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm leading-6 [&_a]:text-sky-400 [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-purple-500 [&_blockquote]:pl-3 [&_details]:my-3 [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded [&_pre]:overflow-auto [&_pre]:font-mono [&_table]:my-3 [&_table]:border-collapse [&_td]:border [&_td]:p-2 [&_th]:border [&_th]:p-2 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100 [&_td]:border-gray-700 [&_th]:border-gray-700" : "border-gray-300 bg-white text-gray-800 [&_td]:border-gray-300 [&_th]:border-gray-300"}`} dangerouslySetInnerHTML={{ __html: renderBbcodePreview(descriptionDraft) }} />
+            )}
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>{descriptionDraft.length.toLocaleString()} characters {descriptionDirty ? "· Unsaved changes" : "· Saved"}</span>
+              <button onClick={() => saveExecutionDescription()} disabled={Boolean(descriptionAction) || !descriptionDirty} className="rounded-md bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-50">{descriptionAction === "save" ? "Saving…" : "Save description"}</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  };
+
   const renderScreenshotsPanel = () => {
     const isWorking = Boolean(screenshotActionId);
     const expandedItem = executionScreenshots.find(
@@ -5081,6 +5314,7 @@ function AudionutsUAGUI() {
 
           {/* Screenshot Review Panel */}
           {activePanel === "screenshots" && renderScreenshotsPanel()}
+          {activePanel === "description" && renderDescriptionPanel()}
         </div>
 
         {/* Bottom Nav */}
@@ -5112,6 +5346,7 @@ function AudionutsUAGUI() {
               <ScreenshotsIcon />,
               `Screens${executionScreenshots.length ? ` (${executionScreenshots.length})` : ""}`,
             )}
+          {isExecuting && navButton("description", <TerminalIcon />, "Description")}
         </div>
       </div>
     );
@@ -5425,7 +5660,10 @@ function AudionutsUAGUI() {
                   )}
                 </div>
                 <button
-                  onClick={() => setIsScreenshotReviewOpen((open) => !open)}
+                  onClick={() => {
+                    setIsScreenshotReviewOpen((open) => !open);
+                    setIsDescriptionReviewOpen(false);
+                  }}
                   aria-pressed={isScreenshotReviewOpen}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${isScreenshotReviewOpen ? "bg-purple-600 text-white" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
                   title="Review generated screenshots"
@@ -5435,6 +5673,18 @@ function AudionutsUAGUI() {
                   {executionScreenshots.length
                     ? ` (${executionScreenshots.length})`
                     : ""}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsDescriptionReviewOpen((open) => !open);
+                    setIsScreenshotReviewOpen(false);
+                  }}
+                  aria-pressed={isDescriptionReviewOpen}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${isDescriptionReviewOpen ? "bg-purple-600 text-white" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
+                  title="Review and edit the base description"
+                >
+                  <TerminalIcon />
+                  Description
                 </button>
                 <button
                   onClick={clearTerminal}
@@ -5785,6 +6035,8 @@ function AudionutsUAGUI() {
         {isExecuting ? (
           isScreenshotReviewOpen ? (
             renderScreenshotsPanel()
+          ) : isDescriptionReviewOpen ? (
+            renderDescriptionPanel()
           ) : (
             renderExecutionPreviewPanel()
           )

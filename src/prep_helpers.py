@@ -113,10 +113,14 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     use_radarr = prep_instance.config["DEFAULT"].get("use_radarr", False)
     meta.print_tracker_messages = prep_instance.config["DEFAULT"].get("print_tracker_messages", False)
     meta.print_tracker_links = prep_instance.config["DEFAULT"].get("print_tracker_links", True)
-    only_id_val = meta.only_id
-    skip_tracker_descriptions = bool(prep_instance.config["DEFAULT"].get("skip_tracker_descriptions", False) if only_id_val is None else only_id_val)
-    meta.skip_tracker_descriptions = skip_tracker_descriptions
-    meta.keep_images = bool(prep_instance.config["DEFAULT"].get("keep_images", True) if not meta.keep_images else True)
+    from src.tracker_descriptions import resolve_description_mode
+
+    description_mode = resolve_description_mode(prep_instance.config["DEFAULT"].get("tracker_description_mode", "text"))
+    if meta.only_id:
+        description_mode = resolve_description_mode("ids")
+    meta.tracker_description_mode = description_mode.value
+    meta.keep_images = description_mode.imports_images
+    meta.skip_tracker_descriptions = not description_mode.imports_text
     mkbrr_threads = prep_instance.config["DEFAULT"].get("mkbrr_threads", "0")
     meta.mkbrr_threads = mkbrr_threads
 
@@ -144,7 +148,7 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
 
     logger.debug(f"[cyan]ID: {meta.uuid}")
 
-    return use_sonarr, use_radarr, client, skip_tracker_descriptions, hash_ids, tracker_ids
+    return use_sonarr, use_radarr, client, meta.skip_tracker_descriptions, hash_ids, tracker_ids
 
 
 async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str, dict[str, Any]]:
@@ -697,18 +701,6 @@ async def process_trackers_and_torrent(
 ) -> None:
     if "description" not in meta or meta.description is None:
         meta.description = ""
-
-    description_text = meta.description
-    if description_text is None:
-        description_text = ""
-    async with aiofiles.open(
-        f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt",
-        "w",
-        newline="",
-        encoding="utf8",
-    ) as description:
-        if len(description_text):
-            await description.write(description_text)
 
     meta.skip_trackers = False
 

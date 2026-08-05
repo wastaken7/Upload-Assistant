@@ -357,6 +357,14 @@ class Meta:
     rtorrent_label: str | None = None
     runtime: int = 60
     saved_description: bool | None = None
+    description_candidates: list[dict[str, Any]] = field(default_factory=list)
+    description_override: str = ""
+    description_fingerprint: str = ""
+    description_provenance: dict[str, Any] = field(default_factory=dict)
+    tracker_description_raw: dict[str, str] = field(default_factory=dict)
+    tracker_description_mode: str = ""
+    tracker_search_term: str = ""
+    persist_description: bool = True
     scene_name: str = ""
     scene_nfo_file: str = ""
     scene: bool = False

@@ -11,6 +11,7 @@ from rich.markup import escape
 
 from src.cogs.redaction import Redaction
 from src.console import logger
+from src.description_review import get_base_description
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.tracker_images import get_tracker_image_collection
@@ -268,9 +269,7 @@ class BEYONDHD:
 
     async def edit_desc(self, meta: Meta) -> None:
         desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
-        base_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt"
-        async with aiofiles.open(base_path, encoding="utf-8") as f:
-            base = await f.read()
+        base = get_base_description(meta)
         for collection_name in ("menu_images", "spectrograms_images"):
             original_images = getattr(meta, collection_name, [])
             rehosted_images = get_tracker_image_collection(meta, self.tracker, collection_name)

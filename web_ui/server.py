@@ -185,6 +185,8 @@ cfg_dir.mkdir(parents=True, exist_ok=True)
 ARGUMENT_PRESETS_PATH = Path(__file__).resolve().parent.parent / "data" / "argument_presets.json"
 MAX_ARGUMENT_PRESETS = 50
 _argument_presets_lock = threading.Lock()
+_description_review_locks: dict[str, threading.Lock] = {}
+_description_review_locks_lock = threading.Lock()
 
 
 def _load_argument_presets() -> list[dict[str, str]]:
@@ -1922,6 +1924,38 @@ def _resolve_execution_screenshot_review(session_id: str) -> tuple[Path, Mapping
     if not temp_dir.is_dir():
         return None
     return temp_dir, meta_data
+
+
+def _resolve_execution_description_review(session_id: str) -> tuple[Path, Path, dict[str, object]] | None:
+    """Resolve the active description draft through the execution session only."""
+    _execution_path, meta_file, meta_data = _resolve_execution_preview_meta(session_id)
+    if meta_file is None or meta_data is None:
+        return None
+    meta_uuid = _stringify_preview_value(meta_data.get("uuid"))
+    if not meta_uuid:
+        return None
+    temp_root = (Path(__file__).parent.parent / "tmp").resolve()
+    try:
+        temp_dir = (temp_root / meta_uuid).resolve()
+        temp_dir.relative_to(temp_root)
+    except OSError, ValueError:
+        return None
+    if not temp_dir.is_dir():
+        return None
+    return temp_dir, meta_file, dict(meta_data)
+
+
+def _write_execution_description_meta(meta_file: Path, meta_data: Mapping[str, object]) -> None:
+    temporary = meta_file.with_suffix(f".tmp.{os.getpid()}")
+    temporary.write_text(json.dumps(meta_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(meta_file)
+
+
+def _description_review_lock(temp_dir: Path) -> threading.Lock:
+    """Return the in-process mutation lock for one execution's description."""
+    key = str(temp_dir.resolve())
+    with _description_review_locks_lock:
+        return _description_review_locks.setdefault(key, threading.Lock())
 
 
 def _screenshot_review_meta(temp_dir: Path, meta_data: Mapping[str, object]) -> Mapping[str, object]:
@@ -4372,6 +4406,107 @@ def execution_screenshots():
     )
 
 
+@app.route("/api/execution_description")
+@limiter.limit("7200 per hour", key_func=_rate_limit_key_func, override_defaults=True)
+def execution_description():
+    """Return the editable base-description draft and its read-only sources."""
+    session_id = str(request.args.get("session_id", "")).strip()
+    resolved = _resolve_execution_description_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Description is not available yet"}), 404
+    from src.description_review import draft, source_items
+
+    temp_dir, _meta_file, meta_data = resolved
+    content, version = draft(meta_data, temp_dir)
+    return jsonify(
+        {
+            "success": True,
+            "content": content,
+            "version": version,
+            "sources": source_items(meta_data),
+        }
+    )
+
+
+@app.route("/api/execution_description", methods=["PUT"])
+def save_execution_description():
+    """Persist an edited draft for the current execution with optimistic locking."""
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+    payload = _request_json_dict()
+    session_id = _stringify_preview_value(payload.get("session_id"))
+    content = payload.get("content")
+    if not isinstance(content, str):
+        return jsonify({"success": False, "error": "Description content must be text"}), 400
+    if len(content) > 1_000_000:
+        return jsonify({"success": False, "error": "Description exceeds the 1 MiB limit"}), 413
+    resolved = _resolve_execution_description_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Description is not available yet"}), 404
+
+    from src.description_review import draft, save_review
+
+    requested_version = payload.get("version")
+    if not isinstance(requested_version, int):
+        return jsonify({"success": False, "error": "Description version is required"}), 400
+
+    temp_dir, _meta_file, _meta_data = resolved
+    with _description_review_lock(temp_dir):
+        # Reload while holding the release-specific lock so the version check and
+        # write form one compare-and-swap operation across browser tabs.
+        locked_resolved = _resolve_execution_description_review(session_id)
+        if locked_resolved is None:
+            return jsonify({"success": False, "error": "Description is not available yet"}), 404
+        temp_dir, meta_file, meta_data = locked_resolved
+        _current_content, current_version = draft(meta_data, temp_dir)
+        if requested_version != current_version:
+            return jsonify({"success": False, "error": "Description changed in another browser tab", "version": current_version}), 409
+
+        next_version = current_version + 1
+        save_review(temp_dir, content, next_version)
+        meta_data["description_override"] = content
+        _write_execution_description_meta(meta_file, meta_data)
+    return jsonify({"success": True, "content": content, "version": next_version})
+
+
+@app.route("/api/execution_description/reset", methods=["POST"])
+def reset_execution_description():
+    """Restore the draft from one of the read-only sources."""
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+    payload = _request_json_dict()
+    session_id = _stringify_preview_value(payload.get("session_id"))
+    source_key = _stringify_preview_value(payload.get("source_key"))
+    resolved = _resolve_execution_description_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Description is not available yet"}), 404
+    requested_version = payload.get("version")
+    if not isinstance(requested_version, int):
+        return jsonify({"success": False, "error": "Description version is required"}), 400
+
+    from src.description_review import draft, save_review, source_items
+
+    temp_dir, _meta_file, _meta_data = resolved
+    with _description_review_lock(temp_dir):
+        locked_resolved = _resolve_execution_description_review(session_id)
+        if locked_resolved is None:
+            return jsonify({"success": False, "error": "Description is not available yet"}), 404
+        temp_dir, meta_file, meta_data = locked_resolved
+        source = next((item for item in source_items(meta_data) if item["key"] == source_key), None)
+        if source is None:
+            return jsonify({"success": False, "error": "Description source was not found"}), 404
+        content = source["content"]
+        _current_content, current_version = draft(meta_data, temp_dir)
+        if requested_version != current_version:
+            return jsonify({"success": False, "error": "Description changed in another browser tab", "version": current_version}), 409
+
+        next_version = current_version + 1
+        save_review(temp_dir, content, next_version)
+        meta_data["description_override"] = content
+        _write_execution_description_meta(meta_file, meta_data)
+    return jsonify({"success": True, "content": content, "version": next_version})
+
+
 @app.route("/api/execution_screenshots/<screenshot_id>/image")
 def execution_screenshot_image(screenshot_id: str):
     """Serve one reviewed local screenshot after resolving it through its session."""
@@ -4940,6 +5075,9 @@ def execute_command():
 
                         # Run the upload main loop in a separate thread to avoid blocking SSE generator
                         def run_upload():
+                            previous_webui_active = os.environ.get("UA_WEBUI_ACTIVE")
+                            os.environ["UA_WEBUI_ACTIVE"] = "1"
+
                             def emit_progress(event: ProgressEvent) -> None:
                                 event_copy = dict(event)
                                 if not _session_state_is_current(session_id, process_state):
@@ -5001,6 +5139,10 @@ def execute_command():
                                         console.print("In-process run ended", markup=False)
                             finally:
                                 clear_progress_callback()
+                                if previous_webui_active is None:
+                                    os.environ.pop("UA_WEBUI_ACTIVE", None)
+                                else:
+                                    os.environ["UA_WEBUI_ACTIVE"] = previous_webui_active
                                 # Restore sys.argv in finally block
                                 # Restore patched console
                                 console_key = id(src_console.console)

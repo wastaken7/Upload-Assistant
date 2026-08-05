@@ -2739,11 +2739,14 @@ class Common:
                     sys.exit(1)
 
             if description:
+                raw_descriptions = getattr(meta, "tracker_description_raw", {}) or {}
+                raw_descriptions[tracker] = description
+                meta.tracker_description_raw = raw_descriptions
                 bbcode = BBCODE()
                 description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
                 if not skip_tracker_descriptions:
                     logger.info(f"[green]Successfully grabbed description from {tracker}")
-                    logger.info(f"Extracted description: {description}", extra={"markup": False})
+                    logger.info(f"Extracted description: \n\n{description}\n\n", extra={"markup": False, "highlighter": None})
 
                     from src.trackersetup import api_trackers
 
