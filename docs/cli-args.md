@@ -17,9 +17,29 @@ upload.py [path...] [options]
   - Quoting is recommended (single or double quotes) especially when paths contain spaces.
   - The parser has a small recovery mechanism: if extra “unknown” tokens were provided and the joined `path` doesn’t exist, it will append those tokens into the path until it finds an existing path.
 
+### Pasting multiple full paths
+
+Use `--paths-from-stdin` when copying multiple full paths from a torrent client or another application. This keeps spaces, parentheses, and other shell-sensitive characters inside each path instead of letting the shell interpret them.
+
+```console
+python upload.py -ua -sda --paths-from-stdin
+Paste one full path per line, then press Enter on an empty line to start.
+/home/seedbox/data/torrents/sonarr/First.Release.mkv
+/home/seedbox/data/torrents/sonarr/Release With Spaces (2026).mkv
+
+```
+
+After pasting the paths, press Enter on the empty line. For scripts and pipes, input is read until EOF instead:
+
+```console
+printf '%s\n' "/path/First.mkv" "/path/Release With Spaces (2026).mkv" | python upload.py -ua -sda --paths-from-stdin
+```
+
+This option is available in the CLI only. In the Web UI, select paths with the built-in browser or queue controls.
+
 ### Validation rules
 
-- You must provide either at least one `path` OR `--site-upload`.
+- You must provide at least one `path`, paths through `--paths-from-stdin`, `--site-upload`, or `--webui`.
 - If `--site-upload` is provided without a `path`, the parser injects a dummy path internally (so downstream code can continue).
 
 ## Modes / workflows
@@ -53,7 +73,7 @@ If you pass a `.txt` file as the main positional input path (without specifying 
 - `-comps_index`, `--comparison_index N`: Which comparison index is the “main” images (required when using `--comparison`).
 - `-menus`, `--disc-menus PATH`: Raw Disc only (Blu-ray/DVD). Folder containing disc menu screenshots (all images in folder are used).
 - `-ih`, `--imghost HOST`: Select image host.
-  - Choices: `imgbb`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `passtheimage`, `seedpool_cdn`, `utppm`, `lostimg`.
+  - Choices: `imgbb`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `midnightscene`, `passtheimage`, `seedpool_cdn`, `utppm`, `lostimg`.
 - `-siu`, `--skip-imagehost-upload`: Skip uploading images to an image host.
 
 ## Description inputs
@@ -165,7 +185,7 @@ Thise will use the specified hash to get tracker ids from qBitTorrent or rTorren
 - `-tpc`, `--trackers-pass N`: How many trackers must pass checks (dupe/banned-group/etc) for the uploading process to complete.
 - `-req`, `--search_requests`: Search for matching requests on supported trackers.
 - `-sat`, `--skip_auto_torrent`: Skip automated qBittorrent client torrent searching.
-- `-onlyID`, `--onlyID`: Only grab meta ids from tracker (tmdb/imdb/etc), not description text. NOTE: description images are controlled with `keep_images` set in config.py.
+- `-onlyID`, `--onlyID`: Only grab meta IDs from trackers (tmdb/imdb/etc), overriding `tracker_description_mode` to `ids` for this execution.
 - `-sdc`, `--skip-dupe-check`: Ignore dupes and upload anyway (skips dupe check). NOTE: know what you are doing!
 - `-sda`, `--skip-dupe-asking`: Don’t prompt about any dupes that Upload Assistant finds; just treat these dupes as actual dupes.
 - `-ddc`, `--double-dupe-check`: Run a second dupe-check pass on trackers that previously passed checks, immediately before uploading. NOTE: mainly useful when racing as a preventive dupe upload catch.

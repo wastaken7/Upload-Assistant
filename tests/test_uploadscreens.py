@@ -54,9 +54,12 @@ def test_upload_screens_does_not_reupload_source_on_fallback(tmp_path: Path) -> 
             "TRACKERS": {},
         }
         shared_return_dict: dict[str, object] = {}
-        with patch("src.uploadscreens.screenshots_dir", return_value=tmp_path), patch("src.uploadscreens.os.chdir"), patch(
-            "src.uploadscreens.Path.cwd", return_value=tmp_path
-        ), patch("src.uploadscreens.upload_image_task", new=fake_upload):
+        with (
+            patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
+            patch("src.uploadscreens.os.chdir"),
+            patch("src.uploadscreens.Path.cwd", return_value=tmp_path),
+            patch("src.uploadscreens.upload_image_task", new=fake_upload),
+        ):
             await _upload_screens(config, meta, 1, 1, 0, 1, [], shared_return_dict)
             meta.image_list = []
             meta.imghost = "ptscreens"
@@ -97,9 +100,12 @@ def test_upload_screens_preserves_partial_successes_across_fallback(tmp_path: Pa
             },
             "TRACKERS": {},
         }
-        with patch("src.uploadscreens.screenshots_dir", return_value=tmp_path), patch("src.uploadscreens.os.chdir"), patch(
-            "src.uploadscreens.Path.cwd", return_value=tmp_path
-        ), patch("src.uploadscreens.upload_image_task", new=fake_upload):
+        with (
+            patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
+            patch("src.uploadscreens.os.chdir"),
+            patch("src.uploadscreens.Path.cwd", return_value=tmp_path),
+            patch("src.uploadscreens.upload_image_task", new=fake_upload),
+        ):
             return await _upload_screens(config, meta, 1, 1, 0, 2, [], {})
 
     image_list, uploaded_count = asyncio.run(exercise())
@@ -127,8 +133,10 @@ def test_upload_screens_handles_infinite_concurrency(tmp_path: Path) -> None:
             },
             "TRACKERS": {},
         }
-        with patch("src.uploadscreens.screenshots_dir", return_value=tmp_path), patch("src.uploadscreens.os.chdir"), patch(
-            "src.uploadscreens.upload_image_task", new=fake_upload
+        with (
+            patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
+            patch("src.uploadscreens.os.chdir"),
+            patch("src.uploadscreens.upload_image_task", new=fake_upload),
         ):
             return await _upload_screens(config, meta, 1, 1, 0, 1, ["image.png"], {})
 
@@ -178,9 +186,12 @@ def test_upload_screens_normalizes_image_upload_delay_before_limiter(
 
             return wait_for_start_slot
 
-        with patch("src.uploadscreens.screenshots_dir", return_value=tmp_path), patch("src.uploadscreens.os.chdir"), patch(
-            "src.uploadscreens.upload_image_task", new=fake_upload
-        ), patch("src.uploadscreens._build_image_start_limiter", side_effect=fake_build_image_start_limiter):
+        with (
+            patch("src.uploadscreens.screenshots_dir", return_value=tmp_path),
+            patch("src.uploadscreens.os.chdir"),
+            patch("src.uploadscreens.upload_image_task", new=fake_upload),
+            patch("src.uploadscreens._build_image_start_limiter", side_effect=fake_build_image_start_limiter),
+        ):
             return captured_delays, (await _upload_screens(config, meta, 1, 1, 0, 1, ["image.png"], {}))[1]
 
     delays, uploaded_count = asyncio.run(exercise())

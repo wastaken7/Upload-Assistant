@@ -21,6 +21,7 @@ from pymediainfo import MediaInfo
 from src.bbcode import BBCODE
 from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
+from src.description_review import apply_saved_draft
 from src.languages import languages_manager
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
@@ -72,21 +73,16 @@ async def gen_desc(
     _takescreens_manager: TakeScreensManager,
     _uploadscreens_manager: UploadScreensManager,
 ) -> Meta:
+    apply_saved_draft(meta)
+
     def clean_text(text: str) -> str:
         return text.replace("\r\n", "\n").strip()
-
-    async def write_description_file(description_path: str, lines: list[str]) -> None:
-        Path(description_path).parent.mkdir(parents=True, exist_ok=True)
-        content = "\n".join(lines)
-        async with aiofiles.open(description_path, "w", newline="", encoding="utf8") as description:
-            await description.write(content)
 
     description_link = meta.description_link
     description_file = meta.description_file
     scene_nfo = False
     bhd_nfo = False
 
-    description_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt"
     description_lines: list[str] = []
     content_written = False
 
@@ -95,7 +91,10 @@ async def gen_desc(
     specified_dir = Path(base_dir) / "tmp" / uuid
     source_dir = Path(meta.path or "")
 
-    if meta.description_template:
+    if meta.description_override:
+        description_lines.append(clean_text(meta.description_override))
+        content_written = True
+    elif meta.description_template:
         try:
             template_path = f"{meta.base_dir}/data/templates/{meta.description_template}.txt"
             async with aiofiles.open(template_path, encoding="utf-8") as f:
@@ -124,7 +123,8 @@ async def gen_desc(
             logger.info("NFO was set but no nfo file was found")
             if not content_written:
                 description_lines.append("")
-            await write_description_file(description_path, description_lines)
+            meta.description = "\n".join(description_lines).strip()
+            meta.saved_description = bool(meta.description)
             return meta
 
         if nfo_files:
@@ -194,10 +194,8 @@ async def gen_desc(
             description_lines = [description_text]
             content_written = True
 
-    if description_lines:
-        description_lines.append("")
-
-    await write_description_file(description_path, description_lines)
+    meta.description = "\n".join(description_lines).strip()
+    meta.saved_description = bool(meta.description)
 
     if meta.description in ("None", "", " "):
         meta.description = ""
@@ -545,6 +543,8 @@ class DescriptionBuilder:
     async def get_user_description(self, meta: Meta) -> str:
         """Returns the user-provided description (file or link)"""
         try:
+            if meta.description_override:
+                return ""
             description_file_content = meta.description_file_content.strip()
             description_link_content = meta.description_link_content.strip()
 
@@ -1078,6 +1078,7 @@ class DescriptionBuilder:
         signature: str = "",
         desc_header: str = "",
     ) -> str:
+        apply_saved_draft(meta)
         image_list = get_tracker_image_collection(meta, self.tracker, "screenshots")
         image_list = cast(list[Any], image_list)
 
@@ -1316,10 +1317,11 @@ class DescriptionBuilder:
         signature: str = "",
         desc_header: str = "",
         approved_image_hosts: list[str] | None = None,
+        audio_spectrogram: bool = True,
     ) -> str:
         return await self.general_description_generator(
             meta,
-            audio_spectrogram=True,
+            audio_spectrogram=audio_spectrogram,
             bluray=True,
             book=True,
             custom_header=True,

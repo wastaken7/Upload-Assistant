@@ -101,11 +101,14 @@ class TVChaosUK:
             return date_str
 
     async def _read_base_description(self, meta: Meta) -> str:
-        """Read the base DESCRIPTION.txt file if it exists."""
-        try:
-            return await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt")
-        except FileNotFoundError:
-            return ""
+        """Load a saved base description without blocking the event loop."""
+        from src.description_review import get_base_description
+
+        draft_meta = meta.copy()
+        description = await asyncio.to_thread(get_base_description, draft_meta)
+        for key in ("description", "description_override", "saved_description"):
+            meta[key] = draft_meta.get(key)
+        return description
 
     def _ensure_desc_directory(self, meta: Meta, tracker: str) -> str:
         """Create description directory and return file path."""
@@ -498,7 +501,7 @@ class TVChaosUK:
         desc = await self.edit_desc(meta, self.tracker, self.signature, image_list)
 
         if not desc:
-            logger.warning(f"{self.tracker}: [yellow]Warning: DESCRIPTION.txt file not found at {descfile_path}")
+            logger.warning(f"{self.tracker}: [yellow]Warning: tracker-specific description file not found at {descfile_path}")
             desc = ""
 
         # Naming logic
@@ -811,13 +814,13 @@ class TVChaosUK:
         comparison: bool = False,
     ) -> str:
         """
-        Build and write the tracker-specific DESCRIPTION.txt file (FNP multi-block style).
+        Build and write the tracker-specific debug description file (FNP multi-block style).
 
         Constructs BBCode-formatted description text for discs, TV packs,
         episodes, or movies using multiple separate [center] blocks.
         Always writes a non-empty description file to tmp/<uuid>/[TVCHAOSUK]DESCRIPTION.txt.
         """
-        # Read base description file
+        # Read the authoritative in-memory base description.
         base = await self._read_base_description(meta)
 
         # Ensure output directory exists

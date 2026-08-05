@@ -150,11 +150,9 @@ class Swarmazon:
             return True  # Debug mode - simulated success
 
     async def edit_desc(self, meta: Meta) -> None:
-        async with aiofiles.open(
-            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt",
-            encoding="utf-8",
-        ) as base_file:
-            base = await base_file.read()
+        from src.description_review import get_base_description
+
+        base = get_base_description(meta)
 
         parts: list[str] = [base]
         images = meta.image_list
