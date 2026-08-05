@@ -1,5 +1,4 @@
 import hashlib
-import math
 import re
 import warnings
 from collections.abc import Callable
@@ -140,7 +139,7 @@ class UnwalledValidationMixin:
             length = info.get(b"length")
             if not isinstance(length, int) or isinstance(length, bool) or length < 0:
                 return False
-            return len(pieces) // 20 == math.ceil(length / piece_length)
+            return len(pieces) // 20 == (length + piece_length - 1) // piece_length
         raw_files = info.get(b"files")
         if not isinstance(raw_files, list) or not raw_files:
             return False
@@ -166,7 +165,7 @@ class UnwalledValidationMixin:
                     return False
                 if component in {".", ".."} or not cls._valid_filename(component):
                     return False
-        return len(pieces) // 20 == math.ceil(total_length / piece_length)
+        return len(pieces) // 20 == (total_length + piece_length - 1) // piece_length
 
     @classmethod
     def _torrent_matches_files(cls, info: dict[bytes, object], meta: Meta) -> bool:

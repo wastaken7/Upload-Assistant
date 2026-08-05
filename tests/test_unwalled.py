@@ -411,6 +411,20 @@ def test_unwalled_rejects_inconsistent_v1_piece_count() -> None:
     assert _tracker()._valid_v1_info(info) is False  # noqa: S101
 
 
+def test_unwalled_rejects_huge_v1_lengths_without_overflow(tmp_path: Path) -> None:
+    torrent_path = tmp_path / "huge-length.torrent"
+    torrent_path.write_bytes(
+        bencode(
+            {
+                b"announce": b"https://unwalled.cc/announce/test-token",
+                b"info": {b"name": b"episode.mp3", b"piece length": 16384, b"pieces": b"x" * 20, b"length": 10**400},
+            }
+        )
+    )
+
+    assert _tracker()._torrent_is_v1(torrent_path) is False  # noqa: S101
+
+
 @pytest.mark.asyncio
 async def test_unwalled_rejects_cross_host_torrent_download_redirect(tmp_path: Path) -> None:
     requests: list[httpx.Request] = []
