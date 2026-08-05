@@ -424,6 +424,16 @@ def test_unwalled_rejects_huge_v1_lengths_without_overflow(tmp_path: Path) -> No
 
     assert _tracker()._torrent_is_v1(torrent_path) is False  # noqa: S101
 
+    torrent_path.write_bytes(
+        bencode(
+            {
+                b"announce": b"https://unwalled.cc/announce/test-token",
+                b"info": {b"name": b"episode.mp3", b"piece length": 10**400, b"pieces": b"x" * 20, b"length": 1},
+            }
+        )
+    )
+    assert _tracker()._torrent_is_v1(torrent_path) is False  # noqa: S101
+
 
 def test_unwalled_rejects_duplicate_v1_file_paths(tmp_path: Path) -> None:
     root = tmp_path / "show"

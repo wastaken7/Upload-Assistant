@@ -121,7 +121,13 @@ class UnwalledValidationMixin:
         raw_name = info.get(b"name")
         piece_length = info.get(b"piece length")
         pieces = info.get(b"pieces")
-        if not isinstance(raw_name, bytes) or not isinstance(piece_length, int) or isinstance(piece_length, bool) or piece_length <= 0:
+        if (
+            not isinstance(raw_name, bytes)
+            or not isinstance(piece_length, int)
+            or isinstance(piece_length, bool)
+            or not 16 * 1024 <= piece_length <= 32 * 1024 * 1024
+            or piece_length & (piece_length - 1) != 0
+        ):
             return False
         if not isinstance(pieces, bytes) or not pieces or len(pieces) % 20 != 0 or b"meta version" in info or b"file tree" in info:
             return False
