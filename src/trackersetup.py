@@ -210,7 +210,11 @@ class TrackerSetup:
         if not await self.should_update(file_path):
             return file_path
 
-        headers = {"Authorization": f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}", "Content-Type": "application/json", "Accept": "application/json"}
+        api_key = self.config["TRACKERS"][tracker]["api_key"].strip()
+        auth_mode = getattr(tracker_instance, "banned_groups_auth_mode", "bearer")
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        if auth_mode == "bearer":
+            headers["Authorization"] = f"Bearer {api_key}"
 
         all_data: list[JsonDict] = []
         next_cursor: str | None = None
@@ -218,8 +222,11 @@ class TrackerSetup:
         async with httpx.AsyncClient() as client:
             while True:
                 try:
-                    # Add query parameters for pagination
-                    params: JsonDict = {"cursor": next_cursor, "per_page": 100} if next_cursor else {"per_page": 100}
+                    if auth_mode == "api_token":
+                        params: JsonDict = {"api_token": api_key}
+                    else:
+                        # Add query parameters for pagination.
+                        params = {"cursor": next_cursor, "per_page": 100} if next_cursor else {"per_page": 100}
                     response = await client.get(url=banned_url, headers=headers, params=params)
 
                     if response.status_code == 200:
@@ -231,9 +238,10 @@ class TrackerSetup:
                             break  # No pagination in this case
                         if isinstance(response_json, dict):
                             response_dict = cast(JsonDict, response_json)
-                            page_data_any = response_dict.get("data", [])
+                            response_key = getattr(tracker_instance, "banned_groups_response_key", "data")
+                            page_data_any = response_dict.get(response_key, [])
                             if not isinstance(page_data_any, list):
-                                logger.info(f"[red]Unexpected 'data' format: {type(page_data_any)}[/red]")
+                                logger.info(f"[red]Unexpected '{response_key}' format: {type(page_data_any)}[/red]")
                                 return None
 
                             page_data = cast(list[JsonDict], page_data_any)
@@ -388,7 +396,7 @@ class TrackerSetup:
         if "taoe" in group_tags:
             group_tags = "taoe"
 
-        if tracker.upper() in ("AITHER", "LST", "LUMINARR", "SPEEDAPP", "ZENITH"):
+        if tracker.upper() in ("AITHER", "CAPYBARABR", "LST", "LUMINARR", "SPEEDAPP", "ZENITH"):
             file_path = await self.get_banned_groups(meta, tracker)
             if file_path == "empty":
                 logger.info(f"[bold red]No banned groups found for '{tracker}'.")
