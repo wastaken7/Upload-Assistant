@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import Protocol, cast
 
 import mutagen
+from pymediainfo import MediaInfo
 
 from src.exportmi import export_info
 from src.meta import Meta
@@ -12,7 +14,27 @@ from src.meta import Meta
 AUDIO_EXTENSIONS = frozenset({".aac", ".ac3", ".aiff", ".alac", ".ape", ".dts", ".flac", ".m4a", ".m4b", ".mp3", ".ogg", ".opus", ".wav", ".wma", ".wv"})
 VIDEO_EXTENSIONS = frozenset({".avi", ".m4v", ".mkv", ".mov", ".mp4", ".ts", ".webm"})
 ARCHIVE_EXTENSIONS = frozenset({".7z", ".bz2", ".cbr", ".cbz", ".gz", ".rar", ".tar", ".tbz", ".tbz2", ".tgz", ".txz", ".xz", ".zip", ".zst"})
-mutagen_module: Any = cast(Any, mutagen)
+
+
+class _MediaTrack(Protocol):
+    track_type: str | None
+    internet_media_type: str | None
+
+
+class _MediaInfoResult(Protocol):
+    tracks: list[_MediaTrack]
+
+
+class _AudioInfo(Protocol):
+    bitrate: int | None
+
+
+class _AudioFile(Protocol):
+    info: _AudioInfo | None
+
+
+mutagen_file = cast(Callable[[str], _AudioFile | None], vars(mutagen)["File"])
+mutagen_error = cast(type[Exception], vars(mutagen)["MutagenError"])
 
 
 def _source_files(root: Path) -> list[Path]:
@@ -33,17 +55,67 @@ def _has_archive_signature(path: Path) -> bool:
     with path.open("rb") as source:
         header = source.read(512)
     return (
-        header.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08", b"Rar!\x1a\x07", b"7z\xbc\xaf\x27\x1c", b"\x1f\x8b", b"BZh", b"\xfd7zXZ\x00", b"\x28\xb5\x2f\xfd"))
+        header.startswith(
+            (
+                b"PK\x03\x04",
+                b"PK\x05\x06",
+                b"PK\x07\x08",
+                b"Rar!\x1a\x07",
+                b"7z\xbc\xaf\x27\x1c",
+                b"\x1f\x8b",
+                b"\x1f\x9d",
+                b"BZh",
+                b"\xfd7zXZ\x00",
+                b"\x28\xb5\x2f\xfd",
+                b"\x04\x22\x4d\x18",
+                b"MSCF",
+                b"LZIP",
+                b"xar!",
+                b"!<arch>\n",
+            )
+        )
         or header[257:262] == b"ustar"
     )
+
+
+def _detected_media_kind(path: Path) -> str | None:
+    try:
+        media_info = cast(_MediaInfoResult, MediaInfo.parse(str(path)))
+    except OSError, RuntimeError, ValueError:
+        return None
+    general_content_type = ""
+    has_audio = False
+    for track in media_info.tracks:
+        if track.track_type == "Video":
+            return "video"
+        if track.track_type == "Audio":
+            has_audio = True
+        elif track.track_type == "General":
+            general_content_type = str(track.internet_media_type or "").casefold()
+    if general_content_type.startswith("video/"):
+        return "video"
+    if has_audio or general_content_type.startswith("audio/"):
+        return "audio"
+    return None
 
 
 def _media_files(candidates: list[Path]) -> tuple[list[Path], list[Path]]:
     archives = [path for path in candidates if path.suffix.casefold() in ARCHIVE_EXTENSIONS or _has_archive_signature(path)]
     if archives:
         raise ValueError("Podcast uploads cannot contain compressed archive files")
-    audio = sorted((path.resolve() for path in candidates if path.suffix.casefold() in AUDIO_EXTENSIONS), key=str)
-    video = sorted((path.resolve() for path in candidates if path.suffix.casefold() in VIDEO_EXTENSIONS), key=str)
+    audio: list[Path] = []
+    video: list[Path] = []
+    for path in candidates:
+        suffix = path.suffix.casefold()
+        declared_kind = "audio" if suffix in AUDIO_EXTENSIONS else "video" if suffix in VIDEO_EXTENSIONS else None
+        if declared_kind is None:
+            continue
+        detected_kind = _detected_media_kind(path)
+        if detected_kind is not None and detected_kind != declared_kind:
+            raise ValueError(f"Podcast media extension does not match its actual content: {path.name}")
+        (audio if declared_kind == "audio" else video).append(path.resolve())
+    audio.sort(key=str)
+    video.sort(key=str)
     return audio, video
 
 
@@ -56,9 +128,9 @@ def _audio_bitrate(files: list[Path]) -> int | None:
     bitrates: list[int] = []
     for path in files:
         try:
-            audio = mutagen_module.File(str(path))
-            bitrate = int(getattr(getattr(audio, "info", None), "bitrate", 0) or 0)
-        except Exception:
+            audio = mutagen_file(str(path))
+            bitrate = int(audio.info.bitrate or 0) if audio is not None and audio.info is not None else 0
+        except OSError, TypeError, ValueError, mutagen_error:
             bitrate = 0
         if bitrate > 0:
             bitrates.append(round(bitrate / 1000))

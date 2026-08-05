@@ -1,10 +1,9 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import json
 import platform
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import aiofiles
 import httpx
@@ -31,6 +30,7 @@ class UNIT3D:
     upload_url: str = ""
     download_url_hosts: tuple[str, ...] = ()
     max_torrent_download_size: int | None = None
+    max_json_response_size: int | None = None
 
     def __init__(self, config: dict[str, Any], tracker_name: str):
         self.config = config
@@ -523,10 +523,17 @@ class UNIT3D:
             for attempt in range(max_retries):
                 try:
                     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-                        response = await client.post(url=self.upload_url, files=files, data=data, headers=headers)
+                        if self.max_json_response_size is None:
+                            response = await client.post(url=self.upload_url, files=files, data=data, headers=headers)
+                        else:
+                            async with client.stream("POST", self.upload_url, files=files, data=data, headers=headers) as streamed_response:
+                                response = await self._bounded_response(streamed_response, self.max_json_response_size)
                         response.raise_for_status()
 
-                        response_data = response.json()
+                        raw_response_data = cast(object, response.json())
+                        if not isinstance(raw_response_data, dict):
+                            raise ValueError("Tracker response must be a JSON object")
+                        response_data = cast(dict[str, Any], raw_response_data)
 
                         # Verify API success before proceeding
                         if not response_data.get("success"):
@@ -587,7 +594,7 @@ class UNIT3D:
                         continue
                     meta.tracker_status[self.tracker]["status_message"] = f"data error: Unable to upload. Error: {e}.\nResponse: {response_data}"
                     return False  # Request error after all retries
-                except json.JSONDecodeError as e:
+                except ValueError as e:
                     meta.tracker_status[self.tracker]["status_message"] = f"data error: Invalid JSON response from {self.tracker}. Error: {e}"
                     return False  # JSON parsing error
 
@@ -621,6 +628,18 @@ class UNIT3D:
             return True  # Debug mode - simulated success
 
         return False
+
+    @staticmethod
+    async def _bounded_response(response: httpx.Response, max_size: int) -> httpx.Response:
+        content_length = response.headers.get("content-length", "")
+        if content_length.isdigit() and int(content_length) > max_size:
+            raise ValueError("Tracker JSON response exceeds the configured size limit")
+        body = bytearray()
+        async for chunk in response.aiter_bytes():
+            body.extend(chunk)
+            if len(body) > max_size:
+                raise ValueError("Tracker JSON response exceeds the configured size limit")
+        return httpx.Response(response.status_code, headers=response.headers, content=bytes(body), request=response.request)
 
     async def get_torrent_id(self, response_data: dict[str, Any]) -> str:
         """Matches /12345.abcde and returns 12345"""

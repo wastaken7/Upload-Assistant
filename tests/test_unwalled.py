@@ -132,8 +132,22 @@ def test_podcast_prep_rejects_symlinks_and_disguised_archives(tmp_path: Path) ->
         asyncio.run(gather_podcast_prep(meta))
 
     linked.unlink()
-    (tmp_path / "archive.mp3").write_bytes(b"PK\x03\x04" + b"archive")
+    archive = tmp_path / "archive.mp3"
+    archive.write_bytes(b"PK\x03\x04" + b"archive")
     with pytest.raises(ValueError, match="compressed archive"):
+        asyncio.run(gather_podcast_prep(meta))
+
+    archive.write_bytes(b"MSCF" + b"cab archive")
+    with pytest.raises(ValueError, match="compressed archive"):
+        asyncio.run(gather_podcast_prep(meta))
+
+
+def test_podcast_prep_rejects_media_with_a_mismatched_extension(tmp_path: Path) -> None:
+    disguised_video = tmp_path / "video.mp3"
+    disguised_video.write_bytes(b"\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isomiso2")
+    meta = Meta(path=str(disguised_video), base_dir=str(tmp_path), uuid="mismatched-media", category="PODCAST")
+
+    with pytest.raises(ValueError, match="extension does not match"):
         asyncio.run(gather_podcast_prep(meta))
 
 
@@ -168,6 +182,21 @@ async def test_unwalled_discovers_options_across_all_result_pages() -> None:
         catalog = await _tracker().discover_options()
 
     assert catalog == {"categories": {"science": "15", "technology": "14"}, "types": {"free audio": "3", "premium audio": "4"}}  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_unwalled_bounds_option_and_upload_json_responses() -> None:
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"x" * (2 * 1024 * 1024 + 1))
+
+    option_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    with patch("src.trackers.UNIT3D.unwalled.httpx.AsyncClient", return_value=option_client):
+        assert await _tracker().discover_options() == {"categories": {}, "types": {}}  # noqa: S101
+
+    response_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    async with response_client.stream("GET", "https://unwalled.cc/api/test") as response:
+        with pytest.raises(ValueError, match="size limit"):
+            await _tracker()._bounded_response(response, 1024)
 
 
 def test_unwalled_resolves_names_or_explicit_numeric_ids() -> None:
@@ -226,6 +255,11 @@ def test_unwalled_rejects_invalid_torrent_file_names(tmp_path: Path) -> None:
     assert asyncio.run(_tracker().get_additional_checks(meta)) is False  # noqa: S101
 
 
+@pytest.mark.parametrize("filename", ["   ", "episode.mp3.", "episode.mp3 "])
+def test_unwalled_rejects_windows_unsafe_or_blank_names(filename: str) -> None:
+    assert _tracker()._valid_filename(filename) is False  # noqa: S101
+
+
 def test_unwalled_rejects_invalid_nested_paths_and_missing_announce(tmp_path: Path) -> None:
     invalid_dir = tmp_path / "bad:name"
     invalid_dir.mkdir()
@@ -279,6 +313,11 @@ async def test_unwalled_builds_private_v1_torrent_with_source_and_announce(tmp_p
     announce = "https://unwalled.cc/announce/example-token"
 
     await TorrentCreator.create_torrent(meta, episode, "BASE")
+    base_path = release_dir / "BASE.torrent"
+    metainfo = cast(dict[bytes, object], bdecode(base_path.read_bytes()))
+    info = cast(dict[bytes, object], metainfo[b"info"])
+    info.pop(b"private", None)
+    base_path.write_bytes(bencode(metainfo))
     filename = await _tracker(announce_url=announce).get_upload_torrent_filename(meta)
     torrent = Torrent.read(release_dir / f"{filename}.torrent")
 
@@ -337,8 +376,41 @@ async def test_unwalled_rejects_oversized_torrent_download(tmp_path: Path) -> No
 
 
 @pytest.mark.asyncio
+async def test_unwalled_upload_uses_bounded_same_host_torrent_download(tmp_path: Path) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"  # noqa: S101
+        return httpx.Response(200, json={"success": True, "message": "uploaded", "data": "https://unwalled.cc/torrents/download/1"})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    release_dir = tmp_path / "tmp" / "upload-flow"
+    release_dir.mkdir(parents=True)
+    torrent_path = release_dir / "[UNWALLED].torrent"
+    torrent_path.write_bytes(b"torrent")
+    meta = Meta(base_dir=str(tmp_path), uuid="upload-flow", tracker_status={"UNWALLED": {}})
+    tracker = _tracker()
+    downloaded_path = str(torrent_path)
+
+    with (
+        patch("src.trackers.UNIT3D.httpx.AsyncClient", return_value=client),
+        patch.object(tracker, "get_data", new=AsyncMock(return_value={})),
+        patch.object(tracker, "get_upload_torrent_filename", new=AsyncMock(return_value="[UNWALLED]")),
+        patch.object(tracker, "get_additional_files", new=AsyncMock(return_value={})),
+        patch.object(tracker.common, "download_tracker_torrent", new=AsyncMock(return_value=downloaded_path)) as download_torrent,
+    ):
+        assert await tracker.upload(meta) is True  # noqa: S101
+
+    download_torrent.assert_awaited_once()
+    awaited_call = download_torrent.await_args
+    assert awaited_call is not None  # noqa: S101
+    assert awaited_call.kwargs["allowed_hosts"] == ("unwalled.cc",)  # noqa: S101
+    assert awaited_call.kwargs["max_size"] == 1024 * 1024  # noqa: S101
+
+
+@pytest.mark.asyncio
 async def test_unwalled_rejects_v2_base_and_oversized_final_bundle(tmp_path: Path) -> None:
-    episode = tmp_path / "episode.mp3"
+    content = tmp_path / "content"
+    content.mkdir()
+    episode = content / "episode.mp3"
     episode.write_bytes(b"audio")
     cover = tmp_path / "cover.jpg"
     banner = tmp_path / "banner.jpg"
@@ -383,7 +455,9 @@ async def test_unwalled_rejects_v2_base_and_oversized_final_bundle(tmp_path: Pat
 
 @pytest.mark.asyncio
 async def test_unwalled_debug_torrent_never_contains_personal_announce(tmp_path: Path) -> None:
-    episode = tmp_path / "episode.mp3"
+    content = tmp_path / "torrent-content"
+    content.mkdir()
+    episode = content / "episode.mp3"
     episode.write_bytes(b"audio")
     cover = tmp_path / "cover.jpg"
     banner = tmp_path / "banner.jpg"
@@ -413,3 +487,37 @@ async def test_unwalled_debug_torrent_never_contains_personal_announce(tmp_path:
 
 def test_unwalled_rejects_malformed_announce_ports() -> None:
     assert _tracker()._valid_announce_url("https://unwalled.cc:invalid/announce/token") is False  # noqa: S101
+
+
+def test_unwalled_rejects_malformed_or_path_traversing_v1_torrents(tmp_path: Path) -> None:
+    malformed = tmp_path / "malformed.torrent"
+    malformed.write_bytes(b"d4:infod6:lengthi1eee")
+    assert _tracker()._torrent_is_v1(malformed) is False  # noqa: S101
+
+    recursive = tmp_path / "recursive.torrent"
+    recursive.write_bytes(b"d4:info" + b"l" * 1000 + b"e" * 1000 + b"e")
+    assert _tracker()._torrent_is_v1(recursive) is False  # noqa: S101
+
+    content = tmp_path / "torrent-content"
+    content.mkdir()
+    episode = content / "episode.mp3"
+    episode.write_bytes(b"audio")
+    release_dir = tmp_path / "tmp" / "unsafe-metainfo"
+    release_dir.mkdir(parents=True)
+    meta = Meta(base_dir=str(tmp_path), uuid="unsafe-metainfo", path=str(content), filelist=[str(episode)], category="PODCAST", max_piece_size=1)
+    asyncio.run(TorrentCreator.create_torrent(meta, content, "BASE"))
+    base_path = release_dir / "BASE.torrent"
+    metainfo = cast(dict[bytes, object], bdecode(base_path.read_bytes()))
+    info = cast(dict[bytes, object], metainfo[b"info"])
+    files = cast(list[object], info[b"files"])
+    first_file = cast(dict[bytes, object], files[0])
+    first_file[b"path"] = [b"..", b"episode.mp3"]
+    base_path.write_bytes(bencode(metainfo))
+    assert _tracker()._torrent_is_v1(base_path) is False  # noqa: S101
+
+
+def test_unwalled_rejects_decompression_bomb_errors(tmp_path: Path) -> None:
+    image_path = tmp_path / "bomb.jpg"
+    image_path.write_bytes(b"not-an-image")
+    with patch("src.trackers.UNIT3D.unwalled_validation.Image.open", side_effect=Image.DecompressionBombError("bomb")):
+        assert _tracker()._image_details(str(image_path)) is None  # noqa: S101
