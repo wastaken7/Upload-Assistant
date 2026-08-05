@@ -333,13 +333,19 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                 logger.info(f"[red]Request failed with error: {e}")
                 return {"status": "failed", "reason": str(e)}
 
-        elif img_host == "zipline":
-            url = config["DEFAULT"].get("zipline_url")
-            api_key = config["DEFAULT"].get("zipline_api_key")
+        elif img_host in ("zipline", "midnightscene"):
+            if img_host == "midnightscene":
+                url = "https://img.midnightscene.cc/api/upload"
+                api_key = config["DEFAULT"].get("midnightscene_api_key")
+                host_name = "MidnightScene"
+            else:
+                url = config["DEFAULT"].get("zipline_url")
+                api_key = config["DEFAULT"].get("zipline_api_key")
+                host_name = "Zipline"
 
             if not url or not api_key:
-                logger.error("[red]Error: Missing Zipline URL or API key in config.")
-                return {"status": "failed", "reason": "Missing Zipline URL or API key"}
+                logger.error(f"[red]Error: Missing {host_name} URL or API key in config.")
+                return {"status": "failed", "reason": f"Missing {host_name} URL or API key"}
 
             try:
                 async with aiofiles.open(image, "rb") as img_file:
@@ -356,7 +362,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                         zipline_response_mapping = cast(dict[str, Any], zipline_response_data) if isinstance(zipline_response_data, dict) else {}
                         zipline_files_value = zipline_response_mapping.get("files")
                         if not isinstance(zipline_files_value, list) or not zipline_files_value:
-                            return {"status": "failed", "reason": "No valid URL returned from Zipline"}
+                            return {"status": "failed", "reason": f"No valid URL returned from {host_name}"}
 
                         file_entry: object = cast(list[object], zipline_files_value)[0]
                         zipline_img_url: str | None = None
@@ -368,7 +374,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                         elif isinstance(file_entry, str):
                             zipline_img_url = file_entry
                         if not zipline_img_url:
-                            return {"status": "failed", "reason": "No valid URL returned from Zipline"}
+                            return {"status": "failed", "reason": f"No valid URL returned from {host_name}"}
                         zipline_raw_url = zipline_img_url.replace("/u/", "/r/")
                         zipline_web_url = zipline_img_url.replace("/u/", "/r/")
                         return {
@@ -378,7 +384,7 @@ async def upload_image_task(args: Sequence[Any]) -> dict[str, Any]:
                             "web_url": zipline_web_url,
                         }
 
-                    return {"status": "failed", "reason": f"Zipline upload failed: {response.text}"}
+                    return {"status": "failed", "reason": f"{host_name} upload failed: {response.text}"}
             except httpx.TimeoutException:
                 logger.info("[red]Request timed out. The server took too long to respond.")
                 return {"status": "failed", "reason": "Request timed out"}

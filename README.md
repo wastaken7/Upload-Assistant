@@ -17,11 +17,10 @@
   - [2. Audio Stream Spectrogram Generation](#2-audio-stream-spectrogram-generation)
   - [3. qBittorrent Bandwidth Control](#3-qbittorrent-bandwidth-control)
   - [4. Argument-Embedded Text Queue](#4-argument-embedded-text-queue)
-  - [5. Extended Tracker Support](#5-extended-tracker-support)
-  - [6. Usenet & Indexer Posting](#6-usenet--indexer-posting)
-  - [7. Interactive Screenshot Review Workflow](#7-interactive-screenshot-review-workflow)
-  - [8. Persistent TTL-Based Metadata Cache](#8-persistent-ttl-based-metadata-cache)
-  - [9. Modern Web UI & Real-Time Engine](#9-modern-web-ui--real-time-engine)
+  - [5. Usenet & Indexer Posting](#6-usenet--indexer-posting)
+  - [6. Interactive Screenshot Review Workflow](#7-interactive-screenshot-review-workflow)
+  - [7. Persistent TTL-Based Metadata Cache](#8-persistent-ttl-based-metadata-cache)
+  - [8. Modern Web UI & Real-Time Engine](#9-modern-web-ui--real-time-engine)
 - [Supported Sites](#supported-sites)
 - [Setup Guide](#setup-guide)
   - [Step 1: Install Required Tools](#step-1-install-required-tools)
@@ -75,26 +74,22 @@ This branch introduces new media categories and automation features not present 
 - **shlex-Split Parsing**: Allows specifying unique CLI arguments (e.g., different IMDB IDs, tags, or tracker targets) for each file/folder on its respective line.
 - **Resume Capability**: Logs processed lines to prevent reprocessing completed uploads if a queue run is interrupted.
 
-### 5. Extended Tracker Support
-
-- **Added Trackers**: Zenith (ZENITH), MidnightScene (MIDNIGHTSCENE), M-Team (MTEAM), LongPT (LONGPT), lajidui (LAJIDUI), ptcafe (PTCAFE), PTFans (PTFANS), PT GTK (PTGTK), RailgunPT (RAILGUNPT).
-
-### 6. Usenet & Indexer Posting
+### 5. Usenet & Indexer Posting
 
 - **Usenet Upload Support**: Automatically archives and splits files/folders (via `7z`), generates parity recovery blocks (via `par2`), and uploads them to Usenet (via `nyuu`).
 - **Anonymity & Privacy**: Generates randomized poster details and obfuscates post subject lines to protect privacy.
 - **Indexer Integration**: Automatically uploads the generated `.nzb` file to configured Usenet indexers.
 
-### 7. Interactive Screenshot Review Workflow
+### 6. Interactive Screenshot Review Workflow
 
 - **Manual Screenshot Review**: Inspect, add, delete, or replace/recapture individual frames before uploading through the interactive Web UI.
 
-### 8. Persistent TTL-Based Metadata Cache
+### 7. Persistent TTL-Based Metadata Cache
 
 - **Provider-Scoped API Caching**: Disk-cached metadata for TMDb, IMDb, TVDB, TVmaze, OpenLibrary, IGDB, Discogs, and MusicBrainz.
 - **Performance & Rate Limit Protection**: Configurable TTL and negative caching reuse fetched metadata across runs, avoiding redundant API calls and preventing rate-limiting bans.
 
-### 9. Modern Web UI & Real-Time Engine
+### 8. Modern Web UI & Real-Time Engine
 
 - **Full Parity Web UI**: Modern interface providing full feature parity with CLI options (`--webui`).
 - **Real-Time Execution & Presets**: Live log streams, real-time preparation preview, preset saving, and interactive screenshot management.

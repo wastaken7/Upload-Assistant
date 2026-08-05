@@ -36,6 +36,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "lensdump_api": (str,),
     "ptscreens_api": (str,),
     "onlyimage_api": (str,),
+    "midnightscene_api_key": (str,),
     "add_logo": (bool,),
     "logo_size": (str, int),
     "episode_overview": (bool,),
@@ -129,6 +130,7 @@ VALID_IMAGE_HOSTS = [
     "onlyimage",
     "dalexni",
     "zipline",
+    "midnightscene",
     "passtheimage",
     "seedpool_cdn",
     "sharex",
@@ -149,6 +151,7 @@ IMAGE_HOST_API_KEYS: dict[str, str] = {
     "seedpool_cdn": "seedpool_cdn_api",
     "sharex": "sharex_api_key",
     "zipline": "zipline_api_key",
+    "midnightscene": "midnightscene_api_key",
     "utppm": "utppm_api",
     # imgbox and pixhost don't require API keys
 }
