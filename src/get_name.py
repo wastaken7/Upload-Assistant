@@ -190,6 +190,9 @@ class NameManager:
         elif meta.category == "MUSIC":
             name = self.extract_music_name(meta)
             potential_missing = []
+        elif meta.category == "PODCAST":
+            name = meta.podcast_title or meta.name or meta.title
+            potential_missing = []
 
         try:
             name = " ".join(name.split())

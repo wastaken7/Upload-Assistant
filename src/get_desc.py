@@ -359,7 +359,7 @@ class DescriptionBuilder:
 
     async def get_mediainfo_section(self, meta: Meta) -> str:
         """Returns the mediainfo section, using a cache file if available."""
-        if meta.is_disc == "BDMV" or meta.category in ("GAME", "BOOK", "MUSIC"):
+        if meta.is_disc == "BDMV" or meta.category in ("GAME", "BOOK", "MUSIC", "PODCAST"):
             return ""
 
         if self._get_bool_config("full_mediainfo", True) or meta.is_disc:

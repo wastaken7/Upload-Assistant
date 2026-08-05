@@ -313,6 +313,9 @@ class Meta:
     path_to_menu_screenshots: str = ""
     path: str | None = None
     personalrelease: bool = False
+    podcast_banner: str = ""
+    podcast_cover: str = ""
+    podcast_title: str = ""
     piece_size_constraints_enabled: str | bool = False
     platform: str = ""
     potential_missing: list[Any] = field(default_factory=list)
@@ -463,6 +466,8 @@ class Meta:
     ulcx: str | int | None = None
     unattended_audio_skip: bool = False
     unattended_confirm: bool = False
+    unwalled_category: str = ""
+    unwalled_type: str = ""
     unattended_subtitle_skip: bool = False
     unattended: bool = False
     unit3d: bool | None = None

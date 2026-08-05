@@ -539,7 +539,7 @@ config: dict[str, Any] = {
         # Available tracker: AURA4K, ASIANCINEMA, AITHER, ANTHELION, ALPHARATIO, AMIGOSSHARE, AVISTAZ, BEYONDHD, BITHDTV, BJSHARE, BLUTOPIA, BRASILTRACKER, CAPYBARABR, CURUPIRA, SUIO, CINEMAZ, DIGITALCORE, DRUNKENSLUG, DARKPEERS, DESITORRENTS, EMUWAREZ, FUNFILE, FILELIST,
         # GREATPOSTERWALL, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK, HAWKEUNO, INFINITYHD, IMMORTALSEED, ITATORRENTS, LAJIDUI, LOCADORA, LASTDIGITALUNDERGROUND, LONGPT, LST, LATTEAM, LUMINARR, MIDNIGHTSCENE, MTEAM, MORETHANTV, NEBULANCE, ONLYENCODES,
         # NORDICQUALITY, OLDTOONSWORLD, PRIVATEHD, PORTUGAS, PTCAFE, PTERCLUB, PTFANS, PTGTK, PASSTHEPOPCORN, PEERGARDEN, PTSKIT, POLISHTORRENT, RACING4EVERYONE, RASTASTUGAN, REELFLIX, RAILGUNPT, RETROFLIX, RETROMOVIESCLUB, SAMARITANO, SHAREISLAND, SWARMAZON, SEEDPOOL, SPEEDAPP, SKIPTHECOMMERCIALS, TORRENTHR,
-        # CINEMATIK, ORPHEUS, TORRENTLEECH, THELEACHZONE, THEOLDSCHOOL, TOTHEGLORY, TORRENTEROS, TVCHAOSUK, ULCX, UTOPIA, YUSCENE, ZENITH
+        # CINEMATIK, ORPHEUS, TORRENTLEECH, THELEACHZONE, THEOLDSCHOOL, TOTHEGLORY, TORRENTEROS, TVCHAOSUK, ULCX, UNWALLED, UTOPIA, YUSCENE, ZENITH
 
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
@@ -2672,6 +2672,32 @@ config: dict[str, Any] = {
             "use_bluray_images": True,
             "bluray_image_size": "",
             "add_audio_spectrogram": True,
+            "inject_delay": 0,
+        },
+        "UNWALLED": {
+            "link_dir_name": "",
+            "use_for_search": False,
+            "api_key": "",
+            "announce_url": "",
+            "anon": True,
+            "category": "",
+            "type": "",
+            "add_logo": True,
+            "logo_size": "",
+            "thumbnail_size": "",
+            "screens_per_row": "",
+            "episode_overview": True,
+            "multiScreens": "",
+            "pack_thumb_size": "",
+            "charLimit": "",
+            "fileLimit": "",
+            "processLimit": "",
+            "custom_description_header": "",
+            "screenshot_header": "[h2]Screenshots[/h2]",
+            "custom_signature": "",
+            "add_bluray_link": False,
+            "use_bluray_images": False,
+            "add_audio_spectrogram": False,
             "inject_delay": 0,
         },
         "UTOPIA": {

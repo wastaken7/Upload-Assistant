@@ -493,9 +493,12 @@ class UNIT3D:
 
         return files
 
+    async def get_upload_torrent_filename(self, meta: Meta) -> str:
+        return await self.common.get_torrent_filename(meta, self.tracker_config)
+
     async def upload(self, meta: Meta) -> bool:
         data = await self.get_data(meta)
-        torrent_filename = await self.common.get_torrent_filename(meta, self.tracker_config)
+        torrent_filename = await self.get_upload_torrent_filename(meta)
         torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{torrent_filename}.torrent"
         async with aiofiles.open(torrent_file_path, "rb") as f:
             torrent_bytes = await f.read()

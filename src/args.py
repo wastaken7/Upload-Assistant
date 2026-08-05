@@ -185,10 +185,15 @@ class Args:
             "--category",
             nargs=1,
             required=False,
-            help="Category [movie, tv, fanres, book, game, music]",
-            choices=["movie", "tv", "fanres", "book", "game", "music"],
+            help="Category [movie, tv, fanres, book, game, music, podcast]",
+            choices=["movie", "tv", "fanres", "book", "game", "music", "podcast"],
             dest="manual_category",
         )
+        parser.add_argument("--podcast-title", nargs=1, required=False, help="PODCAST: final tracker title following the site's naming rules", dest="podcast_title")
+        parser.add_argument("--podcast-cover", nargs=1, required=False, help="PODCAST: local square JPEG cover path", dest="podcast_cover")
+        parser.add_argument("--podcast-banner", nargs=1, required=False, help="PODCAST: local 16:9 JPEG banner path", dest="podcast_banner")
+        parser.add_argument("--unwalled-category", nargs=1, required=False, help="Unwalled subject category name or numeric ID", dest="unwalled_category")
+        parser.add_argument("--unwalled-type", nargs=1, required=False, help="Unwalled upload type name or numeric ID", dest="unwalled_type")
         parser.add_argument("--music-artist", nargs=1, required=False, help="MUSIC: main artist(s), separated by &", dest="music_artist")
         parser.add_argument("--music-album", nargs=1, required=False, help="MUSIC: album/release title", dest="music_album")
         parser.add_argument(

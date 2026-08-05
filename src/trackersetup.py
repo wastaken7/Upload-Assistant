@@ -95,6 +95,7 @@ from src.trackers.UNIT3D.tlzdigital import TheLeachZone
 from src.trackers.UNIT3D.torrentdesi import DesiTorrents
 from src.trackers.UNIT3D.torrenteros import Torrenteros
 from src.trackers.UNIT3D.ulcx import ULCX
+from src.trackers.UNIT3D.unwalled import Unwalled
 from src.trackers.UNIT3D.utopia import Utopia
 from src.trackers.UNIT3D.yuscene import YUSCENE
 from src.trackers.UNIT3D.znth import Zenith
@@ -1415,6 +1416,7 @@ tracker_class_map: dict[str, Any] = {
     "TORRENTEROS": Torrenteros,
     "TVCHAOSUK": TVChaosUK,
     "ULCX": ULCX,
+    "UNWALLED": Unwalled,
     "UTOPIA": Utopia,
     "YUSCENE": YUSCENE,
     "ZENITH": Zenith,

@@ -245,6 +245,36 @@ const argumentCategories = [
     ],
   },
   {
+    title: "Podcast / Unwalled",
+    args: [
+      {
+        label: "--podcast-title",
+        placeholder: "SHOW [YEAR/FORMAT - BITRATE]",
+        description: "Final Unwalled torrent title",
+      },
+      {
+        label: "--podcast-cover",
+        placeholder: "/path/to/cover.jpg",
+        description: "Square JPEG cover, at least 400x400",
+      },
+      {
+        label: "--podcast-banner",
+        placeholder: "/path/to/banner.jpg",
+        description: "Distinct 16:9 JPEG banner, at least 960x540",
+      },
+      {
+        label: "--unwalled-category",
+        placeholder: "Technology or 14",
+        description: "Unwalled subject category name or numeric id",
+      },
+      {
+        label: "--unwalled-type",
+        placeholder: "Free Audio or 3",
+        description: "Unwalled upload type name or numeric id",
+      },
+    ],
+  },
+  {
     title: "Screenshots / Images",
     args: [
       {

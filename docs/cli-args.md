@@ -89,11 +89,19 @@ If you pass a `.txt` file as the main positional input path (without specifying 
 
 ### Category / type / source / resolution
 
-- `-c`, `--category {movie,tv,fanres}`: Override the category.
+- `-c`, `--category {movie,tv,fanres,book,game,music,podcast}`: Override the category.
 - `-t`, `--type {disc,remux,encode,webdl,web-dl,webrip,hdtv,dvdrip}`: Override release type.
   - Stored as uppercase with `-` removed (e.g. `web-dl` → `WEBDL`).
 - `--source {Blu-ray,BluRay,DVD,DVD5,DVD9,HDDVD,WEB,HDTV,UHDTV,LaserDisc,DCP}`: Override the source string.
 - `-res`, `--resolution {2160p,1080p,1080i,720p,576p,576i,480p,480i,8640p,4320p,other}`: Override the resolution.
+
+### Podcast fields
+
+- `--podcast-title TITLE`: Final tracker title, including the date/year, file type and bitrate required by Unwalled.
+- `--podcast-cover PATH`: Local square JPEG cover, at least 400x400.
+- `--podcast-banner PATH`: Local 16:9 JPEG banner, at least 960x540 and different from the cover.
+- `--unwalled-category NAME_OR_ID`: Unwalled subject category name or numeric id.
+- `--unwalled-type NAME_OR_ID`: Unwalled upload type name or numeric id.
 
 ### External IDs
 

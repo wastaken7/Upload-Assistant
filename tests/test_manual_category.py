@@ -25,6 +25,17 @@ def test_manual_music_category_routes_to_music_before_media_processing(tmp_path)
     assert meta.category == "MUSIC"
 
 
+def test_manual_podcast_category_routes_before_media_processing(tmp_path):
+    episode = tmp_path / "episode.mp3"
+    episode.write_bytes(b"audio")
+    meta = Meta(path=str(episode), manual_category="podcast")
+    prep = SimpleNamespace(disc_info_manager=SimpleNamespace(get_disc=AsyncMock(return_value=("", str(episode), {}, []))))
+
+    asyncio.run(detect_disc_and_category(prep, meta))
+
+    assert meta.category == "PODCAST"  # noqa: S101
+
+
 def test_missing_cli_video_exits_with_failure_status(tmp_path):
     with pytest.raises(SystemExit) as error:
         asyncio.run(video_manager.get_video(str(tmp_path), "cli"))

@@ -1487,8 +1487,8 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                 from src.screenshot_review import target_count
 
                 meta.screens = target_count(Path(meta.base_dir) / "tmp" / meta.uuid, meta.screens)
-                if meta.category == "MUSIC":
-                    logger.debug("[cyan]MUSIC: skipping video screenshots and MediaInfo-dependent image processing.[/cyan]")
+                if meta.category in ("MUSIC", "PODCAST"):
+                    logger.debug(f"[cyan]{meta.category}: skipping video screenshots and MediaInfo-dependent image processing.[/cyan]")
                 elif meta.is_disc == "BDMV":
                     use_vs = meta.vapoursynth
                     try:
@@ -1543,7 +1543,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                         cleanup_manager.reset_terminal()
                         raise Exception(f"Error during screenshot capture: {e}") from e
 
-                elif meta.category != "MUSIC":
+                elif meta.category not in ("MUSIC", "PODCAST"):
                     try:
                         logger.debug(f"videopath: {videopath}, filename: {filename}, meta: {meta.uuid}, base_dir: {base_dir}, manual_frames: {manual_frames}")
 
@@ -1617,7 +1617,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             from src.screenshot_review import staged_remote_uploads
 
             reviewed_uploads = staged_remote_uploads(Path(meta.base_dir) / "tmp" / meta.uuid, cast(list[dict[str, Any]], meta.image_list or []))
-            if (len(meta.image_list) < cutoff or reviewed_uploads) and meta.skip_imghost_upload is False and meta.category not in ("GAME", "MUSIC"):
+            if (len(meta.image_list) < cutoff or reviewed_uploads) and meta.skip_imghost_upload is False and meta.category not in ("GAME", "MUSIC", "PODCAST"):
                 # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
                 trackers_with_image_host_requirements = {
                     "AURA4K",
