@@ -1401,6 +1401,7 @@ function AudionutsUAGUI() {
   const [descriptionVersion, setDescriptionVersion] = useState(0);
   const [descriptionDirty, setDescriptionDirty] = useState(false);
   const descriptionDirtyRef = useRef(false);
+  const descriptionVersionRef = useRef(0);
   const [descriptionAction, setDescriptionAction] = useState("");
   const [canAddExecutionScreenshot, setCanAddExecutionScreenshot] =
     useState(false);
@@ -2192,6 +2193,7 @@ function AudionutsUAGUI() {
       setExecutionDescription(null);
       setDescriptionDraft("");
       setDescriptionView("edit");
+      descriptionVersionRef.current = 0;
       setDescriptionVersion(0);
       setDescriptionDirty(false);
       setCanAddExecutionScreenshot(false);
@@ -2258,11 +2260,13 @@ function AudionutsUAGUI() {
         );
         if (descriptionResponse.ok) {
           const descriptionData = await descriptionResponse.json();
-          if (!cancelled && descriptionData?.success) {
+          const polledVersion = Number.isInteger(descriptionData?.version) ? descriptionData.version : null;
+          if (!cancelled && descriptionData?.success && polledVersion !== null && polledVersion >= descriptionVersionRef.current) {
+            descriptionVersionRef.current = polledVersion;
             setExecutionDescription(descriptionData);
             if (!descriptionDirtyRef.current) {
               setDescriptionDraft(descriptionData.content || "");
-              setDescriptionVersion(descriptionData.version || 0);
+              setDescriptionVersion(polledVersion);
             }
           }
         }
@@ -3877,6 +3881,7 @@ function AudionutsUAGUI() {
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.success) {
         if (response.status === 409 && Number.isInteger(data?.version)) {
+          descriptionVersionRef.current = data.version;
           setDescriptionVersion(data.version);
           setExecutionDescription((current) => ({ ...current, version: data.version }));
         }
@@ -3884,6 +3889,7 @@ function AudionutsUAGUI() {
         return;
       }
       setDescriptionDraft(data.content || "");
+      descriptionVersionRef.current = data.version || 0;
       setDescriptionVersion(data.version || 0);
       setDescriptionDirty(false);
       setExecutionDescription((current) => ({ ...current, content: data.content, version: data.version }));
@@ -3907,6 +3913,7 @@ function AudionutsUAGUI() {
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.success) {
         if (response.status === 409 && Number.isInteger(data?.version)) {
+          descriptionVersionRef.current = data.version;
           setDescriptionVersion(data.version);
           setExecutionDescription((current) => ({ ...current, version: data.version }));
         }
@@ -3914,6 +3921,7 @@ function AudionutsUAGUI() {
         return;
       }
       setDescriptionDraft(data.content || "");
+      descriptionVersionRef.current = data.version || 0;
       setDescriptionVersion(data.version || 0);
       setDescriptionDirty(false);
     } catch (error) {
@@ -3957,7 +3965,7 @@ function AudionutsUAGUI() {
               {descriptionView === "preview" && <span className={`text-right text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Preview only; tracker formatting is applied later.</span>}
             </div>
             {descriptionView === "edit" ? (
-              <textarea value={descriptionDraft} onChange={(event) => { setDescriptionDraft(event.target.value); setDescriptionDirty(true); }} onBlur={() => { if (descriptionDirty) saveExecutionDescription(); }} spellCheck={false} aria-label="Base description" className={`min-h-[20rem] flex-1 resize-y rounded-lg border p-3 font-mono text-xs leading-5 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-300 bg-white text-gray-800"}`} placeholder="The editable base description will appear here." />
+              <textarea value={descriptionDraft} onChange={(event) => { descriptionVersionRef.current = Math.max(descriptionVersionRef.current, descriptionVersion); setDescriptionDraft(event.target.value); setDescriptionDirty(true); }} onBlur={() => { if (descriptionDirty) saveExecutionDescription(); }} spellCheck={false} aria-label="Base description" className={`min-h-[20rem] flex-1 resize-y rounded-lg border p-3 font-mono text-xs leading-5 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-300 bg-white text-gray-800"}`} placeholder="The editable base description will appear here." />
             ) : (
               <div className={`bbcode-preview min-h-[20rem] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm leading-6 [&_a]:text-sky-400 [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-purple-500 [&_blockquote]:pl-3 [&_details]:my-3 [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded [&_pre]:overflow-auto [&_pre]:font-mono [&_table]:my-3 [&_table]:border-collapse [&_td]:border [&_td]:p-2 [&_th]:border [&_th]:p-2 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100 [&_td]:border-gray-700 [&_th]:border-gray-700" : "border-gray-300 bg-white text-gray-800 [&_td]:border-gray-300 [&_th]:border-gray-300"}`} dangerouslySetInnerHTML={{ __html: renderBbcodePreview(descriptionDraft) }} />
             )}
