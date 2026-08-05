@@ -78,8 +78,12 @@ def test_podcast_prep_rejects_mixed_audio_and_video(tmp_path: Path) -> None:
     (tmp_path / "episode.mp4").write_bytes(b"video")
     meta = Meta(path=str(tmp_path), category="PODCAST", manual_category="podcast")
 
+    def detected_kind(path: Path) -> str:
+        return "audio" if path.suffix == ".mp3" else "video"
+
     try:
-        asyncio.run(gather_podcast_prep(meta))
+        with patch("src.podcast_prep._detected_media_kind", side_effect=detected_kind):
+            asyncio.run(gather_podcast_prep(meta))
     except ValueError as error:
         assert "mixed audio and video" in str(error).lower()  # noqa: S101
     else:
@@ -98,7 +102,10 @@ def test_podcast_prep_builds_an_audio_pack_without_tmdb(tmp_path: Path) -> None:
         podcast_title="Example Show [2026/MP3 - 128kbps]",
     )
 
-    with patch("src.podcast_prep.export_info", new=AsyncMock(return_value={"media": {"track": []}})):
+    with (
+        patch("src.podcast_prep._detected_media_kind", return_value="audio"),
+        patch("src.podcast_prep.export_info", new=AsyncMock(return_value={"media": {"track": []}})),
+    ):
         asyncio.run(gather_podcast_prep(meta))
 
     assert meta.category == "PODCAST"  # noqa: S101
@@ -115,7 +122,10 @@ def test_podcast_prep_includes_allowed_companion_files(tmp_path: Path) -> None:
     companion.write_bytes(b"notes")
     meta = Meta(path=str(tmp_path), base_dir=str(tmp_path), uuid="podcast-companion", category="PODCAST")
 
-    with patch("src.podcast_prep.export_info", new=AsyncMock(return_value={"media": {"track": []}})):
+    with (
+        patch("src.podcast_prep._detected_media_kind", return_value="audio"),
+        patch("src.podcast_prep.export_info", new=AsyncMock(return_value={"media": {"track": []}})),
+    ):
         asyncio.run(gather_podcast_prep(meta))
 
     assert meta.filelist == [str(episode.resolve()), str(companion.resolve())]  # noqa: S101
@@ -148,6 +158,15 @@ def test_podcast_prep_rejects_media_with_a_mismatched_extension(tmp_path: Path) 
     meta = Meta(path=str(disguised_video), base_dir=str(tmp_path), uuid="mismatched-media", category="PODCAST")
 
     with pytest.raises(ValueError, match="extension does not match"):
+        asyncio.run(gather_podcast_prep(meta))
+
+
+def test_podcast_prep_rejects_unidentified_declared_media(tmp_path: Path) -> None:
+    fake_audio = tmp_path / "fake.mp3"
+    fake_audio.write_text("not audio", encoding="utf-8")
+    meta = Meta(path=str(fake_audio), base_dir=str(tmp_path), uuid="unidentified-media", category="PODCAST")
+
+    with pytest.raises(ValueError, match="could not be identified"):
         asyncio.run(gather_podcast_prep(meta))
 
 
@@ -404,6 +423,36 @@ async def test_unwalled_upload_uses_bounded_same_host_torrent_download(tmp_path:
     assert awaited_call is not None  # noqa: S101
     assert awaited_call.kwargs["allowed_hosts"] == ("unwalled.cc",)  # noqa: S101
     assert awaited_call.kwargs["max_size"] == 1024 * 1024  # noqa: S101
+
+
+@pytest.mark.asyncio
+async def test_unwalled_upload_does_not_follow_redirects(tmp_path: Path) -> None:
+    requests: list[httpx.Request] = []
+    async_client_class = httpx.AsyncClient
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(307, headers={"location": "https://attacker.invalid/collect"})
+
+    release_dir = tmp_path / "tmp" / "upload-redirect"
+    release_dir.mkdir(parents=True)
+    (release_dir / "[UNWALLED].torrent").write_bytes(b"private torrent")
+    meta = Meta(base_dir=str(tmp_path), uuid="upload-redirect", tracker_status={"UNWALLED": {}})
+    tracker = _tracker()
+
+    def client_factory(**kwargs: object) -> httpx.AsyncClient:
+        assert kwargs["follow_redirects"] is False  # noqa: S101
+        return async_client_class(transport=httpx.MockTransport(handler), follow_redirects=False)
+
+    with (
+        patch("src.trackers.UNIT3D.httpx.AsyncClient", side_effect=client_factory),
+        patch.object(tracker, "get_data", new=AsyncMock(return_value={"name": "Private Show"})),
+        patch.object(tracker, "get_upload_torrent_filename", new=AsyncMock(return_value="[UNWALLED]")),
+        patch.object(tracker, "get_additional_files", new=AsyncMock(return_value={})),
+    ):
+        assert await tracker.upload(meta) is False  # noqa: S101
+
+    assert [request.url.host for request in requests] == ["unwalled.cc"]  # noqa: S101
 
 
 @pytest.mark.asyncio

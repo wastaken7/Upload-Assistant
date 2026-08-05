@@ -31,6 +31,7 @@ class UNIT3D:
     download_url_hosts: tuple[str, ...] = ()
     max_torrent_download_size: int | None = None
     max_json_response_size: int | None = None
+    follow_upload_redirects = True
 
     def __init__(self, config: dict[str, Any], tracker_name: str):
         self.config = config
@@ -522,7 +523,7 @@ class UNIT3D:
 
             for attempt in range(max_retries):
                 try:
-                    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+                    async with httpx.AsyncClient(timeout=timeout, follow_redirects=self.follow_upload_redirects) as client:
                         if self.max_json_response_size is None:
                             response = await client.post(url=self.upload_url, files=files, data=data, headers=headers)
                         else:
@@ -550,6 +551,9 @@ class UNIT3D:
                         break  # POST definitively succeeded
 
                 except httpx.HTTPStatusError as e:
+                    if 300 <= e.response.status_code < 400 and not self.follow_upload_redirects:
+                        meta.tracker_status[self.tracker]["status_message"] = "data error: Upload redirect rejected"
+                        return False
                     if e.response.status_code in [403, 302]:
                         # Don't retry auth/permission errors
                         if e.response.status_code == 403:

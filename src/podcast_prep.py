@@ -111,7 +111,9 @@ def _media_files(candidates: list[Path]) -> tuple[list[Path], list[Path]]:
         if declared_kind is None:
             continue
         detected_kind = _detected_media_kind(path)
-        if detected_kind is not None and detected_kind != declared_kind:
+        if detected_kind is None:
+            raise ValueError(f"Podcast media content could not be identified: {path.name}")
+        if detected_kind != declared_kind:
             raise ValueError(f"Podcast media extension does not match its actual content: {path.name}")
         (audio if declared_kind == "audio" else video).append(path.resolve())
     audio.sort(key=str)

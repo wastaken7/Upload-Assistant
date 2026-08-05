@@ -304,7 +304,7 @@ class Common:
                 else:
                     raw_announce = self.config["TRACKERS"][tracker].get("announce_url")
                     new_torrent.metainfo["announce"] = str(raw_announce).strip() if raw_announce else "https://fake.tracker"
-                new_torrent.metainfo["info"]["private"] = 1
+                new_torrent.metainfo["info"]["private"] = True
             new_torrent.metainfo["info"]["source"] = source_flag
             if "created by" in new_torrent.metainfo:
                 created_by = new_torrent.metainfo["created by"]
