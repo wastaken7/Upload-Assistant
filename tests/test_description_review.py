@@ -3,6 +3,7 @@
 import asyncio
 import json
 
+from src.description_review import load_review
 from src.get_desc import gen_desc
 from src.meta import Meta
 from web_ui import server
@@ -34,7 +35,8 @@ def test_webui_description_api_saves_an_execution_scoped_override(tmp_path, monk
     assert response.status_code == 200
     assert response.get_json()["version"] == 1
     assert not (temp_dir / "DESCRIPTION.txt").exists()
-    assert json.loads(meta_file.read_text(encoding="utf-8"))["description_override"] == "edited text"
+    assert load_review(temp_dir) == {"content": "edited text", "version": 1}
+    assert "description_override" not in json.loads(meta_file.read_text(encoding="utf-8"))
 
 
 def test_webui_description_api_rejects_stale_save_and_reset_versions(tmp_path, monkeypatch):

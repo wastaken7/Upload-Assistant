@@ -18,7 +18,7 @@ from src.btnid import BtnIdManager
 from src.console import buffer_console_logs, logger
 from src.meta import Meta
 from src.temp_paths import screenshots_dir
-from src.tracker_descriptions import DescriptionCandidate, TrackerDescriptionMode, add_candidate, description_fingerprint, score_release_name
+from src.tracker_descriptions import DescriptionCandidate, add_candidate, description_fingerprint, resolve_description_mode, score_release_name
 from src.trackers.common import Common
 from src.trackersetup import api_trackers
 from src.type_utils import to_int
@@ -284,7 +284,7 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
     if mal:
         meta.mal_id = mal
         logger.debug(f"set MAL ID: {meta.mal_id}")
-    mode = TrackerDescriptionMode(meta.tracker_description_mode)
+    mode = resolve_description_mode(meta.tracker_description_mode)
     if desc:
         raw_descriptions = getattr(meta, "tracker_description_raw", {}) or {}
         raw_description = str(raw_descriptions.get(tracker_name, desc))

@@ -152,7 +152,7 @@ class TrackerDataManager:
         candidate.unattended_confirm = False
         candidate.persist_description = False
         candidate_dir = Path(meta.base_dir) / "tmp" / candidate.uuid
-        await asyncio.to_thread(candidate_dir.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(candidate_dir.mkdir, mode=0o700, parents=True, exist_ok=True)
         try:
             if tracker_name == "BTN":
                 btn_id = str(candidate.btn or "")
@@ -210,7 +210,7 @@ class TrackerDataManager:
             logger.info("[cyan]Tracker metadata candidates:[/cyan]")
             for index, (tracker_name, candidate, score) in enumerate(ranked, start=1):
                 logger.info(f"  {index}. {tracker_name}: score {score}, {candidate.name or candidate.filename}")
-            choice = cli_ui.ask_string(f"Choose a tracker candidate [1-{len(ranked)}] (Enter for best): ")
+            choice = await asyncio.to_thread(cli_ui.ask_string, f"Choose a tracker candidate [1-{len(ranked)}] (Enter for best): ")
             if choice and choice.strip().isdigit():
                 selected = int(choice.strip()) - 1
                 if 0 <= selected < len(ranked):
@@ -244,7 +244,7 @@ class TrackerDataManager:
                 await asyncio.to_thread(save_review, temp_dir, candidate.description, version)
             return
         logger.info(f"[cyan]Selected description from {tracker_name}:[/cyan]\n{candidate.description[:1000]}", extra={"markup": False})
-        choice = cli_ui.ask_string("\nEnter 'e' to edit, 'd' to discard the description, or press Enter to keep it: ")
+        choice = await asyncio.to_thread(cli_ui.ask_string, "\nEnter 'e' to edit, 'd' to discard the description, or press Enter to keep it: ")
         choice = (choice or "").strip().lower()
         if choice == "e":
             edited = await asyncio.to_thread(click.edit, candidate.description)
@@ -374,7 +374,7 @@ class TrackerDataManager:
                     meta.trackers = []
 
                 available_trackers, waiting_trackers = await self.get_available_trackers(specific_tracker, base_dir, debug=meta.debug)
-                if waiting_trackers:
+                if waiting_trackers and not available_trackers:
                     wait_time = max(wait for _tracker, wait in waiting_trackers)
                     waiting_names = ", ".join(f"{tracker} ({wait:.1f}s)" for tracker, wait in waiting_trackers)
                     logger.info(f"[yellow]Waiting for tracker metadata candidate cooldowns: {waiting_names}[/yellow]")
@@ -457,13 +457,8 @@ class TrackerDataManager:
                     return meta
 
                 for tracker_name in tracker_order:
-                    if not found_match:  # Stop checking once a match is found
-                        tracker_config = self.get_tracker_config(tracker_name)
-                        use_search = tracker_config.get("use_for_search")
-                        if use_search is None:
-                            use_search = tracker_config.get("useAPI", "false")
-                        if str(use_search).lower() == "true":
-                            meta = await process_tracker(tracker_name, meta, skip_tracker_descriptions)
+                    if not found_match and self._search_enabled(tracker_name):  # Stop checking once a match is found
+                        meta = await process_tracker(tracker_name, meta, skip_tracker_descriptions)
 
                 if not found_match:
                     meta.no_tracker_match = True

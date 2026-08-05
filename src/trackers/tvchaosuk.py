@@ -101,10 +101,14 @@ class TVChaosUK:
             return date_str
 
     async def _read_base_description(self, meta: Meta) -> str:
-        """Return the in-memory base description."""
+        """Load a saved base description without blocking the event loop."""
         from src.description_review import get_base_description
 
-        return get_base_description(meta)
+        draft_meta = meta.copy()
+        description = await asyncio.to_thread(get_base_description, draft_meta)
+        for key in ("description", "description_override", "saved_description"):
+            meta[key] = draft_meta.get(key)
+        return description
 
     def _ensure_desc_directory(self, meta: Meta, tracker: str) -> str:
         """Create description directory and return file path."""
