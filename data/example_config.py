@@ -217,6 +217,10 @@ config: dict[str, Any] = {
         "screens": "4",
         # Set true to automatically capture DVD menu screenshots from menu VOBs
         "auto_dvd_menus": True,
+        # Keep screenshots at the coded dimensions reported by MediaInfo.
+        # Set true only to convert non-square-pixel video for display geometry;
+        # this can change dimensions such as 1920x1040 to 1924x1040.
+        "scale_screenshots_for_par": False,
         # Max number of disc menu screenshots to upload
         "max_menu_screens": "6",
         # Minimum successful image uploads required to continue
