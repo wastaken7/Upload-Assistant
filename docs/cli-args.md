@@ -73,7 +73,7 @@ If you pass a `.txt` file as the main positional input path (without specifying 
 - `-comps_index`, `--comparison_index N`: Which comparison index is the “main” images (required when using `--comparison`).
 - `-menus`, `--disc-menus PATH`: Raw Disc only (Blu-ray/DVD). Folder containing disc menu screenshots (all images in folder are used).
 - `-ih`, `--imghost HOST`: Select image host.
-  - Choices: `imgbb`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `passtheimage`, `seedpool_cdn`, `utppm`, `lostimg`.
+  - Choices: `imgbb`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `midnightscene`, `passtheimage`, `seedpool_cdn`, `utppm`, `lostimg`.
 - `-siu`, `--skip-imagehost-upload`: Skip uploading images to an image host.
 
 ## Description inputs
@@ -193,7 +193,7 @@ Thise will use the specified hash to get tracker ids from qBitTorrent or rTorren
 - `-tpc`, `--trackers-pass N`: How many trackers must pass checks (dupe/banned-group/etc) for the uploading process to complete.
 - `-req`, `--search_requests`: Search for matching requests on supported trackers.
 - `-sat`, `--skip_auto_torrent`: Skip automated qBittorrent client torrent searching.
-- `-onlyID`, `--onlyID`: Only grab meta ids from tracker (tmdb/imdb/etc), not description text. NOTE: description images are controlled with `keep_images` set in config.py.
+- `-onlyID`, `--onlyID`: Only grab meta IDs from trackers (tmdb/imdb/etc), overriding `tracker_description_mode` to `ids` for this execution.
 - `-sdc`, `--skip-dupe-check`: Ignore dupes and upload anyway (skips dupe check). NOTE: know what you are doing!
 - `-sda`, `--skip-dupe-asking`: Don’t prompt about any dupes that Upload Assistant finds; just treat these dupes as actual dupes.
 - `-ddc`, `--double-dupe-check`: Run a second dupe-check pass on trackers that previously passed checks, immediately before uploading. NOTE: mainly useful when racing as a preventive dupe upload catch.

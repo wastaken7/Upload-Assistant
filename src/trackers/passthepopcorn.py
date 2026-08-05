@@ -825,8 +825,9 @@ class PassThePopcorn:
         return re.sub(r"\[img=[^\]]+\]", "[img]", desc)
 
     async def edit_desc(self, meta: Meta) -> None:
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt", encoding="utf-8") as base_file:
-            base = await base_file.read()
+        from src.description_review import get_base_description
+
+        base = get_base_description(meta)
         if meta.scene_nfo_file:
             # Remove NFO from description
             meta_description = re.sub(

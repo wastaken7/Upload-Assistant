@@ -47,12 +47,12 @@ Thank you to noraa for all your help, shoutout to deeznuts and ringbear
 
 ## Since people were asking how to do it in Unraid when still wanting CLI options, here goes:
 
-* create /mnt/user/appdata/upload-assistant
-* cd into folder, nano run-cli.sh, paste contents
-* adjust contents to match your setup
-* Ctrl+X to save
-* do chmod +x run-cli.sh
-* place config.py in here
+- create /mnt/user/appdata/upload-assistant
+- cd into folder, nano run-cli.sh, paste contents
+- adjust contents to match your setup
+- Ctrl+X to save
+- do chmod +x run-cli.sh
+- place config.py in here
 
 ```bash
 #!/bin/sh
@@ -102,7 +102,7 @@ services:
     container_name: upload-assistant-cli
     restart: unless-stopped
     networks:
-      - changeme                ######enter a custom network here that your qbittorrent uses
+      - changeme ######enter a custom network here that your qbittorrent uses
     entrypoint: tail
     command: -f /dev/null
     volumes:

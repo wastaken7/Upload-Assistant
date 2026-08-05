@@ -63,7 +63,7 @@ Important gotchas:
 
 Order matters: `img_host_1` is primary, later hosts are fallbacks.
 
-- `img_host_1`..`img_host_5` (str): Image host names. Valid examples include `imgbb`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `passtheimage`, `seedpool_cdn`, `utppm`, `lostimg`.
+- `img_host_1`..`img_host_5` (str): Image host names. Valid examples include `imgbb`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `midnightscene`, `passtheimage`, `seedpool_cdn`, `utppm`, `lostimg`.
 - `image_upload_concurrency` (int): Maximum number of image uploads running at once. Set to `0` to use the image host default.
 - `image_upload_delay` (float): Minimum delay in seconds between starting image uploads.
 
@@ -76,8 +76,9 @@ Order matters: `img_host_1` is primary, later hosts are fallbacks.
 - `onlyimage_api` (str): API key for onlyimage.
 - `dalexni_api` (str): API key for dalexni.
 - `passtheima_ge_api` (str): API key for passtheimage.
-- `zipline_url` (str): Base URL for a Zipline instance.
+- `zipline_url` (str): Zipline upload endpoint, for example `https://zipline.example.com/api/upload`.
 - `zipline_api_key` (str): Zipline API key.
+- `midnightscene_api_key` (str): MidnightScene Zipline API token. Retrieve it from the account menu's **Copy token** button or **Settings > User**; never share it.
 - `seedpool_cdn_api` (str): Seedpool CDN API key.
 
 ### Description extras
@@ -176,13 +177,13 @@ Implementation notes:
 - `embed_links` (bool): Set true to embed terminal links using terminal hyperlinks (OSC 8). Set false to display the full raw URLs. `embed_dupe_links` remains supported temporarily as a deprecated alias.
 - `tracker_pass_checks` (str): Minimum number of trackers that must pass checks to continue upload.
 - `use_largest_playlist` (bool): Always use the largest Blu-ray playlist without prompting.
-- `keep_images` (bool): If false, do not pull images/screenshots from other tracker descriptions. If true, images are downloaded, validated for resolution, and used directly (if hosted on an approved host) or automatically rehosted to your configured image host.
-- `skip_tracker_descriptions` (bool): Only grab IDs from trackers (skip description parsing).
+- `tracker_description_mode` (str, required): Import policy for other tracker releases: `ids`, `images`, `text`, or `text_and_images`.
+- `tracker_search_concurrency` (int): Maximum number of tracker IDs queried concurrently; default `4`.
 
 Implementation notes:
 
 - `tracker_pass_checks` is used to determine how many trackers must pass early validation before continuing (see `upload.py`).
-- `skip_tracker_descriptions` and `keep_images` influence how much another tracker description is scraped/merged. The options are independent.
+- `tracker_description_mode` is the only configuration that controls imported tracker description text and screenshots. `--onlyID` temporarily forces `ids` for that execution.
 
 ### Sonarr / Radarr integration
 

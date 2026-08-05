@@ -41,15 +41,27 @@ def test_greatposterwall_rehosts_only_unapproved_urls(monkeypatch):
     meta = Meta(
         image_list=[
             {"img_url": "https://lostimg.cc/example.png", "raw_url": "https://lostimg.cc/example.png", "web_url": "https://lostimg.cc/example.png"},
-            {"img_url": "https://img2.kshare.club/gpw/user/1/kept.png", "raw_url": "https://img2.kshare.club/gpw/user/1/kept.png", "web_url": "https://img2.kshare.club/gpw/user/1/kept.png"},
+            {
+                "img_url": "https://img2.kshare.club/gpw/user/1/kept.png",
+                "raw_url": "https://img2.kshare.club/gpw/user/1/kept.png",
+                "web_url": "https://img2.kshare.club/gpw/user/1/kept.png",
+            },
         ]
     )
 
     asyncio.run(tracker.rehost_unapproved_images(meta))
 
     assert meta.image_list == [
-        {"img_url": "https://img2.kshare.club/gpw/user/1/test.png", "raw_url": "https://img2.kshare.club/gpw/user/1/test.png", "web_url": "https://img2.kshare.club/gpw/user/1/test.png"},
-        {"img_url": "https://img2.kshare.club/gpw/user/1/kept.png", "raw_url": "https://img2.kshare.club/gpw/user/1/kept.png", "web_url": "https://img2.kshare.club/gpw/user/1/kept.png"},
+        {
+            "img_url": "https://img2.kshare.club/gpw/user/1/test.png",
+            "raw_url": "https://img2.kshare.club/gpw/user/1/test.png",
+            "web_url": "https://img2.kshare.club/gpw/user/1/test.png",
+        },
+        {
+            "img_url": "https://img2.kshare.club/gpw/user/1/kept.png",
+            "raw_url": "https://img2.kshare.club/gpw/user/1/kept.png",
+            "web_url": "https://img2.kshare.club/gpw/user/1/kept.png",
+        },
     ]
     assert _Client.request_params == {"action": "img_upload", "api_key": "test-key"}
     assert _Client.request_data == {"urls[]": "https://lostimg.cc/example.png"}

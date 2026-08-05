@@ -3,11 +3,10 @@ line-length = 176
 target-version = "py314"
 exclude = [
   ".git",
+  "tests",
   "__pycache__",
   ".pytest_cache",
   ".ruff_cache",
-  "tests",
-  "data",
   "tmp",
 ]
 
@@ -65,7 +64,10 @@ exclude = [
   "tests",
   "data",
   "tmp",
-  "**/__pyrefly_virtual__/**"
+  "**/__pyrefly_virtual__/**",
+  "**/node_modules",
+  "**/__pycache__",
+  "**/.*",
 ]
 
 [tool.pyrefly]

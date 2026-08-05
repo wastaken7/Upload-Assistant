@@ -2,8 +2,10 @@
 import asyncio
 import contextlib
 import json
-import sys
+import os
+import shutil
 import time
+import uuid
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
@@ -11,14 +13,15 @@ from typing import Any, cast
 from urllib.parse import urlparse
 
 import cli_ui
+import click
 import httpx
 import requests
 
 from src.btnid import BtnIdManager
-from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
 from src.metadata_cache import is_cache_miss, tracker_metadata_cache_for
+from src.tracker_descriptions import description_fingerprint
 from src.trackermeta import TrackerMetaManager
 from src.trackersetup import tracker_class_map
 
@@ -67,6 +70,8 @@ class TrackerDataManager:
         search_term: str,
         search_file_folder: str,
         skip_tracker_descriptions: bool,
+        *,
+        use_cache: bool = True,
     ) -> tuple[Meta, bool]:
         """Reuse a cached tracker response only when the user supplied a torrent ID."""
         tracker_field = _TRACKER_ID_FIELDS.get(tracker_name, tracker_name.lower())
@@ -86,8 +91,8 @@ class TrackerDataManager:
             },
             sort_keys=True,
         )
-        cached = await cache.get(tracker_name.lower(), "torrent", cache_key)
-        if not is_cache_miss(cached) and isinstance(cached, dict):
+        cached = await cache.get(tracker_name.lower(), "torrent", cache_key) if use_cache else None
+        if use_cache and not is_cache_miss(cached) and isinstance(cached, dict):
             cached_metadata = cached.get("metadata")
             if isinstance(cached_metadata, dict):
                 meta.update(cached_metadata)
@@ -101,14 +106,157 @@ class TrackerDataManager:
         )
         after = updated_meta.to_dict()
         metadata_patch = {key: value for key, value in after.items() if before.get(key) != value}
-        await cache.set(
-            tracker_name.lower(),
-            "torrent",
-            cache_key,
-            {"match": match, "metadata": metadata_patch},
-            negative=not match,
-        )
+        if use_cache:
+            await cache.set(
+                tracker_name.lower(),
+                "torrent",
+                cache_key,
+                {"match": match, "metadata": metadata_patch},
+                negative=not match,
+            )
         return updated_meta, match
+
+    def _search_enabled(self, tracker_name: str) -> bool:
+        tracker_config = self.get_tracker_config(tracker_name)
+        use_search = tracker_config.get("use_for_search")
+        if use_search is None:
+            use_search = tracker_config.get("useAPI", "false")
+        return str(use_search).lower() == "true"
+
+    @staticmethod
+    def _candidate_score(original: Meta, candidate: Meta) -> int:
+        score = 0
+        for field in ("tmdb_id", "imdb_id", "tvdb_id", "mal_id"):
+            if candidate.get(field) and candidate.get(field) != original.get(field):
+                score += 20
+        provenance = candidate.description_provenance
+        if provenance:
+            score += int(provenance.get("score", 0)) + 10
+        if candidate.description and candidate.description != original.description:
+            score += 10
+        score += min(len(candidate.image_list), 10)
+        return score
+
+    async def _collect_explicit_tracker_candidate(
+        self,
+        tracker_name: str,
+        meta: Meta,
+        search_term: str,
+        search_file_folder: str,
+        skip_tracker_descriptions: bool,
+    ) -> tuple[str, Meta, int] | None:
+        """Fetch one candidate without allowing it to mutate the live release."""
+        candidate = meta.copy()
+        candidate.uuid = f"{meta.uuid}-candidate-{tracker_name.lower()}-{uuid.uuid4().hex}"
+        candidate.unattended = True
+        candidate.unattended_confirm = False
+        candidate.persist_description = False
+        candidate_dir = Path(meta.base_dir) / "tmp" / candidate.uuid
+        await asyncio.to_thread(candidate_dir.mkdir, mode=0o700, parents=True, exist_ok=True)
+        try:
+            if tracker_name == "BTN":
+                btn_id = str(candidate.btn or "")
+                btn_api = self.default_config.get("btn_api")
+                if not isinstance(btn_api, str) or len(btn_api) <= 25:
+                    return None
+                imdb, tvdb = await BtnIdManager.get_btn_torrents(btn_api, btn_id)
+                if not (imdb or tvdb):
+                    return None
+                candidate.imdb_id = imdb or candidate.imdb_id
+                candidate.tvdb_id = tvdb or candidate.tvdb_id
+                return tracker_name, candidate, self._candidate_score(meta, candidate)
+
+            if tracker_name == "ANTHELION":
+                data = await tracker_class_map[tracker_name](config=self.config).get_data_from_files(candidate)
+                if not data:
+                    return None
+                for values in data:
+                    candidate.update(values)
+                return tracker_name, candidate, self._candidate_score(meta, candidate)
+
+            factory = tracker_class_map.get(tracker_name)
+            if factory is None:
+                return None
+            candidate, match = await self.update_metadata_from_explicit_tracker(
+                tracker_name,
+                factory(config=self.config),
+                candidate,
+                search_term,
+                search_file_folder,
+                skip_tracker_descriptions,
+                use_cache=True,
+            )
+            if not match:
+                return None
+            return tracker_name, candidate, self._candidate_score(meta, candidate)
+        except (httpx.ConnectError, requests.exceptions.ConnectionError) as error:
+            logger.info(f"{tracker_name} tracker request failed due to connection error: {error}", extra={"markup": False})
+            return None
+        except Exception as error:
+            logger.info(f"{tracker_name} tracker metadata candidate failed: {error}", extra={"markup": False})
+            return None
+        finally:
+            await asyncio.to_thread(shutil.rmtree, candidate_dir, True)
+
+    async def _choose_explicit_tracker_candidate(
+        self,
+        meta: Meta,
+        candidates: list[tuple[str, Meta, int]],
+    ) -> tuple[str, Meta] | None:
+        if not candidates:
+            return None
+        ranked = sorted(candidates, key=lambda item: (-item[2], item[0]))
+        if len(ranked) > 1 and not meta.unattended:
+            logger.info("[cyan]Tracker metadata candidates:[/cyan]")
+            for index, (tracker_name, candidate, score) in enumerate(ranked, start=1):
+                logger.info(f"  {index}. {tracker_name}: score {score}, {candidate.name or candidate.filename}")
+            choice = await asyncio.to_thread(cli_ui.ask_string, f"Choose a tracker candidate [1-{len(ranked)}] (Enter for best): ")
+            if choice and choice.strip().isdigit():
+                selected = int(choice.strip()) - 1
+                if 0 <= selected < len(ranked):
+                    return ranked[selected][0], ranked[selected][1]
+            elif choice and choice.strip():
+                logger.warning("[yellow]Invalid candidate selection; using the best score.[/yellow]")
+        return ranked[0][0], ranked[0][1]
+
+    async def _apply_explicit_tracker_candidate(self, meta: Meta, tracker_name: str, candidate: Meta) -> None:
+        """Apply the selected isolated result without leaking worker-only state."""
+        excluded = {"uuid", "unattended", "unattended_confirm", "base_dir", "persist_description"}
+        for key, value in candidate.to_dict().items():
+            if key not in excluded and meta.get(key) != value:
+                meta[key] = value
+        meta.matched_tracker = tracker_name
+
+    async def _review_explicit_tracker_description(self, meta: Meta, tracker_name: str, candidate: Meta) -> None:
+        """Allow an interactive run to edit the selected tracker description."""
+        if meta.unattended or not candidate.description:
+            return
+        if os.environ.get("UA_WEBUI_ACTIVE"):
+            from src.description_review import load_review, save_review
+
+            temp_dir = Path(meta.base_dir) / "tmp" / meta.uuid
+            review = load_review(temp_dir)
+            if not isinstance(review.get("content"), str):
+                try:
+                    version = int(review.get("version", 0) or 0) + 1
+                except TypeError, ValueError:
+                    version = 1
+                await asyncio.to_thread(save_review, temp_dir, candidate.description, version)
+            return
+        logger.info(f"[cyan]Selected description from {tracker_name}:[/cyan]\n{candidate.description[:1000]}", extra={"markup": False})
+        choice = await asyncio.to_thread(cli_ui.ask_string, "\nEnter 'e' to edit, 'd' to discard the description, or press Enter to keep it: ")
+        choice = (choice or "").strip().lower()
+        if choice == "e":
+            edited = await asyncio.to_thread(click.edit, candidate.description)
+            if edited is not None:
+                candidate.description = str(edited).strip()
+                candidate.saved_description = bool(candidate.description)
+                candidate.description_fingerprint = description_fingerprint(candidate, tracker_name)
+                candidate.description_provenance = {**candidate.description_provenance, "edited": True}
+        elif choice == "d":
+            candidate.description = ""
+            candidate.saved_description = False
+            candidate.description_provenance = {**candidate.description_provenance, "discarded": True}
 
     async def get_tracker_timestamps(self, base_dir: str | None = None) -> dict[str, float]:
         """Get tracker timestamps from the log file"""
@@ -180,49 +328,14 @@ class TrackerDataManager:
         search_file_folder_value = search_file_folder or ""
         if search_term:
             # Check if a specific tracker is already set in meta
-            tracker_keys = {
-                # preference some unit3d based trackers first
-                # since they can return tmdb/imdb/tvdb ids
-                "aither": "AITHER",
-                "blu": "BLUTOPIA",
-                "lst": "LST",
-                "ulcx": "ULCX",
-                "oe": "ONLYENCODES",
-                "huno": "HAWKEUNO",
-                "ant": "ANTHELION",
-                "btn": "BTN",
-                "bhd": "BEYONDHD",
-                "hdb": "HDBITS",
-                "sp": "SEEDPOOL",
-                "rf": "REELFLIX",
-                "otw": "OLDTOONSWORLD",
-                "yus": "YUSCENE",
-                "dp": "DARKPEERS",
-                "ptp": "PASSTHEPOPCORN",
-            }
-
-            specific_tracker: list[str] = [tracker_keys[key] for key in tracker_keys if meta.get(key) is not None]
+            specific_tracker = sorted(tracker_name for tracker_name, tracker_key in _TRACKER_ID_FIELDS.items() if meta.get(tracker_key) is not None)
 
             # Filter out trackers that don't have valid config or api_key/announce_url
             if specific_tracker:
                 valid_trackers: list[str] = []
                 for tracker in specific_tracker:
-                    if "BTN" in tracker:
-                        valid_trackers.append(tracker)
-                        continue
-                    tracker_config = self.get_tracker_config(tracker)
-                    api_key = tracker_config.get("api_key", "")
-                    announce_url = tracker_config.get("announce_url", "")
-
-                    if not tracker_config:
-                        logger.debug(f"[yellow]Tracker {tracker} not found in config, skipping[/yellow]")
-                        continue
-
-                    has_api_key = isinstance(api_key, str) and api_key.strip() != ""
-                    has_announce_url = isinstance(announce_url, str) and announce_url.strip() != ""
-
-                    if not has_api_key and not has_announce_url:
-                        logger.debug(f"[yellow]Tracker {tracker} has no api_key or announce_url set, skipping[/yellow]")
+                    if not self._search_enabled(tracker):
+                        logger.debug(f"[yellow]Tracker {tracker} is not enabled for metadata search, skipping[/yellow]")
                         continue
 
                     valid_trackers.append(tracker)
@@ -260,136 +373,44 @@ class TrackerDataManager:
                 else:
                     meta.trackers = []
 
-                async def process_tracker(tracker_name: str, meta: Meta, skip_tracker_descriptions: bool) -> Meta:
-                    nonlocal found_match
-                    tracker_factory = tracker_class_map.get(tracker_name)
-                    if tracker_factory is None:
-                        logger.info(f"[red]Tracker class for {tracker_name} not found.[/red]")
-                        return meta
+                available_trackers, waiting_trackers = await self.get_available_trackers(specific_tracker, base_dir, debug=meta.debug)
+                if waiting_trackers and not available_trackers:
+                    wait_time = max(wait for _tracker, wait in waiting_trackers)
+                    waiting_names = ", ".join(f"{tracker} ({wait:.1f}s)" for tracker, wait in waiting_trackers)
+                    logger.info(f"[yellow]Waiting for tracker metadata candidate cooldowns: {waiting_names}[/yellow]")
+                    await asyncio.sleep(wait_time)
+                    available_trackers, waiting_trackers = await self.get_available_trackers(specific_tracker, base_dir, debug=meta.debug)
+                    if waiting_trackers:
+                        logger.warning("[yellow]Some tracker metadata candidates remain in cooldown and will not be queried.[/yellow]")
 
-                    tracker_instance = tracker_factory(config=self.config)
-                    try:
-                        updated_meta, match = await self.update_metadata_from_explicit_tracker(
+                search_limit = self.default_config.get("tracker_search_concurrency", 4)
+                try:
+                    semaphore = asyncio.Semaphore(max(1, int(search_limit)))
+                except TypeError, ValueError:
+                    semaphore = asyncio.Semaphore(4)
+
+                async def collect(tracker_name: str) -> tuple[str, Meta, int] | None:
+                    async with semaphore:
+                        return await self._collect_explicit_tracker_candidate(
                             tracker_name,
-                            tracker_instance,
                             meta,
                             search_term_value,
                             search_file_folder_value,
                             skip_tracker_descriptions,
                         )
-                        if match:
-                            found_match = True
-                            logger.debug(f"[green]Match found on tracker: {tracker_name}[/green]")
-                            meta.matched_tracker = tracker_name
-                        await self.save_tracker_timestamp(tracker_name, base_dir=base_dir)
-                        return updated_meta
-                    except httpx.ConnectError:
-                        await self.save_tracker_timestamp(tracker_name, base_dir=base_dir)
-                        logger.info(f"{tracker_name} tracker request failed due to SSL/Connection error.", extra={"markup": False})
-                    except requests.exceptions.ConnectionError as conn_err:
-                        await self.save_tracker_timestamp(tracker_name, base_dir=base_dir)
-                        logger.info(f"{tracker_name} tracker request failed due to connection error: {conn_err}", extra={"markup": False})
-                    return meta
 
-                while not found_match and specific_tracker:
-                    meta_trackers_raw = meta.trackers
-                    if isinstance(meta_trackers_raw, str):
-                        meta_trackers = [t.strip().upper() for t in meta_trackers_raw.split(",")]
-                    elif isinstance(meta_trackers_raw, list):
-                        meta_trackers_list = cast(list[Any], meta_trackers_raw)
-                        meta_trackers = [str(t).upper() for t in meta_trackers_list]
-                    else:
-                        meta_trackers = []
+                results = await asyncio.gather(*(collect(tracker_name) for tracker_name in available_trackers))
+                candidates = [result for result in results if result is not None]
+                for tracker_name in available_trackers:
+                    await self.save_tracker_timestamp(tracker_name, base_dir=base_dir)
 
-                    available_trackers, waiting_trackers = await self.get_available_trackers(specific_tracker, base_dir, debug=meta.debug)
-
-                    if available_trackers:
-                        logger.debug(f"[green]Available trackers: {', '.join(available_trackers)}[/green]")
-                        tracker_to_process = available_trackers[0]
-                    else:
-                        if waiting_trackers:
-                            waiting_trackers.sort(key=lambda x: x[1])
-                            tracker_to_process, wait_time = waiting_trackers[0]
-
-                            cooldown_info = ", ".join(f"{tracker} ({wait_time:.1f}s)" for tracker, wait_time in waiting_trackers)
-                            for remaining in range(int(wait_time), -1, -1):
-                                msg = (
-                                    f"[yellow]All specific trackers in cooldown. Waiting {remaining:.1f} seconds for {tracker_to_process}. Cooldowns: {cooldown_info}[/yellow]"
-                                )
-                                logger.info(msg)
-                                await asyncio.sleep(1)
-                            logger.info("")
-
-                        else:
-                            logger.debug("[red]No specific trackers available[/red]")
-                            break
-
-                    # Process the selected tracker
-                    if tracker_to_process == "BTN":
-                        btn_id_value = meta.btn
-                        btn_id = str(btn_id_value) if btn_id_value is not None else ""
-                        btn_api = self.default_config.get("btn_api")
-                        if isinstance(btn_api, str) and len(btn_api) > 25:
-                            imdb, tvdb = await BtnIdManager.get_btn_torrents(btn_api, btn_id)
-                            if imdb != 0 or tvdb != 0:
-                                if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                                    logger.info(f"[green]Found BTN IDs: IMDb={imdb}, TVDb={tvdb}[/green]")
-                                    try:
-                                        if cli_ui.ask_yes_no("Do you want to use these ids?", default=True):
-                                            if imdb != 0:
-                                                meta.imdb_id = imdb
-                                            if tvdb != 0:
-                                                meta.tvdb_id = tvdb
-                                            found_match = True
-                                            meta.matched_tracker = "BTN"
-                                    except EOFError:
-                                        logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
-                                        await cleanup_manager.cleanup()
-                                        cleanup_manager.reset_terminal()
-                                        sys.exit(1)
-                                else:
-                                    if imdb != 0:
-                                        meta.imdb_id = imdb
-                                    if tvdb != 0:
-                                        meta.tvdb_id = tvdb
-                                    found_match = True
-                                    meta.matched_tracker = "BTN"
-                            await self.save_tracker_timestamp("BTN", base_dir=base_dir)
-                    elif tracker_to_process == "ANTHELION":
-                        imdb_tmdb_list = await tracker_class_map["ANTHELION"](config=self.config).get_data_from_files(meta)
-                        if imdb_tmdb_list:
-                            logger.info(f"[green]Found ANTHELION IDs: {imdb_tmdb_list}[/green]")
-                            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                                try:
-                                    if cli_ui.ask_yes_no("Do you want to use these ids?", default=True):
-                                        for d in imdb_tmdb_list:
-                                            meta.update(d)
-                                        found_match = True
-                                        meta.matched_tracker = "ANTHELION"
-                                except EOFError:
-                                    logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
-                                    await cleanup_manager.cleanup()
-                                    cleanup_manager.reset_terminal()
-                                    sys.exit(1)
-                            else:
-                                for d in imdb_tmdb_list:
-                                    meta.update(d)
-                                found_match = True
-                                meta.matched_tracker = "ANTHELION"
-                        await self.save_tracker_timestamp("ANTHELION", base_dir=base_dir)
-                    else:
-                        meta = await process_tracker(tracker_to_process, meta, skip_tracker_descriptions)
-
-                    if not found_match:
-                        if tracker_to_process in specific_tracker:
-                            specific_tracker.remove(tracker_to_process)
-                        remaining_available, remaining_waiting = await self.get_available_trackers(specific_tracker, base_dir, debug=meta.debug)
-
-                        if remaining_available or remaining_waiting:
-                            logger.debug(f"[yellow]No match found with {tracker_to_process}. Checking remaining trackers...[/yellow]")
-                        else:
-                            logger.debug(f"[yellow]No match found with {tracker_to_process}. No more trackers available to check.[/yellow]")
-                            break
+                selected_candidate = await self._choose_explicit_tracker_candidate(meta, candidates)
+                if selected_candidate:
+                    tracker_name, candidate_meta = selected_candidate
+                    await self._review_explicit_tracker_description(meta, tracker_name, candidate_meta)
+                    await self._apply_explicit_tracker_candidate(meta, tracker_name, candidate_meta)
+                    found_match = True
+                    logger.debug(f"[green]Selected tracker metadata candidate: {tracker_name}[/green]")
 
                 if found_match:
                     logger.debug(f"[green]Successfully found match using tracker: {(meta.matched_tracker if meta.matched_tracker is not None else 'Unknown')}[/green]")
@@ -436,13 +457,8 @@ class TrackerDataManager:
                     return meta
 
                 for tracker_name in tracker_order:
-                    if not found_match:  # Stop checking once a match is found
-                        tracker_config = self.get_tracker_config(tracker_name)
-                        use_search = tracker_config.get("use_for_search")
-                        if use_search is None:
-                            use_search = tracker_config.get("useAPI", "false")
-                        if str(use_search).lower() == "true":
-                            meta = await process_tracker(tracker_name, meta, skip_tracker_descriptions)
+                    if not found_match and self._search_enabled(tracker_name):  # Stop checking once a match is found
+                        meta = await process_tracker(tracker_name, meta, skip_tracker_descriptions)
 
                 if not found_match:
                     meta.no_tracker_match = True

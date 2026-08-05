@@ -49,11 +49,60 @@
       integrity="sha384-qJNkHwhlYywDHfyoEe1np+1lYvX/8x+3gHCKFhSSBMQyCFlvFnn+zXmaebXl21rV"
       crossorigin="anonymous"
     ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/xbbcode-parser@0.3.1/xbbcode.min.js"
+      integrity="sha384-WDYMYmCuXkFj0FX/C0kpV1U5pxmo83sVh+ZFvGHm+4umR3+3JkUokAhJrfXmj3Cj"
+      crossorigin="anonymous"
+    ></script>
     <style>
       /* Rich output area styling (keeps preformatted blocks readable) */
       #rich-output pre {
         white-space: pre-wrap;
         font-family: monospace;
+      }
+      .bbcode-preview .xbbcode-b {
+        font-weight: 700;
+      }
+      .bbcode-preview .xbbcode-i {
+        font-style: italic;
+      }
+      .bbcode-preview .xbbcode-u {
+        text-decoration: underline;
+      }
+      .bbcode-preview .xbbcode-s {
+        text-decoration: line-through;
+      }
+      .bbcode-preview .xbbcode-center,
+      .bbcode-preview .xbbcode-left,
+      .bbcode-preview .xbbcode-right,
+      .bbcode-preview .xbbcode-justify {
+        display: block;
+      }
+      .bbcode-preview .xbbcode-center {
+        text-align: center;
+      }
+      .bbcode-preview .xbbcode-left {
+        text-align: left;
+      }
+      .bbcode-preview .xbbcode-right {
+        text-align: right;
+      }
+      .bbcode-preview .xbbcode-justify {
+        text-align: justify;
+      }
+      .bbcode-preview .xbbcode-code {
+        display: block;
+        overflow: auto;
+        margin: 0.75rem 0;
+        padding: 0.75rem;
+        border-radius: 0.375rem;
+        background: rgb(17 24 39);
+        color: rgb(243 244 246);
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.75rem;
+        line-height: 1.25rem;
+        white-space: pre-wrap;
       }
       /* Smaller text output for mobile */
       @media (max-width: 767px) {

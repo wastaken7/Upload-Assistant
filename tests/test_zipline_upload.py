@@ -36,9 +36,10 @@ class _FakeResponse:
 
 
 class _FakeHttpClient:
-    def __init__(self, payload: object) -> None:
+    def __init__(self, payload: object, requests: list[tuple[tuple[object, ...], dict[str, object]]]) -> None:
         """Create a fake HTTP client returning payload."""
         self._response = _FakeResponse(payload)
+        self._requests = requests
 
     async def __aenter__(self) -> Self:
         """Enter the fake HTTP client context."""
@@ -50,25 +51,34 @@ class _FakeHttpClient:
 
     async def post(self, *_args: object, **_kwargs: object) -> _FakeResponse:
         """Return the configured fake upload response."""
+        self._requests.append((_args, _kwargs))
         return self._response
 
 
-def _run_upload(tmp_path: Path, payload: object) -> dict[str, str]:
+def _run_upload(
+    tmp_path: Path,
+    payload: object,
+    *,
+    img_host: str = "zipline",
+    config_defaults: dict[str, str] | None = None,
+    requests: list[tuple[tuple[object, ...], dict[str, object]]] | None = None,
+) -> dict[str, str]:
     """Run one mocked Zipline upload with the supplied response payload."""
+    request_log = requests if requests is not None else []
+    config = config_defaults if config_defaults is not None else {"zipline_url": "https://zip.example/api/upload", "zipline_api_key": "key"}
+
     async def exercise() -> dict[str, str]:
         """Execute the upload coroutine under test."""
         return await upload_image_task(
             (
                 str(tmp_path / "image.png"),
-                "zipline",
-                {"DEFAULT": {"zipline_url": "https://zip.example/api/upload", "zipline_api_key": "key"}},
+                img_host,
+                {"DEFAULT": config},
                 None,
             )
         )
 
-    with patch("src.uploadscreens.aiofiles.open", return_value=_FakeFile()), patch(
-        "src.uploadscreens.httpx.AsyncClient", return_value=_FakeHttpClient(payload)
-    ):
+    with patch("src.uploadscreens.aiofiles.open", return_value=_FakeFile()), patch("src.uploadscreens.httpx.AsyncClient", return_value=_FakeHttpClient(payload, request_log)):
         return asyncio.run(exercise())
 
 
@@ -99,3 +109,27 @@ def test_zipline_upload_rejects_non_list_files_response(tmp_path: Path) -> None:
     result = _run_upload(tmp_path, {"files": "not-a-list"})
 
     assert result == {"status": "failed", "reason": "No valid URL returned from Zipline"}
+
+
+def test_midnightscene_uses_its_fixed_endpoint_and_token(tmp_path: Path) -> None:
+    """Upload to MidnightScene without requiring a generic Zipline URL."""
+    requests: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    result = _run_upload(
+        tmp_path,
+        {"files": [{"url": "https://img.midnightscene.cc/u/image.png"}]},
+        img_host="midnightscene",
+        config_defaults={"midnightscene_api_key": "midnightscene-token"},
+        requests=requests,
+    )
+
+    assert result["status"] == "success"
+    assert requests == [
+        (
+            ("https://img.midnightscene.cc/api/upload",),
+            {
+                "files": {"file": ("image.png", b"image")},
+                "headers": {"Authorization": "midnightscene-token"},
+                "timeout": 60,
+            },
+        )
+    ]

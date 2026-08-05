@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
+from src.description_review import get_base_description
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
@@ -388,24 +389,20 @@ class AmigosShare:
             description_parts.append(book_section)
             description_parts.append("")
 
-        # External DESCRIPTION.txt
-        desc = ""
-        base_desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt"
-        if Path(base_desc_path).exists():
-            async with aiofiles.open(base_desc_path, encoding="utf-8") as f:
-                desc = (await f.read()).strip()
-                # strip standard formatting codes
-                desc = desc.replace("[user]", "").replace("[/user]", "")
-                desc = desc.replace("[align=left]", "").replace("[/align]", "")
-                desc = desc.replace("[align=right]", "").replace("[/align]", "")
-                desc = desc.replace("[alert]", "").replace("[/alert]", "")
-                desc = desc.replace("[note]", "").replace("[/note]", "")
-                desc = desc.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
-                desc = desc.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
-                desc = desc.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
-                desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
-                description_parts.append(desc)
-                description_parts.append("")
+        desc = get_base_description(meta).strip()
+        if desc:
+            # Strip standard formatting codes.
+            desc = desc.replace("[user]", "").replace("[/user]", "")
+            desc = desc.replace("[align=left]", "").replace("[/align]", "")
+            desc = desc.replace("[align=right]", "").replace("[/align]", "")
+            desc = desc.replace("[alert]", "").replace("[/alert]", "")
+            desc = desc.replace("[note]", "").replace("[/note]", "")
+            desc = desc.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            desc = desc.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            desc = desc.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
+            description_parts.append(desc)
+            description_parts.append("")
 
         custom_description_header = self.config["DEFAULT"].get("custom_description_header", "")
         if custom_description_header:
@@ -561,22 +558,18 @@ class AmigosShare:
         description_parts.extend([await self.format_image(layout_image.get(f"BARRINHA_CUSTOM_B_{i}")) for i in range(1, 4)])
         description_parts.append("[/center]")
 
-        # External description
-        desc = ""
-        base_desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt"
-        if Path(base_desc_path).exists():
-            async with aiofiles.open(base_desc_path, encoding="utf-8") as f:
-                desc = (await f.read()).strip()
-                desc = desc.replace("[user]", "").replace("[/user]", "")
-                desc = desc.replace("[align=left]", "").replace("[/align]", "")
-                desc = desc.replace("[align=right]", "").replace("[/align]", "")
-                desc = desc.replace("[alert]", "").replace("[/alert]", "")
-                desc = desc.replace("[note]", "").replace("[/note]", "")
-                desc = desc.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
-                desc = desc.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
-                desc = desc.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
-                desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
-                description_parts.append(desc)
+        desc = get_base_description(meta).strip()
+        if desc:
+            desc = desc.replace("[user]", "").replace("[/user]", "")
+            desc = desc.replace("[align=left]", "").replace("[/align]", "")
+            desc = desc.replace("[align=right]", "").replace("[/align]", "")
+            desc = desc.replace("[alert]", "").replace("[/alert]", "")
+            desc = desc.replace("[note]", "").replace("[/note]", "")
+            desc = desc.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            desc = desc.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            desc = desc.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
+            description_parts.append(desc)
 
         custom_description_header = self.config["DEFAULT"].get("custom_description_header", "")
         if custom_description_header:

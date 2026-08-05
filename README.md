@@ -17,16 +17,15 @@
   - [2. Audio Stream Spectrogram Generation](#2-audio-stream-spectrogram-generation)
   - [3. qBittorrent Bandwidth Control](#3-qbittorrent-bandwidth-control)
   - [4. Argument-Embedded Text Queue](#4-argument-embedded-text-queue)
-  - [5. Extended Tracker Support](#5-extended-tracker-support)
-  - [6. Usenet & Indexer Posting](#6-usenet--indexer-posting)
-  - [7. Interactive Screenshot Review Workflow](#7-interactive-screenshot-review-workflow)
-  - [8. Persistent TTL-Based Metadata Cache](#8-persistent-ttl-based-metadata-cache)
-  - [9. Modern Web UI & Real-Time Engine](#9-modern-web-ui--real-time-engine)
+  - [5. Usenet & Indexer Posting](#5-usenet--indexer-posting)
+  - [6. Interactive Screenshot Review Workflow](#6-interactive-screenshot-review-workflow)
+  - [7. Persistent TTL-Based Metadata Cache](#7-persistent-ttl-based-metadata-cache)
+  - [8. Modern Web UI & Real-Time Engine](#8-modern-web-ui--real-time-engine)
 - [Supported Sites](#supported-sites)
 - [Setup Guide](#setup-guide)
   - [Step 1: Install Required Tools](#step-1-install-required-tools)
-  - [Step 2: Download Upload Assistant](#step-2-download-upload-assistant)
-  - [Step 3: Install Python Packages](#step-3-install-python-packages)
+  - [Step 2: Download Upload Assistant](#step-2-download-upload-assistant-linuxmacos)
+  - [Step 3: Install Python Packages](#step-3-install-python-packages-linuxmacos)
   - [Step 4: Configure the Assistant](#step-4-configure-the-assistant)
 - [Updating](#updating)
 - [CLI Usage](#cli-usage)
@@ -75,26 +74,22 @@ This branch introduces new media categories and automation features not present 
 - **shlex-Split Parsing**: Allows specifying unique CLI arguments (e.g., different IMDB IDs, tags, or tracker targets) for each file/folder on its respective line.
 - **Resume Capability**: Logs processed lines to prevent reprocessing completed uploads if a queue run is interrupted.
 
-### 5. Extended Tracker Support
-
-- **Added Trackers**: Zenith (ZENITH), MidnightScene (MIDNIGHTSCENE), M-Team (MTEAM), LongPT (LONGPT), lajidui (LAJIDUI), ptcafe (PTCAFE), PTFans (PTFANS), PT GTK (PTGTK), RailgunPT (RAILGUNPT).
-
-### 6. Usenet & Indexer Posting
+### 5. Usenet & Indexer Posting
 
 - **Usenet Upload Support**: Automatically archives and splits files/folders (via `7z`), generates parity recovery blocks (via `par2`), and uploads them to Usenet (via `nyuu`).
 - **Anonymity & Privacy**: Generates randomized poster details and obfuscates post subject lines to protect privacy.
 - **Indexer Integration**: Automatically uploads the generated `.nzb` file to configured Usenet indexers.
 
-### 7. Interactive Screenshot Review Workflow
+### 6. Interactive Screenshot Review Workflow
 
 - **Manual Screenshot Review**: Inspect, add, delete, or replace/recapture individual frames before uploading through the interactive Web UI.
 
-### 8. Persistent TTL-Based Metadata Cache
+### 7. Persistent TTL-Based Metadata Cache
 
 - **Provider-Scoped API Caching**: Disk-cached metadata for TMDb, IMDb, TVDB, TVmaze, OpenLibrary, IGDB, Discogs, and MusicBrainz.
 - **Performance & Rate Limit Protection**: Configurable TTL and negative caching reuse fetched metadata across runs, avoiding redundant API calls and preventing rate-limiting bans.
 
-### 9. Modern Web UI & Real-Time Engine
+### 8. Modern Web UI & Real-Time Engine
 
 - **Full Parity Web UI**: Modern interface providing full feature parity with CLI options (`--webui`).
 - **Real-Time Execution & Presets**: Live log streams, real-time preparation preview, preset saving, and interactive screenshot management.
@@ -119,7 +114,7 @@ This branch introduces new media categories and automation features not present 
 | <img src="web_ui/static/img/trackers/bjshare.png" width="16" height="16" />                | BrasilJapão-Share      | BJSHARE                | MOVIE, TV, BOOK, GAME        |
 | <img src="web_ui/static/img/trackers/brasiltracker.png" width="16" height="16" />          | BrasilTracker          | BRASILTRACKER          | MOVIE, TV, BOOK, GAME        |
 | <img src="web_ui/static/img/trackers/capybarabr.png" width="16" height="16" />             | CapybaraBR             | CAPYBARABR             | MOVIE, TV, BOOK, GAME        |
-| <img src="web_ui/static/img/trackers/cathoderaytube.png" width="16" height="16" />       | Cathode-Ray.Tube       | CATHODERAYTUBE         | MOVIE, TV, GAME              |
+| <img src="web_ui/static/img/trackers/cathoderaytube.png" width="16" height="16" />         | Cathode-Ray.Tube       | CATHODERAYTUBE         | MOVIE, TV, GAME              |
 | <img src="web_ui/static/img/trackers/cinematik.png" width="16" height="16" />              | Cinematik              | CINEMATIK              | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/cinemaz.png" width="16" height="16" />                | CinemaZ                | CINEMAZ                | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/darkpeers.png" width="16" height="16" />              | DarkPeers              | DARKPEERS              | MOVIE, TV, BOOK, GAME, MUSIC |
@@ -236,6 +231,7 @@ Using Git is the recommended method because it makes updating the assistant in t
    - **macOS:** Install it via Homebrew or Xcode Command Line Tools.
 2. **Clone the project**:
    Open your command prompt or terminal, navigate to the folder where you want to keep the assistant, and run:
+
    ```bash
    git clone https://github.com/wastaken7/Upload-Assistant.git
    cd Upload-Assistant
@@ -264,6 +260,7 @@ pip3 install --user -U -r requirements.txt
 > This means your system prefers keeping Python packages separated. You can set up a "Virtual Environment" (a private workspace for this tool) by running:
 >
 > - **Linux / macOS:**
+>
 >   ```bash
 >   python3 -m venv venv
 >   source venv/bin/activate
@@ -286,6 +283,7 @@ In your terminal, run the command for your operating system and follow the on-sc
 
 - **Windows:** Install with the [`.exe` installer](docs/windows-install.md), then run `ua-config` in a new terminal.
 - **Linux / macOS:**
+
   ```bash
   python3 config-generator.py
   ```
@@ -310,10 +308,12 @@ In your terminal, run the command for your operating system and follow the on-sc
 ## **Updating:**
 
 - To update a Git installation, navigate into the Upload-Assistant directory and pull the latest changes:
+
   ```bash
   cd Upload-Assistant
   git pull
   ```
+
 - Or, if you downloaded the ZIP file, download a fresh ZIP from GitHub and overwrite your existing files.
 - For the Windows installation, run `ua-update`.
 - Run the command to update dependencies:
@@ -327,10 +327,13 @@ In your terminal, run the command for your operating system and follow the on-sc
 To run the assistant, use the command for your system:
 
 - **Windows:**
+
   ```cmd
   ua "C:\path\to\content" --args
   ```
+
 - **Linux / macOS:**
+
   ```bash
   python3 upload.py "/path/to/content" --args
   ```

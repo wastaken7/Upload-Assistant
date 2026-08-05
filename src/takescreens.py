@@ -341,7 +341,7 @@ async def disc_screenshots(
                     else:
                         logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
                         retake = True
-                elif img_host and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "passtheimage", "seedpool_cdn", "sharex", "utppm"]:
+                elif img_host and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "passtheimage", "seedpool_cdn", "sharex", "utppm"]:
                     logger.debug(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
                 else:
                     logger.info(f"[red]Unknown image host or image doesn't meet requirements for host: {img_host}, retaking.")
@@ -371,7 +371,7 @@ async def disc_screenshots(
                                 valid_image = True
                         elif (
                             img_host
-                            and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
+                            and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
                             and new_size > 75000
                         ):
                             logger.info(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
@@ -445,7 +445,7 @@ async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str
             # Get the resolution and convert it to integer
             resol = int("".join(filter(str.isdigit, (meta.resolution if meta.resolution is not None else "1080p"))))
             font_size = round(text_size * resol / 1080)
-            border_width = round(2 * resol/1080)
+            border_width = round(2 * resol / 1080)
             x_all = round(10 * resol / 1080)
 
             # Scale vertical spacing based on font size
@@ -455,7 +455,9 @@ async def capture_disc_task(index: int, file: str, ss_time: str, image_path: str
             y_hdr = y_type + line_spacing
 
             # Frame number
-            vf_filters.append(f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:borderw={border_width}:bordercolor=black")
+            vf_filters.append(
+                f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:borderw={border_width}:bordercolor=black"
+            )
 
             # Frame type
             vf_filters.append(f"drawtext=text='Frame Type\\: {frame_type}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_type}:borderw={border_width}:bordercolor=black")
@@ -805,7 +807,7 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
             # Get the resolution and convert it to integer
             resol = int("".join(filter(str.isdigit, (meta.resolution if meta.resolution is not None else "576p"))))
             font_size = round(text_size * resol / 576)
-            border_width = round(2 * resol/576)
+            border_width = round(2 * resol / 576)
             x_all = round(10 * resol / 576)
 
             # Scale vertical spacing based on font size
@@ -814,7 +816,9 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
             y_type = y_number + line_spacing
 
             # Frame number
-            vf_filters.append(f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:borderw={border_width}:bordercolor=black")
+            vf_filters.append(
+                f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:borderw={border_width}:bordercolor=black"
+            )
 
             # Frame type
             vf_filters.append(f"drawtext=text='Frame Type\\: {frame_type}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_type}:borderw={border_width}:bordercolor=black")
@@ -1812,7 +1816,7 @@ async def screenshots(
                     else:
                         logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
                         retake = True
-                elif img_host and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "passtheimage", "seedpool_cdn", "sharex", "utppm"]:
+                elif img_host and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "passtheimage", "seedpool_cdn", "sharex", "utppm"]:
                     logger.debug(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
                 else:
                     logger.info(f"[red]Unknown image host or image doesn't meet requirements for host: {img_host}, retaking.")
@@ -1861,7 +1865,7 @@ async def screenshots(
                                     valid_image = True
                             elif (
                                 img_host
-                                and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
+                                and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
                                 and new_size > 75000
                             ):
                                 logger.info(f"[green]Successfully retaken screenshot for: {screenshot_path} ({new_size} bytes)[/green]")
@@ -1903,7 +1907,7 @@ async def screenshots(
                             valid_image = True
                     elif (
                         img_host
-                        and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
+                        and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
                         and new_size > 75000
                     ):
                         valid_image = True
@@ -2163,7 +2167,7 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
             # Get the resolution and convert it to integer
             resol = int("".join(filter(str.isdigit, (meta.resolution if meta.resolution is not None else "1080p"))))
             font_size = round(text_size * resol / 1080)
-            border_width = round(2 * resol/1080)
+            border_width = round(2 * resol / 1080)
             x_all = round(10 * resol / 1080)
 
             # Scale vertical spacing based on font size
@@ -2173,7 +2177,9 @@ async def capture_screenshot(args: tuple[int, str, float, str, float, float, flo
             y_hdr = y_type + line_spacing
 
             # Frame number
-            vf_filters.append(f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:borderw={border_width}:bordercolor=black")
+            vf_filters.append(
+                f"drawtext=text='Frame Number\\: {frame_number}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_number}:borderw={border_width}:bordercolor=black"
+            )
 
             # Frame type
             vf_filters.append(f"drawtext=text='Frame Type\\: {frame_type}':fontcolor=white:fontsize={font_size}:x={x_all}:y={y_type}:borderw={border_width}:bordercolor=black")

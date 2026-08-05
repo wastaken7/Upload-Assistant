@@ -145,8 +145,9 @@ class AlphaRatio:
         heading = "[color=green][size=6]"
         subheading = "[color=red][size=4]"
         heading_end = "[/size][/color]"
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt", encoding="utf8") as f:
-            base = await f.read()
+        from src.description_review import get_base_description
+
+        base = get_base_description(meta)
         base = re.sub(r"\[center\]\[spoiler=Scene NFO:\].*?\[/center\]", "", base, flags=re.DOTALL)
         base = re.sub(r"\[center\]\[spoiler=FraMeSToR NFO:\].*?\[/center\]", "", base, flags=re.DOTALL)
         description = ""
