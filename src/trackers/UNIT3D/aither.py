@@ -100,7 +100,14 @@ class Aither(UNIT3D):
             aither_name = aither_name.replace(f"{source}", f"{resolution} {source}", 1)
             aither_name = aither_name.replace((meta.audio), f"{meta.audio}{video_encode}", 1)
 
-        elif meta.is_disc == "DVD" or (name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD")):
+        elif meta.is_disc == "DVD":
+            region_and_source = " ".join(part for part in (meta.region, source) if part)
+            disc_details = " ".join(part for part in (resolution, meta.region, source) if part)
+            if region_and_source:
+                aither_name = aither_name.replace(region_and_source, disc_details, 1)
+            aither_name = aither_name.replace((meta.audio), f"{video_codec} {meta.audio}", 1)
+
+        elif name_type == "REMUX" and source in ("PAL DVD", "NTSC DVD", "DVD"):
             aither_name = aither_name.replace(meta.source or "", f"{resolution} {meta.source}", 1)
             aither_name = aither_name.replace((meta.audio), f"{video_codec} {meta.audio}", 1)
 
