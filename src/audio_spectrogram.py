@@ -13,9 +13,9 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+import cli_ui
 import matplotlib.pyplot as plt
 import numpy as np
-from rich.prompt import Prompt
 
 from src.console import logger
 from src.meta import Meta
@@ -31,6 +31,17 @@ CACHE_VERSION = 2
 AUDIOBOOK_EXTENSIONS = {".aac", ".aax", ".flac", ".m4a", ".m4b", ".mp3", ".ogg", ".opus", ".wav", ".wma"}
 SPECTROGRAM_N_FFT = 2048
 MAX_TIME_BINS = 1024
+
+
+def prompt_audio_stream_positions() -> str:
+    """Ask for stream positions through the prompt API supported by the WebUI."""
+    return (
+        cli_ui.ask_string(
+            "Select audio stream positions (e.g. 0,1 or all)",
+            default="all",
+        )
+        or "all"
+    )
 
 
 def get_audio_streams(file_path: str | Path) -> list[dict[str, Any]]:
@@ -106,7 +117,7 @@ def get_stft_parameters(sample_count: int) -> tuple[int, int]:
 
 
 def _cache_fingerprint(audio_sources: list[Path], duration: int, sample_rate: int, stream_indexes: list[tuple[Path, int]]) -> str:
-    data = {
+    data: dict[str, object] = {
         "cache_version": CACHE_VERSION,
         "sources": [{"path": str(source.resolve()), "size": source.stat().st_size, "mtime_ns": source.stat().st_mtime_ns} for source in audio_sources],
         "duration": duration,
@@ -121,10 +132,10 @@ def _load_cached_images(cache_path: Path, fingerprint: str) -> list[Any]:
         return []
     try:
         content = cache_path.read_text(encoding="utf-8")
-        cache = cast(dict[str, Any], json.loads(content)) if content.strip() else {}
+        cache: dict[str, object] = cast(dict[str, object], json.loads(content)) if content.strip() else {}
         images = cache.get("spectrograms_images")
         if cache.get("fingerprint") == fingerprint and isinstance(images, list):
-            return images
+            return cast(list[Any], images)
     except (OSError, json.JSONDecodeError) as error:
         logger.warning(f"[yellow]Could not load spectrogram image cache: {error!s}[/yellow]")
     return []
@@ -178,9 +189,9 @@ def generate_spectrogram(
 
     n_fft, hop_length = get_stft_parameters(samples.size)
     stft = np.abs(librosa.stft(samples, n_fft=n_fft, hop_length=hop_length))
-    db_spectrogram = librosa.amplitude_to_db(stft, ref=np.max)
+    db_spectrogram = librosa.amplitude_to_db(stft, ref=np.max)  # pyright: ignore[reportUnknownMemberType]  # librosa stub has an untyped callback overload.
 
-    figure, axis = plt.subplots(figsize=(WIDTH_INCH, HEIGHT_INCH), dpi=DPI_VALUE)
+    figure, axis = plt.subplots(figsize=(WIDTH_INCH, HEIGHT_INCH), dpi=DPI_VALUE)  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **fig_kw as Unknown.
     image = librosa.display.specshow(
         db_spectrogram,
         sr=actual_sample_rate,
@@ -191,10 +202,10 @@ def generate_spectrogram(
         ax=axis,
         rasterized=True,
     )
-    figure.colorbar(image, ax=axis, format="%+2.0f dB")
+    figure.colorbar(image, ax=axis, format="%+2.0f dB")  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
     display_label = stream_label if stream_label and stream_label != f"Stream_{stream_index}" else source_name
-    axis.set_title(display_label, fontsize=18, fontweight="bold", pad=22)
-    axis.text(
+    axis.set_title(display_label, fontsize=18, fontweight="bold", pad=22)  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
+    axis.text(  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
         0.5,
         1.01,
         f"File: {source_name}  •  Stream {stream_index}  •  {stream_lang}  •  First {duration}s  •  mono mix @ {actual_sample_rate / 1000:g} kHz",
@@ -203,12 +214,12 @@ def generate_spectrogram(
         va="bottom",
         fontsize=10,
     )
-    axis.set_xlabel("Time (s)")
-    axis.set_ylabel("Frequency (Hz)")
+    axis.set_xlabel("Time (s)")  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
+    axis.set_ylabel("Frequency (Hz)")  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
 
     output_name = output_dir / f"spectrogram_source_{source_position:02d}_stream_{stream_index}.png"
     figure.tight_layout()
-    figure.savefig(output_name, dpi=DPI_VALUE, bbox_inches="tight")
+    figure.savefig(output_name, dpi=DPI_VALUE, bbox_inches="tight")  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
     plt.close(figure)
     return output_name
 
@@ -274,7 +285,7 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
         for position, stream in enumerate(first_streams):
             tags = stream.get("tags", {})
             logger.info(f"[{position}] FFmpeg stream {stream.get('index')} | Lang: {tags.get('language', 'und')} | Title: {tags.get('title', 'No Title')}")
-        choice = Prompt.ask("\nSelect audio stream positions (e.g. [bold yellow]0,1[/bold yellow] or [bold yellow]all[/bold yellow])", default="all")
+        choice = prompt_audio_stream_positions()
 
     selected_jobs: list[tuple[int, Path, dict[str, Any]]] = []
     for source_position, audio_path, streams in source_streams:
@@ -338,7 +349,7 @@ async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploads
             spec_images, _ = await uploadscreens_manager.upload_screens(meta, len(generated_files), 1, 0, len(generated_files), generated_files, {})
             if spec_images:
                 meta.spectrograms_images = spec_images
-                cache = {"cache_version": CACHE_VERSION, "fingerprint": fingerprint, "spectrograms_images": spec_images}
+                cache: dict[str, object] = {"cache_version": CACHE_VERSION, "fingerprint": fingerprint, "spectrograms_images": spec_images}
                 await asyncio.to_thread(cache_path.write_text, json.dumps(cache, indent=4), encoding="utf-8")
                 logger.debug(f"[cyan]Saved {len(spec_images)} spectrograms to audio_spectrograms_images.json[/cyan]")
         except Exception as error:

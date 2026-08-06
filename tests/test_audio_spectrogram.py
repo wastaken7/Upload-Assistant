@@ -1,4 +1,18 @@
-from src.audio_spectrogram import MAX_TIME_BINS, get_spectrogram_sources, get_stft_parameters, select_audio_streams
+from src.audio_spectrogram import MAX_TIME_BINS, get_spectrogram_sources, get_stft_parameters, prompt_audio_stream_positions, select_audio_streams
+
+
+def test_prompt_audio_stream_positions_uses_cli_ui_and_defaults_to_all(monkeypatch):
+    recorded = {}
+
+    def ask_string(*question, default=None):
+        recorded["question"] = question
+        recorded["default"] = default
+        return
+
+    monkeypatch.setattr("src.audio_spectrogram.cli_ui.ask_string", ask_string)
+
+    assert prompt_audio_stream_positions() == "all"  # noqa: S101
+    assert recorded == {"question": ("Select audio stream positions (e.g. 0,1 or all)",), "default": "all"}  # noqa: S101
 
 
 def test_select_audio_streams_accepts_positions_and_removes_duplicates():
