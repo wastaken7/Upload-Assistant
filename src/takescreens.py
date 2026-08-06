@@ -64,9 +64,8 @@ def get_ffmpeg_output_path(command: Any, cmd_list: list[str]) -> str:
         if filename is not None:
             return str(filename)
 
-        incoming_edges = getattr(node, "_KwargReprNode__incoming_edge_map", {})
-        if isinstance(incoming_edges, dict):
-            nodes.extend(edge[0] for edge in incoming_edges.values() if edge)
+        incoming_edges = getattr(node, "incoming_edges", ())
+        nodes.extend(edge.upstream_node for edge in incoming_edges if getattr(edge, "upstream_node", None) is not None)
 
     # Keep compatibility with lightweight command doubles used by callers.
     return cmd_list[-1] if cmd_list else ""

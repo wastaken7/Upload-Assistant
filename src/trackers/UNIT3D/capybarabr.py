@@ -200,7 +200,8 @@ class CapybaraBR(UNIT3D):
             if self.tracker == "CAPYBARABR" and meta.type == "DVDRIP":
                 title = meta.aka.replace("AKA", "").strip() if meta.original_language == "pt" and meta.aka else meta.title
                 episode = f"{meta.season}{meta.episode}" if category == "TV" else ""
-                cbr_name = " ".join(part for part in (title, str(meta.year or ""), episode, meta.resolution, "DVDRip", meta.audio, meta.video_encode) if part)
+                audio = str(meta.audio).replace("DD+ ", "DDP").replace("DD ", "DD").replace("AAC ", "AAC").replace("FLAC ", "FLAC")
+                cbr_name = " ".join(part for part in (title, str(meta.year or ""), episode, meta.resolution, "DVDRip", audio, meta.video_encode) if part)
                 if meta.tag:
                     cbr_name += meta.tag
 

@@ -45,7 +45,7 @@ def test_capybarabr_formats_dvdrips_with_resolution_before_audio_and_codec() -> 
         year=2001,
         type="DVDRIP",
         resolution="480p",
-        audio="DD2.0",
+        audio="DD 2.0",
         video_encode="x264",
         tag="-DDOS",
     )
