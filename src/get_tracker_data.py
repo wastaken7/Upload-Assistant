@@ -102,7 +102,7 @@ class TrackerDataManager:
 
         before = meta.to_dict()
         updated_meta, match = await self.tracker_meta_manager.update_metadata_from_tracker(
-            tracker_name, tracker_instance, meta, search_term, search_file_folder, skip_tracker_descriptions
+            tracker_name, tracker_instance, meta, search_term, search_file_folder, skip_tracker_descriptions, torrent_id=tracker_id
         )
         after = updated_meta.to_dict()
         metadata_patch = {key: value for key, value in after.items() if before.get(key) != value}

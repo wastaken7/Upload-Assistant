@@ -66,6 +66,8 @@ class TrackerMetaManager:
         search_term: str,
         search_file_folder: str,
         skip_tracker_descriptions: bool = False,
+        *,
+        torrent_id: str = "",
     ) -> tuple[Meta, bool]:
         return await update_metadata_from_tracker(
             tracker_name,
@@ -74,6 +76,7 @@ class TrackerMetaManager:
             search_term,
             search_file_folder,
             skip_tracker_descriptions,
+            torrent_id=torrent_id,
         )
 
     async def handle_image_list(self, meta: Meta, tracker_name: str, valid_images: Sequence[ImageDict] | None = None) -> None:
@@ -338,6 +341,8 @@ async def update_metadata_from_tracker(
     search_term: str,
     search_file_folder: str,
     skip_tracker_descriptions: bool = False,
+    *,
+    torrent_id: str = "",
 ) -> tuple[Meta, bool]:
     # HDBITS stores its torrent ID in ``meta.hdb`` rather than ``meta.hdbits``.
     # Keep the generic key for every other tracker so all bracket accesses in
@@ -584,8 +589,9 @@ async def update_metadata_from_tracker(
             found_match = False
 
     elif tracker_name in api_trackers:
-        if meta.get(tracker_key) is not None:
-            logger.debug(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
+        resolved_torrent_id = torrent_id or meta.get(tracker_key)
+        if resolved_torrent_id:
+            logger.debug(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {resolved_torrent_id}[/cyan]")
             tracker_data = cast(
                 Sequence[Any],
                 await Common(config).unit3d_torrent_info(
@@ -593,7 +599,7 @@ async def update_metadata_from_tracker(
                     tracker_instance.id_url,
                     tracker_instance.search_url,
                     meta,
-                    id=meta[tracker_key],
+                    id=resolved_torrent_id,
                     skip_tracker_descriptions=skip_tracker_descriptions,
                 ),
             )
