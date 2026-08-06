@@ -339,7 +339,10 @@ async def update_metadata_from_tracker(
     search_file_folder: str,
     skip_tracker_descriptions: bool = False,
 ) -> tuple[Meta, bool]:
-    tracker_key = tracker_name.lower()
+    # HDBITS stores its torrent ID in ``meta.hdb`` rather than ``meta.hdbits``.
+    # Keep the generic key for every other tracker so all bracket accesses in
+    # the HDBITS branch address the field that was detected upstream.
+    tracker_key = "hdb" if tracker_name == "HDBITS" else tracker_name.lower()
     meta.tracker_search_term = search_term
     manual_key = f"{tracker_key}_manual"
     found_match = False

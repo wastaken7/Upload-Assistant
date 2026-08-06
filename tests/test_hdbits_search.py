@@ -1,8 +1,12 @@
+# ruff: noqa: S101
+
 import asyncio
 
 import pytest
 
+from src.get_tracker_data import TrackerDataManager
 from src.meta import Meta
+from src.trackermeta import update_metadata_from_tracker
 from src.trackers.hdbits import HDBits
 
 
@@ -32,4 +36,32 @@ def test_hdbits_search_returns_six_values_for_api_error(monkeypatch: pytest.Monk
 
     result = asyncio.run(tracker.search_filename("Gladiator.2000.mkv", "file", Meta(category="MOVIE")))
 
-    assert result == (None, None, None, None, None, None)  # noqa: S101
+    assert result == (None, None, None, None, None, None)
+
+
+def test_hdbits_explicit_id_uses_hdb_meta_key() -> None:
+    class _Tracker:
+        @staticmethod
+        async def get_info_from_torrent_id(torrent_id: str) -> tuple[int, None, str, None, str]:
+            assert torrent_id == "12345"
+            return 1602620, None, "Amour.2012.1080p.BluRay.x264", None, ""
+
+    meta = Meta({"hdb": "12345", "unattended": True})
+
+    updated_meta, matched = asyncio.run(update_metadata_from_tracker("HDBITS", _Tracker(), meta, "Amour", "Amour"))
+
+    assert matched
+    assert updated_meta.imdb_id == 1602620
+    assert updated_meta.hdb == "12345"
+
+
+def test_hdbits_use_for_search_false_skips_explicit_id(tmp_path) -> None:
+    async def run() -> None:
+        manager = TrackerDataManager({"TRACKERS": {"HDBITS": {"use_for_search": False}}})
+        meta = Meta({"base_dir": str(tmp_path), "hdb": "12345", "unattended": True})
+
+        await manager.get_tracker_data(None, meta, "Amour", "Amour")
+
+        assert meta.matched_tracker == ""
+
+    asyncio.run(run())
