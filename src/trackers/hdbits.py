@@ -842,7 +842,7 @@ class HDBits:
 
         return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description
 
-    async def search_filename(self, search_term: str, search_file_folder: str, meta: Meta):
+    async def search_filename(self, search_term: str, search_file_folder: str, meta: Meta) -> tuple[int | None, int | None, str | None, str | None, str | None, int | None]:
         hdb_imdb = hdb_tvdb = hdb_name = hdb_torrenthash = hdb_description = hdb_id = None
         url = f"{self.base_url}/api/torrents"
 
@@ -895,7 +895,7 @@ class HDBits:
                         logger.error(
                             f"{self.tracker}: [red]Error: 'data' key not found or empty in {self.tracker} API response. Full response: {escape(str(response_json))}[/red]"
                         )
-                        return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_id
+                        return hdb_imdb, hdb_tvdb, hdb_name, hdb_torrenthash, hdb_description, hdb_id
 
                     for each in response_json["data"]:
                         hdb_imdb = int(each.get("imdb", {}).get("id") or 0)
