@@ -35,3 +35,21 @@ def test_brazilian_trackers_audio_tags_require_portuguese(tracker_class: type[Ca
 
     assert (" DUAL-" in name) == (expected_tag == "DUAL")  # noqa: S101
     assert (" MULTI-" in name) == (expected_tag == "MULTI")  # noqa: S101
+
+
+def test_capybarabr_formats_dvdrips_with_resolution_before_audio_and_codec() -> None:
+    meta = Meta(
+        category="MOVIE",
+        name="Example Movie 2001 DVD x264 DVDRip DD 2.0-DDOS",
+        title="Example Movie",
+        year=2001,
+        type="DVDRIP",
+        resolution="480p",
+        audio="DD2.0",
+        video_encode="x264",
+        tag="-DDOS",
+    )
+
+    name = asyncio.run(CapybaraBR({"TRACKERS": {}}).get_name(meta))["name"]
+
+    assert name == "Example Movie 2001 480p DVDRip DD2.0 x264-DDOS"  # noqa: S101
