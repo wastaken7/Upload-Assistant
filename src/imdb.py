@@ -13,7 +13,7 @@ import guessit
 import httpx
 
 from src.cleanup import cleanup_manager
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.metadata_cache import cache_for, is_cache_miss
 
 anitopy_parse_fn: Any = cast(Any, anitopy).parse
@@ -797,7 +797,7 @@ class ImdbManager:
                 selection = None
                 while True:
                     try:
-                        selection = cli_ui.ask_string("Enter the number of the correct entry, 0 for none, or manual IMDb ID (tt1234567): ") or ""
+                        selection = await prompt_in_thread(cli_ui.ask_string, "Enter the number of the correct entry, 0 for none, or manual IMDb ID (tt1234567): ") or ""
                     except EOFError, KeyboardInterrupt:
                         logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                         await cleanup_manager.cleanup()
@@ -835,7 +835,7 @@ class ImdbManager:
         else:
             if not unattended:
                 try:
-                    selection = cli_ui.ask_string("No results found. Please enter a manual IMDb ID (tt1234567) or 0 to skip: ") or ""
+                    selection = await prompt_in_thread(cli_ui.ask_string, "No results found. Please enter a manual IMDb ID (tt1234567) or 0 to skip: ") or ""
                 except EOFError, KeyboardInterrupt:
                     logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()

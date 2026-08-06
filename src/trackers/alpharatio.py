@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
+import cli_ui
 import httpx
 from bs4 import BeautifulSoup
 from pymediainfo import MediaInfo
-from rich.prompt import Prompt
 
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
@@ -369,7 +369,7 @@ class AlphaRatio:
                 meta.skipping = f"{self.tracker}"
                 return False
             while cover is None:
-                cover = Prompt.ask("No Cover was found. Please input a link to a cover:", default="")
+                cover = await prompt_in_thread(cli_ui.ask_string, "No Cover was found. Please input a link to a cover:", default="") or ""
                 if not re.match(r"https?://.*\.(jpg|png|gif)$", cover):
                     logger.info(f"{self.tracker}: [red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
                     cover = None

@@ -4,9 +4,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
+import cli_ui
 import guessit
 
-from src.console import console, logger
+from src.console import logger, prompt_in_thread
 from src.meta import Meta
 from src.region import get_distributor
 
@@ -98,7 +99,12 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
                                 )
 
                             try:
-                                choice = console.input(f"[yellow]Select edition number (1-{len(matching_editions)}) or press Enter to use the closest match: [/yellow]")
+                                choice = (
+                                    await prompt_in_thread(
+                                        cli_ui.ask_string, f"Select edition number (1-{len(matching_editions)}) or press Enter to use the closest match:", default=""
+                                    )
+                                    or ""
+                                )
 
                                 if choice.strip() and choice.isdigit() and 1 <= int(choice) <= len(matching_editions):
                                     selected = matching_editions[int(choice) - 1]
@@ -192,8 +198,13 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
                                 logger.info(f"[yellow]{i + 1}. [green]{ed['name']} ({ed['display_name']}, diff: {ed['difference']:.2f} seconds)")
 
                             try:
-                                choice = console.input(
-                                    f"[yellow]Select edition number (1-{len(playlist_matching_editions)}), press e to use playlist edition or press Enter to use the closest match: [/yellow]"
+                                choice = (
+                                    await prompt_in_thread(
+                                        cli_ui.ask_string,
+                                        f"Select edition number (1-{len(playlist_matching_editions)}), press e to use playlist edition or press Enter to use the closest match:",
+                                        default="",
+                                    )
+                                    or ""
                                 )
 
                                 playlist_selected: str | dict[str, Any]

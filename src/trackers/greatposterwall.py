@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
 import re
 import unicodedata
 from pathlib import Path
@@ -13,7 +12,7 @@ from bs4 import BeautifulSoup
 from rich.markup import escape
 
 from src.cogs.redaction import Redaction
-from src.console import buffer_console_logs, logger
+from src.console import logger, prompt_in_thread
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
@@ -359,8 +358,7 @@ class GreatPosterWall:
                 logger.info(f"{self.tracker}: [yellow]Unattended mode: Enter genres not available. Skipping {self.tracker} upload.[/yellow]")
                 meta.skipping = f"{self.tracker}"
                 return ""
-            async with buffer_console_logs():
-                tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Enter the genres (in {self.tracker} format): ")
+            tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Enter the genres (in {self.tracker} format): ")
             tags = (tags_raw or "").strip()
 
         return tags
@@ -828,22 +826,19 @@ class GreatPosterWall:
 
             imdb_id = ""
             while not re.match(r"^nm\d+$", imdb_id):
-                async with buffer_console_logs():
-                    imdb_id_raw = await asyncio.to_thread(cli_ui.ask_string, "Enter Director IMDb ID (e.g., nm0000138): ")
+                imdb_id_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director IMDb ID (e.g., nm0000138): ")
                 imdb_id = (imdb_id_raw or "").strip()
                 if not re.match(r"^nm\d+$", imdb_id):
                     logger.info(f"{self.tracker}: [red]Invalid IMDb person ID. Format must be like nm0000138.[/red]")
 
             english_name = ""
             while not english_name:
-                async with buffer_console_logs():
-                    english_name_raw = await asyncio.to_thread(cli_ui.ask_string, "Enter Director English name: ")
+                english_name_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director English name: ")
                 english_name = (english_name_raw or "").strip()
                 if not english_name:
                     logger.info(f"{self.tracker}: [red]Director English name cannot be empty.[/red]")
 
-            async with buffer_console_logs():
-                chinese_name_raw = await asyncio.to_thread(cli_ui.ask_string, "Enter Director Chinese name (optional, press Enter to skip): ")
+            chinese_name_raw = await prompt_in_thread(cli_ui.ask_string, "Enter Director Chinese name (optional, press Enter to skip): ")
             chinese_name = (chinese_name_raw or "").strip()
 
         artists: list[str] = [english_name]
