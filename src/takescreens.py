@@ -48,6 +48,30 @@ def compile_ffmpeg_command(command: Any) -> list[str]:
     return [str(argument) for argument in command.compile()]
 
 
+def get_ffmpeg_output_path(command: Any, cmd_list: list[str]) -> str:
+    """Return ffmpeg-python's output filename without relying on argument order."""
+    nodes = [getattr(command, "node", None)]
+    visited: set[int] = set()
+
+    while nodes:
+        node = nodes.pop()
+        if node is None or id(node) in visited:
+            continue
+        visited.add(id(node))
+
+        kwargs = getattr(node, "kwargs", {})
+        filename = kwargs.get("filename") if isinstance(kwargs, dict) else None
+        if filename is not None:
+            return str(filename)
+
+        incoming_edges = getattr(node, "_KwargReprNode__incoming_edge_map", {})
+        if isinstance(incoming_edges, dict):
+            nodes.extend(edge[0] for edge in incoming_edges.values() if edge)
+
+    # Keep compatibility with lightweight command doubles used by callers.
+    return cmd_list[-1] if cmd_list else ""
+
+
 algorithm = "mobius"
 desat = 10.0
 
@@ -89,7 +113,7 @@ async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
     # FFREPORT defaults to a timestamped file in the current working
     # directory.  Keep each report beside its output, with a unique name so
     # concurrent or repeated runs do not overwrite an earlier report.
-    output_path = cmd_list[-1] if cmd_list else ""
+    output_path = get_ffmpeg_output_path(command, cmd_list)
     if output_path and output_path not in {"-", "pipe:"} and not output_path.startswith("pipe:"):
         report_path = Path(output_path).resolve().parent / f"ffmpeg-{uuid.uuid4().hex}.log"
         report_path.parent.mkdir(parents=True, exist_ok=True)
