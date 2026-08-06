@@ -1,8 +1,9 @@
 import asyncio
 import json
-from pathlib import Path
 
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any, cast
 
 from src.cogs.redaction import PathAwareEncoder
@@ -60,10 +61,17 @@ class Prep:
         Create Name
     """
 
-    def __init__(self, screens: int, img_host: str, config: dict[str, Any]) -> None:
+    def __init__(
+        self,
+        screens: int,
+        img_host: str,
+        config: dict[str, Any],
+        publish_preview: Callable[[str, str | None], None] | None = None,
+    ) -> None:
         self.screens = screens
         self.config = config
         self.img_host = img_host.lower()
+        self.publish_preview = publish_preview
         self.tvdb_handler = TvdbData(config)
         self.overrides = ApplyOverrides(config)
         self.audio_manager = AudioManager(config)
@@ -125,13 +133,8 @@ class Prep:
         meta_file.parent.mkdir(parents=True, exist_ok=True)
         async with aiofiles.open(meta_file, "w", encoding="utf-8") as snapshot:
             await snapshot.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
-        try:
-            from upload import _publish_webui_preview_target
-
-            _publish_webui_preview_target(str(meta.path or ""), meta.uuid)
-        except Exception:
-            # CLI preparation deliberately has no dependency on the WebUI server.
-            return
+        if self.publish_preview is not None:
+            self.publish_preview(str(meta.path or ""), meta.uuid)
 
     async def gather_prep(self, meta: Meta, mode: str) -> Meta:
         meta_start_time = time.time()

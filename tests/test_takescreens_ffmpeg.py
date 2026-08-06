@@ -5,6 +5,7 @@ import asyncio
 import sys
 from types import SimpleNamespace
 
+import ffmpeg
 import pytest
 
 from src import takescreens
@@ -36,12 +37,10 @@ async def test_run_ffmpeg_writes_report_next_to_output(tmp_path, monkeypatch):
     monkeypatch.setattr(takescreens.platform, "system", lambda: "Windows")
     monkeypatch.setattr(takescreens.asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
 
-    class Command:
-        def compile(self):
-            return ["ffmpeg", "-i", output.with_name("source.mkv"), output]
+    command = ffmpeg.input(str(output.with_name("source.mkv"))).output(str(output), vframes=1).global_args("-y", "-loglevel", "quiet")
 
-    process = await takescreens.run_ffmpeg(Command())
-    second_process = await takescreens.run_ffmpeg(Command())
+    process = await takescreens.run_ffmpeg(command)
+    second_process = await takescreens.run_ffmpeg(command)
 
     assert process == (0, b"", b"")
     assert second_process == (0, b"", b"")
