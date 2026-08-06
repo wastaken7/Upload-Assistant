@@ -237,7 +237,7 @@ class HawkeUno(UNIT3D):
             "category_id": 1 if meta.category == "MOVIE" else 2,
             "type_id": (await self.get_type_id(meta))["type_id"],
             "tmdb": meta.tmdb,
-            "anonymous": 1 if meta.anon else 0,
+            "anonymous": int(bool(meta.anon) or self.tracker_config.get("anon", False)),
             "imdb": meta.imdb_id,
         }
 
