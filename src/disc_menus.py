@@ -12,8 +12,8 @@ from pymediainfo import MediaInfo
 
 from src.console import logger
 from src.meta import Meta
-from src.temp_paths import menu_screenshots_dir
 from src.takescreens import screenshot_par_scale_factors, should_scale_screenshots_for_par
+from src.temp_paths import menu_screenshots_dir
 from src.uploadscreens import UploadScreensManager
 
 
