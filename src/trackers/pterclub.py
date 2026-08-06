@@ -41,11 +41,11 @@ class PTerClub:
 
     def __init__(self, config: Config) -> None:
         self.config: Config = config
-        self.passkey = str(config["TRACKERS"]["PTERCLUB"].get("passkey", "")).strip()
-        self.username = str(config["TRACKERS"]["PTERCLUB"].get("username", "")).strip()
-        self.password = str(config["TRACKERS"]["PTERCLUB"].get("password", "")).strip()
-        self.rehost_images = bool(config["TRACKERS"]["PTERCLUB"].get("img_rehost", False))
-        self.ptgen_api = str(config["TRACKERS"]["PTERCLUB"].get("ptgen_api", "")).strip()
+        self.passkey = str(config["TRACKERS"][self.tracker].get("passkey", "")).strip()
+        self.username = str(config["TRACKERS"][self.tracker].get("username", "")).strip()
+        self.password = str(config["TRACKERS"][self.tracker].get("password", "")).strip()
+        self.rehost_images = bool(config["TRACKERS"][self.tracker].get("img_rehost", False))
+        self.ptgen_api = str(config["TRACKERS"][self.tracker].get("ptgen_api", "")).strip()
         self.cookie_validator = CookieValidator(config)
 
     def _extract_auth_token(self, text: str, pattern: str) -> str:
