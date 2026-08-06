@@ -104,7 +104,7 @@ class BitHDTV:
             parsed_data: dict[str, Any] | None = cast(dict[str, Any] | None, parsed) if isinstance(parsed, dict) else None
             data_block: dict[str, Any] | None = parsed_data.get("data") if parsed_data else None
             if isinstance(data_block, dict) and "view" in data_block:
-                my_announce_url = self.config["TRACKERS"]["BITHDTV"].get("my_announce_url")
+                my_announce_url = self.config["TRACKERS"][self.tracker].get("my_announce_url")
                 if my_announce_url:
                     await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, my_announce_url, str(data_block["view"]))
                     return True

@@ -1217,15 +1217,16 @@ class DescriptionBuilder:
         if self.tracker in {"LAJIDUI", "LONGPT", "PTCAFE", "PTFANS", "PTGTK", "RAILGUNPT", "NEXUSPHP"} and meta.nexusphp_description:
             desc_parts.append(meta.nexusphp_description)
 
+        meta_description_value = meta.description
+        if isinstance(meta_description_value, str):
+            meta_description = meta_description_value
+        elif meta_description_value is None:
+            meta_description = ""
+        else:
+            meta_description = str(meta_description_value)
+
         # Description that may come from API requests
         if description:
-            meta_description_value = meta.description
-            if isinstance(meta_description_value, str):
-                meta_description = meta_description_value
-            elif meta_description_value is None:
-                meta_description = ""
-            else:
-                meta_description = str(meta_description_value)
             # Add FraMeSToR NFO to AITHER
             if self.tracker == "AITHER" and "framestor" in meta and meta.framestor:
                 nfo_content = meta.description_nfo_content
@@ -1268,7 +1269,12 @@ class DescriptionBuilder:
 
         # Description from file/pastebin link
         if user_description:
-            desc_parts.append(await self.get_user_description(meta))
+            user_description_content = await self.get_user_description(meta)
+            # ``gen_desc`` promotes a supplied file/link to ``meta.description``
+            # while retaining it as the user-description source.  Trackers that
+            # enable both sections must not render that same content twice.
+            if not description or user_description_content.strip() != meta_description.strip():
+                desc_parts.append(user_description_content)
 
         # Menu Screenshots
         if menu_screenshots:
