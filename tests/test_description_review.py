@@ -4,7 +4,7 @@ import asyncio
 import json
 
 from src.description_review import load_review
-from src.get_desc import gen_desc
+from src.get_desc import DescriptionBuilder, gen_desc
 from src.meta import Meta
 from web_ui import server
 
@@ -82,5 +82,39 @@ def test_base_description_is_kept_in_meta_without_creating_description_file(tmp_
 
         assert meta.description == "tracker text"
         assert not (tmp_path / "tmp" / "release" / "DESCRIPTION.txt").exists()
+
+    asyncio.run(run())
+
+
+def test_description_file_is_not_rendered_twice_when_both_sections_are_enabled(tmp_path):
+    async def run():
+        description_file = tmp_path / "description.txt"
+        description_file.write_text("release notes", encoding="utf-8")
+        meta = Meta({"base_dir": str(tmp_path), "uuid": "release", "description_file": str(description_file)})
+        await gen_desc(meta, None, None)
+        builder = DescriptionBuilder("TEST", {"DEFAULT": {}, "TRACKERS": {"TEST": {}}})
+
+        result = await builder.general_description_generator(
+            meta,
+            audio_spectrogram=False,
+            bluray=False,
+            book=False,
+            custom_header=False,
+            custom_signature=False,
+            description=True,
+            game=False,
+            languages=False,
+            logo=False,
+            mediainfo=False,
+            menu_screenshots=False,
+            nfo=False,
+            screenshots=False,
+            tonemapped_header=False,
+            tv_info=False,
+            ua_signature=False,
+            user_description=True,
+        )
+
+        assert result == "release notes"
 
     asyncio.run(run())
