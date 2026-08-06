@@ -10,8 +10,19 @@ class _FakeTrackerMetadataManager:
     def __init__(self) -> None:
         self.calls = 0
 
-    async def update_metadata_from_tracker(self, _tracker, _instance, meta, _search_term, _search_file_folder, _skip_descriptions):
+    async def update_metadata_from_tracker(
+        self,
+        _tracker,
+        _instance,
+        meta,
+        _search_term,
+        _search_file_folder,
+        _skip_descriptions,
+        *,
+        torrent_id="",
+    ):
         self.calls += 1
+        assert torrent_id == "12345"
         meta.imdb_id = 1602620
         meta.description = "Cached tracker description"
         return meta, True
