@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from unidecode import unidecode
 
 from src.cogs.redaction import Redaction
-from src.console import console, logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa #F405
 from src.meta import Meta
@@ -277,7 +277,11 @@ class ToTheGlory:
                 if meta and meta.unattended and not meta.unattended_confirm:
                     logger.error(f"{self.tracker}: [red]Unattended mode: 2FA required. Skipping login.[/red]")
                     return
-                two_factor_data = {"otp": console.input(f"[yellow]{self.tracker} 2FA Code: "), "authenticity_token": auth_token, "uid": self.uid}
+                two_factor_data: dict[str, Any] = {
+                    "otp": await prompt_in_thread(cli_ui.ask_string, f"{self.tracker} 2FA Code:", default="") or "",
+                    "authenticity_token": auth_token,
+                    "uid": self.uid,
+                }
                 two_factor_url = f"{self.base_url}/take2fa.php"
                 response = await client.post(two_factor_url, data=two_factor_data)
                 await asyncio.sleep(0.5)

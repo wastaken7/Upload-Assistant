@@ -17,7 +17,7 @@ import httpx
 
 from src.args import Args
 from src.cleanup import cleanup_manager
-from src.console import console, logger
+from src.console import logger, prompt_in_thread
 from src.imdb import imdb_manager
 from src.meta import Meta
 from src.metadata_cache import cache_for, is_cache_miss
@@ -379,7 +379,7 @@ async def get_tmdb_from_imdb(
     # **User Prompt for Manual TMDb ID Entry**
     if tmdb_id in ("None", "", None, 0, "0") and mode == "cli":
         logger.info("[yellow]Unable to find a matching TMDb entry[/yellow]")
-        tmdb_input = console.input("Please enter TMDb ID (format: tv/12345 or movie/12345): ") or ""
+        tmdb_input = await prompt_in_thread(cli_ui.ask_string, "Please enter TMDb ID (format: tv/12345 or movie/12345): ", default="") or ""
         category, tmdb_id = _get_parser().parse_tmdb_id(tmdb_input, category)
 
     return category, tmdb_id, original_language, filename_search
@@ -721,7 +721,7 @@ async def get_tmdb_id(
                         while True:
                             logger.info("Enter the number of the correct entry, or manual TMDb ID (tv/12345 or movie/12345):")
                             try:
-                                selection = cli_ui.ask_string("Or push enter to try a different search: ") or ""
+                                selection = await prompt_in_thread(cli_ui.ask_string, "Or push enter to try a different search: ") or ""
                             except EOFError:
                                 logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                                 await cleanup_manager.cleanup()
@@ -917,7 +917,7 @@ async def get_tmdb_id(
     # No match found, prompt user if in CLI mode
     logger.info("[bold red]Unable to find TMDb match using any search[/bold red]")
     try:
-        tmdb_input = cli_ui.ask_string("Please enter TMDb ID in this format: tv/12345 or movie/12345")
+        tmdb_input = await prompt_in_thread(cli_ui.ask_string, "Please enter TMDb ID in this format: tv/12345 or movie/12345")
     except EOFError:
         logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
         await cleanup_manager.cleanup()

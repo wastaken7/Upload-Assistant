@@ -15,7 +15,7 @@ from defusedxml import ElementTree
 from rich.markup import escape
 
 from src.cogs.redaction import Redaction
-from src.console import console, logger
+from src.console import logger, prompt_in_thread
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
@@ -601,12 +601,12 @@ class MoreThanTV:
                                 if meta and meta.unattended and not meta.unattended_confirm:
                                     logger.error(f"{self.tracker}: [red]Unattended mode: 2FA required. Skipping login.[/red]")
                                     return False
-                                mfa_code = console.input(f"[yellow]{self.tracker} 2FA Code: ")
+                                mfa_code = await prompt_in_thread(cli_ui.ask_string, f"{self.tracker} 2FA Code:", default="") or ""
                         else:
                             if meta and meta.unattended and not meta.unattended_confirm:
                                 logger.error(f"{self.tracker}: [red]Unattended mode: 2FA required. Skipping login.[/red]")
                                 return False
-                            mfa_code = console.input(f"[yellow]{self.tracker} 2FA Code: ")
+                            mfa_code = await prompt_in_thread(cli_ui.ask_string, f"{self.tracker} 2FA Code:", default="") or ""
 
                         two_factor_token = resp.text.rsplit('name="token" value="', 1)[1][:48]
                         two_factor_payload = {"token": two_factor_token, "code": mfa_code, "submit": "login"}

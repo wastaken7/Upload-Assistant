@@ -18,7 +18,7 @@ import httpx
 import requests
 
 from src.btnid import BtnIdManager
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.meta import Meta
 from src.metadata_cache import is_cache_miss, tracker_metadata_cache_for
 from src.tracker_descriptions import description_fingerprint
@@ -210,7 +210,7 @@ class TrackerDataManager:
             logger.info("[cyan]Tracker metadata candidates:[/cyan]")
             for index, (tracker_name, candidate, score) in enumerate(ranked, start=1):
                 logger.info(f"  {index}. {tracker_name}: score {score}, {candidate.name or candidate.filename}")
-            choice = await asyncio.to_thread(cli_ui.ask_string, f"Choose a tracker candidate [1-{len(ranked)}] (Enter for best): ")
+            choice = await prompt_in_thread(cli_ui.ask_string, f"Choose a tracker candidate [1-{len(ranked)}] (Enter for best): ")
             if choice and choice.strip().isdigit():
                 selected = int(choice.strip()) - 1
                 if 0 <= selected < len(ranked):
@@ -244,7 +244,7 @@ class TrackerDataManager:
                 await asyncio.to_thread(save_review, temp_dir, candidate.description, version)
             return
         logger.info(f"[cyan]Selected description from {tracker_name}:[/cyan]\n{candidate.description[:1000]}", extra={"markup": False})
-        choice = await asyncio.to_thread(cli_ui.ask_string, "\nEnter 'e' to edit, 'd' to discard the description, or press Enter to keep it: ")
+        choice = await prompt_in_thread(cli_ui.ask_string, "\nEnter 'e' to edit, 'd' to discard the description, or press Enter to keep it: ")
         choice = (choice or "").strip().lower()
         if choice == "e":
             edited = await asyncio.to_thread(click.edit, candidate.description)
