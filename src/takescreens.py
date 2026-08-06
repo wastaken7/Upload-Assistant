@@ -2,7 +2,6 @@
 import asyncio
 import contextlib
 import gc
-import glob
 import json
 import os
 import platform
@@ -103,6 +102,29 @@ def _apply_config(config: Mapping[str, Any]) -> None:
         desat = float(default_config.get("desat", 10.0))
     except TypeError, ValueError:
         desat = 10.0
+
+
+def discard_smallest_capture_result(capture_results: list[str]) -> str | None:
+    """Delete and remove the smallest image produced by this capture batch."""
+    smallest: str | None = None
+    smallest_size = float("inf")
+    for image in capture_results:
+        try:
+            image_size = Path(image).stat().st_size
+        except FileNotFoundError:
+            logger.info(f"[red]File not found: {image}[/red]")
+            continue
+        if image_size < smallest_size:
+            smallest = image
+            smallest_size = image_size
+
+    if smallest is None:
+        return None
+
+    logger.debug(f"[yellow]Removing smallest image: {smallest} ({smallest_size} bytes)[/yellow]")
+    Path(smallest).unlink()
+    capture_results.remove(smallest)
+    return smallest
 
 
 async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
@@ -718,25 +740,7 @@ async def dvd_screenshots(
     capture_results = [r[1] for r in filtered_results if r[1] is not None]
 
     if capture_results and len(capture_results) > num_screens:
-        smallest = None
-        smallest_size = float("inf")
-        matching_files = [str(p) for p in screenshot_dir.glob(f"{glob.escape(sanitized_disc_name)}-*")]
-        normal_screens = [Path(f).name for f in matching_files if re.match(r"^-\d+\.png$", Path(f).name[len(sanitized_disc_name) :])]
-        for screens in normal_screens:
-            screen_path = screenshot_dir / screens
-            try:
-                screen_size = Path(screen_path).stat().st_size
-                if screen_size < smallest_size:
-                    smallest_size = screen_size
-                    smallest = screen_path
-            except FileNotFoundError:
-                logger.info(f"[red]File not found: {screen_path}[/red]")  # Handle potential edge cases
-                continue
-
-        if smallest:
-            logger.debug(f"[yellow]Removing smallest image: {smallest} ({smallest_size} bytes)[/yellow]")
-            Path(smallest).unlink()
-            capture_results.remove(smallest)
+        discard_smallest_capture_result(capture_results)
 
     valid_results: list[str] = []
     remaining_retakes: list[str] = []
