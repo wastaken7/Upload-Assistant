@@ -920,7 +920,7 @@ async def search_metadata(
 
     # if there's no region/distributor info, lets ping some unit3d trackers and see if we get it
     ping_unit3d_config = prep_instance.config["DEFAULT"].get("ping_unit3d", False)
-    if (not meta.region or not meta.distributor) and meta.is_disc == "BDMV" and ping_unit3d_config and not meta.edit and not meta.site_check:
+    if (not meta.region or not meta.distributor) and meta.is_disc in ("BDMV", "DVD") and ping_unit3d_config and not meta.edit and not meta.site_check:
         await prep_instance.tracker_data_manager.ping_unit3d(meta)
 
     # the first user override check that allows to set metadata ids.
