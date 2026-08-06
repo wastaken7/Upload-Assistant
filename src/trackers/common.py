@@ -2580,10 +2580,14 @@ class Common:
         raw_api_key = self.config["TRACKERS"][tracker].get("api_key")
         api_key = str(raw_api_key).strip() if raw_api_key else ""
         params: dict[str, str] = {"api_token": api_key}
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        }
         url = f"{torrent_url}{id}"
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(url=url, params=params)
+                response = await client.get(url=url, params=params, headers=headers)
                 json_response = response.json()
         except (httpx.RequestError, httpx.TimeoutException) as e:
             logger.info(f"[yellow]Request error in unit3d_region_distributor: {e}[/yellow]")
@@ -2636,6 +2640,10 @@ class Common:
         raw_api_key = self.config["TRACKERS"][tracker].get("api_key")
         api_key = str(raw_api_key).strip() if raw_api_key else ""
         params: dict[str, Any] = {"api_token": api_key}
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        }
 
         # Determine the search method and add parameters accordingly
         if file_name:
@@ -2653,7 +2661,7 @@ class Common:
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 logger.info(f"Searching for information on [bold cyan]{tracker}[/bold cyan]")
-                response = await client.get(url=url, params=params)
+                response = await client.get(url=url, params=params, headers=headers)
                 json_response = response.json()
         except (httpx.RequestError, httpx.TimeoutException) as e:
             logger.info(f"[yellow]Request error in unit3d_torrent_info: {e}[/yellow]")
@@ -2683,12 +2691,12 @@ class Common:
                 tvdb = 0 if tvdb == 0 else tvdb
                 mal = 0 if mal == 0 else mal
                 imdb = 0 if imdb == 0 else imdb
-                if not meta.region and meta.is_disc == "BDMV":
+                if not meta.region and meta.is_disc in ("BDMV", "DVD"):
                     region_id = attributes.get("region_id")
                     region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                     if region_name:
                         meta.region = region_name
-                if not meta.distributor and meta.is_disc == "BDMV":
+                if not meta.distributor and meta.is_disc in ("BDMV", "DVD"):
                     distributor_id = attributes.get("distributor_id")
                     distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                     if distributor_name:
@@ -2710,12 +2718,12 @@ class Common:
                     tvdb = 0 if tvdb == 0 else tvdb
                     mal = 0 if mal == 0 else mal
                     imdb = 0 if imdb == 0 else imdb
-                    if not meta.region and meta.is_disc == "BDMV":
+                    if not meta.region and meta.is_disc in ("BDMV", "DVD"):
                         region_id = attributes.get("region_id")
                         region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                         if region_name:
                             meta.region = region_name
-                    if not meta.distributor and meta.is_disc == "BDMV":
+                    if not meta.distributor and meta.is_disc in ("BDMV", "DVD"):
                         distributor_id = attributes.get("distributor_id")
                         distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                         if distributor_name:
