@@ -1503,11 +1503,13 @@ class DescriptionBuilder:
                             desc_parts.append(f"[spoiler={edition}][code]{summary}[/code][/spoiler]\n\n")
                             logger.debug("[yellow]Using original uploaded images for first disc")
                             desc_parts.append("[center]")
-                            for img in meta[new_images_key]:
+                            for img_index, img in enumerate(meta[new_images_key]):
                                 web_url = img["web_url"]
                                 raw_url = img["raw_url"]
                                 img_url = img.get("img_url", raw_url)
                                 desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
+                                if screens_per_row and (img_index + 1) % screens_per_row == 0:
+                                    desc_parts.append("\n")
                             desc_parts.append("[/center]\n\n")
                         else:
                             desc_parts.append("[center]\n\n")
@@ -1542,11 +1544,13 @@ class DescriptionBuilder:
                                     )
 
                                 desc_parts.append("[center]")
-                                for img in uploaded_images:
+                                for img_index, img in enumerate(uploaded_images):
                                     web_url = img["web_url"]
                                     raw_url = img["raw_url"]
                                     img_url = img.get("img_url", raw_url) or ""
                                     desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
+                                    if screens_per_row and (img_index + 1) % screens_per_row == 0:
+                                        desc_parts.append("\n")
                                 desc_parts.append("[/center]\n\n")
 
                             meta_filename = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json"
@@ -1627,11 +1631,13 @@ class DescriptionBuilder:
                             desc_parts.append("[/center]\n\n")
                             # Use existing URLs from meta to write to descfile
                             desc_parts.append("[center]")
-                            for img in meta[new_images_key]:
+                            for img_index, img in enumerate(meta[new_images_key]):
                                 web_url = img["web_url"]
                                 raw_url = img["raw_url"]
                                 img_url = img.get("img_url", raw_url)
                                 desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
+                                if screens_per_row and (img_index + 1) % screens_per_row == 0:
+                                    desc_parts.append("\n")
                             desc_parts.append("[/center]\n\n")
                         else:
                             # Increment retry_count for tracking but use unique disc keys for each disc
@@ -1681,11 +1687,13 @@ class DescriptionBuilder:
 
                                 # Write new URLs to descfile
                                 desc_parts.append("[center]")
-                                for img in uploaded_images:
+                                for img_index, img in enumerate(uploaded_images):
                                     web_url = img["web_url"]
                                     raw_url = img["raw_url"]
                                     img_url = img.get("img_url", raw_url) or ""
                                     desc_parts.append(self.format_screenshot(web_url, raw_url, img_url, thumb_size))
+                                    if screens_per_row and (img_index + 1) % screens_per_row == 0:
+                                        desc_parts.append("\n")
                                 desc_parts.append("[/center]\n\n")
 
                             # Save the updated meta to `meta.json` after upload
@@ -1887,13 +1895,15 @@ class DescriptionBuilder:
                 elif multi_screens != 0 and new_images_key in meta and meta[new_images_key]:
                     desc_parts.append("[center]")
                     char_count += len("[center]")
-                    for img in meta[new_images_key]:
+                    for img_index, img in enumerate(meta[new_images_key]):
                         web_url = img["web_url"]
                         raw_url = img["raw_url"]
                         img_url = img.get("img_url", raw_url)
                         image_str = self.format_screenshot(web_url, raw_url, img_url, thumb_size)
                         desc_parts.append(image_str)
                         char_count += len(image_str)
+                        if screens_per_row and (img_index + 1) % screens_per_row == 0:
+                            desc_parts.append("\n")
                     desc_parts.append("[/center]\n\n")
                     char_count += len("[/center]\n\n")
 
