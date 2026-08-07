@@ -10,13 +10,7 @@ The installer includes the Python runtime, dependencies, FFmpeg, and MediaInfo n
 
 ## Create the configuration
 
-The configuration must be created after installing Upload Assistant. In a new terminal, run:
-
-```powershell
-ua-config
-```
-
-Follow the prompts to add your API keys and tracker credentials. Complete this step before the first upload.
+The first Upload Assistant launch creates `data/config.py` from the bundled example automatically. Start the Web UI and use its configuration editor to add API keys, tracker credentials, and torrent clients before your first upload.
 
 ## Basic commands
 
@@ -38,4 +32,4 @@ Update the installed version:
 ua-update
 ```
 
-If Windows does not recognize `ua` or `ua-config`, close and reopen the terminal so it reloads the updated `PATH`.
+If Windows does not recognize `ua`, close and reopen the terminal so it reloads the updated `PATH`.

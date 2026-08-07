@@ -210,5 +210,5 @@ Run:
   ./run-ua.sh "/path/to/content" --trackers yourtracker
 
 Optional next steps:
-  - Configure UA with: ${UA_DIR}/.venv/bin/python ${UA_DIR}/config-generator.py
+  - Start the Web UI and configure UA in its configuration editor.
 EOF

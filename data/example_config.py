@@ -3,6 +3,8 @@ from typing import Any
 
 config: dict[str, Any] = {
     "DEFAULT": {
+        # Internal schema marker. Upload Assistant updates this when it adds new default settings.
+        "config_schema_version": 1,
         # MAIN SETTINGS
         # will print a notice if an update is available
         "update_notification": True,
