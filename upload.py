@@ -42,7 +42,6 @@ from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.cogs.redaction import PathAwareEncoder, Redaction
 from src.config_helpers import format_terminal_link
-from src.config_sync import ensure_config_exists, find_obsolete_config_paths, sync_config_schema
 from src.console import current_release_log_path, logger  # pyright: ignore[reportUnknownVariableType]
 from src.console import rich_handler as _rich_handler
 from src.disc_menus import process_disc_menus
@@ -168,11 +167,9 @@ _defaults_data_dir = Path(base_dir) / "defaults" / "data"
 # Directories that should never be copied into user-facing data/
 _SKIP_DIRS = {"__pycache__", ".mypy_cache", ".ruff_cache"}
 
-# Built-in schema/metadata files that should track the image version even when
+# Built-in metadata files that should track the image version even when
 # /Upload-Assistant/data is a persistent volume from an older container.
-# example_config.py is not user configuration: schema sync, tracker setup, and
-# the Web UI must all see the bundled version after a Docker image upgrade.
-_ALWAYS_SYNC_ROOT_FILES = {"example_config.py", "version.py"}
+_ALWAYS_SYNC_ROOT_FILES = {"version.py"}
 
 if Path(_defaults_data_dir).is_dir():
     Path(_data_dir).mkdir(parents=True, exist_ok=True)
@@ -228,46 +225,20 @@ if Path(_defaults_data_dir).is_dir():
         logger.info("[yellow]  e.g. on the host: chown -R 1000:1000 /path/to/data[/yellow]")
 
 _config_path = Path(_data_dir) / "config.py"
-_example_config_path = Path(_data_dir) / "example_config.py"
 
 # Detect -webui or --webui forms, including --webui=host:port
 _is_webui_arg = any((arg == "-webui" or arg == "--webui" or arg.startswith("-webui=") or arg.startswith("--webui=")) for arg in sys.argv)
-# All entry points bootstrap a usable config. The Web UI is the recommended editor.
-try:
-    if ensure_config_exists(Path(_config_path), Path(_example_config_path)):
-        logger.info("No config.py found. Created it from example_config.py. Use the Web UI to configure Upload Assistant.", extra={"markup": False})
-except OSError as e:
-    logger.warning(f"Failed to create default config: {e}", extra={"markup": False})
-    logger.warning("Continuing without config file...", extra={"markup": False})
-
-# Keep existing configurations compatible with settings added in newer releases.
-# This must happen before importing data.config, but never block automation or help.
-_is_unattended_arg = any(arg in ("-ua", "--unattended") for arg in sys.argv[1:])
-_is_help_arg = any(arg in ("-h", "--help") for arg in sys.argv[1:])
-_stdin_is_tty = bool(getattr(sys.stdin, "isatty", None)) and sys.stdin.isatty()
-_can_prompt_for_config_sync = not _is_unattended_arg and not _is_webui_arg and _stdin_is_tty
-if Path(_config_path).exists() and Path(_example_config_path).exists() and not _is_help_arg:
-    try:
-        _added_config_paths = sync_config_schema(
-            Path(_config_path),
-            Path(_example_config_path),
-            prompt_for_required=_can_prompt_for_config_sync,
-            prompt_for_obsolete=_can_prompt_for_config_sync,
-        )
-        if _added_config_paths:
-            logger.info(
-                f"Updated config.py with {len(_added_config_paths)} new setting(s); backup saved as {_config_path}.bak.",
-                extra={"markup": False},
-            )
-            logger.debug("Added config settings: %s", ", ".join(_added_config_paths))
-        _obsolete_config_paths = find_obsolete_config_paths(Path(_config_path), Path(_example_config_path))
-        if _obsolete_config_paths and not _can_prompt_for_config_sync:
-            logger.warning(
-                f"Keeping {len(_obsolete_config_paths)} obsolete config setting(s) because this run cannot confirm removal.",
-                extra={"markup": False},
-            )
-    except Exception as exc:
-        logger.warning(f"Could not update config.py with new defaults: {exc}", extra={"markup": False})
+# Auto-create config.py from example on first WebUI start
+if _is_webui_arg and not Path(_config_path).exists():
+    _example_config_path = Path(_data_dir) / "example_config.py"
+    if Path(_example_config_path).exists():
+        logger.info("No config.py found. Creating default config from example_config.py...", extra={"markup": False})
+        try:
+            shutil.copy2(_example_config_path, _config_path)
+            logger.info("Default config created successfully!", extra={"markup": False})
+        except Exception as e:
+            logger.info(f"Failed to create default config: {e}", extra={"markup": False})
+            logger.info("Continuing without config file...", extra={"markup": False})
 
 from src.book_prep import sanitize_book_author, sanitize_book_language
 from src.meta import Meta

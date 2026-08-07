@@ -28,6 +28,7 @@ SetupIconFile=logo.ico
 UninstallDisplayIcon={app}\logo.ico
 
 [Tasks]
+Name: "configure"; Description: "Open the configuration wizard after installation"; Flags: checkedonce
 
 [Files]
 Source: "..\build\payload\source\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
@@ -38,7 +39,9 @@ Source: "..\build\payload\wheels\*"; DestDir: "{tmp}\wheels"; Flags: recursesubd
 Source: "install-bundled-windows.ps1"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
+Name: "{autoprograms}\Upload Assistant Configuration"; Filename: "{app}\bin\ua-config.cmd"
 Name: "{autoprograms}\Upload Assistant Command Prompt"; Filename: "{cmd}"; Parameters: "/k set PATH={app}\bin;%PATH% & title Upload Assistant"
 
 [Run]
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{tmp}\install-bundled-windows.ps1"" -InstallDir ""{app}"" -PythonInstaller ""{tmp}\python-installer.exe"" -FfmpegArchive ""{tmp}\ffmpeg.zip"" -Wheelhouse ""{tmp}\wheels"""; StatusMsg: "Installing Upload Assistant and its bundled tools (this may take a while)..."; Flags: waituntilterminated runhidden
+Filename: "{app}\bin\ua-config.cmd"; Description: "Configure Upload Assistant now"; Flags: postinstall nowait skipifsilent unchecked; Tasks: configure

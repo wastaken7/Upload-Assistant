@@ -29,9 +29,15 @@ ghcr.io/wastaken7/upload-assistant:latest /downloads/path/to/content --help
 
 The paths in your config file need to refer to paths inside the docker image, same with path provided for file. May need to utilize remote path mapping for your client.
 
-## Configuration
+## Config-generator
 
-On first launch, Upload Assistant creates `data/config.py` from the bundled example. Use the Web UI configuration editor to configure it, or edit the mounted `config.py` on the host.
+```
+docker run --rm -it --network=host \
+-v /full/path/to/config.py:/Upload-Assistant/data/config.py \
+-v /full/path/to/downloads:/downloads \
+--entrypoint python \
+ghcr.io/wastaken7/upload-assistant:latest /Upload-Assistant/config-generator.py
+```
 
 ## What if I want to utilize re-using torrents and I use qbit?
 
