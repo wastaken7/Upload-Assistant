@@ -40,6 +40,7 @@ ffmpeg_is_good = False
 use_libplacebo = True
 tone_map = False
 ffmpeg_compression = "6"
+LOSTIMG_MAX_SIZE = 20_000_000
 
 
 def compile_ffmpeg_command(command: Any) -> list[str]:
@@ -427,6 +428,12 @@ async def disc_screenshots(
                     else:
                         logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
                         retake = True
+                elif img_host == "lostimg":
+                    if 75000 < image_size <= LOSTIMG_MAX_SIZE:
+                        logger.debug(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
+                    else:
+                        logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
+                        retake = True
                 elif img_host and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "passtheimage", "seedpool_cdn", "sharex", "utppm"]:
                     logger.debug(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
                 else:
@@ -453,6 +460,10 @@ async def disc_screenshots(
                                 valid_image = True
                         elif img_host and img_host in ["imgbox", "pixhost"]:
                             if new_size > 75000 and new_size <= 10000000:
+                                logger.info(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
+                                valid_image = True
+                        elif img_host == "lostimg":
+                            if 75000 < new_size <= LOSTIMG_MAX_SIZE:
                                 logger.info(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
                                 valid_image = True
                         elif (
@@ -1866,6 +1877,12 @@ async def screenshots(
                     else:
                         logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
                         retake = True
+                elif img_host == "lostimg":
+                    if 75000 < image_size <= LOSTIMG_MAX_SIZE:
+                        logger.debug(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
+                    else:
+                        logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
+                        retake = True
                 elif img_host and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "passtheimage", "seedpool_cdn", "sharex", "utppm"]:
                     logger.debug(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
                 else:
@@ -1913,6 +1930,10 @@ async def screenshots(
                                 if 75000 < new_size <= 10000000:
                                     logger.info(f"[green]Successfully retaken screenshot for: {screenshot_path} ({new_size} bytes)[/green]")
                                     valid_image = True
+                            elif img_host == "lostimg":
+                                if 75000 < new_size <= LOSTIMG_MAX_SIZE:
+                                    logger.info(f"[green]Successfully retaken screenshot for: {screenshot_path} ({new_size} bytes)[/green]")
+                                    valid_image = True
                             elif (
                                 img_host
                                 and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
@@ -1954,6 +1975,9 @@ async def screenshots(
                             valid_image = True
                     elif img_host and img_host in ["imgbox", "pixhost"]:
                         if 75000 < new_size <= 10000000:
+                            valid_image = True
+                    elif img_host == "lostimg":
+                        if 75000 < new_size <= LOSTIMG_MAX_SIZE:
                             valid_image = True
                     elif (
                         img_host
