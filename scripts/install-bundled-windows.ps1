@@ -167,11 +167,12 @@ function Write-Launchers {
     )
 
     New-Item -ItemType Directory -Path $LauncherDirectory -Force | Out-Null
+    Remove-Item -LiteralPath (Join-Path $LauncherDirectory "ua-config.cmd") -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $LauncherDirectory "ua-config.ps1") -Force -ErrorAction SilentlyContinue
     $escapedAppDirectory = $AppDirectory.Replace('"', '""')
     $launchers = @{
         "ua.cmd" = "@echo off`r`npowershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$escapedAppDirectory\run-ua.ps1`" %*`r`nexit /b %errorlevel%`r`n"
         "ua-update.cmd" = "@echo off`r`npowershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$escapedAppDirectory\scripts\update-windows.ps1`" -UaDir `"$escapedAppDirectory`" -PythonInstallDir `"$escapedAppDirectory\python`" -LauncherDir `"$escapedAppDirectory\bin`" -FfmpegInstallDir `"$escapedAppDirectory\ffmpeg`" %*`r`nexit /b %errorlevel%`r`n"
-        "ua-config.cmd" = "@echo off`r`npushd `"$escapedAppDirectory`"`r`n`"$escapedAppDirectory\.venv\Scripts\python.exe`" `"$escapedAppDirectory\config-generator.py`" %*`r`nset `"exit_code=%errorlevel%`"`r`npopd`r`nexit /b %exit_code%`r`n"
     }
 
     foreach ($launcher in $launchers.GetEnumerator()) {
@@ -258,4 +259,4 @@ Add-DirectoryToUserPath -DirectoryPath (Join-Path $ffmpegDir "bin")
 Write-Step "Installing Upload Assistant dependencies"
 Invoke-Process -FilePath $venvPython -Description "Bundled pip upgrade" -ArgumentList @("-m", "pip", "install", "--no-index", "--find-links", $resolvedWheelhouse, "--upgrade", "pip")
 Invoke-Process -FilePath $venvPython -Description "Bundled base dependency installation" -ArgumentList @("-m", "pip", "install", "--no-index", "--find-links", $resolvedWheelhouse, "-r", (Join-Path $resolvedInstallDir "requirements.txt"))
-Write-Step "Installation complete. Run ua-config before the first upload."
+Write-Step "Installation complete. Use the Web UI configuration editor before the first upload."

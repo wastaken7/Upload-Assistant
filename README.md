@@ -272,26 +272,19 @@ pip3 install --user -U -r requirements.txt
 
 You need to add your API keys (like TMDb) and tracker credentials so the tool knows where to upload.
 
-#### Method A: Use the Web UI (Easiest)
+#### Use the Web UI (Recommended)
 
-If you plan to use the Web UI, **your configuration file will be generated automatically** when you launch and configure it for the first time.
+On the first launch, Upload Assistant automatically creates `data/config.py` from the bundled example. Start the Web UI and use its configuration editor to add API keys, tracker credentials, and torrent clients.
 
-#### Method B: Use the Interactive Generator
+```bash
+python upload.py --webui 127.0.0.1:5000
+```
 
-In your terminal, run the command for your operating system and follow the on-screen prompts:
+#### Manual configuration
 
-- **Windows:** Install with the [`.exe` installer](docs/windows-install.md), then run `ua-config` in a new terminal.
-- **Linux / macOS:**
+If you do not use the Web UI, edit the generated `data/config.py` in a text editor.
 
-  ```bash
-  python3 config-generator.py
-  ```
-
-#### Method C: Manual Configuration
-
-1. Go to the `data/` folder inside the project.
-2. Copy `example_config.py` and rename the copy to `config.py` (leave the original `example_config.py` file as-is).
-3. Open `config.py` in a text editor (like Notepad, VS Code, or TextEdit) and fill in your information.
+1. Open `data/config.py` in a text editor (like Notepad, VS Code, or TextEdit) and fill in your information.
    - For detailed info on what each setting does, see [Example Config Docs](docs/example-config.md).
    - Get a free TMDb API key from [TheMovieDB API settings](https://www.themoviedb.org/settings/api).
 
@@ -317,9 +310,7 @@ In your terminal, run the command for your operating system and follow the on-sc
 - For the Windows installation, run `ua-update`.
 - Run the command to update dependencies:
   - **Linux / macOS:** `python3 -m pip install --user -U -r requirements.txt`
-- Run the configuration generator to fetch any new settings:
-  - **Windows:** run `ua-config` from any folder.
-  - **Linux / macOS:** `python3 config-generator.py`
+- New settings are synchronized automatically the next time Upload Assistant runs. Use the Web UI configuration editor to review or change settings.
 
 ## **CLI Usage:**
 

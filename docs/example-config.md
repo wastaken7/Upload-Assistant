@@ -6,11 +6,8 @@ Upload Assistant loads configuration from `data/config.py`.
 
 ## How to use
 
-- Generate a config interactively:
-  - Run `python config-generator.py` from the repo root.
-- Or create your config manually:
-  - Copy `data/example_config.py` to `data/config.py`
-  - Edit `data/config.py` with your own values
+- Upload Assistant creates `data/config.py` from this example on its first launch.
+- Use the Web UI configuration editor to change values, or edit `data/config.py` manually.
 
 ## Config file shape
 
