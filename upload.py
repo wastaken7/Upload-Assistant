@@ -237,14 +237,15 @@ try:
     if ensure_config_exists(Path(_config_path), Path(_example_config_path)):
         logger.info("No config.py found. Created it from example_config.py. Use the Web UI to configure Upload Assistant.", extra={"markup": False})
 except OSError as e:
-    logger.info(f"Failed to create default config: {e}", extra={"markup": False})
-    logger.info("Continuing without config file...", extra={"markup": False})
+    logger.warning(f"Failed to create default config: {e}", extra={"markup": False})
+    logger.warning("Continuing without config file...", extra={"markup": False})
 
 # Keep existing configurations compatible with settings added in newer releases.
 # This must happen before importing data.config, but never block automation or help.
 _is_unattended_arg = any(arg in ("-ua", "--unattended") for arg in sys.argv[1:])
 _is_help_arg = any(arg in ("-h", "--help") for arg in sys.argv[1:])
-_can_prompt_for_config_sync = not _is_unattended_arg and not _is_webui_arg and sys.stdin.isatty()
+_stdin_is_tty = bool(getattr(sys.stdin, "isatty", None)) and sys.stdin.isatty()
+_can_prompt_for_config_sync = not _is_unattended_arg and not _is_webui_arg and _stdin_is_tty
 if Path(_config_path).exists() and Path(_example_config_path).exists() and not _is_help_arg:
     try:
         _added_config_paths = sync_config_schema(
@@ -265,7 +266,7 @@ if Path(_config_path).exists() and Path(_example_config_path).exists() and not _
                 f"Keeping {len(_obsolete_config_paths)} obsolete config setting(s) because this run cannot confirm removal.",
                 extra={"markup": False},
             )
-    except OSError as exc:
+    except Exception as exc:
         logger.warning(f"Could not update config.py with new defaults: {exc}", extra={"markup": False})
 
 from src.book_prep import sanitize_book_author, sanitize_book_language

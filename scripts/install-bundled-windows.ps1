@@ -167,6 +167,8 @@ function Write-Launchers {
     )
 
     New-Item -ItemType Directory -Path $LauncherDirectory -Force | Out-Null
+    Remove-Item -LiteralPath (Join-Path $LauncherDirectory "ua-config.cmd") -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $LauncherDirectory "ua-config.ps1") -Force -ErrorAction SilentlyContinue
     $escapedAppDirectory = $AppDirectory.Replace('"', '""')
     $launchers = @{
         "ua.cmd" = "@echo off`r`npowershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$escapedAppDirectory\run-ua.ps1`" %*`r`nexit /b %errorlevel%`r`n"

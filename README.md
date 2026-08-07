@@ -276,6 +276,10 @@ You need to add your API keys (like TMDb) and tracker credentials so the tool kn
 
 On the first launch, Upload Assistant automatically creates `data/config.py` from the bundled example. Start the Web UI and use its configuration editor to add API keys, tracker credentials, and torrent clients.
 
+```bash
+python upload.py --webui 127.0.0.1:5000
+```
+
 #### Manual configuration
 
 If you do not use the Web UI, edit the generated `data/config.py` in a text editor.

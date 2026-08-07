@@ -7,6 +7,7 @@ import re
 import shutil
 import sys
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -150,8 +151,20 @@ def _apply_source_edits(source: str, edits: list[tuple[int, int, str]]) -> str:
     return source
 
 
-def _offset(lines: list[str], line: int, column: int) -> int:
-    return sum(len(item) for item in lines[: line - 1]) + column
+def _line_offsets(lines: list[str]) -> list[int]:
+    offsets: list[int] = []
+    offset = 0
+    for line in lines:
+        offsets.append(offset)
+        offset += len(line)
+    return offsets
+
+
+def _offset(lines: list[str], line: int, column: int, offsets: list[int] | None = None) -> int:
+    """Convert AST UTF-8 byte columns to Python string offsets."""
+    offsets = offsets or _line_offsets(lines)
+    prefix = lines[line - 1].encode("utf-8")[:column].decode("utf-8")
+    return offsets[line - 1] + len(prefix)
 
 
 def _migrate_tracker_aliases(source: str, config_node: ast.Dict, config: ConfigDict) -> tuple[str, list[str]]:
@@ -217,7 +230,7 @@ def _collect_missing_values(template: ConfigDict, config: ConfigDict) -> dict[tu
         if section == "TORRENT_CLIENTS":
             clients = config.get(section)
             if not isinstance(clients, Mapping):
-                add((), section, {})
+                add((), section, template_section)
                 continue
             for name, client in clients.items():
                 if not isinstance(name, str) or not isinstance(client, Mapping):
@@ -244,9 +257,12 @@ def _collect_obsolete_paths(config: ConfigDict, template: ConfigDict) -> list[tu
     """
     obsolete: list[tuple[str, ...]] = []
 
+    default_keys = set(template.get("DEFAULT", {}))
+
     def walk(current: Mapping[str, Any], example: Mapping[str, Any], path: tuple[str, ...]) -> None:
         for key, value in current.items():
-            if key not in example:
+            tracker_override = len(path) == 2 and path[0] == "TRACKERS" and key in default_keys
+            if key not in example and not tracker_override:
                 obsolete.append((*path, key))
             elif isinstance(value, Mapping) and isinstance(example[key], Mapping):
                 walk(value, example[key], (*path, key))
@@ -286,11 +302,8 @@ def _apply_additions(
     removal_edits: list[tuple[int, int, str]] | None = None,
 ) -> str:
     """Insert only missing dictionary entries, retaining existing comments and formatting."""
-    line_offsets: list[int] = []
-    offset = 0
-    for line in source.splitlines(keepends=True):
-        line_offsets.append(offset)
-        offset += len(line)
+    source_lines = source.splitlines(keepends=True)
+    line_offsets = _line_offsets(source_lines)
 
     edits: list[tuple[int, int, str]] = []
     lines = source.splitlines()
@@ -301,9 +314,13 @@ def _apply_additions(
         closing_line = lines[node.end_lineno - 1]
         closing_indent = closing_line[: len(closing_line) - len(closing_line.lstrip())]
         entry_indent = closing_indent + "    "
-        insert_at = line_offsets[node.end_lineno - 1] + node.end_col_offset - 1
-        preceding = source[line_offsets[node.lineno - 1] : insert_at].rstrip()
-        separator = "," if node.keys and not preceding.endswith(",") else ""
+        insert_at = _offset(source_lines, node.end_lineno, node.end_col_offset - 1, line_offsets)
+        separator = ""
+        if node.values:
+            last = node.values[-1]
+            last_end = _offset(source_lines, last.end_lineno, last.end_col_offset, line_offsets)
+            if not source[last_end:insert_at].lstrip().startswith(","):
+                separator = ","
         entries = "".join(_format_entry(key, value, entry_indent) for key, value in values.items())
         edits.append((insert_at, insert_at, f"{separator}\n{entries}{closing_indent}"))
 
@@ -320,7 +337,7 @@ def _entry_removal_edits(source: str, config_node: ast.Dict, paths: list[tuple[s
     """Build source edits which remove selected dict entries and their comments."""
     nodes = _dict_nodes(config_node)
     lines = source.splitlines(keepends=True)
-    line_offsets = [sum(len(line) for line in lines[:index]) for index in range(len(lines))]
+    line_offsets = _line_offsets(lines)
     edits: list[tuple[int, int, str]] = []
     for path in paths:
         parent = nodes.get(path[:-1])
@@ -333,7 +350,7 @@ def _entry_removal_edits(source: str, config_node: ast.Dict, paths: list[tuple[s
             while start_line > 0 and lines[start_line - 1].lstrip().startswith("#"):
                 start_line -= 1
             start = line_offsets[start_line]
-            end = line_offsets[value.end_lineno - 1] + value.end_col_offset
+            end = _offset(lines, value.end_lineno, value.end_col_offset, line_offsets)
             while end < len(source) and source[end] in " \t":
                 end += 1
             if end < len(source) and source[end] == ",":
@@ -353,7 +370,11 @@ def _prompt_obsolete_removals(paths: list[tuple[str, ...]]) -> list[tuple[str, .
     print("Configuration settings no longer present in example_config.py:")
     for path in paths:
         dotted_path = ".".join(path)
-        if input(f"Remove {dotted_path}? [y/N]: ").strip().lower() in {"y", "yes"}:
+        try:
+            answer = input(f"Remove {dotted_path}? [y/N]: ")
+        except EOFError:
+            break
+        if answer.strip().lower() in {"y", "yes"}:
             selected.append(path)
     return selected
 
@@ -367,8 +388,9 @@ def _schema_version_edit(source: str, config_node: ast.Dict, config: ConfigDict)
             for default_key, default_value in zip(value.keys, value.values, strict=False):
                 if isinstance(default_key, ast.Constant) and default_key.value == SCHEMA_VERSION_KEY:
                     lines = source.splitlines(keepends=True)
-                    start = sum(len(line) for line in lines[: default_value.lineno - 1]) + default_value.col_offset
-                    end = sum(len(line) for line in lines[: default_value.end_lineno - 1]) + default_value.end_col_offset
+                    offsets = _line_offsets(lines)
+                    start = _offset(lines, default_value.lineno, default_value.col_offset, offsets)
+                    end = _offset(lines, default_value.end_lineno, default_value.end_col_offset, offsets)
                     return start, end, str(CONFIG_SCHEMA_VERSION)
     return None
 
@@ -400,7 +422,10 @@ def _prompt_required_values(additions: Mapping[tuple[str, ...], ConfigDict], exa
             if key not in required_keys or not isinstance(default, str):
                 continue
             path = ".".join((*parent, key))
-            value = input(f"New required setting {path} [leave blank to use the default]: ").strip()
+            try:
+                value = input(f"New required setting {path} [leave blank to use the default]: ").strip()
+            except EOFError:
+                return
             if value:
                 values[key] = value
 
@@ -445,9 +470,15 @@ def sync_config_schema(
     updated = _apply_additions(source, _dict_nodes(config_node), additions, version_edit, removal_edits)
     if updated == original_source:
         return []
+    if _read_config_literal_source(updated, str(config_path)) is None:
+        return []
     backup_path = config_path.with_suffix(config_path.suffix + ".bak")
+    if backup_path.exists():
+        backup_path = config_path.with_suffix(f"{config_path.suffix}.{datetime.now(UTC):%Y%m%d%H%M%S}.bak")
     backup_path.write_text(original_source, encoding="utf-8")
-    config_path.write_text(updated, encoding="utf-8")
+    temp_path = config_path.with_suffix(config_path.suffix + ".tmp")
+    temp_path.write_text(updated, encoding="utf-8")
+    temp_path.replace(config_path)
     paths = [".".join((*parent, key)) for parent, values in additions.items() for key in values]
     if version_updated and f"DEFAULT.{SCHEMA_VERSION_KEY}" not in paths:
         paths.append(f"DEFAULT.{SCHEMA_VERSION_KEY}")

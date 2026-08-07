@@ -12,6 +12,10 @@ The installer includes the Python runtime, dependencies, FFmpeg, and MediaInfo n
 
 The first Upload Assistant launch creates `data/config.py` from the bundled example automatically. Start the Web UI and use its configuration editor to add API keys, tracker credentials, and torrent clients before your first upload.
 
+```powershell
+ua --webui 127.0.0.1:5000
+```
+
 ## Basic commands
 
 Upload a file or folder:

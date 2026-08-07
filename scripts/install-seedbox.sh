@@ -210,5 +210,5 @@ Run:
   ./run-ua.sh "/path/to/content" --trackers yourtracker
 
 Optional next steps:
-  - Start the Web UI and configure UA in its configuration editor.
+  - Start the Web UI: ./run-ua.sh --webui 0.0.0.0:5000
 EOF
