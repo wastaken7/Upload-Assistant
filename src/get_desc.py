@@ -1910,6 +1910,9 @@ class DescriptionBuilder:
 
     async def get_screens_per_row(self) -> int:
         try:
+            if self.tracker == "TORRENTLEECH":
+                return 2
+
             # If screens_per_row is set, use that to determine how many screenshots should be on each row. Otherwise, use 2 as default
             screens_per_row = self._get_int_config("screens_per_row", 2)
             if self.tracker == "HAWKEUNO":
@@ -1961,7 +1964,7 @@ class DescriptionBuilder:
         if self.tracker == "HDTORRENTS":
             return f"<a href='{raw_url}'><img src='{img_url}' height=137></a> "
         if self.tracker == "TORRENTLEECH":
-            return f'<a href="{web_url}"><img src="{img_url}" style="max-width: {thumb_size}px;"></a>  '
+            return f'<a href="{web_url}"><img src="{img_url}" style="max-width: 350px;"></a>  '
         if self.tracker == "FUNFILE":
             return f'<a href="{web_url}" target="_blank"><img src="{img_url}" width="{thumb_size}"></a> '
         if self.tracker == "GREATPOSTERWALL":
