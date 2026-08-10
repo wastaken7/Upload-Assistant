@@ -24,7 +24,7 @@ if [ "$(id -u)" = "0" ]; then
     #   session_secret file inside it; the runtime user must be able to write
     # - /root/.config/upload-assistant: webui-auth mount; when PUID is set,
     #   the runtime user must traverse /root and write there
-    for dir in /Upload-Assistant/data /Upload-Assistant/tmp /Upload-Assistant/session_secret /root/.config/upload-assistant; do
+    for dir in /Upload-Assistant/data /Upload-Assistant/tmp /Upload-Assistant/session_secret /root/.config/upload-assistant /Upload-Assistant/bin/dovi_tool /Upload-Assistant/bin/hdr10plus_tool; do
         # If the path already exists as a non-directory (e.g. a file bind-mount),
         # fix its ownership but don't try mkdir -p (which would fail under set -e).
         if [ -e "$dir" ] && [ ! -d "$dir" ]; then

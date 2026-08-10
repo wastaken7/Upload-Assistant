@@ -11,6 +11,8 @@ from pathlib import Path
 import aiofiles
 import httpx
 
+from bin.download_integrity import verify_downloaded_asset
+
 try:
     from src.console import console, logger
 except ImportError:
@@ -129,6 +131,7 @@ class BDInfoBinaryManager:
                     async for chunk in response.aiter_bytes(chunk_size=8192):
                         await f.write(chunk)
             logger.debug(f"[green]Downloaded {file_pattern}[/green]")
+            verify_downloaded_asset(temp_archive, file_pattern)
 
             # Extract archive safely and ensure temporary archive is always removed.
             try:

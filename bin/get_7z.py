@@ -9,6 +9,8 @@ from pathlib import Path
 import aiofiles
 import httpx
 
+from bin.download_integrity import verify_downloaded_asset
+
 try:
     from src.console import console, logger
 except ImportError:
@@ -101,6 +103,7 @@ class SevenZipBinaryManager:
                         await f.write(chunk)
 
             logger.debug(f"[green]Downloaded 7-Zip package: {file_pattern}[/green]")
+            verify_downloaded_asset(temp_file, file_pattern)
 
             if file_pattern.endswith(".exe"):
                 # Windows 7zr.exe is a raw executable

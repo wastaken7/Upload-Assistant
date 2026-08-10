@@ -1,5 +1,8 @@
 import asyncio
+import hashlib
 from pathlib import Path
+
+import pytest
 
 from bin import get_dynamic_hdr_tools
 from src.dynamic_hdr_plot import _formats, _generate_plot, _source_files, dynamic_hdr_plot_enabled
@@ -62,6 +65,16 @@ def test_existing_versioned_binary_does_not_download(tmp_path: Path, monkeypatch
     assert result == str(binary)  # noqa: S101
 
 
+def test_downloaded_asset_checksum_is_verified(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    asset = "test-asset"
+    content = b"known-good"
+    monkeypatch.setitem(get_dynamic_hdr_tools.ASSET_SHA256, asset, hashlib.sha256(content).hexdigest())
+
+    get_dynamic_hdr_tools._verify_checksum(asset, content)
+    with pytest.raises(RuntimeError, match="Checksum mismatch"):
+        get_dynamic_hdr_tools._verify_checksum(asset, b"tampered")
+
+
 def test_mp4_is_remuxed_to_annex_b_hevc(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     source = tmp_path / "release.mp4"
     source.touch()
@@ -76,8 +89,29 @@ def test_mp4_is_remuxed_to_annex_b_hevc(tmp_path: Path, monkeypatch) -> None:  #
 
     asyncio.run(_generate_plot("dovi_tool", "dovi", source, tmp_path))
 
-    assert commands[0][-3:] == ["-f", "hevc", str(tmp_path / ".metadata" / "release.hevc")]  # noqa: S101
-    assert commands[1][2].endswith("release.hevc")  # noqa: S101
+    assert commands[0][-3:-1] == ["-f", "hevc"]  # noqa: S101
+    assert Path(commands[0][-1]).name.startswith("release_")  # noqa: S101
+    assert commands[1][2] == commands[0][-1]  # noqa: S101
+
+
+def test_plot_artifacts_are_unique_for_same_named_sources(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    first = tmp_path / "first" / "release.mkv"
+    second = tmp_path / "second" / "release.mkv"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    first.touch()
+    second.touch()
+
+    def fake_run(command: list[str]) -> None:
+        if command[-1].endswith(".png"):
+            Path(command[-1]).touch()
+
+    monkeypatch.setattr("src.dynamic_hdr_plot._run", fake_run)
+
+    first_plot = asyncio.run(_generate_plot("dovi_tool", "dovi", first, tmp_path))
+    second_plot = asyncio.run(_generate_plot("dovi_tool", "dovi", second, tmp_path))
+
+    assert first_plot != second_plot  # noqa: S101
 
 
 def test_tracker_override_enables_dynamic_hdr_plot() -> None:

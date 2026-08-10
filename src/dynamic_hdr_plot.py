@@ -71,24 +71,26 @@ def _run(command: list[str]) -> None:
 
 async def _generate_plot(binary: str, kind: str, source: Path, output_dir: Path) -> Path:
     stem = source.stem
-    output = output_dir / f"dynamic_hdr_{kind}_{stem}.png"
+    artifact_id = hashlib.sha256(str(source.resolve()).encode()).hexdigest()[:12]
+    artifact_name = f"{stem}_{artifact_id}"
+    output = output_dir / f"dynamic_hdr_{kind}_{artifact_name}.png"
     work_dir = output_dir / ".metadata"
     work_dir.mkdir(exist_ok=True)
     input_source = source
     if source.suffix.lower() in {".m2ts", ".mp4", ".ts"}:
         # The third-party tools accept MKV or elementary HEVC streams. Convert
         # transport streams and MP4 containers with a stream copy, never a re-encode.
-        input_source = work_dir / f"{stem}.hevc"
+        input_source = work_dir / f"{artifact_name}.hevc"
         await asyncio.to_thread(
             _run,
             ["ffmpeg", "-y", "-i", str(source), "-map", "0:v:0", "-c:v", "copy", "-bsf:v", "hevc_mp4toannexb", "-f", "hevc", str(input_source)],
         )
     if kind == "dovi":
-        rpu = work_dir / f"{stem}.rpu.bin"
+        rpu = work_dir / f"{artifact_name}.rpu.bin"
         await asyncio.to_thread(_run, [binary, "extract-rpu", str(input_source), "-o", str(rpu)])
         await asyncio.to_thread(_run, [binary, "plot", str(rpu), "-t", f"Dolby Vision L1 Plot - {stem}", "-o", str(output)])
     else:
-        metadata = work_dir / f"{stem}.hdr10plus.json"
+        metadata = work_dir / f"{artifact_name}.hdr10plus.json"
         await asyncio.to_thread(_run, [binary, "extract", str(input_source), "-o", str(metadata)])
         await asyncio.to_thread(_run, [binary, "plot", str(metadata), "-t", f"HDR10+ Plot - {stem}", "-o", str(output)])
     if not output.is_file():
@@ -155,7 +157,7 @@ async def process_dynamic_hdr_plots(meta: Meta, config: dict[str, Any], uploadsc
             logger.warning(f"[yellow]{detail}[/yellow]")
         publish_progress(progress_id, "Generating dynamic HDR plots", current=position, total=len(jobs), detail=detail, group="dynamic_hdr", unit="plots")
 
-    if generated and uploadscreens_manager:
+    if generated and uploadscreens_manager and not meta.skip_imghost_upload:
         try:
             images, _ = await uploadscreens_manager.upload_screens(meta, len(generated), 1, 0, len(generated), generated, {})
             if images:

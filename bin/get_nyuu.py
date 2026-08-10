@@ -10,6 +10,8 @@ from pathlib import Path
 import aiofiles
 import httpx
 
+from bin.download_integrity import verify_downloaded_asset
+
 try:
     from src.console import console, logger
 except ImportError:
@@ -99,6 +101,7 @@ class NyuuBinaryManager:
                         await f.write(chunk)
 
             logger.debug(f"[green]Downloaded Nyuu package: {file_pattern}[/green]")
+            verify_downloaded_asset(temp_file, file_pattern)
 
             if file_pattern.endswith(".7z"):
                 if not path_7z:
