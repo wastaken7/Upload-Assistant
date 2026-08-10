@@ -137,6 +137,7 @@ async def process_dynamic_hdr_plots(meta: Meta, config: dict[str, Any], uploadsc
         pass
 
     jobs = [(kind, source) for source in sources for kind in formats]
+    logger.info("[yellow]Generating dynamic HDR plots reads each selected video file in full; this may take a while for large releases.[/yellow]")
     progress_id = f"dynamic-hdr-plot-{meta.uuid}"
     publish_progress(progress_id, "Generating dynamic HDR plots", current=0, total=len(jobs), detail="Preparing metadata tools", group="dynamic_hdr", unit="plots")
     tools: dict[str, str] = {}

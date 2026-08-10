@@ -338,6 +338,7 @@ config: dict[str, Any] = {
         "add_audio_spectrogram": True,
         # Set true to generate and add Dolby Vision/HDR10+ dynamic metadata plots.
         # Required third-party tools are downloaded automatically on first use.
+        # Warning: metadata extraction reads each selected video file in full and may take a while for large releases.
         "add_dynamic_hdr_plot": False,
         # Set true to generate spectrograms for all audio streams
         "process_all_audio_spectrogram": False,
