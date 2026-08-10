@@ -18,6 +18,7 @@ def meta(**overrides):
         "category": "MOVIE",
         "name": "Example Movie (2010)",
         "title": "Example Movie",
+        "aka": "",
         "year": "2010",
         "edition": "",
         "imdb_id": "1234567",
@@ -98,6 +99,7 @@ def test_maps_categories_and_builds_description():
 def test_formats_titles_to_crt_conventions():
     site = tracker()
     assert asyncio.run(site.get_name(meta(edition="Director's Cut"))) == "Example Movie (2010) Director's Cut"  # noqa: S101
+    assert asyncio.run(site.get_name(meta(aka="AKA Example Movie in Portuguese"))) == "Example Movie AKA Example Movie in Portuguese (2010)"  # noqa: S101
     tv_name = asyncio.run(site.get_name(meta(category="TV", title="Example Show", season="S01", year="2001")))
     assert tv_name == "Example Show - Season 1 (2001)"  # noqa: S101
     assert asyncio.run(site.get_name(meta(category="TV", title="Example Show", season="S00", year="2001"))) == "Example Show - Specials (2001)"  # noqa: S101
