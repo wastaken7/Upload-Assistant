@@ -1,4 +1,4 @@
-import os
+import stat
 from pathlib import Path
 
 import pytest
@@ -13,7 +13,7 @@ async def test_existing_local_mkbrr_is_used_on_unsupported_platform(tmp_path: Pa
     binary_path = tmp_path / "bin" / "mkbrr"
     binary_path.parent.mkdir()
     binary_path.write_text("#!/bin/sh\n", encoding="utf-8")
-    binary_path.chmod(binary_path.stat().st_mode | os.X_OK)
+    binary_path.chmod(binary_path.stat().st_mode | stat.S_IXUSR)
     monkeypatch.setattr("bin.get_mkbrr.platform.system", lambda: "Android")
     monkeypatch.setattr("bin.get_mkbrr.platform.machine", lambda: "aarch64")
 
