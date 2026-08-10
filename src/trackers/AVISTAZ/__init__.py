@@ -485,6 +485,11 @@ class AZTrackerBase:
         audio_spectrogram_links = (
             [img.get("raw_url") for img in meta.spectrograms_images if img.get("raw_url")] if self.config["TRACKERS"][self.tracker].get("add_audio_spectrogram", False) else []
         )
+        dynamic_hdr_plot_links = (
+            [img.get("raw_url") for img in meta.dynamic_hdr_plot_images if img.get("raw_url")]
+            if meta.dynamic_hdr_plot or self.config["DEFAULT"].get("add_dynamic_hdr_plot", False) or self.config["TRACKERS"][self.tracker].get("add_dynamic_hdr_plot", False)
+            else []
+        )
 
         upload_referer = f"{self.base_url}/upload/{meta.category.lower()}"
 
@@ -518,11 +523,11 @@ class AZTrackerBase:
             if result:
                 results.append(result)
 
-        remaining_slots = max(0, limit - len(results) - len(audio_spectrogram_links))
+        remaining_slots = max(0, limit - len(results) - len(audio_spectrogram_links) - len(dynamic_hdr_plot_links))
 
         if local_files and remaining_slots > 0:
             for path in local_files:
-                if len(results) >= limit - len(audio_spectrogram_links):
+                if len(results) >= limit - len(audio_spectrogram_links) - len(dynamic_hdr_plot_links):
                     break
                 result = await upload_local_file(path)
                 if result:
@@ -532,7 +537,7 @@ class AZTrackerBase:
         image_links = [str(img.get("raw_url")) for img in meta.image_list if img.get("raw_url")]
 
         for url in image_links:
-            if len(results) >= limit - len(audio_spectrogram_links):
+            if len(results) >= limit - len(audio_spectrogram_links) - len(dynamic_hdr_plot_links):
                 break
             result = await upload_remote_file(url)
             if result:
@@ -542,6 +547,15 @@ class AZTrackerBase:
         remaining_slots = max(0, limit - len(results))
         if remaining_slots > 0 and audio_spectrogram_links:
             for url in audio_spectrogram_links:
+                if len(results) >= limit:
+                    break
+                result = await upload_remote_file(url)
+                if result:
+                    results.append(result)
+
+        # Upload dynamic HDR metadata plots after screenshots and spectrograms.
+        if len(results) < limit and dynamic_hdr_plot_links:
+            for url in dynamic_hdr_plot_links:
                 if len(results) >= limit:
                     break
                 result = await upload_remote_file(url)

@@ -17,7 +17,7 @@ from src.console import logger
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
-from src.temp_paths import artwork_dir, menu_screenshots_dir, screenshots_dir, spectrograms_dir
+from src.temp_paths import artwork_dir, dynamic_hdr_plots_dir, menu_screenshots_dir, screenshots_dir, spectrograms_dir
 from src.tracker_images import (
     get_tracker_image_collection,
     has_tracker_image_collection,
@@ -157,6 +157,8 @@ def _collection_directory(meta: Meta, collection_name: str) -> Path | None:
         return menu_screenshots_dir(meta.base_dir, meta.uuid)
     if collection_name == "spectrograms_images":
         return spectrograms_dir(meta.base_dir, meta.uuid)
+    if collection_name == "dynamic_hdr_plot_images":
+        return dynamic_hdr_plots_dir(meta.base_dir, meta.uuid)
     return None
 
 
@@ -225,7 +227,7 @@ async def _check_additional_image_collections(
 
     original_imghost = meta.imghost
     try:
-        for collection_name in ("menu_images", "spectrograms_images"):
+        for collection_name in ("menu_images", "spectrograms_images", "dynamic_hdr_plot_images"):
             collection = getattr(meta, collection_name, [])
             if not isinstance(collection, list) or not collection:
                 continue

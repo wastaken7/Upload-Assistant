@@ -59,6 +59,7 @@ This branch introduces new media categories and automation features not present 
 ### 2. Audio Stream Spectrogram Generation
 
 - **Spectrogram Extraction & Plotting**: Use `-as` / `--audio-spectrogram` to automatically extract audio streams from MKVs, Blu-ray BDInfo, music tracks, or audiobook chapters using FFmpeg and plot frequency/time graphs (inferno theme) via `librosa` and `matplotlib`. Music and audiobook processing is capped by `audio_spectrogram_max_files`.
+- **Dynamic HDR Metadata Plots**: Use `--dynamic-hdr-plot` to create and upload separate Dolby Vision and HDR10+ metadata plots. The required `dovi_tool` and `hdr10plus_tool` binaries are downloaded automatically for the current platform on first use.
 - **Automated Upload**: Automatically uploads generated spectrograms along with your screenshots for release verification.
 - **Stream Selection**: Supports targeting specific tracks using `-ast` / `--audio-spectrogram-tracks` (e.g., track indexes or `all`).
 

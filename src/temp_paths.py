@@ -37,3 +37,8 @@ def menu_screenshots_dir(base_dir: str | Path, release_id: str) -> Path:
 
 def spectrograms_dir(base_dir: str | Path, release_id: str) -> Path:
     return image_dir(base_dir, release_id, "spectrograms")
+
+
+def dynamic_hdr_plots_dir(base_dir: str | Path, release_id: str) -> Path:
+    """Return the per-release directory for Dolby Vision/HDR10+ plot images."""
+    return image_dir(base_dir, release_id, "dynamic_hdr_plots")

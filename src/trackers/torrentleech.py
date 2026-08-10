@@ -220,7 +220,7 @@ class TorrentLeech:
         return 0
 
     def get_screens(self, meta: Meta) -> list[str]:
-        images = cast(list[dict[str, Any]], meta.menu_images) + meta.image_list + meta.spectrograms_images
+        images = cast(list[dict[str, Any]], meta.menu_images) + meta.image_list + meta.spectrograms_images + meta.dynamic_hdr_plot_images
         return [image["raw_url"] for image in images if image.get("raw_url")]
 
     async def get_name(self, meta: Meta) -> str:

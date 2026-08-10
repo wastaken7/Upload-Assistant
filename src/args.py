@@ -694,6 +694,15 @@ class Args:
             dest="audio_spectrogram_tracks",
             default=None,
         )
+        parser.add_argument(
+            "-dhp",
+            "--dynamic-hdr-plot",
+            action="store_true",
+            required=False,
+            help="Generate and upload Dolby Vision and HDR10+ dynamic metadata plots",
+            dest="dynamic_hdr_plot",
+            default=None,
+        )
         parser.add_argument("-u", "--usenet", action="store_true", required=False, help="Upload files to Usenet (NNTP)")
         parser.add_argument("--usenet-subject", nargs=1, required=False, help="Custom subject line for Usenet post", type=str, dest="usenet_subject", default=None)
         parser.add_argument(

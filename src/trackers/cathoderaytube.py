@@ -329,7 +329,8 @@ class CathodeRayTube:
         images = get_tracker_image_collection(meta, self.tracker, "screenshots")
         menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
         spectrograms_images = get_tracker_image_collection(meta, self.tracker, "spectrograms_images")
-        screenshots = "\n".join(image["raw_url"] for image in (menu_images + images + spectrograms_images) if image.get("raw_url"))
+        dynamic_hdr_plot_images = get_tracker_image_collection(meta, self.tracker, "dynamic_hdr_plot_images")
+        screenshots = "\n".join(image["raw_url"] for image in (menu_images + images + spectrograms_images + dynamic_hdr_plot_images) if image.get("raw_url"))
 
         sections: list[str] = []
         if links:
@@ -415,7 +416,8 @@ class CathodeRayTube:
             images = get_tracker_image_collection(meta, self.tracker, "screenshots")
             menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
             spectrograms_images = get_tracker_image_collection(meta, self.tracker, "spectrograms_images")
-            screens_count = len(menu_images) + len(images) + len(spectrograms_images)
+            dynamic_hdr_plot_images = get_tracker_image_collection(meta, self.tracker, "dynamic_hdr_plot_images")
+            screens_count = len(menu_images) + len(images) + len(spectrograms_images) + len(dynamic_hdr_plot_images)
             if screens_count == 0 and hasattr(meta, "screens"):
                 try:
                     screens_count = int(meta.screens or 0)

@@ -46,6 +46,7 @@ from src.console import current_release_log_path, logger  # pyright: ignore[repo
 from src.console import rich_handler as _rich_handler
 from src.disc_menus import process_disc_menus
 from src.dupe_checking import DupeChecker
+from src.dynamic_hdr_plot import dynamic_hdr_plot_enabled, process_dynamic_hdr_plots
 from src.early_tasks import cancel_and_drain_early_artifact_tasks, get_early_artifact_tasks, start_early_artifact_tasks
 from src.early_tasks import is_usenet_only as _is_usenet_only
 from src.get_desc import gen_desc
@@ -1479,6 +1480,12 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                     await process_audio_spectrograms(meta, config, uploadscreens_manager)
                 except Exception as e:
                     logger.error(f"[red]Error processing audio spectrograms: {e}[/red]")
+
+            if dynamic_hdr_plot_enabled(meta, config):
+                try:
+                    await process_dynamic_hdr_plots(meta, config, uploadscreens_manager)
+                except Exception as e:
+                    logger.error(f"[red]Error processing dynamic HDR plots: {e}[/red]")
 
             # Take Screenshots
             try:

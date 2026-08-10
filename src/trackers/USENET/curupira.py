@@ -348,6 +348,7 @@ class Curupira:
         image_entries: list[Any] = cast(list[Any], images_value) if isinstance(images_value, list) else []
         images_list = [cast(dict[str, Any], img) for img in image_entries if isinstance(img, dict)]
         spectrograms_images = [cast(dict[str, Any], img) for img in get_tracker_image_collection(meta, self.tracker, "spectrograms_images") if isinstance(img, dict)]
+        dynamic_hdr_plot_images = [cast(dict[str, Any], img) for img in get_tracker_image_collection(meta, self.tracker, "dynamic_hdr_plot_images") if isinstance(img, dict)]
 
         combined_images: list[dict[str, Any]] = []
         if menu_images:
@@ -356,6 +357,8 @@ class Curupira:
             combined_images.extend(images_list)
         if spectrograms_images:
             combined_images.extend(spectrograms_images)
+        if dynamic_hdr_plot_images:
+            combined_images.extend(dynamic_hdr_plot_images)
 
         urls: list[str] = []
         for image in combined_images:

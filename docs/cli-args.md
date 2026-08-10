@@ -199,6 +199,7 @@ Thise will use the specified hash to get tracker ids from qBitTorrent or rTorren
 - `-ns`, `--no-seed`: Do not add the torrent to the client.
 - `-st`, `--stream`: Stream optimized upload.
 - `-webdv`, `--webdv`: Indicates a Dolby Vision layer converted using `dovi_tool` (HYBRID).
+- `--dynamic-hdr-plot`: Generate and upload Dolby Vision and HDR10+ dynamic metadata plots. Required third-party tools are installed automatically when first used.
 - `-hc`, `--hardcoded-subs`: Contains hardcoded subs.
   - Note: stored in `meta` under key `hardcoded-subs` (with a hyphen).
 - `-pr`, `--personalrelease`: Personal release.

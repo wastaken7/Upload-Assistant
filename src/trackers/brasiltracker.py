@@ -934,6 +934,7 @@ class BrasilTracker:
         menu_images = meta.menu_images
         image_list = meta.image_list
         spectrograms_images = meta.spectrograms_images
+        dynamic_hdr_plot_images = meta.dynamic_hdr_plot_images
 
         combined_images: list[dict[str, Any]] = []
         if isinstance(menu_images, list):
@@ -945,6 +946,8 @@ class BrasilTracker:
         if isinstance(spectrograms_images, list):
             spectrograms_images_list = spectrograms_images
             combined_images.extend([cast(dict[str, Any], img) for img in spectrograms_images_list if isinstance(img, dict)])
+        if isinstance(dynamic_hdr_plot_images, list):
+            combined_images.extend([cast(dict[str, Any], img) for img in dynamic_hdr_plot_images if isinstance(img, dict)])
 
         urls: list[str] = []
         for image in combined_images:

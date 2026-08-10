@@ -1511,7 +1511,7 @@ class MakingOff:
             list[str]: Resolved image URLs.
         """
         urls: list[str] = []
-        image_list = cast(list[dict[str, Any]], meta.menu_images) + meta.image_list + meta.spectrograms_images
+        image_list = cast(list[dict[str, Any]], meta.menu_images) + meta.image_list + meta.spectrograms_images + meta.dynamic_hdr_plot_images
         for img in image_list:
             if isinstance(img, str):
                 urls.append(img)

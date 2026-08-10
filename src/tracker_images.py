@@ -5,13 +5,14 @@ from typing import Any, Literal
 
 from src.meta import Meta
 
-ImageCollection = Literal["screenshots", "menu_images", "spectrograms_images"]
+ImageCollection = Literal["screenshots", "menu_images", "spectrograms_images", "dynamic_hdr_plot_images"]
 ImageDict = dict[str, Any]
 
 _BASE_COLLECTION_FIELDS: dict[ImageCollection, str] = {
     "screenshots": "image_list",
     "menu_images": "menu_images",
     "spectrograms_images": "spectrograms_images",
+    "dynamic_hdr_plot_images": "dynamic_hdr_plot_images",
 }
 
 
