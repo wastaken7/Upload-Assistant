@@ -313,7 +313,6 @@ const trackerNameMap = {
   LUMINARR: "Luminarr",
   MAKINGOFF: "MakingOff",
   MIDNIGHTSCENE: "MidnightScene",
-  MORETHANTV: "MoreThanTV",
   MTEAM: "MTeam",
   NEBULANCE: "Nebulance",
   NORDICQUALITY: "NordicQuality",

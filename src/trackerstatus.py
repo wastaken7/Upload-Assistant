@@ -3,20 +3,16 @@ import asyncio
 import copy
 import sys
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any, cast
 
 import cli_ui
-from torf import Torrent
 
 from src.cleanup import cleanup_manager
-from src.clients import Clients
 from src.console import logger, prompt_in_thread
 from src.dupe_checking import DupeChecker
 from src.imdb import imdb_manager
 from src.meta import Meta
 from src.metadata_searching import get_douban_id
-from src.torrentcreate import TorrentCreator
 from src.trackers.AVISTAZ.routing import AvistaZNetworkRouter
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup, tracker_class_map
@@ -39,7 +35,6 @@ class TrackerStatusManager:
     async def process_all_trackers(self, meta: Meta) -> int:
         tracker_status: dict[str, dict[str, Any]] = {}
         successful_trackers = 0
-        client: Any = Clients(config=self.config)
         tracker_setup: Any = TrackerSetup(config=self.config)
         tracker_setup.filter_unsupported_trackers(meta)
         await AvistaZNetworkRouter(self.config, tracker_class_map).apply(meta)
@@ -284,28 +279,6 @@ class TrackerStatusManager:
 
                     elif "skipping" in local_meta:
                         local_tracker_status["skipped"] = True
-
-                    if tracker_name == "MORETHANTV" and not local_tracker_status["banned"] and not local_tracker_status["skipped"] and not local_tracker_status["dupe"]:
-                        tracker_config = self.trackers_config.get(tracker_name, {})
-                        if str(tracker_config.get("skip_if_rehash", "false")).lower() == "true":
-                            base_torrent_path = Path(f"{local_meta['base_dir']}{'/' + 'tmp' + '/'}{local_meta['uuid']}/BASE.torrent").resolve()
-                            subs_torrent_path = Path(f"{local_meta['base_dir']}{'/' + 'tmp' + '/'}{local_meta['uuid']}/BASE_SUBS.torrent").resolve()
-                            torrent_path = base_torrent_path if base_torrent_path.exists() else subs_torrent_path
-                            if not torrent_path.exists():
-                                check_torrent = await client.find_existing_torrent(cast(dict[str, Any], local_meta))
-                                if check_torrent and client._torrent_has_no_subtitles(check_torrent):
-                                    logger.info(f"[yellow]Existing torrent found on {check_torrent}[yellow]")
-                                    created_torrent_path = await TorrentCreator.create_base_from_existing_torrent(check_torrent, local_meta["base_dir"], local_meta["uuid"])
-                                    if created_torrent_path:
-                                        torrent = Torrent.read(created_torrent_path)
-                                        if torrent.piece_size > 8388608:
-                                            logger.info("[yellow]No existing torrent found with piece size lesser than 8MB[yellow]")
-                                            local_tracker_status["skipped"] = True
-                            else:
-                                torrent = Torrent.read(torrent_path)
-                                if torrent.piece_size > 8388608:
-                                    logger.info("[yellow]Existing torrent found with piece size greater than 8MB[yellow]")
-                                    local_tracker_status["skipped"] = True
 
                 # Determine name change for display during interactive prompt
                 if not local_tracker_status["banned"] and not local_tracker_status["skipped"] and not local_tracker_status["dupe"]:

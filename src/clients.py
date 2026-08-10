@@ -249,15 +249,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             return None
 
         # Determine piece size preferences
-        trackers_config = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-        mtv_config = trackers_config.get("MORETHANTV", {})
         piece_limit = bool(self.config["DEFAULT"].get("prefer_max_16_torrent", False))
-        if isinstance(mtv_config, dict):
-            mtv_config_dict = cast(dict[str, Any], mtv_config)
-            mtv_torrent = bool(mtv_config_dict.get("prefer_mtv_torrent", False))
-        else:
-            mtv_torrent = False
-        prefer_small_pieces = mtv_torrent or piece_limit
+        prefer_small_pieces = piece_limit
         best_match = None  # Track the best match for fallback if prefer_small_pieces is enabled
         video_only_fallback: tuple[str, str] | None = None
 
@@ -291,7 +284,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 logger.info(f"[yellow]Client '{client_name}' not found in TORRENT_CLIENTS config, skipping...")
                 continue
 
-            result = await self._search_single_client_for_torrent(meta, client_name, prefer_small_pieces, mtv_torrent, piece_limit, best_match)
+            result = await self._search_single_client_for_torrent(meta, client_name, prefer_small_pieces, piece_limit, best_match)
 
             if result:
                 candidate_path = result.get("torrent_path") if isinstance(result, dict) else result
@@ -300,9 +293,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                     # A partially subtitle-bearing torrent would produce an invalid
                     # BASE_SUBS.torrent and omit selected local subtitles.
                     if self._torrent_has_no_subtitles(candidate_path) and (
-                        video_only_fallback is None
-                        or not prefer_small_pieces
-                        or self._is_preferred_piece_size_candidate(candidate_path, video_only_fallback[0], mtv_torrent, piece_limit)
+                        video_only_fallback is None or not prefer_small_pieces or self._is_preferred_piece_size_candidate(candidate_path, video_only_fallback[0], piece_limit)
                     ):
                         video_only_fallback = (candidate_path, client_name)
                     continue
@@ -337,7 +328,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         return None
 
     async def _search_single_client_for_torrent(
-        self, meta: Meta, client_name: str, prefer_small_pieces: bool, mtv_torrent: bool, piece_limit: bool, best_match: dict[str, Any] | None
+        self, meta: Meta, client_name: str, prefer_small_pieces: bool, piece_limit: bool, best_match: dict[str, Any] | None
     ) -> dict[str, Any] | str | None:
         """Search a single client for an existing torrent by hash or via API search (qbit only)."""
 
@@ -525,10 +516,6 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                         return resolved_path
 
                     # Track best match for small pieces
-                    if piece_size <= 8388608 and mtv_torrent:
-                        logger.info(f"[green]Found a valid torrent with preferred piece size from client search: [bold yellow]{found_hash}")
-                        return resolved_path
-
                     if piece_size < 16777216 and piece_limit:  # 16 MiB
                         logger.info(f"[green]Found a valid torrent with piece size under 16 MiB from client search: [bold yellow]{found_hash}")
                         return resolved_path
@@ -694,7 +681,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         return not any(Path(str(path)).suffix.casefold() in SUBTITLE_EXTENSIONS for path in torrent.files)
 
     @staticmethod
-    def _is_preferred_piece_size_candidate(candidate_path: str, current_path: str, mtv_torrent: bool, piece_limit: bool) -> bool:
+    def _is_preferred_piece_size_candidate(candidate_path: str, current_path: str, piece_limit: bool) -> bool:
         """Whether a candidate outranks the current fallback by configured piece preference."""
         try:
             candidate_piece_size = Torrent.read(candidate_path).piece_size
@@ -702,8 +689,6 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         except Exception:
             return False
 
-        if mtv_torrent:
-            return candidate_piece_size < current_piece_size
         if piece_limit:
             limit = 16 * 1024 * 1024
             candidate_within_limit = candidate_piece_size <= limit

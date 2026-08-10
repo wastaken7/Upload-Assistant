@@ -249,7 +249,6 @@ class Meta:
     mode: str = ""
     modq: bool = False
     mteam_description: str = ""
-    mtv_timeout: bool | None = None
     music_album: str = ""
     music_artist: str = ""
     music_catalogue_number: str = ""

@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import os
 import platform
+import shutil
 import stat
 import tarfile
 import zipfile
@@ -27,7 +28,25 @@ except ImportError:
 
 class MkbrrBinaryManager:
     @staticmethod
+    def find_existing_binary(base_dir: str | Path) -> str | None:
+        """Return a user-provided mkbrr binary before attempting a download."""
+        binary_name = "mkbrr.exe" if platform.system().lower() == "windows" else "mkbrr"
+        bin_root = Path(base_dir) / "bin"
+        candidates = (bin_root / binary_name, bin_root / "mkbrr" / binary_name)
+
+        for binary_path in candidates:
+            if binary_path.is_file() and (binary_name.endswith(".exe") or os.access(binary_path, os.X_OK)):
+                logger.debug(f"[blue]Using existing mkbrr binary: {binary_path}[/blue]")
+                return str(binary_path)
+
+        return shutil.which("mkbrr")
+
+    @staticmethod
     async def ensure_mkbrr_binary(base_dir: str | Path, version: str) -> str:
+        existing_binary = MkbrrBinaryManager.find_existing_binary(base_dir)
+        if existing_binary:
+            return existing_binary
+
         system = platform.system().lower()
         machine = platform.machine().lower()
         logger.debug(f"[blue]Detected system: {system}, architecture: {machine}[/blue]")

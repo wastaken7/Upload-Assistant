@@ -106,8 +106,6 @@ async def process_trackers(
                 if "torrent_id" in status:
                     torrent_url = str(getattr(tracker_class, "torrent_url", ""))
                     link_url = f"{torrent_url}{status['torrent_id']}"
-                elif tracker == "MORETHANTV" and has_status_message:
-                    link_url = status_message
 
                 if config["DEFAULT"].get("show_upload_duration", True) or meta.upload_timer:
                     duration = meta.get(f"{tracker}_upload_duration")

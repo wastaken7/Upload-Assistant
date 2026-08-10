@@ -396,7 +396,6 @@ config: dict[str, Any] = {
         # Conversely, you can set a lower amount such as 1 to protect system resources (default "0" (auto))
         "mkbrr_threads": "0",
         # Set true to prefer torrents with piece size <= 16 MiB when searching for existing torrents in clients
-        # Does not override MORETHANTV preference for small pieces
         "prefer_max_16_torrent": False,
         # Tracker based rehashing cooldown.
         # For trackers that might need specific piece size rehashing, using a value higher than 0 will add the specified cooldown
@@ -441,7 +440,7 @@ config: dict[str, Any] = {
         # Note: Description layout settings (like screenshot grids, logos, etc.) can be overridden per-tracker.
         # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
         # Available tracker: AURA4K, ASIANCINEMA, AITHER, ANTHELION, ALPHARATIO, AMIGOSSHARE, AVISTAZ, BEYONDHD, BITHDTV, BJSHARE, BLUTOPIA, BRASILTRACKER, CAPYBARABR, CURUPIRA, SUIO, CINEMAZ, DIGITALCORE, DRUNKENSLUG, DARKPEERS, DESITORRENTS, EMUWAREZ, FUNFILE, FILELIST,
-        # GREATPOSTERWALL, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK, HAWKEUNO, INFINITYHD, IMMORTALSEED, ITATORRENTS, LAJIDUI, LOCADORA, LASTDIGITALUNDERGROUND, LONGPT, LST, LATTEAM, LUMINARR, MIDNIGHTSCENE, MTEAM, MORETHANTV, NEBULANCE, ONLYENCODES,
+        # GREATPOSTERWALL, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK, HAWKEUNO, INFINITYHD, IMMORTALSEED, ITATORRENTS, LAJIDUI, LOCADORA, LASTDIGITALUNDERGROUND, LONGPT, LST, LATTEAM, LUMINARR, MIDNIGHTSCENE, MTEAM, NEBULANCE, ONLYENCODES,
         # NORDICQUALITY, OLDTOONSWORLD, PRIVATEHD, PORTUGAS, PTCAFE, PTERCLUB, PTFANS, PTGTK, PASSTHEPOPCORN, PEERGARDEN, PTSKIT, POLISHTORRENT, RACING4EVERYONE, RASTASTUGAN, REELFLIX, RAILGUNPT, RETROFLIX, RETROMOVIESCLUB, SAMARITANO, SHAREISLAND, SWARMAZON, SEEDPOOL, SPEEDAPP, SKIPTHECOMMERCIALS, TORRENTHR,
         # CINEMATIK, MAKINGOFF, ORPHEUS, TORRENTLEECH, THELEACHZONE, THEOLDSCHOOL, TOTHEGLORY, TORRENTEROS, TVCHAOSUK, ULCX, UTOPIA, YUSCENE, ZENITH
         # Only add the trackers you want to upload to on a regular basis
@@ -1615,44 +1614,6 @@ config: dict[str, Any] = {
             "disc_menu_header": "[h2]Disc Menu Screenshots[/h2]",
             "audio_spectrogram_header": "[h2]Audio Spectrogram[/h2]",
             "dynamic_hdr_plot_header": "[h2]Dynamic HDR Metadata[/h2]",
-            "custom_signature": "",
-            "add_bluray_link": True,
-            "use_bluray_images": True,
-            "bluray_image_size": "",
-            "add_audio_spectrogram": True,
-            "inject_delay": 0,
-        },
-        "MORETHANTV": {
-            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
-            "link_dir_name": "",
-            # get from security page
-            "api_key": "",
-            "username": "",
-            "password": "",
-            "announce_url": "get from https://www.morethantv.me/upload.php",
-            "anon": False,
-            # read the following for more information https://github.com/google/google-authenticator/wiki/Key-Uri-Format
-            "otp_uri": "OTP URI,",
-            # Skip uploading to MORETHANTV if it would require a torrent rehash because existing piece size > 8 MiB
-            "skip_if_rehash": False,
-            # Iterate over found torrents and prefer MORETHANTV suitable torrents if found.
-            "prefer_mtv_torrent": False,
-            # The configurations below override the DEFAULT configuration
-            "add_logo": True,
-            "logo_size": "",
-            "thumbnail_size": "",
-            "screens_per_row": "",
-            "episode_overview": True,
-            "multiScreens": "",
-            "pack_thumb_size": "",
-            "charLimit": "",
-            "fileLimit": "",
-            "processLimit": "",
-            "custom_description_header": "",
-            "screenshot_header": "",
-            "disc_menu_header": "",
-            "audio_spectrogram_header": "",
-            "dynamic_hdr_plot_header": "",
             "custom_signature": "",
             "add_bluray_link": True,
             "use_bluray_images": True,

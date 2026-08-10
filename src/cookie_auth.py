@@ -141,7 +141,6 @@ def get_tracker_domain(tracker: str, config: dict[str, Any] | None = None) -> st
         "railgunpt": "bilibili.download",
         "torrentleech": "torrentleech.org",
         "filelist": "filelist.io",
-        "morethantv": "morethan.tv",
         "passthepopcorn": "passthepopcorn.me",
         "pterclub": "pterclub.com",
     }
@@ -216,7 +215,7 @@ def find_cookie_file(base_dir: str, tracker: str, config: dict[str, Any] | None 
     # 4. Fallback to default
     if tracker == "FILELIST":
         return str((cookies_dir / "FILELIST.json").resolve())
-    if tracker in ["MORETHANTV", "PASSTHEPOPCORN"]:
+    if tracker == "PASSTHEPOPCORN":
         return str((cookies_dir / f"{tracker}.json").resolve())
     if tracker == "Pterimg":
         return str((cookies_dir / "Pterimg.json").resolve())
