@@ -97,3 +97,35 @@ def test_nordicquality_sanitizes_upload_name():
     meta = Meta(uuid="\u00c6r\u00f8sk\u00f8bing \u00c5r 2025 HDR10+ DD+ DTS:X &.mkv")
 
     assert asyncio.run(_tracker().get_name(meta)) == {"name": "AEroskobing.Ar.2025.HDR10P.DDP.DTS-X.and"}  # noqa: S101
+
+
+def test_nordicquality_preserves_release_suffix_in_extensionless_uuid():
+    meta = Meta(category="MOVIE", uuid="Snatched.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC.REMUX-FraMeSToR")
+
+    assert asyncio.run(_tracker().get_name(meta)) == {  # noqa: S101
+        "name": "Snatched.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC.REMUX-FraMeSToR"
+    }
+
+
+def test_nordicquality_prefers_single_media_filename_over_folder_uuid():
+    meta = Meta(
+        category="MOVIE",
+        uuid="Snatched.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC",
+        filelist=["D:/Movies/Snatched/Snatched.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC.REMUX-FraMeSToR.mkv"],
+    )
+
+    assert asyncio.run(_tracker().get_name(meta)) == {  # noqa: S101
+        "name": "Snatched.2017.UHD.BluRay.2160p.DTS-HD.MA.7.1.HEVC.REMUX-FraMeSToR"
+    }
+
+
+def test_nordicquality_strips_only_known_media_extensions():
+    meta = Meta(category="MOVIE", uuid="unused-folder-name", filelist=["D:/Movies/Movie.2025.1080p.BluRay.REMUX-GROUP.MKV"])
+
+    assert asyncio.run(_tracker().get_name(meta)) == {"name": "Movie.2025.1080p.BluRay.REMUX-GROUP"}  # noqa: S101
+
+
+def test_nordicquality_falls_back_to_generated_name():
+    meta = Meta(category="MOVIE", name="Movie 2025 1080p BluRay REMUX DTS-HD MA 7.1-GROUP")
+
+    assert asyncio.run(_tracker().get_name(meta)) == {"name": "Movie.2025.1080p.BluRay.REMUX.DTS-HD.MA.7.1-GROUP"}  # noqa: S101

@@ -23,6 +23,7 @@ class NordicQuality(UNIT3D):
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE", "MUSIC", "BOOK", "GAME")
     tracker_urls = (base_url,)
+    KNOWN_MEDIA_EXTENSIONS: ClassVar[frozenset[str]] = frozenset({".avi", ".mkv", ".mp4", ".ts"})
     NORDIC_SUBTITLE_LANGUAGES: ClassVar[list[str]] = [
         "da",
         "dan",
@@ -129,8 +130,25 @@ class NordicQuality(UNIT3D):
 
         return {"type_id": type_id.get(resolved_type, "15" if meta.category in {"MUSIC", "BOOK", "GAME"} else "0")}
 
+    @classmethod
+    def _release_name_source(cls, meta: Meta) -> str:
+        if meta.category not in {"MOVIE", "TV"}:
+            return Path(meta.uuid or meta.name).stem
+
+        source_name = ""
+        if not meta.is_disc and len(meta.filelist) == 1:
+            media_path = meta.filelist[0]
+            if isinstance(media_path, str) and media_path.strip():
+                source_name = Path(media_path).name
+
+        if not source_name:
+            source_name = Path(meta.uuid or meta.name).name
+
+        extension = Path(source_name).suffix
+        return source_name[: -len(extension)] if extension.casefold() in cls.KNOWN_MEDIA_EXTENSIONS else source_name
+
     async def get_name(self, meta: Meta) -> dict[str, str]:
-        name = Path(meta.uuid).stem.replace(" ", ".")
+        name = self._release_name_source(meta).replace(" ", ".")
 
         name = name.translate(
             str.maketrans(
