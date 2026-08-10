@@ -142,7 +142,6 @@ For `MUSIC` uploads, it renders the normalized release data collected during mus
 Insert the main synopsis (description) retrieved via external APIs (TMDb, IMDb, etc.).
 
 - _Aither Specifics:_ If the upload is a `FraMeSToR` release, formatting is customized to clean and style the scene group's information.
-- _MORETHANTV Specifics:_ Wraps the description in `[spoiler=Notes]...[/spoiler]`.
 
 #### 11. NFO Content
 

@@ -1625,7 +1625,6 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                     "DIGITALCORE",
                     "GREATPOSTERWALL",
                     "HAWKEUNO",
-                    "MORETHANTV",
                     "ONLYENCODES",
                     "PASSTHEPOPCORN",
                     "SKIPTHECOMMERCIALS",
@@ -1977,7 +1976,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         trackers_normalized = [t.strip().upper() for t in trackers_list]
 
         base_piece_mb: int | None = cast(int | None, meta.base_torrent_piece_mb)
-        if base_piece_mb is None and any(t in {"HDBITS", "MORETHANTV", "PASSTHEPOPCORN"} for t in trackers_normalized):
+        if base_piece_mb is None and any(t in {"HDBITS", "PASSTHEPOPCORN"} for t in trackers_normalized):
             try:
                 torrent = await asyncio.to_thread(TORF_Torrent.read, torrent_path)
                 base_piece_mb = torrent.piece_size // (1024 * 1024)
@@ -1986,18 +1985,6 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             except Exception as e:
                 logger.debug(f"[yellow]Unable to cache BASE.torrent piece size: {e}")
                 base_piece_mb = None
-
-        if "MORETHANTV" in trackers_normalized:
-            mtv_cfg = config.get("TRACKERS", {}).get("MORETHANTV", {})
-            if str(mtv_cfg.get("skip_if_rehash", "false")).lower() == "true" and base_piece_mb and base_piece_mb > 8:
-                meta.trackers = [t for t in trackers_list if t.strip().upper() != "MORETHANTV"]
-                trackers_list = [str(t) for t in cast(list[Any], meta.trackers or []) if str(t).strip()]
-                trackers_normalized = [t.strip().upper() for t in trackers_list]
-                logger.debug("[yellow]Removed MORETHANTV from trackers due to skip_if_rehash config and 8 MiB limit.[/yellow]")
-                if not meta.trackers:
-                    logger.info("[red]No trackers remain after removing MORETHANTV for skip_if_rehash.[/red]")
-                    meta.we_are_uploading = False
-                    return True
 
     if meta.randomized >= 1 and not meta.mkbrr and not is_usenet_only:
         TORRENT_CREATOR.create_random_torrents(meta.base_dir, meta.uuid, meta.randomized, cast(str, meta.path))

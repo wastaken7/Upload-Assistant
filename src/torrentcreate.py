@@ -316,7 +316,7 @@ class TorrentCreator:
                             except ValueError, TypeError:
                                 logger.warning("[yellow]Warning: Invalid max_piece_size value, using default piece length")
 
-                        if not piece_size and not tracker_url and not any(tracker in meta.trackers for tracker in ["HDBITS", "PASSTHEPOPCORN", "MORETHANTV"]):
+                        if not piece_size and not tracker_url and not any(tracker in meta.trackers for tracker in ["HDBITS", "PASSTHEPOPCORN"]):
                             cmd.extend(["-m", "27"])
 
                         if meta.mkbrr_threads != "0":

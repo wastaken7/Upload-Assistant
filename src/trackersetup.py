@@ -38,7 +38,6 @@ from src.trackers.hdtorrents import HDTorrents
 from src.trackers.immortalseed import ImmortalSeed
 from src.trackers.iptorrents import IPTorrents
 from src.trackers.makingoff import MakingOff
-from src.trackers.morethantv import MoreThanTV
 from src.trackers.mteam import MTeam
 from src.trackers.nebulance import Nebulance
 from src.trackers.NEXUSPHP.lajidui import Lajidui
@@ -1385,7 +1384,6 @@ tracker_class_map: dict[str, Any] = {
     "MAKINGOFF": MakingOff,
     "MIDNIGHTSCENE": MidnightScene,
     "MTEAM": MTeam,
-    "MORETHANTV": MoreThanTV,
     "NEBULANCE": Nebulance,
     "NORDICQUALITY": NordicQuality,
     "ONLYENCODES": OnlyEncodes,

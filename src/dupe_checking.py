@@ -537,8 +537,7 @@ class DupeChecker:
 
             if not meta.is_disc:
                 for file in filenames:
-                    if tracker_name in ["MORETHANTV", "ALPHARATIO", "RETROFLIX"]:
-                        # MORETHANTV: check if any dupe file is a substring of our file (ignoring extension)
+                    if tracker_name in ["ALPHARATIO", "RETROFLIX"]:
                         if any(f.lower() in file.lower() for f in files):
                             meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
                             remember_match("filename")
@@ -600,22 +599,6 @@ class DupeChecker:
                 await log_exclusion("repack release", each)
                 return True
 
-            if tracker_name == "MORETHANTV":
-                target_name = meta.name.replace(" ", ".").replace("DD+", "DDP")
-                dupe_name = entry.get("name", "")
-
-                def normalize_mtv_name(name: str) -> str:
-                    # Handle audio format variations: DDP.5.1 <-> DDP5.1
-                    name = re.sub(r"\.DDP\.(\d)", r".DDP\1", name)
-                    name = re.sub(r"\.DD\.(\d)", r".DD\1", name)
-                    name = re.sub(r"\.AC3\.(\d)", r".AC3\1", name)
-                    return re.sub(r"\.DTS\.(\d)", r".DTS\1", name)
-
-                normalized_target = normalize_mtv_name(target_name)
-                if normalized_target == dupe_name:
-                    meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
-                    return False
-
             if tracker_name == "BEYONDHD":
                 target_name = meta.name.replace("DD+", "DDP")
                 if str(entry.get("name")) == target_name:
@@ -631,7 +614,7 @@ class DupeChecker:
                     meta.filename_match = f"{entry.get('name')} = {entry.get('link', None)}"
                     return False
 
-            if tracker_name in ["BEYONDHD", "MORETHANTV", "RETROFLIX", "ALPHARATIO"] and (
+            if tracker_name in ["BEYONDHD", "RETROFLIX", "ALPHARATIO"] and (
                 ("2160p" in target_resolution and "2160p" in each) and ("framestor" in each.lower() or "framestor" in meta.uuid.lower())
             ):
                 return False
