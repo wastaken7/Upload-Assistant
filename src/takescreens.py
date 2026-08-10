@@ -40,7 +40,13 @@ ffmpeg_is_good = False
 use_libplacebo = True
 tone_map = False
 ffmpeg_compression = "6"
+LOSTIMG_MIN_SIZE = 75_000
 LOSTIMG_MAX_SIZE = 20_000_000
+
+
+def is_valid_lostimg_image_size(image_size: int) -> bool:
+    """Return whether an image meets Lostimg's accepted size range."""
+    return LOSTIMG_MIN_SIZE < image_size <= LOSTIMG_MAX_SIZE
 
 
 def compile_ffmpeg_command(command: Any) -> list[str]:
@@ -352,7 +358,14 @@ async def disc_screenshots(
 
         before = {path.resolve() for path in screenshot_dir.glob("*.png")}
         vs_screengn(source=file_path, encode=None, num=num_screens, dir=f"{screenshot_dir}/")
-        valid_results = [str(path) for path in screenshot_dir.glob("*.png") if path.resolve() not in before]
+        for image_path in screenshot_dir.glob("*.png"):
+            if image_path.resolve() in before:
+                continue
+            image_size = image_path.stat().st_size
+            if img_host == "lostimg" and not is_valid_lostimg_image_size(image_size):
+                logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, skipping.[/red]")
+                continue
+            valid_results.append(str(image_path))
     else:
         loglevel = "verbose" if ffdebug else "quiet"
 
@@ -429,7 +442,7 @@ async def disc_screenshots(
                         logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
                         retake = True
                 elif img_host == "lostimg":
-                    if 75000 < image_size <= LOSTIMG_MAX_SIZE:
+                    if is_valid_lostimg_image_size(image_size):
                         logger.debug(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
                     else:
                         logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
@@ -463,7 +476,7 @@ async def disc_screenshots(
                                 logger.info(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
                                 valid_image = True
                         elif img_host == "lostimg":
-                            if 75000 < new_size <= LOSTIMG_MAX_SIZE:
+                            if is_valid_lostimg_image_size(new_size):
                                 logger.info(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
                                 valid_image = True
                         elif (
@@ -1860,6 +1873,9 @@ async def screenshots(
         retake = False
         image_size = Path(image_path).stat().st_size
         logger.debug(f"[yellow]Checking image {image_path} (size: {image_size} bytes) for image host: {img_host}[/yellow]")
+        if manual_frames and img_host == "lostimg" and not is_valid_lostimg_image_size(image_size):
+            logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, skipping.[/red]")
+            continue
         if not manual_frames:
             if image_size <= 75000:
                 logger.info(f"[yellow]Image {image_path} is incredibly small, retaking.")
@@ -1878,7 +1894,7 @@ async def screenshots(
                         logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
                         retake = True
                 elif img_host == "lostimg":
-                    if 75000 < image_size <= LOSTIMG_MAX_SIZE:
+                    if is_valid_lostimg_image_size(image_size):
                         logger.debug(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
                     else:
                         logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
@@ -1931,7 +1947,7 @@ async def screenshots(
                                     logger.info(f"[green]Successfully retaken screenshot for: {screenshot_path} ({new_size} bytes)[/green]")
                                     valid_image = True
                             elif img_host == "lostimg":
-                                if 75000 < new_size <= LOSTIMG_MAX_SIZE:
+                                if is_valid_lostimg_image_size(new_size):
                                     logger.info(f"[green]Successfully retaken screenshot for: {screenshot_path} ({new_size} bytes)[/green]")
                                     valid_image = True
                             elif (
@@ -1977,7 +1993,7 @@ async def screenshots(
                         if 75000 < new_size <= 10000000:
                             valid_image = True
                     elif img_host == "lostimg":
-                        if 75000 < new_size <= LOSTIMG_MAX_SIZE:
+                        if is_valid_lostimg_image_size(new_size):
                             valid_image = True
                     elif (
                         img_host
