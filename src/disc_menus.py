@@ -40,6 +40,14 @@ def select_evenly_spaced(items: list[Any], num_to_select: int) -> list[Any]:
     return [items[idx] for idx in unique_indices]
 
 
+def discard_previous_menu_capture_files(image_pattern: Path) -> None:
+    """Remove only prior output for the menu VOB about to be captured."""
+    glob_name = image_pattern.name.replace("%03d", "*")
+    for image_path in image_pattern.parent.glob(glob_name):
+        with contextlib.suppress(OSError):
+            image_path.unlink()
+
+
 class DiscMenus:
     """
     Handles the processing and uploading of disc menu images.
@@ -184,6 +192,7 @@ class DiscMenus:
                 sanitized_disc_name = re.sub(r'[<>:"/\\|?*]', "_", disc.get("name", "dvd"))
                 vob_base = Path(file).stem
                 image_pattern = Path(output_dir) / f"{sanitized_disc_name}-{vob_base}-%03d.png"
+                discard_previous_menu_capture_files(image_pattern)
 
                 # Run ffmpeg
                 if duration_sec < 2.0:
@@ -212,7 +221,10 @@ class DiscMenus:
 
                     # Gather generated screenshots
                     glob_pattern = Path(output_dir) / f"{sanitized_disc_name}-{vob_base}-*.png"
-                    found_images = sorted(str(p) for p in glob_pattern.parent.glob(glob_pattern.name))
+                    found_images = sorted(str(p) for p in glob_pattern.parent.glob(glob_pattern.name)) if process.returncode == 0 else []
+                    if process.returncode != 0:
+                        logger.error(f"[red]FFmpeg failed processing {file}: {_stderr.decode(errors='replace')}[/red]")
+                        discard_previous_menu_capture_files(image_pattern)
 
                     # Filter out blank/black frames
                     valid_images = []
@@ -250,16 +262,20 @@ class DiscMenus:
                             str(image_pattern),
                         ]
                         logger.debug(f"Fallback FFmpeg command: {' '.join(cmd_fallback)}")
+                        discard_previous_menu_capture_files(image_pattern)
                         process_fallback = await asyncio.create_subprocess_exec(*cmd_fallback, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
                         try:
-                            await asyncio.wait_for(process_fallback.communicate(), timeout=30.0)
+                            _fallback_stdout, fallback_stderr = await asyncio.wait_for(process_fallback.communicate(), timeout=30.0)
                         except TimeoutError:
                             with contextlib.suppress(Exception):
                                 process_fallback.kill()
-                            await process_fallback.communicate()
+                            _fallback_stdout, fallback_stderr = await process_fallback.communicate()
                             logger.error(f"[red]FFmpeg fallback timed out processing {file}[/red]")
 
-                        found_images = sorted(str(p) for p in glob_pattern.parent.glob(glob_pattern.name))
+                        found_images = sorted(str(p) for p in glob_pattern.parent.glob(glob_pattern.name)) if process_fallback.returncode == 0 else []
+                        if process_fallback.returncode != 0:
+                            logger.error(f"[red]FFmpeg fallback failed processing {file}: {fallback_stderr.decode(errors='replace')}[/red]")
+                            discard_previous_menu_capture_files(image_pattern)
                         valid_images = []
                         for img_path in found_images:
                             try:
