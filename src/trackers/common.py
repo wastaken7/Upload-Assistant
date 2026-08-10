@@ -10,7 +10,7 @@ import sys
 import unicodedata
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, ClassVar, cast
+from typing import Any, cast
 
 import aiofiles
 import bencodepy
@@ -22,7 +22,7 @@ from langcodes import tag_parser
 from torf import Torrent
 
 from src.bbcode import BBCODE
-from src.console import console, logger
+from src.console import console, logger, prompt_in_thread
 from src.exportmi import export_info
 from src.languages import languages_manager
 from src.meta import Meta
@@ -30,6 +30,45 @@ from src.usenetcreate import verify_nzb_has_password
 
 
 class Common:
+    PORTUGUESE_SUBTITLE_EXTENSIONS: frozenset[str] = frozenset({".ass", ".ssa", ".srt", ".sub", ".vtt"})
+    PORTUGUESE_SUBTITLE_WORDS: frozenset[str] = frozenset(
+        {
+            "agora",
+            "aqui",
+            "bem",
+            "como",
+            "com",
+            "entao",
+            "essa",
+            "esse",
+            "esta",
+            "estao",
+            "isso",
+            "muito",
+            "nao",
+            "obrigada",
+            "obrigado",
+            "onde",
+            "para",
+            "porque",
+            "posso",
+            "pode",
+            "quando",
+            "que",
+            "senhor",
+            "senhora",
+            "sua",
+            "suas",
+            "seu",
+            "seus",
+            "tambem",
+            "tenho",
+            "temos",
+            "uma",
+            "voce",
+            "vamos",
+        }
+    )
     LANGUAGE_EQUIVALENCE_GROUPS: tuple[set[str], ...] = (
         {"chinese", "mandarin", "zh", "zho", "chi", "cmn", "chinese simplified", "chinese traditional", "zh hans", "zh hant"},
         {"english", "eng", "en", "en us", "en gb", "english cc", "english sdh", "english forced"},
@@ -109,6 +148,69 @@ class Common:
         for value in values:
             expanded.update(self._expand_language_candidates(value, alias_lookup))
         return expanded
+
+    @staticmethod
+    def _read_subtitle_text(path: Path) -> str:
+        for encoding in ("utf-8-sig", "utf-16", "cp1252"):
+            try:
+                return path.read_text(encoding=encoding)
+            except UnicodeError:
+                continue
+            except OSError:
+                return ""
+        return ""
+
+    async def has_portuguese_external_subtitle(self, meta: Meta) -> bool:
+        """Check external subtitle filenames and textual content for Portuguese."""
+        aliases = {
+            "brazilian",
+            "brazilian portuguese",
+            "por",
+            "portuguese",
+            "portugues",
+            "pt",
+            "pt br",
+            "ptbr",
+            "pt brasil",
+        }
+        normalized_aliases = {self._normalize_language_token(alias) for alias in aliases}
+        text_paths: list[Path] = []
+
+        for subtitle_file in meta.subtitle_files or []:
+            path = Path(str(subtitle_file))
+            filename = self._normalize_language_token(path.stem)
+            filename_tokens = filename.split()
+            while filename_tokens and filename_tokens[-1] in {"forced", "sdh"}:
+                filename_tokens.pop()
+            filename_without_flags = " ".join(filename_tokens)
+            if any(filename_without_flags == alias or filename_without_flags.endswith(f" {alias}") for alias in normalized_aliases):
+                return True
+            if path.suffix.casefold() in self.PORTUGUESE_SUBTITLE_EXTENSIONS:
+                text_paths.append(path)
+
+        for path in text_paths:
+            text = await asyncio.to_thread(self._read_subtitle_text, path)
+            words = set(re.findall(r"[a-z]+", self._normalize_language_token(text)))
+            if len(words & self.PORTUGUESE_SUBTITLE_WORDS) >= 3:
+                return True
+
+        return False
+
+    async def check_portuguese_video_requirements(self, meta: Meta, tracker: str) -> bool:
+        if await self.has_portuguese_external_subtitle(meta):
+            return True
+
+        subtitles = await self.check_language_requirements(
+            meta,
+            tracker,
+            languages_to_check=["portuguese", "português", "por", "pt", "pt-br", "pt br", "brazilian portuguese"],
+            check_audio=True,
+            check_subtitle=True,
+            prompt_on_failure=False,
+        )
+        if not subtitles and (not meta.unattended or meta.unattended_confirm):
+            return await self.prompt_user_for_confirmation(f"{tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?")
+        return subtitles
 
     def _format_language_for_display(self, language: str) -> str:
         if not language:
@@ -2440,7 +2542,7 @@ class Common:
             logger.info(f"Filename: {filename}")  # Ensure filename is printed if available
 
         if not meta.unattended:
-            selection = (await asyncio.to_thread(input, f"Do you want to use these IDs from {tracker_name}? (Y/n): ")).strip().lower()
+            selection = (await prompt_in_thread(cli_ui.ask_string, f"Do you want to use these IDs from {tracker_name}? (Y/n): ", default="") or "").strip().lower()
             try:
                 return selection == "" or selection == "y" or selection == "yes"
             except KeyboardInterrupt, EOFError:
@@ -2448,8 +2550,10 @@ class Common:
         else:
             return True
 
-    async def prompt_user_for_confirmation(self, message: str) -> bool:
-        response = (await asyncio.to_thread(input, f"{message} (Y/n): ")).strip().lower()
+    async def prompt_user_for_confirmation(self, message: str, meta: Meta | None = None) -> bool:
+        if meta and meta.unattended and not meta.unattended_confirm:
+            return False
+        response = (await prompt_in_thread(cli_ui.ask_string, f"{message} (Y/n): ", default="") or "").strip().lower()
         return response == "" or response == "y"
 
     async def _apply_region_distributor(self, meta: Meta, attributes: dict[str, Any]) -> None:
@@ -2476,10 +2580,14 @@ class Common:
         raw_api_key = self.config["TRACKERS"][tracker].get("api_key")
         api_key = str(raw_api_key).strip() if raw_api_key else ""
         params: dict[str, str] = {"api_token": api_key}
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        }
         url = f"{torrent_url}{id}"
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(url=url, params=params)
+                response = await client.get(url=url, params=params, headers=headers)
                 json_response = response.json()
         except (httpx.RequestError, httpx.TimeoutException) as e:
             logger.info(f"[yellow]Request error in unit3d_region_distributor: {e}[/yellow]")
@@ -2532,6 +2640,10 @@ class Common:
         raw_api_key = self.config["TRACKERS"][tracker].get("api_key")
         api_key = str(raw_api_key).strip() if raw_api_key else ""
         params: dict[str, Any] = {"api_token": api_key}
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        }
 
         # Determine the search method and add parameters accordingly
         if file_name:
@@ -2549,7 +2661,7 @@ class Common:
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 logger.info(f"Searching for information on [bold cyan]{tracker}[/bold cyan]")
-                response = await client.get(url=url, params=params)
+                response = await client.get(url=url, params=params, headers=headers)
                 json_response = response.json()
         except (httpx.RequestError, httpx.TimeoutException) as e:
             logger.info(f"[yellow]Request error in unit3d_torrent_info: {e}[/yellow]")
@@ -2579,12 +2691,12 @@ class Common:
                 tvdb = 0 if tvdb == 0 else tvdb
                 mal = 0 if mal == 0 else mal
                 imdb = 0 if imdb == 0 else imdb
-                if not meta.region and meta.is_disc == "BDMV":
+                if not meta.region and meta.is_disc in ("BDMV", "DVD"):
                     region_id = attributes.get("region_id")
                     region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                     if region_name:
                         meta.region = region_name
-                if not meta.distributor and meta.is_disc == "BDMV":
+                if not meta.distributor and meta.is_disc in ("BDMV", "DVD"):
                     distributor_id = attributes.get("distributor_id")
                     distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                     if distributor_name:
@@ -2606,12 +2718,12 @@ class Common:
                     tvdb = 0 if tvdb == 0 else tvdb
                     mal = 0 if mal == 0 else mal
                     imdb = 0 if imdb == 0 else imdb
-                    if not meta.region and meta.is_disc == "BDMV":
+                    if not meta.region and meta.is_disc in ("BDMV", "DVD"):
                         region_id = attributes.get("region_id")
                         region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
                         if region_name:
                             meta.region = region_name
-                    if not meta.distributor and meta.is_disc == "BDMV":
+                    if not meta.distributor and meta.is_disc in ("BDMV", "DVD"):
                         distributor_id = attributes.get("distributor_id")
                         distributor_name = await self.unit3d_distributor_ids(reverse=True, distributor_id=distributor_id)
                         if distributor_name:
@@ -2633,11 +2745,14 @@ class Common:
                     sys.exit(1)
 
             if description:
+                raw_descriptions = getattr(meta, "tracker_description_raw", {}) or {}
+                raw_descriptions[tracker] = description
+                meta.tracker_description_raw = raw_descriptions
                 bbcode = BBCODE()
                 description, imagelist = bbcode.clean_unit3d_description(description, torrent_url)
                 if not skip_tracker_descriptions:
                     logger.info(f"[green]Successfully grabbed description from {tracker}")
-                    logger.info(f"Extracted description: {description}", extra={"markup": False})
+                    logger.info(f"Extracted description: \n\n{description}\n\n", extra={"markup": False, "highlighter": None})
 
                     from src.trackersetup import api_trackers
 
@@ -2723,10 +2838,16 @@ class Common:
                             raise KeyError("No data in response")
                     except KeyError, IndexError, TypeError:
                         logger.info("[red]Unable to get data from ptgen using IMDb")
-                        params["url"] = console.input("[red]Please enter [yellow]Douban[/yellow] link: ")
+                        if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                            params["url"] = await prompt_in_thread(cli_ui.ask_string, "Please enter Douban link:", default="") or ""
+                        else:
+                            params["url"] = ""
                 else:
                     logger.info("[red]No IMDb id was found.")
-                    params["url"] = console.input("[red]Please enter [yellow]Douban[/yellow] link: ")
+                    if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                        params["url"] = await prompt_in_thread(cli_ui.ask_string, "Please enter Douban link:", default="") or ""
+                    else:
+                        params["url"] = ""
 
                 # Fetch with douban URL
                 ptgen_json = await fetch_ptgen(client, url, params)
@@ -2747,7 +2868,7 @@ class Common:
                 ptgen_text = ptgen_json.get("format", "")
                 if "[/img]" in ptgen_text:
                     ptgen_text = ptgen_text.split("[/img]")[1]
-                ptgen_text = f"[img]{meta.imdb_info.get('cover', meta.cover)}[/img]{ptgen_text}"
+                ptgen_text = f"[img]{meta.imdb_info.get('cover', meta.artwork_url)}[/img]{ptgen_text}"
 
         except Exception:
             console.print_exception()
@@ -2756,102 +2877,6 @@ class Common:
         return ptgen_text
 
     class MediaInfoParser:
-        # Language to ISO country code mapping
-        LANGUAGE_CODE_MAP: ClassVar = {
-            "afrikaans": ("https://ptpimg.me/i9pt6k.png", "20"),
-            "albanian": ("https://ptpimg.me/sfhik8.png", "20"),
-            "amharic": ("https://ptpimg.me/zm816y.png", "20"),
-            "arabic": ("https://ptpimg.me/5g8i9u.png", "26x10"),
-            "armenian": ("https://ptpimg.me/zm816y.png", "20"),
-            "azerbaijani": ("https://ptpimg.me/h3rbe0.png", "20"),
-            "basque": ("https://ptpimg.me/xj51b9.png", "20"),
-            "belarusian": ("https://ptpimg.me/iushg1.png", "20"),
-            "bengali": ("https://ptpimg.me/jq996n.png", "20"),
-            "bosnian": ("https://ptpimg.me/19t9rv.png", "20"),
-            "brazilian": ("https://ptpimg.me/p8sgla.png", "20"),
-            "bulgarian": ("https://ptpimg.me/un9dc6.png", "20"),
-            "catalan": ("https://ptpimg.me/v4h5bf.png", "20"),
-            "chinese": ("https://ptpimg.me/ea3yv3.png", "20"),
-            "croatian": ("https://ptpimg.me/rxi533.png", "20"),
-            "czech": ("https://ptpimg.me/5m75n3.png", "20"),
-            "danish": ("https://ptpimg.me/m35c41.png", "20"),
-            "dutch": ("https://ptpimg.me/6nmwpx.png", "20"),
-            "dzongkha": ("https://ptpimg.me/56e7y5.png", "20"),
-            "english": ("https://ptpimg.me/ine2fd.png", "25x10"),
-            "english (gb)": ("https://ptpimg.me/a9w539.png", "20"),
-            "estonian": ("https://ptpimg.me/z25pmk.png", "20"),
-            "filipino": ("https://ptpimg.me/9d3z9w.png", "20"),
-            "finnish": ("https://ptpimg.me/p4354c.png", "20"),
-            "french (canada)": ("https://ptpimg.me/ei4s6u.png", "20"),
-            "french canadian": ("https://ptpimg.me/ei4s6u.png", "20"),
-            "french": ("https://ptpimg.me/m7mfoi.png", "20"),
-            "galician": ("https://ptpimg.me/xj51b9.png", "20"),
-            "georgian": ("https://ptpimg.me/pp412q.png", "20"),
-            "german": ("https://ptpimg.me/dw8d04.png", "30x10"),
-            "greek": ("https://ptpimg.me/px1u3e.png", "20"),
-            "gujarati": ("https://ptpimg.me/d0l479.png", "20"),
-            "haitian creole": ("https://ptpimg.me/f64wlp.png", "20"),
-            "hebrew": ("https://ptpimg.me/5jw1jp.png", "20"),
-            "hindi": ("https://ptpimg.me/d0l479.png", "20"),
-            "hungarian": ("https://ptpimg.me/fr4aj7.png", "30x10"),
-            "icelandic": ("https://ptpimg.me/40o553.png", "20"),
-            "indonesian": ("https://ptpimg.me/f00c8u.png", "20"),
-            "irish": ("https://ptpimg.me/71x9mk.png", "20"),
-            "italian": ("https://ptpimg.me/ao762a.png", "20"),
-            "japanese": ("https://ptpimg.me/o1amm3.png", "20"),
-            "kannada": ("https://ptpimg.me/d0l479.png", "20"),
-            "kazakh": ("https://ptpimg.me/tq1h8b.png", "20"),
-            "khmer": ("https://ptpimg.me/0p1tli.png", "20"),
-            "korean": ("https://ptpimg.me/2tvwgn.png", "20"),
-            "kurdish": ("https://ptpimg.me/g290wo.png", "20"),
-            "kyrgyz": ("https://ptpimg.me/336unh.png", "20"),
-            "lao": ("https://ptpimg.me/n3nan1.png", "20"),
-            "latin american": ("https://ptpimg.me/11350x.png", "20"),
-            "latvian": ("https://ptpimg.me/3x2y1b.png", "25x10"),
-            "lithuanian": ("https://ptpimg.me/b444z8.png", "20"),
-            "luxembourgish": ("https://ptpimg.me/52x189.png", "20"),
-            "macedonian": ("https://ptpimg.me/2g5lva.png", "20"),
-            "malagasy": ("https://ptpimg.me/n5120r.png", "20"),
-            "malay": ("https://ptpimg.me/02e17w.png", "30x10"),
-            "malayalam": ("https://ptpimg.me/d0l479.png", "20"),
-            "maltese": ("https://ptpimg.me/ua46c2.png", "20"),
-            "maori": ("https://ptpimg.me/2fw03g.png", "20"),
-            "marathi": ("https://ptpimg.me/d0l479.png", "20"),
-            "mongolian": ("https://ptpimg.me/z2h682.png", "20"),
-            "nepali": ("https://ptpimg.me/5yd3sp.png", "20"),
-            "norwegian": ("https://ptpimg.me/1t11u4.png", "20"),
-            "pashto": ("https://ptpimg.me/i9pt6k.png", "20"),
-            "persian": ("https://ptpimg.me/i0y103.png", "20"),
-            "polish": ("https://ptpimg.me/m73uwa.png", "20"),
-            "portuguese": ("https://ptpimg.me/5j1a7q.png", "20"),
-            "portuguese (brazil)": ("https://ptpimg.me/p8sgla.png", "20"),
-            "punjabi": ("https://ptpimg.me/d0l479.png", "20"),
-            "romanian": ("https://ptpimg.me/ux94x0.png", "20"),
-            "russian": ("https://ptpimg.me/v33j64.png", "20"),
-            "samoan": ("https://ptpimg.me/8nt3zq.png", "20"),
-            "serbian": ("https://ptpimg.me/2139p2.png", "20"),
-            "slovak": ("https://ptpimg.me/70994n.png", "20"),
-            "slovenian": ("https://ptpimg.me/61yp81.png", "25x10"),
-            "somali": ("https://ptpimg.me/320pa6.png", "20"),
-            "spanish": ("https://ptpimg.me/xj51b9.png", "20"),
-            "spanish (latin america)": ("https://ptpimg.me/11350x.png", "20"),
-            "swahili": ("https://ptpimg.me/d0l479.png", "20"),
-            "swedish": ("https://ptpimg.me/082090.png", "20"),
-            "tamil": ("https://ptpimg.me/d0l479.png", "20"),
-            "telugu": ("https://ptpimg.me/d0l479.png", "20"),
-            "thai": ("https://ptpimg.me/38ru43.png", "20"),
-            "turkish": ("https://ptpimg.me/g4jg39.png", "20"),
-            "ukrainian": ("https://ptpimg.me/d8fp6k.png", "20"),
-            "urdu": ("https://ptpimg.me/z23gg5.png", "20"),
-            "uzbek": ("https://ptpimg.me/89854s.png", "20"),
-            "vietnamese": ("https://ptpimg.me/qnuya2.png", "20"),
-            "welsh": ("https://ptpimg.me/a9w539.png", "20"),
-            "xhosa": ("https://ptpimg.me/7teg09.png", "20"),
-            "yiddish": ("https://ptpimg.me/5jw1jp.png", "20"),
-            "yoruba": ("https://ptpimg.me/9l34il.png", "20"),
-            "zulu": ("https://ptpimg.me/7teg09.png", "20"),
-        }
-
         def parse_mediainfo(self, mediainfo_text: str) -> dict[str, Any]:
             # Patterns for matching sections and fields
             section_pattern = re.compile(r"^(General|Video|Audio|Text|Menu)(?:\s#\d+)?", re.IGNORECASE)
@@ -2924,32 +2949,15 @@ class Common:
                         # Processing specific properties for text
                         # Process title field
                         if property_name == "title" and "title" not in current_track:
-                            title_lower = property_value.lower()
                             # print(f"\nProcessing Title: '{property_value}'")  # Debugging output
 
                             # Store the title as-is since it should remain descriptive
                             current_track["title"] = property_value
                             # print(f"Stored title: '{property_value}'")
 
-                            # If there's an exact match in LANGUAGE_CODE_MAP, add country code to language field
-                            if title_lower in self.LANGUAGE_CODE_MAP:
-                                country_code, size = self.LANGUAGE_CODE_MAP[title_lower]
-                                current_track["language"] = f"[img={size}]{country_code}[/img]"
-                                # print(f"Exact match found for title '{title_lower}' with country code: {country_code}")
-
                         # Process language field only if it hasn't already been set
                         elif property_name == "language" and "language" not in current_track:
-                            language_lower = property_value.lower()
-                            # print(f"\nProcessing Language: '{property_value}'")  # Debugging output
-
-                            if language_lower in self.LANGUAGE_CODE_MAP:
-                                country_code, size = self.LANGUAGE_CODE_MAP[language_lower]
-                                current_track["language"] = f"[img={size}]{country_code}[/img]"
-                                # print(f"Matched language '{language_lower}' to country code: {country_code}")
-                            else:
-                                # If no match in LANGUAGE_CODE_MAP, store language as-is
-                                current_track["language"] = property_value
-                                # print(f"No match found for language '{property_value}', stored as-is.")
+                            current_track["language"] = property_value
 
             # Append the last track to the parsed data if it exists
             if current_section and current_track:
@@ -2989,17 +2997,8 @@ class Common:
                 for index, track in enumerate(parsed_mediainfo["audio"], start=1):  # Start enumeration at 1
                     parts = [f"{index}."]  # Start with track number without a trailing slash
 
-                    # Language flag image
                     language = track.get("language", "").lower()
-                    result = self.LANGUAGE_CODE_MAP.get(language)
-
-                    # Check if the language was found in LANGUAGE_CODE_MAP
-                    if result is not None:
-                        country_code, size = result
-                        parts.append(f"[img={size}]{country_code}[/img]")
-                    else:
-                        # If language is not found, use a fallback or display the language as plain text
-                        parts.append(language.capitalize() if language else "")
+                    parts.append(language.capitalize() if language else "")
 
                     # Other properties to concatenate (language already handled above)
                     properties = ["codec", "format", "channels", "bit_rate", "format_profile", "stream_size"]
@@ -3008,7 +3007,7 @@ class Common:
                     # Join parts (starting from index 1, after the track number) with slashes and add to bbcode_output
                     bbcode_output += f"{parts[0]} " + " / ".join(parts[1:]) + "\n"
 
-            # Format Text Section - Centered with flags or text, spaced apart
+            # Format Text Section - Centered, spaced apart
             if "text" in parsed_mediainfo:
                 bbcode_output += "\n[b]Subtitles[/b]\n"
                 subtitle_entries: list[str] = []
@@ -3089,6 +3088,7 @@ class Common:
         require_both: bool = False,
         original_language: bool = False,
         original_required: bool = False,
+        prompt_on_failure: bool = True,
     ) -> bool:
         """
         Check if the media metadata meets specific language requirements for audio and/or subtitles.
@@ -3115,6 +3115,8 @@ class Common:
         :type original_language: bool
         :param original_required: If True, the original language must be present in the audio tracks.
         :type original_required: bool
+        :param prompt_on_failure: If True, ask whether to continue when the requirement is not met.
+        :type prompt_on_failure: bool
         :return: True if the media meets the specified language requirements, False otherwise.
         :rtype: bool
         """
@@ -3134,6 +3136,11 @@ class Common:
                         f"[yellow]Required one of:[/yellow] {', '.join(languages_to_check)}\n"
                         f"[cyan]Found book language:[/cyan] {book_language}"
                     )
+                    if prompt_on_failure:
+                        return await self.prompt_user_for_confirmation(
+                            f"{tracker}: Language requirements not met. Do you want to proceed with the upload?",
+                            meta,
+                        )
                 return meets_requirement
             return True
 
@@ -3176,7 +3183,12 @@ class Common:
                     f"[yellow]Required original audio language:[/yellow] {language_display}\n"
                     f"[cyan]Found Audio Languages:[/cyan] {', '.join(audio_languages) or 'None'}"
                 )
-                return not meta.unattended and cli_ui.ask_yes_no("Do you want to upload anyway?", default=False)
+                if prompt_on_failure:
+                    return await self.prompt_user_for_confirmation(
+                        f"{tracker}: Language requirements not met. Do you want to proceed with the upload?",
+                        meta,
+                    )
+                return False
 
             audio_ok = not check_audio or any(lang in audio_languages for lang in languages_to_check)
             subtitle_ok = not check_subtitle or any(lang in subtitle_languages for lang in languages_to_check)
@@ -3199,8 +3211,13 @@ class Common:
                 )
                 return False
 
+            if not check_audio and not check_subtitle:
+                return True
+
+            meets_requirement = audio_ok and subtitle_ok if require_both else (check_audio and audio_ok) or (check_subtitle and subtitle_ok)
+
             if require_both:
-                if not (audio_ok and subtitle_ok):
+                if not meets_requirement:
                     logger.info(
                         f"[red]Language requirement not met for [bold]{tracker}[/bold].[/red]\n"
                         f"[yellow]Required both audio and subtitles in one of the following:[/yellow] "
@@ -3209,7 +3226,7 @@ class Common:
                         f"[cyan]Found Subtitles:[/cyan] {', '.join(subtitle_languages) or 'None'}"
                     )
             else:
-                if not (audio_ok or subtitle_ok):
+                if not meets_requirement:
                     logger.info(
                         f"[red]Language requirement not met for [bold]{tracker}[/bold].[/red]\n"
                         f"[yellow]Required at least one of the following:[/yellow] "
@@ -3218,9 +3235,12 @@ class Common:
                         f"[cyan]Found Subtitles:[/cyan] {', '.join(subtitle_languages) or 'None'}"
                     )
 
-            if require_both:
-                return audio_ok and subtitle_ok
-            return audio_ok or subtitle_ok
+            if not meets_requirement and prompt_on_failure:
+                return await self.prompt_user_for_confirmation(
+                    f"{tracker}: Language requirements not met. Do you want to proceed with the upload?",
+                    meta,
+                )
+            return meets_requirement
 
         except Exception as e:
             console.print_exception()
@@ -3390,7 +3410,7 @@ class Common:
         # --nzb-password only tags NZB metadata, it doesn't encrypt), so a
         # configured password was never applied and won't be in the NZB.
         # That's expected, not an error.
-        password_applies = bool(usenet_cfg.get("archive_password")) and not usenet_cfg.get("skip_archive", False)
+        password_applies = bool(meta.archive_password or usenet_cfg.get("archive_password")) and not usenet_cfg.get("skip_archive", False)
         if password_applies and not await verify_nzb_has_password(nzb_path):
             logger.error(f"{tracker}: [red]Error: The NZB file does not contain the password in its metadata header. Aborting upload...[/red]")
             return False

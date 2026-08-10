@@ -1,5 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any, cast
@@ -8,10 +9,13 @@ from urllib.parse import urlparse
 import aiofiles
 import cli_ui
 import click
+import httpx
+from rich.markup import escape
 
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.temp_paths import artwork_dir
 from src.trackers.UNIT3D import UNIT3D
 from src.uploadscreens import UploadScreensManager
 
@@ -41,7 +45,7 @@ class Cinematik(UNIT3D):
 
     async def get_additional_checks(self, meta: Meta) -> bool:
         if not meta.is_disc:
-            logger.info("[red]Only disc-based content allowed at Cinematik")
+            logger.info(f"{self.tracker}: [red]Only disc-based content allowed at Cinematik")
             return False
 
         return True
@@ -140,7 +144,7 @@ class Cinematik(UNIT3D):
         type_id_map = {"Custom": "1", "BD100": "3", "BD66": "4", "BD50": "5", "BD25": "6", "NTSC DVD9": "7", "NTSC DVD5": "8", "PAL DVD9": "9", "PAL DVD5": "10", "3D": "11"}
 
         if not disctype:
-            logger.info("[red]You must specify a --disctype")
+            logger.info(f"{self.tracker}: [red]You must specify a --disctype")
             # Raise an exception since we can't proceed without disctype
             raise ValueError("disctype is required for Cinematik tracker but was not provided")
 
@@ -170,7 +174,7 @@ class Cinematik(UNIT3D):
         if meta.description_link or meta.description_file:
             desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)
 
-            logger.info(f"Custom Description Link/File Path: {desc}", extra={"markup": False})
+            logger.info(f"{self.tracker}: Custom Description Link/File Path: {desc}", extra={"markup": False})
             return {"description": desc}
 
         discs = cast(list[dict[str, Any]], meta.discs)
@@ -186,45 +190,43 @@ class Cinematik(UNIT3D):
         country_name = self.country_code_to_name(str(meta.region))
 
         # Rehost poster if tmdb_poster is available
-        poster_url = f"https://image.tmdb.org/t/p/original{meta.tmdb_poster}"
+        poster_url = f"https://image.tmdb.org/t/p/original{meta.tmdb_poster_path}"
 
         # Define the paths for both jpg and png poster images
-        poster_jpg_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/poster.jpg"
-        poster_png_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/poster.png"
+        poster_dir = artwork_dir(meta.base_dir, meta.uuid)
+        poster_paths = [poster_dir / filename for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg")]
 
         # Check if either poster.jpg or poster.png already exists
-        if Path(poster_jpg_path).exists():
-            poster_path = poster_jpg_path
-            logger.info("[green]Cover already exists as poster.jpg, skipping download.[/green]")
-        elif Path(poster_png_path).exists():
-            poster_path = poster_png_path
-            logger.info("[green]Cover already exists as poster.png, skipping download.[/green]")
+        existing_poster = next((path for path in poster_paths if path.is_file()), None)
+        if existing_poster is not None:
+            poster_path = str(existing_poster)
+            logger.info(f"{self.tracker}: [green]Cover already exists as {existing_poster.name}, skipping download.[/green]")
         else:
             # No poster file exists, download the poster image
-            poster_path = poster_jpg_path  # Default to saving as poster.jpg
+            poster_path = str(poster_dir / "poster.jpg")  # Default to saving as poster.jpg
             try:
                 parsed_url = urlparse(poster_url)
                 if parsed_url.scheme not in ("http", "https"):
                     raise ValueError(f"Invalid URL scheme: {parsed_url.scheme}")
                 urllib.request.urlretrieve(poster_url, poster_path)  # noqa: S310
-                logger.info(f"[green]Cover downloaded to {poster_path}[/green]")
-            except Exception as e:
-                logger.error(f"[red]Error downloading poster: {e}[/red]")
+                logger.info(f"{self.tracker}: [green]Cover downloaded to {escape(str(poster_path))}[/green]")
+            except (urllib.error.URLError, OSError, ValueError) as e:
+                logger.error(f"{self.tracker}: [red]Error downloading poster: {escape(str(e))}[/red]")
 
         # Upload the downloaded or existing poster image once
         if Path(poster_path).exists():
             try:
-                logger.info("Uploading standard poster to image host....")
+                logger.info(f"{self.tracker}: Uploading standard poster to image host....")
                 new_poster_url, _ = await self.uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [poster_path], {})
 
                 # Ensure that the new poster URL is assigned only once
                 poster_urls = new_poster_url
                 if len(poster_urls) > 0:
                     poster_url = str(poster_urls[0].get("raw_url", poster_url))
-            except Exception as e:
-                logger.error(f"[red]Error uploading poster: {e}[/red]")
+            except (httpx.HTTPError, ValueError, KeyError) as e:
+                logger.error(f"{self.tracker}: [red]Error uploading poster: {escape(str(e))}[/red]")
         else:
-            logger.info("[red]Cover file not found, cannot upload.[/red]")
+            logger.info(f"{self.tracker}: [red]Cover file not found, cannot upload.[/red]")
 
         # Generate the description text
         desc_text: list[str] = []
@@ -383,17 +385,20 @@ class Cinematik(UNIT3D):
         description = "".join(desc_text)
 
         # Ask user if they want to edit or keep the description
-        logger.info(f"Current description: {description}", extra={"markup": False})
-        logger.info("[cyan]Do you want to edit or keep the description?[/cyan]")
-        edit_choice = cli_ui.ask_string("Enter 'e' to edit, or press Enter to keep it as is: ")
+        if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+            logger.info(f"{self.tracker}: Current description: {description}", extra={"markup": False})
+            logger.info(f"{self.tracker}: [cyan]Do you want to edit or keep the description?[/cyan]")
+            edit_choice = cli_ui.ask_string("Enter 'e' to edit, or press Enter to keep it as is: ")
 
-        if (edit_choice or "").lower() == "e":
-            edited_description = cast(str | None, click.edit(description))  # pyrefly: ignore [bad-argument-type]
-            if edited_description:
-                description = edited_description.strip()
-            logger.info(f"Final description after editing: {description}", extra={"markup": False})
+            if (edit_choice or "").lower() == "e":
+                edited_description = cast(str | None, click.edit(description))  # pyrefly: ignore [bad-argument-type]
+                if edited_description:
+                    description = edited_description.strip()
+                logger.info(f"{self.tracker}: Final description after editing: {description}", extra={"markup": False})
+            else:
+                logger.info(f"{self.tracker}: [green]Keeping the original description.[/green]")
         else:
-            logger.info("[green]Keeping the original description.[/green]")
+            logger.info(f"{self.tracker}: [green]Unattended mode: Keeping the original description.[/green]")
 
         # Write the final description to the file
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as desc_file:

@@ -161,7 +161,8 @@ class Samaritano(UNIT3D):
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.category == "BOOK":
             return True
-        return await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
+
+        return await self.common.check_portuguese_video_requirements(meta, self.tracker)
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/size][/url][/right]"

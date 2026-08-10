@@ -6,7 +6,7 @@ from typing import Any, cast
 import aiofiles
 import httpx
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
@@ -30,7 +30,7 @@ class TorrentLeech:
     http_upload_url = f"{base_url}/torrents/upload/"
     api_upload_url = f"{base_url}/torrents/upload/apiupload"
     torrent_url = f"{base_url}/torrent/"
-    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
     tracker_urls = ("tracker.tleechreload", "tracker.torrentleech")
     allows_bloated_audio = True
 
@@ -66,13 +66,13 @@ class TorrentLeech:
                 logged_in = response.status_code == 200 and "torrents/upload" in str(response.url)
 
             if logged_in:
-                logger.debug(f"[bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
+                logger.debug(f"{self.tracker}: [bold green]Logged in to '{self.tracker}' with cookies.[/bold green]")
                 return True
 
-            logger.info(f"[bold red]Login to '{self.tracker}' with cookies failed. Please check your cookies.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Login to '{self.tracker}' with cookies failed. Please check your cookies.[/bold red]")
             return False
         except httpx.RequestError as e:
-            logger.info(f"[bold red]Error while validating credentials for '{self.tracker}': {e}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Error while validating credentials for '{self.tracker}': {e}[/bold red]")
             return False
 
     async def generate_description(self, meta: Meta) -> str:
@@ -91,6 +91,7 @@ class TorrentLeech:
             logo=True,
             mediainfo=True,
             menu_screenshots=process_screenshot,
+            music=True,
             nfo=True,
             screenshots=process_screenshot,
             tonemapped_header=True,
@@ -136,6 +137,8 @@ class TorrentLeech:
         games_mac = 42
         games_switch = 48
         games_ps5 = 49
+
+        music = 31
 
         if meta.anime:
             return anime
@@ -211,6 +214,9 @@ class TorrentLeech:
 
             return games_pc
 
+        if category == "MUSIC":
+            return music
+
         return 0
 
     def get_screens(self, meta: Meta) -> list[str]:
@@ -227,7 +233,7 @@ class TorrentLeech:
         login = await self.login(meta, force=True)
         if not login:
             meta.skipping = "TORRENTLEECH"
-            logger.debug(f"[bold red]Skipping upload to '{self.tracker}' as login failed.[/bold red]")
+            logger.debug(f"{self.tracker}: [bold red]Skipping upload to '{self.tracker}' as login failed.[/bold red]")
             return []
         cat_id = self.get_category(meta)
 
@@ -268,7 +274,7 @@ class TorrentLeech:
             param = f"{cat_id}/query/{search_name} {year} {resolution}"
             search_urls.append(f"{self.base_url}/torrents/browse/list/categories/{param}")
 
-        elif meta.category in ("BOOK", "GAME"):
+        elif meta.category in ("BOOK", "GAME", "MUSIC"):
             param = f"{cat_id}/query/{search_name}"
             search_urls.append(f"{self.base_url}/torrents/browse/list/categories/{param}")
 
@@ -356,7 +362,7 @@ class TorrentLeech:
                 return True
 
         else:
-            logger.info("[cyan]TORRENTLEECH Request Data:")
+            logger.info(f"{self.tracker}: Request Data:")
             logger.info(Redaction.redact_private_info(data))
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
@@ -390,9 +396,7 @@ class TorrentLeech:
         return data
 
     async def cookie_upload(self, meta: Meta) -> bool | None:
-        await self.generate_description(meta)
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
-            description_content = await f.read()
+        description_content = await self.generate_description(meta)
         login = await self.login(meta)
         if not login:
             tracker_status = meta.tracker_status
@@ -403,7 +407,7 @@ class TorrentLeech:
         data = await self.get_cookie_upload_data(meta)
 
         if meta.debug:
-            logger.debug("[cyan]TORRENTLEECH Request Data:")
+            logger.debug(f"{self.tracker}: [cyan]Request Data:")
             logger.debug(Redaction.redact_private_info(data))
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success

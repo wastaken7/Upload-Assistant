@@ -1,6 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
-import contextlib
 import os
 import re
 import shutil
@@ -16,6 +15,8 @@ from torf import Torrent
 from src.console import logger
 from src.meta import Meta
 from src.torrent_clients import DelugeClientMixin, QbittorrentClientMixin, RtorrentClientMixin, TransmissionClientMixin
+from src.torrent_clients.path_utils import coerce_str_list, is_path_under
+from src.torrentcreate import SUBTITLE_EXTENSIONS
 
 # Secure XML-RPC client using defusedxml to prevent XML attacks
 defusedxml.xmlrpc.monkey_patch()
@@ -23,74 +24,48 @@ defusedxml.xmlrpc.monkey_patch()
 
 class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, TransmissionClientMixin):
     def __init__(self, config: dict[str, Any]) -> None:
+        """Initialize torrent-client operations with the application config."""
         self.config = config
+        self._tracker_comment_hosts: dict[str, tuple[str, ...]] | None = None
+
+    @staticmethod
+    def _matches_tracker_host(host: str, tracker_hosts: dict[str, tuple[str, ...]]) -> str | None:
+        for tracker_name, domains in tracker_hosts.items():
+            if any(host == domain or host.endswith(f".{domain}") for domain in domains):
+                return tracker_name
+        return None
+
+    def _get_tracker_comment_hosts(self) -> dict[str, tuple[str, ...]]:
+        if self._tracker_comment_hosts is None:
+            from src.trackersetup import get_tracker_comment_hosts
+
+            self._tracker_comment_hosts = get_tracker_comment_hosts(self.config)
+        return self._tracker_comment_hosts
 
     def _extract_tracker_ids_from_comment(self, comment: str) -> dict[str, str]:
+        """Extract known tracker IDs from a torrent comment URL set."""
         if not comment:
             return {}
 
-        def _is_host(host: str, domain: str) -> bool:
-            host = host.lower()
-            domain = domain.lower()
-            return host == domain or host.endswith(f".{domain}")
-
         def _last_path_id(path: str) -> str | None:
+            """Extract a numeric tracker ID from the end of a URL path."""
             match = re.search(r"/(\d+)$", path)
             return match.group(1) if match else None
 
         def _query_id(query: str, key: str) -> str | None:
+            """Extract the first value for key from a URL query string."""
             values = urllib.parse.parse_qs(query).get(key)
             return values[0] if values else None
 
         tracker_ids: dict[str, str] = {}
-
-        from src.trackersetup import tracker_class_map
-
-        tracker_hosts: dict[str, str] = {}
-        for tracker_name in set(tracker_class_map.keys()) | {"PASSTHEPOPCORN", "BeyondHD", "BTN", "HDBITS"}:
-            # Check base_url from class
-            hostname = ""
-            if tracker_name in tracker_class_map:
-                with contextlib.suppress(Exception):
-                    tracker_instance = tracker_class_map[tracker_name](self.config)
-                    base_url = getattr(tracker_instance, "base_url", "")
-                    if base_url:
-                        hostname = urllib.parse.urlparse(base_url).hostname or ""
-            # Fallback to announce_url from config
-            if not hostname:
-                announce_url = self.config.get("TRACKERS", {}).get(tracker_name, {}).get("announce_url", "")
-                if announce_url:
-                    hostname = urllib.parse.urlparse(announce_url).hostname or ""
-            # Hardcoded fallbacks if config/class is not loaded yet or not configured
-            if not hostname:
-                hardcoded_hosts = {
-                    "PASSTHEPOPCORN": "passthepopcorn.me",
-                    "AITHER": "aither.cc",
-                    "LST": "lst.gg",
-                    "ONLYENCODES": "onlyencodes.cc",
-                    "BLUTOPIA": "blutopia.cc",
-                    "ULCX": "upload.cx",
-                    "HDBITS": "hdbits.org",
-                    "BTN": "broadcasthe.net",
-                    "BEYONDHD": "beyond-hd.me",
-                    "HAWKEUNO": "hawke.uno",
-                }
-                hostname = hardcoded_hosts.get(tracker_name, "")
-            if hostname:
-                tracker_hosts[tracker_name] = hostname.lower()
-
         urls: list[str] = re.findall(r"https?://[^\s\"'<>]+", comment)
+        tracker_hosts = self._get_tracker_comment_hosts()
         for url in urls:
             parsed = urllib.parse.urlparse(url)
             host = (parsed.hostname or "").lower()
             path = parsed.path
 
-            # Match against tracker_hosts
-            matched_tracker = None
-            for name, domain in tracker_hosts.items():
-                if _is_host(host, domain):
-                    matched_tracker = name
-                    break
+            matched_tracker = self._matches_tracker_host(host, tracker_hosts)
 
             if not matched_tracker:
                 continue
@@ -118,10 +93,14 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 btn_id = _query_id(parsed.query, "id")
                 if btn_id:
                     tracker_ids[tracker_key] = btn_id
-            elif matched_tracker == "BeyondHD":
+            elif matched_tracker in {"BeyondHD", "BEYONDHD"}:
                 match = re.search(r"/details/(\d+)", path)
                 if match:
                     tracker_ids[tracker_key] = match.group(1)
+            elif matched_tracker == "ORPHEUS":
+                torrent_id = _query_id(parsed.query, "torrentid")
+                if torrent_id:
+                    tracker_ids[tracker_key] = torrent_id
             else:
                 # UNIT3D style: last path ID
                 tracker_id = _last_path_id(path)
@@ -131,6 +110,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         return tracker_ids
 
     async def add_to_client(self, meta: Meta, tracker: str, cross: bool = False) -> None:
+        """Add the prepared torrent to each configured client."""
         if meta.path is None:
             logger.info("[bold red]meta.path is None, cannot add to client")
             return
@@ -240,28 +220,31 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         tracker_cfg = self.config.get("TRACKERS", {}).get(tracker, {})
         has_tracker_delay = isinstance(tracker_cfg, dict) and "inject_delay" in tracker_cfg
         inject_delay = tracker_cfg.get("inject_delay") if has_tracker_delay else self.config["DEFAULT"].get("inject_delay", 0)
-        if inject_delay is not None:
-            try:
-                inject_delay = int(inject_delay)
-            except ValueError, TypeError:
-                if has_tracker_delay:
-                    logger.info(f"{tracker}: [bold red]CONFIG ERROR: 'inject_delay' must be an integer")
-                else:
-                    logger.info("[bold red]CONFIG ERROR: 'inject_delay' must be an integer")
-                inject_delay = 0
+        if inject_delay is None or (isinstance(inject_delay, str) and not inject_delay.strip()):
+            return
 
-            if inject_delay < 0:
-                logger.info("[bold red]CONFIG ERROR: 'inject_delay' must be >= 0")
-                inject_delay = 0
-            if inject_delay > 0:
-                if meta.debug or inject_delay > 5:
-                    if has_tracker_delay:
-                        logger.info(f"{tracker}: [cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
-                    else:
-                        logger.info(f"[cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
-                await asyncio.sleep(inject_delay)
+        try:
+            inject_delay = int(inject_delay)
+        except ValueError, TypeError:
+            if has_tracker_delay:
+                logger.info(f"{tracker}: [bold red]CONFIG ERROR: 'inject_delay' must be an integer")
+            else:
+                logger.info("[bold red]CONFIG ERROR: 'inject_delay' must be an integer")
+            inject_delay = 0
+
+        if inject_delay < 0:
+            logger.info("[bold red]CONFIG ERROR: 'inject_delay' must be >= 0")
+            inject_delay = 0
+        if inject_delay > 0:
+            if meta.debug or inject_delay > 5:
+                if has_tracker_delay:
+                    logger.info(f"{tracker}: [cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
+                else:
+                    logger.info(f"[cyan]Waiting {inject_delay} seconds before adding to client '{client_name}'[/cyan]")
+            await asyncio.sleep(inject_delay)
 
     async def find_existing_torrent(self, meta: Meta) -> str | None:
+        """Find a reusable torrent matching the prepared metadata."""
         if meta.get("skip_auto_torrent", False):
             return None
 
@@ -276,6 +259,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             mtv_torrent = False
         prefer_small_pieces = mtv_torrent or piece_limit
         best_match = None  # Track the best match for fallback if prefer_small_pieces is enabled
+        video_only_fallback: tuple[str, str] | None = None
 
         default_torrent_client = cast(str, self.config["DEFAULT"]["default_torrent_client"])
 
@@ -310,24 +294,44 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
             result = await self._search_single_client_for_torrent(meta, client_name, prefer_small_pieces, mtv_torrent, piece_limit, best_match)
 
             if result:
+                candidate_path = result.get("torrent_path") if isinstance(result, dict) else result
+                if meta.subtitle_files and isinstance(candidate_path, str) and not self._torrent_includes_all_local_subtitles(candidate_path, meta):
+                    # Only a subtitle-free torrent can safely provide BASE.torrent.
+                    # A partially subtitle-bearing torrent would produce an invalid
+                    # BASE_SUBS.torrent and omit selected local subtitles.
+                    if self._torrent_has_no_subtitles(candidate_path) and (
+                        video_only_fallback is None
+                        or not prefer_small_pieces
+                        or self._is_preferred_piece_size_candidate(candidate_path, video_only_fallback[0], mtv_torrent, piece_limit)
+                    ):
+                        video_only_fallback = (candidate_path, client_name)
+                    continue
                 if isinstance(result, dict):
                     # Got a valid torrent but not ideal piece size
-                    best_match = result
+                    best_match = {**result, "client_name": client_name}
                     # If prefer_small_pieces is False, we don't care about piece size optimization
                     # so stop searching after finding the first valid torrent
                     if not prefer_small_pieces:
                         logger.info(f"[green]Found valid torrent in client '{client_name}', stopping search[/green]")
                         torrent_path = best_match.get("torrent_path")
+                        meta.reuse_torrent_client = client_name
                         return torrent_path if isinstance(torrent_path, str) else None
                 else:
                     # Got a path - this means we found a torrent with ideal piece size
                     logger.debug(f"[green]Found valid torrent with preferred piece size in client '{client_name}', stopping search[/green]")
+                    meta.reuse_torrent_client = client_name
                     return result
 
         if prefer_small_pieces and best_match:
             logger.info(f"[yellow]Using best match torrent with hash: [bold yellow]{best_match['torrenthash']}[/bold yellow]")
             torrent_path = best_match.get("torrent_path")
+            meta.reuse_torrent_client = cast(str | None, best_match.get("client_name"))
             return torrent_path if isinstance(torrent_path, str) else None
+
+        if video_only_fallback:
+            logger.info("[yellow]No matching torrent with all local subtitles found; using the video-only fallback.[/yellow]")
+            meta.reuse_torrent_client = video_only_fallback[1]
+            return video_only_fallback[0]
 
         logger.info("[bold yellow]No Valid .torrent found")
         return None
@@ -535,7 +539,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         return best_match
 
-    async def is_valid_torrent(self, meta: Meta, torrent_path: str, torrenthash: str, torrent_client: str, client: dict[str, Any]) -> tuple[bool, str]:
+    async def is_valid_torrent(self, meta: Meta, torrent_path: str, torrenthash: str, torrent_client: str, _client: dict[str, Any]) -> tuple[bool, str]:
+        """Validate a candidate torrent against files, layout, and piece limits."""
         torrent_path = str(torrent_path)
         valid = False
         wrong_file = False
@@ -592,21 +597,23 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                             wrong_file = True
                         logger.debug(f"Single file match status: valid={valid}, wrong_file={wrong_file}")
 
-                    # Check if number of files matches number of videos (+ subtitles optionally)
+                    # Check complete relative layouts, not only filenames. Matching
+                    # basenames alone can reuse a torrent from a different folder
+                    # structure when releases have repeated filenames.
                     elif len(torrent.files) == len(cand):
-                        torrent_filepath = os.path.commonpath(torrent.files)
-                        actual_filepath = os.path.commonpath(cand)
-                        local_path, remote_path = await self.remote_path_map(meta, client)
-                        if local_path.lower() in meta_path.lower() and local_path.lower() != remote_path.lower():
-                            actual_filepath = actual_filepath.replace(local_path, remote_path).replace(os.sep, "/")
 
-                        logger.debug(f"Torrent_filepath: {torrent_filepath}")
-                        logger.debug(f"Actual_filepath: {actual_filepath}")
+                        def relative_layout(paths: list[str]) -> list[str]:
+                            """Normalize relative file layout for structural comparison."""
+                            root = Path(os.path.commonpath(paths))
+                            return sorted(str(Path(path).relative_to(root)).replace("\\", "/") for path in paths)
 
-                        cand_basenames = sorted([Path(f).name for f in cand])
-                        torrent_basenames = sorted([Path(f).name for f in torrent.files])
+                        torrent_layout = relative_layout([str(file) for file in torrent.files])
+                        candidate_layout = relative_layout([str(file) for file in cand])
 
-                        if torrent_filepath in actual_filepath and cand_basenames == torrent_basenames:
+                        logger.debug(f"Torrent layout: {torrent_layout}")
+                        logger.debug(f"Candidate layout: {candidate_layout}")
+
+                        if torrent_layout == candidate_layout:
                             valid = True
                             break
                         logger.debug(f"Multiple file match status: valid={valid}")
@@ -663,7 +670,49 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         return valid, torrent_path
 
+    @staticmethod
+    def _torrent_includes_all_local_subtitles(torrent_path: str, meta: Meta) -> bool:
+        """Whether a validated torrent includes every subtitle selected locally."""
+        if not meta.subtitle_files:
+            return True
+        try:
+            torrent = Torrent.read(torrent_path)
+        except Exception:
+            return False
+
+        torrent_names = {Path(str(path)).name.casefold() for path in torrent.files}
+        subtitle_names = {Path(str(path)).name.casefold() for path in meta.subtitle_files}
+        return subtitle_names.issubset(torrent_names)
+
+    @staticmethod
+    def _torrent_has_no_subtitles(torrent_path: str) -> bool:
+        """Whether a torrent contains no external subtitle files."""
+        try:
+            torrent = Torrent.read(torrent_path)
+        except Exception:
+            return False
+        return not any(Path(str(path)).suffix.casefold() in SUBTITLE_EXTENSIONS for path in torrent.files)
+
+    @staticmethod
+    def _is_preferred_piece_size_candidate(candidate_path: str, current_path: str, mtv_torrent: bool, piece_limit: bool) -> bool:
+        """Whether a candidate outranks the current fallback by configured piece preference."""
+        try:
+            candidate_piece_size = Torrent.read(candidate_path).piece_size
+            current_piece_size = Torrent.read(current_path).piece_size
+        except Exception:
+            return False
+
+        if mtv_torrent:
+            return candidate_piece_size < current_piece_size
+        if piece_limit:
+            limit = 16 * 1024 * 1024
+            candidate_within_limit = candidate_piece_size <= limit
+            current_within_limit = current_piece_size <= limit
+            return candidate_within_limit and (not current_within_limit or candidate_piece_size < current_piece_size)
+        return False
+
     async def remote_path_map(self, meta: Meta, torrent_client_name: str | dict[str, Any] | None = None) -> tuple[str, str]:
+        """Return the local and remote roots matching the torrent metadata path."""
         if isinstance(torrent_client_name, dict):
             client_config: dict[str, Any] = torrent_client_name
         elif isinstance(torrent_client_name, str) and torrent_client_name:
@@ -674,14 +723,8 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         else:
             raise ValueError("torrent_client_name must be a client name or client config dict")
 
-        def _coerce_paths(value: Any) -> list[str]:
-            if isinstance(value, list):
-                value_list = value
-                return [str(v) for v in value_list if str(v)]
-            return [str(value)] if value is not None else []
-
-        local_paths = _coerce_paths(client_config.get("local_path", ["/LocalPath"]))
-        remote_paths = _coerce_paths(client_config.get("remote_path", ["/RemotePath"]))
+        local_paths = coerce_str_list(client_config.get("local_path", ["/LocalPath"]))
+        remote_paths = coerce_str_list(client_config.get("remote_path", ["/RemotePath"]))
         if not local_paths:
             local_paths = ["/LocalPath"]
         if not remote_paths:
@@ -692,7 +735,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
         meta_path = str(meta.path)
 
         for i, local_path_value in enumerate(local_paths):
-            if os.path.normpath(local_path_value).lower() in meta_path.lower():
+            if is_path_under(meta_path, local_path_value):
                 list_local_path = local_path_value
                 list_remote_path = remote_paths[i] if i < len(remote_paths) else remote_paths[0]
                 break
@@ -704,12 +747,23 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         return local_path, remote_path
 
-    async def get_ptp_from_hash(self, meta: Meta, pathed: bool = False) -> Meta:
-        default_torrent_client = self.config["DEFAULT"]["default_torrent_client"]
-        client = self.config["TORRENT_CLIENTS"][default_torrent_client]
-        torrent_client = client["torrent_client"]
+    async def get_ptp_from_hash(self, meta: Meta, pathed: bool = False, client_name: str | None = None) -> Meta:
+        """Fetch PTP metadata through the configured torrent client when available."""
+        default_config = self.config.get("DEFAULT", {})
+        clients_config = self.config.get("TORRENT_CLIENTS", {})
+        default_torrent_client = client_name or (default_config.get("default_torrent_client") if isinstance(default_config, dict) else None)
+        if not isinstance(default_torrent_client, str) or not default_torrent_client:
+            logger.debug("[yellow]Skipping torrent metadata lookup: no default torrent client configured.[/yellow]")
+            return meta
+
+        client = clients_config.get(default_torrent_client) if isinstance(clients_config, dict) else None
+        if not isinstance(client, dict):
+            logger.debug(f"[yellow]Skipping torrent metadata lookup: client '{default_torrent_client}' is not configured.[/yellow]")
+            return meta
+
+        torrent_client = client.get("torrent_client")
         if torrent_client == "rtorrent":
-            await self.get_ptp_from_hash_rtorrent(meta, pathed)
+            await self.get_ptp_from_hash_rtorrent(meta, pathed, client)
             return meta
         if torrent_client == "qbit":
             return await self.get_ptp_from_hash_qbit(meta, client, pathed)

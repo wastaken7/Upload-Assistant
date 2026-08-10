@@ -1,191 +1,367 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
+import hashlib
 import io
 import json
 import subprocess
 from pathlib import Path
 from typing import Any, cast
 
-import aiofiles
 import librosa
 import librosa.display
+import matplotlib
+
+matplotlib.use("Agg")
+
+import cli_ui
 import matplotlib.pyplot as plt
 import numpy as np
-from rich.prompt import Prompt
 
 from src.console import logger
 from src.meta import Meta
+from src.temp_paths import spectrograms_dir
+from src.webui_progress import complete_progress, publish_progress
 
 DURATION_LIMIT = 600
+SAMPLE_RATE = 48000
 WIDTH_INCH = 16
 HEIGHT_INCH = 9
 DPI_VALUE = 240
+CACHE_VERSION = 2
+AUDIOBOOK_EXTENSIONS = {".aac", ".aax", ".flac", ".m4a", ".m4b", ".mp3", ".ogg", ".opus", ".wav", ".wma"}
+SPECTROGRAM_N_FFT = 2048
+MAX_TIME_BINS = 1024
 
 
-def get_audio_streams(file_path):
-    """
-    Uses ffprobe to list all audio streams in the MKV file.
-    """
-    command: list[str] = ["ffprobe", "-v", "error", "-show_entries", "stream=index:stream_tags=language,title", "-select_streams", "a", "-of", "json", file_path]
-    result = subprocess.run(command, capture_output=True, text=True)  # noqa: S603
-    return json.loads(result.stdout).get("streams", [])
+def prompt_audio_stream_positions() -> str:
+    """Ask for stream positions through the prompt API supported by the WebUI."""
+    return (
+        cli_ui.ask_string(
+            "Select audio stream positions (e.g. 0,1 or all)",
+            default="all",
+        )
+        or "all"
+    )
 
 
-def generate_spectrogram(stream_index, stream_label, stream_lang, file_path, output_dir):
-    """
-    Extracts specific stream and generates the spectrogram plot.
-    """
-    logger.info(f"--- Processing Stream {stream_index} ({stream_label}) [{stream_lang}] ---")
+def get_audio_streams(file_path: str | Path) -> list[dict[str, Any]]:
+    """Return the audio streams reported by ffprobe, or raise a useful error."""
+    command = ["ffprobe", "-v", "error", "-show_entries", "stream=index:stream_tags=language,title", "-select_streams", "a", "-of", "json", str(file_path)]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise RuntimeError(f"Could not run ffprobe: {error}") from error
 
-    # FFmpeg command to extract specific audio stream to pipe
-    command = ["ffmpeg", "-y", "-i", file_path, "-map", f"0:{stream_index}", "-t", str(DURATION_LIMIT), "-f", "wav", "-ac", "1", "-ar", "22050", "pipe:1"]
+    if result.returncode:
+        detail = result.stderr.strip() or "unknown ffprobe error"
+        raise RuntimeError(f"ffprobe could not inspect '{file_path}': {detail}")
+    try:
+        streams = json.loads(result.stdout).get("streams", [])
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"ffprobe returned invalid JSON for '{file_path}'") from error
+    return [stream for stream in streams if isinstance(stream, dict)]
 
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # noqa: S603  # noqa: S603
-    stdout, _ = process.communicate()
 
-    # Load into librosa
-    y, sr = librosa.load(io.BytesIO(stdout), sr=22050)
-    stft = np.abs(librosa.stft(y))
-    db_spectrogram = librosa.amplitude_to_db(stft, ref=np.max)
+def select_audio_streams(streams: list[dict[str, Any]], choice: str) -> list[dict[str, Any]]:
+    """Select streams by their displayed, zero-based position; ``all`` selects all."""
+    normalized = [item.strip().lower() for item in choice.split(",") if item.strip()]
+    if "all" in normalized:
+        return streams
 
-    # Plotting
-    plt.figure(figsize=(WIDTH_INCH, HEIGHT_INCH), dpi=DPI_VALUE)
-    img = librosa.display.specshow(db_spectrogram, sr=sr, x_axis="time", y_axis="hz", cmap="inferno")
+    selected: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for item in normalized:
+        if not item.isdigit():
+            logger.warning(f"Invalid audio stream selection: {item}. Use zero-based positions or 'all'.")
+            continue
+        position = int(item)
+        if not 0 <= position < len(streams):
+            logger.warning(f"Invalid audio stream position: {position}. Available positions: 0-{len(streams) - 1}.")
+            continue
+        if position not in seen:
+            selected.append(streams[position])
+            seen.add(position)
+    return selected
 
-    plt.colorbar(img, format="%+2.0f dB")
-    plt.title(f"Spectrogram - Index: {stream_index} | Lang: {stream_lang} | Label: {stream_label} | First {DURATION_LIMIT}s", fontsize=22, pad=20)
-    plt.xlabel("Time (s)", fontsize=14)
-    plt.ylabel("Frequency (Hz)", fontsize=14)
 
-    output_name = Path(output_dir) / f"spectrogram_stream_{stream_index}.png"
-    plt.tight_layout()
-    plt.savefig(output_name, dpi=DPI_VALUE, bbox_inches="tight")
-    plt.close()  # Free memory
-    logger.info(f"Saved: {output_name}")
+def _positive_config_int(config: dict[str, Any], key: str, default: int) -> int:
+    value = config.get("DEFAULT", {}).get(key, default)
+    try:
+        value_as_int = int(value)
+    except TypeError, ValueError:
+        logger.warning(f"[yellow]Invalid {key!r} value {value!r}; using {default}.[/yellow]")
+        return default
+    if value_as_int <= 0:
+        logger.warning(f"[yellow]{key!r} must be positive; using {default}.[/yellow]")
+        return default
+    return value_as_int
+
+
+def get_spectrogram_sources(category: str, filelist: list[Any], disc_final_path: Path | None, max_source_files: int) -> list[Path]:
+    """Return source files for a release, preserving all music/audiobook chapters."""
+    if disc_final_path:
+        return [disc_final_path]
+    sources = [Path(file_path) for file_path in filelist if Path(file_path).is_file()]
+    if category == "BOOK":
+        sources = [source for source in sources if source.suffix.lower() in AUDIOBOOK_EXTENSIONS]
+    elif category not in ("BOOK", "MUSIC"):
+        sources = sources[:1]
+    return sources[:max_source_files]
+
+
+def get_stft_parameters(sample_count: int) -> tuple[int, int]:
+    """Bound the matrix plotted by Matplotlib while retaining useful frequency detail."""
+    n_fft = min(SPECTROGRAM_N_FFT, max(32, 2 ** int(np.floor(np.log2(max(sample_count, 1))))))
+    hop_length = max(n_fft // 4, int(np.ceil(sample_count / MAX_TIME_BINS)))
+    return n_fft, hop_length
+
+
+def _cache_fingerprint(audio_sources: list[Path], duration: int, sample_rate: int, stream_indexes: list[tuple[Path, int]]) -> str:
+    data: dict[str, object] = {
+        "cache_version": CACHE_VERSION,
+        "sources": [{"path": str(source.resolve()), "size": source.stat().st_size, "mtime_ns": source.stat().st_mtime_ns} for source in audio_sources],
+        "duration": duration,
+        "sample_rate": sample_rate,
+        "stream_indexes": [{"path": str(source.resolve()), "index": index} for source, index in stream_indexes],
+    }
+    return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+
+
+def _load_cached_images(cache_path: Path, fingerprint: str) -> list[Any]:
+    if not cache_path.exists():
+        return []
+    try:
+        content = cache_path.read_text(encoding="utf-8")
+        cache: dict[str, object] = cast(dict[str, object], json.loads(content)) if content.strip() else {}
+        images = cache.get("spectrograms_images")
+        if cache.get("fingerprint") == fingerprint and isinstance(images, list):
+            return cast(list[Any], images)
+    except (OSError, json.JSONDecodeError) as error:
+        logger.warning(f"[yellow]Could not load spectrogram image cache: {error!s}[/yellow]")
+    return []
+
+
+def generate_spectrogram(
+    stream_index: int,
+    stream_label: str,
+    stream_lang: str,
+    file_path: str | Path,
+    output_dir: Path,
+    duration: int,
+    sample_rate: int,
+    source_position: int,
+    source_name: str,
+) -> Path:
+    """Decode one stream and generate a frequency/time image suitable for review."""
+    command = [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-nostdin",
+        "-i",
+        str(file_path),
+        "-map",
+        f"0:{stream_index}",
+        "-t",
+        str(duration),
+        "-ac",
+        "1",
+        "-ar",
+        str(sample_rate),
+        "-f",
+        "wav",
+        "pipe:1",
+    ]
+    try:
+        result = subprocess.run(command, capture_output=True, check=False, timeout=duration + 120)  # noqa: S603
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise RuntimeError(f"Could not decode audio stream {stream_index}: {error}") from error
+    if result.returncode or not result.stdout:
+        detail = result.stderr.decode(errors="replace").strip() or "no audio was produced"
+        raise RuntimeError(f"FFmpeg could not decode audio stream {stream_index}: {detail}")
+
+    try:
+        samples, actual_sample_rate = librosa.load(io.BytesIO(result.stdout), sr=None, mono=True)
+    except Exception as error:
+        raise RuntimeError(f"Could not read decoded audio for stream {stream_index}: {error}") from error
+    if samples.size == 0:
+        raise RuntimeError(f"Audio stream {stream_index} contains no decodable samples.")
+
+    n_fft, hop_length = get_stft_parameters(samples.size)
+    stft = np.abs(librosa.stft(samples, n_fft=n_fft, hop_length=hop_length))
+    db_spectrogram = librosa.amplitude_to_db(stft, ref=np.max)  # pyright: ignore[reportUnknownMemberType]  # librosa stub has an untyped callback overload.
+
+    figure, axis = plt.subplots(figsize=(WIDTH_INCH, HEIGHT_INCH), dpi=DPI_VALUE)  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **fig_kw as Unknown.
+    image = librosa.display.specshow(
+        db_spectrogram,
+        sr=actual_sample_rate,
+        hop_length=hop_length,
+        x_axis="time",
+        y_axis="hz",
+        cmap="inferno",
+        ax=axis,
+        rasterized=True,
+    )
+    figure.colorbar(image, ax=axis, format="%+2.0f dB")  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
+    display_label = stream_label if stream_label and stream_label != f"Stream_{stream_index}" else source_name
+    axis.set_title(display_label, fontsize=18, fontweight="bold", pad=22)  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
+    axis.text(  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
+        0.5,
+        1.01,
+        f"File: {source_name}  •  Stream {stream_index}  •  {stream_lang}  •  First {duration}s  •  mono mix @ {actual_sample_rate / 1000:g} kHz",
+        transform=axis.transAxes,
+        ha="center",
+        va="bottom",
+        fontsize=10,
+    )
+    axis.set_xlabel("Time (s)")  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
+    axis.set_ylabel("Frequency (Hz)")  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
+
+    output_name = output_dir / f"spectrogram_source_{source_position:02d}_stream_{stream_index}.png"
+    figure.tight_layout()
+    figure.savefig(output_name, dpi=DPI_VALUE, bbox_inches="tight")  # pyright: ignore[reportUnknownMemberType]  # matplotlib stub types **kwargs as Unknown.
+    plt.close(figure)
     return output_name
 
 
 async def process_audio_spectrograms(meta: Meta, config: dict[str, Any], uploadscreens_manager: Any = None) -> list[str]:
-    audio_spectrograms_images = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/audio_spectrograms_images.json"
-    if Path(audio_spectrograms_images).exists():
-        try:
-            async with aiofiles.open(audio_spectrograms_images, encoding="utf-8") as spec_file:
-                content = await spec_file.read()
-                spectrograms_image_file = cast(dict[str, Any], json.loads(content)) if content.strip() else {}
-
-                if "spectrograms_images" in spectrograms_image_file and not meta.spectrograms_images:
-                    meta.spectrograms_images = spectrograms_image_file["spectrograms_images"]
-                    logger.debug(f"[cyan]Loaded {len(spectrograms_image_file['spectrograms_images'])} previously saved spectrograms")
-
-        except Exception as e:
-            logger.info(f"[yellow]Could not load spectrograms image data: {e!s}")
-
     if meta.spectrograms_images:
         return []
 
     logger.info("[yellow]Generating Audio Spectrograms...[/yellow]")
+    output_dir = spectrograms_dir(meta.base_dir, meta.uuid)
+    cache_path = Path(meta.base_dir) / "tmp" / meta.uuid / "audio_spectrograms_images.json"
 
-    output_dir = Path(meta.base_dir) / "tmp" / meta.uuid / "spectrograms"
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-
-    disc_final_path = ""
     bdinfo = meta.bdinfo
+    disc_final_path: Path | None = None
     if bdinfo:
         disc_path = bdinfo.get("path", "")
         files_list = bdinfo.get("files", [])
         disc_file = files_list[0].get("file", "") if files_list else ""
-        disc_final_path = Path(disc_path) / "STREAM" / disc_file if disc_path and disc_file else ""
-        logger.debug(f"disc_final_path: {disc_final_path}")
+        if disc_path and disc_file:
+            disc_final_path = Path(disc_path) / "STREAM" / disc_file
+            logger.debug(f"disc_final_path: {disc_final_path}")
 
-    mkv_path = ""
-    filelist = meta.filelist
-    if filelist:
-        mkv_path = filelist[0]
+    max_source_files = _positive_config_int(config, "audio_spectrogram_max_files", 12)
+    all_audio_sources = get_spectrogram_sources(meta.category, meta.filelist, disc_final_path, max(len(meta.filelist), 1))
+    audio_sources = all_audio_sources[:max_source_files]
+    if len(all_audio_sources) > max_source_files:
+        logger.info(f"[yellow]Limiting audio spectrogram generation to the first {max_source_files} of {len(all_audio_sources)} {meta.category.lower()} audio files.[/yellow]")
 
-    audio_path = disc_final_path if disc_final_path else mkv_path
-
-    generated_files = []
-
-    if not audio_path or not Path(audio_path).exists():
+    if not audio_sources:
         logger.info("[red]Could not find a valid audio or video file to process spectrograms from.[/red]")
-        return generated_files
+        return []
 
-    streams = get_audio_streams(audio_path)
+    source_streams: list[tuple[int, Path, list[dict[str, Any]]]] = []
+    for source_position, audio_path in enumerate(audio_sources, start=1):
+        try:
+            streams = await asyncio.to_thread(get_audio_streams, audio_path)
+        except RuntimeError as error:
+            logger.error(f"[red]{error}[/red]")
+            continue
 
-    if bdinfo and audio_path == disc_final_path:
-        bdinfo_audios = bdinfo.get("audio", [])
-        valid_streams = []
-        for i, s in enumerate(streams):
-            if i < len(bdinfo_audios):
-                if "tags" not in s:
-                    s["tags"] = {}
-                if not s["tags"].get("language") or s["tags"].get("language") == "und":
-                    s["tags"]["language"] = bdinfo_audios[i].get("language", "und")
-                s["tags"]["title"] = bdinfo_audios[i].get("codec", "No Title")
-                valid_streams.append(s)
-        streams = valid_streams
+        if bdinfo and audio_path == disc_final_path:
+            bdinfo_audios = bdinfo.get("audio", [])
+            for position, stream in enumerate(streams):
+                tags = stream.setdefault("tags", {})
+                if position < len(bdinfo_audios):
+                    if not tags.get("language") or tags.get("language") == "und":
+                        tags["language"] = bdinfo_audios[position].get("language", "und")
+                    tags.setdefault("title", bdinfo_audios[position].get("codec", "No Title"))
+        if streams:
+            source_streams.append((source_position, audio_path, streams))
 
-    if not streams:
-        logger.info("No audio streams found.")
+    if not source_streams:
+        logger.warning("No audio streams found.")
+        return []
+
+    if meta.audio_spectrogram_tracks is not None:
+        choice = str(meta.audio_spectrogram_tracks)
+    elif meta.unattended or len(source_streams) > 1:
+        choice = "all" if config["DEFAULT"].get("process_all_audio_spectrogram", False) else "0"
     else:
-        logger.info("\nAvailable Audio Streams:")
-        for i, s in enumerate(streams):
-            lang = s.get("tags", {}).get("language", "und")
-            title = s.get("tags", {}).get("title", "No Title")
-            logger.info(f"[{i}] Lang: {lang} | Title: {title}")
+        _, first_audio_path, first_streams = source_streams[0]
+        logger.info(f"Available audio streams for {first_audio_path.name} (use zero-based positions):")
+        for position, stream in enumerate(first_streams):
+            tags = stream.get("tags", {})
+            logger.info(f"[{position}] FFmpeg stream {stream.get('index')} | Lang: {tags.get('language', 'und')} | Title: {tags.get('title', 'No Title')}")
+        choice = prompt_audio_stream_positions()
 
-        unattended = meta.unattended
-        audio_spectrogram_tracks = meta.audio_spectrogram_tracks
+    selected_jobs: list[tuple[int, Path, dict[str, Any]]] = []
+    for source_position, audio_path, streams in source_streams:
+        selected_streams = select_audio_streams(streams, choice)
+        if not selected_streams:
+            logger.warning(f"[yellow]No valid streams selected for {audio_path.name}; skipping it.[/yellow]")
+            continue
+        selected_jobs.extend((source_position, audio_path, stream) for stream in selected_streams)
 
-        if audio_spectrogram_tracks is not None:
-            choice = str(audio_spectrogram_tracks)
-            logger.info(f"[yellow]Using audio spectrogram tracks from argument: {choice}[/yellow]")
-        elif unattended:
-            choice = "all" if config["DEFAULT"].get("process_all_audio_spectrogram", False) else "0"
-            logger.info(f"[yellow]Unattended mode. Automatically selected option: {choice}[/yellow]")
-        else:
-            choice = Prompt.ask(
-                "\nSelect the stream index to scan (comma-separated list e.g. [bold yellow]0,1,2[/bold yellow] or [bold yellow]all[/bold yellow])", default="all"
+    if not selected_jobs:
+        logger.warning("[yellow]No valid audio streams were selected.[/yellow]")
+        return []
+
+    duration = _positive_config_int(config, "audio_spectrogram_duration", DURATION_LIMIT)
+    sample_rate = _positive_config_int(config, "audio_spectrogram_sample_rate", SAMPLE_RATE)
+    fingerprint = _cache_fingerprint(audio_sources, duration, sample_rate, [(audio_path, int(stream["index"])) for _, audio_path, stream in selected_jobs])
+    cached_images = await asyncio.to_thread(_load_cached_images, cache_path, fingerprint)
+    if cached_images:
+        meta.spectrograms_images = cached_images
+        logger.debug(f"[cyan]Loaded {len(cached_images)} matching cached spectrograms.[/cyan]")
+        return []
+
+    generated_files: list[str] = []
+    progress_id = f"audio-spectrogram-{meta.uuid}"
+    publish_progress(progress_id, "Generating audio spectrograms", current=0, total=len(selected_jobs), detail="Preparing audio streams", group="spectrogram", unit="streams")
+    for job_position, (source_position, audio_path, stream) in enumerate(selected_jobs, start=1):
+        tags = stream.get("tags", {})
+        label = tags.get("title", f"Stream_{stream['index']}")
+        language = tags.get("language", "und")
+        try:
+            file_path = await asyncio.to_thread(
+                generate_spectrogram, int(stream["index"]), label, language, audio_path, output_dir, duration, sample_rate, source_position, audio_path.stem
             )
+        except RuntimeError as error:
+            logger.error(f"[red]{error}[/red]")
+            publish_progress(
+                progress_id,
+                "Generating audio spectrograms",
+                current=job_position,
+                total=len(selected_jobs),
+                detail=f"{audio_path.name}: stream {stream['index']} failed",
+                status="failed",
+                group="spectrogram",
+                unit="streams",
+            )
+            continue
+        generated_files.append(str(file_path))
+        publish_progress(
+            progress_id,
+            "Generating audio spectrograms",
+            current=job_position,
+            total=len(selected_jobs),
+            detail=f"Processed {audio_path.name}: stream {stream['index']}",
+            group="spectrogram",
+            unit="streams",
+        )
 
-        choices = [c.strip().lower() for c in choice.split(",")]
+    if generated_files and uploadscreens_manager:
+        logger.info("[yellow]Uploading Audio Spectrograms...[/yellow]")
+        try:
+            spec_images, _ = await uploadscreens_manager.upload_screens(meta, len(generated_files), 1, 0, len(generated_files), generated_files, {})
+            if spec_images:
+                meta.spectrograms_images = spec_images
+                cache: dict[str, object] = {"cache_version": CACHE_VERSION, "fingerprint": fingerprint, "spectrograms_images": spec_images}
+                await asyncio.to_thread(cache_path.write_text, json.dumps(cache, indent=4), encoding="utf-8")
+                logger.debug(f"[cyan]Saved {len(spec_images)} spectrograms to audio_spectrograms_images.json[/cyan]")
+        except Exception as error:
+            logger.error(f"[red]Error uploading audio spectrograms: {error}[/red]")
 
-        if "all" in choices or str(len(streams)) in choices:
-            # Scan all
-            for s in streams:
-                label = s.get("tags", {}).get("title", f"Stream_{s['index']}")
-                lang = s.get("tags", {}).get("language", "und")
-                filepath = generate_spectrogram(s["index"], label, lang, audio_path, output_dir)
-                generated_files.append(filepath)
-        else:
-            # Scan selected
-            for c in choices:
-                if c.isdigit():
-                    idx = int(c)
-                    if 0 <= idx < len(streams):
-                        target = streams[idx]
-                        label = target.get("tags", {}).get("title", f"Stream_{target['index']}")
-                        lang = target.get("tags", {}).get("language", "und")
-                        filepath = generate_spectrogram(target["index"], label, lang, audio_path, output_dir)
-                        generated_files.append(filepath)
-                    else:
-                        logger.info(f"Invalid index: {idx}")
-                else:
-                    logger.info(f"Invalid input: {c}")
-
-        if generated_files and uploadscreens_manager:
-            logger.info("[yellow]Uploading Audio Spectrograms...[/yellow]")
-            try:
-                spec_images, _ = await uploadscreens_manager.upload_screens(meta, len(generated_files), 1, 0, len(generated_files), generated_files, {})
-                if spec_images:
-                    meta.spectrograms_images = spec_images
-                    try:
-                        spectrograms_image_file_dict = {"spectrograms_images": spec_images}
-                        async with aiofiles.open(audio_spectrograms_images, "w", encoding="utf-8") as spec_file:
-                            await spec_file.write(json.dumps(spectrograms_image_file_dict, indent=4))
-                        logger.debug(f"[cyan]Saved {len(spec_images)} spectrograms to audio_spectrograms_images.json")
-                    except Exception as e:
-                        logger.info(f"[yellow]Failed to save spectrograms image data: {e!s}")
-            except Exception as e:
-                logger.error(f"[red]Error uploading audio spectrograms: {e}[/red]")
-
+    complete_progress(
+        progress_id,
+        "Audio spectrograms generated",
+        current=len(generated_files),
+        total=len(selected_jobs),
+        detail=f"Generated {len(generated_files)} of {len(selected_jobs)} stream(s)",
+        group="spectrogram",
+        unit="streams",
+    )
     return generated_files

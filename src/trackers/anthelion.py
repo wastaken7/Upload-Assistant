@@ -3,14 +3,15 @@ import asyncio
 import json
 import platform
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import aiofiles
 import cli_ui
 import httpx
+from rich.markup import escape
 
-from cogs.redaction import Redaction
-from src.console import logger
+from src.cogs.redaction import Redaction
+from src.console import logger, prompt_in_thread
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.torrentcreate import TorrentCreator
@@ -107,8 +108,7 @@ class Anthelion:
         "ZMNT",
     )
     base_url = "https://anthelion.me"
-    search_url = f"{base_url}/api.php"
-    upload_url = f"{base_url}/api.php"
+    api_url = f"{base_url}/api.php"
     supported_categories = ("MOVIE",)
     tracker_urls = ("tracker.anthelion.me",)
 
@@ -116,6 +116,7 @@ class Anthelion:
         self.config = config
         self.common = Common(config)
         self.tracker_config = self.config["TRACKERS"].get(self.tracker, {})
+        self.api_key: str = str(self.tracker_config.get("api_key", "")).strip()
 
     async def get_flags(self, meta: Meta) -> list[str]:
         flags: list[str] = []
@@ -186,21 +187,25 @@ class Anthelion:
             tags = [tag for tag in tags if tag.lower() in allowed_tags]
 
             if tags:
-                logger.info(f"[green]{self.tracker}: Using IMDb genres for tagging: {', '.join(tags)}")
+                logger.info(f"{self.tracker}: [green]Using IMDb genres for tagging: {', '.join(tags)}")
                 logger.info(
-                    "[yellow]ANTHELION api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
+                    f"{self.tracker}: [yellow]api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
                 )
                 await asyncio.sleep(3)
                 meta.ant_user_tags = True
 
         if not tags:
-            logger.info(f"[yellow]{self.tracker}: No genres found for tagging. Tag required.")
-            logger.info("[yellow]Only use a tag in the approved list found in the site search box.")
+            if meta.unattended and not meta.unattended_confirm:
+                logger.info(f"{self.tracker}: [yellow]Unattended mode: No genres found for tagging. Skipping {self.tracker} upload.[/yellow]")
+                meta.skipping = f"{self.tracker}"
+                return ""
+            logger.info(f"{self.tracker}: [yellow]No genres found for tagging. Tag required.")
+            logger.info(f"{self.tracker}: [yellow]Only use a tag in the approved list found in the site search box.")
             logger.info(
-                "[yellow]ANTHELION api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
+                f"{self.tracker}: [yellow]api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
             )
             await asyncio.sleep(3)
-            user_tag = cli_ui.ask_string("Please enter at least one tag (genre) to use for the upload", default="")
+            user_tag = await prompt_in_thread(cli_ui.ask_string, "Please enter at least one tag (genre) to use for the upload", default="")
             if user_tag:
                 tags.append(user_tag.replace(" ", ".").lower())
                 meta.ant_user_tags = True
@@ -235,12 +240,12 @@ class Anthelion:
         if ant_type is None:
             if not meta.unattended:
                 ant_type_list = ["Feature Film", "Short Film", "Miniseries", "Other"]
-                choice = cli_ui.ask_choice("Select the proper type for ANTHELION", choices=ant_type_list)
+                choice = await prompt_in_thread(cli_ui.ask_choice, "Select the proper type for ANTHELION", choices=ant_type_list)
                 # Map the choice back to the integer
                 type_map = {"Feature Film": 0, "Short Film": 1, "Miniseries": 2, "Other": 3}
                 ant_type = type_map.get(choice, 0)
             else:
-                logger.debug(f"[bold red]{self.tracker} type could not be determined automatically in unattended mode.")
+                logger.debug(f"{self.tracker}: [bold red]type could not be determined automatically in unattended mode.")
                 ant_type = 0  # Default to Feature Film in unattended mode
 
         return ant_type
@@ -255,7 +260,7 @@ class Anthelion:
 
         # Trigger regeneration automatically if size constraints aren't met
         if torrent_file_size_kib > 250:  # 250 KiB
-            logger.info("[yellow]Existing .torrent exceeds 250 KiB and will be regenerated to fit constraints.")
+            logger.info(f"{self.tracker}: [yellow]Existing .torrent exceeds 250 KiB and will be regenerated to fit constraints.")
             meta.max_piece_size = 128  # 128 MiB
             await TorrentCreator.create_torrent(meta, str(Path(str(meta.path))), "ANTHELION", tracker_url=tracker_url)
             torrent_filename = "ANTHELION"
@@ -264,7 +269,7 @@ class Anthelion:
         flags = await self.get_flags(meta)
         audioformat = await self.get_audio(meta)
         if not audioformat:
-            logger.info(f"[bold red]{self.tracker} upload aborted due to unsupported audio format.")
+            logger.info(f"{self.tracker}: [bold red]upload aborted due to unsupported audio format.")
             meta.tracker_status[self.tracker]["status_message"] = "data error: upload aborted: unsupported audio format"
             return False
 
@@ -297,6 +302,8 @@ class Anthelion:
             data["censored"] = 1
 
         tags = await self.get_tags(meta)
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
         if tags != "":
             data.update({"tags": ",".join(tags)})
 
@@ -308,8 +315,8 @@ class Anthelion:
 
         if meta.adult_media:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info("[bold red]Adult content detected[/bold red]")
-                if cli_ui.ask_yes_no("Are the screenshots safe?", default=False):
+                logger.info(f"{self.tracker}: [bold red]Adult content detected[/bold red]")
+                if await prompt_in_thread(cli_ui.ask_yes_no, "Are the screenshots safe?", default=False):
                     data.update({"screenshots": "\n".join([x["raw_url"] for x in meta.image_list][:4])})
                     if not meta.ant_user_tags:
                         data.update({"flagchangereason": f"Adult with screens uploaded with {meta.ua_name}"})
@@ -331,7 +338,7 @@ class Anthelion:
         try:
             if not meta.debug:
                 async with httpx.AsyncClient(timeout=40) as client:
-                    response = await client.post(url=self.upload_url, files=files, data=data, headers=headers)
+                    response = await client.post(url=self.api_url, files=files, data=data, headers=headers)
                     try:
                         response_data: dict[str, Any] = response.json()
                     except json.JSONDecodeError:
@@ -350,7 +357,7 @@ class Anthelion:
                     meta.tracker_status[self.tracker]["status_message"] = f"data error - {response_data}"
                     return False
             else:
-                logger.info("[cyan]ANTHELION Request Data:")
+                logger.info(f"{self.tracker}: Request Data:")
                 logger.info(Redaction.redact_private_info(data))
                 meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
                 await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
@@ -367,8 +374,8 @@ class Anthelion:
             error_type = type(e).__name__
             error_msg = str(e) if str(e) else "No error message"
             traceback_str = traceback.format_exc()
-            logger.info(f"[bold red]ANTHELION upload exception ({error_type}): {error_msg}[/bold red]")
-            logger.info(f"[red]Traceback:\n{traceback_str}[/red]")
+            logger.info(f"{self.tracker}: [bold red]upload exception ({error_type}): {escape(error_msg)}[/bold red]")
+            logger.info(f"{self.tracker}: [red]Traceback:\n{escape(traceback_str)}[/red]")
             meta.tracker_status[self.tracker]["status_message"] = "data error: double check if it uploaded"
             return False
 
@@ -432,61 +439,70 @@ class Anthelion:
     async def get_additional_checks(self, meta: Meta) -> bool:
         if meta.valid_mi is False:
             if not meta.unattended:
-                logger.info(f"[bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
+                logger.info(f"{self.tracker}: [bold red]No unique ID in mediainfo, skipping {self.tracker} upload.")
             return False
 
         return True
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
-        api_key = self.tracker_config.get("api_key")
-        if not api_key or not isinstance(api_key, str) or not api_key.strip():
-            return dupes
 
         params = {"t": "search", "o": "json"}
         if meta.tmdb:
-            params["tmdb"] = str(meta.tmdb)
-        elif meta.imdb_id is not None and meta.imdb_id != 0:
-            params["imdb"] = str(meta.imdb)
+            params["tmdbid"] = str(meta.tmdb)
+        elif meta.imdb_id:
+            params["imdbid"] = str(meta.imdb)
 
         headers = {
-            "X-API-Key": api_key.strip(),
+            "X-API-Key": self.api_key,
             "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})",
         }
 
         async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.get(url=self.search_url, params=params, headers=headers)
+            response = await client.get(url=self.api_url, params=params, headers=headers)
             response.raise_for_status()
             data = response.json()
-            target_resolution = meta.resolution.lower()
+            target_resolution = str(meta.resolution or "").lower()
+            raw_items = data.get("item", [])
 
-            for each in data.get("item", []):
-                if target_resolution and each.get("resolution", "").lower() != target_resolution.lower():
-                    logger.debug(f"[yellow]Skipping {each.get('fileName')} - resolution mismatch: {each.get('resolution')} vs {target_resolution}")
+            if not isinstance(raw_items, list):
+                logger.warning(f"{self.tracker}: Unexpected search response: 'item' is not a list.")
+                return dupes
+
+            items = cast(list[Any], raw_items)
+            for each in items:
+                if not isinstance(each, dict):
+                    logger.warning(f"{self.tracker}: Skipping malformed search result.")
+                    continue
+                search_result = cast(dict[str, Any], each)
+
+                resolution = str(search_result.get("resolution") or "")
+                if target_resolution and resolution.lower() != target_resolution:
+                    logger.debug(
+                        f"{self.tracker}: [yellow]Skipping {escape(str(search_result.get('fileName') or ''))} - resolution mismatch: {resolution} vs {target_resolution}"
+                    )
                     continue
 
-                largest_file = None
-                if "files" in each and len(each["files"]) > 0:
-                    largest = each["files"][0]
-                    for file in each["files"]:
-                        current_size = int(file.get("size", 0))
-                        largest_size = int(largest.get("size", 0))
-                        if current_size > largest_size:
-                            largest = file
+                largest_file: Any = None
+                raw_files = search_result.get("files", [])
+                files = cast(list[Any], raw_files) if isinstance(raw_files, list) else []
+                valid_files: list[dict[str, Any]] = [cast(dict[str, Any], file) for file in files if isinstance(file, dict)]
+                if valid_files:
+                    largest = max(valid_files, key=lambda file: int(file.get("size") or 0))
                     largest_file = largest.get("name", "")
 
                 result: dict[str, Any] = {
-                    "name": largest_file or each.get("fileName", ""),
-                    "files": [file.get("name", "") for file in each.get("files", [])],
-                    "size": int(each.get("size", 0)),
-                    "link": each.get("guid", ""),
-                    "flags": each.get("flags", []),
-                    "file_count": each.get("fileCount", 0),
-                    "download": each.get("link", "").replace("&amp;", "&"),
+                    "name": largest_file or search_result.get("fileName", ""),
+                    "files": [cast(dict[str, Any], file).get("name", "") for file in files if isinstance(file, dict)],
+                    "size": int(search_result.get("size", 0)),
+                    "link": search_result.get("guid", ""),
+                    "flags": search_result.get("flags", []),
+                    "file_count": search_result.get("fileCount", 0),
+                    "download": search_result.get("link", "").replace("&amp;", "&"),
                 }
                 dupes.append(result)
 
-                logger.debug(f"[green]Found potential dupe: {result['name']} ({result['size']} bytes)")
+                logger.debug(f"{self.tracker}: [green]Found potential dupe: {escape(result['name'])} ({result['size']} bytes)")
 
         return dupes
 
@@ -497,14 +513,14 @@ class Anthelion:
 
         filelist: list[str] = meta.filelist
         if not filelist:
-            logger.debug(f"[yellow]{self.tracker}: No files in filelist, skipping file-based search.")
+            logger.debug(f"{self.tracker}: [yellow]No files in filelist, skipping file-based search.")
             return imdb_tmdb_list
 
         filename: str = Path(filelist[0]).name
 
         api_key = self.tracker_config.get("api_key")
         if not api_key or not isinstance(api_key, str) or not api_key.strip():
-            logger.debug(f"[yellow]{self.tracker}: API key not configured, skipping file-based search.")
+            logger.debug(f"{self.tracker}: [yellow]API key not configured, skipping file-based search.")
             return imdb_tmdb_list
 
         headers = {"X-API-Key": api_key.strip(), "User-Agent": f"Upload Assistant/2.4 ({platform.system()} {platform.release()})"}
@@ -513,7 +529,7 @@ class Anthelion:
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.get(url=self.search_url, params=params, headers=headers)
+                response = await client.get(url=self.api_url, params=params, headers=headers)
                 if response.status_code == 200:
                     try:
                         data = response.json()
@@ -544,7 +560,7 @@ class Anthelion:
                                     break
 
                             if not matched_item:
-                                logger.debug("[yellow]Could not match filename, returning empty list")
+                                logger.debug(f"{self.tracker}: [yellow]Could not match filename, returning empty list")
                                 imdb_tmdb_list = []
 
                         if matched_item:
@@ -556,19 +572,19 @@ class Anthelion:
                             if tmdb_id and str(tmdb_id).isdigit() and int(tmdb_id) != 0:
                                 imdb_tmdb_list.append({"tmdb_id": int(tmdb_id)})
                     except json.JSONDecodeError:
-                        logger.info("[bold yellow]Error parsing JSON response from ANTHELION")
+                        logger.info(f"{self.tracker}: [bold yellow]Error parsing JSON response from {self.tracker}")
                         imdb_tmdb_list = []
                 else:
-                    logger.info(f"[bold red]Failed to search torrents. HTTP Status: {response.status_code}")
+                    logger.info(f"{self.tracker}: [bold red]Failed to search torrents. HTTP Status: {response.status_code}")
                     imdb_tmdb_list = []
         except httpx.TimeoutException:
-            logger.info("[bold red]ANTHELION Request timed out after 5 seconds")
+            logger.info(f"{self.tracker}: [bold red]Request timed out after 5 seconds")
             imdb_tmdb_list = []
         except httpx.RequestError as e:
-            logger.info(f"[bold red]Unable to search for existing torrents: {e}")
+            logger.info(f"{self.tracker}: [bold red]Unable to search for existing torrents: {escape(str(e))}")
             imdb_tmdb_list = []
         except Exception as e:
-            logger.error(f"[bold red]Unexpected error: {e}")
+            logger.error(f"{self.tracker}: [bold red]Unexpected error: {escape(str(e))}")
             imdb_tmdb_list = []
 
         return imdb_tmdb_list

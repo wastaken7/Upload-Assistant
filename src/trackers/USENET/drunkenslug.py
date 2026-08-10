@@ -1,5 +1,6 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -51,9 +52,6 @@ class DrunkenSlug:
             logger.info(f"{self.tracker}: [yellow]Found local upload cache.[/yellow]")
             return [release_name]
 
-        if not self.api_key:
-            logger.info(f"{self.tracker}: [yellow]Duplicate search skipped due to missing API key.[/yellow]")
-            return []
         if self.daily_api_hit_limit <= 0:
             logger.info(f"{self.tracker}: [yellow]Duplicate search via API is disabled because daily_api_hit_limit is 0.[/yellow]")
             return []
@@ -164,9 +162,10 @@ class DrunkenSlug:
                     status_dict["status_message"] = "data error: No results returned from tracker."
                     return False
 
-                clean_result = results[0].replace(f"{nzb_name}: ", "")
+                clean_result = results[0].replace(f"{nzb_name}: ", "[redacted]: ")
+                clean_result = re.sub(r"(\buploaded by\s+)\S+", r"\1[redacted]", clean_result, flags=re.IGNORECASE)
                 status_dict["status_message"] = clean_result
-                status_dict["torrent_id"] = f"{nzb_name.replace('.nzb', '')} (may take a few minutes to show up)"
+                status_dict["torrent_id"] = nzb_name.replace(".nzb", "")
 
                 cache_dir = Path(meta.base_dir) / "tmp" / meta.uuid
                 Path(cache_dir).mkdir(parents=True, exist_ok=True)

@@ -3,7 +3,7 @@ import contextlib
 import json
 import platform
 import re
-from collections.abc import MutableMapping, Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
 from pathlib import Path
 from typing import Any, cast
 
@@ -12,6 +12,8 @@ from pymediainfo import MediaInfo
 
 from src.console import logger
 from src.meta import Meta
+from src.takescreens import screenshot_par_scale_factors, should_scale_screenshots_for_par
+from src.temp_paths import menu_screenshots_dir
 from src.uploadscreens import UploadScreensManager
 
 
@@ -83,10 +85,11 @@ class DiscMenus:
             max_menu_screens = int(default_section.get("max_menu_screens", 6))
         except ValueError, TypeError:
             max_menu_screens = 6
+        screenshot_config = cast(Mapping[str, Any], default_section) if isinstance(default_section, Mapping) else {}
+        scale_for_par = should_scale_screenshots_for_par(screenshot_config)
 
         captured_images = []
-        output_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        output_dir = menu_screenshots_dir(meta.base_dir, meta.uuid)
 
         # Get ffmpeg path
         ffmpeg_path = "ffmpeg"
@@ -157,18 +160,7 @@ class DiscMenus:
                     logger.error(f"[red]Error parsing MediaInfo for {file}: {e}[/red]")
                     width, height, par, dar, duration_ms = 720, 480, 1.0, 1.3333, None
 
-                # Calculate DAR-corrected resolution (following takescreens.py logic)
-                w_sar = 1.0
-                h_sar = 1.0
-                if par < 1:
-                    new_height = dar * height
-                    sar = width / new_height
-                    w_sar = 1.0
-                    h_sar = sar
-                else:
-                    sar = par
-                    w_sar = sar
-                    h_sar = 1.0
+                w_sar, h_sar = screenshot_par_scale_factors(width, height, par, dar, scale_for_par)
 
                 # Determine duration
                 duration_sec = 0.0

@@ -10,13 +10,16 @@ import aiofiles
 import cli_ui
 import httpx
 from bs4 import BeautifulSoup
+from rich.markup import escape
 from unidecode import unidecode
 
-from cogs.redaction import Redaction
-from src.console import logger
+from src.cogs.redaction import Redaction
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
+from src.description_review import get_base_description
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
+from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
 
 
@@ -146,7 +149,7 @@ class FileList:
                             if len(line_fields) >= 7:
                                 cookies[line_fields[5]] = line_fields[6]
             except Exception as e:
-                logger.error(f"[red]Error parsing FILELIST Netscape cookie file: {e}[/red]")
+                logger.error(f"{self.tracker}: [red]Error parsing {self.tracker} Netscape cookie file: {escape(str(e))}[/red]")
             return cookies
 
         # If it's a pickle file (ends with .pkl or .pickle)
@@ -161,7 +164,7 @@ class FileList:
                 self.cookie_validator._save_cookies_secure(session_cookies, str(json_path))  # pyright: ignore[reportPrivateUsage]
                 return {cookie.name: cookie.value for cookie in session_cookies}
             except Exception as e:
-                logger.error(f"[red]Failed to migrate legacy cookies from pickle: {e}[/red]")
+                logger.error(f"{self.tracker}: [red]Failed to migrate legacy cookies from pickle: {e}[/red]")
                 return {}
 
         # Default to loading as JSON
@@ -180,7 +183,7 @@ class FileList:
                             return {name: str(item.get("value", "")) for name, item in data.items()}
                     return {name: str(val) for name, val in data.items()}
             except Exception as e:
-                logger.error(f"[yellow]Warning: Error parsing cookie file: {e}[/yellow]")
+                logger.error(f"{self.tracker}: [yellow]Warning: Error parsing cookie file: {e}[/yellow]")
             return {}
 
     async def upload(self, meta: Meta) -> bool:
@@ -194,12 +197,12 @@ class FileList:
         # Confirm the correct naming order for FILELIST
         cli_ui.info(f"Filelist name: {fl_name}")
         if meta.unattended is False:
-            fl_confirm = cli_ui.ask_yes_no("Correct?", default=False)
+            fl_confirm = await prompt_in_thread(cli_ui.ask_yes_no, "Correct?", default=False)
             if fl_confirm is not True:
-                fl_name_manually = cli_ui.ask_string("Please enter a proper name", default="")
+                fl_name_manually = await prompt_in_thread(cli_ui.ask_string, "Please enter a proper name", default="")
                 if fl_name_manually == "":
-                    logger.info("No proper name given")
-                    logger.info("Aborting...")
+                    logger.info(f"{self.tracker}: No proper name given")
+                    logger.info(f"{self.tracker}: Aborting...")
                     return False
                 fl_name = fl_name_manually
 
@@ -263,7 +266,7 @@ class FileList:
             await self.download_new_torrent(cookies, torrent_id, torrent_path)
             return True
         logger.info(data)
-        logger.info("\n\n")
+        logger.info(f"{self.tracker}: \n\n")
         logger.info(up.text)
         raise UploadError(f"Upload to FILELIST Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa F405
 
@@ -305,13 +308,14 @@ class FileList:
             await self.login(cookiefile)
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
-            logger.error("[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
-            recreate = cli_ui.ask_yes_no("Log in again and create new session?")
-            if recreate is True:
-                if Path(cookiefile).exists():
-                    Path(cookiefile).unlink()
-                await self.login(cookiefile)
-                return await self.validate_cookies(meta, cookiefile)
+            logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
+            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                recreate = await prompt_in_thread(cli_ui.ask_yes_no, "Log in again and create new session?")
+                if recreate is True:
+                    if Path(cookiefile).exists():
+                        Path(cookiefile).unlink()
+                    await self.login(cookiefile)
+                    return await self.validate_cookies(meta, cookiefile)
             return False
         return True
 
@@ -350,10 +354,10 @@ class FileList:
             index = f"{self.base_url}/index.php"
             response = await client.get(index)
             if response.text.find("Logout") != -1:
-                logger.info("[green]Successfully logged into FILELIST")
+                logger.info(f"{self.tracker}: [green]Successfully logged into {self.tracker}")
                 self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # pyright: ignore[reportPrivateUsage]
             else:
-                logger.info("[bold red]Something went wrong while trying to log into FILELIST")
+                logger.info(f"{self.tracker}: [bold red]Something went wrong while trying to log into {self.tracker}")
                 logger.info(response.url)
         return
 
@@ -365,14 +369,12 @@ class FileList:
             async with aiofiles.open(torrent_path, "wb") as tor:
                 await tor.write(r.content)
         else:
-            logger.info("[red]There was an issue downloading the new .torrent from FILELIST")
+            logger.info(f"{self.tracker}: [red]There was an issue downloading the new .torrent from {self.tracker}")
             logger.info(r.text)
         return
 
     async def edit_desc(self, meta: Meta) -> None:
-        base_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt"
-        async with aiofiles.open(base_path, encoding="utf-8") as base_file:
-            base = await base_file.read()
+        base = get_base_description(meta)
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", newline="", encoding="utf-8") as descfile:
             from src.bbcode import BBCODE
 
@@ -393,11 +395,11 @@ class FileList:
                     }
                 if meta.imdb_id:
                     data["imdbURL"] = f"tt{meta.imdb_id}"
-                screen_glob = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.filename)}-*.png")]
+                screen_dir = screenshots_dir(meta.base_dir, meta.uuid)
+                screen_glob = [f.name for f in screen_dir.glob(f"{glob.escape(meta.filename)}-*.png")]
                 files: list[tuple[str, tuple[str, bytes, str]]] = []
                 for screen in screen_glob:
-                    screen_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{screen}"
-                    async with aiofiles.open(screen_path, "rb") as image_file:
+                    async with aiofiles.open(screen_dir / screen, "rb") as image_file:
                         image_bytes = await image_file.read()
                     files.append(("images", (Path(screen).name, image_bytes, "image/png")))
                 async with httpx.AsyncClient(timeout=30.0) as client:
@@ -420,11 +422,11 @@ class FileList:
                     final_desc += "[/pre][/quote]\n"  # Closed bbcode tags
                     # Upload screens and append to the end of the description
                     url = "https://up.img4k.net/api/description"
-                    screen_glob = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.filename)}-*.png")]
+                    screen_dir = screenshots_dir(meta.base_dir, meta.uuid)
+                    screen_glob = [f.name for f in screen_dir.glob(f"{glob.escape(meta.filename)}-*.png")]
                     files: list[tuple[str, tuple[str, bytes, str]]] = []
                     for screen in screen_glob:
-                        screen_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{screen}"
-                        async with aiofiles.open(screen_path, "rb") as image_file:
+                        async with aiofiles.open(screen_dir / screen, "rb") as image_file:
                             image_bytes = await image_file.read()
                         files.append(("images", (Path(screen).name, image_bytes, "image/png")))
                     async with httpx.AsyncClient(timeout=30.0) as client:

@@ -33,7 +33,7 @@ class Rastastugan(UNIT3D):
     search_url = f"{base_url}/api/torrents/filter"
     requests_url = f"{base_url}/api/requests/filter"
     torrent_url = f"{base_url}/torrents/"
-    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
     tracker_urls = ("https://rastastugan.org",)
 
     def __init__(self, config: Config) -> None:
@@ -50,6 +50,7 @@ class Rastastugan(UNIT3D):
         category_id = {
             "MOVIE": "1",
             "TV": "2",
+            "MUSIC": "3",
             "AUDIOBOOK": "7",
             "BOOK": "8",
             "GAME": "5",
@@ -109,7 +110,9 @@ class Rastastugan(UNIT3D):
 
         resolved_id = type_id.get(meta_type or "", "0")
 
-        if category == "GAME":
+        if category == "MUSIC":
+            resolved_id = type_id.get(meta.format.upper(), "19")
+        elif category == "GAME":
             platform = meta.platform.lower()
             if "mac" in platform:
                 resolved_id = "9"

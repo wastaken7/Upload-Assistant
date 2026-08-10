@@ -4,7 +4,7 @@ from typing import Any, cast
 import aiofiles
 import httpx
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import console, logger
 from src.meta import Meta
 from src.trackers.common import Common
@@ -112,7 +112,7 @@ class Swarmazon:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = await client.post(self.upload_url, data=data, files=files)
             except httpx.RequestError as e:
-                logger.info(f"[red]Request failed with error: {e}")
+                logger.info(f"{self.tracker}: [red]Request failed with error: {e}")
                 return False
 
             try:
@@ -130,18 +130,18 @@ class Swarmazon:
                             str(response.json()["link"]),
                         )
                         return True
-                    logger.info("[red]No Link in Response")
+                    logger.info(f"{self.tracker}: [red]No Link in Response")
                     return False
-                logger.info("[red]Did not upload successfully")
+                logger.info(f"{self.tracker}: [red]Did not upload successfully")
                 logger.info(response.json())
                 return False
             except Exception:
-                logger.error("[red]Error! It may have uploaded, go check")
+                logger.error(f"{self.tracker}: [red]Error! It may have uploaded, go check")
                 logger.info(Redaction.redact_private_info(data))
                 console.print_exception()
                 return False
         else:
-            logger.info("[cyan]SWARMAZON Request Data:")
+            logger.info(f"{self.tracker}: Request Data:")
             logger.info(Redaction.redact_private_info(data))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
@@ -150,11 +150,9 @@ class Swarmazon:
             return True  # Debug mode - simulated success
 
     async def edit_desc(self, meta: Meta) -> None:
-        async with aiofiles.open(
-            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt",
-            encoding="utf-8",
-        ) as base_file:
-            base = await base_file.read()
+        from src.description_review import get_base_description
+
+        base = get_base_description(meta)
 
         parts: list[str] = [base]
         images = meta.image_list

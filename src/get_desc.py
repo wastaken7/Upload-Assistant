@@ -1,26 +1,32 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import contextlib
-import glob
+import html
 import json
 import os
 import re
 import urllib.parse
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import ParseResult
 
 import aiofiles
 import httpx
+import langcodes
 from jinja2 import Template
+from langcodes.tag_parser import LanguageTagError
 from pymediainfo import MediaInfo
 
-from cogs.redaction import PathAwareEncoder
 from src.bbcode import BBCODE
+from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
+from src.description_review import apply_saved_draft
 from src.languages import languages_manager
 from src.meta import Meta
+from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager
+from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 from src.uploadscreens import UploadScreensManager
 
@@ -67,21 +73,16 @@ async def gen_desc(
     _takescreens_manager: TakeScreensManager,
     _uploadscreens_manager: UploadScreensManager,
 ) -> Meta:
+    apply_saved_draft(meta)
+
     def clean_text(text: str) -> str:
         return text.replace("\r\n", "\n").strip()
-
-    async def write_description_file(description_path: str, lines: list[str]) -> None:
-        Path(description_path).parent.mkdir(parents=True, exist_ok=True)
-        content = "\n".join(lines)
-        async with aiofiles.open(description_path, "w", newline="", encoding="utf8") as description:
-            await description.write(content)
 
     description_link = meta.description_link
     description_file = meta.description_file
     scene_nfo = False
     bhd_nfo = False
 
-    description_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt"
     description_lines: list[str] = []
     content_written = False
 
@@ -90,7 +91,10 @@ async def gen_desc(
     specified_dir = Path(base_dir) / "tmp" / uuid
     source_dir = Path(meta.path or "")
 
-    if meta.description_template:
+    if meta.description_override:
+        description_lines.append(clean_text(meta.description_override))
+        content_written = True
+    elif meta.description_template:
         try:
             template_path = f"{meta.base_dir}/data/templates/{meta.description_template}.txt"
             async with aiofiles.open(template_path, encoding="utf-8") as f:
@@ -119,7 +123,8 @@ async def gen_desc(
             logger.info("NFO was set but no nfo file was found")
             if not content_written:
                 description_lines.append("")
-            await write_description_file(description_path, description_lines)
+            meta.description = "\n".join(description_lines).strip()
+            meta.saved_description = bool(meta.description)
             return meta
 
         if nfo_files:
@@ -189,10 +194,8 @@ async def gen_desc(
             description_lines = [description_text]
             content_written = True
 
-    if description_lines:
-        description_lines.append("")
-
-    await write_description_file(description_path, description_lines)
+    meta.description = "\n".join(description_lines).strip()
+    meta.saved_description = bool(meta.description)
 
     if meta.description in ("None", "", " "):
         meta.description = ""
@@ -354,10 +357,10 @@ class DescriptionBuilder:
 
     async def get_mediainfo_section(self, meta: Meta) -> str:
         """Returns the mediainfo section, using a cache file if available."""
-        if meta.is_disc == "BDMV" or meta.category in ("GAME", "BOOK"):
+        if meta.is_disc == "BDMV" or meta.category in ("GAME", "BOOK", "MUSIC"):
             return ""
 
-        if self._get_bool_config("full_mediainfo", False) or meta.is_disc:
+        if self._get_bool_config("full_mediainfo", True) or meta.is_disc:
             mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
             if await self.common.path_exists(mi_path):
                 async with aiofiles.open(mi_path, encoding="utf-8") as mi:
@@ -375,43 +378,127 @@ class DescriptionBuilder:
                     return await f.read()
 
         video_file = meta.filelist[0]
-        mi_template = Path(meta.base_dir) / "data" / "templates" / "MEDIAINFO.txt"
-        mi_file_path = Path(cache_file_dir) / "MEDIAINFO_CLEANPATH.txt"
 
-        template_exists = await self.common.path_exists(mi_template)
-
-        if template_exists:
-            try:
-                media_info_result = MediaInfo.parse(
-                    video_file,
-                    output="STRING",
-                    full=False,
-                    mediainfo_options={"inform": f"file://{mi_template}"},
-                )
-                media_info_content = media_info_result
-
-                if media_info_content:
-                    media_info_content = media_info_content.replace("\r\n", "\n")
-                    with contextlib.suppress(Exception):
-                        await self.common.makedirs(cache_file_dir)
-                        async with aiofiles.open(cache_file_path, mode="w", encoding="utf-8") as f:
-                            await f.write(media_info_content)
-
-                    return media_info_content
-
-            except Exception:
-                cleanpath_exists = await self.common.path_exists(mi_file_path)
-                if cleanpath_exists:
-                    async with aiofiles.open(mi_file_path, encoding="utf-8") as f:
-                        return await f.read()
-
-        else:
-            cleanpath_exists = await self.common.path_exists(mi_file_path)
-            if cleanpath_exists:
-                async with aiofiles.open(mi_file_path, encoding="utf-8") as f:
-                    return await f.read()
+        if meta.mediainfo:
+            media_info_content = self.format_short_mediainfo_json(meta.mediainfo, video_file)
+            if media_info_content:
+                with contextlib.suppress(Exception):
+                    await self.common.makedirs(str(cache_file_dir))
+                    async with aiofiles.open(cache_file_path, mode="w", encoding="utf-8") as f:
+                        await f.write(media_info_content)
+                return media_info_content
 
         return ""
+
+    @staticmethod
+    def format_short_mediainfo_json(mediainfo: dict[str, Any] | None, video_file: str = "") -> str:
+        """Render the short MediaInfo section from meta.mediainfo."""
+        if not mediainfo:
+            return ""
+        raw_tracks = mediainfo.get("media", {}).get("track", [])
+        if not isinstance(raw_tracks, list):
+            return ""
+        tracks = [track for track in raw_tracks if isinstance(track, dict)]
+
+        def value(track: dict[str, Any], key: str) -> str:
+            field = track.get(key, "")
+            return field.strip() if isinstance(field, str) else ""
+
+        def format_duration(seconds: str) -> str:
+            try:
+                milliseconds = int((Decimal(seconds) * 1000).to_integral_value(rounding=ROUND_HALF_UP))
+            except InvalidOperation, ValueError:
+                return ""
+            hours, milliseconds = divmod(milliseconds, 3_600_000)
+            minutes, milliseconds = divmod(milliseconds, 60_000)
+            seconds, milliseconds = divmod(milliseconds, 1000)
+            return f"{hours:02}:{minutes:02}:{seconds:02}.{milliseconds:03}"
+
+        def format_size(bytes_value: str) -> str:
+            try:
+                gibibytes = Decimal(bytes_value) / (1024**3)
+            except InvalidOperation:
+                return ""
+            precision = ".1f" if gibibytes >= 10 else ".2f"
+            return f"{gibibytes:{precision}} GiB"
+
+        def format_bitrate(bits_per_second: str) -> str:
+            try:
+                bitrate = Decimal(bits_per_second)
+            except InvalidOperation:
+                return ""
+            if bitrate >= 10_000_000:
+                return f"{bitrate / 1_000_000:.1f} Mb/s"
+            return f"{int((bitrate / 1000).to_integral_value(rounding=ROUND_HALF_UP)):,}".replace(",", " ") + " kb/s"
+
+        def format_sampling_rate(hertz: str) -> str:
+            try:
+                return f"{Decimal(hertz) / 1000:.1f} kHz"
+            except InvalidOperation:
+                return ""
+
+        def language_name(language: str) -> str:
+            if not language:
+                return ""
+            try:
+                parsed = langcodes.Language.get(language)
+                name = parsed.language_name("en")
+                return f"{name} ({parsed.territory})" if parsed.territory else name
+            except LanguageTagError:
+                return language
+
+        general = next((track for track in tracks if value(track, "@type") == "General"), None)
+        if general is None:
+            return ""
+
+        filename = Path(value(general, "CompleteName") or video_file).stem
+        output = [
+            filename,
+            "",
+            "---GENERAL----",
+            f"Size...........: {format_size(value(general, 'FileSize'))}",
+            f"Container......: {value(general, 'Format')}",
+            f"Duration.......: {format_duration(value(general, 'Duration'))}",
+            "",
+        ]
+
+        for video in (track for track in tracks if value(track, "@type") == "Video"):
+            codec = value(video, "Format")
+            codec += ", " + value(video, "Encoded_Library") if value(video, "Encoded_Library") else ""
+            codec += ", " + value(video, "HDR_Format_String") if value(video, "HDR_Format_String") else ""
+            codec += ", " + value(video, "transfer_characteristics") if value(video, "transfer_characteristics") else ""
+            output.extend(
+                [
+                    "---VIDEO----",
+                    f"Codec..........: {codec}",
+                    f"Resolution.....: {value(video, 'Width')}x{value(video, 'Height')}",
+                    f"Bit rate.......: {format_bitrate(value(video, 'BitRate'))}",
+                    f"Frame rate.....: {value(video, 'FrameRate')} fps",
+                    "",
+                ]
+            )
+
+        for audio in (track for track in tracks if value(track, "@type") == "Audio"):
+            title = value(audio, "Title")
+            output.extend(
+                [
+                    "---AUDIO----",
+                    f"Format.........: {value(audio, 'Format_Commercial_IfAny') or value(audio, 'Format')}",
+                    f"Channels.......: {value(audio, 'Channels')} channel{'s' if value(audio, 'Channels') != '1' else ''}",
+                    f"Sample rate....: {format_sampling_rate(value(audio, 'SamplingRate'))}",
+                    f"Bit rate.......: {format_bitrate(value(audio, 'BitRate'))}",
+                    f"Language.......: {language_name(value(audio, 'Language'))}{f' ({title})' if title else ''}",
+                    "",
+                ]
+            )
+
+        for index, text in enumerate(track for track in tracks if value(track, "@type") == "Text"):
+            if index == 0:
+                output.append("---SUBTITLES---")
+            title = value(text, "Title")
+            output.append(f"Language.......: {language_name(value(text, 'Language'))}{f' ({title})' if title else ''}, {value(text, 'Format')}")
+
+        return "\n".join(output).rstrip() + "\n"
 
     async def get_bdinfo_section(self, meta: Meta) -> str:
         """Returns the bdinfo section if applicable."""
@@ -443,7 +530,8 @@ class DescriptionBuilder:
     async def menu_screenshot_header(self, meta: Meta) -> str:
         """Returns the screenshot header for menus if applicable."""
         try:
-            if meta.is_disc and meta.menu_images:
+            menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
+            if meta.is_disc and menu_images:
                 disc_menu_header = self._get_str_config("disc_menu_header", "")
                 if disc_menu_header:
                     return disc_menu_header
@@ -455,6 +543,8 @@ class DescriptionBuilder:
     async def get_user_description(self, meta: Meta) -> str:
         """Returns the user-provided description (file or link)"""
         try:
+            if meta.description_override:
+                return ""
             description_file_content = meta.description_file_content.strip()
             description_link_content = meta.description_link_content.strip()
 
@@ -489,7 +579,7 @@ class DescriptionBuilder:
             if meta.is_disc in ["BDMV", "DVD"] and bluray_link and meta.release_url:
                 release_url = meta.release_url
 
-            cover_data = meta.covers
+            cover_data = meta.hosted_artwork
             if not cover_data and await self.common.path_exists(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/covers.json"):
                 try:
                     async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/covers.json", encoding="utf-8") as f:
@@ -526,7 +616,7 @@ class DescriptionBuilder:
             if not add_spec:
                 return ""
 
-            spectrograms_images = meta.spectrograms_images
+            spectrograms_images = get_tracker_image_collection(meta, self.tracker, "spectrograms_images")
             if not spectrograms_images:
                 return ""
             audio_spectrogram_header = self._get_str_config("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]")
@@ -550,7 +640,7 @@ class DescriptionBuilder:
 
     def _build_book_desc_section(self, meta: Meta, header_size: int = 0, table: bool = True, underline: bool = False, bullet: str = "") -> str:
         """Build the BBCode table or list for BOOK-category uploads."""
-        if self.tracker == "TORRENTLEECH":
+        if self.tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP"):
             table = False
             header_size = -1
         elif self.tracker in ("BJSHARE", "BRASILTRACKER", "AMIGOSSHARE"):
@@ -592,7 +682,7 @@ class DescriptionBuilder:
             overview = re.sub(r"<[^>]+>", "", overview).strip()
 
         # Collect key-value pairs
-        fields = []
+        fields: list[tuple[str, str]] = []
         if author:
             fields.append((str_author, author))
         if book_translator:
@@ -699,7 +789,7 @@ class DescriptionBuilder:
         str_support = "Support" if not use_pt_br else "Suporte"
 
         # 1. Technical Details
-        fields = []
+        fields: list[tuple[str, str]] = []
         if meta.platform:
             fields.append((str_platform, meta.platform))
         if meta.game_version:
@@ -816,6 +906,152 @@ class DescriptionBuilder:
 
         return "\n".join(part for part in game_parts if part.strip())
 
+    def _build_music_desc_section(self, meta: Meta, header_size: int = 0, table: bool = True) -> str:
+        """Build a tracker-neutral BBCode summary for MUSIC-category uploads."""
+        if meta.category != "MUSIC" or not isinstance(meta.music_release, dict):
+            return ""
+
+        if self.tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP"):
+            table = False
+
+        release = meta.music_release
+        fields_data = release.get("fields", {})
+        tracks = release.get("tracks", [])
+        external_ids = release.get("external_ids", {})
+        if not isinstance(fields_data, dict):
+            fields_data = {}
+        if not isinstance(tracks, list):
+            tracks = []
+        if not isinstance(external_ids, dict):
+            external_ids = {}
+        if not fields_data and not tracks and not external_ids:
+            return ""
+
+        if self.tracker == "TORRENTLEECH" and not header_size:
+            header_size = 1
+        elif self.tracker in ("BJSHARE", "BRASILTRACKER", "SPEEDAPP") and not header_size:
+            header_size = 3
+
+        header = "[h2]" if not header_size else f"[size={header_size}][b]"
+        header_end = "[/h2]" if not header_size else "[/b][/size]\n"
+        use_pt_br = self.tracker in ("AMIGOSSHARE", "BRASILTRACKER", "CAPYBARABR", "SAMARITANO", "BJSHARE")
+
+        def value(name: str, fallback: Any = "") -> Any:
+            """Return a populated normalized release field or its fallback."""
+            item = fields_data.get(name, {})
+            if isinstance(item, dict) and item.get("value") not in (None, "", [], {}):
+                return item["value"]
+            return fallback
+
+        def display(item: Any) -> str:
+            """Format a release field for human-readable BBCode output."""
+            if isinstance(item, list):
+                return ", ".join(str(part) for part in item if str(part).strip())
+            return str(item).strip() if item not in (None, "") else ""
+
+        def technical_values(name: str, formatter: Any = str) -> str:
+            """Format unique valid technical values from the release tracks."""
+            formatted_values: dict[Any, str] = {}
+            for track in tracks:
+                if not isinstance(track, dict):
+                    continue
+                item = track.get(name)
+                if item in (None, ""):
+                    continue
+                try:
+                    hash(item)
+                    formatted = display(formatter(item))
+                except TypeError, ValueError, OverflowError:
+                    continue
+                if formatted:
+                    formatted_values[item] = formatted
+            return ", ".join(formatted_values[item] for item in sorted(formatted_values, key=str))
+
+        text = {
+            "details": "Music Details" if not use_pt_br else "Detalhes da Música",
+            "artist": "Artist" if not use_pt_br else "Artista",
+            "album": "Album" if not use_pt_br else "Álbum",
+            "year": "Original Release Year" if not use_pt_br else "Ano de Lançamento Original",
+            "release_year": "Release Year" if not use_pt_br else "Ano desta Edição",
+            "edition": "Edition" if not use_pt_br else "Edição",
+            "edition_year": "Edition Year" if not use_pt_br else "Ano da Edição",
+            "type": "Release Type" if not use_pt_br else "Tipo de Lançamento",
+            "media": "Media" if not use_pt_br else "Mídia",
+            "label": "Label" if not use_pt_br else "Gravadora",
+            "catalogue": "Catalogue Number" if not use_pt_br else "Número de Catálogo",
+            "genres": "Genres" if not use_pt_br else "Gêneros",
+            "tracks": "Tracks" if not use_pt_br else "Faixas",
+            "discs": "Discs" if not use_pt_br else "Discos",
+            "format": "Format" if not use_pt_br else "Formato",
+            "codec": "Codec",
+            "bit_depth": "Bit Depth" if not use_pt_br else "Profundidade de Bits",
+            "sample_rate": "Sample Rate" if not use_pt_br else "Taxa de Amostragem",
+            "channels": "Channels" if not use_pt_br else "Canais",
+            "bitrate": "Bitrate",
+            "external_ids": "External IDs" if not use_pt_br else "IDs Externos",
+        }
+
+        def musicbrainz_link(kind: str, identifier: Any) -> str:
+            """Return a safe MusicBrainz BBCode link for a canonical UUID."""
+            identifier = str(identifier or "").strip()
+            if not re.fullmatch(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}", identifier, re.IGNORECASE):
+                return ""
+            return f"[url=https://musicbrainz.org/{kind}/{identifier}]{identifier}[/url]"
+
+        def discogs_link(kind: str, identifier: Any) -> str:
+            """Return a safe Discogs BBCode link for a known release/master ID."""
+            raw_identifier = str(identifier or "").strip()
+            match = re.fullmatch(
+                rf"(?:https?://(?:www\.)?discogs\.com/)?{kind}(?:/|:)(\d+)(?:-[^/?#]+)?/?(?:[?#].*)?",
+                raw_identifier,
+                re.IGNORECASE,
+            )
+            numeric_identifier = match.group(1) if match else raw_identifier if raw_identifier.isdecimal() else ""
+            return f"[url=https://www.discogs.com/{kind}/{numeric_identifier}]{numeric_identifier}[/url]" if numeric_identifier else ""
+
+        external_id_links = [
+            ("MusicBrainz Release", musicbrainz_link("release", external_ids.get("musicbrainz_release"))),
+            ("MusicBrainz Release Group", musicbrainz_link("release-group", external_ids.get("musicbrainz_release_group"))),
+            ("Discogs Release", discogs_link("release", external_ids.get("discogs_release"))),
+            ("Discogs Master", discogs_link("master", external_ids.get("discogs_master"))),
+        ]
+        external_id_links = [f"{label}: {link}" for label, link in external_id_links if link]
+
+        music_fields = [
+            (text["artist"], display(value("artists", value("artist", meta.artist)))),
+            (text["album"], display(value("album", meta.title))),
+            (text["year"], display(value("year", meta.year))),
+            (text["release_year"], display(value("release_year"))),
+            (text["edition"], display(value("edition"))),
+            (text["edition_year"], display(value("edition_year"))),
+            (text["type"], display(value("release_type"))),
+            (text["media"], display(value("media", meta.source))),
+            (text["label"], display(value("release_label", value("label")))),
+            (text["catalogue"], display(value("release_catalogue_number"))),
+            (text["genres"], display(value("genres"))),
+            (text["tracks"], display(value("track_count", len(tracks)))),
+            (text["discs"], display(value("disc_count", 1))),
+            (text["format"], display(value("format", technical_values("format")))),
+            (text["codec"], technical_values("codec")),
+            (text["bit_depth"], technical_values("bit_depth", lambda item: f"{item}-bit")),
+            (text["sample_rate"], technical_values("sample_rate", lambda item: f"{int(item) / 1000:g} kHz")),
+            (text["channels"], technical_values("channels", lambda item: {1: "Mono", 2: "Stereo"}.get(int(item), f"{item} channels"))),
+            (text["bitrate"], technical_values("bitrate", lambda item: f"{round(int(item) / 1000)} kbps")),
+            (text["external_ids"], ", ".join(external_id_links) if table else "\n".join(external_id_links)),
+        ]
+        music_fields = [(label, field_value) for label, field_value in music_fields if field_value]
+        if not music_fields:
+            return ""
+
+        if table:
+            table_lines = ["[table]"]
+            table_lines.extend(f"[tr][td][b]{label}[/b][/td][td]{field_value}[/td][/tr]" for label, field_value in music_fields)
+            table_lines.append("[/table]")
+            body = "\n".join(table_lines)
+        else:
+            body = "\n".join(f"[b]{label}:[/b] {field_value}" for label, field_value in music_fields)
+        return f"{header}{text['details']}{header_end}\n{body}"
+
     async def general_description_generator(
         self,
         meta: Meta,
@@ -837,11 +1073,13 @@ class DescriptionBuilder:
         tv_info: bool,
         ua_signature: bool,
         user_description: bool,
+        music: bool = True,
         approved_image_hosts: list[str] | None = None,
         signature: str = "",
         desc_header: str = "",
     ) -> str:
-        image_list = meta.get(f"{self.tracker}_images_key", meta.image_list)
+        apply_saved_draft(meta)
+        image_list = get_tracker_image_collection(meta, self.tracker, "screenshots")
         image_list = cast(list[Any], image_list)
 
         if image_list is None:
@@ -967,21 +1205,28 @@ class DescriptionBuilder:
             if game_section:
                 desc_parts.append(game_section)
 
+        # Music details
+        if music and meta.category == "MUSIC":
+            music_section = self._build_music_desc_section(meta)
+            if music_section:
+                desc_parts.append(music_section)
+
         if self.tracker == "MTEAM" and meta.mteam_description:
             desc_parts.append(meta.mteam_description)
 
         if self.tracker in {"LAJIDUI", "LONGPT", "PTCAFE", "PTFANS", "PTGTK", "RAILGUNPT", "NEXUSPHP"} and meta.nexusphp_description:
             desc_parts.append(meta.nexusphp_description)
 
+        meta_description_value = meta.description
+        if isinstance(meta_description_value, str):
+            meta_description = meta_description_value
+        elif meta_description_value is None:
+            meta_description = ""
+        else:
+            meta_description = str(meta_description_value)
+
         # Description that may come from API requests
         if description:
-            meta_description_value = meta.description
-            if isinstance(meta_description_value, str):
-                meta_description = meta_description_value
-            elif meta_description_value is None:
-                meta_description = ""
-            else:
-                meta_description = str(meta_description_value)
             # Add FraMeSToR NFO to AITHER
             if self.tracker == "AITHER" and "framestor" in meta and meta.framestor:
                 nfo_content = meta.description_nfo_content
@@ -1024,7 +1269,12 @@ class DescriptionBuilder:
 
         # Description from file/pastebin link
         if user_description:
-            desc_parts.append(await self.get_user_description(meta))
+            user_description_content = await self.get_user_description(meta)
+            # ``gen_desc`` promotes a supplied file/link to ``meta.description``
+            # while retaining it as the user-description source.  Trackers that
+            # enable both sections must not render that same content twice.
+            if not description or user_description_content.strip() != meta_description.strip():
+                desc_parts.append(user_description_content)
 
         # Menu Screenshots
         if menu_screenshots:
@@ -1073,10 +1323,11 @@ class DescriptionBuilder:
         signature: str = "",
         desc_header: str = "",
         approved_image_hosts: list[str] | None = None,
+        audio_spectrogram: bool = True,
     ) -> str:
         return await self.general_description_generator(
             meta,
-            audio_spectrogram=True,
+            audio_spectrogram=audio_spectrogram,
             bluray=True,
             book=True,
             custom_header=True,
@@ -1093,6 +1344,7 @@ class DescriptionBuilder:
             tv_info=True,
             ua_signature=True,
             user_description=True,
+            music=True,
             signature=signature,
             desc_header=desc_header,
             approved_image_hosts=approved_image_hosts,
@@ -1264,25 +1516,9 @@ class DescriptionBuilder:
                             desc_parts.append("[/center]\n\n")
                             meta.retry_count += 1
                             meta[new_images_key] = []
-                            new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"PLAYLIST_{i}-*.png")]
+                            new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"PLAYLIST_{i}")]
                             if not new_screens:
-                                use_vs = meta.vapoursynth
-                                try:
-                                    await self.takescreens_manager.disc_screenshots(
-                                        meta,
-                                        f"PLAYLIST_{i}",
-                                        bdinfo,
-                                        meta.uuid,
-                                        meta.base_dir,
-                                        use_vs,
-                                        [],
-                                        meta.ffdebug,
-                                        multi_screens,
-                                        True,
-                                    )
-                                except Exception as e:
-                                    logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
-                                new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"PLAYLIST_{i}-*.png")]
+                                logger.warning(f"[yellow]Missing prepared screenshots for PLAYLIST_{i}; skipping its images in the description.[/yellow]")
                             if new_screens and not meta.skip_imghost_upload:
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
                                     meta,
@@ -1412,36 +1648,13 @@ class DescriptionBuilder:
                             # Check if new screenshots already exist before running prep.screenshots
                             new_screens: list[str] = []
                             if each["type"] == "BDMV":
-                                new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
+                                new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
                             elif each["type"] == "DVD":
-                                new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
+                                new_screens = [
+                                    f.name for f in manifest_files(meta.base_dir, meta.uuid, await self.takescreens_manager.sanitize_filename(meta.discs[i]["name"]))
+                                ]
                             if not new_screens:
-                                logger.debug(f"[yellow]No new screens for {new_images_key}; creating new screenshots")
-                                # Run prep.screenshots if no screenshots are present
-                                if each["type"] == "BDMV":
-                                    use_vs = meta.vapoursynth
-                                    try:
-                                        await self.takescreens_manager.disc_screenshots(
-                                            meta,
-                                            f"FILE_{i}",
-                                            each["bdinfo"],
-                                            meta.uuid,
-                                            meta.base_dir,
-                                            use_vs,
-                                            [],
-                                            meta.ffdebug,
-                                            multi_screens,
-                                            True,
-                                        )
-                                    except Exception as e:
-                                        logger.info(f"Error during BDMV screenshot capture: {e}", extra={"markup": False})
-                                    new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
-                                if each["type"] == "DVD":
-                                    try:
-                                        await self.takescreens_manager.dvd_screenshots(meta, i, multi_screens, True)
-                                    except Exception as e:
-                                        logger.info(f"Error during DVD screenshot capture: {e}", extra={"markup": False})
-                                    new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"{glob.escape(meta.discs[i]['name'])}-*.png")]
+                                logger.warning(f"[yellow]Missing prepared screenshots for {new_images_key}; skipping its images in the description.[/yellow]")
 
                             if new_screens and not meta.skip_imghost_upload:
                                 uploaded_images, _ = await self.uploadscreens_manager.upload_screens(
@@ -1566,7 +1779,7 @@ class DescriptionBuilder:
                     if new_images_key not in meta or not meta[new_images_key]:
                         meta[new_images_key] = []
                         # Proceed with image generation if not already present
-                        new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
+                        new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
 
                         # If no screenshots exist, create them
                         if not new_screens:
@@ -1581,12 +1794,13 @@ class DescriptionBuilder:
                                     meta,
                                     multi_screens,
                                     True,
+                                    capture_group=f"FILE_{i}",
                                 )
                                 await asyncio.sleep(0.1)
                             except Exception as e:
                                 logger.info(f"Error during generic screenshot capture: {e}", extra={"markup": False})
 
-                        new_screens = [f.name for f in (Path(meta.base_dir) / "tmp" / meta.uuid).glob(f"FILE_{i}-*.png")]
+                        new_screens = [f.name for f in manifest_files(meta.base_dir, meta.uuid, f"FILE_{i}")]
 
                         # Upload generated screenshots
                         if new_screens and not meta.skip_imghost_upload:
@@ -1714,7 +1928,7 @@ class DescriptionBuilder:
             screens_per_row = await self.get_screens_per_row()
             if meta.is_disc:
                 menu_parts: list[str] = []
-                menu_images = meta.menu_images
+                menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
                 if disc_menu_header and menu_images:
                     menu_parts.append(disc_menu_header + "\n")
                 if menu_images:
@@ -1961,6 +2175,16 @@ class DescriptionBuilder:
             description = bbcode.convert_comparison_to_centered(description, 1000)
             description = bbcode.remove_spoiler(description)
             description = re.sub(r"\n{3,}", "\n\n", description)
+
+        if tracker == "IMMORTALSEED":
+            # all tags must be removed, this is a plain-text only description
+            description = html.unescape(description)
+            # Preserve text structure where markup normally separates content.
+            description = re.sub(r"<br\s*/?\s*>", "\n", description, flags=re.IGNORECASE)
+            description = re.sub(r"</(?:p|div|li|tr|h[1-6]|blockquote|pre)\s*>", "\n", description, flags=re.IGNORECASE)
+            description = re.sub(r"<!--.*?-->|<![^>]*>|</?[a-z][^>]*>", "", description, flags=re.IGNORECASE | re.DOTALL)
+            # Strip BBCode names and attributes while retaining their contents.
+            description = re.sub(r"\[/?[a-z][a-z0-9_-]*(?:=[^\]]*|\s+[^\]]*)?\]|\[\*\]", "", description, flags=re.IGNORECASE)
 
         from src.trackersetup import api_trackers as unit3d_trackers
 

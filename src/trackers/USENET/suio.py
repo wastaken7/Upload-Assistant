@@ -13,9 +13,10 @@ import aiofiles
 import httpx
 from PIL import Image
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
+from src.temp_paths import artwork_dir
 from src.trackers.common import Common
 from src.trackers.USENET.search_helpers import (
     build_newznab_search_query,
@@ -72,7 +73,7 @@ class Suio:
                     self.upload_url = None
                     self.torrent_url = None
                     self.search_url = None
-                    logger.info(f"{self.tracker} [red]base_url from config.py does not match the expected domain. Skipping...[/red]")
+                    logger.info(f"{self.tracker}: [red]base_url from config.py does not match the expected domain. Skipping...[/red]")
             except Exception:
                 self.upload_url = None
                 self.torrent_url = None
@@ -99,9 +100,6 @@ class Suio:
             return [release_name]
 
         if not self.search_url:
-            return []
-        if not self.api_key:
-            logger.info(f"{self.tracker}: [yellow]Duplicate search skipped due to missing API key.[/yellow]")
             return []
         if self.daily_api_hit_limit <= 0:
             logger.info(f"{self.tracker}: [yellow]Duplicate search via API is disabled because daily_api_hit_limit is 0.[/yellow]")
@@ -367,8 +365,8 @@ class Suio:
             files["nfo"] = (nfo_filename, nfo_content, "application/octet-stream")
         # Cover image file (optional)
         if meta.category not in ("TV", "MOVIE"):
-            cover_jpg_path = Path(nfo_dir) / "POSTER.jpg"
-            cover_png_path = Path(nfo_dir) / "POSTER.png"
+            cover_jpg_path = artwork_dir(meta.base_dir, meta.uuid) / "POSTER.jpg"
+            cover_png_path = artwork_dir(meta.base_dir, meta.uuid) / "POSTER.png"
             cover_path = None
             if Path(cover_jpg_path).exists():
                 cover_path = cover_jpg_path
@@ -420,7 +418,7 @@ class Suio:
         status_dict = status_map[self.tracker]
 
         if not self.upload_url:
-            logger.info(f"[red]{self.tracker}: base_url missing. Cannot upload.[/red]")
+            logger.info(f"{self.tracker}: [red]base_url missing. Cannot upload.[/red]")
             status_dict["status_message"] = "data error: base_url missing"
             return False
 
@@ -433,11 +431,11 @@ class Suio:
 
         data = await self._prepare_data(meta)
         if meta.debug:
-            logger.debug(f"[cyan]{self.tracker} Upload (DEBUG MODE):[/cyan]")
-            logger.debug(f"User: {username}")
-            logger.debug("Fields:")
+            logger.debug(f"{self.tracker}: [cyan]Upload (DEBUG MODE):[/cyan]")
+            logger.debug(f"{self.tracker}: User: {username}")
+            logger.debug(f"{self.tracker}: Fields:")
             logger.debug(Redaction.redact_private_info(data))
-            logger.debug("Files:")
+            logger.debug(f"{self.tracker}: Files:")
             logger.debug({k: v[0] for k, v in files.items()})
             status_dict["status_message"] = "Debug mode enabled, skipping upload."
             return True

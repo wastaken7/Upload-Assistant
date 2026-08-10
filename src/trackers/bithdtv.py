@@ -5,10 +5,11 @@ from typing import Any, cast
 
 import aiofiles
 import httpx
-from pymediainfo import MediaInfo
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
+from src.description_review import get_base_description
+from src.get_desc import DescriptionBuilder
 from src.meta import Meta
 from src.trackers.common import Common
 
@@ -64,9 +65,7 @@ class BitHDTV:
         if meta.is_disc != "BDMV":
             filelist = cast(list[str], meta.filelist or [])
             video = filelist[0] if filelist else (meta.path or "")
-            mi_template = str(Path(f"{meta.base_dir}/data/templates/MEDIAINFO.txt").resolve())
-            if Path(mi_template).exists():
-                media_info = MediaInfo.parse(video, output="STRING", full=False, mediainfo_options={"inform": f"file://{mi_template}"})
+            media_info = DescriptionBuilder.format_short_mediainfo_json(meta.mediainfo, video)
 
         data: dict[str, Any] = {
             "api_key": str(self.config["TRACKERS"][self.tracker]["api_key"]).strip(),
@@ -98,20 +97,20 @@ class BitHDTV:
                     parsed = response.json()
                     meta.tracker_status[self.tracker]["status_message"] = parsed
                 except Exception:
-                    logger.info("[cyan]It may have uploaded, go check")
+                    logger.info(f"{self.tracker}: [cyan]It may have uploaded, go check")
                     logger.info(Redaction.redact_private_info(data))
                     traceback.print_exc()
 
             parsed_data: dict[str, Any] | None = cast(dict[str, Any] | None, parsed) if isinstance(parsed, dict) else None
             data_block: dict[str, Any] | None = parsed_data.get("data") if parsed_data else None
             if isinstance(data_block, dict) and "view" in data_block:
-                my_announce_url = self.config["TRACKERS"]["BITHDTV"].get("my_announce_url")
+                my_announce_url = self.config["TRACKERS"][self.tracker].get("my_announce_url")
                 if my_announce_url:
                     await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, my_announce_url, str(data_block["view"]))
                     return True
             return False
 
-        logger.info("[cyan]BITHDTV Request Data:")
+        logger.info(f"{self.tracker}: Request Data:")
         logger.info(Redaction.redact_private_info(data))
         meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
         await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
@@ -181,8 +180,7 @@ class BitHDTV:
         return {"2160p": "4", "1080p": "3", "1080i": "2", "720p": "1"}.get(resolution, "10")
 
     async def edit_desc(self, meta: Meta) -> None:
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt", encoding="utf-8") as base_file:
-            base = await base_file.read()
+        base = get_base_description(meta)
         parts: list[str] = [base.replace("[img=250]", "[img=250x250]")]
         images = meta.image_list or []
         if len(images) > 0:

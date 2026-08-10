@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import platform
 import re
 from pathlib import Path
 from typing import Any, cast
@@ -48,20 +47,25 @@ class HDTorrents:
 
         self.torrent_url = f"{self.base_url}/details.php?id="
         self.announce_url = str(tracker_config_dict.get("announce_url", ""))
-        self.session = httpx.AsyncClient(headers={"User-Agent": f"Upload-Assistant ({platform.system()} {platform.release()})"}, timeout=60.0)
+        self.session = httpx.AsyncClient(
+            # HD-Torrents is very strict about User-Agent, so we use a common browser UA to avoid being blocked
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
+            timeout=60.0,
+        )
 
     async def validate_credentials(self, meta: Meta) -> bool:
-        cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
-        self.session.cookies.clear()
-        if cookies is not None:
-            self.session.cookies.update(cookies)
-        return await self.cookie_validator.cookie_validation(
-            meta=meta,
-            tracker=self.tracker,
-            test_url=f"{self.base_url}/upload.php",
-            success_text="usercp.php",
-            token_pattern=r'name="csrfToken" value="([^"]+)"',  # noqa: S106
-        )
+        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if not cookie_jar:
+            return False
+
+        configured_host = (urlparse(self.base_url).hostname or self.config_url).lower().lstrip(".")
+        cookie_hosts = {str(cookie.domain).lower().lstrip(".") for cookie in cookie_jar if cookie.domain}
+        if configured_host not in cookie_hosts:
+            logger.error(f"{self.tracker}: Cookie domain does not match the configured base URL ({configured_host}). Please export cookies from {self.base_url}.")
+            return False
+
+        self.session.cookies = cookie_jar
+        return True
 
     async def get_category_id(self, meta: Meta) -> int:
         cat_id = 0
@@ -167,19 +171,17 @@ class HDTorrents:
         return True
 
     async def search_existing(self, meta: Meta) -> list[dict[str, str | None]]:
-        # Ensure we have valid credentials and auth_token before searching
-        if not hasattr(self, "auth_token") or not self.auth_token:
-            credentials_valid = await self.validate_credentials(meta)
-            if not credentials_valid:
-                logger.info(f"[bold red]{self.tracker}: Failed to validate credentials for search.")
-                return []
+        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if cookie_jar:
+            self.session.cookies = cookie_jar
+
+        results: list[dict[str, str | None]] = []
 
         search_url = f"{self.base_url}/torrents.php?"
         if meta.imdb_id or 0 != 0:
-            imdb_id_str = f"tt{meta.imdb}"
             params: dict[str, str | int] = {
                 "csrfToken": self.secret_token,
-                "search": imdb_id_str,
+                "search": meta.imdb_tt,
                 "active": "0",
                 "options": "2",
                 "category[]": await self.get_category_id(meta),
@@ -187,10 +189,22 @@ class HDTorrents:
         else:
             params = {"csrfToken": self.secret_token, "search": meta.title, "category[]": await self.get_category_id(meta), "options": "3"}
 
-        results: list[dict[str, str | None]] = []
-
-        response = await self.session.get(search_url, params=params)
+        response = await self.session.get(search_url, params=params, follow_redirects=True)
         response.raise_for_status()
+
+        if "login.php" in str(response.url) or "login.php" in response.text:
+            await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
+            meta.skipping = f"{self.tracker}"
+            return results
+
+        token_match = re.search(r'name="csrfToken" value="([^"]+)"', response.text)
+        if token_match:
+            HDTorrents.secret_token = token_match.group(1)
+        else:
+            logger.info(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
+            meta.skipping = f"{self.tracker}"
+            return results
+
         soup = BeautifulSoup(response.text, "html.parser")
         rows = soup.find_all("tr")
 
@@ -269,10 +283,10 @@ class HDTorrents:
         return {}
 
     async def upload(self, meta: Meta) -> bool:
-        cookies = await self.cookie_validator.load_session_cookies(meta, self.tracker)
-        self.session.cookies.clear()
-        if cookies is not None:
-            self.session.cookies.update(cookies)
+        cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
+        if cookie_jar:
+            self.session.cookies = cookie_jar
+
         data = await self.get_data(meta)
         files = await self.get_nfo(meta)
 

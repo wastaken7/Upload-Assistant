@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
+import cli_ui
 import httpx
 from bs4 import BeautifulSoup
 from pymediainfo import MediaInfo
-from rich.prompt import Prompt
 
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
@@ -145,8 +145,9 @@ class AlphaRatio:
         heading = "[color=green][size=6]"
         subheading = "[color=red][size=4]"
         heading_end = "[/size][/color]"
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt", encoding="utf8") as f:
-            base = await f.read()
+        from src.description_review import get_base_description
+
+        base = get_base_description(meta)
         base = re.sub(r"\[center\]\[spoiler=Scene NFO:\].*?\[/center\]", "", base, flags=re.DOTALL)
         base = re.sub(r"\[center\]\[spoiler=FraMeSToR NFO:\].*?\[/center\]", "", base, flags=re.DOTALL)
         description = ""
@@ -185,8 +186,8 @@ class AlphaRatio:
                     full_mediainfo = await mi_file.read()
                 description += f"[hide=FULL MEDIAINFO][code]{full_mediainfo}[/code][/hide]\n"
             else:
-                logger.info("[bold red]Couldn't find the MediaInfo template")
-                logger.info("[green]Using normal MediaInfo for the description.")
+                logger.info(f"{self.tracker}: [bold red]Couldn't find the MediaInfo template")
+                logger.info(f"{self.tracker}: [green]Using normal MediaInfo for the description.")
 
                 async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as mi_file:
                     cleaned_mediainfo = await mi_file.read()
@@ -231,7 +232,7 @@ class AlphaRatio:
                         if not has_eng_audio:
                             audio_lang = mi["media"]["track"][2].get("Language_String", "").upper()
             except Exception as e:
-                logger.error(f"[red]Error: {e}")
+                logger.error(f"{self.tracker}: [red]Error: {e}")
         else:
             for audio in meta.bdinfo["audio"]:
                 if audio["language"] == "English":
@@ -258,14 +259,14 @@ class AlphaRatio:
         title = meta.title.strip()
         year = str(meta.year).strip() if meta.year is not None else ""
         if not title:
-            logger.info("[red]Title is missing.")
+            logger.info(f"{self.tracker}: [red]Title is missing.")
             return dupes
 
         search_query = f"{title} {year}".strip()
         search_query_encoded = urllib.parse.quote(search_query)
         search_url = f"{self.base_url}/ajax.php?action=browse&searchstr={search_query_encoded}"
 
-        logger.debug(f"[blue]{search_url}")
+        logger.debug(f"{self.tracker}: [blue]{search_url}")
 
         headers = {"User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')}"}
 
@@ -338,7 +339,7 @@ class AlphaRatio:
                             logger.info(f"{self.tracker}: [green]Auth key saved for future use[/green]")
                         return auth_key
         except Exception as e:
-            logger.error(f"[red]Error extracting auth key: {e}")
+            logger.error(f"{self.tracker}: [red]Error extracting auth key: {e}")
 
         return None
 
@@ -361,12 +362,17 @@ class AlphaRatio:
 
         # Handle cover image input
         imdb_info = cast(dict[str, Any], meta.imdb_info or {})
-        cover = meta.poster or imdb_info.get("cover", None)
-        while cover is None and not meta.unattended:
-            cover = Prompt.ask("No Cover was found. Please input a link to a cover:", default="")
-            if not re.match(r"https?://.*\.(jpg|png|gif)$", cover):
-                logger.info("[red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
-                cover = None
+        cover = meta.artwork_url or imdb_info.get("cover", None)
+        if cover is None:
+            if meta.unattended and not meta.unattended_confirm:
+                logger.info(f"{self.tracker}: [yellow]Unattended mode: No cover image found. Skipping {self.tracker} upload.[/yellow]")
+                meta.skipping = f"{self.tracker}"
+                return False
+            while cover is None:
+                cover = await prompt_in_thread(cli_ui.ask_string, "No Cover was found. Please input a link to a cover:", default="") or ""
+                if not re.match(r"https?://.*\.(jpg|png|gif)$", cover):
+                    logger.info(f"{self.tracker}: [red]Invalid image link. Please enter a link that ends with .jpg, .png, or .gif.")
+                    cover = None
 
         # Tag Compilation
         genres_raw = meta.genres

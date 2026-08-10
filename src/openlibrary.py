@@ -1,33 +1,22 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
-import contextlib
-import json
 import re
-from pathlib import Path
 from typing import Any
 
 import httpx
 
 from src.console import logger
+from src.metadata_cache import MetadataCache, cache_for, is_cache_miss
 
 openlibrary_color_str = "[#e1d8c1]OpenLibrary[/#e1d8c1]"
 
 
 class OpenLibraryManager:
-    async def get_author_name(self, author_key: str, client: httpx.AsyncClient, cache_dir: str | None) -> str:
-        """Fetch author name from key like /authors/OL26320A."""
+    async def get_author_name(self, author_key: str, client: httpx.AsyncClient, cache: MetadataCache) -> str:
+        """Fetch an author name from a key such as /authors/OL26320A."""
         author_id = author_key.split("/")[-1]
-        author_cache_file = None
-        if cache_dir:
-            author_cache_file = Path(cache_dir) / f"author_{author_id}.json"
-            if author_cache_file and Path(author_cache_file).exists():
-                try:
-                    cache_content = await asyncio.to_thread(Path(author_cache_file).read_text, encoding="utf-8")
-                    cached_data = json.loads(cache_content)
-                    if cached_data and "name" in cached_data:
-                        return cached_data["name"]
-                except Exception as ex:
-                    logger.debug(f"[yellow]Warning: Could not read author cache for '{author_id}': {ex}[/yellow]")
+        cached_data = await cache.get("openlibrary", "author", author_id)
+        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+            return str(cached_data.get("name", ""))
 
         url = f"https://openlibrary.org/authors/{author_id}.json"
         try:
@@ -35,10 +24,13 @@ class OpenLibraryManager:
             if resp.status_code == 200:
                 data = resp.json()
                 name = data.get("name") or data.get("personal_name") or ""
-                if name and cache_dir and author_cache_file:
-                    with contextlib.suppress(Exception):
-                        await asyncio.to_thread(Path(author_cache_file).write_text, json.dumps(data, indent=4), encoding="utf-8")
+                if name:
+                    await cache.set("openlibrary", "author", author_id, {"name": name})
+                else:
+                    await cache.set("openlibrary", "author", author_id, {}, negative=True)
                 return name
+            if resp.status_code == 404:
+                await cache.set("openlibrary", "author", author_id, {}, negative=True)
         except Exception as e:
             logger.debug(f"[yellow]Warning: Error fetching author name for {author_id}: {e}[/yellow]")
         return ""
@@ -48,27 +40,15 @@ class OpenLibraryManager:
         work_id = work_id.strip()
         if not work_id:
             return None
-        cache_dir = None
-        cache_file = None
-        if base_dir:
-            cache_dir = Path(base_dir) / "tmp" / "openlibrary_cache"
-            try:
-                Path(cache_dir).mkdir(parents=True, exist_ok=True)
-                cache_file = Path(cache_dir) / f"{work_id}.json"
-                if Path(cache_file).exists():
-                    try:
-                        cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
-                        cached_data = json.loads(cache_content)
-                        if cached_data:
-                            if cached_data.get("not_found"):
-                                logger.info(f"{openlibrary_color_str}: Work match not found (cached): {work_id}")
-                                return None
-                            logger.info(f"{openlibrary_color_str}: Work match found (cached): {work_id}")
-                            return cached_data
-                    except Exception as ex:
-                        logger.debug(f"[yellow]Warning: Could not read cache file for Work ID '{work_id}': {ex}[/yellow]")
-            except Exception as ex:
-                logger.debug(f"[yellow]Warning: Could not create cache directory: {ex}[/yellow]")
+
+        cache = cache_for(base_dir)
+        cached_data = await cache.get("openlibrary", "work", work_id)
+        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+            if cached_data.get("not_found"):
+                logger.info(f"{openlibrary_color_str}: Work match not found (cached): {work_id}")
+                return None
+            logger.info(f"{openlibrary_color_str}: Work match found (cached): {work_id}")
+            return cached_data
 
         url = f"https://openlibrary.org/works/{work_id}.json"
         logger.debug(f"[cyan]{openlibrary_color_str}: Searching API for Work ID: {work_id}[/cyan]")
@@ -85,52 +65,41 @@ class OpenLibraryManager:
                         subtitle = data.get("subtitle")
                         metadata["title"] = f"{title}: {subtitle}" if subtitle else title
 
-                        # Description
-                        desc_val = data.get("description")
-                        if desc_val:
-                            desc = desc_val.get("value", "") if isinstance(desc_val, dict) else str(desc_val)
-                            metadata["overview"] = re.sub(r"<[^>]+>", "", desc).strip()
+                        description = data.get("description")
+                        if description:
+                            value = description.get("value", "") if isinstance(description, dict) else str(description)
+                            metadata["overview"] = re.sub(r"<[^>]+>", "", value).strip()
 
-                        # Cover
                         covers = data.get("covers")
-                        if covers and isinstance(covers, list) and covers[0] > 0:
-                            metadata["poster"] = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg"
+                        if covers and isinstance(covers, list) and isinstance(covers[0], int) and covers[0] > 0:
+                            metadata["artwork_url"] = f"https://covers.openlibrary.org/b/id/{covers[0]}-L.jpg"
 
-                        # Authors
-                        authors_list = data.get("authors", [])
                         author_names = []
-                        for author_entry in authors_list:
+                        for author_entry in data.get("authors", []):
                             author_obj = author_entry.get("author")
                             if author_obj and "key" in author_obj:
-                                author_name = await self.get_author_name(author_obj["key"], client, cache_dir)
+                                author_name = await self.get_author_name(author_obj["key"], client, cache)
                                 if author_name:
                                     author_names.append(author_name)
                         if author_names:
                             metadata["author"] = ", ".join(author_names)
 
-                        # Subjects / Keywords
                         subjects = data.get("subjects")
                         if subjects and isinstance(subjects, list):
-                            metadata["keywords"] = metadata["genres"] = [str(s) for s in subjects[:10] if s]
+                            subject_list = [str(subject) for subject in subjects[:10] if subject]
+                            metadata["keywords"] = list(subject_list)
+                            metadata["genres"] = list(subject_list)
 
                         metadata["openlibrary"] = work_id
-
-                        if cache_file:
-                            try:
-                                await asyncio.to_thread(Path(cache_file).write_text, json.dumps(metadata, indent=4), encoding="utf-8")
-                            except Exception as ex:
-                                logger.debug(f"[yellow]Warning: Could not write cache for Work ID '{work_id}': {ex}[/yellow]")
-
+                        await cache.set("openlibrary", "work", work_id, metadata)
                         return metadata
+
                     logger.info(f"{openlibrary_color_str}: No metadata found for Work ID: {work_id}")
-                    if cache_file:
-                        with contextlib.suppress(Exception):
-                            await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
+                    await cache.set("openlibrary", "work", work_id, {"not_found": True}, negative=True)
                 else:
                     logger.info(f"{openlibrary_color_str}: API returned error status code {resp.status_code} for Work ID: {work_id}")
-                    if resp.status_code == 404 and cache_file:
-                        with contextlib.suppress(Exception):
-                            await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
+                    if resp.status_code == 404:
+                        await cache.set("openlibrary", "work", work_id, {"not_found": True}, negative=True)
         except Exception as e:
             logger.info(f"{openlibrary_color_str}: Network or query error for Work ID {work_id}: {e}")
 
@@ -142,27 +111,14 @@ class OpenLibraryManager:
         if not clean_isbn:
             return None
 
-        cache_dir = None
-        cache_file = None
-        if base_dir:
-            cache_dir = Path(base_dir) / "tmp" / "openlibrary_cache"
-            try:
-                Path(cache_dir).mkdir(parents=True, exist_ok=True)
-                cache_file = Path(cache_dir) / f"isbn_{clean_isbn}.json"
-                if Path(cache_file).exists():
-                    try:
-                        cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
-                        cached_data = json.loads(cache_content)
-                        if cached_data:
-                            if cached_data.get("not_found"):
-                                logger.info(f"{openlibrary_color_str}: ISBN match not found (cached): {clean_isbn}")
-                                return None
-                            logger.info(f"{openlibrary_color_str}: ISBN match found (cached): {clean_isbn}")
-                            return cached_data
-                    except Exception as ex:
-                        logger.debug(f"[yellow]Warning: Could not read cache file for ISBN '{clean_isbn}': {ex}[/yellow]")
-            except Exception as ex:
-                logger.debug(f"[yellow]Warning: Could not create cache directory: {ex}[/yellow]")
+        cache = cache_for(base_dir)
+        cached_data = await cache.get("openlibrary", "isbn", clean_isbn)
+        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+            if cached_data.get("not_found"):
+                logger.info(f"{openlibrary_color_str}: ISBN match not found (cached): {clean_isbn}")
+                return None
+            logger.info(f"{openlibrary_color_str}: ISBN match found (cached): {clean_isbn}")
+            return cached_data
 
         bibkey = f"ISBN:{clean_isbn}"
         url = f"https://openlibrary.org/api/books?bibkeys={bibkey}&jscmd=details&format=json"
@@ -176,88 +132,65 @@ class OpenLibraryManager:
                     book_data = res_data.get(bibkey)
                     if book_data:
                         details = book_data.get("details", {})
-
-                        # Find the Work ID if present
-                        work_key = ""
                         works = details.get("works", [])
-                        if works and isinstance(works, list) and "key" in works[0]:
-                            work_key = works[0]["key"]
+                        work_key = works[0].get("key", "") if works and isinstance(works, list) else ""
 
                         if work_key:
-                            work_id = work_key.split("/")[-1]
-                            metadata = await self.search_by_work_id(work_id, base_dir)
+                            metadata = await self.search_by_work_id(work_key.split("/")[-1], base_dir)
                             if metadata:
-                                # Add any details fields that might not be in the work info
                                 publishers = details.get("publishers")
                                 if publishers and isinstance(publishers, list) and not metadata.get("publisher"):
                                     metadata["publisher"] = ", ".join(publishers)
-
-                                publish_date = details.get("publish_date")
-                                if publish_date and not metadata.get("year"):
-                                    year_match = re.search(r"\b\d{4}\b", str(publish_date))
-                                    if year_match:
-                                        year_str = year_match.group(0)
-                                        metadata["year"] = year_str
-                                        metadata["search_year"] = int(year_str)
-
+                                self._add_year(metadata, details.get("publish_date"))
                                 metadata["isbn"] = clean_isbn
-
-                                # Cache the ISBN-to-metadata association
-                                if cache_file:
-                                    with contextlib.suppress(Exception):
-                                        await asyncio.to_thread(Path(cache_file).write_text, json.dumps(metadata, indent=4), encoding="utf-8")
+                                await cache.set("openlibrary", "isbn", clean_isbn, metadata)
                                 return metadata
-                        # Parse metadata directly from details if no work key or work lookup misses
-                        metadata = {}
-                        title = details.get("title")
-                        if title:
-                            subtitle = details.get("subtitle")
-                            metadata["title"] = f"{title}: {subtitle}" if subtitle else title
 
-                            authors = details.get("authors", [])
-                            author_names = [a.get("name") for a in authors if a.get("name")]
-                            if author_names:
-                                metadata["author"] = ", ".join(author_names)
-
-                            publishers = details.get("publishers")
-                            if publishers and isinstance(publishers, list):
-                                metadata["publisher"] = ", ".join(publishers)
-
-                            publish_date = details.get("publish_date")
-                            if publish_date:
-                                year_match = re.search(r"\b\d{4}\b", str(publish_date))
-                                if year_match:
-                                    year_str = year_match.group(0)
-                                    metadata["year"] = year_str
-                                    metadata["search_year"] = int(year_str)
-
-                            thumbnail_url = book_data.get("thumbnail_url")
-                            if thumbnail_url:
-                                metadata["poster"] = thumbnail_url.replace("-S.jpg", "-L.jpg")
-
-                            metadata["isbn"] = clean_isbn
-
-                            if metadata and cache_file:
-                                with contextlib.suppress(Exception):
-                                    await asyncio.to_thread(Path(cache_file).write_text, json.dumps(metadata, indent=4), encoding="utf-8")
+                        metadata = self._metadata_from_book_details(book_data, details, clean_isbn)
+                        if metadata:
+                            await cache.set("openlibrary", "isbn", clean_isbn, metadata)
                             return metadata
-                        if cache_file:
-                            with contextlib.suppress(Exception):
-                                await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
+                        await cache.set("openlibrary", "isbn", clean_isbn, {"not_found": True}, negative=True)
                         return None
+
                     logger.info(f"{openlibrary_color_str}: No items found for ISBN: {clean_isbn}")
-                    if cache_file:
-                        with contextlib.suppress(Exception):
-                            await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
+                    await cache.set("openlibrary", "isbn", clean_isbn, {"not_found": True}, negative=True)
                 else:
                     logger.info(f"{openlibrary_color_str}: API returned error status code {resp.status_code} for ISBN: {clean_isbn}")
-                    if resp.status_code == 404 and cache_file:
-                        with contextlib.suppress(Exception):
-                            await asyncio.to_thread(Path(cache_file).write_text, json.dumps({"not_found": True}, indent=4), encoding="utf-8")
+                    if resp.status_code == 404:
+                        await cache.set("openlibrary", "isbn", clean_isbn, {"not_found": True}, negative=True)
         except Exception as e:
             logger.info(f"{openlibrary_color_str}: Network or query error for ISBN {clean_isbn}: {e}")
 
         return None
+
+    @staticmethod
+    def _add_year(metadata: dict[str, Any], publish_date: Any) -> None:
+        if publish_date and not metadata.get("year"):
+            year_match = re.search(r"\b\d{4}\b", str(publish_date))
+            if year_match:
+                year = year_match.group(0)
+                metadata["year"] = year
+                metadata["search_year"] = int(year)
+
+    def _metadata_from_book_details(self, book_data: dict[str, Any], details: dict[str, Any], isbn: str) -> dict[str, Any]:
+        title = details.get("title")
+        if not title:
+            return {}
+
+        subtitle = details.get("subtitle")
+        metadata: dict[str, Any] = {"title": f"{title}: {subtitle}" if subtitle else title, "isbn": isbn}
+        author_names = [author.get("name") for author in details.get("authors", []) if author.get("name")]
+        if author_names:
+            metadata["author"] = ", ".join(author_names)
+        publishers = details.get("publishers")
+        if publishers and isinstance(publishers, list):
+            metadata["publisher"] = ", ".join(publishers)
+        self._add_year(metadata, details.get("publish_date"))
+        thumbnail_url = book_data.get("thumbnail_url")
+        if thumbnail_url:
+            metadata["artwork_url"] = thumbnail_url.replace("-S.jpg", "-L.jpg")
+        return metadata
 
 
 openlibrary_manager = OpenLibraryManager()

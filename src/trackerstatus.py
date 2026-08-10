@@ -11,15 +11,24 @@ from torf import Torrent
 
 from src.cleanup import cleanup_manager
 from src.clients import Clients
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.dupe_checking import DupeChecker
 from src.imdb import imdb_manager
 from src.meta import Meta
 from src.metadata_searching import get_douban_id
 from src.torrentcreate import TorrentCreator
+from src.trackers.AVISTAZ.routing import AvistaZNetworkRouter
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup, tracker_class_map
 from src.uphelper import UploadHelper
+
+
+def merge_tracker_status(processed: dict[str, dict[str, Any]], existing: Mapping[str, Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Preserve routing metadata while keeping fresh processing results authoritative."""
+    merged = {tracker: dict(status) for tracker, status in existing.items()}
+    for tracker, status in processed.items():
+        merged.setdefault(tracker, {}).update(status)
+    return merged
 
 
 class TrackerStatusManager:
@@ -28,11 +37,12 @@ class TrackerStatusManager:
         self.trackers_config = cast(Mapping[str, Mapping[str, Any]], config.get("TRACKERS", {}))
 
     async def process_all_trackers(self, meta: Meta) -> int:
-        tracker_status: dict[str, dict[str, bool]] = {}
+        tracker_status: dict[str, dict[str, Any]] = {}
         successful_trackers = 0
         client: Any = Clients(config=self.config)
         tracker_setup: Any = TrackerSetup(config=self.config)
         tracker_setup.filter_unsupported_trackers(meta)
+        await AvistaZNetworkRouter(self.config, tracker_class_map).apply(meta)
         helper: Any = UploadHelper(self.config)
         dupe_checker = DupeChecker(self.config)
         if any(tracker in meta.trackers for tracker in ["MTEAM", "LAJIDUI", "PTFANS", "PTGTK", "RAILGUNPT"]):
@@ -49,7 +59,9 @@ class TrackerStatusManager:
             if needs_imdb:
                 while True:
                     try:
-                        imdb_id = cli_ui.ask_string("Unable to find IMDB id, please enter e.g.(tt1234567) or press Enter to skip uploading to trackers requiring it:")
+                        imdb_id = await prompt_in_thread(
+                            cli_ui.ask_string, "Unable to find IMDB id, please enter e.g.(tt1234567) or press Enter to skip uploading to trackers requiring it:"
+                        )
                     except EOFError:
                         logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                         await cleanup_manager.cleanup()
@@ -160,8 +172,9 @@ class TrackerStatusManager:
                                     dupes = []
                                 else:
                                     try:
-                                        choice = cli_ui.ask_string(f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway? (y/N):")
-                                        if (choice or "").lower() == "y":
+                                        if await helper.prompt_yes_no(
+                                            f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway?", default=False
+                                        ):
                                             dupes = []
                                             # set trackers here so that they are not double checked later with cross seeding
                                             async with meta_lock:
@@ -204,8 +217,9 @@ class TrackerStatusManager:
                                     dupes = []
                                 else:
                                     try:
-                                        choice = cli_ui.ask_string(f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway? (y/N):")
-                                        if (choice or "").lower() == "y":
+                                        if await helper.prompt_yes_no(
+                                            f"Duplicate check failed on {tracker_name}. Do you want to proceed with the upload anyway?", default=False
+                                        ):
                                             dupes = []
                                         else:
                                             local_tracker_status["skipped"] = True
@@ -274,17 +288,20 @@ class TrackerStatusManager:
                     if tracker_name == "MORETHANTV" and not local_tracker_status["banned"] and not local_tracker_status["skipped"] and not local_tracker_status["dupe"]:
                         tracker_config = self.trackers_config.get(tracker_name, {})
                         if str(tracker_config.get("skip_if_rehash", "false")).lower() == "true":
-                            torrent_path = str(Path(f"{local_meta['base_dir']}{'/' + 'tmp' + '/'}{local_meta['uuid']}/BASE.torrent").resolve())
-                            if not Path(torrent_path).exists():
+                            base_torrent_path = Path(f"{local_meta['base_dir']}{'/' + 'tmp' + '/'}{local_meta['uuid']}/BASE.torrent").resolve()
+                            subs_torrent_path = Path(f"{local_meta['base_dir']}{'/' + 'tmp' + '/'}{local_meta['uuid']}/BASE_SUBS.torrent").resolve()
+                            torrent_path = base_torrent_path if base_torrent_path.exists() else subs_torrent_path
+                            if not torrent_path.exists():
                                 check_torrent = await client.find_existing_torrent(cast(dict[str, Any], local_meta))
-                                if check_torrent:
+                                if check_torrent and client._torrent_has_no_subtitles(check_torrent):
                                     logger.info(f"[yellow]Existing torrent found on {check_torrent}[yellow]")
-                                    await TorrentCreator.create_base_from_existing_torrent(check_torrent, local_meta["base_dir"], local_meta["uuid"])
-                                    torrent = Torrent.read(torrent_path)
-                                    if torrent.piece_size > 8388608:
-                                        logger.info("[yellow]No existing torrent found with piece size lesser than 8MB[yellow]")
-                                        local_tracker_status["skipped"] = True
-                            elif Path(torrent_path).exists():
+                                    created_torrent_path = await TorrentCreator.create_base_from_existing_torrent(check_torrent, local_meta["base_dir"], local_meta["uuid"])
+                                    if created_torrent_path:
+                                        torrent = Torrent.read(created_torrent_path)
+                                        if torrent.piece_size > 8388608:
+                                            logger.info("[yellow]No existing torrent found with piece size lesser than 8MB[yellow]")
+                                            local_tracker_status["skipped"] = True
+                            else:
                                 torrent = Torrent.read(torrent_path)
                                 if torrent.piece_size > 8388608:
                                     logger.info("[yellow]Existing torrent found with piece size greater than 8MB[yellow]")
@@ -340,7 +357,7 @@ class TrackerStatusManager:
                 successful_trackers += 1
                 passed_names.append(tracker_name)
             if passed_names:
-                logger.info(f"[bold blue]{', '.join(passed_names)}[/bold blue]: [bold green]no potential dupes found.[/bold green]")
+                logger.info(f"[bold]{', '.join(passed_names)}[/bold]: [bold green]no potential dupes found.[/bold green]")
         else:
             # Attended mode
             prompt_trackers = [tracker_name for tracker_name, _display_name, _tracker_class in passed_trackers if tracker_name not in ("MANUAL", "USENET")]
@@ -348,20 +365,22 @@ class TrackerStatusManager:
             if not meta.get("debug", False) and prompt_trackers:
                 if len(prompt_trackers) == 1:
                     tracker_name = prompt_trackers[0]
-                    logger.info(f"[bold blue]{tracker_name}:[/bold blue] [green]no potential dupes found.[/green]")
-                    prompt_msg = "Enter 'y' to upload, or press enter to skip uploading:"
+                    logger.info(f"[bold]{tracker_name}:[/bold] [green]no potential dupes found.[/green]")
+                    prompt_msg = "Upload?"
                 else:
-                    logger.info(f"[bold blue]{', '.join(prompt_trackers)}:[/bold blue] [green]no potential dupes found.[/green]")
-                    prompt_msg = "Enter 'y' to upload to all, or press enter to skip uploading:"
+                    logger.info(f"[bold]{', '.join(prompt_trackers)}:[/bold] [green]no potential dupes found.[/green]")
+                    prompt_msg = "Upload to all?"
 
                 try:
-                    edit_choice = cli_ui.ask_string(prompt_msg)
-                    upload_all = (edit_choice or "").lower() == "y"
+                    upload_all = await helper.prompt_yes_no(prompt_msg, default=False)
                 except EOFError:
                     logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()
                     cleanup_manager.reset_terminal()
                     sys.exit(1)
+
+                if upload_all:
+                    logger.info("[yellow]Processing approved uploads in the background...[/yellow]")
 
                 for tracker_name, _display_name, _tracker_class in passed_trackers:
                     if tracker_name in ("MANUAL", "USENET"):
@@ -391,7 +410,7 @@ class TrackerStatusManager:
             logger.debug("", extra={"markup": False})
             logger.debug("[bold red]DEBUG MODE does not upload to sites")
 
-        meta.tracker_status = tracker_status
+        meta.tracker_status = merge_tracker_status(tracker_status, status_map)
         return successful_trackers
 
 

@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import re
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -77,13 +78,9 @@ class PrivateHD(AZTrackerBase):
         if video_encode:
             video_encode = video_encode.strip().lower()
 
-        release_type = str(meta.type)
-        if release_type:
-            release_type = release_type.strip().lower()
+        release_type = str(meta.type or "").strip().lower()
 
-        source = str(meta.source)
-        if source:
-            source = source.strip().lower()
+        source = str(meta.source or "").strip().lower()
 
         # This also checks the rule 'FANRES content is not allowed'
         if meta.category not in ("MOVIE", "TV"):
@@ -93,8 +90,12 @@ class PrivateHD(AZTrackerBase):
             warnings.append("Upload Anime content to our sister site AnimeTorrents.me instead. If it's on AniDB, it's an anime.")
 
         current_year = datetime.now(UTC).year
-        if meta.year is not None:
-            is_older_than_50_years = (current_year - int(meta.year)) >= 50
+        try:
+            year = int(meta.year)
+        except TypeError, ValueError:
+            year = 0
+        if year:
+            is_older_than_50_years = (current_year - year) >= 50
             if is_older_than_50_years:
                 warnings.append("Upload movies/series 50+ years old to our sister site CINEMAZ.to instead.")
 
@@ -434,8 +435,13 @@ class PrivateHD(AZTrackerBase):
         if meta.sd == 1:
             warnings.append("SD (Standard Definition) content is forbidden.")
 
-        if not is_bd_disc and meta.container not in ["mkv", "mp4"]:
-            warnings.append("Allowed containers: MKV, MP4.")
+        container = str(meta.container or "").strip().lower().lstrip(".")
+        allowed_containers = {"mkv", "mp4"}
+        if release_type == "hdtv":
+            allowed_containers.update({"ts", "tp"})
+        if not is_bd_disc and container not in allowed_containers:
+            allowed = ", ".join(sorted(allowed_containers)).upper()
+            warnings.append(f"Container not allowed for this rip type: {container or 'unknown'}. Allowed: {allowed}.")
 
         # Video codec
         # 1
@@ -477,7 +483,7 @@ class PrivateHD(AZTrackerBase):
             pass
         else:
             # 1
-            allowed_keywords = ["AC3", "Dolby Digital", "Dolby TrueHD", "DTS", "DTS-HD", "FLAC", "AAC", "Dolby"]
+            allowed_keywords = ["AC3", "E-AC3", "E-AC-3", "Dolby Digital", "Dolby TrueHD", "DTS", "DTS-HD", "FLAC", "AAC", "Dolby"]
 
             # 2
             forbidden_keywords = ["LPCM", "PCM", "Linear PCM"]
@@ -485,7 +491,7 @@ class PrivateHD(AZTrackerBase):
             audio_tracks: list[dict[str, str]] = []
             for track in media_tracks:
                 if track.get("@type") == "Audio":
-                    codec_info = track.get("Format_Commercial_IfAny")
+                    codec_info = track.get("Format_Commercial_IfAny") or track.get("Format")
                     codec = codec_info if isinstance(codec_info, str) else ""
                     audio_tracks.append({"codec": codec, "language": str(track.get("Language", ""))})
 
@@ -549,7 +555,7 @@ class PrivateHD(AZTrackerBase):
         web_sources = ("hdtv", "web", "hdrip")
 
         if release_type == "encode":
-            bitrate = 0
+            bitrate = int(meta.video_bitrate or 0) * 1000
             for track in media_tracks:
                 if track.get("@type") == "Video":
                     bitrate_value = track.get("BitRate")
@@ -576,6 +582,15 @@ class PrivateHD(AZTrackerBase):
                             f"Minimum bitrate for {resolution}p {source.upper()} {video_encode.upper()} is {min_bitrate / 1000} Kbps."
                         )
                         warnings.append(quality_rule_text + rule)
+
+            for track in media_tracks:
+                if track.get("@type") != "Video":
+                    continue
+                encoding_settings = str(track.get("Encoded_Library_Settings", "") or "")
+                crf_match = re.search(r"\bcrf[ =:]+(\d+(?:\.\d+)?)", encoding_settings, re.IGNORECASE)
+                if crf_match and float(crf_match.group(1)) > 20:
+                    warnings.append(f"CRF {crf_match.group(1)} exceeds PrivateHD's maximum CRF of 20.")
+                break
 
         if resolution < 720:
             rule = "Video must be at least 720p."

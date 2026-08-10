@@ -4,7 +4,7 @@ from collections.abc import Callable, MutableMapping, Sequence
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
 from src.trackers.UNIT3D.hawkeuno import HawkeUno
@@ -67,6 +67,10 @@ class DupeChecker:
                 logger.debug(dupes)
 
         meta.trumpable_id = None
+        meta.season_pack_exists = False
+        meta.season_pack_id = None
+        meta.season_pack_link = None
+        meta.season_pack_name = ""
         processed_dupes: list[DupeEntry] = []
         for d in dupes:
             if isinstance(d, str):
@@ -189,6 +193,11 @@ class DupeChecker:
             },
         ]
 
+        from src.trackersetup import tracker_class_map
+
+        tracker_cls = tracker_class_map.get(tracker_name.upper())
+        is_exact_match_only = bool(getattr(tracker_cls, "exact_match_only", False))
+
         async def log_exclusion(reason: str, item: str) -> None:
             if meta.debug:
                 logger.debug(f"[yellow]Excluding result due to {reason}: {item}")
@@ -200,6 +209,13 @@ class DupeChecker:
             """
             each = entry.get("name", "")
             sized = entry.get("size")  # This may come as a string, such as "1.5 GB"
+
+            if is_exact_match_only:
+                is_exact = await DupeChecker.is_exact_match(entry, meta)
+                if not is_exact:
+                    await log_exclusion("non-exact release (allowed on exact-match-only tracker)", each)
+                    return True
+                return False
 
             # Check dupe size difference tolerance
             tolerance = meta.dupe_size_difference_tolerance
@@ -816,6 +832,13 @@ class DupeChecker:
 
         new_dupes = [each for each in processed_dupes if not await process_exclusion(each)]
 
+        if is_exact_match_only:
+            if processed_dupes and not new_dupes:
+                logger.info(f"{tracker_name}: related releases found, but no exact renamed release was detected.")
+                logger.info(f"{tracker_name}: continuing upload.")
+            elif new_dupes:
+                logger.info(f"{tracker_name}: exact existing release detected from matching files and size.")
+
         if new_dupes and not meta.unattended and meta.debug:
             if len(processed_dupes) > 1:
                 logger.debug(f"[yellow]Filtered dupes on {tracker_name}: ")
@@ -839,6 +862,67 @@ class DupeChecker:
                 logger.debug(filtered_dupes_to_print)
 
         return new_dupes
+
+    @staticmethod
+    async def is_exact_match(candidate: dict[str, Any] | DupeEntry, meta: Meta) -> bool:
+        """Check if candidate torrent is an exact match / exact renamed release of local upload."""
+        from pathlib import Path
+
+        from src.uphelper import parse_size_to_bytes
+
+        # 1. Local files and file count
+        local_files: list[str] = []
+        if meta.filelist and not meta.is_disc:
+            local_files = [Path(str(f)).name.lower() for f in meta.filelist if f]
+
+        # 2. Local total size
+        local_size = parse_size_to_bytes(meta.source_size)
+        if local_size is None and not meta.is_disc and meta.mediainfo:
+            tracks = meta.mediainfo.get("media", {}).get("track", [])
+            if tracks and isinstance(tracks, list) and len(tracks) > 0:
+                local_size = parse_size_to_bytes(tracks[0].get("FileSize"))
+
+        # 3. Candidate files and file count
+        candidate_files: list[str] = []
+        raw_files = candidate.get("files", [])
+        if isinstance(raw_files, list):
+            candidate_files = [Path(str(f)).name.lower() for f in raw_files if f]
+        elif isinstance(raw_files, str) and raw_files:
+            candidate_files = [Path(f.strip()).name.lower() for f in raw_files.split(",") if f.strip()]
+
+        candidate_file_count_raw = candidate.get("file_count")
+        try:
+            candidate_file_count = int(candidate_file_count_raw) if candidate_file_count_raw is not None else len(candidate_files)
+        except ValueError, TypeError:
+            candidate_file_count = len(candidate_files)
+
+        local_file_count = len(local_files) if local_files else None
+
+        # 4. Candidate total size
+        candidate_size = parse_size_to_bytes(candidate.get("size"))
+
+        # Comparison flags
+        files_match = bool(local_files and candidate_files and sorted(local_files) == sorted(candidate_files))
+        same_file_count = local_file_count is not None and candidate_file_count > 0 and local_file_count == candidate_file_count
+        same_size = local_size is not None and candidate_size is not None and local_size == candidate_size
+
+        # 5. Check if both have file lists
+        if local_files and candidate_files:
+            return files_match and same_size
+
+        # 6. If file list unavailable for one or both (e.g. disc release)
+        if same_size and same_file_count:
+            return True
+
+        # Disc releases have no reliable local file count, so compare their
+        # total size when neither side provides a file list.
+        if not local_files and not candidate_files and same_size:
+            return True
+
+        # 7. Exact name match fallback
+        candidate_name = str(candidate.get("name", "")).strip().lower()
+        local_name = str(meta.name or "").strip().lower()
+        return bool(candidate_name and local_name and candidate_name == local_name and (same_size or local_size is None or candidate_size is None))
 
     @staticmethod
     async def normalize_filename(filename: str | MutableMapping[str, Any]) -> str:

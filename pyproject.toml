@@ -3,11 +3,10 @@ line-length = 176
 target-version = "py314"
 exclude = [
   ".git",
+  "tests",
   "__pycache__",
   ".pytest_cache",
   ".ruff_cache",
-  "tests",
-  "data",
   "tmp",
 ]
 
@@ -51,7 +50,7 @@ ignore = [
 "src/trackers/UNIT3D/UNIT3D_TEMPLATE.py" = ["N999"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["cogs", "data", "src", "web_ui"]
+known-first-party = ["data", "src", "web_ui"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 
 [tool.pyright]
@@ -65,7 +64,10 @@ exclude = [
   "tests",
   "data",
   "tmp",
-  "**/__pyrefly_virtual__/**"
+  "**/__pyrefly_virtual__/**",
+  "**/node_modules",
+  "**/__pycache__",
+  "**/.*",
 ]
 
 [tool.pyrefly]

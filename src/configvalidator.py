@@ -4,13 +4,14 @@ Config validation helper for Upload Assistant.
 Validates the user's config.py against expected structure and types.
 """
 
+import math
 from typing import Any, cast
 
 # Required top-level sections
 REQUIRED_SECTIONS = ["DEFAULT", "TRACKERS"]
 
 # Optional top-level sections
-OPTIONAL_SECTIONS = ["IMAGES", "TORRENT_CLIENTS", "DISCORD", "USENET"]
+OPTIONAL_SECTIONS = ["IMAGES", "TORRENT_CLIENTS", "USENET"]
 
 # Required keys in DEFAULT section (critical for operation)
 REQUIRED_DEFAULT_KEYS: dict[str, type] = {
@@ -28,12 +29,14 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "img_host_1": (str,),
     "img_host_2": (str,),
     "img_host_3": (str,),
+    "image_upload_concurrency": (str, int),
+    "image_upload_delay": (str, float, int),
     "imgbb_api": (str,),
-    "ptpimg_api": (str,),
     "lostimg_api": (str,),
     "lensdump_api": (str,),
     "ptscreens_api": (str,),
     "onlyimage_api": (str,),
+    "midnightscene_api_key": (str,),
     "add_logo": (bool,),
     "logo_size": (str, int),
     "episode_overview": (bool,),
@@ -44,6 +47,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "frame_overlay": (bool,),
     "tone_map": (bool,),
     "auto_dvd_menus": (bool,),
+    "scale_screenshots_for_par": (bool,),
     "use_libplacebo": (bool,),
     "ffmpeg_is_good": (bool,),
     "ffmpeg_warmup": (bool,),
@@ -68,13 +72,14 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "console_debug_show_level": (bool,),
     "console_debug_show_path": (bool,),
     "console_debug_markup": (bool,),
+    "embed_links": (bool,),
     "embed_dupe_links": (bool,),
     "show_dupe_size_diff": (bool,),
     "dupe_size_difference_tolerance": (float, int),
     "tracker_pass_checks": (str, int),
     "use_largest_playlist": (bool,),
-    "keep_images": (bool,),
-    "skip_tracker_descriptions": (bool,),
+    "tracker_description_mode": (str,),
+    "tracker_search_concurrency": (str, int),
     "use_sonarr": (bool,),
     "use_radarr": (bool,),
     "mkbrr": (bool,),
@@ -103,12 +108,22 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "twitch_client_id": (str,),
     "twitch_client_secret": (str,),
     "upload_order": (str,),
+    "music_enrichment_enabled": (bool,),
+    "music_discogs_token": (str,),
+    "metadata_cache_enabled": (bool,),
+    "metadata_cache_dir": (str,),
+    "metadata_cache_default_ttl_hours": (int,),
+    "metadata_cache_negative_ttl_minutes": (int,),
+    "metadata_cache_services": (dict,),
+    "tracker_metadata_cache_enabled": (bool,),
+    "tracker_metadata_cache_dir": (str,),
+    "tracker_metadata_cache_ttl_hours": (int,),
+    "tracker_metadata_cache_negative_ttl_minutes": (int,),
 }
 
 # Valid image hosts
 VALID_IMAGE_HOSTS = [
     "imgbb",
-    "ptpimg",
     "imgbox",
     "pixhost",
     "lensdump",
@@ -116,6 +131,7 @@ VALID_IMAGE_HOSTS = [
     "onlyimage",
     "dalexni",
     "zipline",
+    "midnightscene",
     "passtheimage",
     "seedpool_cdn",
     "sharex",
@@ -127,7 +143,6 @@ VALID_IMAGE_HOSTS = [
 # Image hosts that require API keys and their corresponding config key names
 IMAGE_HOST_API_KEYS: dict[str, str] = {
     "imgbb": "imgbb_api",
-    "ptpimg": "ptpimg_api",
     "lostimg": "lostimg_api",
     "lensdump": "lensdump_api",
     "ptscreens": "ptscreens_api",
@@ -137,6 +152,7 @@ IMAGE_HOST_API_KEYS: dict[str, str] = {
     "seedpool_cdn": "seedpool_cdn_api",
     "sharex": "sharex_api_key",
     "zipline": "zipline_api_key",
+    "midnightscene": "midnightscene_api_key",
     "utppm": "utppm_api",
     # imgbox and pixhost don't require API keys
 }
@@ -205,11 +221,13 @@ class ConfigValidationWarning:
     """Represents a non-critical config warning."""
 
     def __init__(self, message: str, key: str = "", section: str = ""):
+        """Create a warning with optional config location metadata."""
         self.message = message
         self.key = key
         self.section = section
 
     def __str__(self) -> str:
+        """Render the warning with its section and key when available."""
         location = ""
         if self.section:
             location = f"[{self.section}]"
@@ -222,6 +240,7 @@ class ConfigValidationWarning:
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
+    """Return value as a typed dictionary, or an empty dictionary."""
     return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
@@ -290,12 +309,6 @@ def validate_config(config: Any, active_trackers: list[str] | None = None, activ
         client_errors, client_warnings = _validate_torrent_clients_section(_as_dict(config_dict.get("TORRENT_CLIENTS")))
         errors.extend(client_errors)
         warnings.extend(client_warnings)
-
-    # Validate DISCORD section if present
-    if "DISCORD" in config_dict:
-        discord_errors, discord_warnings = _validate_discord_section(_as_dict(config_dict.get("DISCORD")))
-        errors.extend(discord_errors)
-        warnings.extend(discord_warnings)
 
     # Determine if Usenet is active (either because USENET is a target tracker, a Usenet tracker class is active, or enabled in config)
     trackers_upper = [t.upper() for t in active_trackers] if active_trackers else []
@@ -490,6 +503,15 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
                 )
             )
 
+    if "embed_dupe_links" in default:
+        warnings.append(
+            ConfigValidationWarning(
+                "Deprecated; rename to 'embed_links'.",
+                key="embed_dupe_links",
+                section="DEFAULT",
+            )
+        )
+
     # Validate image hosts
     for i in range(1, 10):
         host_key = f"img_host_{i}"
@@ -526,6 +548,50 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
                     int(value)
                 except ValueError:
                     warnings.append(ConfigValidationWarning(f"Cannot parse '{value}' as integer", key=key, section="DEFAULT"))
+
+    image_upload_concurrency = default.get("image_upload_concurrency")
+    if image_upload_concurrency is not None:
+        try:
+            parsed_concurrency = int(image_upload_concurrency)
+        except OverflowError, TypeError, ValueError:
+            warnings.append(
+                ConfigValidationWarning(
+                    f"Cannot parse '{image_upload_concurrency}' as integer",
+                    key="image_upload_concurrency",
+                    section="DEFAULT",
+                )
+            )
+        else:
+            if parsed_concurrency < 0:
+                warnings.append(
+                    ConfigValidationWarning(
+                        "Value must be >= 0",
+                        key="image_upload_concurrency",
+                        section="DEFAULT",
+                    )
+                )
+
+    image_upload_delay = default.get("image_upload_delay")
+    if image_upload_delay is not None:
+        try:
+            parsed_delay = float(image_upload_delay)
+        except TypeError, ValueError:
+            warnings.append(
+                ConfigValidationWarning(
+                    f"Cannot parse '{image_upload_delay}' as number",
+                    key="image_upload_delay",
+                    section="DEFAULT",
+                )
+            )
+        else:
+            if not math.isfinite(parsed_delay) or parsed_delay < 0:
+                warnings.append(
+                    ConfigValidationWarning(
+                        "Value must be finite and >= 0",
+                        key="image_upload_delay",
+                        section="DEFAULT",
+                    )
+                )
 
     return errors, warnings
 
@@ -620,22 +686,6 @@ def _validate_torrent_clients_section(clients: dict[str, Any]) -> tuple[list[str
                         section="TORRENT_CLIENTS",
                     )
                 )
-
-    return errors, warnings
-
-
-def _validate_discord_section(discord: dict[str, Any]) -> tuple[list[str], list[ConfigValidationWarning]]:
-    """Validate the DISCORD config section."""
-    errors: list[str] = []
-    warnings: list[ConfigValidationWarning] = []
-
-    use_discord = discord.get("use_discord", False)
-    if use_discord:
-        # If Discord is enabled, check for required fields
-        if not discord.get("discord_bot_token"):
-            warnings.append(ConfigValidationWarning("Discord is enabled but 'discord_bot_token' is empty", key="discord_bot_token", section="DISCORD"))
-        if not discord.get("discord_channel_id"):
-            warnings.append(ConfigValidationWarning("Discord is enabled but 'discord_channel_id' is empty", key="discord_channel_id", section="DISCORD"))
 
     return errors, warnings
 

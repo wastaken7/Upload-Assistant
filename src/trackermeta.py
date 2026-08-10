@@ -15,8 +15,10 @@ from PIL import Image
 
 from src.bbcode import BBCODE
 from src.btnid import BtnIdManager
-from src.console import logger
+from src.console import buffer_console_logs, logger
 from src.meta import Meta
+from src.temp_paths import screenshots_dir
+from src.tracker_descriptions import DescriptionCandidate, add_candidate, description_fingerprint, resolve_description_mode, score_release_name
 from src.trackers.common import Common
 from src.trackersetup import api_trackers
 from src.type_utils import to_int
@@ -44,8 +46,8 @@ class TrackerMetaManager:
         self.config = config
         _apply_config(config)
 
-    async def prompt_user_for_confirmation(self, message: str) -> bool:
-        return await prompt_user_for_confirmation(message)
+    async def prompt_user_for_confirmation(self, message: str, meta: Meta | None = None) -> bool:
+        return await prompt_user_for_confirmation(message, meta)
 
     async def check_images_concurrently(self, imagelist: Sequence[ImageDict], meta: Meta) -> list[ImageDict]:
         return await check_images_concurrently(imagelist, meta)
@@ -64,6 +66,8 @@ class TrackerMetaManager:
         search_term: str,
         search_file_folder: str,
         skip_tracker_descriptions: bool = False,
+        *,
+        torrent_id: str = "",
     ) -> tuple[Meta, bool]:
         return await update_metadata_from_tracker(
             tracker_name,
@@ -72,17 +76,19 @@ class TrackerMetaManager:
             search_term,
             search_file_folder,
             skip_tracker_descriptions,
+            torrent_id=torrent_id,
         )
 
     async def handle_image_list(self, meta: Meta, tracker_name: str, valid_images: Sequence[ImageDict] | None = None) -> None:
         await handle_image_list(meta, tracker_name, valid_images)
 
 
-async def prompt_user_for_confirmation(message: str) -> bool:
+async def prompt_user_for_confirmation(message: str, meta: Meta | None = None) -> bool:
+    if meta and meta.unattended and not meta.unattended_confirm:
+        return False
     try:
-        response_raw = cli_ui.ask_string(f"{message} (Y/n): ")
-        response = (response_raw or "").strip().lower()
-        return response in ["y", "yes", ""]
+        async with buffer_console_logs():
+            return cli_ui.ask_yes_no(message, default=True)
     except EOFError:
         sys.exit(1)
 
@@ -139,11 +145,6 @@ async def check_images_concurrently(imagelist: Sequence[ImageDict], meta: Meta) 
         img_url = cast(str | None, image_dict.get("raw_url"))
         if not img_url:
             return None
-
-        if "ptpimg.me" in img_url and img_url.startswith("http://"):
-            img_url = img_url.replace("http://", "https://")
-            image_dict["raw_url"] = img_url
-            image_dict["web_url"] = img_url
 
         # Handle when pixhost url points to web_url and convert to raw_url
         if img_url.startswith("https://pixhost.to/show/"):
@@ -271,7 +272,7 @@ async def check_image_link(url: str, timeout: httpx.Timeout | None = None) -> bo
         return False
 
 
-async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], tracker_name: str, skip_tracker_descriptions: bool = False) -> bool:
+async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], tracker_name: str, _skip_tracker_descriptions: bool = False) -> bool:
     # Unpack the expected 9 elements, ignoring any additional ones
     tmdb, imdb, tvdb, mal, desc, category, _infohash, imagelist, filename, *_rest = tracker_data
     if tmdb:
@@ -286,12 +287,27 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
     if mal:
         meta.mal_id = mal
         logger.debug(f"set MAL ID: {meta.mal_id}")
-    if desc and not skip_tracker_descriptions:
+    mode = resolve_description_mode(meta.tracker_description_mode)
+    if desc:
+        raw_descriptions = getattr(meta, "tracker_description_raw", {}) or {}
+        raw_description = str(raw_descriptions.get(tracker_name, desc))
+        candidate = DescriptionCandidate(
+            source=tracker_name,
+            release_id=str(meta.get(tracker_name.lower(), "") or ""),
+            release_name=str(filename or ""),
+            raw_description=raw_description,
+            cleaned_description=str(desc),
+            image_count=len(imagelist or []),
+            score=score_release_name(
+                getattr(meta, "tracker_search_term", ""),
+                filename,
+                explicit_id=bool(meta.get(tracker_name.lower())),
+            ),
+        )
+        add_candidate(meta, candidate, selected=mode.imports_text)
+    if desc and mode.imports_text:
         meta.description = desc
         meta.saved_description = True
-        description_path = Path(meta.base_dir) / "tmp" / meta.uuid / "DESCRIPTION.txt"
-        if len(desc) > 0:
-            await asyncio.to_thread(description_path.write_text, (desc or "") + "\n", encoding="utf8")
     if category and not meta.manual_category:
         cat_upper = category.upper()
         if "MOVIE" in cat_upper:
@@ -301,12 +317,15 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
         logger.debug(f"set Category: {meta.category}")
 
     imagelist_typed = cast(list[ImageDict] | None, imagelist)
-    if imagelist_typed:  # Ensure imagelist is not empty before setting
+    if imagelist_typed and mode.imports_images:  # Ensure imagelist is not empty before setting
         valid_images = await check_images_concurrently(imagelist_typed, meta)
         if valid_images:
             meta.image_list = valid_images
             if meta.image_list and (not any(meta.get(t.lower()) for t in api_trackers) or meta.unattended):
                 await handle_image_list(meta, tracker_name, valid_images)
+
+    if desc and mode.imports_text:
+        meta.description_fingerprint = description_fingerprint(meta, tracker_name)
 
     if filename:
         meta[f"{tracker_name.lower()}_filename"] = filename
@@ -322,8 +341,14 @@ async def update_metadata_from_tracker(
     search_term: str,
     search_file_folder: str,
     skip_tracker_descriptions: bool = False,
+    *,
+    torrent_id: str = "",
 ) -> tuple[Meta, bool]:
-    tracker_key = tracker_name.lower()
+    # HDBITS stores its torrent ID in ``meta.hdb`` rather than ``meta.hdbits``.
+    # Keep the generic key for every other tracker so all bracket accesses in
+    # the HDBITS branch address the field that was detected upstream.
+    tracker_key = "hdb" if tracker_name == "HDBITS" else tracker_name.lower()
+    meta.tracker_search_term = search_term
     manual_key = f"{tracker_key}_manual"
     found_match = False
 
@@ -564,8 +589,9 @@ async def update_metadata_from_tracker(
             found_match = False
 
     elif tracker_name in api_trackers:
-        if meta.get(tracker_key) is not None:
-            logger.debug(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
+        resolved_torrent_id = torrent_id or meta.get(tracker_key)
+        if resolved_torrent_id:
+            logger.debug(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {resolved_torrent_id}[/cyan]")
             tracker_data = cast(
                 Sequence[Any],
                 await Common(config).unit3d_torrent_info(
@@ -573,7 +599,7 @@ async def update_metadata_from_tracker(
                     tracker_instance.id_url,
                     tracker_instance.search_url,
                     meta,
-                    id=meta[tracker_key],
+                    id=resolved_torrent_id,
                     skip_tracker_descriptions=skip_tracker_descriptions,
                 ),
             )
@@ -745,7 +771,7 @@ async def handle_image_list(meta: Meta, tracker_name: str, valid_images: Sequenc
             if not keep_images:
                 meta.image_list = []
                 meta.image_sizes = {}
-                save_path = Path(meta.base_dir) / "tmp" / meta.uuid
+                save_path = screenshots_dir(meta.base_dir, meta.uuid)
                 try:
                     png_files = list(Path(save_path).glob("*.png"))
                     for png_file in png_files:

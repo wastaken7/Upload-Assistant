@@ -73,7 +73,7 @@ class YUSCENE(UNIT3D):
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
-    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
     tracker_urls = ("https://yu-scene.net",)
 
     def __init__(self, config: Config) -> None:
@@ -86,7 +86,7 @@ class YUSCENE(UNIT3D):
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai", "adult animation", "softcore"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info("[bold red]Porn/xxx is not allowed at YUSCENE.")
+                logger.info(f"{self.tracker}: [bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -163,6 +163,9 @@ class YUSCENE(UNIT3D):
         resolved_type = type if type is not None and type != "" else meta.type
         if isinstance(resolved_type, str):
             resolved_type = resolved_type.upper().strip().lstrip(".")
+
+        if meta.category == "MUSIC" and not str(type or "").strip():
+            resolved_type = meta.format.upper()
 
         val = type_id.get(resolved_type or "", "0")
         if meta.category == "BOOK" and val == "0":

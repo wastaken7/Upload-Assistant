@@ -6,6 +6,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlparse
 
 import aiofiles
 import cli_ui
@@ -25,6 +26,7 @@ from src.trackers.beyondhd import BEYONDHD
 from src.trackers.bithdtv import BitHDTV
 from src.trackers.bjshare import BJShare
 from src.trackers.brasiltracker import BrasilTracker
+from src.trackers.cathoderaytube import CathodeRayTube
 from src.trackers.common import Common
 from src.trackers.digitalcore import DigitalCore
 from src.trackers.filelist import FileList
@@ -45,6 +47,7 @@ from src.trackers.NEXUSPHP.ptcafe import PTCafe
 from src.trackers.NEXUSPHP.ptfans import PTFans
 from src.trackers.NEXUSPHP.ptgtk import PTGTK
 from src.trackers.NEXUSPHP.railgunpt import RailgunPT
+from src.trackers.orpheus import Orpheus
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackers.pterclub import PTerClub
 from src.trackers.ptskit import Ptskit
@@ -67,23 +70,26 @@ from src.trackers.UNIT3D.hawkeuno import HawkeUno
 from src.trackers.UNIT3D.homiehelpdesk import HomieHelpDesk
 from src.trackers.UNIT3D.infinityhd import InfinityHD
 from src.trackers.UNIT3D.itatorrents import ItaTorrents
+from src.trackers.UNIT3D.lastdigitalunderground import LastDigitalUnderground
 from src.trackers.UNIT3D.latteam import LatTeam
 from src.trackers.UNIT3D.locadora import Locadora
 from src.trackers.UNIT3D.lst import LST
 from src.trackers.UNIT3D.luminarr import Luminarr
 from src.trackers.UNIT3D.midnightscene import MidnightScene
+from src.trackers.UNIT3D.nordicquality import NordicQuality
 from src.trackers.UNIT3D.oldtoonsworld import OldToonsWorld
 from src.trackers.UNIT3D.onlyencodes import OnlyEncodes
+from src.trackers.UNIT3D.peergarden import PeerGarden
 from src.trackers.UNIT3D.polishtorrent import PolishTorrent
 from src.trackers.UNIT3D.portugas import Portugas
 from src.trackers.UNIT3D.racing4everyone import Racing4Everyone
 from src.trackers.UNIT3D.rastastugan import Rastastugan
 from src.trackers.UNIT3D.reelflix import ReelFlix
+from src.trackers.UNIT3D.retromoviesclub import RetroMoviesClub
 from src.trackers.UNIT3D.samaritano import Samaritano
 from src.trackers.UNIT3D.seedpool import Seedpool
 from src.trackers.UNIT3D.shareisland import ShareIsland
 from src.trackers.UNIT3D.skipthecommercials import SkipTheCommercials
-from src.trackers.UNIT3D.theldu import LastDigitalUnderground
 from src.trackers.UNIT3D.theoldschool import TheOldSchool
 from src.trackers.UNIT3D.tlzdigital import TheLeachZone
 from src.trackers.UNIT3D.torrentdesi import DesiTorrents
@@ -132,11 +138,13 @@ class TrackerSetup:
             if isinstance(example_tracker_config, dict) and isinstance(tracker_config, dict):
                 if "api_key" in example_tracker_config and not tracker_config.get("api_key"):
                     logger.info(f"{tracker_name}: [bold red]Tracker is missing an API key and will be ignored.[/bold red]")
-                    continue
+                    if not meta.debug:
+                        continue
 
                 if "announce_url" in example_tracker_config and not tracker_config.get("announce_url"):
                     logger.info(f"{tracker_name}: [bold red]Tracker is missing an announce URL and will be ignored.[/bold red]")
-                    continue
+                    if not meta.debug:
+                        continue
 
             supported_cats = getattr(tracker_class, "supported_categories", None)
             if supported_cats is None:
@@ -149,7 +157,7 @@ class TrackerSetup:
             if category.upper() in [c.upper() for c in supported_cats]:
                 supported_trackers.append(tracker_name)
             else:
-                logger.info(f"{tracker_name}: [bold red]category '{category}' is not supported. Removing from queue.[/bold red]", extra={"markup": False})
+                logger.info(f"{tracker_name}: [bold red]category '{category}' is not supported. Removing from queue.[/bold red]")
                 meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})["upload"] = False
                 meta.setdefault("tracker_status", {}).setdefault(tracker_name, {})["skipped"] = True
 
@@ -202,7 +210,11 @@ class TrackerSetup:
         if not await self.should_update(file_path):
             return file_path
 
-        headers = {"Authorization": f"Bearer {self.config['TRACKERS'][tracker]['api_key'].strip()}", "Content-Type": "application/json", "Accept": "application/json"}
+        api_key = self.config["TRACKERS"][tracker]["api_key"].strip()
+        auth_mode = getattr(tracker_instance, "banned_groups_auth_mode", "bearer")
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        if auth_mode == "bearer":
+            headers["Authorization"] = f"Bearer {api_key}"
 
         all_data: list[JsonDict] = []
         next_cursor: str | None = None
@@ -210,8 +222,11 @@ class TrackerSetup:
         async with httpx.AsyncClient() as client:
             while True:
                 try:
-                    # Add query parameters for pagination
-                    params: JsonDict = {"cursor": next_cursor, "per_page": 100} if next_cursor else {"per_page": 100}
+                    if auth_mode == "api_token":
+                        params: JsonDict = {"api_token": api_key}
+                    else:
+                        # Add query parameters for pagination.
+                        params = {"cursor": next_cursor, "per_page": 100} if next_cursor else {"per_page": 100}
                     response = await client.get(url=banned_url, headers=headers, params=params)
 
                     if response.status_code == 200:
@@ -223,9 +238,10 @@ class TrackerSetup:
                             break  # No pagination in this case
                         if isinstance(response_json, dict):
                             response_dict = cast(JsonDict, response_json)
-                            page_data_any = response_dict.get("data", [])
+                            response_key = getattr(tracker_instance, "banned_groups_response_key", "data")
+                            page_data_any = response_dict.get(response_key, [])
                             if not isinstance(page_data_any, list):
-                                logger.info(f"[red]Unexpected 'data' format: {type(page_data_any)}[/red]")
+                                logger.info(f"[red]Unexpected '{response_key}' format: {type(page_data_any)}[/red]")
                                 return None
 
                             page_data = cast(list[JsonDict], page_data_any)
@@ -380,7 +396,7 @@ class TrackerSetup:
         if "taoe" in group_tags:
             group_tags = "taoe"
 
-        if tracker.upper() in ("AITHER", "LST", "LUMINARR", "SPEEDAPP", "ZENITH"):
+        if tracker.upper() in ("AITHER", "CAPYBARABR", "LST", "LUMINARR", "SPEEDAPP", "ZENITH"):
             file_path = await self.get_banned_groups(meta, tracker)
             if file_path == "empty":
                 logger.info(f"[bold red]No banned groups found for '{tracker}'.")
@@ -751,10 +767,10 @@ class TrackerSetup:
                 if not url:
                     return False
                 requests = await self.bhd_request_check(meta, tracker_name, url)
-            elif tracker_name.upper() in ("AMIGOSSHARE", "BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD", "MTEAM"):
+            elif tracker_name.upper() in ("AMIGOSSHARE", "BJSHARE", "FUNFILE", "HDSPACE", "AVISTAZ", "CINEMAZ", "PRIVATEHD", "MTEAM", "ORPHEUS"):
                 # These trackers have custom request handling
                 requests = cast(list[JsonDict], await tracker_instance.get_requests(meta))
-                return False
+                return bool(requests) if tracker_name.upper() == "ORPHEUS" else False
             else:
                 if not url:
                     return False
@@ -1339,6 +1355,7 @@ tracker_class_map: dict[str, Any] = {
     "BLUTOPIA": Blutopia,
     "BRASILTRACKER": BrasilTracker,
     "CAPYBARABR": CapybaraBR,
+    "CATHODERAYTUBE": CathodeRayTube,
     "CURUPIRA": Curupira,
     "CINEMAZ": CinemaZ,
     "DIGITALCORE": DigitalCore,
@@ -1370,8 +1387,10 @@ tracker_class_map: dict[str, Any] = {
     "MTEAM": MTeam,
     "MORETHANTV": MoreThanTV,
     "NEBULANCE": Nebulance,
+    "NORDICQUALITY": NordicQuality,
     "ONLYENCODES": OnlyEncodes,
     "OLDTOONSWORLD": OldToonsWorld,
+    "ORPHEUS": Orpheus,
     "PRIVATEHD": PrivateHD,
     "PORTUGAS": Portugas,
     "PTCAFE": PTCafe,
@@ -1380,12 +1399,14 @@ tracker_class_map: dict[str, Any] = {
     "PTGTK": PTGTK,
     "PASSTHEPOPCORN": PassThePopcorn,
     "PTSKIT": Ptskit,
+    "PEERGARDEN": PeerGarden,
     "POLISHTORRENT": PolishTorrent,
     "RACING4EVERYONE": Racing4Everyone,
     "RASTASTUGAN": Rastastugan,
     "REELFLIX": ReelFlix,
     "RAILGUNPT": RailgunPT,
     "RETROFLIX": RetroFlix,
+    "RETROMOVIESCLUB": RetroMoviesClub,
     "SAMARITANO": Samaritano,
     "SHAREISLAND": ShareIsland,
     "SWARMAZON": Swarmazon,
@@ -1406,6 +1427,46 @@ tracker_class_map: dict[str, Any] = {
     "YUSCENE": YUSCENE,
     "ZENITH": Zenith,
 }
+
+
+def get_tracker_comment_hosts(config: dict[str, Any]) -> dict[str, tuple[str, ...]]:
+    """Return tracker domains usable when parsing torrent-comment URLs.
+
+    Hosts are metadata of the registered tracker classes, so looking up a
+    comment never needs to instantiate every tracker. ``comment_hosts`` or
+    the existing ``tracker_urls`` class attribute covers additional domains;
+    configured ``base_url`` and ``announce_url`` cover runtime overrides.
+    """
+
+    def hostname(value: Any) -> str | None:
+        if not isinstance(value, str) or not value:
+            return None
+        parsed = urlparse(value if "://" in value else f"//{value}")
+        return parsed.hostname.lower() if parsed.hostname else None
+
+    trackers_config = config.get("TRACKERS", {})
+    tracker_config_map = trackers_config if isinstance(trackers_config, dict) else {}
+    tracker_hosts: dict[str, tuple[str, ...]] = {}
+
+    for tracker_name, tracker_class in tracker_class_map.items():
+        domains = [resolved_host for value in (getattr(tracker_class, "base_url", ""),) if (resolved_host := hostname(value))]
+
+        for attribute_name in ("comment_hosts", "tracker_urls"):
+            values = getattr(tracker_class, attribute_name, ())
+            if isinstance(values, str):
+                values = (values,)
+            if isinstance(values, tuple | list):
+                domains.extend(resolved_host for value in values if (resolved_host := hostname(value)))
+
+        tracker_config = tracker_config_map.get(tracker_name, {})
+        if isinstance(tracker_config, dict):
+            domains.extend(resolved_host for key in ("base_url", "announce_url") if (resolved_host := hostname(tracker_config.get(key, ""))))
+
+        if domains:
+            tracker_hosts[tracker_name] = tuple(dict.fromkeys(domains))
+
+    return tracker_hosts
+
 
 api_trackers: set[str] = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "unit3d_api"}
 other_api_trackers: set[str] = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "other_api"}

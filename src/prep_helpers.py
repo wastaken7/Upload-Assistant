@@ -13,8 +13,10 @@ from urllib.parse import urlparse
 import aiofiles
 import cli_ui
 import guessit
+from torf import Torrent
 
 from src.bluray_com import get_bluray_releases
+from src.book_prep import AUDIOBOOK_EXTENSIONS, BOOK_EXTENSIONS
 from src.cleanup import cleanup_manager
 from src.clients import Clients
 from src.console import logger
@@ -106,15 +108,19 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     hash_ids = ["infohash", "torrent_hash", "skip_auto_torrent"]
     from src.trackersetup import api_trackers
 
-    tracker_ids = [t.lower() for t in api_trackers] + ["ptp", "btn", "hdb"]
+    tracker_ids = [t.lower() for t in api_trackers] + ["ptp", "btn", "hdb", "orpheus"]
     use_sonarr = prep_instance.config["DEFAULT"].get("use_sonarr", False)
     use_radarr = prep_instance.config["DEFAULT"].get("use_radarr", False)
     meta.print_tracker_messages = prep_instance.config["DEFAULT"].get("print_tracker_messages", False)
     meta.print_tracker_links = prep_instance.config["DEFAULT"].get("print_tracker_links", True)
-    only_id_val = meta.only_id
-    skip_tracker_descriptions = bool(prep_instance.config["DEFAULT"].get("skip_tracker_descriptions", False) if only_id_val is None else only_id_val)
-    meta.skip_tracker_descriptions = skip_tracker_descriptions
-    meta.keep_images = bool(prep_instance.config["DEFAULT"].get("keep_images", True) if not meta.keep_images else True)
+    from src.tracker_descriptions import resolve_description_mode
+
+    description_mode = resolve_description_mode(prep_instance.config["DEFAULT"].get("tracker_description_mode", "text"))
+    if meta.only_id:
+        description_mode = resolve_description_mode("ids")
+    meta.tracker_description_mode = description_mode.value
+    meta.keep_images = description_mode.imports_images
+    meta.skip_tracker_descriptions = not description_mode.imports_text
     mkbrr_threads = prep_instance.config["DEFAULT"].get("mkbrr_threads", "0")
     meta.mkbrr_threads = mkbrr_threads
 
@@ -142,7 +148,7 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
 
     logger.debug(f"[cyan]ID: {meta.uuid}")
 
-    return use_sonarr, use_radarr, client, skip_tracker_descriptions, hash_ids, tracker_ids
+    return use_sonarr, use_radarr, client, meta.skip_tracker_descriptions, hash_ids, tracker_ids
 
 
 async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str, dict[str, Any]]:
@@ -152,11 +158,82 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
         raise
     logger.debug(f"[blue]is_disc: [yellow]{meta.is_disc}[/yellow][/blue]")
 
-    # Auto-detect BOOK category if category/manual_category is not already set and it's not a disc
+    # A CLI category is an explicit instruction, not only a signal to skip
+    # automatic detection.  Content-specific preparation below routes on
+    # ``meta.category``, so normalise the manual value before that routing.
+    if isinstance(meta.manual_category, str) and meta.manual_category.strip():
+        meta.category = meta.manual_category.strip().upper()
+
+    # If category is manually set to BOOK, ensure meta.audiobook is set if audio files are present
+    if meta.category == "BOOK" and not meta.audiobook:
+        path_to_check = Path(meta.path) if meta.path else None
+        if path_to_check and path_to_check.exists():
+            from src.audio_classifier import AUDIOBOOK_CONTAINER_EXTENSIONS, SHARED_AUDIO_EXTENSIONS
+
+            audio_exts = SHARED_AUDIO_EXTENSIONS | AUDIOBOOK_CONTAINER_EXTENSIONS
+            if path_to_check.is_file() and path_to_check.suffix.lower() in audio_exts:
+                meta.audiobook = True
+            elif path_to_check.is_dir():
+                for item in path_to_check.rglob("*"):
+                    if item.is_file() and item.suffix.lower() in audio_exts:
+                        meta.audiobook = True
+                        break
+
+    # Auto-detect audio release category (BOOK audiobook vs MUSIC) if category/manual_category is not already set and it's not a disc
+    if not meta.category and not meta.manual_category and not meta.is_disc:
+        path_to_check = Path(meta.path) if meta.path else None
+        if path_to_check and path_to_check.exists():
+            from src.audio_classifier import detect_audio_category
+
+            audio_res = await detect_audio_category(meta, path_to_check)
+            if audio_res.category in ("BOOK", "MUSIC"):
+                meta.category = audio_res.category
+                meta.audiobook = audio_res.is_audiobook
+                logger.debug(f"[cyan]Auto-detected category: {meta.category}[/cyan]")
+                if audio_res.is_audiobook:
+                    logger.debug("[cyan]Subtype: AUDIOBOOK[/cyan]")
+                if audio_res.evidence:
+                    logger.debug("[cyan]Evidence:[/cyan]")
+                    for ev in audio_res.evidence:
+                        logger.debug(f"[cyan]- {ev}[/cyan]")
+            elif audio_res.category == "AMBIGUOUS":
+                unattended = getattr(meta, "unattended", False)
+                unattended_confirm = getattr(meta, "unattended_confirm", False)
+
+                logger.warning("[yellow]Audio category is ambiguous: could not confidently determine whether this is MUSIC or an AUDIOBOOK.[/yellow]")
+                if audio_res.evidence:
+                    logger.warning("[yellow]Evidence evaluated:[/yellow]")
+                    for ev in audio_res.evidence:
+                        logger.warning(f"[yellow]- {ev}[/yellow]")
+
+                if not unattended or (unattended and unattended_confirm):
+                    try:
+                        choice = cli_ui.ask_choice(
+                            "Choose category for audio release:",
+                            choices=["1. Music", "2. Audiobook"],
+                        )
+                    except EOFError, KeyboardInterrupt:
+                        logger.error("[bold red]Category selection cancelled or failed.[/bold red]")
+                        sys.exit(1)
+                    if choice is None:
+                        logger.error("[bold red]Category selection cancelled or failed.[/bold red]")
+                        sys.exit(1)
+                    if choice.startswith("1") or choice.lower() == "music":
+                        meta.category = "MUSIC"
+                        meta.audiobook = False
+                    else:
+                        meta.category = "BOOK"
+                        meta.audiobook = True
+                    logger.info(f"[cyan]Category selected interactively: {meta.category}[/cyan]")
+                else:
+                    logger.error("[bold red]Could not confidently distinguish MUSIC from AUDIOBOOK in unattended mode.[/bold red]")
+                    logger.error("[yellow]Specify one of: -c book or -c music[/yellow]")
+                    logger.error("[yellow]Skipping this release instead of assigning an unsafe category.[/yellow]")
+                    sys.exit(1)
+
+    # Fallback auto-detect BOOK category if category/manual_category is not already set and it's not a disc
     if not meta.category and not meta.manual_category and not meta.is_disc:
         is_book = False
-        book_extensions = {".pdf", ".epub", ".mobi", ".cbz", ".cbr"}
-        audiobook_extensions = {".mp3", ".m4b", ".flac", ".aac", ".m4a", ".ogg", ".wav"}
         video_extensions = {".mkv", ".mp4", ".ts"}
 
         path_to_check = meta.path
@@ -168,9 +245,9 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                 for _root, _, files in os.walk(path_to_check):
                     for file in files:
                         ext = Path(file).suffix.lower()
-                        if ext in book_extensions:
+                        if ext in BOOK_EXTENSIONS:
                             has_books = True
-                        elif ext in audiobook_extensions:
+                        elif ext in AUDIOBOOK_EXTENSIONS:
                             has_audio = True
                         elif ext in video_extensions:
                             has_video = True
@@ -179,7 +256,7 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                     is_book = True
             else:
                 ext = Path(path_to_check).suffix.lower()
-                if ext in book_extensions or ext in audiobook_extensions:
+                if ext in BOOK_EXTENSIONS or ext in AUDIOBOOK_EXTENSIONS:
                     is_book = True
 
         if is_book:
@@ -405,7 +482,7 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
             videopath, filelist, search_term, search_file_folder = prep_instance._resolve_game_filelist(meta, videoloc)
             video = videopath
         else:
-            videopath, meta.filelist = await video_manager.get_video(videoloc, (meta.mode if meta.mode is not None else "discord"), meta.sorted_filelist)
+            videopath, meta.filelist = await video_manager.get_video(videoloc, (meta.mode if meta.mode is not None else "non_cli"), meta.sorted_filelist)
             filelist = meta.filelist
             meta.filelist = filelist
             search_term = Path(filelist[0]).name if filelist else ""
@@ -625,18 +702,6 @@ async def process_trackers_and_torrent(
     if "description" not in meta or meta.description is None:
         meta.description = ""
 
-    description_text = meta.description
-    if description_text is None:
-        description_text = ""
-    async with aiofiles.open(
-        f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt",
-        "w",
-        newline="",
-        encoding="utf8",
-    ) as description:
-        if len(description_text):
-            await description.write(description_text)
-
     meta.skip_trackers = False
 
     if meta.trackers:
@@ -652,9 +717,24 @@ async def process_trackers_and_torrent(
     meta.trackers = cast(list[str], trackers)
     meta.requested_trackers = cast(list[str], trackers)
 
-    # auto torrent searching with qbittorrent that grabs torrent ids for metadata searching
+    # Find one reusable torrent while all local files (including external
+    # subtitles) are known. Its path is cached for the upload stage, which
+    # prevents a second full client search later in the run.
     if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids) and not meta.skip_trackers and not meta.edit:
-        await client.get_pathed_torrents(str(meta.path), meta)
+        reuse_torrent_path = await client.find_existing_torrent(meta)
+        if reuse_torrent_path:
+            meta.reuse_torrent_path = reuse_torrent_path
+            if meta.subtitle_files and client._torrent_includes_all_local_subtitles(reuse_torrent_path, meta):
+                meta.subs_reuse_torrent_path = reuse_torrent_path
+            else:
+                meta.base_reuse_torrent_path = reuse_torrent_path
+            try:
+                meta.infohash = Torrent.read(reuse_torrent_path).infohash
+            except Exception as e:
+                logger.debug(f"[yellow]Unable to read infohash from cached torrent: {e}")
+            # Fetch properties only: this preserves comment/tracker-ID discovery
+            # without running another name-based torrent search or exporting it.
+            await client.get_ptp_from_hash(meta, pathed=True, client_name=meta.reuse_torrent_client)
 
 
 async def search_metadata(
@@ -840,7 +920,7 @@ async def search_metadata(
 
     # if there's no region/distributor info, lets ping some unit3d trackers and see if we get it
     ping_unit3d_config = prep_instance.config["DEFAULT"].get("ping_unit3d", False)
-    if (not meta.region or not meta.distributor) and meta.is_disc == "BDMV" and ping_unit3d_config and not meta.edit and not meta.site_check:
+    if (not meta.region or not meta.distributor) and meta.is_disc in ("BDMV", "DVD") and ping_unit3d_config and not meta.edit and not meta.site_check:
         await prep_instance.tracker_data_manager.ping_unit3d(meta)
 
     # the first user override check that allows to set metadata ids.
@@ -944,7 +1024,7 @@ async def search_metadata(
             search_year_value,
             filename,
             debug=meta.debug,
-            mode=(meta.mode if meta.mode is not None else "discord"),
+            mode=(meta.mode if meta.mode is not None else "non_cli"),
             category_preference=meta.category,
             imdb_info=meta.imdb_info,
         )
@@ -1021,7 +1101,7 @@ async def search_metadata(
             search_year_value,
             filename,
             debug=meta.debug,
-            mode=(meta.mode if meta.mode is not None else "discord"),
+            mode=(meta.mode if meta.mode is not None else "non_cli"),
             category_preference=meta.category,
             imdb_info=meta.imdb_info,
         )
@@ -1035,10 +1115,10 @@ async def search_metadata(
     if tmdb_id_value != 0 and meta.category not in ("BOOK", "GAME"):
         await prep_instance.tmdb_manager.set_tmdb_metadata(meta, filename)
 
-    # Ensure IMDb info is retrieved if it wasn't already fetched
+    # Ensure IMDb info is retrieved if it wasn't already fetched or was cleared.
     imdb_id_value = _to_int(meta.imdb_id)
-    if meta.imdb_info is None and imdb_id_value != 0 and meta.category not in ("BOOK", "GAME"):
-        imdb_info = await imdb_manager.get_imdb_info_api(imdb_id_value, manual_language=meta.manual_language)
+    if not meta.imdb_info and imdb_id_value != 0 and meta.category not in ("BOOK", "GAME"):
+        imdb_info = await imdb_manager.get_imdb_info_api(imdb_id_value, manual_language=meta.manual_language, base_dir=meta.base_dir, config=prep_instance.config)
         meta.imdb_info = imdb_info
 
 
@@ -1108,6 +1188,7 @@ async def finalize_metadata(
                 meta.tvmaze_manual,
                 year=meta.year,
                 tv_movie=meta.tv_movie,
+                base_dir=meta.base_dir,
             )
             both_ids_searched = True
             if tvmaze:
@@ -1132,6 +1213,8 @@ async def finalize_metadata(
                 manual_date=meta.manual_date,
                 tvmaze_manual=meta.tvmaze_manual,
                 return_full_tuple=False,
+                base_dir=meta.base_dir,
+                config=prep_instance.config,
             )
             meta.tvmaze_id = tvmaze_res if isinstance(tvmaze_res, int) else tvmaze_res[0]
         if meta.tvdb_id == 0:
@@ -1160,7 +1243,9 @@ async def finalize_metadata(
                         if series_imdb.isdigit() and int(series_imdb) != meta.imdb_id:
                             logger.debug(f"[yellow]Updating IMDb ID from episode data: {series_imdb}")
                             meta.imdb_id = int(series_imdb)
-                            imdb_info = await imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language)
+                            imdb_info = await imdb_manager.get_imdb_info_api(
+                                meta.imdb_id, manual_language=meta.manual_language, base_dir=meta.base_dir, config=prep_instance.config
+                            )
                             meta.imdb_info = imdb_info
                             check_valid_data = meta.imdb_info.get("title", "")
                             if check_valid_data:

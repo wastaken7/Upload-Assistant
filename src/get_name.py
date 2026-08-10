@@ -187,6 +187,9 @@ class NameManager:
         elif meta.category == "GAME":
             name = self.extract_game_name(meta)
             potential_missing = []
+        elif meta.category == "MUSIC":
+            name = self.extract_music_name(meta)
+            potential_missing = []
 
         try:
             name = " ".join(name.split())
@@ -354,6 +357,63 @@ class NameManager:
         base_name = " ".join(t for t in tokens if t)
         # Final safety: collapse any double spaces
         return re.sub(r"\.{2,}", " ", base_name)
+
+    @staticmethod
+    def _music_release_field(release: dict[str, Any], name: str, default: Any = "") -> Any:
+        """Read a serialized MusicRelease field without its provenance."""
+        fields = release.get("fields", {})
+        value = fields.get(name, {}) if isinstance(fields, dict) else {}
+        return value.get("value", default) if isinstance(value, dict) else default
+
+    @staticmethod
+    def _music_codec(value: Any) -> str:
+        codec = str(value or "").upper().strip()
+        aliases = {
+            "OGG VORBIS": "VORBIS",
+            "OGG": "VORBIS",
+            "MPEG AUDIO": "MP3",
+            "MPEG-4 AAC": "AAC",
+            "M4A": "AAC",
+        }
+        return aliases.get(codec, codec)
+
+    @staticmethod
+    def _music_source(value: Any) -> str:
+        source = str(value or "").strip().casefold()
+        aliases = {
+            "cd": "CD",
+            "hdcd": "HDCD",
+            "dts-cd": "DTS-CD",
+            "dts cd": "DTS-CD",
+            "8-track": "8-Track",
+            "8 track": "8-Track",
+            "vinyl": "Vinyl",
+            "web": "WEB",
+            "cassette": "Cassette",
+        }
+        return aliases.get(source, str(value or "").strip())
+
+    def extract_music_name(self, meta: Meta) -> str:
+        """Build MUSIC names with the LST Discogs-based naming convention."""
+        release = meta.music_release if isinstance(meta.music_release, dict) else {}
+        artist = self._music_release_field(release, "artist", meta.artist)
+        title = self._music_release_field(release, "album", meta.title)
+        year = self._music_release_field(release, "release_year", self._music_release_field(release, "year", meta.year))
+        source = self._music_source(self._music_release_field(release, "media", meta.source))
+        tracks = release.get("tracks", []) if isinstance(release.get("tracks"), list) else []
+        first_track = tracks[0] if tracks and isinstance(tracks[0], dict) else {}
+        codec = self._music_codec(first_track.get("codec") or first_track.get("format") or meta.format or meta.type)
+        parts = [str(artist), "-", str(title), str(year), source, codec]
+
+        # LST omits technical PCM fields for lossy codecs.
+        if codec in {"FLAC", "ALAC"}:
+            depth = first_track.get("bit_depth") or self._music_release_field(release, "nfo_bit_depth")
+            rate = first_track.get("sample_rate") or self._music_release_field(release, "nfo_sample_rate")
+            if depth:
+                parts.append(f"{depth}-bit")
+            if rate:
+                parts.append(f"{int(rate) / 1000:g} kHz")
+        return " ".join(part.strip() for part in parts if str(part or "").strip())
 
     async def clean_filename(self, name: str) -> str:
         invalid = '<>:"/\\|?*'

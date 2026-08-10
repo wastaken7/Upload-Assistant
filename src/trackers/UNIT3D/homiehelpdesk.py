@@ -1,8 +1,10 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import re
 from typing import Any
 
 from src.console import logger
 from src.meta import Meta
+from src.music.sources import DiscogsEnricher
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
@@ -74,7 +76,7 @@ class HomieHelpDesk(UNIT3D):
     search_url = f"{base_url}/api/torrents/filter"
     requests_url = f"{base_url}/api/requests/filter"
     torrent_url = f"{base_url}/torrents/"
-    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "MUSIC")
     tracker_urls = ("https://homiehelpdesk.net",)
 
     def __init__(self, config: Config) -> None:
@@ -83,12 +85,54 @@ class HomieHelpDesk(UNIT3D):
         self.common = Common(config)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        should_continue = True
         if meta.type == "DVDRIP":
-            logger.info("[bold red]DVDRIP uploads are not allowed on HomieHelpDesk.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]DVDRIP uploads are not allowed on {self.tracker}.[/bold red]")
             return False
 
-        return should_continue
+        if meta.category == "MUSIC" and not self._music_upload_data(meta):
+            logger.info(f"{self.tracker}: [bold red]Music uploads require a valid MusicBrainz or Discogs ID.[/bold red]")
+            return False
+
+        return True
+
+    @staticmethod
+    def _music_upload_data(meta: Meta) -> dict[str, str]:
+        """Build HomieHelpDesk's music-specific external-ID payload."""
+        release = meta.music_release if isinstance(meta.music_release, dict) else {}
+        external_ids = release.get("external_ids", {})
+        external_ids = external_ids if isinstance(external_ids, dict) else {}
+
+        musicbrainz = str(external_ids.get("musicbrainz_release") or external_ids.get("musicbrainz_release_group") or "").strip()
+        if re.fullmatch(r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}", musicbrainz, re.IGNORECASE):
+            return {
+                "music_exists_on_musicbrainz": "1",
+                "musicbrainz": musicbrainz,
+            }
+
+        discogs = ""
+        if meta.music_discogs_enabled:
+            discogs = str(
+                external_ids.get("discogs_release_url")
+                or external_ids.get("discogs_release")
+                or meta.music_discogs_release_id
+                or meta.music_discogs_id
+                or external_ids.get("discogs_master_url")
+                or external_ids.get("discogs_master")
+                or meta.music_discogs_master_id
+                or ""
+            ).strip()
+        if DiscogsEnricher.parse_reference(discogs):
+            return {
+                "music_exists_on_discogs": "1",
+                "discogs": discogs,
+            }
+
+        return {}
+
+    async def get_additional_data(self, meta: Meta) -> dict[str, str]:
+        if meta.category == "MUSIC":
+            return self._music_upload_data(meta)
+        return {}
 
     async def get_category_id(self, meta: Meta, category: str = "", reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         category_id = {
@@ -172,6 +216,12 @@ class HomieHelpDesk(UNIT3D):
 
         if meta.category == "GAME":
             resolved_type = "CONSOLE" if meta.console_game else meta.platform.upper()
+        elif meta.category == "MUSIC":
+            release = meta.music_release if isinstance(meta.music_release, dict) else {}
+            fields = release.get("fields", {})
+            music_format = fields.get("format", {}) if isinstance(fields, dict) else {}
+            resolved_type = music_format.get("value", meta.format) if isinstance(music_format, dict) else meta.format
+            resolved_type = str(resolved_type or "").upper()
 
         return {"type_id": type_id.get(str(resolved_type), "0")}
 

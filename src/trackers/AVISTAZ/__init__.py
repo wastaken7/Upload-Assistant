@@ -15,12 +15,13 @@ import httpx
 from bs4 import BeautifulSoup
 
 import bbcode
-from cogs.redaction import Redaction
-from src.console import logger
+from src.cogs.redaction import Redaction
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
+from src.temp_paths import screenshots_dir
 from src.trackers.common import Common
 
 Config = dict[str, Any]
@@ -125,15 +126,20 @@ class AZTrackerBase:
                 break
 
             if attempt == 0 and not self.media_code:
-                logger.info(f"\n{self.tracker}: The media [[yellow]IMDB:{imdb_id}[/yellow]] [[blue]TMDB:{tmdb_id}[/blue]] appears to be missing from the site's database.")
-                if cli_ui.ask_yes_no(f"{self.tracker}: Do you want to add it to the site database?\n"):
-                    added_successfully = await self.add_media_to_db(meta, title, category, imdb_id, tmdb_id)
-                    if not added_successfully:
-                        logger.info(f"{self.tracker}: Failed to add media. Aborting.")
+                logger.info(f"{self.tracker}: \nThe media [[yellow]IMDB:{imdb_id}[/yellow]] [[blue]TMDB:{tmdb_id}[/blue]] appears to be missing from the site's database.")
+                if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                    if await prompt_in_thread(cli_ui.ask_yes_no, f"{self.tracker}: Do you want to add it to the site database?\n"):
+                        added_successfully = await self.add_media_to_db(meta, title, category, imdb_id, tmdb_id)
+                        if not added_successfully:
+                            logger.info(f"{self.tracker}: Failed to add media. Aborting.")
+                            break
+                    else:
+                        logger.info(f"{self.tracker}: User chose not to add media. Aborting.")
                         break
                 else:
-                    logger.info(f"{self.tracker}: User chose not to add media. Aborting.")
-                    break
+                    logger.info(f"{self.tracker}: [yellow]Unattended mode: Media missing from site database. Skipping {self.tracker} upload.[/yellow]")
+                    meta.skipping = f"{self.tracker}"
+                    return False
 
         if not self.media_code:
             logger.info(f"{self.tracker}: Unable to get media code.")
@@ -171,7 +177,7 @@ class AZTrackerBase:
             Path(failure_path).parent.mkdir(parents=True, exist_ok=True)
             async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
                 await f.write(response.text)
-            logger.info(f"The server response was saved to {failure_path} for analysis.")
+            logger.info(f"{self.tracker}: The server response was saved to {failure_path} for analysis.")
             return False
 
         except Exception as e:
@@ -197,15 +203,15 @@ class AZTrackerBase:
             if warnings:
                 logger.info(f"{self.tracker}: [red]Rule check returned the following warning(s):[/red]\n\n{warnings}")
                 if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                    if not cli_ui.ask_yes_no("Do you want to continue anyway?", default=False):
+                    if not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to continue anyway?", default=False):
                         return False
                 else:
                     return False
 
         if meta.type not in ["WEBDL"] and self.tracker == "PRIVATEHD" and meta.tag in ["FGT", "EVO"]:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"[bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
-                if not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+                logger.info(f"{self.tracker}: [bold red]Group {meta.tag} is only allowed for web-dl[/bold red]")
+                if not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
                     return False
             else:
                 return False
@@ -318,15 +324,18 @@ class AZTrackerBase:
                 if pre_tag:
                     return pre_tag.get_text("\n", strip=True)
 
-            logger.info(f"[yellow]{self.tracker}: MediaInfo/BDInfo block not found at {torrent_link}[/yellow]")
+            logger.info(f"{self.tracker}: [yellow]MediaInfo/BDInfo block not found at {torrent_link}[/yellow]")
             return ""
 
         except httpx.HTTPStatusError as e:
-            logger.info(f"[red]{self.tracker}: HTTP error {e.response.status_code} from {torrent_link}[/red]")
+            logger.info(f"{self.tracker}: [red]HTTP error {e.response.status_code} from {torrent_link}[/red]")
         except httpx.RequestError as e:
-            logger.info(f"[red]{self.tracker}: Request failed to {torrent_link}. {e}[/red]")
+            logger.info(f"{self.tracker}: [red]Request failed to {torrent_link}. {e}[/red]")
+        except (AttributeError, TypeError, ValueError) as e:
+            logger.info(f"{self.tracker}: [red]Parsing failed for {torrent_link}. {e}[/red]")
         except Exception as e:
-            logger.error(f"[red]{self.tracker}: Unexpected error parsing {torrent_link}. {e}[/red]")
+            logger.error(f"{self.tracker}: [red]Unexpected error parsing {torrent_link}. {e}[/red]", exc_info=True)
+            raise
 
         return ""
 
@@ -406,9 +415,13 @@ class AZTrackerBase:
                             missing_audio_languages.append(track)
 
                 if missing_audio_languages:
-                    logger.info("No audio language/s found.")
-                    logger.info("You must enter (comma-separated) languages for all audio tracks, eg: English, Spanish: ")
-                    user_input_raw = cli_ui.ask_string("[bold yellow]Enter languages: [/bold yellow]")
+                    if meta.unattended and not meta.unattended_confirm:
+                        logger.info(f"{self.tracker}: [yellow]Unattended mode: Missing audio languages. Skipping {self.tracker} upload.[/yellow]")
+                        meta.skipping = f"{self.tracker}"
+                        return {}
+                    logger.info(f"{self.tracker}: No audio language/s found.")
+                    logger.info(f"{self.tracker}: You must enter (comma-separated) languages for all audio tracks, eg: English, Spanish: ")
+                    user_input_raw = await prompt_in_thread(cli_ui.ask_string, "[bold yellow]Enter languages: [/bold yellow]")
                     user_input = (user_input_raw or "").strip()
                     langs = [lang.strip() for lang in user_input.split(",")]
                     for lang in langs:
@@ -417,9 +430,9 @@ class AZTrackerBase:
                             audio_ids.add(target_id)
 
             except FileNotFoundError:
-                logger.warning(f"Warning: MediaInfo.json not found for uuid {meta.uuid}. No languages will be processed.", extra={"markup": False})
+                logger.warning(f"{self.tracker}: Warning: MediaInfo.json not found for uuid {meta.uuid}. No languages will be processed.", extra={"markup": False})
             except (json.JSONDecodeError, KeyError, TypeError) as e:
-                logger.info(f"Error processing MediaInfo.json for uuid {meta.uuid}: {e}", extra={"markup": False})
+                logger.info(f"{self.tracker}: Error processing MediaInfo.json for uuid {meta.uuid}: {e}", extra={"markup": False})
 
         final_subtitle_ids = sorted(subtitle_ids)
         final_audio_ids = sorted(audio_ids)
@@ -459,8 +472,8 @@ class AZTrackerBase:
             return None
 
     async def get_screenshots(self, meta: Meta) -> list[str] | None:
-        screenshot_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-        local_files = sorted(path for path in screenshot_dir.glob("*.png") if path.is_file() and not path.stem.upper().startswith(("POSTER", "COVER")))
+        screens_dir = screenshots_dir(meta.base_dir, meta.uuid)
+        local_files = sorted(path for path in screens_dir.glob("*.png") if path.is_file())
         results: list[str] = []
 
         limit = 3 if (meta.category == "TV" and meta.tv_pack == 0) else 15
@@ -481,7 +494,7 @@ class AZTrackerBase:
                     image_bytes = await f.read()
                 return await self.img_host(meta, upload_referer, image_bytes, path.name)
             except Exception as e:
-                logger.info(f"Failed to process local screenshot {path}: {e}", extra={"markup": False})
+                logger.info(f"{self.tracker}: Failed to process local screenshot {path}: {e}", extra={"markup": False})
                 return None
 
         async def upload_remote_file(url: str):
@@ -494,7 +507,7 @@ class AZTrackerBase:
                     filename = f"{filename}.png"
                 return await self.img_host(meta, upload_referer, image_bytes, filename)
             except Exception as e:
-                logger.info(f"Failed to process screenshot from URL {url}: {e}", extra={"markup": False})
+                logger.info(f"{self.tracker}: Failed to process screenshot from URL {url}: {e}", extra={"markup": False})
                 return None
 
         # Upload menu images
@@ -607,7 +620,7 @@ class AZTrackerBase:
                         return 0
 
         except Exception as e:
-            logger.info(f"An unexpected error occurred while processing the tag '{word}': {e}", extra={"markup": False})
+            logger.info(f"{self.tracker}: An unexpected error occurred while processing the tag '{word}': {e}", extra={"markup": False})
 
         return 0
 
@@ -766,14 +779,38 @@ class AZTrackerBase:
         daily_episode_title = meta.daily_episode_title or ""
         upload_name: str = meta.name.replace(aka_name, "").replace("Dubbed", "").replace("Dual-Audio", "").replace(manual_episode_title, "").replace(daily_episode_title, "")
 
-        if self.tracker == "PRIVATEHD":
+        if self.tracker in ("CINEMAZ", "PRIVATEHD"):
+            # Both sites prohibit these release descriptors in torrent titles.
             forbidden_terms = [r"\bLIMITED\b", r"\bCriterion Collection\b", r"\b\d{1,3}(?:st|nd|rd|th)\s+Anniversary Edition\b"]
             for term in forbidden_terms:
                 upload_name = re.sub(term, "", upload_name, flags=re.IGNORECASE).strip()
 
             upload_name = re.sub(r"\bDirector[’\'`]s\s+Cut\b", "DC", upload_name, flags=re.IGNORECASE)  # noqa: RUF001
-            upload_name = re.sub(r"\bExtended\s+Cut\b", "Extended", upload_name, flags=re.IGNORECASE)
-            upload_name = re.sub(r"\bTheatrical\s+Cut\b", "Theatrical", upload_name, flags=re.IGNORECASE)
+            if self.tracker == "CINEMAZ":
+                upload_name = re.sub(r"\bExtended\s+Cut\b", "EXT", upload_name, flags=re.IGNORECASE)
+                upload_name = re.sub(r"\bTheatrical\s+Cut\b", "TC", upload_name, flags=re.IGNORECASE)
+            else:
+                upload_name = re.sub(r"\bExtended\s+Cut\b", "Extended", upload_name, flags=re.IGNORECASE)
+                upload_name = re.sub(r"\bTheatrical\s+Cut\b", "Theatrical", upload_name, flags=re.IGNORECASE)
+
+            # CinemaZ and PrivateHD prohibit brackets in torrent titles.
+            upload_name = upload_name.replace("[", "").replace("]", "")
+
+            if self.tracker == "CINEMAZ":
+                # CinemaZ requires HYBRID immediately after the video quality.
+                has_hybrid_marker = bool(meta.webdv) or "hybrid" in (meta.edition or "").casefold()
+                title_match = re.search(re.escape(meta.title), upload_name, flags=re.IGNORECASE) if meta.title else None
+                marker_search_start = title_match.end() if title_match else 0
+                hybrid_match = re.search(r"\bHYBRID\b", upload_name[marker_search_start:], flags=re.IGNORECASE) if has_hybrid_marker else None
+                if hybrid_match:
+                    hybrid_start = marker_search_start + hybrid_match.start()
+                    hybrid_end = marker_search_start + hybrid_match.end()
+                    upload_name_without_hybrid = f"{upload_name[:hybrid_start]}{upload_name[hybrid_end:]}"
+                    resolution_match = re.search(r"\b(?:\d{3,4}[pi]|4K|UHD|SD)\b", upload_name_without_hybrid, flags=re.IGNORECASE)
+                    if resolution_match:
+                        upload_name = upload_name_without_hybrid
+                        upload_name = f"{upload_name[: resolution_match.end()]} HYBRID{upload_name[resolution_match.end() :]}"
+
             upload_name = re.sub(r"\s{2,}", " ", upload_name).strip()
 
         if meta.has_encode_settings:
@@ -907,8 +944,10 @@ class AZTrackerBase:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
         if cookie_jar:
             self.session.cookies = cookie_jar
-        task_info = await self.create_task_id(meta)
         lang_info = await self.get_lang(meta) or {}
+        if getattr(meta, "skipping", None) == self.tracker:
+            return {}
+        task_info = await self.create_task_id(meta)
 
         data: dict[str, Any] = {
             "_token": self.az_class.secret_token,
@@ -976,6 +1015,8 @@ class AZTrackerBase:
 
     async def upload(self, meta: Meta) -> bool:
         data = await self.fetch_data(meta)
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
         status_message = ""
 
         issue = self.check_data(meta, data)
@@ -1022,7 +1063,7 @@ class AZTrackerBase:
             meta.tracker_status[self.tracker]["status_message"] = status_message
             return False
 
-        logger.info(f"[cyan]{self.tracker} Request Data:")
+        logger.info(f"{self.tracker}: Request Data:")
         logger.info(Redaction.redact_private_info(data))
         meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
         await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")

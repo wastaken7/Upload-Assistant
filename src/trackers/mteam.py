@@ -7,7 +7,7 @@ from urllib.parse import urlparse, urlunparse
 import aiofiles
 import httpx
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -37,7 +37,7 @@ class MTeam:
         self.config = config
         self.common = Common(config)
         self.tmdb_manager = TmdbManager(config)
-        raw_url = self.config["TRACKERS"][self.tracker].get("base_url", "kp.m-team.cc").strip()
+        raw_url = str(self.config["TRACKERS"][self.tracker].get("base_url", "kp.m-team.cc")).strip()
         parsed_raw = urlparse(raw_url)
         clean_netloc = parsed_raw.netloc if parsed_raw.netloc else parsed_raw.path
         self.base_url = urlunparse(("https", clean_netloc, "", "", "", ""))
@@ -56,7 +56,7 @@ class MTeam:
 
         category = self.get_category_id(meta)
 
-        payload = {
+        payload: dict[str, int | bool | str] = {
             "pageNumber": 1,
             "pageSize": 10,
             "keyword": meta.title,
@@ -161,14 +161,14 @@ class MTeam:
             return response.json()
 
         except Exception as e:
-            logger.info(f"Error fetching Douban info: {e}")
+            logger.info(f"{self.tracker}: Error fetching Douban info: {e}")
             return info
 
     async def mteam_standard_desc(self, meta: Meta):
         db_info = await self.get_douban_info(meta)
+        d = db_info.get("data") if isinstance(db_info, dict) else None
 
-        if db_info and db_info.get("code") == "0":
-            d = db_info.get("data", {})
+        if db_info and db_info.get("code") == "0" and isinstance(d, dict):
             title = d.get("title", "")
             aka = d.get("aka", [])
             translated_names = " / ".join([title, *aka]) if title else " / ".join(aka)
@@ -210,9 +210,9 @@ class MTeam:
 
         # Fallback
         logger.info(f"{self.tracker}: Douban information is unavailable, using an alternative English version for the description.")
-        imdb = meta.imdb_info
+        imdb = meta.imdb_info or {}
 
-        tmdb_poster_path = meta.tmdb_poster or "".strip()
+        tmdb_poster_path = meta.tmdb_poster_path or "".strip()
         tmdb_poster = f"https://image.tmdb.org/t/p/w200{tmdb_poster_path}" if tmdb_poster_path else ""
         poster_url = tmdb_poster or str(imdb.get("cover") or "")
         title = meta.title if meta.title is not None else "N/A"
@@ -331,7 +331,7 @@ class MTeam:
         if "upscale" in uuid.lower() and "upscale" not in meta.title:
             logger.info(f"{self.tracker}: Uploading upscaled files created by converting low-bitrate videos to high-bitrate versions might be prohibited.")
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                user_input = self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ")
+                user_input = await self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ", meta)
                 if not user_input:
                     return False
             else:
@@ -352,7 +352,7 @@ class MTeam:
                 f"{self.tracker}: [bold yellow]LGBT content detected. Please ensure the cover photo does not contain depictions of genitalia per tracker rules.[/bold yellow]"
             )
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                user_input = self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ")
+                user_input = await self.common.prompt_user_for_confirmation(f"{self.tracker}: Do you want to continue with the upload? (y/n): ", meta)
                 if not user_input:
                     return False
             else:
@@ -601,11 +601,45 @@ class MTeam:
                 return False
 
         else:
-            logger.info("[cyan]M-Team Request Data:")
+            logger.info(f"{self.tracker}: [cyan]{self.tracker} Request Data:")
             logger.info(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading"
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
             return True  # Debug mode - simulated success
 
     async def get_name(self, meta: Meta) -> str:
-        return meta.name
+        """https://wiki.m-team.cc/zh-tw/upload-title-rules"""
+        name = meta.name
+
+        # 1. Normalize Blu-ray / BLURAY / Blu-Ray to BluRay (incorporates UHD Blu-ray -> UHD BluRay)
+        name = re.sub(r"\bblu[-_]?ray\b", "BluRay", name, flags=re.IGNORECASE)
+
+        # 2. Normalize WEBDL / Web-DL to WEB-DL
+        name = re.sub(r"\bweb[-_]?dl\b", "WEB-DL", name, flags=re.IGNORECASE)
+
+        # 3. Normalize Dolby Vision: DoVi / Dovi / DOVI to DV
+        name = re.sub(r"\bdovi\b", "DV", name, flags=re.IGNORECASE)
+
+        # 4. Normalize HDR / Hdr / hdr / HLG case (e.g. Hdr10 -> HDR10, hdr10+ -> HDR10+)
+        name = re.sub(r"\b(hdr|hlg)(10)?(\+)?\b", lambda m: f"{m.group(1).upper()}{m.group(2) or ''}{m.group(3) or ''}", name, flags=re.IGNORECASE)
+
+        # 5. Dolby Digital Plus: EAC3 / EAC-3 / DD+ / DDPlus to DDP
+        name = re.sub(r"\b(eac[-_]?3|dd\+)(?![a-zA-Z0-9])", "DDP", name, flags=re.IGNORECASE)
+
+        # 6. Dolby Digital: AC3 / AC-3 to DD
+        name = re.sub(r"\bac[-_]?3(?![a-zA-Z0-9])", "DD", name, flags=re.IGNORECASE)
+
+        # 7. DTS:X: DTS-X / DTS_X / DTSX / DTS X to DTS:X
+        name = re.sub(r"\bdts[-_\s]?x\b", "DTS:X", name, flags=re.IGNORECASE)
+
+        # 8. TrueHD: True-HD to TrueHD
+        name = re.sub(r"\btrue[-_]?hd\b", "TrueHD", name, flags=re.IGNORECASE)
+
+        # 9. High Frame Rate: 50fps / 60fps / 120fps to HFR
+        name = re.sub(r"\b(50|60|120)fps\b", "HFR", name, flags=re.IGNORECASE)
+
+        # Clean up duplicate HFR words (e.g. "HFR HFR" or "HFR.HFR" or "HFR-HFR" -> "HFR")
+        name = re.sub(r"\bHFR\b([-.\s_]+HFR)+", "HFR", name, flags=re.IGNORECASE)
+
+        # 10. Strip video file extension suffixes if they are present in the name
+        return re.sub(r"\.(mkv|mp4|avi|ts)$", "", name, flags=re.IGNORECASE)

@@ -1,5 +1,4 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +7,7 @@ from torf import Torrent
 
 from src.console import logger
 from src.meta import Meta
+from src.torrent_clients.path_utils import map_save_path
 
 
 class TransmissionClientMixin:
@@ -27,11 +27,9 @@ class TransmissionClientMixin:
 
         logger.info("Connected to Transmission")
         # Remote path mount
-        if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():
-            path = path.replace(local_path, remote_path)
-            path = path.replace(os.sep, "/")
+        path = map_save_path(path, local_path, remote_path, trailing_slash=False)
 
-        path = str(Path(path).parent)
+        path = Path(path).parent.as_posix()
 
         if meta.transmission_label is not None:
             label = [meta.transmission_label]

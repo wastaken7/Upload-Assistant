@@ -20,7 +20,6 @@ The config is a Python dict named `config` with these top-level sections:
 - `IMAGES`: static icon URLs used in some descriptions.
 - `TRACKERS`: which trackers to upload to + per-tracker credentials/options.
 - `TORRENT_CLIENTS`: qBittorrent/ruTorrent/etc client configuration.
-- `DISCORD`: optional Discord bot integration.
 
 Notes:
 
@@ -64,20 +63,22 @@ Important gotchas:
 
 Order matters: `img_host_1` is primary, later hosts are fallbacks.
 
-- `img_host_1`..`img_host_5` (str): Image host names. Valid examples include `imgbb`, `ptpimg`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `passtheimage`, `seedpool_cdn`, `utppm`, `lostimg`.
+- `img_host_1`..`img_host_5` (str): Image host names. Valid examples include `imgbb`, `imgbox`, `pixhost`, `lensdump`, `ptscreens`, `onlyimage`, `dalexni`, `zipline`, `midnightscene`, `passtheimage`, `seedpool_cdn`, `utppm`, `lostimg`.
+- `image_upload_concurrency` (int): Maximum number of image uploads running at once. Set to `0` to use the image host default.
+- `image_upload_delay` (float): Minimum delay in seconds between starting image uploads.
 
 ### Image host credentials
 
 - `imgbb_api` (str): API key for imgbb.
-- `ptpimg_api` (str): API key for ptpimg.
 - `lostimg_api` (str): API key for lostimg.
 - `lensdump_api` (str): API key for lensdump.
 - `ptscreens_api` (str): API key for ptscreens.
 - `onlyimage_api` (str): API key for onlyimage.
 - `dalexni_api` (str): API key for dalexni.
 - `passtheima_ge_api` (str): API key for passtheimage.
-- `zipline_url` (str): Base URL for a Zipline instance.
+- `zipline_url` (str): Zipline upload endpoint, for example `https://zipline.example.com/api/upload`.
 - `zipline_api_key` (str): Zipline API key.
+- `midnightscene_api_key` (str): MidnightScene Zipline API token. Retrieve it from the account menu's **Copy token** button or **Settings > User**; never share it.
 - `seedpool_cdn_api` (str): Seedpool CDN API key.
 
 ### Description extras
@@ -104,6 +105,7 @@ Implementation notes:
 - `screens_per_row` (str): Screenshots per row in description (only for some trackers).
 - `frame_overlay` (bool): Overlay frame number/type and “Tonemapped” (if applicable) on screenshots.
 - `overlay_text_size` (str): Overlay text size (scales with resolution).
+- `scale_screenshots_for_par` (bool): When `False` (the default), preserve MediaInfo's coded dimensions. Set to `True` only to apply pixel-aspect-ratio correction for non-square-pixel sources; this can change a PNG from `1920x1040` to `1924x1040`.
 
 Implementation notes:
 
@@ -173,16 +175,16 @@ Implementation notes:
 ### UX / safety toggles
 
 - `sfx_on_prompt` (bool): Play a bell sound effect when asking for confirmation.
-- `embed_dupe_links` (bool): Set true to embed links in duplicate entries using terminal hyperlinks (OSC 8). Set false to display the full raw URLs.
+- `embed_links` (bool): Set true to embed terminal links using terminal hyperlinks (OSC 8). Set false to display the full raw URLs. `embed_dupe_links` remains supported temporarily as a deprecated alias.
 - `tracker_pass_checks` (str): Minimum number of trackers that must pass checks to continue upload.
 - `use_largest_playlist` (bool): Always use the largest Blu-ray playlist without prompting.
-- `keep_images` (bool): If false, do not pull images/screenshots from other tracker descriptions. If true, images are downloaded, validated for resolution, and used directly (if hosted on an approved host) or automatically rehosted to your configured image host.
-- `skip_tracker_descriptions` (bool): Only grab IDs from trackers (skip description parsing).
+- `tracker_description_mode` (str, required): Import policy for other tracker releases: `ids`, `images`, `text`, or `text_and_images`.
+- `tracker_search_concurrency` (int): Maximum number of tracker IDs queried concurrently; default `4`.
 
 Implementation notes:
 
 - `tracker_pass_checks` is used to determine how many trackers must pass early validation before continuing (see `upload.py`).
-- `skip_tracker_descriptions` and `keep_images` influence how much another tracker description is scraped/merged. The options are independent.
+- `tracker_description_mode` is the only configuration that controls imported tracker description text and screenshots. `--onlyID` temporarily forces `ids` for that execution.
 
 ### Sonarr / Radarr integration
 
@@ -298,9 +300,32 @@ Implementation notes:
 - If the exmaple-config does not contain the option for a tracker, then the tracker does not support that specific config option.
 
 Some trackers authenticate via cookies instead of an API key.
-If comments in `example_config.py` mention cookies, they are typically expected as a Netscape cookie file in:
+If comments in `example_config.py` mention cookies, they are typically expected as a Netscape cookie file.
 
-- `data/cookies/<TRACKER>.txt`
+### How to Export Cookies
+
+If the tracker configuration in `example_config.py` mentions cookies, they must be exported in Netscape format and placed in:
+
+- `data/cookies/<TRACKER>.txt` (e.g., `data/cookies/MAKINGOFF.txt` or `data/cookies/AVISTAZ.txt`)
+
+#### Step-by-Step Guide:
+
+1. **Install a Cookie Export Extension:**
+   - **Firefox:** Use [Export Cookies](https://addons.mozilla.org/en-US/firefox/addon/export-cookies-txt/).
+   - **Chrome / Chromium-based browsers:** Use an extension like [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/cclelndahbckbenkjhflpdbgdldlbecc) or similar.
+2. **Log in to the Tracker:**
+   - Open your browser, navigate to the tracker's website, and log in to your account.
+3. **Export the Cookies:**
+   - Click the extension icon.
+   - Choose to export cookies for the active tab/domain in **Netscape** format.
+4. **Save the File:**
+   - Save or move the exported text file into the `data/cookies/` folder inside your Upload-Assistant directory.
+   - By default, name the file after the tracker (e.g., `MAKINGOFF.txt` or `AVISTAZ.txt`).
+
+> [!NOTE]
+>
+> - **BJ-Share:** Two-factor authentication (2FA) must be enabled in your profile settings; otherwise, your session cookies will expire fairly quickly.
+> - **HDTorrents:** Keep in mind that changing the site domain requires exporting the cookies again from the new domain.
 
 ### `MANUAL`
 
@@ -334,7 +359,8 @@ Typical keys:
 - `linking` (str): `"symlink"`, `"hardlink"`, or empty to disable.
 - `allow_fallback` (bool): Fallback to original path injection if linking fails.
 - `linked_folder` (list[str]): Destination folder(s) for linked content. This is the top level directory that will contain the linked content.
-- `local_path` / `remote_path` (list[str]): Local/remote path mapping (docker/seedbox), case-sensitive. Local path is how UA sees the content, remote path is how the client sees the content.
+- `local_path` / `remote_path` (list[str]): Local/remote path mapping (docker/seedbox), matched case-insensitively. Local path is how UA sees the content, remote path is how the client sees the content.
+- `link_dir_name` (str): Optional single directory name for linked content. Path separators, parent traversal, absolute paths, and Windows drive/device names are rejected.
 - `torrent_storage_dir` (str, optional): Only needed if API searching doesn’t work. Falls back to search the client storage directory for existing torrents.
 
 ### ruTorrent / rTorrent
@@ -364,21 +390,6 @@ Typical keys:
 - `watch_folder` (str): Path to a watch folder where `.torrent` files should be dropped.
 
 ---
-
-## `DISCORD` section
-
-Enables an optional Discord bot.
-
-Install `requirements-discord.txt` before enabling this section.
-
-- `use_discord` (bool): Enable Discord bot.
-- `only_unattended` (bool): Only run the bot in unattended mode.
-- `send_upload_links` (bool): Send tracker torrent URLs.
-- `discord_bot_token` (str): Bot token.
-- `discord_channel_id` (str): Target channel.
-- `discord_bot_description` (str): Bot description.
-- `command_prefix` (str): Command prefix (example `!`).
-- See https://github.com/Audionut/Upload-Assistant/wiki/Discord-Bot
 
 ### Tracker overridable settings
 

@@ -16,12 +16,13 @@ from bs4 import BeautifulSoup, Tag
 from langcodes.tag_parser import LanguageTagError
 from unidecode import unidecode
 
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
+from src.temp_paths import screenshots_dir
 from src.tmdb import TmdbManager
 from src.trackers.common import Common
 
@@ -49,6 +50,8 @@ class BJShare:
     secret_token: str = ""
     already_has_the_info: bool = False
     database_title: str = ""
+    database_identifier: str = ""
+    database_overview: str = ""
     tmdb_localization_requirements: ClassVar = {
         "pt-BR": {
             "main": "credits,videos,content_ratings",
@@ -162,12 +165,10 @@ class BJShare:
 
             return True
 
-        subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
-        if not subtitles and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
-            return await self.common.prompt_user_for_confirmation(
-                f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
-            )
-        return subtitles
+        if not bool(meta.subtitle_files):
+            return await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
+
+        return True
 
     async def validate_credentials(self, meta: Meta) -> bool:
         cookie_jar = await self.cookie_validator.load_session_cookies(meta, self.tracker)
@@ -562,7 +563,7 @@ class BJShare:
             if BJShare.database_title:
                 original_title = BJShare.database_title
 
-            main_tmdb_data = meta.tmdb_localized_data.get("pt-BR", {}).get("main") or {}
+            main_tmdb_data = dict(meta.tmdb_localized_data.get("pt-BR", {}).get("main")) or {}
             tmdb_title = main_tmdb_data.get("name") or main_tmdb_data.get("title")
 
             original_titles_to_compare = (
@@ -635,9 +636,6 @@ class BJShare:
 
     async def get_tags(self, meta: Meta) -> str:
         """Map genres from meta.genres or TMDB to Portuguese tags."""
-        if BJShare.already_has_the_info:
-            return ""
-
         matched_tags: list[str] = []
 
         genres_list = meta.genres or meta.keywords or []
@@ -662,11 +660,16 @@ class BJShare:
 
         # If we have matched tags, return them
         if matched_tags:
-            return ", ".join(matched_tags)
+            return unidecode(", ".join(matched_tags))
 
         # Final fallback: ask user
-        tags_raw = await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
-        return (tags_raw or "").strip()
+        if meta.unattended and not meta.unattended_confirm:
+            logger.info(f"{self.tracker}: [yellow]Unattended mode: Gêneros não encontrados. Plando upload para {self.tracker}.[/yellow]")
+            meta.skipping = f"{self.tracker}"
+            return ""
+
+        tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
+        return unidecode((tags_raw or "").strip())
 
     def get_database_title(self, soup: BeautifulSoup) -> str:
         """
@@ -696,24 +699,72 @@ class BJShare:
 
         return original_title
 
-    async def search_existing(self, meta: Meta) -> list[dict[str, str]]:
-        dupes: list[dict[str, str]] = []
+    def get_database_identifier(self, soup: BeautifulSoup) -> str:
+        """Return the IMDb or TMDb identifier used by an existing BJShare group."""
+        for box in soup.find_all("div", class_="box"):
+            header = box.find("div", class_="head")
+            if not header or "Informações" not in header.get_text():
+                continue
+
+            for row in box.find_all("tr"):
+                cells = row.find_all("td")
+                if len(cells) < 2:
+                    continue
+
+                label = cells[0].get_text(" ", strip=True).lower()
+                link = cells[1].find("a", href=True)
+                href = str(link.get("href", "")) if link else ""
+
+                if "imdb" in label:
+                    match = re.search(r"tt\d+", href, re.IGNORECASE)
+                    if match:
+                        return match.group(0).lower()
+
+                if "tmdb" in label:
+                    match = re.search(r"themoviedb\.org/(movie|tv)/(\d+)", href, re.IGNORECASE)
+                    if match:
+                        return f"{match.group(1).lower()}/{match.group(2)}"
+
+        return ""
+
+    def get_database_overview(self, soup: BeautifulSoup) -> str:
+        """Extract the existing overview/synopsis from a BJShare group details page."""
+        desc_box = soup.find("div", class_="torrent_description")
+        if not desc_box:
+            return ""
+
+        for bq in desc_box.find_all("blockquote"):
+            if bq.find("iframe") or "center" in bq.get("class", []):
+                continue
+            text = bq.get_text(strip=True)
+            if text:
+                return text
+
+        body = desc_box.find("div", class_="body") or desc_box
+        for tag in body.find_all(["iframe", "script", "style"]):
+            tag.decompose()
+        return body.get_text(strip=True)
+
+    async def search_existing(self, meta: Meta) -> list[dict[str, str | list[str]]]:
+        dupes: list[dict[str, str | list[str]]] = []
         category = meta.category
         title = meta.title
         if category == "BOOK" and meta.title:
             title = self.common.portuguese_title_capitalization(meta.title)
         search_url = f"{self.base_url}/torrents.php"
+        params = {"searchstr": title}
 
+        media_search_terms: list[str] = []
         if category in ("TV", "MOVIE"):
-            if not dict(meta.imdb_info).get("imdbID"):
-                logger.info(f"{self.tracker}: [bold red]IMDb ID not found in metadata. Skipping duplicate check.[/bold red]")
-                return dupes
+            imdb_id = str(dict(meta.imdb_info).get("imdbID", "")).strip()
+            if imdb_id:
+                media_search_terms.append(imdb_id)
 
-            params = {
-                "searchstr": meta.imdb_info["imdbID"],
-            }
+            tmdb_id = str(meta.tmdb_id or "").strip()
+            if tmdb_id:
+                media_search_terms.append(f"{category.lower()}/{tmdb_id}")
 
-        if category == "BOOK":
+        elif category == "BOOK":
             filter_cat = "11" if meta.audiobook else "10"
             params = {
                 "searchstr": title,
@@ -742,21 +793,60 @@ class BJShare:
 
         BJShare.already_has_the_info = False
         BJShare.database_title = ""
+        BJShare.database_identifier = ""
+        BJShare.database_overview = ""
 
-        response = await self.session.get(search_url, params=params, follow_redirects=True)
-        response.raise_for_status()
-        if "login.php" in str(response.url) or "login.php" in response.text:
-            await self.cookie_validator.handle_validation_failure(meta, self.tracker, response.text)
-            meta.skipping = f"{self.tracker}"
-            return dupes
+        search_params = [params]
+        title_already_queried = False
+        if category in ("TV", "MOVIE"):
+            # Query both exact IDs. The first group page found is retained, while
+            # a title search remains available for older groups lacking either ID.
+            search_params = [{"searchstr": term} for term in dict.fromkeys(media_search_terms)]
+            title_already_queried = not search_params
+            if not search_params:
+                search_params.append({"searchstr": title})
 
-        # Extract auth token if present
-        auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", response.text)
-        if auth_match:
+        response: httpx.Response | None = None
+        fallback_response: httpx.Response | None = None
+        for query_params in search_params:
+            candidate = await self.session.get(search_url, params=query_params, follow_redirects=True)
+            candidate.raise_for_status()
+            if "login.php" in str(candidate.url) or "login.php" in candidate.text:
+                await self.cookie_validator.handle_validation_failure(meta, self.tracker, candidate.text)
+                meta.skipping = f"{self.tracker}"
+                return dupes
+
+            auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", candidate.text)
+            if not auth_match:
+                logger.info(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
+                meta.skipping = f"{self.tracker}"
+                return dupes
             BJShare.secret_token = auth_match.group(1)
-        else:
-            logger.info(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
-            meta.skipping = f"{self.tracker}"
+
+            fallback_response = candidate
+            if response is None and BeautifulSoup(candidate.text, "html.parser").find("div", class_="main_column"):
+                response = candidate
+
+        if category in ("TV", "MOVIE") and response is None and title and not title_already_queried and title not in media_search_terms:
+            candidate = await self.session.get(search_url, params={"searchstr": title}, follow_redirects=True)
+            candidate.raise_for_status()
+            if "login.php" in str(candidate.url) or "login.php" in candidate.text:
+                await self.cookie_validator.handle_validation_failure(meta, self.tracker, candidate.text)
+                meta.skipping = f"{self.tracker}"
+                return dupes
+
+            auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", candidate.text)
+            if not auth_match:
+                logger.info(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
+                meta.skipping = f"{self.tracker}"
+                return dupes
+            BJShare.secret_token = auth_match.group(1)
+            fallback_response = candidate
+            if BeautifulSoup(candidate.text, "html.parser").find("div", class_="main_column"):
+                response = candidate
+
+        response = response or fallback_response
+        if response is None:
             return dupes
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -769,6 +859,8 @@ class BJShare:
         if torrent_details_table:
             BJShare.already_has_the_info = True
             BJShare.database_title = self.get_database_title(soup)
+            BJShare.database_identifier = self.get_database_identifier(soup)
+            BJShare.database_overview = self.get_database_overview(soup)
 
             for row in torrent_details_table.find_all("tr"):
                 row_id = row.get("id")
@@ -811,7 +903,7 @@ class BJShare:
                         names.append(BJShare.database_title.strip())
 
                     for n in names:
-                        dupe_entry = {
+                        dupe_entry: dict[str, str | list[str]] = {
                             "name": n,
                             "size": size,
                             "link": link,
@@ -1040,9 +1132,9 @@ class BJShare:
         category = meta.category
 
         if category in ("MOVIE", "TV"):
-            cover_path = self.main_tmdb_data.get("poster_path") or meta.tmdb_poster
+            cover_path = self.main_tmdb_data.get("poster_path") or meta.tmdb_poster_path
             if not cover_path:
-                logger.info("Nenhum poster_path encontrado nos dados do TMDB.", extra={"markup": False})
+                logger.info(f"{self.tracker}: Nenhum poster_path encontrado nos dados do TMDB.", extra={"markup": False})
                 return None
 
             cover_tmdb_url = f"https://image.tmdb.org/t/p/w500{cover_path}"
@@ -1061,7 +1153,7 @@ class BJShare:
                 return None
 
         if category in ("BOOK", "GAME"):
-            cover_path = meta.cover_path
+            cover_path = meta.artwork_path
             if not cover_path or not await self.common.path_exists(cover_path):
                 logger.info("Nenhum cover_path válido encontrado.", extra={"markup": False})
                 return None
@@ -1078,8 +1170,8 @@ class BJShare:
         return None
 
     async def get_screenshots(self, meta: Meta) -> list[str]:
-        screenshot_dir = Path(meta.base_dir) / "tmp" / meta.uuid
-        local_files = sorted([f for f in screenshot_dir.glob("*.png") if "POSTER" not in f.stem.upper() and "COVER" not in f.stem.upper()])
+        screens_dir = screenshots_dir(meta.base_dir, meta.uuid)
+        local_files = sorted(screens_dir.glob("*.png"))
 
         disc_menu_links = [img.get("raw_url") for img in meta.menu_images if img.get("raw_url")][:3]
 
@@ -1096,7 +1188,7 @@ class BJShare:
                 filename = Path(urlparse(url).path).name or "screenshot.png"
                 return await self.img_host(image_bytes, filename)
             except Exception as e:
-                logger.info(f"Failed to process screenshot from URL {url}: {e}", extra={"markup": False})
+                logger.info(f"{self.tracker}: Failed to process screenshot from URL {url}: {e}", extra={"markup": False})
                 return None
 
         results: list[str] = []
@@ -1279,10 +1371,15 @@ class BJShare:
             return ", ".join(unique_names)
 
         display_name = prompt_labels.get(role, role.capitalize())
+        if meta.unattended and not meta.unattended_confirm:
+            logger.info(f"{self.tracker}: [yellow]Unattended mode: {display_name} não encontrado(s). Plando upload para {self.tracker}.[/yellow]")
+            meta.skipping = f"{self.tracker}"
+            return "skipped"
+
         suffix = " (apenas uma pessoa)" if role in ("director", "creator") else " (separados por vírgula)"
         prompt_message = f"{display_name} não encontrado(s).\nPor favor, insira manualmente{suffix}: "
 
-        user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f"{prompt_message}")
+        user_input_raw = await prompt_in_thread(cli_ui.ask_string, f"{prompt_message}")
         user_input = (user_input_raw or "").strip()
         if user_input:
             entered_names = [name.strip() for name in user_input.split(",")]
@@ -1378,7 +1475,7 @@ class BJShare:
             return results
 
         except Exception as e:
-            logger.info(f"[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
             import traceback
 
             logger.info(traceback.format_exc())
@@ -1487,7 +1584,7 @@ class BJShare:
                     "remaster_title": self.build_remaster_title(meta),
                     "resolucaoh": height,
                     "resolucaow": width,
-                    "sinopse": await self.get_overview(),
+                    "sinopse": await self.get_overview(meta),
                     "tags": await self.get_tags(meta),
                     "tipolegenda": await self.get_subtitle(meta),
                     "title": original_title,
@@ -1652,12 +1749,16 @@ class BJShare:
     def get_imdblink(self, meta: Meta) -> str:
         """
         Get the media identifier for the upload.
-        Uses IMDb ID as primary source, falling back to TMDb ID if unavailable.
+        Uses the identifier from an existing BJShare group when available, then
+        falls back to IMDb and TMDb metadata.
 
         Accepted formats:
             IMDb: tt12345
             TMDb: movie/12345 or tv/12345
         """
+        if BJShare.database_identifier:
+            return BJShare.database_identifier
+
         imdb_info = dict(meta.imdb_info)
         imdbid = str(imdb_info.get("imdbID", ""))
         if imdbid:
@@ -1671,16 +1772,23 @@ class BJShare:
 
         return ""
 
-    async def get_overview(self) -> str:
-        if BJShare.already_has_the_info:
-            return ""
+    async def get_overview(self, meta: Meta | None = None) -> str:
+        database_overview = BJShare.database_overview
+        if database_overview:
+            logger.debug(f"{self.tracker}: Using database overview: {database_overview[:50]}...")
+            return database_overview
 
         overview = self.main_tmdb_data.get("overview", "")
         if isinstance(overview, str) and overview.strip():
             return overview
 
+        if meta and meta.unattended and not meta.unattended_confirm:
+            logger.info(f"{self.tracker}: [yellow]Sinopse não encontrada em modo unattended. Plando upload para {self.tracker}.[/yellow]")
+            meta.skipping = f"{self.tracker}"
+            return ""
+
         logger.info(f"{self.tracker}: [bold red]Sinopse não encontrada no TMDb. Por favor, insira manualmente.[/bold red]")
-        user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f'"{self.tracker}: [green]Digite a sinopse:[/green]"')
+        user_input_raw = await prompt_in_thread(cli_ui.ask_string, f'"{self.tracker}: [green]Digite a sinopse:[/green]"')
         user_input = (user_input_raw or "").strip()
         if user_input:
             return user_input
@@ -1710,7 +1818,12 @@ class BJShare:
         return ""
 
     async def upload(self, meta: Meta):
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
+
         data = await self.get_data(meta)
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
 
         issue = self.check_data(meta, data)
         if issue:

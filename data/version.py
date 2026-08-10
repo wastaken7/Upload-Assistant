@@ -1,16 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
-__version__ = "v2.6"
+__version__ = "v3.3"
 
-"""
-## What's Changed
-* fix: improve BrasilTracker typing and audio formats by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/83
-* feat(web): add path queueing and tracker selector by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/82
-* fix(ulcx): update upload validation rules by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/84
-* feat(web): use project logo in UI by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/85
-* fix(webui): hide trackers while running by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/86
-* fix(webui): add yes/no prompt actions by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/87
-* fix: correct tracker names and QUI bandwidth by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/88
-
-**Full Changelog**: https://github.com/wastaken7/Upload-Assistant/compare/v2.5...v2.6
-"""
+"## What's Changed\n* refactor: reorganize project structure and update documentation links by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/197\n* refactor(passthepopcorn): use self.tracker for configuration lookups by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/210\n* fix: usenet archive retry after screenshot cleanup by @unchain0 in https://github.com/wastaken7/Upload-Assistant/pull/198\n* Add RetroMoviesClub tracker support by @FortKnox1337 in https://github.com/wastaken7/Upload-Assistant/pull/200\n* Add NordicQuality tracker support by @FortKnox1337 in https://github.com/wastaken7/Upload-Assistant/pull/202\n* style(screenshots): use outline in frame overlay by @fancychain in https://github.com/wastaken7/Upload-Assistant/pull/204\n* fix(cli): accept multiple paths from stdin by @unchain0 in https://github.com/wastaken7/Upload-Assistant/pull/203\n* fix(darkpeers): limit spectrograms to music by @unchain0 in https://github.com/wastaken7/Upload-Assistant/pull/205\n* fix(darkpeers): enforce TV title rules by @unchain0 in https://github.com/wastaken7/Upload-Assistant/pull/206\n* fix(darkpeers): reject episodes covered by season packs by @unchain0 in https://github.com/wastaken7/Upload-Assistant/pull/207\n* feat(capybarabr): fetch banned groups dynamically from API by @wastaken7 in https://github.com/wastaken7/Upload-Assistant/pull/215\n* feat: add MidnightScene image host support by @FortKnox1337 in https://github.com/wastaken7/Upload-Assistant/pull/211\n\n## New Contributors\n* @FortKnox1337 made their first contribution in https://github.com/wastaken7/Upload-Assistant/pull/200\n* @fancychain made their first contribution in https://github.com/wastaken7/Upload-Assistant/pull/204\n\n**Full Changelog**: https://github.com/wastaken7/Upload-Assistant/compare/v3.2...v3.3"

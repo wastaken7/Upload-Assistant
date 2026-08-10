@@ -14,11 +14,12 @@ import httpx
 import requests
 import tmdbsimple as tmdb
 
-from cogs.redaction import Redaction
 from src.bbcode import BBCODE
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
+from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 
 Config = dict[str, Any]
@@ -38,7 +39,17 @@ class TVChaosUK:
     source_flag = "TVCHAOS"
     signature = ""
     banned_groups = ()
-    approved_image_hosts = ("imgbb", "ptpimg", "imgbox", "pixhost", "bam", "onlyimage")
+    approved_image_hosts = ("imgbb", "imgbox", "pixhost", "bam", "onlyimage")
+    image_host_policy = ImageHostPolicy(
+        {
+            "ibb.co": "imgbb",
+            "imgbox.com": "imgbox",
+            "pixhost.to": "pixhost",
+            "imagebam.com": "bam",
+            "onlyimage.org": "onlyimage",
+        },
+        approved_image_hosts,
+    )
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
@@ -90,11 +101,14 @@ class TVChaosUK:
             return date_str
 
     async def _read_base_description(self, meta: Meta) -> str:
-        """Read the base DESCRIPTION.txt file if it exists."""
-        try:
-            return await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt")
-        except FileNotFoundError:
-            return ""
+        """Load a saved base description without blocking the event loop."""
+        from src.description_review import get_base_description
+
+        draft_meta = meta.copy()
+        description = await asyncio.to_thread(get_base_description, draft_meta)
+        for key in ("description", "description_override", "saved_description"):
+            meta[key] = draft_meta.get(key)
+        return description
 
     def _ensure_desc_directory(self, meta: Meta, tracker: str) -> str:
         """Create description directory and return file path."""
@@ -336,7 +350,7 @@ class TVChaosUK:
 
             await asyncio.to_thread(_write)
         except OSError as e:
-            logger.warning(f"[yellow]Warning: Failed to write description file: {e}[/yellow]")
+            logger.warning(f"{self.tracker}: [yellow]Warning: Failed to write description file: {e}[/yellow]")
 
     async def get_cat_id(self, genres: list[str]) -> str:
         """
@@ -435,23 +449,10 @@ class TVChaosUK:
 
         return await asyncio.to_thread(_read)
 
-    async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "ptpimg.me": "ptpimg",
-            "imgbox.com": "imgbox",
-            "pixhost.to": "pixhost",
-            "imagebam.com": "bam",
-            "onlyimage.org": "onlyimage",
-        }
-
-        await self.rehost_images_manager.check_hosts(meta, self.tracker, url_host_mapping=url_host_mapping, img_host_index=1, approved_image_hosts=self.approved_image_hosts)
-        return
-
     async def upload(self, meta: Meta) -> bool | None:
         common = Common(config=self.config)
 
-        raw_images = meta.TVC_images_key if meta.TVC_images_key is not None else meta.get("image_list", [])
+        raw_images = get_tracker_image_collection(meta, self.tracker, "screenshots")
         image_list_seq: list[Any]
         if isinstance(raw_images, list):
             image_list_seq = raw_images
@@ -469,7 +470,7 @@ class TVChaosUK:
             content = await self.read_file(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MediaInfo.json")
             mi = cast(dict[str, Any], json.loads(content))
         except (FileNotFoundError, json.JSONDecodeError) as e:
-            logger.warning(f"[yellow]Warning: Could not load MediaInfo.json: {e}")
+            logger.warning(f"{self.tracker}: [yellow]Warning: Could not load MediaInfo.json: {e}")
             mi = {}
 
         cat_id = await self.get_cat_id(meta.genres) if meta.category == "TV" else "44"
@@ -500,7 +501,7 @@ class TVChaosUK:
         desc = await self.edit_desc(meta, self.tracker, self.signature, image_list)
 
         if not desc:
-            logger.warning(f"[yellow]Warning: DESCRIPTION.txt file not found at {descfile_path}")
+            logger.warning(f"{self.tracker}: [yellow]Warning: tracker-specific description file not found at {descfile_path}")
             desc = ""
 
         # Naming logic
@@ -650,7 +651,7 @@ class TVChaosUK:
                 return False
 
         else:
-            logger.info("[cyan]TVCHAOSUK Request Data:")
+            logger.info(f"{self.tracker}: Request Data:")
             logger.info(Redaction.redact_private_info(data))
             tracker_status = meta.tracker_status
             tracker_status.setdefault(self.tracker, {})
@@ -705,10 +706,10 @@ class TVChaosUK:
         if meta.category == "MOVIE":
             # Everything movie-specific is already handled
             if meta.debug and meta.tmdb is not None:
-                logger.info("[yellow]Fetching TMDb movie details[/yellow]")
+                logger.info(f"{self.tracker}: [yellow]Fetching TMDb movie details[/yellow]")
                 movie = tmdb.Movies(meta.tmdb)
                 response = cast(Any, movie).info()
-                logger.info(f"[cyan]DEBUG: Movie data: {response}[/cyan]")
+                logger.info(f"{self.tracker}: [cyan]DEBUG: Movie data: {response}[/cyan]")
             return {}
 
         if meta.category == "TV":
@@ -771,11 +772,11 @@ class TVChaosUK:
                         meta.episodes = episodes
 
             except (requests.exceptions.RequestException, KeyError, TypeError) as e:
-                logger.info(f"[yellow]Expected error while fetching TV episode/season info: {e}")
+                logger.info(f"{self.tracker}: [yellow]Expected error while fetching TV episode/season info: {e}")
                 logger.info(traceback.format_exc())
 
                 logger.info(
-                    f"Unable to get episode information, Make sure episode {meta.season}{meta.episode} exists in TMDB.\n"
+                    f"{self.tracker}: Unable to get episode information, Make sure episode {meta.season}{meta.episode} exists in TMDB.\n"
                     f"https://www.themoviedb.org/tv/{meta.tmdb}/season/{meta.season_int}"
                 )
                 year_str = str(meta.year) if meta.year is not None else ""
@@ -790,7 +791,7 @@ class TVChaosUK:
     async def get_additional_checks(self, meta: Meta) -> bool:
         # UHD, Discs, remux and non-1080p HEVC are not allowed on TVCHAOSUK.
         if meta.resolution == "2160p" or (meta.is_disc or "REMUX" in str(meta.type)) or (meta.video_codec == "HEVC" and meta.resolution != "1080p"):
-            logger.info("[bold red]No UHD, Discs, Remuxes or non-1080p HEVC allowed at TVCHAOSUK[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]No UHD, Discs, Remuxes or non-1080p HEVC allowed at TVCHAOSUK[/bold red]")
             return False
         return True
 
@@ -798,8 +799,8 @@ class TVChaosUK:
         # Search on TVCUK has been DISABLED due to issues, but we can still skip uploads based on criteria
         dupes: list[dict[str, Any]] = []
 
-        logger.info("[red]Cannot search for dupes on TVCHAOSUK at this time.[/red]")
-        logger.info("[red]Please make sure you are not uploading duplicates.")
+        logger.info(f"{self.tracker}: [red]Cannot search for dupes on TVCHAOSUK at this time.[/red]")
+        logger.info(f"{self.tracker}: [red]Please make sure you are not uploading duplicates.")
         await asyncio.sleep(2)
 
         return dupes
@@ -813,13 +814,13 @@ class TVChaosUK:
         comparison: bool = False,
     ) -> str:
         """
-        Build and write the tracker-specific DESCRIPTION.txt file (FNP multi-block style).
+        Build and write the tracker-specific debug description file (FNP multi-block style).
 
         Constructs BBCode-formatted description text for discs, TV packs,
         episodes, or movies using multiple separate [center] blocks.
         Always writes a non-empty description file to tmp/<uuid>/[TVCHAOSUK]DESCRIPTION.txt.
         """
-        # Read base description file
+        # Read the authoritative in-memory base description.
         base = await self._read_base_description(meta)
 
         # Ensure output directory exists

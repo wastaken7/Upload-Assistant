@@ -23,7 +23,39 @@ jobs:
         run: python -m pip install -r requirements.txt
 
       - name: Compile Python sources
-        run: python -m compileall src web_ui upload.py discordbot.py config-generator.py
+        run: python -m compileall src web_ui upload.py config-generator.py
+
+  tests:
+    name: Pytest (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Ubuntu
+            runner: ubuntu-24.04
+          - os: Windows
+            runner: windows-2025
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt pytest pytest-asyncio
+
+      - name: Create test configuration
+        shell: pwsh
+        run: Copy-Item data/example_config.py data/config.py
+
+      - name: Run pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -m pytest -q
 
   docker-build:
     name: Docker build validation (${{ matrix.arch }})

@@ -7,11 +7,14 @@ from typing import Any, cast
 import aiofiles
 import cli_ui
 import httpx
+from rich.markup import escape
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
+from src.description_review import get_base_description
 from src.meta import Meta
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
+from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 
 
@@ -57,7 +60,17 @@ class BEYONDHD:
         "x0r",
         "YIFY",
     )
-    approved_image_hosts = ("ptpimg", "imgbox", "imgbb", "pixhost", "bhd", "bam")
+    approved_image_hosts = ("imgbox", "imgbb", "pixhost", "bhd", "bam")
+    image_host_policy = ImageHostPolicy(
+        {
+            "ibb.co": "imgbb",
+            "pixhost.to": "pixhost",
+            "imgbox.com": "imgbox",
+            "beyondhd.co": "bhd",
+            "imagebam.com": "bam",
+        },
+        approved_image_hosts,
+    )
     base_url = "https://beyond-hd.me"
     upload_url = f"{base_url}/api/upload/"
     torrent_url = f"{base_url}/details/"
@@ -71,25 +84,6 @@ class BEYONDHD:
         self.tracker_config = cast(dict[str, Any], trackers_cfg.get("BEYONDHD", {}))
         api_key = str(self.tracker_config.get("api_key", "")).strip()
         self.requests_url = f"{self.base_url}/api/requests/{api_key}"
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "ptpimg.me": "ptpimg",
-            "pixhost.to": "pixhost",
-            "imgbox.com": "imgbox",
-            "beyondhd.co": "bhd",
-            "imagebam.com": "bam",
-        }
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            url_host_mapping=url_host_mapping,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
 
     async def upload(self, meta: Meta) -> bool:
         common = Common(config=self.config)
@@ -171,14 +165,14 @@ class BEYONDHD:
                     response = await client.post(url=url, files=files, data=data, headers=headers)
                     response_json = cast(dict[str, Any], response.json())
                     if int(response_json["status_code"]) == 0:
-                        logger.info(f"[red]{response_json['status_message']}")
+                        logger.info(f"{self.tracker}: [red]{escape(response_json['status_message'])}")
                         if response_json["status_message"].startswith("Invalid imdb_id"):
-                            logger.info("[yellow]RETRYING UPLOAD")
+                            logger.info(f"{self.tracker}: [yellow]RETRYING UPLOAD")
                             data["imdb_id"] = 1
                             response = await client.post(url=url, files=files, data=data, headers=headers)
                             response_json = cast(dict[str, Any], response.json())
                         elif response_json["status_message"].startswith("Invalid name value"):
-                            logger.info(f"[bold yellow]Submitted Name: {bhd_name}")
+                            logger.info(f"{self.tracker}: [bold yellow]Submitted Name: {escape(bhd_name)}")
 
                     if "status_message" in response_json:
                         match = re.search(rf"{re.escape(self.base_url)}/torrent/download/.*\.(\d+)\.", response_json["status_message"])
@@ -198,7 +192,7 @@ class BEYONDHD:
                 meta.tracker_status[self.tracker]["status_message"] = f"data error: {e}"
                 return False
         else:
-            logger.info("[cyan]BEYONDHD Request Data:")
+            logger.info(f"{self.tracker}: Request Data:")
             logger.info(Redaction.redact_private_info(data))
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
             await common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
@@ -209,7 +203,7 @@ class BEYONDHD:
                 await common.create_torrent_ready_to_seed(meta, self.tracker, self.source_flag, self.config["TRACKERS"][self.tracker].get("announce_url"), details_link)
                 return True
             except Exception as e:
-                logger.info(f"Error while editing the torrent file: {e}")
+                logger.info(f"{self.tracker}: Error while editing the torrent file: {e}")
                 return False
         else:
             return False
@@ -275,9 +269,19 @@ class BEYONDHD:
 
     async def edit_desc(self, meta: Meta) -> None:
         desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
-        base_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt"
-        async with aiofiles.open(base_path, encoding="utf-8") as f:
-            base = await f.read()
+        base = get_base_description(meta)
+        for collection_name in ("menu_images", "spectrograms_images"):
+            original_images = getattr(meta, collection_name, [])
+            rehosted_images = get_tracker_image_collection(meta, self.tracker, collection_name)
+            if not isinstance(original_images, list) or not isinstance(rehosted_images, list):
+                continue
+            for original, rehosted in zip(original_images, rehosted_images, strict=False):
+                if not isinstance(original, dict) or not isinstance(rehosted, dict):
+                    continue
+                original_url = original.get("raw_url")
+                rehosted_url = rehosted.get("raw_url")
+                if isinstance(original_url, str) and isinstance(rehosted_url, str) and original_url != rehosted_url:
+                    base = base.replace(original_url, rehosted_url)
         async with aiofiles.open(desc_path, "w", encoding="utf-8") as desc:
             discs = cast(list[dict[str, Any]], meta.discs or [])
             if discs:
@@ -332,8 +336,8 @@ class BEYONDHD:
                     await desc.write(tonemapped_header)
                     await desc.write("\n\n")
             except Exception as e:
-                logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
-            images = cast(list[dict[str, Any]], meta.get(f"{self.tracker}_images_key") or meta.image_list or [])
+                logger.warning(f"{self.tracker}: [yellow]Warning: Error setting tonemapped header: {escape(str(e))}[/yellow]")
+            images = cast(list[dict[str, Any]], get_tracker_image_collection(meta, self.tracker, "screenshots"))
             if len(images) > 0:
                 await desc.write("[align=center]")
                 for each in range(len(images[: meta.screens])):
@@ -376,7 +380,7 @@ class BEYONDHD:
             )
         ):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info("[bold red]This is an internal BEYONDHD release, skipping upload[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]This is an internal {self.tracker} release, skipping upload[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:
@@ -385,16 +389,18 @@ class BEYONDHD:
                 return False
 
         if not meta.valid_mi_settings:
-            logger.info(f"[bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]No encoding settings in mediainfo, skipping {self.tracker} upload.[/bold red]")
             return False
 
         if meta.type in ["REMUX", "ENCODE", "WEBDL", "WEBRIP"] and meta.container not in ["mkv", "mp4"]:
-            logger.info(f"[bold red]Container '{meta.container}' is not allowed for {meta.type}. Only MKV and MP4 are permitted. Skipping upload.[/bold red]")
+            logger.info(
+                f"{self.tracker}: [bold red]Container '{escape(str(meta.container))}' is not allowed for {escape(str(meta.type))}. Only MKV and MP4 are permitted. Skipping upload.[/bold red]"
+            )
             return False
 
         if meta.type not in ["WEBDL"] and meta.tag and any(x in meta.tag for x in ["EVO"]):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
-                logger.info(f"[bold red]Group {meta.tag} is only allowed for raw type content at BEYONDHD[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Group {escape(str(meta.tag))} is only allowed for raw type content at {self.tracker}[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
                     pass
                 else:

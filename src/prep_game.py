@@ -4,6 +4,7 @@ import contextlib
 import datetime
 import html
 import io
+import json
 import os
 import re
 import shutil
@@ -19,6 +20,8 @@ from PIL import Image
 from src.console import logger
 from src.igdb import IGDBAPI
 from src.meta import Meta
+from src.metadata_cache import cache_for, is_cache_miss
+from src.temp_paths import artwork_dir
 
 
 def normalize_version(version_str: str) -> str:
@@ -668,20 +671,17 @@ async def gather_game_prep(
         if cover_url.startswith("//"):
             cover_url = "https:" + cover_url
         cover_url = cover_url.replace("t_thumb", "t_cover_big")
-        meta.poster = cover_url
-        meta.cover_path = cover_url
+        meta.artwork_url = cover_url
 
         # Download and save cover locally as POSTER.png
-        tmp_dir = Path(base_dir) / "tmp" / meta.uuid
-        Path(tmp_dir).mkdir(parents=True, exist_ok=True)
-        poster_png_path = Path(tmp_dir) / "POSTER.png"
+        poster_png_path = artwork_dir(base_dir, meta.uuid) / "POSTER.png"
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(cover_url)
                 if response.status_code == 200:
                     img = Image.open(io.BytesIO(response.content))
                     img.save(poster_png_path, "PNG")
-                    meta.cover_path = poster_png_path
+                    meta.artwork_path = str(poster_png_path)
                     logger.info("[green]IGDB: Cover downloaded and saved to POSTER.png[/green]")
                 else:
                     logger.info(f"[yellow]IGDB: Failed to download cover. Status: {response.status_code}[/yellow]")
@@ -825,31 +825,42 @@ async def gather_game_prep(
             params["l"] = "brazilian"
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(url, params=params)
+            cache = cache_for(base_dir, config)
+            cache_key = json.dumps(params, sort_keys=True)
+            res_data = await cache.get("steam", "appdetails", cache_key)
+            if is_cache_miss(res_data):
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.get(url, params=params)
                 if resp.status_code == 200:
                     res_data = resp.json()
-                    if res_data and steam_id in res_data and res_data[steam_id].get("success"):
-                        app_data = res_data[steam_id]["data"]
+                    if isinstance(res_data, dict):
+                        await cache.set("steam", "appdetails", cache_key, res_data, negative=not bool(res_data))
+                elif resp.status_code == 404:
+                    res_data = {}
+                    await cache.set("steam", "appdetails", cache_key, res_data, negative=True)
+                else:
+                    res_data = {}
+            if isinstance(res_data, dict) and res_data and steam_id in res_data and res_data[steam_id].get("success"):
+                app_data = res_data[steam_id]["data"]
 
-                        # Fetch localized pt-BR description from Steam if target tracker is present
-                        if any(t in target_trackers for t in trackers):
-                            desc = app_data.get("short_description") or app_data.get("about_the_game") or app_data.get("detailed_description") or ""
-                            # Strip HTML tags
-                            desc_clean = re.sub(r"<[^>]+>", "", desc).strip()
-                            desc_unescaped = html.unescape(desc_clean)
-                            if desc_unescaped:
-                                meta.localized_overviews = {"brazilian": desc_unescaped}
+                # Fetch localized pt-BR description from Steam if target tracker is present
+                if any(t in target_trackers for t in trackers):
+                    desc = app_data.get("short_description") or app_data.get("about_the_game") or app_data.get("detailed_description") or ""
+                    # Strip HTML tags
+                    desc_clean = re.sub(r"<[^>]+>", "", desc).strip()
+                    desc_unescaped = html.unescape(desc_clean)
+                    if desc_unescaped:
+                        meta.localized_overviews = {"brazilian": desc_unescaped}
 
-                        # Extract PC system requirements
-                        pc_reqs = app_data.get("pc_requirements", {})
-                        if isinstance(pc_reqs, dict):
-                            minimum = pc_reqs.get("minimum", "")
-                            recommended = pc_reqs.get("recommended", "")
-                            if minimum:
-                                meta.requirements_minimum = minimum
-                            if recommended:
-                                meta.requirements_recommended = recommended
+                # Extract PC system requirements
+                pc_reqs = app_data.get("pc_requirements", {})
+                if isinstance(pc_reqs, dict):
+                    minimum = pc_reqs.get("minimum", "")
+                    recommended = pc_reqs.get("recommended", "")
+                    if minimum:
+                        meta.requirements_minimum = minimum
+                    if recommended:
+                        meta.requirements_recommended = recommended
         except Exception as e:
             logger.info(f"[yellow]Steam: Error fetching app details: {e}[/yellow]")
 
@@ -870,7 +881,6 @@ async def gather_game_prep(
                 image_list.append({"img_url": img_url, "raw_url": raw_url, "web_url": web_url})
         if image_list:
             meta.image_list = image_list
-            import json
 
             tmp_dir = Path(base_dir) / "tmp" / meta.uuid
             Path(tmp_dir).mkdir(parents=True, exist_ok=True)

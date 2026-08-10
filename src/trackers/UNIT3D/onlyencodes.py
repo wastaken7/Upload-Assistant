@@ -1,15 +1,10 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from pathlib import Path
 from typing import Any, cast
 
-import aiofiles
-
-from src.bbcode import BBCODE
-from src.console import logger
 from src.languages import languages_manager
 from src.meta import Meta
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
@@ -25,7 +20,18 @@ class OnlyEncodes(UNIT3D):
     display_name = "OnlyEncodes"
     allows_bloated_audio = True
     base_url = "https://onlyencodes.cc"
-    approved_image_hosts = ("ptpimg", "imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage")
+    approved_image_hosts = ("imgbox", "imgbb", "onlyimage", "ptscreens", "passtheimage")
+    image_host_policy = ImageHostPolicy(
+        {
+            "ibb.co": "imgbb",
+            "imgbox.com": "imgbox",
+            "onlyimage.org": "onlyimage",
+            "imagebam.com": "bam",
+            "ptscreens.com": "ptscreens",
+            "img.passtheima.ge": "passtheimage",
+        },
+        approved_image_hosts,
+    )
     banned_groups = (
         "[Oj]",
         "$andra",
@@ -183,81 +189,6 @@ class OnlyEncodes(UNIT3D):
             meta.is_disc != "BDMV"
             and not await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["english"], check_audio=True, check_subtitle=True)
         )
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "ptpimg.me": "ptpimg",
-            "imgbox.com": "imgbox",
-            "onlyimage.org": "onlyimage",
-            "imagebam.com": "bam",
-            "ptscreens.com": "ptscreens",
-            "img.passtheima.ge": "passtheimage",
-        }
-
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            url_host_mapping=url_host_mapping,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
-        return
-
-    async def get_description(self, meta: Meta) -> dict[str, str]:
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt", encoding="utf8") as f:
-            base = await f.read()
-
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf8") as descfile:
-            await languages_manager.process_desc_language(meta, tracker=self.tracker)
-
-            bbcode = BBCODE()
-            if meta.discs != []:
-                discs = meta.discs
-                if discs[0]["type"] == "DVD":
-                    await descfile.write(f"[spoiler=VOB MediaInfo][code]{discs[0]['vob_mi']}[/code][/spoiler]\n\n")
-                if len(discs) >= 2:
-                    for each in discs[1:]:
-                        if each["type"] == "BDMV":
-                            await descfile.write(f"[spoiler={each.get('name', 'BDINFO')}][code]{each['summary']}[/code][/spoiler]\n\n")
-                        elif each["type"] == "DVD":
-                            await descfile.write(f"{each['name']}:\n")
-                            await descfile.write(
-                                f"[spoiler={Path(each['vob']).name}][code][{each['vob_mi']}[/code][/spoiler] [spoiler={Path(each['ifo']).name}][code][{each['ifo_mi']}[/code][/spoiler]\n\n"
-                            )
-                        elif each["type"] == "HDDVD":
-                            await descfile.write(f"{each['name']}:\n")
-                            await descfile.write(f"[spoiler={Path(each['largest_evo']).name}][code][{each['evo_mi']}[/code][/spoiler]\n\n")
-
-            desc = base
-            desc = bbcode.convert_pre_to_code(desc)
-            desc = bbcode.convert_hide_to_spoiler(desc)
-            desc = bbcode.convert_comparison_to_collapse(desc, 1000)
-            try:
-                tonemapped_header = self.config["DEFAULT"].get("tonemapped_header")
-                if meta.tonemapped and tonemapped_header:
-                    desc = desc + str(tonemapped_header)
-                    desc = desc + "\n\n"
-            except Exception as e:
-                logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
-            desc = desc.replace("[img]", "[img=300]")
-            await descfile.write(desc)
-            images_value = meta.get(f"{self.tracker}_images_key", meta.image_list)
-            images = cast(list[dict[str, Any]], images_value) if isinstance(images_value, list) else []
-            if len(images) > 0:
-                await descfile.write("[center]")
-                for each in range(len(images[: meta.screens])):
-                    web_url = images[each]["web_url"]
-                    raw_url = images[each]["raw_url"]
-                    await descfile.write(f"[url={web_url}][img=350]{raw_url}[/img][/url]")
-                await descfile.write("[/center]")
-
-            await descfile.write(f"\n[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]{meta.ua_signature}[/size][/url][/right]")
-
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
-            desc = await f.read()
-
-        return {"description": desc}
 
     async def get_name(self, meta: Meta) -> dict[str, str]:
         oe_name = meta.name

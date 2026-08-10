@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
 import contextlib
 import json
 import re
@@ -12,14 +13,139 @@ import aiofiles
 import cli_ui
 from rich.markup import escape
 
-from cogs.redaction import Redaction
 from src.bdinfo_comparator import compare_bdinfo, has_bdinfo_content
 from src.cleanup import cleanup_manager
-from src.console import console, logger
+from src.cogs.redaction import Redaction
+from src.config_helpers import format_terminal_link
+from src.console import logger, prompt_in_thread
 from src.meta import Meta
 from src.trackersetup import tracker_class_map
 
 DupeEntry = dict[str, Any]
+
+
+def _music_confirmation_lines(meta: Meta, missing_warning: str) -> list[tuple[str, str] | str]:
+    """Build a concise, tracker-neutral MUSIC review for the confirmation UI.
+
+    Music analysis intentionally remains in ``meta.music_release`` so tracker
+    adapters can use the full provenance-rich model.  The confirmation prompt
+    should expose the important parts of that analysis without printing local
+    paths, complete tags, or an unbounded list of warnings.
+    """
+    release = meta.music_release if isinstance(meta.music_release, dict) else {}
+    fields = release.get("fields", {}) if isinstance(release.get("fields"), dict) else {}
+    tracks = release.get("tracks", []) if isinstance(release.get("tracks"), list) else []
+    auxiliary = release.get("auxiliary", {}) if isinstance(release.get("auxiliary"), dict) else {}
+    warnings = release.get("warnings", []) if isinstance(release.get("warnings"), list) else []
+    conflicts = release.get("conflicts", {}) if isinstance(release.get("conflicts"), dict) else {}
+
+    def value(name: str, fallback: Any = "") -> Any:
+        entry = fields.get(name, {})
+        if isinstance(entry, dict) and entry.get("value") not in (None, "", [], {}):
+            return entry["value"]
+        return fallback
+
+    def source(name: str) -> str:
+        entry = fields.get(name, {})
+        source_name = entry.get("source", "") if isinstance(entry, dict) else ""
+        return {
+            "file_tag": "tags",
+            "auxiliary": "auxiliary files",
+            "directory": "folder name",
+            "external": "external metadata",
+            "user": "user input",
+            "tracker": "tracker",
+            "inferred": "inferred",
+        }.get(str(source_name), "")
+
+    def display(name: str, fallback: Any = "") -> str:
+        item = value(name, fallback)
+        if isinstance(item, list):
+            item = " & ".join(str(part) for part in item)
+        text = str(item).strip()
+        provenance = source(name)
+        return escape(text) + (f" [dim]({provenance})[/dim]" if text and provenance else "")
+
+    def technical_values(key: str, formatter: Callable[[Any], str]) -> str:
+        values = sorted({track.get(key) for track in tracks if isinstance(track, dict) and track.get(key) not in (None, "")})
+        if not values:
+            return ""
+        rendered = [formatter(item) for item in values]
+        return ", ".join(rendered) if len(rendered) <= 2 else f"{len(rendered)} variants"
+
+    artist = display("artists", value("artist", meta.artist))
+    album = display("album", meta.title)
+    year = display("year", meta.year)
+    media = display("media", meta.source)
+    release_type = display("release_type")
+    format_name = display("format", meta.format)
+    formats = technical_values("format", str)
+    codecs = technical_values("codec", str)
+    bit_depth = technical_values("bit_depth", lambda item: f"{item}-bit")
+    sample_rate = technical_values("sample_rate", lambda item: f"{int(item) / 1000:g} kHz")
+    channels = technical_values("channels", lambda item: {1: "Mono", 2: "Stereo"}.get(int(item), f"{item} channels"))
+    bitrate = technical_values("bitrate", lambda item: f"{round(int(item) / 1000)} kbps")
+    # Container and codec are commonly both "FLAC"; repeating them adds no
+    # review value, while different values (for example M4A / AAC) stay clear.
+    if formats.casefold() == codecs.casefold():
+        codecs = ""
+    technical = " / ".join(part for part in (formats or format_name, codecs, bit_depth, sample_rate, channels, bitrate) if part)
+
+    disc_count = value("disc_count", 1)
+    track_count = value("track_count", len(tracks))
+    edition = display("edition")
+    edition_year = display("edition_year")
+    release_year = display("release_year")
+    retail_date = display("retail_date")
+    release_label = display("release_label")
+    release_catalogue = display("release_catalogue_number")
+    genres = display("genres")
+
+    lines: list[tuple[str, str] | str] = [
+        ("Artist", artist or missing_warning),
+        ("Album", album or missing_warning),
+        ("Original Year", year or missing_warning),
+        ("Release Type", release_type or missing_warning),
+        ("Media", media or missing_warning),
+        ("Tracks / Discs", f"{track_count or missing_warning} / {disc_count or 1}"),
+        ("Audio", technical or format_name or missing_warning),
+    ]
+    if genres:
+        lines.append(("Genre", genres))
+    if any((release_year, retail_date, release_label, release_catalogue)):
+        release_details = " / ".join(part for part in (release_year, retail_date, release_label, release_catalogue) if part)
+        lines.append(("This Release", release_details))
+    if edition:
+        edition_details = " / ".join(part for part in (edition, edition_year) if part)
+        lines.append(("Edition", edition_details))
+
+    if re.match(r"^https?://[^/]+", str(meta.artwork_url or "").strip(), flags=re.IGNORECASE):
+        artwork = "public URL supplied"
+    elif Path(str(meta.artwork_path or "")).is_file():
+        artwork = "local/embedded artwork available"
+        if meta.debug:
+            artwork += "; host upload skipped in debug"
+    else:
+        artwork = "not found (optional for Orpheus)"
+    lines.append(("Artwork", artwork))
+
+    sidecars = []
+    for label, key in (("log", "logs"), ("cue", "cues"), ("NFO", "nfos"), ("playlist", "playlists"), ("SFV", "sfvs"), ("artwork", "artwork"), ("scan", "scans")):
+        count = len(auxiliary.get(key, [])) if isinstance(auxiliary.get(key, []), list) else 0
+        if count:
+            sidecars.append(f"{count} {label}{'' if count == 1 else 's'}")
+    if sidecars:
+        lines.append(("Auxiliary", ", ".join(sidecars)))
+
+    if conflicts:
+        names = ", ".join(str(name).replace("_", " ") for name in sorted(conflicts)[:5])
+        extra = f" (+{len(conflicts) - 5})" if len(conflicts) > 5 else ""
+        lines.append(("Metadata conflicts", f"[yellow]{escape(names)}{extra}[/yellow]"))
+    if warnings:
+        preview = "; ".join(str(item) for item in warnings[:3])
+        extra = f" (+{len(warnings) - 3} more)" if len(warnings) > 3 else ""
+        lines.append(("Music validation", f"[yellow]{escape(preview)}{extra}[/yellow]"))
+    return lines
 
 
 def parse_size_to_bytes(size_str: Any) -> int | None:
@@ -122,6 +248,12 @@ class UploadHelper:
         if not isinstance(self.default_config, dict):
             raise ValueError("'DEFAULT' config section must be a dict")
         self.tracker_class_map = cast(Mapping[str, Any], tracker_class_map)
+        self._prompt_lock = asyncio.Lock()
+
+    async def prompt_yes_no(self, question: str, *, default: bool = False) -> bool:
+        """Ask one interactive question at a time without blocking the event loop."""
+        async with self._prompt_lock:
+            return await prompt_in_thread(cli_ui.ask_yes_no, question, default=default)
 
     async def dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str) -> tuple[bool, Meta]:
         def _format_dupe(entry: DupeEntry | str) -> str:
@@ -144,9 +276,7 @@ class UploadHelper:
                         size_diff_str = f" - [#{color_hex}][{diff_mb:+d} MB / {diff_pct:+d}%][/]"
 
                 if isinstance(link, str) and link:
-                    if self.default_config.get("embed_dupe_links", True):
-                        return f"[link={link}]{escape(name)}[/link]{size_diff_str}"
-                    return f"{name} - {link}{size_diff_str}"
+                    return f"{format_terminal_link(name, link, self.default_config)}{size_diff_str}"
                 return f"{name}{size_diff_str}"
             return entry
 
@@ -181,6 +311,11 @@ class UploadHelper:
                 display_name = str(tracker_rename_dict.get("name", ""))
             elif isinstance(tracker_rename, str):
                 display_name = tracker_rename
+
+        if meta.dupe is False and meta.season_pack_exists and bool(getattr(tracker_class, "reject_episode_if_season_pack_exists", False)):
+            pack_name = meta.season_pack_name or "matching season pack"
+            logger.info(f"[bold red]{tracker_name}: {pack_name} already contains this episode. Skipping individual episode upload.[/bold red]")
+            return True, meta
 
         # Show naming change before dupe prompts so user knows what the final name will be
         pass
@@ -226,7 +361,7 @@ class UploadHelper:
                 logger.info("[yellow]You will have the option to report the trumpable torrent if you upload.[/yellow]")
                 if meta.dupe is False:
                     try:
-                        upload = cli_ui.ask_yes_no("Are you trumping this release?", default=False)
+                        upload = await self.prompt_yes_no(f"Are you trumping this release on {tracker_name}?", default=False)
                         if upload:
                             meta.we_asked = True
                             meta.were_trumping = True
@@ -258,7 +393,7 @@ class UploadHelper:
                     try:
                         if tracker_name in ["AITHER", "LST"]:
                             logger.info(f"[yellow]{tracker_name} supports automatic trumping of exact matches, if the file is allowed to be trumped.[/yellow]")
-                            upload = cli_ui.ask_yes_no("Are you trumping this exact match?", default=False)
+                            upload = await self.prompt_yes_no(f"Are you trumping this exact match on {tracker_name}?", default=False)
                             if upload:
                                 meta.we_asked = True
                                 meta.were_trumping = True
@@ -266,7 +401,7 @@ class UploadHelper:
                                 if not meta.get(f"{tracker_name}_trumpable_id"):
                                     meta[f"{tracker_name}_trumpable_id"] = meta.get(f"{tracker_name}_matched_id", None)
                         else:
-                            upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
+                            upload = await self.prompt_yes_no(f"Upload to {tracker_name} anyway?", default=False)
                             meta.we_asked = True
                     except EOFError:
                         logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
@@ -280,13 +415,7 @@ class UploadHelper:
                         # Display only the matched season pack info from dupe_checking
                         season_pack_name = meta.season_pack_name
                         season_pack_link = meta.season_pack_link
-                        if season_pack_link:
-                            if self.default_config.get("embed_dupe_links", False):
-                                season_pack_text = f"[link={season_pack_link}]{escape(season_pack_name)}[/link]"
-                            else:
-                                season_pack_text = f"{season_pack_name} - {season_pack_link}"
-                        else:
-                            season_pack_text = season_pack_name
+                        season_pack_text = format_terminal_link(season_pack_name, season_pack_link, self.default_config) if season_pack_link else season_pack_name
                         logger.info(f"[yellow]Note: A season pack exists on {tracker_name}[/yellow]")
                         logger.info("[yellow]Ensure your upload is not part of that season pack, or is otherwise allowed.[/yellow]")
                         logger.info("")
@@ -298,8 +427,8 @@ class UploadHelper:
                     if meta.dupe is False:
                         try:
                             if meta.is_disc == "BDMV":
-                                self.ask_bdinfo_comparison(meta, dupes_list, tracker_name)
-                            upload = cli_ui.ask_yes_no(f"Upload to {tracker_name} anyway?", default=False)
+                                await self.ask_bdinfo_comparison(meta, dupes_list, tracker_name)
+                            upload = await self.prompt_yes_no(f"Upload to {tracker_name} anyway?", default=False)
                             meta.we_asked = True
                         except EOFError:
                             logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
@@ -369,7 +498,7 @@ class UploadHelper:
 
         return False, meta
 
-    def ask_bdinfo_comparison(self, meta: Meta, dupes: list[DupeEntry | str], tracker_name: str) -> None:
+    async def ask_bdinfo_comparison(self, meta: Meta, dupes: list[DupeEntry | str], tracker_name: str) -> None:
         """
         Check if any duplicate has BDInfo content and ask the user
         if they want to perform a comparison.
@@ -379,8 +508,8 @@ class UploadHelper:
         if not possible:
             return
 
-        question = "\033[1;35mFound BDInfo content in potential duplicates.\033[0m Perform a comparison?"
-        if cli_ui.ask_yes_no(question, default=True):
+        question = "[bold magenta]Found BDInfo content in potential duplicates.[/bold magenta] Perform a comparison?"
+        if await self.prompt_yes_no(question, default=True):
             warnings: list[str] = []
             results: list[str] = []
 
@@ -426,7 +555,7 @@ class UploadHelper:
             asin = meta.asin or ""  # not essential
             narrator = meta.narrator or missing_warning
             audiobook_duration_formatted = meta.audiobook_duration_formatted or missing_warning
-            poster = meta.poster or "[yellow][italic]not found online - will be auto-generated[/italic][/yellow]"
+            poster = "Found" if bool(meta.artwork_url or meta.artwork_path) else missing_warning
             comic = meta.comic
             manga = meta.manga
             magazine = meta.magazine
@@ -465,7 +594,7 @@ class UploadHelper:
             developer = meta.developer or missing_warning
             publisher = meta.publisher or missing_warning
             platform = meta.platform or missing_warning
-            poster = meta.poster or missing_warning
+            poster = "Found" if bool(meta.artwork_url or meta.artwork_path) else missing_warning
             igdb_id = meta.igdb_id or "0"
             steam_url = meta.steam_url
             languages = len(meta.languages) if meta.languages else missing_warning
@@ -491,51 +620,53 @@ class UploadHelper:
                     lang_summary = str(languages)
                 lines.append(("Languages", lang_summary))
 
-        lines.append(("Overview", f"{meta.overview[:60]}...."))
-        if meta.category == "TV" and not meta.tv_pack and meta.auto_episode_title:
-            lines.append(("Episode Title", (meta.auto_episode_title)))
-        if meta.category == "TV" and not meta.tv_pack and meta.overview_meta:
-            lines.append(("Episode overview:", meta.overview_meta[:60] + "...."))
-        lines.append(("Genre", ", ".join(meta.genres)))
-        if meta.demographic != "":
-            lines.append(("Demographic", meta.demographic))
+        if meta.category == "MUSIC":
+            lines.extend(_music_confirmation_lines(meta, missing_warning))
+        else:
+            lines.append(("Overview", f"{meta.overview[:60]}...."))
+            if meta.category == "TV" and not meta.tv_pack and meta.auto_episode_title:
+                lines.append(("Episode Title", (meta.auto_episode_title)))
+            if meta.category == "TV" and not meta.tv_pack and meta.overview_meta:
+                lines.append(("Episode overview:", meta.overview_meta[:60] + "...."))
+            lines.append(("Genre", ", ".join(meta.genres)))
+            if meta.demographic != "":
+                lines.append(("Demographic", meta.demographic))
 
-        if meta.tmdb_id or 0 != 0:
-            lines.append(("TMDB", f"https://www.themoviedb.org/{(meta.category or '').lower()}/{meta.tmdb_id}"))
-        if meta.imdb_id or 0 != 0:
-            lines.append(("IMDB", f"https://www.imdb.com/title/tt{meta.imdb}"))
-        if meta.tvdb_id or 0 != 0:
-            lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series"))
-        if meta.tvmaze_id or 0 != 0:
-            lines.append(("TVMaze", f"https://www.tvmaze.com/shows/{meta.tvmaze_id}"))
-        if meta.mal_id or 0 != 0:
-            lines.append(("MAL", f"https://myanimelist.net/anime/{meta.mal_id}"))
+            if meta.tmdb_id or 0 != 0:
+                lines.append(("TMDB", f"https://www.themoviedb.org/{(meta.category or '').lower()}/{meta.tmdb_id}"))
+            if meta.imdb_id or 0 != 0:
+                lines.append(("IMDB", f"https://www.imdb.com/title/tt{meta.imdb}"))
+            if meta.tvdb_id or 0 != 0:
+                lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series"))
+            if meta.tvmaze_id or 0 != 0:
+                lines.append(("TVMaze", f"https://www.thetvmaze.com/shows/{meta.tvmaze_id}"))
+            if meta.mal_id or 0 != 0:
+                lines.append(("MAL", f"https://myanimelist.net/anime/{meta.mal_id}"))
 
-        resolution = meta.resolution
-        source = meta.source
-        type_ = meta.type or ""
-        tag = meta.tag or ""
-        if tag and tag.startswith("-"):
-            tag = tag[1:]
-        region = meta.region or missing_warning
-        distributor = meta.distributor or missing_warning
-        edition = meta.edition
+            resolution = meta.resolution
+            source = meta.source
+            type_ = meta.type or ""
+            tag = meta.tag or ""
+            if tag and tag.startswith("-"):
+                tag = tag[1:]
+            region = meta.region or missing_warning
+            distributor = meta.distributor or missing_warning
+            edition = meta.edition
 
-        lines.append(("Edition", edition))
-        lines.append(("Resolution", resolution))
-        lines.append(("Source", str(source)))
-        lines.append(("Type", type_))
-        lines.append(("Edition", edition))
+            lines.append(("Edition", edition))
+            lines.append(("Resolution", resolution))
+            lines.append(("Source", str(source)))
+            lines.append(("Type", type_))
 
-        if meta.category != "BOOK":
-            lines.append(("Group Tag", tag))
+            if meta.category != "BOOK":
+                lines.append(("Group Tag", tag))
 
-        if meta.is_disc:
-            lines.append(("Region", region))
-            lines.append(("Distributor", distributor))
+            if meta.is_disc:
+                lines.append(("Region", region))
+                lines.append(("Distributor", distributor))
 
-        if meta.freeleech != 0:
-            lines.append(("Freeleech", str(meta.freeleech)))
+            if meta.freeleech != 0:
+                lines.append(("Freeleech", str(meta.freeleech)))
         lines.append("")
 
         if meta.personalrelease is True:
@@ -572,12 +703,11 @@ class UploadHelper:
             meta.keep_folder = False
 
         if meta.keep_folder and meta.isdir:
-            kf_confirm = (
-                console.input("[bold yellow]You specified --keep-folder. Uploading in folders might not be allowed.[/bold yellow] [green]Proceed? y/N: [/green]")
-                .strip()
-                .lower()
+            kf_confirm = await self.prompt_yes_no(
+                "You specified --keep-folder. Uploading in folders might not be allowed. Proceed?",
+                default=False,
             )
-            if kf_confirm != "y":
+            if not kf_confirm:
                 logger.info("[bold red]Aborting...[/bold red]")
                 exit()
         tracker_release_names: dict[str, str] = {}
@@ -618,7 +748,7 @@ class UploadHelper:
         else:
             logger.info(f"[bold]Base Name:[/bold] {meta.name}\n", extra={"highlighter": None})
 
-        confirm = cli_ui.ask_yes_no("Is this correct?")
+        confirm = await self.prompt_yes_no("Is this correct?")
         logger.info("")
 
         if confirm:

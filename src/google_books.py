@@ -1,14 +1,12 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
-import json
 import re
-from pathlib import Path
 from typing import Any
 
 import httpx
 
 from src.book_prep import is_valid_book_language, resolve_book_language
 from src.console import logger
+from src.metadata_cache import cache_for, is_cache_miss
 
 google_color_str = "[#4285f4]G[/#4285f4][#ea4335]o[/#ea4335][#fbbc05]o[/#fbbc05][#4285f4]g[/#4285f4][#34a853]l[/#34a853][#ea4335]e[/#ea4335] [#4285f4]Books[/#4285f4]"
 
@@ -31,7 +29,7 @@ class GoogleBooksManager:
 
         # Cover URL (Google Books cover image)
         if volume_id and image_link:
-            metadata["poster"] = image_link
+            metadata["artwork_url"] = image_link
 
         # Title & Subtitle
         title = volume_info.get("title")
@@ -106,38 +104,14 @@ class GoogleBooksManager:
         if not clean_isbn:
             return None
 
-        # Check local cache first
-        cache_file = None
-        if base_dir:
-            cache_dir = Path(base_dir) / "tmp" / "google_books_cache"
-            try:
-                Path(cache_dir).mkdir(parents=True, exist_ok=True)
-                cache_file = Path(cache_dir) / f"{clean_isbn}.json"
-                if Path(cache_file).exists():
-                    try:
-                        cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
-                        cached_data = json.loads(cache_content)
-                        if cached_data:
-                            # Support backwards compatibility if cache is in the old parsed format
-                            if "items" in cached_data or "totalItems" in cached_data:
-                                if cached_data.get("totalItems", 0) == 0:
-                                    logger.info(f"{google_color_str}: ISBN match not found (cached): {clean_isbn}")
-                                    return None
-                                parsed_meta = self._parse_volume_info(cached_data, isbn)
-                                if parsed_meta:
-                                    logger.info(f"{google_color_str}: ISBN match found (cached): {clean_isbn}")
-                                else:
-                                    logger.info(f"{google_color_str}: ISBN match not found (cached): {clean_isbn}")
-                                return parsed_meta
-                            if cached_data.get("not_found"):
-                                logger.info(f"{google_color_str}: ISBN match not found (cached): {clean_isbn}")
-                                return None
-                            logger.info(f"{google_color_str}: ISBN match found (cached): {clean_isbn}")
-                            return cached_data
-                    except Exception as ex:
-                        logger.debug(f"[yellow]Warning: Could not read cache file for ISBN '{clean_isbn}': {ex}[/yellow]")
-            except Exception as ex:
-                logger.debug(f"[yellow]Warning: Could not create cache directory: {ex}[/yellow]")
+        cache = cache_for(base_dir)
+        cached_data = await cache.get("google_books", "isbn", clean_isbn)
+        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+            if cached_data.get("not_found"):
+                logger.info(f"{google_color_str}: ISBN match not found (cached): {clean_isbn}")
+                return None
+            logger.info(f"{google_color_str}: ISBN match found (cached): {clean_isbn}")
+            return cached_data
 
         url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{clean_isbn}"
         if api_key:
@@ -152,36 +126,20 @@ class GoogleBooksManager:
                     total_items = data.get("totalItems", 0)
                     if total_items > 0 and "items" in data:
                         metadata = self._parse_volume_info(data, isbn)
-                        # Save full response to cache since response was successful
-                        if cache_file:
-                            try:
-                                cache_content = json.dumps(data, indent=4)
-                                await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
-                                logger.debug(f"{google_color_str}: Saved cache for ISBN: {clean_isbn}")
-                            except Exception as ex:
-                                logger.debug(f"[yellow]Warning: Could not write cache for ISBN '{clean_isbn}': {ex}[/yellow]")
+                        if metadata:
+                            await cache.set("google_books", "isbn", clean_isbn, metadata)
                         if metadata:
                             logger.info(f"{google_color_str}: ISBN match found: {clean_isbn}")
                         return metadata
                     logger.info(f"{google_color_str}: No items found for ISBN: {clean_isbn}")
-                    if cache_file:
-                        try:
-                            cache_content = json.dumps(data, indent=4)
-                            await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
-                            logger.debug(f"{google_color_str}: Saved empty cache for ISBN: {clean_isbn}")
-                        except Exception as ex:
-                            logger.debug(f"[yellow]Warning: Could not write cache for ISBN '{clean_isbn}': {ex}[/yellow]")
+                    await cache.set("google_books", "isbn", clean_isbn, {"not_found": True}, negative=True)
                 else:
                     if resp.status_code == 429:
                         logger.info(f"{google_color_str}: Rate limited (Status 429) for ISBN: {clean_isbn}")
                     else:
                         logger.info(f"{google_color_str}: API returned error status code {resp.status_code} for ISBN: {clean_isbn}")
-                        if resp.status_code == 404 and cache_file:
-                            try:
-                                cache_content = json.dumps({"not_found": True}, indent=4)
-                                await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
-                            except Exception as ex:
-                                logger.debug(f"[yellow]Warning: Could not write cache for ISBN '{clean_isbn}': {ex}[/yellow]")
+                        if resp.status_code == 404:
+                            await cache.set("google_books", "isbn", clean_isbn, {"not_found": True}, negative=True)
         except Exception as e:
             logger.info(f"{google_color_str}: Network or query error for ISBN {clean_isbn}: {e}")
 

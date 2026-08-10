@@ -1,12 +1,10 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
 import platform
 from typing import Any, cast
 
 import httpx
 from bs4 import BeautifulSoup
 
-from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.get_desc import DescriptionBuilder
 from src.meta import Meta
@@ -78,14 +76,7 @@ class Ptskit:
         )
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        mandarin = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["mandarin", "chinese"], check_audio=True, check_subtitle=True)
-
-        if not mandarin:
-            user_input = await asyncio.to_thread(input, "Warning: Mandarin subtitle or audio not found. Do you want to continue with the upload anyway? (y/n): ")
-            if user_input.lower() not in ["y", "yes"]:
-                logger.info("Upload cancelled by user.", extra={"markup": False})
-                return False
-        return True
+        return await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["mandarin", "chinese"], check_audio=True, check_subtitle=True)
 
     async def search_existing(self, meta: Meta) -> list[str] | None:
         search_url = f"{self.base_url}/torrents.php"

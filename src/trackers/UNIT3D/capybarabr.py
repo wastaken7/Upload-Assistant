@@ -18,89 +18,10 @@ class CapybaraBR(UNIT3D):
     display_name = "CapybaraBR"
     base_url = "https://capybarabr.com"
     allows_bloated_audio = True
-    banned_groups = (
-        "4K4U",
-        "afm72",
-        "Alcaide_Kira",
-        "AROMA",
-        "ASM",
-        "Bandi",
-        "BiTOR",
-        "BLUDV",
-        "Bluespots",
-        "BOLS",
-        "CaNNIBal",
-        "Comando",
-        "d3g",
-        "DepraveD",
-        "EMBER",
-        "Emmid",
-        "FGT",
-        "FreetheFish",
-        "Garshasp",
-        "Ghost",
-        "Grym",
-        "HDS",
-        "Hi10",
-        "HiQVE",
-        "Hiro360",
-        "ImE",
-        "ION10",
-        "iVy",
-        "Judas",
-        "LAMA",
-        "Langbard",
-        "Lapumia",
-        "LION",
-        "MeGusta",
-        "Memoriadatv",
-        "MONOLITH",
-        "MRCS",
-        "NaNi",
-        "Natty",
-        "nikt0",
-        "OEPlus",
-        "OFT",
-        "OsC",
-        "Panda",
-        "PANDEMONiUM",
-        "PHOCiS",
-        "PiRaTeS",
-        "PYC",
-        "r00t",
-        "Ralphy",
-        "RARBG",
-        "RetroPeeps",
-        "RZeroX",
-        "S74Ll10n",
-        "SAMPA",
-        "Sicario",
-        "SiCFoI",
-        "Silence",
-        "SkipTT",
-        "SM737",
-        "SPDVD",
-        "STUTTERSHIT",
-        "SWTYBLZ",
-        "t3nzin",
-        "TAoE",
-        "TEKNO3D",
-        "Telly",
-        "TGx",
-        "Tigole",
-        "TSP",
-        "TSPxL",
-        "TWA",
-        "UnKn0wn",
-        "VXT",
-        "Vyndros",
-        "W32",
-        "Will1869",
-        "x0r",
-        "YIFY",
-        "YTS.MX",
-        "YTS",
-    )
+    banned_groups: tuple[str, ...] = ()
+    banned_url = f"{base_url}/api/banned-groups"
+    banned_groups_auth_mode = "api_token"
+    banned_groups_response_key = "groups"
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
@@ -224,7 +145,6 @@ class CapybaraBR(UNIT3D):
     async def get_name(self, meta: Meta) -> dict[str, str]:
         category = meta.category
         cbr_name = meta.name
-        name = meta.name
 
         if category == "BOOK":
             book_title = self.common.portuguese_title_capitalization(meta.title)
@@ -277,6 +197,14 @@ class CapybaraBR(UNIT3D):
                 title = meta.title
                 cbr_name = cbr_name.replace(meta.aka, "").replace(title, aka_clean).strip()
 
+            if self.tracker == "CAPYBARABR" and meta.type == "DVDRIP":
+                title = meta.aka.replace("AKA", "").strip() if meta.original_language == "pt" and meta.aka else meta.title
+                episode = f"{meta.season}{meta.episode}" if category == "TV" else ""
+                audio = str(meta.audio).replace("DD+ ", "DDP").replace("DD ", "DD").replace("AAC ", "AAC").replace("FLAC ", "FLAC")
+                cbr_name = " ".join(part for part in (title, str(meta.year or ""), episode, meta.resolution, "DVDRip", audio, meta.video_encode) if part)
+                if meta.tag:
+                    cbr_name += meta.tag
+
             tag_lower = "" if not meta.tag else meta.tag.lower()
             invalid_tags = ["nogrp", "nogroup", "unknown", "-unk-"]
 
@@ -297,22 +225,23 @@ class CapybaraBR(UNIT3D):
                         else:
                             audio_tag = ""
 
-                    if audio_tag:
-                        if "-" in cbr_name:
-                            parts = cbr_name.rsplit("-", 1)
+                if audio_tag:
+                    if "-" in cbr_name:
+                        parts = cbr_name.rsplit("-", 1)
 
-                            custom_tag = dict(dict(self.config.get("TRACKERS", {})).get(self.tracker, {})).get("tag_for_custom_release", "")
-                            if custom_tag and custom_tag in name:
-                                match = re.search(r"-([^.-]+)\.(?:DUAL|MULTI)", meta.uuid)
-                                if match and match.group(1) != meta.tag:
-                                    original_group_tag = match.group(1)
-                                    cbr_name = f"{parts[0]}-{original_group_tag}{audio_tag}-{parts[1]}"
-                                else:
-                                    cbr_name = f"{parts[0]}{audio_tag}-{parts[1]}"
-                            else:
-                                cbr_name = f"{parts[0]}{audio_tag}-{parts[1]}"
+                        match = None
+                        for source_name in (meta.path, meta.uuid):
+                            if source_name:
+                                match = re.search(r"-([^.-]+)\.(?:DUAL|MULTI)(?=-|\.|$)", str(source_name), re.IGNORECASE)
+                                if match:
+                                    break
+                        current_group_tag = (meta.tag or "").lstrip("-")
+                        if match and match.group(1).casefold() != current_group_tag.casefold():
+                            cbr_name = f"{parts[0]}-{match.group(1)}{audio_tag}-{parts[1]}"
                         else:
-                            cbr_name += audio_tag
+                            cbr_name = f"{parts[0]}{audio_tag}-{parts[1]}"
+                    else:
+                        cbr_name += audio_tag
 
             if not meta.tag or any(invalid_tag in tag_lower for invalid_tag in invalid_tags):
                 for invalid_tag in invalid_tags:
@@ -357,11 +286,6 @@ class CapybaraBR(UNIT3D):
                 )
                 return False
 
-            subtitles = await self.common.check_language_requirements(meta, self.tracker, languages_to_check=["portuguese", "português"], check_audio=True, check_subtitle=True)
-            if not subtitles and (not meta.unattended or (meta.unattended and meta.unattended_confirm)):
-                return await self.common.prompt_user_for_confirmation(
-                    f"{self.tracker}: No Portuguese audio or subtitles found. Do you want to proceed with the upload?",
-                )
-            return subtitles
+            return await self.common.check_portuguese_video_requirements(meta, self.tracker)
 
         return True

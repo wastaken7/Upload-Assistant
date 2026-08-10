@@ -45,9 +45,9 @@ class Torrenteros(UNIT3D):
 
         def ask_spanish_type(kind: str) -> str:
             logger.info(f"{self.tracker}: [green]Found Spanish {kind} track.[/green] [yellow]Is it Castellano or Latino?[/yellow]")
-            logger.info("1 = Castellano")
-            logger.info("2 = Latino")
-            logger.info("3 = Castellano Latino")
+            logger.info(f"{self.tracker}: 1 = Castellano")
+            logger.info(f"{self.tracker}: 2 = Latino")
+            logger.info(f"{self.tracker}: 3 = Castellano Latino")
             return str(cli_ui.ask_string("Enter choice (1-3): "))
 
         def get_spanish_type(lang_code: str) -> str | None:
@@ -135,7 +135,7 @@ class Torrenteros(UNIT3D):
 
         if "Spanish" not in (meta.audio_languages or []):
             if "Spanish" not in (meta.subtitle_languages or []):
-                logger.info("[bold red]Torrenteros requires at least one Spanish audio or subtitle track.")
+                logger.info(f"{self.tracker}: [bold red]requires at least one Spanish audio or subtitle track.")
                 return False
             if meta.unattended:
                 if not meta.unattended_confirm:

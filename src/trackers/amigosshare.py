@@ -11,10 +11,10 @@ import aiofiles
 import cli_ui
 import httpx
 from bs4 import BeautifulSoup
-from pymediainfo import MediaInfo
 
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
+from src.description_review import get_base_description
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
@@ -349,14 +349,14 @@ class AmigosShare:
         return f"{base_name}"
 
     def get_book_cover(self, meta: Meta) -> str:
-        covers = meta.covers
+        covers = meta.hosted_artwork
         if isinstance(covers, list) and len(covers) > 0:
             raw_url = covers[0].get("raw_url")
             if raw_url:
                 return str(raw_url)
 
         # Fallback to poster URL if remote
-        poster_url = meta.poster
+        poster_url = meta.artwork_url
         if isinstance(poster_url, str) and poster_url.startswith(("http://", "https://")):
             return poster_url
 
@@ -389,24 +389,20 @@ class AmigosShare:
             description_parts.append(book_section)
             description_parts.append("")
 
-        # External DESCRIPTION.txt
-        desc = ""
-        base_desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt"
-        if Path(base_desc_path).exists():
-            async with aiofiles.open(base_desc_path, encoding="utf-8") as f:
-                desc = (await f.read()).strip()
-                # strip standard formatting codes
-                desc = desc.replace("[user]", "").replace("[/user]", "")
-                desc = desc.replace("[align=left]", "").replace("[/align]", "")
-                desc = desc.replace("[align=right]", "").replace("[/align]", "")
-                desc = desc.replace("[alert]", "").replace("[/alert]", "")
-                desc = desc.replace("[note]", "").replace("[/note]", "")
-                desc = desc.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
-                desc = desc.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
-                desc = desc.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
-                desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
-                description_parts.append(desc)
-                description_parts.append("")
+        desc = get_base_description(meta).strip()
+        if desc:
+            # Strip standard formatting codes.
+            desc = desc.replace("[user]", "").replace("[/user]", "")
+            desc = desc.replace("[align=left]", "").replace("[/align]", "")
+            desc = desc.replace("[align=right]", "").replace("[/align]", "")
+            desc = desc.replace("[alert]", "").replace("[/alert]", "")
+            desc = desc.replace("[note]", "").replace("[/note]", "")
+            desc = desc.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            desc = desc.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            desc = desc.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
+            description_parts.append(desc)
+            description_parts.append("")
 
         custom_description_header = self.config["DEFAULT"].get("custom_description_header", "")
         if custom_description_header:
@@ -452,14 +448,18 @@ class AmigosShare:
         season_tmdb = dict(localized_tmdb.get("season", {})) or {}
         main_tmdb = dict(localized_tmdb.get("main", {})) or {}
         episode_tmdb = dict(localized_tmdb.get("episode", {})) or {}
-        poster_path = season_tmdb.get("poster_path") or main_tmdb.get("poster_path") or meta.tmdb_poster
+        poster_path = season_tmdb.get("poster_path") or main_tmdb.get("poster_path") or meta.tmdb_poster_path
         poster = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else ""
         await append_section("BARRINHA_CAPA", await self.format_image(poster))
 
         # Overview
         overview: str = season_tmdb.get("overview", "") or main_tmdb.get("overview", "")
         if not overview:
-            user_input_raw = await asyncio.to_thread(cli_ui.ask_string, f"{self.tracker}: Sinopse não encontrada no TMDb. Por favor, insira manualmente.")
+            if meta.unattended and not meta.unattended_confirm:
+                logger.info(f"{self.tracker}: [yellow]Sinopse não encontrada no TMDb em modo unattended. Plando upload para {self.tracker}.[/yellow]")
+                meta.skipping = f"{self.tracker}"
+                return ""
+            user_input_raw = await prompt_in_thread(cli_ui.ask_string, f"{self.tracker}: Sinopse não encontrada no TMDb. Por favor, insira manualmente.")
             user_input = (user_input_raw or "").strip()
             overview = user_input or "Sinopse não encontrada."
         await append_section("BARRINHA_SINOPSE", overview)
@@ -558,22 +558,18 @@ class AmigosShare:
         description_parts.extend([await self.format_image(layout_image.get(f"BARRINHA_CUSTOM_B_{i}")) for i in range(1, 4)])
         description_parts.append("[/center]")
 
-        # External description
-        desc = ""
-        base_desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt"
-        if Path(base_desc_path).exists():
-            async with aiofiles.open(base_desc_path, encoding="utf-8") as f:
-                desc = (await f.read()).strip()
-                desc = desc.replace("[user]", "").replace("[/user]", "")
-                desc = desc.replace("[align=left]", "").replace("[/align]", "")
-                desc = desc.replace("[align=right]", "").replace("[/align]", "")
-                desc = desc.replace("[alert]", "").replace("[/alert]", "")
-                desc = desc.replace("[note]", "").replace("[/note]", "")
-                desc = desc.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
-                desc = desc.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
-                desc = desc.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
-                desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
-                description_parts.append(desc)
+        desc = get_base_description(meta).strip()
+        if desc:
+            desc = desc.replace("[user]", "").replace("[/user]", "")
+            desc = desc.replace("[align=left]", "").replace("[/align]", "")
+            desc = desc.replace("[align=right]", "").replace("[/align]", "")
+            desc = desc.replace("[alert]", "").replace("[/alert]", "")
+            desc = desc.replace("[note]", "").replace("[/note]", "")
+            desc = desc.replace("[h1]", "[u][b]").replace("[/h1]", "[/b][/u]")
+            desc = desc.replace("[h2]", "[u][b]").replace("[/h2]", "[/b][/u]")
+            desc = desc.replace("[h3]", "[u][b]").replace("[/h3]", "[/b][/u]")
+            desc = re.sub(r"(\[img=\d+)]", "[img]", desc, flags=re.IGNORECASE)
+            description_parts.append(desc)
 
         custom_description_header = self.config["DEFAULT"].get("custom_description_header", "")
         if custom_description_header:
@@ -599,7 +595,11 @@ class AmigosShare:
         )
 
         if not tags:
-            tags_raw = meta.genre or await asyncio.to_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
+            if not meta.genre and meta.unattended and not meta.unattended_confirm:
+                logger.info(f"{self.tracker}: [yellow]Gêneros não encontrados em modo unattended. Plando upload para {self.tracker}.[/yellow]")
+                meta.skipping = f"{self.tracker}"
+                return ""
+            tags_raw = meta.genre or await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
             tags = (tags_raw or "").strip()
 
         return tags
@@ -622,7 +622,7 @@ class AmigosShare:
                 filename = first_content.strip() if isinstance(first_content, str) else first_content.get_text(strip=True)
 
         except Exception as e:
-            logger.info(f"[bold red]Falha ao obter nome do arquivo para ID {torrent_id}: {e}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Falha ao obter nome do arquivo para ID {torrent_id}: {e}[/bold red]")
 
         return {"name": filename, "size": size, "link": torrent_link}
 
@@ -756,9 +756,15 @@ class AmigosShare:
             logger.info(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
             return False
 
-        if meta.category not in ("BOOK", "GAME") and not meta.imdb_id and not meta.anime:
+        if meta.category in ("BOOK", "GAME"):
+            return True
+
+        if not meta.imdb_id and not meta.anime:
             logger.info(f"{self.tracker}: [bold red]Ignorando upload devido à ausência de IMDb.[/bold red]")
             return False
+
+        if meta.category in ("MOVIE", "TV"):
+            return await self.common.check_portuguese_video_requirements(meta, self.tracker)
 
         return True
 
@@ -920,10 +926,7 @@ class AmigosShare:
         if not meta.is_disc:
             filelist = cast(list[str], meta.filelist or [])
             video_file = filelist[0] if filelist else (meta.path or "")
-            template_path = str(Path(f"{meta.base_dir}/data/templates/MEDIAINFO.txt").resolve())
-            if Path(template_path).exists():
-                mi_output = MediaInfo.parse(video_file, output="STRING", full=False, mediainfo_options={"inform": f"file://{template_path}"})
-                return mi_output.replace("\r", "")
+            return DescriptionBuilder.format_short_mediainfo_json(meta.mediainfo, video_file) or None
 
         return None
 
@@ -1084,7 +1087,7 @@ class AmigosShare:
             return results
 
         except Exception as e:
-            logger.info(f"[bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Ocorreu um erro ao buscar pedido(s) no {self.tracker}: {e}[/bold red]")
             import traceback
 
             logger.info(traceback.format_exc())
@@ -1155,7 +1158,7 @@ class AmigosShare:
         if meta.category == "GAME":
             data.update(
                 {
-                    "capa": meta.poster,
+                    "capa": meta.artwork_url,
                     "genero": self.get_game_genre(meta),
                     "idioma": self.get_game_idioma(meta),
                     "type": upload_type,
@@ -1179,7 +1182,7 @@ class AmigosShare:
             {
                 "altura": resolution["height"],
                 "audio": await self.get_audio(meta),
-                "capa": f"https://image.tmdb.org/t/p/w500{meta.tmdb_localized_data.get('pt-BR', {}).get('main', {}).get('poster_path') or meta.tmdb_poster}",
+                "capa": f"https://image.tmdb.org/t/p/w500{meta.tmdb_localized_data.get('pt-BR', {}).get('main', {}).get('poster_path') or meta.tmdb_poster_path}",
                 "codecaudio": await self.get_audio_codec(meta),
                 "codecvideo": await self.get_video_codec(meta),
                 "extencao": await self.get_container(meta),
@@ -1214,6 +1217,8 @@ class AmigosShare:
         return data
 
     async def upload(self, meta: Meta) -> bool:
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
         if meta.category == "BOOK" and meta.source_size <= 1024 * 1024:
             logger.info(f"{self.tracker}: [bold red]Ignorando upload na categoria BOOK devido ao tamanho ser menor ou igual a 1MB.[/bold red]")
             return False
@@ -1221,6 +1226,8 @@ class AmigosShare:
         if cookie_jar is not None:
             self.session.cookies = cast(Any, cookie_jar)
         data = await self.get_data(meta)
+        if getattr(meta, "skipping", None) == self.tracker:
+            return False
         upload_url = await self.get_upload_url(meta)
 
         is_uploaded = await self.cookie_auth_uploader.handle_upload(

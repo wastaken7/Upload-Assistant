@@ -14,6 +14,7 @@ from torf import Torrent
 
 from src.console import logger
 from src.meta import Meta
+from src.temp_paths import artwork_dir
 from src.uploadscreens import UploadScreensManager
 
 
@@ -47,11 +48,11 @@ class ManualPackageManager:
                 await generic.write(f"TVDB: https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series\n")
             if "tvmaze_id" in meta and meta.tvmaze_id != 0:
                 await generic.write(f"TVMaze: https://www.tvmaze.com/shows/{meta.tvmaze_id}\n")
-            poster_img = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/POSTER.png"
-            if meta.poster not in ["", None] and not Path(poster_img).exists():
-                if meta.rehosted_poster is None:
+            poster_img = str(artwork_dir(meta.base_dir, meta.uuid) / "POSTER.png")
+            if meta.artwork_url not in ["", None] and not Path(poster_img).exists():
+                if meta.rehosted_artwork_url is None:
                     async with httpx.AsyncClient(timeout=30.0) as client:
-                        response = await client.get(meta.poster)
+                        response = await client.get(meta.artwork_url)
                     if response.status_code == 200:
                         logger.info("[bold yellow]Rehosting Cover")
                         await asyncio.to_thread(Path(poster_img).write_bytes, response.content)
@@ -59,14 +60,14 @@ class ManualPackageManager:
                             poster, _ = await self.uploadscreens_manager.upload_screens(meta, 1, 1, 0, 1, [poster_img], {})
                             poster = poster[0]
                             await generic.write(f"TMDB Cover: {poster.get('raw_url', poster.get('img_url'))}\n")
-                            meta.rehosted_poster = poster.get("raw_url", poster.get("img_url"))
+                            meta.rehosted_artwork_url = poster.get("raw_url", poster.get("img_url"))
                         meta_text = json.dumps(meta.to_dict(), indent=4)
                         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w") as metafile:
                             await metafile.write(meta_text)
                     else:
                         logger.info("[bold yellow]Cover could not be retrieved")
-            elif Path(poster_img).exists() and meta.rehosted_poster is not None:
-                await generic.write(f"TMDB Cover: {meta.rehosted_poster}\n")
+            elif Path(poster_img).exists() and meta.rehosted_artwork_url is not None:
+                await generic.write(f"TMDB Cover: {meta.rehosted_artwork_url}\n")
             if len(meta.image_list) > 0:
                 await generic.write("\nImage Webpage:\n")
                 for each in meta.image_list:

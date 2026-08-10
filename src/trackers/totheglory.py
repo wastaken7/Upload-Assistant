@@ -11,8 +11,8 @@ import httpx
 from bs4 import BeautifulSoup
 from unidecode import unidecode
 
-from cogs.redaction import Redaction
-from src.console import console, logger
+from src.cogs.redaction import Redaction
+from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa #F405
 from src.meta import Meta
@@ -195,14 +195,14 @@ class ToTheGlory:
             await self.download_new_torrent(torrent_id, torrent_path)
             return True
         logger.info(data)
-        logger.info("\n\n")
+        logger.info(f"{self.tracker}: \n\n")
         raise UploadError(f"Upload to {self.tracker} Failed: result URL {up.url} ({up.status_code}) was not expected", "red")  # noqa #F405
 
     async def search_existing(self, meta: Meta) -> list[str]:
         dupes: list[str] = []
         cookiefile = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.json").resolve())
         if not Path(cookiefile).exists():
-            logger.info(f"[bold red]Cookie file not found: {self.tracker}.json")
+            logger.info(f"{self.tracker}: [bold red]Cookie file not found: {self.tracker}.json")
             return []
         cookies = self.cookie_validator._load_cookies_dict_secure(cookiefile)  # type: ignore[reportPrivateUsage]
 
@@ -235,16 +235,17 @@ class ToTheGlory:
     async def validate_credentials(self, meta: Meta) -> bool:
         cookiefile = str(Path(f"{meta.base_dir}/data/cookies/{self.tracker}.pkl").resolve())
         if not Path(cookiefile).exists():
-            await self.login(cookiefile)
+            await self.login(cookiefile, meta)
         vcookie = await self.validate_cookies(meta, cookiefile)
         if vcookie is not True:
-            logger.error("[red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
-            recreate = cli_ui.ask_yes_no("Log in again and create new session?")
-            if recreate is True:
-                if Path(cookiefile).exists():
-                    Path(cookiefile).unlink()
-                await self.login(cookiefile)
-                return await self.validate_cookies(meta, cookiefile)
+            logger.error(f"{self.tracker}: [red]Failed to validate cookies. Please confirm that the site is up and your passkey is valid.")
+            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                recreate = cli_ui.ask_yes_no("Log in again and create new session?")
+                if recreate is True:
+                    if Path(cookiefile).exists():
+                        Path(cookiefile).unlink()
+                    await self.login(cookiefile, meta)
+                    return await self.validate_cookies(meta, cookiefile)
             return False
         return True
 
@@ -255,13 +256,13 @@ class ToTheGlory:
             cookies = {name: str(data.get("value", "")) for name, data in raw_cookies.items()}
             async with httpx.AsyncClient(cookies=cookies, timeout=30.0, follow_redirects=True) as client:
                 resp = await client.get(url=url)
-                logger.debug("[cyan]Cookies:")
+                logger.debug(f"{self.tracker}: [cyan]Cookies:")
                 logger.debug(resp.url)
                 return resp.text.find("""<a href="/logout.php">Logout</a>""") != -1
         else:
             return False
 
-    async def login(self, cookiefile: str) -> None:
+    async def login(self, cookiefile: str, meta: Meta | None = None) -> None:
         url = f"{self.base_url}/takelogin.php"
         data: dict[str, Any] = {"username": self.username, "password": self.password, "passid": self.passid, "passan": self.passan}
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
@@ -273,26 +274,31 @@ class ToTheGlory:
                 auth_token = token_input.get("value") if token_input else None
                 if not auth_token:
                     raise UploadError(f"Missing authenticity token during {self.tracker} login", "red")  # noqa #F405
-                two_factor_data = {"otp": console.input(f"[yellow]{self.tracker} 2FA Code: "), "authenticity_token": auth_token, "uid": self.uid}
+                if meta and meta.unattended and not meta.unattended_confirm:
+                    logger.error(f"{self.tracker}: [red]Unattended mode: 2FA required. Skipping login.[/red]")
+                    return
+                two_factor_data: dict[str, Any] = {
+                    "otp": await prompt_in_thread(cli_ui.ask_string, f"{self.tracker} 2FA Code:", default="") or "",
+                    "authenticity_token": auth_token,
+                    "uid": self.uid,
+                }
                 two_factor_url = f"{self.base_url}/take2fa.php"
                 response = await client.post(two_factor_url, data=two_factor_data)
                 await asyncio.sleep(0.5)
             if str(response.url).endswith("my.php"):
-                logger.info(f"[green]Successfully logged into {self.tracker}")
+                logger.info(f"{self.tracker}: [green]Successfully logged into {self.tracker}")
                 self.cookie_validator._save_cookies_secure(client.cookies.jar, cookiefile)  # type: ignore[reportPrivateUsage]
             else:
-                logger.info("[bold red]Something went wrong")
+                logger.info(f"{self.tracker}: [bold red]Something went wrong")
                 await asyncio.sleep(1)
                 logger.info(response.text)
                 logger.info(response.url)
         return
 
     async def edit_desc(self, meta: Meta) -> None:
-        async with aiofiles.open(
-            f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/DESCRIPTION.txt",
-            encoding="utf-8",
-        ) as base_file:
-            base = await base_file.read()
+        from src.description_review import get_base_description
+
+        base = get_base_description(meta)
 
         from src.bbcode import BBCODE
         from src.trackers.common import Common
@@ -369,5 +375,5 @@ class ToTheGlory:
             async with aiofiles.open(torrent_path, "wb") as tor:
                 await tor.write(r.content)
         else:
-            logger.info(f"[red]There was an issue downloading the new .torrent from {self.tracker}")
+            logger.info(f"{self.tracker}: [red]There was an issue downloading the new .torrent from {self.tracker}")
             logger.info(r.text)

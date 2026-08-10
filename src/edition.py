@@ -4,9 +4,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
+import cli_ui
 import guessit
 
-from src.console import console, logger
+from src.console import logger, prompt_in_thread
 from src.meta import Meta
 from src.region import get_distributor
 
@@ -16,6 +17,21 @@ GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
 
 def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
     return cast(dict[str, Any], guessit_module.guessit(value, options))
+
+
+def _has_release_token(value: str, token: str) -> bool:
+    """Return whether a scene-release marker appears as its own token.
+
+    Release names commonly use dots, dashes, and spaces as separators.  A
+    substring check is too broad here: for example, ``TV2`` is a broadcaster,
+    not the ``V2`` marker for a repack.
+    """
+    return re.search(rf"(?<![A-Z0-9]){re.escape(token)}(?![A-Z0-9])", value, flags=re.IGNORECASE) is not None
+
+
+def _strip_release_tokens(value: str) -> str:
+    """Remove standalone release markers while preserving adjacent text."""
+    return re.sub(r"(?<![A-Z0-9])(?:REPACK\d?|RERIP|PROPER\d?)(?![A-Z0-9])", "", value, flags=re.IGNORECASE).strip()
 
 
 async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[str], manual_edition: str | list[str], meta: Meta) -> tuple[str, str, bool]:
@@ -83,7 +99,12 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
                                 )
 
                             try:
-                                choice = console.input(f"[yellow]Select edition number (1-{len(matching_editions)}) or press Enter to use the closest match: [/yellow]")
+                                choice = (
+                                    await prompt_in_thread(
+                                        cli_ui.ask_string, f"Select edition number (1-{len(matching_editions)}) or press Enter to use the closest match:", default=""
+                                    )
+                                    or ""
+                                )
 
                                 if choice.strip() and choice.isdigit() and 1 <= int(choice) <= len(matching_editions):
                                     selected = matching_editions[int(choice) - 1]
@@ -177,8 +198,13 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
                                 logger.info(f"[yellow]{i + 1}. [green]{ed['name']} ({ed['display_name']}, diff: {ed['difference']:.2f} seconds)")
 
                             try:
-                                choice = console.input(
-                                    f"[yellow]Select edition number (1-{len(playlist_matching_editions)}), press e to use playlist edition or press Enter to use the closest match: [/yellow]"
+                                choice = (
+                                    await prompt_in_thread(
+                                        cli_ui.ask_string,
+                                        f"Select edition number (1-{len(playlist_matching_editions)}), press e to use playlist edition or press Enter to use the closest match:",
+                                        default="",
+                                    )
+                                    or ""
                                 )
 
                                 playlist_selected: str | dict[str, Any]
@@ -319,7 +345,7 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
         if len(filelist) == 1:
             video = Path(video).name
 
-        video = video.upper().replace(".", " ").replace(tag.upper(), "").replace("-", "")
+        video = video.upper().replace(".", " ").replace(tag.upper(), "").replace("-", " ")
 
         if "OPEN MATTE" in video.upper():
             edition = edition + " Open Matte"
@@ -334,19 +360,20 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
 
     # Handle repack info
     repack = ""
-    if "REPACK" in (video.upper() or edition.upper()) or "V2" in video:
+    release_text = f"{video} {edition}"
+    if _has_release_token(release_text, "REPACK") or _has_release_token(release_text, "V2"):
         repack = "REPACK"
-    if "REPACK2" in (video.upper() or edition.upper()) or "V3" in video:
+    if _has_release_token(release_text, "REPACK2") or _has_release_token(release_text, "V3"):
         repack = "REPACK2"
-    if "REPACK3" in (video.upper() or edition.upper()) or "V4" in video:
+    if _has_release_token(release_text, "REPACK3") or _has_release_token(release_text, "V4"):
         repack = "REPACK3"
-    if "PROPER" in (video.upper() or edition.upper()):
+    if _has_release_token(release_text, "PROPER"):
         repack = "PROPER"
-    if "PROPER2" in (video.upper() or edition.upper()):
+    if _has_release_token(release_text, "PROPER2"):
         repack = "PROPER2"
-    if "PROPER3" in (video.upper() or edition.upper()):
+    if _has_release_token(release_text, "PROPER3"):
         repack = "PROPER3"
-    if "RERIP" in (video.upper() or edition.upper()):
+    if _has_release_token(release_text, "RERIP"):
         repack = "RERIP"
 
     # Only remove REPACK, RERIP, or PROPER from edition if not in manual edition
@@ -354,7 +381,7 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
         isinstance(manual_edition, str)
         and all(tag.lower() not in ["repack", "repack2", "repack3", "proper", "proper2", "proper3", "rerip"] for tag in manual_edition.strip().lower().split())
     ):
-        edition = re.sub(r"(\bREPACK\d?\b|\bRERIP\b|\bPROPER\b)", "", edition, flags=re.IGNORECASE).strip()
+        edition = _strip_release_tokens(edition)
 
     if not meta.webdv:
         hybrid = False

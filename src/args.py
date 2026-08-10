@@ -6,11 +6,61 @@ import sys
 import urllib.parse
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 from src.book_prep import detect_newspaper, sanitize_book_author, sanitize_book_language
 from src.console import logger
 from src.meta import Meta
+
+MUSIC_MEDIA_CHOICES = ("cd", "web", "vinyl", "dvd", "bd", "soundboard", "sacd", "dat", "cassette")
+MUSIC_RELEASE_TYPE_CHOICES = (
+    "album",
+    "soundtrack",
+    "ep",
+    "anthology",
+    "compilation",
+    "sampler",
+    "single",
+    "demo",
+    "live album",
+    "split",
+    "remix",
+    "bootleg",
+    "interview",
+    "mixtape",
+    "concert recording",
+    "dj mix",
+    "unknown",
+)
+
+PATHS_FROM_STDIN_OPTION = "--paths-from-stdin"
+
+
+def read_paths_from_stdin(argv: Sequence[str], stream: TextIO) -> tuple[list[str], list[str]]:
+    args = list(argv)
+    option_count = args.count(PATHS_FROM_STDIN_OPTION)
+    if option_count == 0 or "-h" in args or "--help" in args:
+        return args, []
+    if option_count > 1:
+        raise ValueError(f"{PATHS_FROM_STDIN_OPTION} may only be specified once")
+
+    args.remove(PATHS_FROM_STDIN_OPTION)
+    interactive = stream.isatty()
+    if interactive:
+        logger.info("[cyan]Paste one full path per line, then press Enter on an empty line to start.[/cyan]")
+
+    paths: list[str] = []
+    for line in stream:
+        path = line.rstrip("\r\n")
+        if not path.strip():
+            if interactive:
+                break
+            continue
+        paths.append(path)
+
+    if not paths:
+        raise ValueError(f"{PATHS_FROM_STDIN_OPTION} did not receive any paths")
+    return args, paths
 
 
 class ShortHelpFormatter(argparse.HelpFormatter):
@@ -36,6 +86,7 @@ Common options:
   --queue (queue name)       Process an entire folder (including files/subfolders) in a queue
   -mf, --manual_frames       Comma-separated list of frame numbers to use for screenshots
   -df, --descfile            Path to custom description file
+  -boverview, --book-overview  Book/Audiobook overview/synopsis (overrides auto-detected value)
   -serv, --service           Streaming service
   --no-aka                   Remove AKA from title
   -daily, --daily            Air date of a daily type episode (YYYY-MM-DD)
@@ -82,6 +133,12 @@ class Args:
         )
 
         parser.add_argument("path", nargs="*", help="Path to file/directory (in single/double quotes is best)")
+        parser.add_argument(
+            PATHS_FROM_STDIN_OPTION,
+            action="store_true",
+            required=False,
+            help="Read one full path per line from standard input (finish an interactive paste with an empty line)",
+        )
         parser.add_argument("--queue", nargs=1, required=False, help="(--queue queue_name) Process an entire folder (files/subfolders) in a queue")
         parser.add_argument("-lq", "--limit-queue", dest="limit_queue", nargs=1, required=False, help="Limit the amount of queue files processed", type=int, default=0)
         parser.add_argument(
@@ -128,10 +185,50 @@ class Args:
             "--category",
             nargs=1,
             required=False,
-            help="Category [movie, tv, fanres, book, game]",
-            choices=["movie", "tv", "fanres", "book", "game"],
+            help="Category [movie, tv, fanres, book, game, music]",
+            choices=["movie", "tv", "fanres", "book", "game", "music"],
             dest="manual_category",
         )
+        parser.add_argument("--music-artist", nargs=1, required=False, help="MUSIC: main artist(s), separated by &", dest="music_artist")
+        parser.add_argument("--music-album", nargs=1, required=False, help="MUSIC: album/release title", dest="music_album")
+        parser.add_argument(
+            "--music-media",
+            nargs=1,
+            required=False,
+            type=str.casefold,
+            choices=MUSIC_MEDIA_CHOICES,
+            help="MUSIC: source medium (CD, WEB, Vinyl, DVD, BD, Soundboard, SACD, DAT, Cassette)",
+            dest="music_media",
+        )
+        parser.add_argument(
+            "--music-release-type",
+            nargs=1,
+            required=False,
+            type=str.casefold,
+            choices=MUSIC_RELEASE_TYPE_CHOICES,
+            help="MUSIC: Orpheus release type (album, ep, single, compilation, live album, etc.)",
+            dest="music_release_type",
+        )
+        parser.add_argument(
+            "--music-release-year", nargs=1, required=False, type=int, help="MUSIC: concrete release/pressing year (not the original group year)", dest="music_release_year"
+        )
+        parser.add_argument("--music-edition-year", nargs=1, required=False, type=int, help="MUSIC: remaster/reissue/edition year", dest="music_edition_year")
+        parser.add_argument("--music-label", nargs=1, required=False, help="MUSIC: label for this release", dest="music_label")
+        parser.add_argument("--music-catalogue-number", nargs=1, required=False, help="MUSIC: catalogue number for this release", dest="music_catalogue_number")
+        parser.add_argument("--music-genre", nargs=1, required=False, help="MUSIC: comma-separated genre override", dest="music_genres")
+        parser.add_argument("--music-cover", nargs=1, required=False, help="MUSIC: public artwork URL or local cover image path", dest="music_cover")
+        parser.add_argument(
+            "--music-discogs-id",
+            nargs=1,
+            required=False,
+            help="MUSIC: Discogs release ID, release/master URL, or master/ID reference (plain IDs mean a release)",
+            dest="music_discogs_id",
+        )
+        parser.add_argument("--music-discogs-release-id", nargs=1, required=False, help="MUSIC: exact Discogs release ID or URL", dest="music_discogs_release_id")
+        parser.add_argument("--music-discogs-master-id", nargs=1, required=False, help="MUSIC: Discogs master ID or URL", dest="music_discogs_master_id")
+        parser.add_argument("--no-music-discogs", dest="music_discogs_enabled", action="store_false", default=True, help="MUSIC: disable Discogs lookup and metadata")
+        parser.add_argument("--music-enrich", dest="music_enrichment", action="store_true", default=None, help="MUSIC: enable bounded MusicBrainz enrichment for this run")
+        parser.add_argument("--no-music-enrich", dest="music_enrichment", action="store_false", help="MUSIC: disable MusicBrainz enrichment for this run")
         parser.add_argument(
             "-t",
             "--type",
@@ -163,6 +260,7 @@ class Args:
         parser.add_argument("-tvmaze", "--tvmaze", nargs=1, required=False, help="TVMAZE ID", type=str, dest="tvmaze_manual")
         parser.add_argument("-tvdb", "--tvdb", nargs=1, required=False, help="TVDB ID", type=str, dest="tvdb_manual")
         parser.add_argument("-douban", "--douban", nargs=1, required=False, help="Douban ID (Number only)", type=int, dest="douban_manual", default=0)
+        parser.add_argument("--no-metadata-cache", action="store_true", required=False, help="Do not read or write the persistent metadata cache", dest="no_metadata_cache")
         parser.add_argument("-igdb", "--igdb", nargs=1, required=False, help="IGDB ID", type=str, dest="igdb_manual")
         parser.add_argument("-steam", "--steam", nargs=1, required=False, help="Steam App ID or URL", type=str, dest="steam_manual")
         parser.add_argument("-g", "--tag", nargs="*", required=False, help="Group Tag", type=str)
@@ -207,6 +305,7 @@ class Args:
         parser.add_argument("-year", "--year", dest="manual_year", nargs=1, required=False, help="Override the year found", type=int, default=0)
         parser.add_argument("-author", "--author", nargs="*", required=False, help="Book/Audiobook author name (overrides auto-detected value)", type=str, dest="book_author")
         parser.add_argument("-btitle", "--book-title", nargs="*", required=False, help="Book/Audiobook title (overrides auto-detected value)", type=str, dest="book_title")
+        parser.add_argument("--book-cover", nargs=1, required=False, help="BOOK: public artwork URL or local cover image path", dest="book_cover")
         parser.add_argument("--comic", "-comic", action="store_true", required=False, help="Identify the book upload as a Comic", dest="comic", default=False)
         parser.add_argument("--manga", "-manga", action="store_true", required=False, help="Identify the book upload as a Manga", dest="manga", default=False)
         parser.add_argument("--magazine", "-magazine", action="store_true", required=False, help="Identify the book upload as a Magazine", dest="magazine", default=False)
@@ -330,6 +429,7 @@ class Args:
         parser.add_argument("-hdb", "--hdb", nargs=1, required=False, help="HDBITS torrent id/link", type=str)
         parser.add_argument("-btn", "--btn", nargs=1, required=False, help="BTN torrent id/link", type=str)
         parser.add_argument("-bhd", "--bhd", nargs=1, required=False, help="BEYONDHD torrent_id/link", type=str)
+        parser.add_argument("--orpheus", nargs=1, required=False, help="Orpheus torrent id/permalink (MUSIC metadata enrichment)", type=str)
         parser.add_argument("-huno", "--huno", nargs=1, required=False, help="HAWKEUNO torrent id/link", type=str)
         parser.add_argument("-ulcx", "--ulcx", nargs=1, required=False, help="ULCX torrent id/link", type=str)
         parser.add_argument("-req", "--search_requests", action="store_true", required=False, help="Search for matching requests on supported trackers", default=None)
@@ -382,6 +482,17 @@ class Args:
             help="Custom description block to insert (path to file OR filename in current working directory). This is added as a section inside the final description and does NOT replace the auto-generated description (MediaInfo, screenshots, etc.)",
         )
         parser.add_argument(
+            "-boverview",
+            "--book-overview",
+            "-ov",
+            "--overview",
+            dest="book_overview",
+            nargs="*",
+            required=False,
+            help="Book/Audiobook overview/synopsis (overrides auto-detected value)",
+            type=str,
+        )
+        parser.add_argument(
             "-menus",
             "--menus",
             "-menu",
@@ -399,7 +510,21 @@ class Args:
             nargs=1,
             required=False,
             help="Image Host",
-            choices=["imgbb", "ptpimg", "imgbox", "pixhost", "lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "passtheimage", "seedpool_cdn", "utppm", "lostimg"],
+            choices=[
+                "imgbb",
+                "imgbox",
+                "pixhost",
+                "lensdump",
+                "ptscreens",
+                "onlyimage",
+                "dalexni",
+                "zipline",
+                "midnightscene",
+                "passtheimage",
+                "seedpool_cdn",
+                "utppm",
+                "lostimg",
+            ],
         )
         parser.add_argument("-siu", "--skip-imagehost-upload", dest="skip_imghost_upload", action="store_true", required=False, help="Skip Uploading to an image host")
         parser.add_argument("-th", "--torrenthash", nargs=1, required=False, help="Torrent Hash to re-use from your client's session directory")
@@ -564,13 +689,21 @@ class Args:
             "--audio-spectrogram-tracks",
             nargs=1,
             required=False,
-            help="Select which audio tracks/streams to generate spectrograms for (comma-separated indexes or 'all')",
+            help="Select zero-based displayed audio stream positions for spectrograms (comma-separated, e.g. '0,1', or 'all')",
             type=str,
             dest="audio_spectrogram_tracks",
             default=None,
         )
         parser.add_argument("-u", "--usenet", action="store_true", required=False, help="Upload files to Usenet (NNTP)")
         parser.add_argument("--usenet-subject", nargs=1, required=False, help="Custom subject line for Usenet post", type=str, dest="usenet_subject", default=None)
+        parser.add_argument(
+            "--archive-password",
+            nargs=1,
+            required=False,
+            help="Override the Usenet 7z archive password for this run; use 'random' to generate one",
+            type=str,
+            dest="archive_password",
+        )
         parsed_args_ns, before_args = parser.parse_known_args(input)
         parsed_args: dict[str, Any] = vars(parsed_args_ns)
         # console.print(args)
@@ -757,6 +890,19 @@ class Args:
                         else:
                             meta.bhd = value2
 
+                    elif key == "orpheus":
+                        if value2.startswith("http"):
+                            parsed = urllib.parse.urlparse(value2)
+                            torrent_id = urllib.parse.parse_qs(parsed.query).get("torrentid", [""])[0]
+                            if torrent_id.isdigit():
+                                meta.orpheus = torrent_id
+                            else:
+                                logger.info("[red]Unable to parse torrentid from --orpheus URL; pass a torrent ID or permalink.[/red]")
+                        elif value2.isdigit():
+                            meta.orpheus = value2
+                        else:
+                            logger.info("[red]Invalid --orpheus value; pass a numeric torrent ID or permalink.[/red]")
+
                     elif key == "huno":
                         if value2.startswith("http"):
                             parsed = urllib.parse.urlparse(value2)
@@ -905,6 +1051,9 @@ class Args:
             # if key == 'help' and value == True:
             # parser.print_help()
 
+        if parsed_args.get("archive_password"):
+            meta.usenet_archive_password_is_random = str(meta.archive_password).lower() == "random"
+
         manual_frames_value = meta.manual_frames
         if manual_frames_value is not None:
             try:
@@ -936,6 +1085,15 @@ class Args:
         *langcodes* so both a human-readable name and the ISO 639-3 code are stored.
         Falls back gracefully when *langcodes* is unavailable or the code is unknown.
         """
+        book_overview_arg = meta.book_overview or meta.overview
+        if book_overview_arg not in (None, "", []):
+            overview_str = " ".join(str(x) for x in book_overview_arg if str(x)).strip() if isinstance(book_overview_arg, list) else str(book_overview_arg).strip()
+            meta.overview = overview_str
+            meta.book_overview = overview_str
+        else:
+            meta.overview = ""
+            meta.book_overview = ""
+
         book_author_arg = meta.book_author
         if book_author_arg not in (None, ""):
             meta.author = str(book_author_arg).strip()
@@ -959,6 +1117,18 @@ class Args:
         book_publisher_arg = meta.book_publisher
         if book_publisher_arg not in (None, ""):
             meta.publisher = str(book_publisher_arg).strip()
+
+        book_cover_arg = meta.book_cover
+        if book_cover_arg not in (None, "", []):
+            cover = " ".join(str(x) for x in book_cover_arg if str(x)).strip() if isinstance(book_cover_arg, list) else str(book_cover_arg).strip()
+            if cover.startswith(("http://", "https://")):
+                meta.artwork_url = cover
+            elif cover:
+                cover_path = Path(cover).expanduser()
+                if cover_path.is_file():
+                    meta.artwork_path = str(cover_path.resolve())
+                else:
+                    logger.warning("[yellow]BOOK: --book-cover is neither a public HTTP(S) URL nor an existing image file; ignoring it.[/yellow]")
 
         book_translator_arg = meta.book_translator
         if book_translator_arg not in (None, ""):

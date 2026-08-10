@@ -1,15 +1,14 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
 import html
 import json
 import re
-from pathlib import Path
 from typing import Any
 
 import httpx
 
 from src.book_prep import is_valid_book_language, resolve_book_language
 from src.console import logger
+from src.metadata_cache import cache_for, is_cache_miss
 
 mam_color = "[#eac117]MyAnonamouse[/#eac117]"
 
@@ -109,7 +108,7 @@ class MyAnonamouseManager:
                 ext = "png"
             elif "gif" in str(poster_type).lower():
                 ext = "gif"
-            metadata["poster"] = f"https://cdn.myanonamouse.net/t/p/large/{mam_id}.{ext}"
+            metadata["artwork_url"] = f"https://cdn.myanonamouse.net/t/p/large/{mam_id}.{ext}"
 
         # Comic / Manga detection
         catname = str(item.get("catname") or "").lower()
@@ -136,26 +135,13 @@ class MyAnonamouseManager:
         if not clean_id or not clean_id.isdigit():
             return None
 
-        # Check local cache first
-        cache_file = None
-        if base_dir:
-            cache_dir = Path(base_dir) / "tmp" / "myanonamouse_cache"
-            try:
-                Path(cache_dir).mkdir(parents=True, exist_ok=True)
-                cache_file = Path(cache_dir) / f"{clean_id}.json"
-                if Path(cache_file).exists():
-                    try:
-                        cache_content = await asyncio.to_thread(Path(cache_file).read_text, encoding="utf-8")
-                        cached_data = json.loads(cache_content)
-                        if cached_data:
-                            logger.info(f"{mam_color}: ID match found (cached): {clean_id}")
-
-                            if cached_data.get("data"):
-                                return self._parse_torrent_info(cached_data["data"][0])
-                    except Exception as ex:
-                        logger.debug(f"{mam_color}: [yellow]Warning: Could not read cache file for ID '{clean_id}': {ex}[/yellow]")
-            except Exception as ex:
-                logger.debug(f"{mam_color}: [yellow]Warning: Could not create cache directory: {ex}[/yellow]")
+        cache = cache_for(base_dir)
+        cached_data = await cache.get("myanonamouse", "torrent", clean_id)
+        if not is_cache_miss(cached_data) and isinstance(cached_data, dict):
+            if cached_data.get("not_found"):
+                return None
+            logger.info(f"{mam_color}: ID match found (cached): {clean_id}")
+            return cached_data
 
         if not api_key:
             logger.debug(f"{mam_color}: [yellow]API key/session cookie not configured, skipping search[/yellow]")
@@ -181,18 +167,12 @@ class MyAnonamouseManager:
                         if metadata:
                             logger.info(f"{mam_color}: match found: {metadata.get('title')}")
 
-                            # Save raw response to cache
-                            if cache_file:
-                                try:
-                                    cache_content = json.dumps(data, indent=4)
-                                    await asyncio.to_thread(Path(cache_file).write_text, cache_content, encoding="utf-8")
-                                    logger.debug(f"{mam_color}: Saved cache for ID: {clean_id}")
-                                except Exception as ex:
-                                    logger.debug(f"{mam_color}: [yellow]Warning: Could not write cache for ID '{clean_id}': {ex}[/yellow]")
+                            await cache.set("myanonamouse", "torrent", clean_id, metadata)
 
                             return metadata
                     else:
                         logger.info(f"{mam_color}: [yellow]No items found for ID: {clean_id}[/yellow]")
+                        await cache.set("myanonamouse", "torrent", clean_id, {"not_found": True}, negative=True)
                 elif resp.status_code in (401, 403):
                     logger.info(
                         f"{mam_color}: [bold red]API: Unauthorized/Forbidden (Status {resp.status_code}). Check your mam_api_key/mam_id and IP locked session cookie setting on the website.[/bold red]"

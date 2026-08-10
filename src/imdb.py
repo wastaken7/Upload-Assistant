@@ -13,11 +13,13 @@ import guessit
 import httpx
 
 from src.cleanup import cleanup_manager
-from src.console import logger
+from src.console import logger, prompt_in_thread
+from src.metadata_cache import cache_for, is_cache_miss
 
 anitopy_parse_fn: Any = cast(Any, anitopy).parse
 guessit_module: Any = cast(Any, guessit)
 GuessitFn = Callable[[str, dict[str, Any] | None], dict[str, Any]]
+IMDB_GRAPHQL_HEADERS = {"Content-Type": "application/json", "Referer": "https://www.imdb.com/"}
 
 
 def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -38,6 +40,8 @@ class ImdbManager:
         self,
         imdb_id: int | str | None,
         manual_language: str | dict[str, Any] | None = None,
+        base_dir: str = "",
+        config: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         imdb_info: dict[str, Any] = {}
 
@@ -50,6 +54,12 @@ class ImdbManager:
         except Exception as e:
             logger.error(f"[red]Error:[/red] {e}")
             return imdb_info
+
+        cache = cache_for(base_dir, config)
+        cache_key = f"{imdb_id_str}|{manual_language!s}"
+        cached_info = await cache.get("imdb", "title", cache_key)
+        if not is_cache_miss(cached_info) and isinstance(cached_info, dict):
+            return cached_info
 
         query = {
             "query": f"""
@@ -271,7 +281,7 @@ class ImdbManager:
                 response = await client.post(
                     "https://api.graphql.imdb.com/",
                     json=query,
-                    headers={"Content-Type": "application/json"},
+                    headers=IMDB_GRAPHQL_HEADERS,
                     timeout=10,
                 )
                 response.raise_for_status()
@@ -285,6 +295,8 @@ class ImdbManager:
 
         title_data = self.safe_get(data, ["data", "title"], {})
         if not title_data:
+            if not data.get("errors"):
+                await cache.set("imdb", "title", cache_key, imdb_info, negative=True)
             return imdb_info  # Return empty if no data found
 
         imdb_info["imdbID"] = imdb_id_str
@@ -314,6 +326,7 @@ class ImdbManager:
         imdb_info["genres"] = ", ".join(filter(None, genre_list))
 
         imdb_info["rating"] = self.safe_get(title_data, ["ratingsSummary", "aggregateRating"], "N/A")
+        imdb_info["votes"] = self.safe_get(title_data, ["ratingsSummary", "voteCount"], 0)
 
         def get_credits(title_data: dict[str, Any], category_keyword: str) -> tuple[list[str], list[str]]:
             people_list: list[str] = []
@@ -455,7 +468,7 @@ class ImdbManager:
             imdb_info["tv_year"] = None
 
         logger.debug(f"[yellow]IMDb Response: {json.dumps(imdb_info, indent=2)[:1000]}...[/yellow]")
-
+        await cache.set("imdb", "title", cache_key, imdb_info)
         return imdb_info
 
     async def search_imdb(
@@ -551,7 +564,7 @@ class ImdbManager:
 
             try:
                 async with httpx.AsyncClient() as client:
-                    response = await client.post(url, json=query, headers={"Content-Type": "application/json"}, timeout=10)
+                    response = await client.post(url, json=query, headers=IMDB_GRAPHQL_HEADERS, timeout=10)
                     response.raise_for_status()
                     data = response.json()
             except Exception as e:
@@ -784,7 +797,7 @@ class ImdbManager:
                 selection = None
                 while True:
                     try:
-                        selection = cli_ui.ask_string("Enter the number of the correct entry, 0 for none, or manual IMDb ID (tt1234567): ") or ""
+                        selection = await prompt_in_thread(cli_ui.ask_string, "Enter the number of the correct entry, 0 for none, or manual IMDb ID (tt1234567): ") or ""
                     except EOFError, KeyboardInterrupt:
                         logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                         await cleanup_manager.cleanup()
@@ -822,7 +835,7 @@ class ImdbManager:
         else:
             if not unattended:
                 try:
-                    selection = cli_ui.ask_string("No results found. Please enter a manual IMDb ID (tt1234567) or 0 to skip: ") or ""
+                    selection = await prompt_in_thread(cli_ui.ask_string, "No results found. Please enter a manual IMDb ID (tt1234567) or 0 to skip: ") or ""
                 except EOFError, KeyboardInterrupt:
                     logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()
@@ -891,7 +904,7 @@ class ImdbManager:
 
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post("https://api.graphql.imdb.com/", json=query, headers={"Content-Type": "application/json"}, timeout=10)
+                response = await client.post("https://api.graphql.imdb.com/", json=query, headers=IMDB_GRAPHQL_HEADERS, timeout=10)
                 response.raise_for_status()
                 data = response.json()
             except Exception as e:

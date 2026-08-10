@@ -1,8 +1,187 @@
 const { useState, useRef, useEffect, useCallback } = React;
 const THEME_KEY = "ua_config_theme";
+const LEFT_SIDEBAR_WIDTH_KEY = "ua_webui_left_sidebar_width";
+const RIGHT_SIDEBAR_WIDTH_KEY = "ua_webui_right_sidebar_width";
+const COLLAPSED_ARGUMENT_SECTIONS_KEY = "ua_webui_collapsed_argument_sections";
+const DEFAULT_SIDEBAR_WIDTH = 320;
+const SIDEBAR_MIN_WIDTH = 200;
+const LEFT_SIDEBAR_MAX_WIDTH = 600;
+const RIGHT_SIDEBAR_MAX_WIDTH = 800;
 
 const storage = window.UAStorage;
 const getStoredTheme = window.getUAStoredTheme;
+const colorThemes = window.UAThemes || [];
+const getStoredColorTheme = window.getUAStoredColorTheme;
+const setColorTheme = window.setUAColorTheme;
+let bbcodePreviewConfigured = false;
+
+const escapePreviewHtml = (value) =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const isSafePreviewUrl = (value) => {
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch (_error) {
+    return false;
+  }
+};
+
+const getSafeBbcodeColor = (params) => {
+  const color = String(params || "")
+    .replace(/^=/, "")
+    .trim()
+    .toLowerCase();
+  if (/^#[0-9a-f]{6}$/i.test(color)) return color;
+  if (/^[a-z]{3,20}$/i.test(color)) return color;
+  return "";
+};
+
+const sanitizeBbcodePreview = (html) => {
+  if (!window.DOMPurify) {
+    return `<div>${escapePreviewHtml(html).replace(/\n/g, "<br>")}</div>`;
+  }
+
+  const sanitized = window.DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      "a",
+      "b",
+      "blockquote",
+      "br",
+      "code",
+      "details",
+      "div",
+      "em",
+      "hr",
+      "i",
+      "img",
+      "li",
+      "ol",
+      "p",
+      "pre",
+      "span",
+      "strong",
+      "summary",
+      "table",
+      "tbody",
+      "td",
+      "th",
+      "thead",
+      "tr",
+      "u",
+      "ul",
+    ],
+    ALLOWED_ATTR: [
+      "alt",
+      "class",
+      "colspan",
+      "data-bbcode-color",
+      "href",
+      "src",
+      "title",
+    ],
+  });
+  const preview = new DOMParser().parseFromString(sanitized, "text/html");
+
+  preview.querySelectorAll("[data-bbcode-color]").forEach((element) => {
+    const color = getSafeBbcodeColor(element.getAttribute("data-bbcode-color"));
+    element.removeAttribute("data-bbcode-color");
+    if (color) element.style.color = color;
+  });
+  preview.querySelectorAll("[class*='xbbcode-size-']").forEach((element) => {
+    const size = Number(
+      element.className.match(/(?:^|\s)xbbcode-size-(\d+)(?:\s|$)/)?.[1],
+    );
+    if (Number.isInteger(size) && size >= 4 && size <= 40) {
+      element.style.fontSize = `${size}px`;
+    }
+  });
+
+  preview.querySelectorAll("a[href]").forEach((link) => {
+    if (!isSafePreviewUrl(link.getAttribute("href"))) {
+      link.removeAttribute("href");
+      return;
+    }
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+  });
+  preview.querySelectorAll("img[src]").forEach((image) => {
+    if (!isSafePreviewUrl(image.getAttribute("src"))) {
+      image.remove();
+      return;
+    }
+    image.loading = "lazy";
+  });
+
+  return preview.body.innerHTML;
+};
+
+const configureBbcodePreview = () => {
+  if (!window.XBBCODE?.addTags || bbcodePreviewConfigured) return;
+
+  window.XBBCODE.addTags({
+    color: {
+      openTag: (params) => {
+        const color = getSafeBbcodeColor(params);
+        return color ? `<span data-bbcode-color="${color}">` : "<span>";
+      },
+      closeTag: () => "</span>",
+    },
+    spoiler: {
+      openTag: () =>
+        '<details class="xbbcode-spoiler"><summary>Spoiler</summary>',
+      closeTag: () => "</details>",
+    },
+  });
+  bbcodePreviewConfigured = true;
+};
+
+const renderBbcodePreview = (content) => {
+  const text = String(content || "");
+  if (!window.XBBCODE?.process) {
+    return `<div>${escapePreviewHtml(text).replace(/\n/g, "<br>")}</div>`;
+  }
+
+  configureBbcodePreview();
+  return sanitizeBbcodePreview(
+    window.XBBCODE.process({
+      text,
+      addInLineBreaks: true,
+      removeMisalignedTags: false,
+      escapeHtml: true,
+    }).html,
+  );
+};
+
+const getStoredSidebarWidth = (key, defaultWidth, maxWidth) => {
+  const storedWidth = Number(storage.get(key));
+  if (
+    Number.isFinite(storedWidth) &&
+    storedWidth >= SIDEBAR_MIN_WIDTH &&
+    storedWidth <= maxWidth
+  ) {
+    return storedWidth;
+  }
+  return defaultWidth;
+};
+
+const getStoredCollapsedSections = () => {
+  try {
+    const storedSections = JSON.parse(
+      storage.get(COLLAPSED_ARGUMENT_SECTIONS_KEY) || "[]",
+    );
+    return Array.isArray(storedSections)
+      ? storedSections.filter((section) => typeof section === "string")
+      : [];
+  } catch (error) {
+    return [];
+  }
+};
 
 // Local CSRF cache used by fallback `apiFetch` when `uaApiFetch` isn't present.
 let localCsrf = null;
@@ -127,6 +306,89 @@ const argumentCategories = [
     ],
   },
   {
+    title: "Music Metadata",
+    args: [
+      {
+        label: "--music-artist",
+        placeholder: "ARTIST",
+        description: "Override the main artist(s)",
+      },
+      {
+        label: "--music-album",
+        placeholder: "TITLE",
+        description: "Override the album or release title",
+      },
+      {
+        label: "--music-media",
+        placeholder: "MEDIUM",
+        description:
+          "Source medium (CD, WEB, Vinyl, DVD, BD, Soundboard, SACD, DAT, Cassette)",
+      },
+      {
+        label: "--music-release-type",
+        placeholder: "ALBUM / EP / SINGLE",
+        description: "Release type",
+      },
+      {
+        label: "--music-release-year",
+        placeholder: "YYYY",
+        description: "Concrete release or pressing year",
+      },
+      {
+        label: "--music-edition-year",
+        placeholder: "YYYY",
+        description: "Remaster, reissue, or edition year",
+      },
+      {
+        label: "--music-label",
+        placeholder: "LABEL",
+        description: "Record label",
+      },
+      {
+        label: "--music-catalogue-number",
+        placeholder: "CATALOGUE",
+        description: "Catalogue number",
+      },
+      {
+        label: "--music-genre",
+        placeholder: "GENRE1,GENRE2",
+        description: "Comma-separated genre override",
+      },
+      {
+        label: "--music-cover",
+        placeholder: "URL_OR_PATH",
+        description: "Artwork URL or local cover path",
+      },
+      {
+        label: "--music-discogs-id",
+        placeholder: "ID_OR_URL",
+        description: "Discogs release or master reference",
+      },
+      {
+        label: "--music-discogs-release-id",
+        placeholder: "ID_OR_URL",
+        description: "Exact Discogs release reference",
+      },
+      {
+        label: "--music-discogs-master-id",
+        placeholder: "ID_OR_URL",
+        description: "Exact Discogs master reference",
+      },
+      {
+        label: "--no-music-discogs",
+        description: "Disable Discogs lookup and metadata",
+      },
+      {
+        label: "--music-enrich",
+        description: "Enable bounded MusicBrainz enrichment",
+      },
+      {
+        label: "--no-music-enrich",
+        description: "Disable MusicBrainz enrichment",
+      },
+    ],
+  },
+  {
     title: "Screenshots / Images",
     args: [
       {
@@ -148,11 +410,6 @@ const argumentCategories = [
         label: "--comparison_index",
         placeholder: "N",
         description: "Comparison main index",
-      },
-      {
-        label: "--disc-menus",
-        placeholder: "PATH",
-        description: "Folder containing disc menus screenshots",
       },
       {
         label: "--imghost",
@@ -265,6 +522,11 @@ const argumentCategories = [
       { label: "--untouched", description: "Mark as untouched disc" },
       { label: "--menus", description: "Path to menus screenshots (PNGs)" },
       {
+        label: "--manual_dvds",
+        placeholder: "2xDVD9+DVD5",
+        description: "Override the default number of DVDs",
+      },
+      {
         label: "--sorted-filelist",
         description: "Sorted filelist (handles typical anime nonsense)",
       },
@@ -290,6 +552,17 @@ const argumentCategories = [
         label: "--book-title",
         placeholder: "TITLE",
         description: "Override detected book title",
+      },
+      {
+        label: "--book-cover",
+        placeholder: "PATH_OR_URL",
+        description: "Required BOOK cover image path or public image URL",
+      },
+      {
+        label: "--book-overview",
+        placeholder: "SYNOPSIS",
+        description:
+          "Book/Audiobook overview/synopsis (overrides auto-detected value)",
       },
       { label: "--comic", description: "Mark upload as comic" },
       { label: "--manga", description: "Mark upload as manga" },
@@ -342,6 +615,7 @@ const argumentCategories = [
         placeholder: "dlc",
         description: "Game subcategory",
       },
+      { label: "--multi", description: "Force a MULTI language tag" },
     ],
   },
   {
@@ -365,6 +639,11 @@ const argumentCategories = [
       { label: "--hdb", placeholder: "ID_OR_URL", description: "HDB id/link" },
       { label: "--btn", placeholder: "ID_OR_URL", description: "BTN id/link" },
       { label: "--bhd", placeholder: "ID_OR_URL", description: "BHD id/link" },
+      {
+        label: "--orpheus",
+        placeholder: "ID_OR_URL",
+        description: "Orpheus id/link for music metadata enrichment",
+      },
       {
         label: "--huno",
         placeholder: "ID_OR_URL",
@@ -572,6 +851,36 @@ const argumentCategories = [
     ],
   },
   {
+    title: "Audio Spectrograms",
+    subtitle:
+      "The stream positions are zero-based. Choose a preset, then edit the command if you want a different list.",
+    args: [
+      {
+        label: "First audio stream",
+        insert: "--audio-spectrogram --audio-spectrogram-tracks 0",
+        description:
+          "Generate an upload-ready spectrogram for stream position 0.",
+      },
+      {
+        label: "All audio streams",
+        insert: "--audio-spectrogram --audio-spectrogram-tracks all",
+        description: "Generate one spectrogram per available stream.",
+      },
+      {
+        label: "--audio-spectrogram",
+        description:
+          "Generate spectrograms; without a stream selection, the workflow will ask which streams to use.",
+      },
+      {
+        label: "--audio-spectrogram-tracks",
+        placeholder: "0,1 or all",
+        insert: "--audio-spectrogram --audio-spectrogram-tracks all",
+        description:
+          "Preset inserts a valid selection. Replace 'all' with zero-based positions in the command field if needed.",
+      },
+    ],
+  },
+  {
     title: "Misc Options",
     args: [
       {
@@ -583,20 +892,16 @@ const argumentCategories = [
         placeholder: "ID_OR_TAG",
         description: "SPD channel",
       },
-      {
-        label: "--audio-spectrogram",
-        description: "Generate audio spectrograms",
-      },
-      {
-        label: "--audio-spectrogram-tracks",
-        placeholder: "1,2",
-        description: "Specific tracks for spectrograms",
-      },
       { label: "--usenet", description: "Upload files to Usenet (NNTP)" },
       {
         label: "--usenet-subject",
         placeholder: "TEXT",
         description: "Custom Usenet subject line",
+      },
+      {
+        label: "--archive-password",
+        placeholder: "PASSWORD or random",
+        description: "Override the Usenet 7z archive password for this run",
       },
       {
         label: "--unattended",
@@ -612,21 +917,23 @@ const argumentCategories = [
 ];
 
 // Icon components
-const FolderIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-    />
-  </svg>
+const WebUiIcon = ({ name, className = "w-5 h-5" }) => (
+  <span
+    aria-hidden="true"
+    className={`inline-block flex-none ${className}`}
+    style={{
+      backgroundColor: "currentColor",
+      mask: `url(/static/img/webui-icons/${name}.svg) center / contain no-repeat`,
+      WebkitMask: `url(/static/img/webui-icons/${name}.svg) center / contain no-repeat`,
+    }}
+  />
 );
+
+const FolderIcon = () => (
+  <WebUiIcon name="file-structure" className="w-4 h-4" />
+);
+
+const ScreenshotsIcon = () => <WebUiIcon name="screenshots" />;
 
 const FolderOpenIcon = () => (
   <svg
@@ -676,6 +983,53 @@ const TerminalIcon = () => (
   </svg>
 );
 
+const PaletteIcon = () => <WebUiIcon name="palette" />;
+
+const SettingsIcon = () => <WebUiIcon name="settings" />;
+
+const ProgressIcon = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M4 19V5m0 14h16M8 16v-4m4 4V8m4 8v-7"
+    />
+  </svg>
+);
+
+const MovieIcon = () => <WebUiIcon name="movie" />;
+
+const TvIcon = () => <WebUiIcon name="tv" />;
+
+const GameIcon = () => <WebUiIcon name="gamepad" />;
+
+const BookIcon = () => <WebUiIcon name="book" />;
+
+const DiscIcon = () => <WebUiIcon name="music" />;
+
+const mediaIconForCategory = (category) => {
+  switch (String(category || "").toUpperCase()) {
+    case "MOVIE":
+      return <MovieIcon />;
+    case "TV":
+      return <TvIcon />;
+    case "GAME":
+      return <GameIcon />;
+    case "BOOK":
+      return <BookIcon />;
+    case "MUSIC":
+      return <DiscIcon />;
+    default:
+      return <FileIcon />;
+  }
+};
+
 const PlayIcon = () => (
   <svg
     className="w-4 h-4"
@@ -694,6 +1048,38 @@ const PlayIcon = () => (
       strokeLinejoin="round"
       strokeWidth={2}
       d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+    />
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 5v14m-7-7h14"
+    />
+  </svg>
+);
+
+const ExpandIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M8 3H3v5m13-5h5v5M8 21H3v-5m18 0v5h-5"
     />
   </svg>
 );
@@ -861,6 +1247,14 @@ const metadataProviderStyles = {
     light: "border-orange-300 bg-transparent text-orange-900",
     dark: "border-orange-900/80 bg-transparent text-orange-100",
   },
+  musicbrainz: {
+    light: "border-[#BA478F] bg-transparent text-[#7D205D]",
+    dark: "border-[#BA478F]/75 bg-transparent text-[#F4C7E4]",
+  },
+  discogs: {
+    light: "border-slate-400 bg-transparent text-slate-900",
+    dark: "border-slate-500/80 bg-transparent text-slate-100",
+  },
   default: {
     light: "border-gray-300 bg-transparent text-gray-900",
     dark: "border-gray-700 bg-transparent text-gray-100",
@@ -892,6 +1286,11 @@ const metadataProviderIcons = {
     src: "/static/img/providers/openlibrary.svg",
     alt: "Open Library",
   },
+  musicbrainz: {
+    src: "/static/img/providers/musicbrainz.ico",
+    alt: "MusicBrainz",
+  },
+  discogs: { src: "/static/img/providers/discogs.svg", alt: "Discogs" },
   steam: { src: "/static/img/providers/steam.svg", alt: "Steam" },
   tvmaze: { src: "/static/img/providers/tvmaze.svg", alt: "TVMaze" },
 };
@@ -905,7 +1304,9 @@ const renderMetadataProviderIcon = (key, isDarkMode) => {
       <img
         src={iconSrc}
         alt={iconAsset.alt}
-        className="block h-3.5 w-auto max-w-[3.75rem] object-contain"
+        className={`block h-3.5 w-auto max-w-[3.75rem] object-contain ${
+          key === "discogs" && !isDarkMode ? "invert" : ""
+        }`}
       />
     );
   }
@@ -992,29 +1393,186 @@ function AudionutsUAGUI() {
   const [selectedPath, setSelectedPath] = useState("");
   const [, setSelectedName] = useState("");
   const [customArgs, setCustomArgs] = useState("");
+  const [argumentPresets, setArgumentPresets] = useState([]);
+  const [argumentPresetName, setArgumentPresetName] = useState("");
+  const [selectedArgumentPreset, setSelectedArgumentPreset] = useState("");
   const [trackers, setTrackers] = useState([]);
   const [defaultTrackers, setDefaultTrackers] = useState(new Set());
   const [selectedTrackers, setSelectedTrackers] = useState(new Set());
   const [failedFavicons, setFailedFavicons] = useState(new Set());
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isOutputExpanded, setIsOutputExpanded] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState(
     new Set(["/data", "/torrent_storage_dir"]),
   );
   const [sessionId, setSessionId] = useState("");
-  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [sidebarWidth, setSidebarWidth] = useState(() =>
+    getStoredSidebarWidth(
+      LEFT_SIDEBAR_WIDTH_KEY,
+      DEFAULT_SIDEBAR_WIDTH,
+      LEFT_SIDEBAR_MAX_WIDTH,
+    ),
+  );
   const [isResizing, setIsResizing] = useState(false);
-  const [rightSidebarWidth, setRightSidebarWidth] = useState(320);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(() =>
+    getStoredSidebarWidth(
+      RIGHT_SIDEBAR_WIDTH_KEY,
+      DEFAULT_SIDEBAR_WIDTH,
+      RIGHT_SIDEBAR_MAX_WIDTH,
+    ),
+  );
   const [isResizingRight, setIsResizingRight] = useState(false);
   const [userInput, setUserInput] = useState("");
   const [isSendingInput, setIsSendingInput] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(getStoredTheme);
+  const [colorTheme, setColorThemeState] = useState(getStoredColorTheme);
+  const [isThemePaletteOpen, setIsThemePaletteOpen] = useState(false);
   const [argSearchFilter, setArgSearchFilter] = useState("");
-  const [collapsedSections, setCollapsedSections] = useState(new Set());
+  const [collapsedSections, setCollapsedSections] = useState(
+    () => new Set(getStoredCollapsedSections()),
+  );
   const [executionPreview, setExecutionPreview] = useState(null);
+  const [executionScreenshots, setExecutionScreenshots] = useState([]);
+  const [executionDescription, setExecutionDescription] = useState(null);
+  const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [descriptionView, setDescriptionView] = useState("edit");
+  const [descriptionVersion, setDescriptionVersion] = useState(0);
+  const [descriptionDirty, setDescriptionDirty] = useState(false);
+  const descriptionDirtyRef = useRef(false);
+  const descriptionVersionRef = useRef(0);
+  const descriptionEditorRef = useRef(null);
+  const [descriptionAction, setDescriptionAction] = useState("");
+  const [canAddExecutionScreenshot, setCanAddExecutionScreenshot] =
+    useState(false);
+  const [screenshotActionId, setScreenshotActionId] = useState("");
+  const [expandedScreenshot, setExpandedScreenshot] = useState(null);
+  const themePaletteRef = useRef(null);
+  const screenshotModalRef = useRef(null);
+
+  useEffect(() => {
+    descriptionDirtyRef.current = descriptionDirty;
+  }, [descriptionDirty]);
+  const screenshotModalCloseRef = useRef(null);
+  const [isScreenshotReviewOpen, setIsScreenshotReviewOpen] = useState(false);
+  const [isDescriptionReviewOpen, setIsDescriptionReviewOpen] = useState(false);
   const [progressItems, setProgressItems] = useState([]);
   const [selectedPaths, setSelectedPaths] = useState([]);
   const [sortBy, setSortBy] = useState("name");
   const [sortOrder, setSortOrder] = useState("asc");
+
+  useEffect(() => {
+    storage.set(
+      COLLAPSED_ARGUMENT_SECTIONS_KEY,
+      JSON.stringify(Array.from(collapsedSections)),
+    );
+  }, [collapsedSections]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadArgumentPresets = async () => {
+      try {
+        const response = await apiFetch(`${API_BASE}/argument_presets`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelled && data.success && Array.isArray(data.presets)) {
+          setArgumentPresets(data.presets);
+        }
+      } catch (error) {
+        console.error("Failed to load argument presets:", error);
+      }
+    };
+    loadArgumentPresets();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleColorThemeChange = (event) => {
+      setColorThemeState(event.detail?.theme || getStoredColorTheme());
+    };
+    window.addEventListener("ua-theme-change", handleColorThemeChange);
+    return () =>
+      window.removeEventListener("ua-theme-change", handleColorThemeChange);
+  }, []);
+
+  useEffect(() => {
+    if (!isThemePaletteOpen) return undefined;
+    const closeWhenOutside = (event) => {
+      if (!themePaletteRef.current?.contains(event.target)) {
+        setIsThemePaletteOpen(false);
+      }
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setIsThemePaletteOpen(false);
+    };
+    document.addEventListener("pointerdown", closeWhenOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeWhenOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isThemePaletteOpen]);
+
+  const handleColorThemeChange = (event) => {
+    setColorThemeState(setColorTheme(event.target.value));
+  };
+
+  const renderThemePalette = () => (
+    <div ref={themePaletteRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setIsThemePaletteOpen((open) => !open)}
+        aria-label="Theme settings"
+        aria-expanded={isThemePaletteOpen}
+        title="Theme settings"
+        className={`p-2 rounded-lg transition-colors ${isDarkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
+      >
+        <PaletteIcon />
+      </button>
+      {isThemePaletteOpen && (
+        <div
+          className={`absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border p-3 shadow-xl ${isDarkMode ? "border-gray-700 bg-gray-800 text-gray-100" : "border-gray-200 bg-white text-gray-800"}`}
+        >
+          <label className="block text-xs font-semibold uppercase tracking-wide opacity-70">
+            Color theme
+          </label>
+          <select
+            value={colorTheme}
+            onChange={(event) => {
+              handleColorThemeChange(event);
+              setIsThemePaletteOpen(false);
+            }}
+            aria-label="Color theme"
+            className="ua-theme-picker mt-1.5 w-full rounded px-2 py-1.5 text-sm"
+          >
+            {colorThemes.map((theme) => (
+              <option key={theme.id} value={theme.id}>
+                {theme.label}
+              </option>
+            ))}
+          </select>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-sm">
+              {isDarkMode ? "Dark mode" : "Light mode"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsDarkMode((dark) => !dark)}
+              aria-label={
+                isDarkMode ? "Switch to light mode" : "Switch to dark mode"
+              }
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isDarkMode ? "bg-purple-600" : "bg-gray-300"}`}
+            >
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${isDarkMode ? "translate-x-5" : "translate-x-1"}`}
+              />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   // Mobile state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -1097,7 +1655,7 @@ function AudionutsUAGUI() {
 
     return (
       <div
-        className={`rounded-lg border p-3 shadow-xl backdrop-blur-sm ${isDarkMode ? "border-gray-700 bg-gray-800/90" : "border-gray-200 bg-white/95"}`}
+        className={`rounded-lg border p-3 shadow-xl backdrop-blur-sm ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white/95"}`}
       >
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
@@ -1139,13 +1697,13 @@ function AudionutsUAGUI() {
                   ? "text-rose-300"
                   : "text-rose-700"
                 : isDarkMode
-                  ? "text-sky-300"
-                  : "text-sky-700";
+                  ? "text-purple-300"
+                  : "text-purple-700";
             const progressTone = isCompleted
               ? "bg-emerald-500"
               : isFailed
                 ? "bg-rose-500"
-                : "bg-sky-500";
+                : "bg-purple-500";
             let summary = "";
             if (hasTotal) {
               if (item.unit === "percent")
@@ -1155,7 +1713,7 @@ function AudionutsUAGUI() {
             return (
               <div
                 key={item.id}
-                className={`rounded-lg border px-3 py-2 ${isDarkMode ? "border-gray-700 bg-gray-900/80" : "border-gray-200 bg-gray-50"}`}
+                className={`rounded-lg border px-3 py-2 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gray-50"}`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -1198,7 +1756,7 @@ function AudionutsUAGUI() {
   };
 
   const renderFloatingProgressPanel = () => {
-    if (isMobile) return null;
+    if (isMobile || isExecuting) return null;
     const panel = renderProgressPanel(true);
     if (!panel) return null;
 
@@ -1211,9 +1769,7 @@ function AudionutsUAGUI() {
     );
   };
 
-  const renderMobileProgressPanel = () => {
-    if (!visibleProgressItems.length) return null;
-
+  const renderProgressWorkspace = () => {
     return (
       <div className="flex flex-col h-full">
         <div
@@ -1222,7 +1778,7 @@ function AudionutsUAGUI() {
           <h2
             className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
           >
-            <TerminalIcon />
+            <ProgressIcon />
             Binary Progress
           </h2>
           <p
@@ -1232,7 +1788,13 @@ function AudionutsUAGUI() {
           </p>
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          {renderProgressPanel()}
+          {renderProgressPanel() || (
+            <div
+              className={`rounded-lg border p-5 text-center text-sm ${isDarkMode ? "border-gray-700 bg-gray-800 text-gray-400" : "border-gray-200 bg-gray-50 text-gray-500"}`}
+            >
+              Waiting for an external tool to report progress.
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1544,7 +2106,9 @@ function AudionutsUAGUI() {
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto pr-1">
+        <div
+          className={`flex flex-wrap gap-2 pr-1 ${!isExecuting && !isOutputExpanded ? "" : "max-h-48 overflow-y-auto"}`}
+        >
           {trackers.map((tracker) => {
             const isSelected = selectedTrackers.has(tracker.name);
             const isDefault = defaultTrackers.has(tracker.name);
@@ -1556,7 +2120,7 @@ function AudionutsUAGUI() {
                 key={tracker.name}
                 onClick={() => handleTrackerToggle(tracker.name)}
                 disabled={isExecuting}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium border transition-all ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium border transition-all ${
                   isSelected
                     ? isDarkMode
                       ? "bg-purple-900/60 border-purple-500 text-purple-200 hover:bg-purple-900/80"
@@ -1578,16 +2142,16 @@ function AudionutsUAGUI() {
                         return next;
                       });
                     }}
-                    className="w-3.5 h-3.5 rounded-sm object-contain"
+                    className="w-4 h-4 rounded-sm object-contain"
                   />
                 ) : (
                   <span
-                    className="w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[9px] font-bold text-white uppercase select-none"
+                    className="w-4 h-4 rounded-sm flex items-center justify-center text-[9px] font-bold text-white uppercase select-none"
                     style={{
                       backgroundColor: getInitialsColor(tracker.display_name),
-                      minWidth: "14px",
-                      height: "14px",
-                      lineHeight: "14px",
+                      minWidth: "16px",
+                      height: "16px",
+                      lineHeight: "16px",
                     }}
                   >
                     {tracker.display_name.charAt(0)}
@@ -1664,6 +2228,20 @@ function AudionutsUAGUI() {
     if (!isExecuting || !sessionId) {
       setExecutionPreview(null);
       setProgressItems([]);
+      setExecutionScreenshots([]);
+      setExecutionDescription(null);
+      setDescriptionDraft("");
+      setDescriptionView("edit");
+      descriptionVersionRef.current = 0;
+      setDescriptionVersion(0);
+      setDescriptionDirty(false);
+      setCanAddExecutionScreenshot(false);
+      setExpandedScreenshot(null);
+      setIsScreenshotReviewOpen(false);
+      setIsDescriptionReviewOpen(false);
+      setActivePanel((panel) =>
+        ["screenshots", "description"].includes(panel) ? "main" : panel,
+      );
       return undefined;
     }
 
@@ -1677,9 +2255,20 @@ function AudionutsUAGUI() {
       try {
         const response = await apiFetch(
           `${API_BASE}/execution_preview?session_id=${encodeURIComponent(sessionId)}`,
-          { signal: controller.signal },
+          // This endpoint changes throughout a queue run.  Do not allow a
+          // browser or intermediary cache to keep showing an earlier item.
+          { cache: "no-store", signal: controller.signal },
         );
         if (!response.ok) {
+          // Do not keep showing the previous queue item when the backend has
+          // already moved on (or the session was briefly unavailable).
+          if (response.status === 404 && !cancelled) {
+            setExecutionPreview(null);
+            setProgressItems([]);
+            setExecutionScreenshots([]);
+            setCanAddExecutionScreenshot(false);
+            setExecutionDescription(null);
+          }
           return;
         }
         const data = await response.json();
@@ -1689,6 +2278,44 @@ function AudionutsUAGUI() {
             setProgressItems((prev) =>
               mergeProgressItemsById(prev, data.media.progress),
             );
+          }
+        }
+        const screenshotsResponse = await apiFetch(
+          `${API_BASE}/execution_screenshots?session_id=${encodeURIComponent(sessionId)}`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        if (screenshotsResponse.ok) {
+          const screenshotsData = await screenshotsResponse.json();
+          if (!cancelled && screenshotsData?.success) {
+            setExecutionScreenshots(
+              Array.isArray(screenshotsData.screenshots)
+                ? screenshotsData.screenshots
+                : [],
+            );
+            setCanAddExecutionScreenshot(Boolean(screenshotsData.can_add));
+          }
+        }
+        const descriptionResponse = await apiFetch(
+          `${API_BASE}/execution_description?session_id=${encodeURIComponent(sessionId)}`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        if (descriptionResponse.ok) {
+          const descriptionData = await descriptionResponse.json();
+          const polledVersion = Number.isInteger(descriptionData?.version)
+            ? descriptionData.version
+            : null;
+          if (
+            !cancelled &&
+            descriptionData?.success &&
+            polledVersion !== null &&
+            polledVersion >= descriptionVersionRef.current
+          ) {
+            descriptionVersionRef.current = polledVersion;
+            setExecutionDescription(descriptionData);
+            if (!descriptionDirtyRef.current) {
+              setDescriptionDraft(descriptionData.content || "");
+              setDescriptionVersion(polledVersion);
+            }
           }
         }
       } catch (_error) {
@@ -1713,6 +2340,95 @@ function AudionutsUAGUI() {
       activeController?.abort();
     };
   }, [API_BASE, isExecuting, sessionId]);
+
+  const refreshExecutionScreenshots = async () => {
+    const refreshed = await apiFetch(
+      `${API_BASE}/execution_screenshots?session_id=${encodeURIComponent(sessionId)}`,
+      { cache: "no-store" },
+    );
+    const refreshedData = await refreshed.json().catch(() => null);
+    if (!refreshed.ok || !refreshedData?.success) {
+      throw new Error("Could not refresh screenshots.");
+    }
+    setExecutionScreenshots(refreshedData.screenshots || []);
+    setCanAddExecutionScreenshot(Boolean(refreshedData.can_add));
+  };
+
+  const changeExecutionScreenshot = async (screenshotId, action) => {
+    if (!sessionId || screenshotActionId) return;
+    setScreenshotActionId(`${action}:${screenshotId}`);
+    try {
+      const response = await apiFetch(
+        `${API_BASE}/execution_screenshots/${encodeURIComponent(screenshotId)}/${action}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId }),
+        },
+      );
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        window.alert(data?.error || `Could not ${action} screenshot.`);
+        return;
+      }
+      await refreshExecutionScreenshots();
+    } catch (error) {
+      console.error(`Could not ${action} screenshot:`, error);
+      window.alert(`Could not ${action} screenshot. Please try again.`);
+    } finally {
+      setScreenshotActionId("");
+    }
+  };
+
+  const addExecutionScreenshot = async (group = "main") => {
+    if (!sessionId || screenshotActionId || !canAddExecutionScreenshot) return;
+    setScreenshotActionId("add");
+    try {
+      const response = await apiFetch(`${API_BASE}/execution_screenshots/add`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, group }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        window.alert(data?.error || "Could not add screenshot.");
+        return;
+      }
+      await refreshExecutionScreenshots();
+    } catch (error) {
+      console.error("Could not add screenshot:", error);
+      window.alert("Could not add screenshot. Please try again.");
+    } finally {
+      setScreenshotActionId("");
+    }
+  };
+
+  useEffect(() => {
+    if (!expandedScreenshot) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setExpandedScreenshot(null);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    const focusTimer = window.setTimeout(
+      () => screenshotModalCloseRef.current?.focus(),
+      0,
+    );
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      window.clearTimeout(focusTimer);
+    };
+  }, [expandedScreenshot]);
+
+  useEffect(() => {
+    if (
+      expandedScreenshot &&
+      !executionScreenshots.some(
+        (screenshot) => screenshot.id === expandedScreenshot,
+      )
+    ) {
+      setExpandedScreenshot(null);
+    }
+  }, [executionScreenshots, expandedScreenshot]);
 
   // Update descfile in args
   const updateDescFile = (path) => {
@@ -1887,6 +2603,12 @@ function AudionutsUAGUI() {
   }, [isDarkMode]);
 
   useEffect(() => {
+    if (isExecuting) {
+      setIsOutputExpanded(true);
+    }
+  }, [isExecuting]);
+
+  useEffect(() => {
     const handleStorage = (event) => {
       if (event.key === THEME_KEY) {
         setIsDarkMode(event.newValue === "dark");
@@ -1960,14 +2682,10 @@ function AudionutsUAGUI() {
   }, [isExecuting]);
 
   useEffect(() => {
-    if (
-      isMobile &&
-      activePanel === "progress" &&
-      visibleProgressItems.length === 0
-    ) {
-      setActivePanel("main");
+    if (isMobile && activePanel === "progress") {
+      setActivePanel(isExecuting ? "files" : "main");
     }
-  }, [activePanel, isMobile, visibleProgressItems.length]);
+  }, [activePanel, isExecuting, isMobile]);
 
   const getVisiblePaths = () => {
     if (fileBrowserSearch) {
@@ -2463,6 +3181,7 @@ function AudionutsUAGUI() {
           >
             <input
               type="checkbox"
+              aria-label={`Select ${item.type === "folder" ? "folder" : "file"} ${item.name}`}
               checked={selectedPaths.some((x) => x.path === item.path)}
               onChange={(e) => {
                 e.stopPropagation();
@@ -2530,6 +3249,7 @@ function AudionutsUAGUI() {
           >
             <input
               type="checkbox"
+              aria-label={`Select ${item.type === "folder" ? "folder" : "file"} ${item.name}`}
               checked={selectedPaths.some((x) => x.path === item.path)}
               onChange={(e) => {
                 e.stopPropagation();
@@ -2968,8 +3688,9 @@ function AudionutsUAGUI() {
   const resize = useCallback(
     (e) => {
       const newWidth = e.clientX;
-      if (newWidth >= 200 && newWidth <= 600) {
+      if (newWidth >= SIDEBAR_MIN_WIDTH && newWidth <= LEFT_SIDEBAR_MAX_WIDTH) {
         setSidebarWidth(newWidth);
+        storage.set(LEFT_SIDEBAR_WIDTH_KEY, String(newWidth));
       }
     },
     [setSidebarWidth],
@@ -2999,8 +3720,12 @@ function AudionutsUAGUI() {
     (e) => {
       // Calculate width from right edge
       const newWidth = window.innerWidth - e.clientX;
-      if (newWidth >= 200 && newWidth <= 800) {
+      if (
+        newWidth >= SIDEBAR_MIN_WIDTH &&
+        newWidth <= RIGHT_SIDEBAR_MAX_WIDTH
+      ) {
         setRightSidebarWidth(newWidth);
+        storage.set(RIGHT_SIDEBAR_WIDTH_KEY, String(newWidth));
       }
     },
     [setRightSidebarWidth],
@@ -3023,6 +3748,121 @@ function AudionutsUAGUI() {
   const addArgument = (arg) => {
     setCustomArgs((prev) => (prev && prev.length ? `${prev} ${arg}` : arg));
   };
+
+  const saveArgumentPreset = async () => {
+    const name = argumentPresetName.trim();
+    const argumentsValue = customArgs.trim();
+    if (!name || !argumentsValue) return;
+
+    try {
+      const response = await apiFetch(`${API_BASE}/argument_presets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, arguments: argumentsValue }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success)
+        throw new Error(data.error || "Save failed");
+      setArgumentPresets(data.presets || []);
+      setSelectedArgumentPreset(name);
+      setArgumentPresetName("");
+    } catch (error) {
+      console.error("Failed to save argument preset:", error);
+    }
+  };
+
+  const loadArgumentPreset = (name) => {
+    setSelectedArgumentPreset(name);
+    const preset = argumentPresets.find((item) => item.name === name);
+    if (preset) setCustomArgs(preset.arguments);
+  };
+
+  const deleteArgumentPreset = async () => {
+    if (!selectedArgumentPreset) return;
+
+    try {
+      const response = await apiFetch(`${API_BASE}/argument_presets`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: selectedArgumentPreset }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success)
+        throw new Error(data.error || "Delete failed");
+      setArgumentPresets(data.presets || []);
+      setSelectedArgumentPreset("");
+    } catch (error) {
+      console.error("Failed to delete argument preset:", error);
+    }
+  };
+
+  const renderArgumentPresetControls = (isMobileView = false) => (
+    <div className={`space-y-2 ${isMobileView ? "pt-1" : ""}`}>
+      <div className="flex gap-2">
+        <select
+          value={selectedArgumentPreset}
+          onChange={(e) => loadArgumentPreset(e.target.value)}
+          className={`min-w-0 flex-1 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+            isDarkMode
+              ? "bg-gray-700 border-gray-600 text-white"
+              : "bg-white border-gray-300 text-gray-900"
+          }`}
+          disabled={isExecuting || argumentPresets.length === 0}
+          aria-label="Saved argument presets"
+        >
+          <option value="">Saved argument presets</option>
+          {argumentPresets.map((preset) => (
+            <option key={preset.name} value={preset.name}>
+              {preset.name}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={deleteArgumentPreset}
+          disabled={isExecuting || !selectedArgumentPreset}
+          className="px-3 py-2 text-sm font-medium rounded-lg border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-red-950"
+          title="Delete selected preset"
+        >
+          Delete
+        </button>
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={argumentPresetName}
+          onChange={(e) => setArgumentPresetName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              saveArgumentPreset();
+            }
+          }}
+          placeholder="Preset name"
+          className={`min-w-0 flex-1 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+            isDarkMode
+              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              : "bg-white border-gray-300 text-gray-900 placeholder-gray-400"
+          }`}
+          disabled={isExecuting}
+        />
+        <button
+          onClick={saveArgumentPreset}
+          disabled={
+            isExecuting || !argumentPresetName.trim() || !customArgs.trim()
+          }
+          className="px-3 py-2 text-sm font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Save current arguments as a named preset"
+        >
+          Save
+        </button>
+      </div>
+      <p
+        className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+      >
+        Saving an existing name updates that preset.
+      </p>
+    </div>
+  );
 
   // Toggle section collapse
   const toggleSectionCollapse = (title) => {
@@ -3077,6 +3917,529 @@ function AudionutsUAGUI() {
 
   const filteredCategories = getFilteredCategories();
 
+  const saveExecutionDescription = async (content = descriptionDraft) => {
+    if (!sessionId || descriptionAction) return;
+    setDescriptionAction("save");
+    try {
+      const response = await apiFetch(`${API_BASE}/execution_description`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          content,
+          version: descriptionVersion,
+        }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        if (response.status === 409 && Number.isInteger(data?.version)) {
+          descriptionVersionRef.current = data.version;
+          setDescriptionVersion(data.version);
+          setExecutionDescription((current) => ({
+            ...current,
+            version: data.version,
+          }));
+        }
+        window.alert(data?.error || "Could not save the description.");
+        return;
+      }
+      setDescriptionDraft(data.content || "");
+      descriptionVersionRef.current = data.version || 0;
+      setDescriptionVersion(data.version || 0);
+      setDescriptionDirty(false);
+      setExecutionDescription((current) => ({
+        ...current,
+        content: data.content,
+        version: data.version,
+      }));
+    } catch (error) {
+      console.error("Could not save the description:", error);
+      window.alert("Could not save the description.");
+    } finally {
+      setDescriptionAction("");
+    }
+  };
+
+  const resetExecutionDescription = async (sourceKey) => {
+    if (!sessionId || descriptionAction) return;
+    setDescriptionAction(`reset:${sourceKey}`);
+    try {
+      const response = await apiFetch(
+        `${API_BASE}/execution_description/reset`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: sessionId,
+            source_key: sourceKey,
+            version: descriptionVersion,
+          }),
+        },
+      );
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        if (response.status === 409 && Number.isInteger(data?.version)) {
+          descriptionVersionRef.current = data.version;
+          setDescriptionVersion(data.version);
+          setExecutionDescription((current) => ({
+            ...current,
+            version: data.version,
+          }));
+        }
+        window.alert(
+          data?.error || "Could not restore the description source.",
+        );
+        return;
+      }
+      setDescriptionDraft(data.content || "");
+      descriptionVersionRef.current = data.version || 0;
+      setDescriptionVersion(data.version || 0);
+      setDescriptionDirty(false);
+    } catch (error) {
+      console.error("Could not restore the description source:", error);
+      window.alert("Could not restore the description source.");
+    } finally {
+      setDescriptionAction("");
+    }
+  };
+
+  const applyDescriptionBbcode = (openingTag, closingTag) => {
+    const editor = descriptionEditorRef.current;
+    if (!editor) return;
+
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const selectedText = descriptionDraft.slice(start, end);
+    const nextDraft = `${descriptionDraft.slice(0, start)}${openingTag}${selectedText}${closingTag}${descriptionDraft.slice(end)}`;
+    const selectionStart = start + openingTag.length;
+    const selectionEnd = selectionStart + selectedText.length;
+
+    descriptionVersionRef.current = Math.max(
+      descriptionVersionRef.current,
+      descriptionVersion,
+    );
+    setDescriptionDraft(nextDraft);
+    setDescriptionDirty(true);
+    window.requestAnimationFrame(() => {
+      editor.focus();
+      editor.setSelectionRange(selectionStart, selectionEnd);
+    });
+  };
+
+  const renderDescriptionPanel = () => {
+    const sources = Array.isArray(executionDescription?.sources)
+      ? executionDescription.sources
+      : [];
+    return (
+      <div className="flex h-full flex-col">
+        <div
+          className={`border-b p-3 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-sky-50 to-indigo-50"}`}
+        >
+          <h2
+            className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"}`}
+          >
+            Description review
+          </h2>
+          <p
+            className={`mt-1 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+          >
+            Edit the base description before tracker-specific formatting is
+            applied.
+          </p>
+        </div>
+        <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden p-3">
+          <section
+            className={`rounded-lg border p-2 ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
+          >
+            <p
+              className={`mb-2 text-xs font-bold uppercase tracking-wide ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+            >
+              Sources
+            </p>
+            {sources.length ? (
+              <div className="overflow-x-auto pb-1">
+                <div className="flex w-max gap-2">
+                  {sources.map((source) => (
+                    <button
+                      key={source.key}
+                      onClick={() => resetExecutionDescription(source.key)}
+                      disabled={Boolean(descriptionAction)}
+                      className={`whitespace-nowrap rounded px-3 py-2 text-left text-xs ${isDarkMode ? "bg-gray-700 text-gray-200 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                      title={`Restore ${source.label}`}
+                    >
+                      {descriptionAction === `reset:${source.key}`
+                        ? "Restoring…"
+                        : source.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500">
+                No description sources are available yet.
+              </p>
+            )}
+          </section>
+          <section className="flex min-h-[24rem] flex-1 flex-col">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div
+                className={`inline-flex rounded-md p-1 ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}
+              >
+                {["edit", "preview"].map((view) => (
+                  <button
+                    key={view}
+                    onClick={() => setDescriptionView(view)}
+                    aria-pressed={descriptionView === view}
+                    className={`rounded px-3 py-1 text-xs font-semibold capitalize ${descriptionView === view ? "bg-purple-600 text-white" : isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-white"}`}
+                  >
+                    {view}
+                  </button>
+                ))}
+              </div>
+              {descriptionView === "preview" && (
+                <span
+                  className={`text-right text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                >
+                  Preview only. Other elements such as logos and screenshots
+                  will be added later.
+                </span>
+              )}
+            </div>
+            {descriptionView === "edit" ? (
+              <>
+                <div
+                  role="toolbar"
+                  aria-label="Description formatting"
+                  className={`mb-2 flex flex-wrap gap-1 rounded-lg border p-1.5 ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"}`}
+                >
+                  {[
+                    ["Bold", "B", "[b]", "[/b]"],
+                    ["Italic", "I", "[i]", "[/i]"],
+                    ["Underline", "U", "[u]", "[/u]"],
+                    ["Strikethrough", "S", "[s]", "[/s]"],
+                    ["Code", "Code", "[code]", "[/code]"],
+                    ["Quote", "Quote", "[quote]", "[/quote]"],
+                    ["Spoiler", "Spoiler", "[spoiler]", "[/spoiler]"],
+                    ["Align left", "Left", "[left]", "[/left]"],
+                    ["Align center", "Center", "[center]", "[/center]"],
+                    ["Align right", "Right", "[right]", "[/right]"],
+                  ].map(([label, text, openingTag, closingTag]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      title={label}
+                      aria-label={label}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() =>
+                        applyDescriptionBbcode(openingTag, closingTag)
+                      }
+                      className={`rounded px-2 py-1 text-xs font-semibold hover:bg-purple-600 hover:text-white ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  ref={descriptionEditorRef}
+                  value={descriptionDraft}
+                  onChange={(event) => {
+                    descriptionVersionRef.current = Math.max(
+                      descriptionVersionRef.current,
+                      descriptionVersion,
+                    );
+                    setDescriptionDraft(event.target.value);
+                    setDescriptionDirty(true);
+                  }}
+                  onBlur={() => {
+                    if (descriptionDirty) saveExecutionDescription();
+                  }}
+                  spellCheck={false}
+                  aria-label="Base description"
+                  className={`min-h-[20rem] flex-1 resize-y rounded-lg border p-3 font-mono text-xs leading-5 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100" : "border-gray-300 bg-white text-gray-800"}`}
+                  placeholder="The editable base description will appear here."
+                />
+              </>
+            ) : (
+              <div
+                className={`bbcode-preview min-h-[20rem] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border p-3 text-sm leading-6 [&_a]:text-sky-400 [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:border-l-4 [&_blockquote]:border-purple-500 [&_blockquote]:pl-3 [&_details]:my-3 [&_img]:my-3 [&_img]:max-w-full [&_img]:rounded [&_pre]:overflow-auto [&_pre]:font-mono [&_table]:my-3 [&_table]:border-collapse [&_td]:border [&_td]:p-2 [&_th]:border [&_th]:p-2 ${isDarkMode ? "border-gray-700 bg-gray-950 text-gray-100 [&_td]:border-gray-700 [&_th]:border-gray-700" : "border-gray-300 bg-white text-gray-800 [&_td]:border-gray-300 [&_th]:border-gray-300"}`}
+                dangerouslySetInnerHTML={{
+                  __html: renderBbcodePreview(descriptionDraft),
+                }}
+              />
+            )}
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <span
+                className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+              >
+                {descriptionDraft.length.toLocaleString()} characters{" "}
+                {descriptionDirty ? "· Unsaved changes" : "· Saved"}
+              </span>
+              <button
+                onClick={() => saveExecutionDescription()}
+                disabled={Boolean(descriptionAction) || !descriptionDirty}
+                className="rounded-md bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700 disabled:opacity-50"
+              >
+                {descriptionAction === "save" ? "Saving…" : "Save description"}
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  };
+
+  const renderScreenshotsPanel = () => {
+    const isWorking = Boolean(screenshotActionId);
+    const expandedItem = executionScreenshots.find(
+      (screenshot) => screenshot.id === expandedScreenshot,
+    );
+    const screenshotGroups = executionScreenshots.reduce(
+      (groups, screenshot) => {
+        const group = screenshot.group || "main";
+        (groups[group] ||= []).push(screenshot);
+        return groups;
+      },
+      {},
+    );
+    const screenshotGroupLabel = (group) => {
+      if (group === "main") return "Main";
+      return group.startsWith("PLAYLIST_")
+        ? `Extra playlist ${group.slice("PLAYLIST_".length)}`
+        : group.startsWith("FILE_")
+          ? `Extra disc ${group.slice("FILE_".length)}`
+          : "Extra disc";
+    };
+    return (
+      <>
+        <div className="flex flex-col h-full">
+          <div
+            className={`p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-l from-purple-50 to-indigo-50"}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2
+                  className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+                >
+                  <ScreenshotsIcon />
+                  Generated Screenshots
+                </h2>
+                <p
+                  className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+                >
+                  Review frames before image hosting. Replacements use a
+                  different point in the video.
+                </p>
+              </div>
+              <button
+                onClick={() => addExecutionScreenshot("main")}
+                disabled={isWorking || !canAddExecutionScreenshot}
+                className="p-2 rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
+                title="Capture an additional screenshot"
+                aria-label="Capture an additional screenshot"
+              >
+                {screenshotActionId === "add" ? <SpinnerIcon /> : <PlusIcon />}
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            {executionScreenshots.length === 0 ? (
+              <div
+                className={`rounded-lg border p-5 text-center text-sm ${isDarkMode ? "border-gray-700 bg-gray-800 text-gray-400" : "border-gray-200 bg-gray-50 text-gray-500"}`}
+              >
+                If the media being uploaded requires screenshots, they will
+                appear here as soon as the local capture is complete.
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {Object.entries(screenshotGroups).map(
+                  ([group, screenshots]) => (
+                    <section key={group}>
+                      <div
+                        className={`mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
+                      >
+                        <span>{screenshotGroupLabel(group)}</span>
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 normal-case tracking-normal ${isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-600"}`}
+                        >
+                          {screenshots.length}
+                        </span>
+                        <button
+                          onClick={() => addExecutionScreenshot(group)}
+                          disabled={isWorking || !canAddExecutionScreenshot}
+                          className="ml-auto rounded-md bg-purple-600 px-2 py-1 normal-case tracking-normal text-white hover:bg-purple-700 disabled:opacity-50"
+                        >
+                          Add to this group
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {screenshots.map((screenshot, index) => {
+                          const replacing =
+                            screenshotActionId === `replace:${screenshot.id}`;
+                          const deleting =
+                            screenshotActionId === `delete:${screenshot.id}`;
+                          const undoing =
+                            screenshotActionId === `undo:${screenshot.id}`;
+                          const screenshotState =
+                            screenshot.source === "remote"
+                              ? "Remote"
+                              : screenshot.source === "replacement"
+                                ? "Pending upload"
+                                : screenshot.source === "addition"
+                                  ? "Pending upload"
+                                  : "Local";
+                          const screenshotStateClass =
+                            screenshot.source === "remote"
+                              ? isDarkMode
+                                ? "bg-sky-950 text-sky-300"
+                                : "bg-sky-100 text-sky-700"
+                              : screenshot.source === "replacement"
+                                ? isDarkMode
+                                  ? "bg-amber-950 text-amber-300"
+                                  : "bg-amber-100 text-amber-700"
+                                : screenshot.source === "addition"
+                                  ? isDarkMode
+                                    ? "bg-emerald-950 text-emerald-300"
+                                    : "bg-emerald-100 text-emerald-700"
+                                  : isDarkMode
+                                    ? "bg-gray-700 text-gray-300"
+                                    : "bg-gray-100 text-gray-600";
+                          return (
+                            <article
+                              key={screenshot.id}
+                              className={`rounded-xl overflow-hidden border ${isDarkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-white"}`}
+                            >
+                              <img
+                                src={screenshot.image_url}
+                                alt={`Screenshot ${index + 1}`}
+                                className={`w-full aspect-video object-contain bg-black transition-all duration-300 ${replacing ? "opacity-35 brightness-50" : "opacity-100 brightness-100"}`}
+                                loading="lazy"
+                              />
+                              <div className="p-2.5 flex items-center justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <span
+                                    className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${screenshotStateClass}`}
+                                  >
+                                    {screenshotState}
+                                  </span>
+                                  <span
+                                    className={`mt-1 block truncate text-[11px] font-mono ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                                    title={screenshot.filename}
+                                  >
+                                    {screenshot.filename}
+                                  </span>
+                                </div>
+                                <div className="flex gap-1.5 flex-shrink-0">
+                                  {screenshot.can_replace && (
+                                    <button
+                                      onClick={() =>
+                                        changeExecutionScreenshot(
+                                          screenshot.id,
+                                          "replace",
+                                        )
+                                      }
+                                      disabled={isWorking}
+                                      className="px-2 py-1 text-xs rounded-md bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
+                                    >
+                                      {replacing ? "Generating…" : "Replace"}
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() =>
+                                      setExpandedScreenshot(screenshot.id)
+                                    }
+                                    disabled={isWorking}
+                                    className={`p-1.5 rounded-md disabled:opacity-50 ${isDarkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
+                                    title={`Expand ${screenshot.filename}`}
+                                    aria-label={`Expand ${screenshot.filename}`}
+                                  >
+                                    <ExpandIcon />
+                                  </button>
+                                  {screenshot.can_delete && (
+                                    <button
+                                      onClick={() =>
+                                        changeExecutionScreenshot(
+                                          screenshot.id,
+                                          "delete",
+                                        )
+                                      }
+                                      disabled={isWorking}
+                                      className="p-1.5 rounded-md text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 disabled:opacity-50"
+                                      title={`Delete ${screenshot.filename}`}
+                                    >
+                                      {deleting ? (
+                                        <SpinnerIcon />
+                                      ) : (
+                                        <TrashIcon />
+                                      )}
+                                    </button>
+                                  )}
+                                  {screenshot.source === "replacement" && (
+                                    <button
+                                      onClick={() =>
+                                        changeExecutionScreenshot(
+                                          screenshot.id,
+                                          "undo",
+                                        )
+                                      }
+                                      disabled={isWorking}
+                                      className={`px-2 py-1 text-xs rounded-md disabled:opacity-50 ${isDarkMode ? "bg-gray-700 text-gray-100 hover:bg-gray-600" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                                      title="Restore the original remote screenshot"
+                                    >
+                                      {undoing ? "Restoring…" : "Undo"}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ),
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        {expandedItem && (
+          <div
+            ref={screenshotModalRef}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Expanded ${expandedItem.filename}`}
+            tabIndex="-1"
+            onClick={() => setExpandedScreenshot(null)}
+            onKeyDown={(event) => {
+              if (event.key === "Tab") {
+                event.preventDefault();
+                screenshotModalCloseRef.current?.focus();
+              }
+            }}
+          >
+            <div
+              className="relative max-h-full max-w-full"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                ref={screenshotModalCloseRef}
+                onClick={() => setExpandedScreenshot(null)}
+                className="absolute right-2 top-2 z-10 rounded-md bg-black/70 px-3 py-1.5 text-sm text-white hover:bg-black"
+              >
+                Close
+              </button>
+              <img
+                src={expandedItem.image_url}
+                alt={expandedItem.filename}
+                className="max-h-[90vh] max-w-[92vw] object-contain"
+              />
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
+
   const renderExecutionPreviewPanel = (compact = false) => {
     const media = executionPreview;
     const category = media?.category || "";
@@ -3129,6 +4492,7 @@ function AudionutsUAGUI() {
       category === "TV"
         ? media?.episode_overview || media?.overview
         : media?.overview;
+    const music = media?.music || {};
 
     const detailRows = (rows) => rows.filter((row) => row.value);
     const renderDetailGrid = (title, rows) => {
@@ -3224,6 +4588,77 @@ function AudionutsUAGUI() {
       { label: "Region", value: media?.game_region },
       { label: "System", value: media?.game_system },
     ]);
+    const musicRows = detailRows([
+      {
+        label: "Artist",
+        value: music?.artist
+          ? `${music.artist}${music.artist_source ? ` (${music.artist_source})` : ""}`
+          : "",
+      },
+      {
+        label: "Album",
+        value: music?.album
+          ? `${music.album}${music.album_source ? ` (${music.album_source})` : ""}`
+          : "",
+      },
+      {
+        label: "Original Year",
+        value: music?.original_year
+          ? `${music.original_year}${music.year_source ? ` (${music.year_source})` : ""}`
+          : "",
+      },
+      {
+        label: "Release Type",
+        value: music?.release_type
+          ? `${music.release_type}${music.release_type_source ? ` (${music.release_type_source})` : ""}`
+          : "",
+      },
+      {
+        label: "Media",
+        value: music?.media
+          ? `${music.media}${music.media_source ? ` (${music.media_source})` : ""}`
+          : "",
+      },
+      { label: "Audio", value: music?.technical || media?.audio },
+      {
+        label: "Tracks / Discs",
+        value:
+          music?.track_count || music?.disc_count
+            ? `${music.track_count || "?"} / ${music.disc_count || "1"}`
+            : "",
+      },
+      {
+        label: "This Release",
+        value: [
+          music?.release_year,
+          music?.retail_date,
+          music?.release_label,
+          music?.release_catalogue_number,
+        ]
+          .filter(Boolean)
+          .join(" • "),
+      },
+      {
+        label: "Edition",
+        value: [music?.edition, music?.edition_year]
+          .filter(Boolean)
+          .join(" • "),
+      },
+    ]);
+    const musicCheckRows = detailRows([
+      {
+        label: "Auxiliary Files",
+        value: Array.isArray(music?.auxiliary)
+          ? music.auxiliary.join(", ")
+          : "",
+      },
+      {
+        label: "Metadata Conflicts",
+        value: Array.isArray(music?.conflicts)
+          ? music.conflicts.join(", ")
+          : "",
+      },
+    ]);
     let categorySection = null;
     if (category === "TV")
       categorySection = renderDetailGrid("TV Details", tvRows);
@@ -3231,6 +4666,8 @@ function AudionutsUAGUI() {
       categorySection = renderDetailGrid("Book Details", bookRows);
     else if (category === "GAME")
       categorySection = renderDetailGrid("Game Details", gameRows);
+    else if (category === "MUSIC")
+      categorySection = renderDetailGrid("Music Details", musicRows);
     else categorySection = renderDetailGrid("Movie Details", movieRows);
 
     return (
@@ -3365,15 +4802,37 @@ function AudionutsUAGUI() {
 
               {categorySection}
 
+              {category === "MUSIC" &&
+                renderDetailGrid("Release Checks", musicCheckRows)}
+
+              {category === "MUSIC" &&
+                Array.isArray(music?.warnings) &&
+                music.warnings.length > 0 && (
+                  <div
+                    className={`rounded-xl p-3 border ${isDarkMode ? "bg-amber-950/30 border-amber-900 text-amber-100" : "bg-amber-50 border-amber-200 text-amber-900"}`}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-wide mb-2">
+                      Music Validation
+                    </p>
+                    <ul className="space-y-1 text-xs leading-5">
+                      {music.warnings.map((warning, index) => (
+                        <li key={`${warning}-${index}`}>• {warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
               <div
                 className={`rounded-xl p-3 ${isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-gray-50 border border-gray-200"}`}
               >
                 <p
                   className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
                 >
-                  {category === "TV" && media?.episode_overview
-                    ? "Episode Overview"
-                    : "Overview"}
+                  {category === "MUSIC"
+                    ? "Release Notes"
+                    : category === "TV" && media?.episode_overview
+                      ? "Episode Overview"
+                      : "Overview"}
                 </p>
                 <p
                   className={`text-sm leading-6 ${isDarkMode ? "text-gray-200" : "text-gray-700"}`}
@@ -3381,7 +4840,9 @@ function AudionutsUAGUI() {
                   {overviewText ||
                     (media?.status === "waiting"
                       ? "Metadata will appear here as soon as Upload-Assistant writes the first meta snapshot."
-                      : "No overview available for this item.")}
+                      : category === "MUSIC"
+                        ? "No release notes were supplied. Review the music details and validation above before continuing."
+                        : "No overview available for this item.")}
                 </p>
               </div>
 
@@ -3419,6 +4880,7 @@ function AudionutsUAGUI() {
       <button
         key={panel}
         onClick={() => setActivePanel(panel)}
+        aria-current={activePanel === panel ? "page" : undefined}
         className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 transition-colors ${
           activePanel === panel
             ? "text-purple-400 border-t-2 border-purple-400"
@@ -3447,25 +4909,14 @@ function AudionutsUAGUI() {
             Upload-Assistant
           </h1>
           <div className="flex items-center gap-2">
+            {renderThemePalette()}
             <a
               href={`${APP_BASE}/config`}
-              className="px-2 py-1 rounded text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700"
+              aria-label="Config"
+              title="Config"
+              className={`p-2 rounded-lg transition-colors ${isDarkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
             >
-              Config
-            </a>
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${isDarkMode ? "bg-purple-600" : "bg-gray-300"}`}
-            >
-              <span
-                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${isDarkMode ? "translate-x-5" : "translate-x-1"}`}
-              />
-            </button>
-            <a
-              href={`${APP_BASE}/logout`}
-              className="px-2 py-1 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700"
-            >
-              Logout
+              <SettingsIcon />
             </a>
           </div>
         </div>
@@ -3473,326 +4924,340 @@ function AudionutsUAGUI() {
         {/* Mobile Content Area. Main panel always mounted (hidden when inactive) to preserve terminal output ref; Files and Args panels conditionally rendered */}
         <div className="flex-1 overflow-hidden relative">
           {/* Files Panel */}
-          {activePanel === "files" && (
-            <div className="flex flex-col h-full">
-              <div
-                className={`p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50"}`}
-              >
-                <h2
-                  className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
+          {activePanel === "files" &&
+            (isExecuting ? (
+              renderProgressWorkspace()
+            ) : (
+              <div className="flex flex-col h-full">
+                <div
+                  className={`p-3 border-b flex-shrink-0 ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50"}`}
                 >
-                  <FolderIcon />
-                  File Browser
-                </h2>
-                <div className="relative mt-2">
-                  <input
-                    type="text"
-                    value={fileBrowserSearch}
-                    onChange={(e) => handleFileBrowserSearch(e.target.value)}
-                    placeholder="Search files and folders..."
-                    className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
-                      isDarkMode
-                        ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500 focus:border-purple-500"
-                        : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
-                    } focus:outline-none focus:ring-1 ${isDarkMode ? "focus:ring-purple-500" : "focus:ring-blue-500"}`}
-                  />
-                  <svg
-                    className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                  <h2
+                    className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    <FolderIcon />
+                    File Browser
+                  </h2>
+                  <div className="relative mt-2">
+                    <input
+                      type="text"
+                      value={fileBrowserSearch}
+                      onChange={(e) => handleFileBrowserSearch(e.target.value)}
+                      placeholder="Search files and folders..."
+                      className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
+                        isDarkMode
+                          ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500 focus:border-purple-500"
+                          : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
+                      } focus:outline-none focus:ring-1 ${isDarkMode ? "focus:ring-purple-500" : "focus:ring-blue-500"}`}
                     />
-                  </svg>
-                  {fileBrowserSearch && (
-                    <button
-                      onClick={() => handleFileBrowserSearch("")}
-                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+                    <svg
+                      className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                    {fileBrowserSearch && (
+                      <button
+                        onClick={() => handleFileBrowserSearch("")}
+                        className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {renderSelectAllBar()}
+                <div
+                  className={`flex-1 overflow-y-auto ${hasDescFile && !descBrowserCollapsed ? "max-h-[50%]" : ""}`}
+                >
+                  {fileBrowserSearch ? (
+                    fileBrowserSearchLoading ? (
+                      <div
+                        className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                      >
+                        <SpinnerIcon />
+                        <p className="text-sm mt-2">Searching...</p>
+                      </div>
+                    ) : (
+                      <>
+                        {fileBrowserSearchResults &&
+                          fileBrowserSearchResults.truncated && (
+                            <div
+                              className={`px-3 py-1.5 text-xs ${isDarkMode ? "text-yellow-400 bg-gray-900" : "text-yellow-700 bg-yellow-50"} border-b ${isDarkMode ? "border-gray-700" : "border-yellow-200"}`}
+                            >
+                              Results limited to{" "}
+                              {fileBrowserSearchResults.count} items
+                            </div>
+                          )}
+                        {renderSearchResults(fileBrowserSearchResults)}
+                      </>
+                    )
+                  ) : (
+                    renderFileTree(directories)
                   )}
                 </div>
-              </div>
-              {renderSelectAllBar()}
-              <div
-                className={`flex-1 overflow-y-auto ${hasDescFile && !descBrowserCollapsed ? "max-h-[50%]" : ""}`}
-              >
-                {fileBrowserSearch ? (
-                  fileBrowserSearchLoading ? (
-                    <div
-                      className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                    >
-                      <SpinnerIcon />
-                      <p className="text-sm mt-2">Searching...</p>
-                    </div>
-                  ) : (
-                    <>
-                      {fileBrowserSearchResults &&
-                        fileBrowserSearchResults.truncated && (
-                          <div
-                            className={`px-3 py-1.5 text-xs ${isDarkMode ? "text-yellow-400 bg-gray-900" : "text-yellow-700 bg-yellow-50"} border-b ${isDarkMode ? "border-gray-700" : "border-yellow-200"}`}
-                          >
-                            Results limited to {fileBrowserSearchResults.count}{" "}
-                            items
-                          </div>
-                        )}
-                      {renderSearchResults(fileBrowserSearchResults)}
-                    </>
-                  )
-                ) : (
-                  renderFileTree(directories)
-                )}
-              </div>
 
-              {/* Description File Browser */}
-              {hasDescFile && (
-                <>
-                  <div
-                    className={`p-3 border-t flex-shrink-0 ${!descBrowserCollapsed ? "border-b" : ""} ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50"} ${descBrowserCollapsed ? "cursor-pointer" : ""}`}
-                    onClick={
-                      descBrowserCollapsed
-                        ? () => setDescBrowserCollapsed(false)
-                        : undefined
-                    }
-                  >
-                    <div className="flex items-center justify-between">
-                      <h2
-                        className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
-                      >
-                        <FileIcon />
-                        Description File
-                        {descBrowserCollapsed &&
-                          descFilePath &&
-                          !descFileError && (
-                            <span className="text-green-500 ml-1">
-                              <svg
-                                className="w-4 h-4 inline"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M5 13l4 4L19 7"
-                                />
-                              </svg>
-                            </span>
-                          )}
-                      </h2>
-                      {descBrowserCollapsed ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDescBrowserCollapsed(false);
-                          }}
-                          className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+                {/* Description File Browser */}
+                {hasDescFile && (
+                  <>
+                    <div
+                      className={`p-3 border-t flex-shrink-0 ${!descBrowserCollapsed ? "border-b" : ""} ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50"} ${descBrowserCollapsed ? "cursor-pointer" : ""}`}
+                      onClick={
+                        descBrowserCollapsed
+                          ? () => setDescBrowserCollapsed(false)
+                          : undefined
+                      }
+                    >
+                      <div className="flex items-center justify-between">
+                        <h2
+                          className={`text-base font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
                         >
-                          <ChevronDownIcon />
-                        </button>
-                      ) : (
-                        descFilePath &&
-                        !descFileError && (
+                          <FileIcon />
+                          Description File
+                          {descBrowserCollapsed &&
+                            descFilePath &&
+                            !descFileError && (
+                              <span className="text-green-500 ml-1">
+                                <svg
+                                  className="w-4 h-4 inline"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M5 13l4 4L19 7"
+                                  />
+                                </svg>
+                              </span>
+                            )}
+                        </h2>
+                        {descBrowserCollapsed ? (
                           <button
-                            onClick={() => setDescBrowserCollapsed(true)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDescBrowserCollapsed(false);
+                            }}
                             className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                           >
-                            <ChevronRightIcon />
+                            <ChevronDownIcon />
                           </button>
+                        ) : (
+                          descFilePath &&
+                          !descFileError && (
+                            <button
+                              onClick={() => setDescBrowserCollapsed(true)}
+                              className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+                            >
+                              <ChevronRightIcon />
+                            </button>
+                          )
+                        )}
+                      </div>
+                      {descBrowserCollapsed && descFilePath ? (
+                        <div className="flex items-center gap-2 mt-1">
+                          <p
+                            className={`text-xs ${descFileError ? (isDarkMode ? "text-red-400" : "text-red-600") : isDarkMode ? "text-green-400" : "text-green-700"} break-all font-mono flex-1`}
+                          >
+                            {descFilePath}
+                          </p>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateDescFile("");
+                              setDescBrowserCollapsed(false);
+                            }}
+                            className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : (
+                        !descBrowserCollapsed && (
+                          <p
+                            className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                          >
+                            Select a .txt, .nfo, or .md file
+                          </p>
                         )
                       )}
                     </div>
-                    {descBrowserCollapsed && descFilePath ? (
-                      <div className="flex items-center gap-2 mt-1">
-                        <p
-                          className={`text-xs ${descFileError ? (isDarkMode ? "text-red-400" : "text-red-600") : isDarkMode ? "text-green-400" : "text-green-700"} break-all font-mono flex-1`}
-                        >
-                          {descFilePath}
-                        </p>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateDescFile("");
-                            setDescBrowserCollapsed(false);
-                          }}
-                          className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                    {!descBrowserCollapsed && (
+                      <div className="flex-1 overflow-y-auto">
+                        {descDirectories.length > 0 ? (
+                          renderDescFileTree(descDirectories)
+                        ) : (
+                          <div
+                            className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
+                            <p className="text-sm">
+                              Loading description files...
+                            </p>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      !descBrowserCollapsed && (
-                        <p
-                          className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                        >
-                          Select a .txt, .nfo, or .md file
-                        </p>
-                      )
                     )}
-                  </div>
-                  {!descBrowserCollapsed && (
-                    <div className="flex-1 overflow-y-auto">
-                      {descDirectories.length > 0 ? (
-                        renderDescFileTree(descDirectories)
-                      ) : (
-                        <div
-                          className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                        >
-                          <p className="text-sm">
-                            Loading description files...
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+                  </>
+                )}
+              </div>
+            ))}
 
           {/* Main Upload Panel */}
           <div
             className={`flex flex-col h-full ${activePanel === "main" ? "" : "hidden"}`}
           >
             {/* Top controls */}
-            <div
-              className={`p-3 space-y-3 border-b flex-shrink-0 ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
-            >
-              {renderSelectedPathOrQueue(true)}
+            {!isExecuting && (
+              <div
+                className={`p-3 space-y-3 border-b ${!isOutputExpanded ? "flex-1 overflow-y-auto" : "flex-shrink-0"} ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
+              >
+                {renderSelectedPathOrQueue(true)}
 
-              {/* Args input */}
-              <input
-                type="text"
-                value={customArgs}
-                onChange={(e) => setCustomArgs(e.target.value)}
-                placeholder="--tmdb movie/12345 --trackers passthepopcorn,aither"
-                className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                  isDarkMode
-                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                    : "bg-white border-gray-300 text-gray-900"
-                }`}
-                disabled={isExecuting}
-              />
+                {/* Args input */}
+                <input
+                  type="text"
+                  value={customArgs}
+                  onChange={(e) => setCustomArgs(e.target.value)}
+                  placeholder="--tmdb movie/12345 --trackers passthepopcorn,aither"
+                  className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    isDarkMode
+                      ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                      : "bg-white border-gray-300 text-gray-900"
+                  }`}
+                  disabled={isExecuting}
+                />
+                {renderArgumentPresetControls(true)}
 
-              {/* Desc Link Input */}
-              {hasDescLink &&
-                (!descLinkUrl || descLinkFocused || descLinkError) && (
-                  <div className="space-y-1">
-                    <label
-                      className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
-                    >
-                      Description Link URL:
-                    </label>
-                    <input
-                      type="url"
-                      value={descLinkUrl}
-                      onChange={(e) => updateDescLink(e.target.value)}
-                      onFocus={() => setDescLinkFocused(true)}
-                      onBlur={() => setDescLinkFocused(false)}
-                      placeholder="https://pastebin.com/abc123"
-                      className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                        descLinkError
-                          ? "border-red-500 focus:ring-red-500"
-                          : isDarkMode
-                            ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                            : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      disabled={isExecuting}
-                    />
-                    {descLinkError && (
-                      <p className="text-xs text-red-500">{descLinkError}</p>
-                    )}
+                {/* Desc Link Input */}
+                {hasDescLink &&
+                  (!descLinkUrl || descLinkFocused || descLinkError) && (
+                    <div className="space-y-1">
+                      <label
+                        className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}
+                      >
+                        Description Link URL:
+                      </label>
+                      <input
+                        type="url"
+                        value={descLinkUrl}
+                        onChange={(e) => updateDescLink(e.target.value)}
+                        onFocus={() => setDescLinkFocused(true)}
+                        onBlur={() => setDescLinkFocused(false)}
+                        placeholder="https://pastebin.com/abc123"
+                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                          descLinkError
+                            ? "border-red-500 focus:ring-red-500"
+                            : isDarkMode
+                              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                              : "bg-white border-gray-300 text-gray-900"
+                        }`}
+                        disabled={isExecuting}
+                      />
+                      {descLinkError && (
+                        <p className="text-xs text-red-500">{descLinkError}</p>
+                      )}
+                    </div>
+                  )}
+
+                {hasDescFile && (descFileError || !descFilePath) && (
+                  <div
+                    className={`p-2 rounded-lg text-xs ${
+                      descFileError
+                        ? isDarkMode
+                          ? "bg-red-900 border border-red-700 text-red-300"
+                          : "bg-red-50 border border-red-200 text-red-700"
+                        : isDarkMode
+                          ? "bg-yellow-900 border border-yellow-700 text-yellow-300"
+                          : "bg-yellow-50 border border-yellow-200 text-yellow-700"
+                    }`}
+                  >
+                    {descFileError ||
+                      "Select a description file from the Files panel"}
                   </div>
                 )}
 
-              {hasDescFile && (descFileError || !descFilePath) && (
-                <div
-                  className={`p-2 rounded-lg text-xs ${
-                    descFileError
-                      ? isDarkMode
-                        ? "bg-red-900 border border-red-700 text-red-300"
-                        : "bg-red-50 border border-red-200 text-red-700"
-                      : isDarkMode
-                        ? "bg-yellow-900 border border-yellow-700 text-yellow-300"
-                        : "bg-yellow-50 border border-yellow-200 text-yellow-700"
-                  }`}
-                >
-                  {descFileError ||
-                    "Select a description file from the Files panel"}
+                {/* Execute & Kill buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={executeCommand}
+                    disabled={
+                      (!selectedPath && selectedPaths.length === 0) ||
+                      isExecuting
+                    }
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+                  >
+                    <PlayIcon />
+                    {isExecuting
+                      ? "Executing..."
+                      : selectedPaths.length > 1
+                        ? "Execute Queue"
+                        : "Execute Upload"}
+                  </button>
+                  <button
+                    onClick={clearTerminal}
+                    aria-label={
+                      isExecuting
+                        ? "Kill process and clear terminal"
+                        : "Clear terminal"
+                    }
+                    className={`flex items-center gap-1 px-3 py-3 rounded-lg transition-colors ${
+                      isExecuting
+                        ? "bg-red-600 hover:bg-red-700 text-white"
+                        : "bg-gray-600 hover:bg-gray-700 text-white"
+                    }`}
+                    title={
+                      isExecuting
+                        ? "Kill process and clear terminal"
+                        : "Clear terminal"
+                    }
+                  >
+                    <TrashIcon />
+                  </button>
                 </div>
-              )}
-
-              {/* Execute & Kill buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={executeCommand}
-                  disabled={
-                    (!selectedPath && selectedPaths.length === 0) || isExecuting
-                  }
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
-                >
-                  <PlayIcon />
-                  {isExecuting
-                    ? "Executing..."
-                    : selectedPaths.length > 1
-                      ? "Execute Queue"
-                      : "Execute Upload"}
-                </button>
-                <button
-                  onClick={clearTerminal}
-                  className={`flex items-center gap-1 px-3 py-3 rounded-lg transition-colors ${
-                    isExecuting
-                      ? "bg-red-600 hover:bg-red-700 text-white"
-                      : "bg-gray-600 hover:bg-gray-700 text-white"
-                  }`}
-                  title={
-                    isExecuting
-                      ? "Kill process and clear terminal"
-                      : "Clear terminal"
-                  }
-                >
-                  <TrashIcon />
-                </button>
+                {renderTrackerSelector()}
               </div>
-              {!isExecuting && renderTrackerSelector()}
-            </div>
+            )}
 
             {/* Terminal output */}
             <div
-              className={`flex-1 p-3 flex flex-col min-h-0 overflow-hidden ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}
+              className={`${isExecuting || isOutputExpanded ? "flex-1 p-3" : "flex-none p-2"} flex flex-col min-h-0 overflow-hidden ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}
             >
-              <div className="flex items-center gap-2 mb-2 flex-shrink-0">
+              <div
+                className={`flex items-center gap-2 ${isExecuting || isOutputExpanded ? "mb-2" : ""} flex-shrink-0`}
+              >
                 <span className={isDarkMode ? "text-white" : "text-gray-800"}>
                   <TerminalIcon />
                 </span>
@@ -3806,11 +5271,39 @@ function AudionutsUAGUI() {
                     ● Running
                   </span>
                 )}
+                {isExecuting && (
+                  <button
+                    onClick={clearTerminal}
+                    aria-label="Kill process and clear terminal"
+                    title="Kill process and clear terminal"
+                    className="flex items-center gap-1 rounded px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    <TrashIcon />
+                    Kill
+                  </button>
+                )}
+                {!isExecuting && (
+                  <button
+                    onClick={() => setIsOutputExpanded((expanded) => !expanded)}
+                    aria-expanded={isOutputExpanded}
+                    title={
+                      isOutputExpanded ? "Collapse output" : "Expand output"
+                    }
+                    className={`ml-auto flex items-center gap-1 rounded px-2 py-1 text-xs ${isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-200"}`}
+                  >
+                    <span
+                      className={`transition-transform ${isOutputExpanded ? "rotate-180" : ""}`}
+                    >
+                      <ChevronDownIcon />
+                    </span>
+                    {isOutputExpanded ? "Collapse" : "Expand"}
+                  </button>
+                )}
               </div>
               <div
                 ref={richOutputRef}
                 id="rich-output"
-                className={`flex-1 rounded-lg overflow-auto p-2 border text-sm ${isDarkMode ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+                className={`rounded-lg overflow-auto p-2 border text-sm bg-black border-gray-700 text-white ${isExecuting || isOutputExpanded ? "flex-1" : "hidden"}`}
               ></div>
               {isExecuting && (
                 <div
@@ -4012,7 +5505,9 @@ function AudionutsUAGUI() {
                                 >
                                   <div className="flex items-start justify-between gap-3">
                                     <button
-                                      onClick={() => addArgument(a.label)}
+                                      onClick={() =>
+                                        addArgument(a.insert || a.label)
+                                      }
                                       disabled={isExecuting}
                                       className={`px-3 py-1.5 text-sm font-mono rounded-md border ${isDarkMode ? "bg-gray-700 border-gray-600 text-white hover:bg-purple-600 hover:text-white" : "bg-white border-gray-200 text-gray-800 hover:bg-purple-600 hover:text-white"} transition-colors`}
                                     >
@@ -4047,27 +5542,42 @@ function AudionutsUAGUI() {
               </div>
             ))}
 
-          {/* Progress Panel */}
-          {activePanel === "progress" && renderMobileProgressPanel()}
+          {/* Screenshot Review Panel */}
+          {activePanel === "screenshots" && renderScreenshotsPanel()}
+          {activePanel === "description" && renderDescriptionPanel()}
         </div>
 
         {/* Bottom Nav */}
         <div
           className={`flex border-t flex-shrink-0 ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}
         >
-          {navButton("files", <FolderIcon />, "Files")}
+          {navButton(
+            "files",
+            isExecuting ? <ProgressIcon /> : <FolderIcon />,
+            isExecuting ? "Progress" : "Files",
+          )}
           {navButton(
             "main",
-            isAwaitingTerminalInput ? <TerminalIcon /> : null,
+            <TerminalIcon />,
             isAwaitingTerminalInput ? "Input Required" : "Upload",
           )}
           {navButton(
             "args",
-            isExecuting ? null : <TerminalIcon />,
-            isExecuting ? "Processing" : "Arguments",
+            isExecuting ? (
+              mediaIconForCategory(executionPreview?.category)
+            ) : (
+              <SettingsIcon />
+            ),
+            isExecuting ? "Media" : "Arguments",
           )}
-          {visibleProgressItems.length > 0 &&
-            navButton("progress", <TerminalIcon />, "Progress")}
+          {isExecuting &&
+            navButton(
+              "screenshots",
+              <ScreenshotsIcon />,
+              `Screens${executionScreenshots.length ? ` (${executionScreenshots.length})` : ""}`,
+            )}
+          {isExecuting &&
+            navButton("description", <TerminalIcon />, "Description")}
         </div>
       </div>
     );
@@ -4087,47 +5597,33 @@ function AudionutsUAGUI() {
           maxWidth: "600px",
         }}
       >
-        <div
-          className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50"}`}
-        >
-          <h2
-            className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
-          >
-            <FolderIcon />
-            File Browser
-          </h2>
-          <div className="relative mt-2">
-            <input
-              type="text"
-              value={fileBrowserSearch}
-              onChange={(e) => handleFileBrowserSearch(e.target.value)}
-              placeholder="Search files and folders..."
-              className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
-                isDarkMode
-                  ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500 focus:border-purple-500"
-                  : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
-              } focus:outline-none focus:ring-1 ${isDarkMode ? "focus:ring-purple-500" : "focus:ring-blue-500"}`}
-            />
-            <svg
-              className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+        {isExecuting ? (
+          renderProgressWorkspace()
+        ) : (
+          <>
+            <div
+              className={`p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50"}`}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            {fileBrowserSearch && (
-              <button
-                onClick={() => handleFileBrowserSearch("")}
-                className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+              <h2
+                className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
               >
+                <FolderIcon />
+                File Browser
+              </h2>
+              <div className="relative mt-2">
+                <input
+                  type="text"
+                  value={fileBrowserSearch}
+                  onChange={(e) => handleFileBrowserSearch(e.target.value)}
+                  placeholder="Search files and folders..."
+                  className={`w-full pl-8 pr-8 py-1.5 text-sm rounded border ${
+                    isDarkMode
+                      ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500 focus:border-purple-500"
+                      : "bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500"
+                  } focus:outline-none focus:ring-1 ${isDarkMode ? "focus:ring-purple-500" : "focus:ring-blue-500"}`}
+                />
                 <svg
-                  className="w-3.5 h-3.5"
+                  className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -4136,120 +5632,16 @@ function AudionutsUAGUI() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
-              </button>
-            )}
-          </div>
-        </div>
-        {renderSelectAllBar()}
-        <div
-          className={`${hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} overflow-y-auto`}
-        >
-          {fileBrowserSearch ? (
-            fileBrowserSearchLoading ? (
-              <div
-                className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-              >
-                <SpinnerIcon />
-                <p className="text-sm mt-2">Searching...</p>
-              </div>
-            ) : (
-              <>
-                {fileBrowserSearchResults &&
-                  fileBrowserSearchResults.truncated && (
-                    <div
-                      className={`px-3 py-1.5 text-xs ${isDarkMode ? "text-yellow-400 bg-gray-900" : "text-yellow-700 bg-yellow-50"} border-b ${isDarkMode ? "border-gray-700" : "border-yellow-200"}`}
-                    >
-                      Results limited to {fileBrowserSearchResults.count} items
-                    </div>
-                  )}
-                {renderSearchResults(fileBrowserSearchResults)}
-              </>
-            )
-          ) : (
-            renderFileTree(directories)
-          )}
-        </div>
-
-        {/* Description File Browser - shown when --descfile is in args */}
-        {hasDescFile && (
-          <>
-            <div
-              className={`p-4 border-t ${!descBrowserCollapsed ? "border-b" : ""} ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50"} ${descBrowserCollapsed ? "cursor-pointer" : ""}`}
-              onClick={
-                descBrowserCollapsed
-                  ? () => setDescBrowserCollapsed(false)
-                  : undefined
-              }
-            >
-              <div className="flex items-center justify-between">
-                <h2
-                  className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
-                >
-                  <FileIcon />
-                  Description File
-                  {descBrowserCollapsed && descFilePath && !descFileError && (
-                    <span className="text-green-500 ml-1">
-                      <svg
-                        className="w-4 h-4 inline"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    </span>
-                  )}
-                </h2>
-                {descBrowserCollapsed ? (
+                {fileBrowserSearch && (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDescBrowserCollapsed(false);
-                    }}
-                    className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
-                    title="Expand browser"
-                  >
-                    <ChevronDownIcon />
-                  </button>
-                ) : (
-                  descFilePath &&
-                  !descFileError && (
-                    <button
-                      onClick={() => setDescBrowserCollapsed(true)}
-                      className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
-                      title="Collapse browser"
-                    >
-                      <ChevronRightIcon />
-                    </button>
-                  )
-                )}
-              </div>
-              {descBrowserCollapsed && descFilePath ? (
-                <div className="flex items-center gap-2 mt-2">
-                  <p
-                    className={`text-xs ${descFileError ? (isDarkMode ? "text-red-400" : "text-red-600") : isDarkMode ? "text-green-400" : "text-green-700"} break-all font-mono flex-1`}
-                  >
-                    {descFilePath}
-                  </p>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      updateDescFile("");
-                      setDescBrowserCollapsed(false);
-                    }}
-                    className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
-                    title="Clear selection"
+                    onClick={() => handleFileBrowserSearch("")}
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                   >
                     <svg
-                      className="w-4 h-4"
+                      className="w-3.5 h-3.5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -4262,47 +5654,114 @@ function AudionutsUAGUI() {
                       />
                     </svg>
                   </button>
-                </div>
-              ) : (
-                !descBrowserCollapsed && (
-                  <p
-                    className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                )}
+              </div>
+            </div>
+            {renderSelectAllBar()}
+            <div
+              className={`${hasDescFile && !descBrowserCollapsed ? "flex-1 max-h-[50%]" : "flex-1"} overflow-y-auto`}
+            >
+              {fileBrowserSearch ? (
+                fileBrowserSearchLoading ? (
+                  <div
+                    className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
                   >
-                    Select a .txt, .nfo, or .md file
-                  </p>
+                    <SpinnerIcon />
+                    <p className="text-sm mt-2">Searching...</p>
+                  </div>
+                ) : (
+                  <>
+                    {fileBrowserSearchResults &&
+                      fileBrowserSearchResults.truncated && (
+                        <div
+                          className={`px-3 py-1.5 text-xs ${isDarkMode ? "text-yellow-400 bg-gray-900" : "text-yellow-700 bg-yellow-50"} border-b ${isDarkMode ? "border-gray-700" : "border-yellow-200"}`}
+                        >
+                          Results limited to {fileBrowserSearchResults.count}{" "}
+                          items
+                        </div>
+                      )}
+                    {renderSearchResults(fileBrowserSearchResults)}
+                  </>
                 )
+              ) : (
+                renderFileTree(directories)
               )}
             </div>
-            {!descBrowserCollapsed && (
+
+            {/* Description File Browser - shown when --descfile is in args */}
+            {hasDescFile && (
               <>
-                <div className="flex-1 overflow-y-auto">
-                  {descDirectories.length > 0 ? (
-                    renderDescFileTree(descDirectories)
-                  ) : (
-                    <div
-                      className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                <div
+                  className={`p-4 border-t ${!descBrowserCollapsed ? "border-b" : ""} ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50"} ${descBrowserCollapsed ? "cursor-pointer" : ""}`}
+                  onClick={
+                    descBrowserCollapsed
+                      ? () => setDescBrowserCollapsed(false)
+                      : undefined
+                  }
+                >
+                  <div className="flex items-center justify-between">
+                    <h2
+                      className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-800"} flex items-center gap-2`}
                     >
-                      <p className="text-sm">Loading description files...</p>
-                    </div>
-                  )}
-                </div>
-                {descFilePath && (
-                  <div
-                    className={`p-3 border-t ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-green-50"}`}
-                  >
-                    <p
-                      className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-600"} mb-1`}
-                    >
-                      Selected Description:
-                    </p>
-                    <div className="flex items-center gap-2">
+                      <FileIcon />
+                      Description File
+                      {descBrowserCollapsed &&
+                        descFilePath &&
+                        !descFileError && (
+                          <span className="text-green-500 ml-1">
+                            <svg
+                              className="w-4 h-4 inline"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                          </span>
+                        )}
+                    </h2>
+                    {descBrowserCollapsed ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDescBrowserCollapsed(false);
+                        }}
+                        className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+                        title="Expand browser"
+                      >
+                        <ChevronDownIcon />
+                      </button>
+                    ) : (
+                      descFilePath &&
+                      !descFileError && (
+                        <button
+                          onClick={() => setDescBrowserCollapsed(true)}
+                          className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+                          title="Collapse browser"
+                        >
+                          <ChevronRightIcon />
+                        </button>
+                      )
+                    )}
+                  </div>
+                  {descBrowserCollapsed && descFilePath ? (
+                    <div className="flex items-center gap-2 mt-2">
                       <p
-                        className={`text-xs ${isDarkMode ? "text-green-400" : "text-green-700"} break-all font-mono flex-1`}
+                        className={`text-xs ${descFileError ? (isDarkMode ? "text-red-400" : "text-red-600") : isDarkMode ? "text-green-400" : "text-green-700"} break-all font-mono flex-1`}
                       >
                         {descFilePath}
                       </p>
                       <button
-                        onClick={() => updateDescFile("")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateDescFile("");
+                          setDescBrowserCollapsed(false);
+                        }}
                         className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
                         title="Clear selection"
                       >
@@ -4321,7 +5780,69 @@ function AudionutsUAGUI() {
                         </svg>
                       </button>
                     </div>
-                  </div>
+                  ) : (
+                    !descBrowserCollapsed && (
+                      <p
+                        className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                      >
+                        Select a .txt, .nfo, or .md file
+                      </p>
+                    )
+                  )}
+                </div>
+                {!descBrowserCollapsed && (
+                  <>
+                    <div className="flex-1 overflow-y-auto">
+                      {descDirectories.length > 0 ? (
+                        renderDescFileTree(descDirectories)
+                      ) : (
+                        <div
+                          className={`p-4 text-center ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                        >
+                          <p className="text-sm">
+                            Loading description files...
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    {descFilePath && (
+                      <div
+                        className={`p-3 border-t ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-200 bg-green-50"}`}
+                      >
+                        <p
+                          className={`text-xs font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-600"} mb-1`}
+                        >
+                          Selected Description:
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <p
+                            className={`text-xs ${isDarkMode ? "text-green-400" : "text-green-700"} break-all font-mono flex-1`}
+                          >
+                            {descFilePath}
+                          </p>
+                          <button
+                            onClick={() => updateDescFile("")}
+                            className={`p-1 rounded ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-200 text-gray-500"}`}
+                            title="Clear selection"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -4340,7 +5861,7 @@ function AudionutsUAGUI() {
       <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Panel */}
         <div
-          className={`${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b ${isExecuting ? "p-3" : "p-4"} flex-shrink-0`}
+          className={`${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border-b ${isExecuting ? "p-3" : "p-4"} ${!isExecuting && !isOutputExpanded ? "flex-1 overflow-y-auto" : "flex-shrink-0"}`}
         >
           <div
             className={`max-w-6xl mx-auto ${isExecuting ? "" : "space-y-4"}`}
@@ -4370,7 +5891,35 @@ function AudionutsUAGUI() {
                   )}
                 </div>
                 <button
+                  onClick={() => {
+                    setIsScreenshotReviewOpen((open) => !open);
+                    setIsDescriptionReviewOpen(false);
+                  }}
+                  aria-pressed={isScreenshotReviewOpen}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${isScreenshotReviewOpen ? "bg-purple-600 text-white" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
+                  title="Review generated screenshots"
+                >
+                  <ScreenshotsIcon />
+                  Screenshots
+                  {executionScreenshots.length
+                    ? ` (${executionScreenshots.length})`
+                    : ""}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsDescriptionReviewOpen((open) => !open);
+                    setIsScreenshotReviewOpen(false);
+                  }}
+                  aria-pressed={isDescriptionReviewOpen}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors flex-shrink-0 ${isDescriptionReviewOpen ? "bg-purple-600 text-white" : isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-100" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
+                  title="Review and edit the base description"
+                >
+                  <TerminalIcon />
+                  Description
+                </button>
+                <button
                   onClick={clearTerminal}
+                  aria-label="Kill process and clear terminal"
                   className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors bg-red-600 hover:bg-red-700 text-white flex-shrink-0"
                   title="Kill process and clear terminal"
                 >
@@ -4391,39 +5940,19 @@ function AudionutsUAGUI() {
                       />
                       Upload-Assistant Web UI
                     </h1>
-                    <a
-                      href={`${APP_BASE}/logout`}
-                      className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors bg-red-600 text-white hover:bg-red-700"
-                    >
-                      Logout
-                    </a>
                   </div>
 
                   {/* Controls */}
                   <div className="flex items-center gap-3">
+                    {renderThemePalette()}
                     <a
                       href={`${APP_BASE}/config`}
-                      className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors bg-blue-600 text-white hover:bg-blue-700"
+                      aria-label="Config"
+                      title="Config"
+                      className={`p-2 rounded-lg transition-colors ${isDarkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"}`}
                     >
-                      View Config
+                      <SettingsIcon />
                     </a>
-                    <span
-                      className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}
-                    >
-                      {isDarkMode ? "🌙 Dark" : "☀️ Light"}
-                    </span>
-                    <button
-                      onClick={() => setIsDarkMode(!isDarkMode)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        isDarkMode ? "bg-purple-600" : "bg-gray-300"
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          isDarkMode ? "translate-x-6" : "translate-x-1"
-                        }`}
-                      />
-                    </button>
                   </div>
                 </div>
 
@@ -4449,6 +5978,7 @@ function AudionutsUAGUI() {
                     }`}
                     disabled={isExecuting}
                   />
+                  {renderArgumentPresetControls()}
                 </div>
 
                 {/* Description Link URL Input - shown when --desclink is in args */}
@@ -4593,6 +6123,11 @@ function AudionutsUAGUI() {
                   </button>
                   <button
                     onClick={clearTerminal}
+                    aria-label={
+                      isExecuting
+                        ? "Kill process and clear terminal"
+                        : "Clear terminal"
+                    }
                     className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-colors ${
                       isExecuting
                         ? "bg-red-600 hover:bg-red-700 text-white"
@@ -4616,10 +6151,19 @@ function AudionutsUAGUI() {
 
         {/* Execution Output */}
         <div
-          className={`flex-1 ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} p-4 flex flex-col min-h-0 overflow-hidden`}
+          className={`${isExecuting || isOutputExpanded ? "flex-1 p-4" : "flex-none p-2"} ${isDarkMode ? "bg-gray-900" : "bg-gray-100"} flex flex-col min-h-0 overflow-hidden`}
+          style={
+            isExecuting || isOutputExpanded
+              ? undefined
+              : { flex: "0 0 auto", minHeight: 0 }
+          }
         >
-          <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col min-h-0">
-            <div className="flex items-center gap-2 mb-3 flex-shrink-0">
+          <div
+            className={`max-w-6xl mx-auto w-full ${isExecuting || isOutputExpanded ? "flex-1" : "flex-none"} flex flex-col min-h-0`}
+          >
+            <div
+              className={`flex items-center gap-2 ${isExecuting || isOutputExpanded ? "mb-3" : ""} flex-shrink-0`}
+            >
               <span className={isDarkMode ? "text-white" : "text-gray-800"}>
                 <TerminalIcon />
               </span>
@@ -4633,12 +6177,27 @@ function AudionutsUAGUI() {
                   ● Running
                 </span>
               )}
+              {!isExecuting && (
+                <button
+                  onClick={() => setIsOutputExpanded((expanded) => !expanded)}
+                  aria-expanded={isOutputExpanded}
+                  title={isOutputExpanded ? "Collapse output" : "Expand output"}
+                  className={`ml-auto flex items-center gap-1.5 rounded px-3 py-1.5 text-sm ${isDarkMode ? "text-gray-300 hover:bg-gray-800" : "text-gray-600 hover:bg-gray-200"}`}
+                >
+                  <span
+                    className={`transition-transform ${isOutputExpanded ? "rotate-180" : ""}`}
+                  >
+                    <ChevronDownIcon />
+                  </span>
+                  {isOutputExpanded ? "Collapse" : "Expand"}
+                </button>
+              )}
             </div>
             {/* Rich HTML output (rendered from Rich export_html fragments) */}
             <div
               ref={richOutputRef}
               id="rich-output"
-              className={`flex-1 rounded-lg overflow-auto p-3 border ${isDarkMode ? "bg-gray-900 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}
+              className={`rounded-lg overflow-auto p-3 border bg-black border-gray-700 text-white ${isExecuting || isOutputExpanded ? "flex-1" : "hidden"}`}
             ></div>
             {isExecuting && (
               <div
@@ -4705,7 +6264,13 @@ function AudionutsUAGUI() {
         }}
       >
         {isExecuting ? (
-          renderExecutionPreviewPanel()
+          isScreenshotReviewOpen ? (
+            renderScreenshotsPanel()
+          ) : isDescriptionReviewOpen ? (
+            renderDescriptionPanel()
+          ) : (
+            renderExecutionPreviewPanel()
+          )
         ) : (
           <>
             <div
@@ -4857,7 +6422,9 @@ function AudionutsUAGUI() {
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <button
-                                  onClick={() => addArgument(a.label)}
+                                  onClick={() =>
+                                    addArgument(a.insert || a.label)
+                                  }
                                   disabled={isExecuting}
                                   className={`px-3 py-1 text-sm font-mono rounded-md border ${isDarkMode ? "bg-gray-700 border-gray-600 text-white hover:bg-purple-600 hover:text-white" : "bg-white border-gray-200 text-gray-800 hover:bg-purple-600 hover:text-white"} transition-colors`}
                                 >

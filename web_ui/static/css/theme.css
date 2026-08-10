@@ -1,0 +1,261 @@
+/* Upload-Assistant visual language: obsidian surfaces, copper actions, gold flow. */
+:root {
+  --ua-obsidian: #0c0a09;
+  --ua-charcoal: #1c1917;
+  --ua-stone: #292524;
+  --ua-stone-light: #57534e;
+  --ua-copper: #b45309;
+  --ua-copper-bright: #d97706;
+  --ua-gold: #fbbf24;
+  --ua-gold-soft: #fef3c7;
+  --ua-ink: #f5f5f4;
+  --ua-muted: #a8a29e;
+  --ua-border: rgba(168, 162, 158, 0.24);
+  --ua-glow: rgba(251, 191, 36, 0.22);
+  --ua-light-panel-start: #fff7ed;
+  --ua-light-panel-end: #fffbeb;
+  --ua-atmosphere: rgba(180, 83, 9, 0.1);
+  --ua-card: rgba(28, 25, 23, 0.86);
+  --ua-card-border: rgba(251, 191, 36, 0.22);
+  --ua-card-glow: rgba(180, 83, 9, 0.08);
+}
+
+[data-ua-theme="graphite"] {
+  --ua-obsidian: #0b1220;
+  --ua-charcoal: #111827;
+  --ua-stone: #1f2937;
+  --ua-stone-light: #475569;
+  --ua-copper: #2563eb;
+  --ua-copper-bright: #38bdf8;
+  --ua-gold: #67e8f9;
+  --ua-gold-soft: #cffafe;
+  --ua-ink: #f8fafc;
+  --ua-muted: #94a3b8;
+  --ua-border: rgba(148, 163, 184, 0.28);
+  --ua-glow: rgba(56, 189, 248, 0.22);
+  --ua-light-panel-start: #eff6ff;
+  --ua-light-panel-end: #ecfeff;
+  --ua-atmosphere: rgba(37, 99, 235, 0.12);
+  --ua-card: rgba(17, 24, 39, 0.88);
+  --ua-card-border: rgba(56, 189, 248, 0.24);
+  --ua-card-glow: rgba(37, 99, 235, 0.1);
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background-color: var(--ua-obsidian) !important;
+  color: var(--ua-ink);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+/* Give the app the same quiet diagonal depth as the logo card. */
+body::before {
+  background:
+    radial-gradient(circle at 85% 0%, var(--ua-atmosphere), transparent 28rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.025), transparent 45%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: -1;
+}
+
+button,
+input,
+select,
+textarea {
+  accent-color: var(--ua-copper-bright);
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+button:focus-visible {
+  border-color: var(--ua-gold) !important;
+  box-shadow: 0 0 0 3px var(--ua-glow) !important;
+  outline: none !important;
+}
+
+/* Accent translation: the old purple/blue utility classes now speak copper. */
+:where([class~="bg-purple-600"], [class~="bg-blue-600"]) {
+  background-color: var(--ua-copper) !important;
+}
+
+:where([class~="hover:bg-purple-700"], [class~="hover:bg-blue-700"]):hover {
+  background-color: var(--ua-copper-bright) !important;
+}
+
+:where([class~="bg-purple-500"], [class~="bg-purple-400"]) {
+  background-color: var(--ua-copper-bright) !important;
+}
+
+:where(
+  [class~="text-purple-600"],
+  [class~="text-purple-500"],
+  [class~="text-blue-400"],
+  [class~="text-blue-600"]
+) {
+  color: var(--ua-copper-bright) !important;
+}
+
+:where(
+  [class~="text-purple-400"],
+  [class~="text-purple-300"],
+  [class~="text-blue-300"]
+) {
+  color: var(--ua-gold) !important;
+}
+
+:where(
+  [class~="border-purple-500"],
+  [class~="border-purple-400"],
+  [class~="focus:border-purple-500"]
+):focus,
+:where([class~="hover:border-purple-500"]):hover {
+  border-color: var(--ua-gold) !important;
+}
+
+:where([class~="focus:ring-purple-500"]):focus {
+  --tw-ring-color: var(--ua-gold) !important;
+}
+
+/* Dark Tailwind surfaces become a restrained warm-black hierarchy. */
+:where([class~="bg-gray-900"], [class~="bg-gray-950"]) {
+  background-color: var(--ua-obsidian) !important;
+}
+
+:where([class~="bg-gray-800"]) {
+  background-color: var(--ua-charcoal) !important;
+}
+
+:where([class~="bg-gray-700"]) {
+  background-color: var(--ua-stone) !important;
+}
+
+:where(
+  [class~="border-gray-700"],
+  [class~="border-gray-600"],
+  [class~="border-gray-500"]
+) {
+  border-color: var(--ua-border) !important;
+}
+
+:where(
+  [class~="text-gray-400"],
+  [class~="text-gray-500"],
+  [class~="text-gray-300"]
+) {
+  color: var(--ua-muted) !important;
+}
+
+/* Warm panels in the light theme, without changing its information hierarchy. */
+:where(
+  [class~="from-purple-50"],
+  [class~="from-blue-50"],
+  [class~="from-cyan-50"]
+) {
+  --tw-gradient-from: var(--ua-light-panel-start)
+    var(--tw-gradient-from-position);
+}
+:where([class~="to-blue-50"], [class~="to-cyan-50"], [class~="to-sky-50"]) {
+  --tw-gradient-to: var(--ua-light-panel-end) var(--tw-gradient-to-position);
+}
+
+[data-ua-theme="graphite"]
+  :where(
+    [class~="from-purple-50"],
+    [class~="from-blue-50"],
+    [class~="from-cyan-50"]
+  ) {
+  --tw-gradient-from: var(--ua-light-panel-start)
+    var(--tw-gradient-from-position);
+}
+
+[data-ua-theme="graphite"]
+  :where([class~="to-blue-50"], [class~="to-cyan-50"], [class~="to-sky-50"]) {
+  --tw-gradient-to: var(--ua-light-panel-end) var(--tw-gradient-to-position);
+}
+
+/* Login cards use inline styles, so these intentional overrides keep them on-brand. */
+.bg-card {
+  background-color: var(--ua-card) !important;
+  border-color: var(--ua-card-border) !important;
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.45),
+    0 0 36px var(--ua-card-glow) !important;
+}
+
+a:hover {
+  color: var(--ua-gold) !important;
+}
+
+.ua-theme-picker {
+  background: color-mix(in srgb, var(--ua-charcoal) 88%, transparent);
+  border: 1px solid var(--ua-border);
+  color: var(--ua-ink);
+}
+
+.ua-theme-picker option {
+  background: var(--ua-charcoal);
+  color: var(--ua-ink);
+}
+
+::selection {
+  background: var(--ua-copper);
+  color: white;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Keep the empty terminal useful without letting it dominate the upload form. */
+.ua-output-box-empty {
+  flex: 0 0 8rem;
+  min-height: 8rem;
+}
+
+.ua-output-section-empty {
+  flex: 0 0 auto;
+}
+
+/* Config sections remain horizontally navigable on narrow screens without a
+   distracting native scrollbar or accidental page-wide overflow. */
+.ua-config-tabs {
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+}
+
+.ua-config-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .ua-config-tabs > button {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+
+  .ua-output-box-empty {
+    flex-basis: 7rem;
+    min-height: 7rem;
+  }
+}

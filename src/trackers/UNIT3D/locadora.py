@@ -130,3 +130,6 @@ class Locadora(UNIT3D):
             "Other": "10",
         }.get(meta.resolution, "10")
         return {"resolution_id": resolution_id}
+
+    async def get_additional_checks(self, meta: Meta) -> bool:
+        return await self.common.check_portuguese_video_requirements(meta, self.tracker)

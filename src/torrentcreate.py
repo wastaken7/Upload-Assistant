@@ -18,15 +18,16 @@ from typing import Any
 
 import cli_ui
 import torf
-from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn
+from rich.progress import BarColumn, TaskProgressColumn, TextColumn
 from torf import Torrent
 
-from src.console import console, logger
+from src.console import console, is_cli_progress_suppressed, logger, progress_display
 from src.meta import Meta
-from src.webui_progress import complete_progress, publish_progress
+from src.webui_progress import complete_progress, has_progress_callback, publish_progress
 
 PIECE_SIZE_MIN = 32 * 1024  # 32 KiB
 PIECE_SIZE_MAX = 134_217_728  # 128 MiB
+SUBTITLE_EXTENSIONS = (".srt", ".sub", ".vtt", ".ssa", ".ass", ".idx")
 
 
 def calculate_piece_size(
@@ -221,7 +222,13 @@ class TorrentCreator:
                 if is_subs and meta.subtitle_files:
                     creation_filelist.extend(meta.subtitle_files)
 
-                if meta.category in ("BOOK", "GAME"):
+                # A single-file release must use its parent as the creation root
+                # when external subtitles are requested; otherwise neither torf nor
+                # mkbrr can discover sibling subtitle files.
+                if is_subs and Path(path).is_file():
+                    path = Path(path).parent
+
+                if meta.category not in ("MOVIE", "TV"):
                     if meta.isdir and len(meta.filelist) == 1 and not meta.keep_folder:
                         path = meta.filelist[0]
                     include = []
@@ -250,7 +257,6 @@ class TorrentCreator:
                         exclude = []
                     elif not meta.tv_pack:
                         path_dir = os.fspath(path)
-                        os.chdir(path_dir)
                         path_dir_path = Path(path_dir)
                         globs = [f.name for f in path_dir_path.glob("*.mkv")] + [f.name for f in path_dir_path.glob("*.mp4")] + [f.name for f in path_dir_path.glob("*.ts")]
                         no_sample_globs = [
@@ -264,6 +270,10 @@ class TorrentCreator:
                         folder_name = Path(str(path)).name
                         include = [f"{folder_name}/{Path(f).name}" for f in creation_filelist]
                         exclude = ["*", "*/**"]
+                elif is_subs:
+                    folder_name = Path(path).name
+                    include = [f"{folder_name}/{Path(file).name}" for file in creation_filelist]
+                    exclude = ["*", "*/**"]
                 else:
                     exclude = ["*.*", "*sample.mkv", "!sample*.*"] if not meta.is_disc else []
                     include = ["*.mkv", "*.mp4", "*.ts"] if not meta.is_disc else []
@@ -312,7 +322,7 @@ class TorrentCreator:
                         if meta.mkbrr_threads != "0":
                             cmd.extend(["--workers", str(meta.mkbrr_threads)])
 
-                        if not meta.is_disc and meta.category not in ("BOOK", "GAME"):
+                        if not meta.is_disc and meta.category in ("MOVIE", "TV"):
                             exclude_str = cls.build_mkbrr_exclude_string(str(path), creation_filelist, allow_subs=is_subs)
                             cmd.extend(["--exclude", exclude_str])
 
@@ -330,12 +340,13 @@ class TorrentCreator:
                             pieces_done = 0
                             mkbrr_start_time = time.time()
 
-                            with Progress(
+                            with progress_display(
                                 TextColumn("[progress.description]{task.description}"),
                                 BarColumn(),
                                 TaskProgressColumn(),
                                 console=console,
                                 transient=False,
+                                disable=has_progress_callback(),
                             ) as progress:
                                 task = progress.add_task("mkbrr hashing...", total=total_pieces)
                                 publish_progress("mkbrr-hash", "mkbrr hashing...", current=0, total=total_pieces, detail="Starting mkbrr hashing")
@@ -431,8 +442,18 @@ class TorrentCreator:
 
                 # Fallback to CustomTorrent if mkbrr is not used
                 custom_include = include or []
-                if is_subs and not custom_include and not meta.is_disc and meta.category not in ("BOOK", "GAME"):
-                    custom_include = ["*.mkv", "*.mp4", "*.ts", "*.srt", "*.sub", "*.vtt", "*.ssa", "*.ass", "*.idx"]
+                if is_subs and not meta.is_disc and meta.category in ("TV", "MOVIE"):
+                    # Preserve the existing video include rules and add only the
+                    # subtitle files selected for this upload, never every subtitle
+                    # matching an extension below the creation root.
+                    root = Path(path).resolve()
+                    selected_subtitles: list[str] = []
+                    for subtitle_file in meta.subtitle_files:
+                        try:
+                            selected_subtitles.append(Path(str(subtitle_file)).resolve().relative_to(root).as_posix())
+                        except ValueError:
+                            logger.warning(f"[yellow]Selected subtitle is outside torrent root and will be skipped: {subtitle_file}")
+                    custom_include = list(dict.fromkeys([*custom_include, *selected_subtitles]))
                 torrent = CustomTorrent(
                     meta=meta,
                     path=path,
@@ -446,6 +467,11 @@ class TorrentCreator:
                     created_by=f"{meta.ua_name} (fork)",
                     piece_size=piece_size,
                 )
+                progress_id = f"torrent-hash-{meta.uuid}"
+                progress_label = f"Hashing {output_filename} torrent"
+                torrent._webui_progress_id = progress_id
+                torrent._webui_progress_label = progress_label
+                publish_progress(progress_id, progress_label, current=0, total=1, detail="Starting torrent hash", group="media", unit="pieces")
 
                 # Run torrent generation in thread to avoid blocking the event loop
                 def generate_torrent() -> None:
@@ -453,7 +479,11 @@ class TorrentCreator:
                     torrent.write(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{output_filename}.torrent", overwrite=True)
                     torrent.verify_filesize(path)
 
-                await asyncio.to_thread(generate_torrent)
+                try:
+                    await asyncio.to_thread(generate_torrent)
+                except Exception as error:
+                    publish_progress(progress_id, progress_label, detail=str(error), status="failed", group="media", unit="pieces")
+                    raise
 
                 total_elapsed_time = time.time() - overall_start_time
                 formatted_time = time.strftime("%H:%M:%S", time.gmtime(total_elapsed_time))
@@ -463,6 +493,7 @@ class TorrentCreator:
                 logger.debug("")
                 logger.debug(f"[bold green]torrent created in {formatted_time}")
                 logger.debug(f"[green]Torrent file size: {torrent_file_size:.2f} KB")
+                complete_progress(progress_id, progress_label, current=1, total=1, detail="Torrent created", group="media", unit="pieces")
                 return torrent
             finally:
                 cls._create_torrent_inflight -= 1
@@ -496,7 +527,19 @@ class TorrentCreator:
             speed_str = "-- MB/s"
 
         # Display progress with percentage, speed, and ETA
-        cli_ui.info_progress(f"Hashing... {speed_str} | ETA: {eta}", int(percentage_done), 100)
+        if not has_progress_callback() and not is_cli_progress_suppressed():
+            cli_ui.info_progress(f"Hashing... {speed_str} | ETA: {eta}", int(percentage_done), 100)
+        progress_id = getattr(torrent, "_webui_progress_id", "torrent-hash")
+        progress_label = getattr(torrent, "_webui_progress_label", "Hashing torrent")
+        publish_progress(
+            progress_id,
+            progress_label,
+            current=pieces_done,
+            total=pieces_total or 1,
+            detail=f"{speed_str} | ETA: {eta}",
+            group="media",
+            unit="pieces",
+        )
 
     @staticmethod
     def create_random_torrents(base_dir: str, uuid: str, num: int | str, path: str) -> None:
@@ -508,7 +551,7 @@ class TorrentCreator:
             Torrent.copy(new_torrent).write(f"{base_dir}{'/' + 'tmp' + '/'}{uuid}/[RAND-{i}]{manual_name}.torrent", overwrite=True)
 
     @staticmethod
-    async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> None:
+    async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> str | None:
         if Path(torrentpath).exists():
             base_torrent = Torrent.read(torrentpath)
             base_torrent.trackers = ["https://fake.tracker"]
@@ -548,14 +591,13 @@ class TorrentCreator:
                     base_torrent.metainfo.pop(each, None)  # type: ignore
             base_torrent.source = "L4G"
             base_torrent.private = True
-            has_subs = False
-            for f in base_torrent.files:
-                ext = Path(str(f)).suffix.lower()
-                if ext in {".srt", ".sub", ".vtt", ".ssa", ".ass", ".idx"}:
-                    has_subs = True
-                    break
+            has_subs = any(Path(str(f)).suffix.lower() in SUBTITLE_EXTENSIONS for f in base_torrent.files)
             out_name = "BASE_SUBS.torrent" if has_subs else "BASE.torrent"
-            Torrent.copy(base_torrent).write(f"{base_dir}{'/' + 'tmp' + '/'}{uuid}/{out_name}", overwrite=True)
+            output_path = Path(base_dir) / "tmp" / uuid / out_name
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            Torrent.copy(base_torrent).write(output_path, overwrite=True)
+            return str(output_path)
+        return None
 
     @staticmethod
     def get_mkbrr_path(meta: Meta) -> str:
@@ -626,8 +668,8 @@ def create_random_torrents(base_dir: str, uuid: str, num: int | str, path: str) 
     TorrentCreator.create_random_torrents(base_dir, uuid, num, path)
 
 
-async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> None:
-    await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid)
+async def create_base_from_existing_torrent(torrentpath: str, base_dir: str, uuid: str) -> str | None:
+    return await TorrentCreator.create_base_from_existing_torrent(torrentpath, base_dir, uuid)
 
 
 def get_mkbrr_path(meta: Meta) -> str:

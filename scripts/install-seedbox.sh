@@ -3,7 +3,6 @@ set -euo pipefail
 
 PYTHON_VERSION="3.14.0"
 UA_DIR="${HOME}/tools/ua"
-WITH_DISCORD=0
 SKIP_PYENV_INSTALL=0
 FORCE_UPDATE=0
 PYENV_ROOT_DEFAULT="${HOME}/.pyenv"
@@ -19,7 +18,6 @@ Install or update Upload Assistant on a Linux box without requiring root.
 Options:
   --ua-dir PATH           Installation directory (default: ~/tools/ua)
   --python VERSION        Python version for pyenv (default: 3.14.0)
-  --with-discord          Install optional Discord dependencies
   --skip-pyenv-install    Fail instead of installing pyenv automatically
   --force-update          Recreate .venv and reinstall packages
   -h, --help              Show this help
@@ -142,10 +140,6 @@ install_dependencies() {
     log "Installing Upload Assistant dependencies"
     pip install -r requirements.txt
 
-    if [ "$WITH_DISCORD" -eq 1 ]; then
-        log "Installing optional Discord dependencies"
-        pip install -r requirements-discord.txt
-    fi
 }
 
 write_runner() {
@@ -174,10 +168,6 @@ while [ "$#" -gt 0 ]; do
             [ "$#" -ge 2 ] || fail "--python requires a version"
             PYTHON_VERSION="$2"
             shift 2
-            ;;
-        --with-discord)
-            WITH_DISCORD=1
-            shift
             ;;
         --skip-pyenv-install)
             SKIP_PYENV_INSTALL=1
@@ -221,6 +211,4 @@ Run:
 
 Optional next steps:
   - Configure UA with: ${UA_DIR}/.venv/bin/python ${UA_DIR}/config-generator.py
-  - Enable Discord later with:
-      ${UA_DIR}/.venv/bin/python -m pip install -r ${UA_DIR}/requirements-discord.txt
 EOF

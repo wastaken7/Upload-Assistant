@@ -4,13 +4,14 @@ from typing import Any
 
 import aiofiles
 import httpx
+from rich.markup import escape
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
-from src.rehostimages import RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.trackers.common import Common
 from src.trackers.UNIT3D import UNIT3D
 
@@ -71,7 +72,6 @@ class HawkeUno(UNIT3D):
         "YTS",
     )
     approved_image_hosts = (
-        "ptpimg",
         "imgbox",
         "imgbb",
         "pixhost",
@@ -80,6 +80,19 @@ class HawkeUno(UNIT3D):
         "ptscreens",
         "passtheimage",
         "hawke.pics",
+    )
+    image_host_policy = ImageHostPolicy(
+        {
+            "ibb.co": "imgbb",
+            "pixhost.to": "pixhost",
+            "imgbox.com": "imgbox",
+            "imagebam.com": "bam",
+            "hawke.pics": "hawke.pics",
+            "onlyimage.org": "onlyimage",
+            "ptscreens.com": "ptscreens",
+            "passtheimage.me": "passtheimage",
+        },
+        approved_image_hosts,
     )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
@@ -127,14 +140,14 @@ class HawkeUno(UNIT3D):
                     if encoding_settings:
                         crf_match = re.search(r"crf[ =:]+([\d.]+)", encoding_settings, re.IGNORECASE)
                         if crf_match:
-                            logger.debug(f"Found CRF value: {crf_match.group(1)}")
+                            logger.debug(f"{self.tracker}: Found CRF value: {crf_match.group(1)}")
                             crf_value = float(crf_match.group(1))
                             if crf_value > 22:
                                 if not meta.unattended:
-                                    logger.info(f"CRF value too high: {crf_value} for HawkeUno")
+                                    logger.info(f"{self.tracker}: CRF value too high: {crf_value} for HawkeUno")
                                 return False
                         else:
-                            logger.debug("No CRF value found in encoding settings.")
+                            logger.debug(f"{self.tracker}: No CRF value found in encoding settings.")
                             bit_rate = track.get("BitRate")
                             if bit_rate and "Animation" not in meta.genre:
                                 try:
@@ -147,30 +160,10 @@ class HawkeUno(UNIT3D):
 
                                     if bit_rate_kbps < 3000:
                                         if not meta.unattended:
-                                            logger.info(f"Video bitrate too low: {bit_rate_kbps:.0f} kbps for HawkeUno")
+                                            logger.info(f"{self.tracker}: Video bitrate too low: {bit_rate_kbps:.0f} kbps for HawkeUno")
                                         return False
 
         return should_continue
-
-    async def check_image_hosts(self, meta: Meta) -> None:
-        url_host_mapping = {
-            "ibb.co": "imgbb",
-            "ptpimg.me": "ptpimg",
-            "pixhost.to": "pixhost",
-            "imgbox.com": "imgbox",
-            "imagebam.com": "bam",
-            "hawke.pics": "hawke.pics",
-            "onlyimage.org": "onlyimage",
-            "ptscreens.com": "ptscreens",
-            "passtheimage.me": "passtheimage",
-        }
-        await self.rehost_images_manager.check_hosts(
-            meta,
-            self.tracker,
-            url_host_mapping=url_host_mapping,
-            img_host_index=1,
-            approved_image_hosts=self.approved_image_hosts,
-        )
 
     async def get_description(self, meta: Meta) -> None:
         desc = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(
@@ -244,7 +237,7 @@ class HawkeUno(UNIT3D):
             "category_id": 1 if meta.category == "MOVIE" else 2,
             "type_id": (await self.get_type_id(meta))["type_id"],
             "tmdb": meta.tmdb,
-            "anonymous": 1 if meta.anon else 0,
+            "anonymous": int(bool(meta.anon) or self.tracker_config.get("anon", False)),
             "imdb": meta.imdb_id,
         }
 
@@ -253,7 +246,8 @@ class HawkeUno(UNIT3D):
             data["internal"] = 1
 
         data["edition"] = meta.edition
-        data["repack"] = meta.repack
+        if meta.repack:
+            data["release_tag"] = meta.repack
 
         if meta.is_disc:
             region = meta.region
@@ -311,15 +305,10 @@ class HawkeUno(UNIT3D):
         status_dict = meta.tracker_status[self.tracker]
 
         api_token = str(self.config["TRACKERS"][self.tracker].get("api_key", ""))
-        if not api_token:
-            logger.info(f"[bold red]{self.tracker}: Missing API key in config.[/bold red]")
-            meta.skipping = self.tracker
-            return False
-
         url = f"{self.upload_url}?api_token={api_token}"
 
         if meta.debug:
-            logger.debug(f"[cyan]{self.tracker} Request Data:")
+            logger.debug(f"{self.tracker}: [cyan]Request Data:")
             logger.debug(Redaction.redact_private_info(data))
             status_dict["status_message"] = "Debug mode enabled, not uploading."
             await self.common.create_torrent_for_upload(meta, f"{self.tracker}_DEBUG", f"{self.tracker}_DEBUG", announce_url="https://fake.tracker")
@@ -343,15 +332,19 @@ class HawkeUno(UNIT3D):
                     return True
                 error_msg = response_json.get("message", "Unknown error")
                 status_dict["status_message"] = f"data error: API error: {error_msg}"
-                logger.info(f"[yellow]Upload to {self.tracker} failed: {error_msg}[/yellow]")
+                logger.info(f"{self.tracker}: [yellow]Upload to {self.tracker} failed: {error_msg}[/yellow]")
                 return False
 
         except httpx.HTTPStatusError as e:
             msg = f"HTTP {e.response.status_code} - {e.response.text}"
             status_dict["status_message"] = f"data error: {msg}"
-            logger.info(f"[bold red]{self.tracker} Upload error: {msg}[/bold red]")
+            logger.info(f"{self.tracker}: [bold red]Upload error: {escape(str(msg))}[/bold red]")
+            return False
+        except (httpx.RequestError, ValueError, KeyError) as e:
+            status_dict["status_message"] = f"data error: {e}"
+            logger.info(f"{self.tracker}: [bold red]Upload connection/parsing error: {escape(str(e))}[/bold red]")
             return False
         except Exception as e:
             status_dict["status_message"] = f"data error: {e}"
-            logger.info(f"[bold red]{self.tracker} Upload unexpected error: {e}[/bold red]")
-            return False
+            logger.info(f"{self.tracker}: [bold red]Upload unexpected error: {escape(str(e))}[/bold red]")
+            raise

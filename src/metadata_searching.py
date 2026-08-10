@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from src.console import logger
 from src.imdb import imdb_manager
 from src.meta import Meta
+from src.metadata_cache import cache_for, is_cache_miss
 from src.tmdb import TmdbManager
 from src.tvdb import TvdbData
 from src.tvmaze import tvmaze_manager
@@ -40,6 +41,7 @@ def _apply_tvdb_series_metadata(meta: Meta, episodes_data: Any, series_name: Any
 
 class MetadataSearchingManager:
     def __init__(self, config: dict[str, Any]) -> None:
+        self.config = config
         self.tvdb_handler = TvdbData(config)
         self.tmdb_manager = TmdbManager(config)
 
@@ -65,6 +67,7 @@ class MetadataSearchingManager:
         tvmaze_manual: str | None = None,
         year: str = "",
         tv_movie: bool = False,
+        base_dir: str = "",
     ) -> tuple[int, int, Any | None, str]:
         return await get_tvmaze_tvdb(
             filename,
@@ -76,6 +79,8 @@ class MetadataSearchingManager:
             tvmaze_manual=tvmaze_manual,
             year=year,
             tv_movie=tv_movie,
+            base_dir=base_dir,
+            config=self.config,
         )
 
     async def get_tv_data(self, meta: Meta) -> Meta:
@@ -101,13 +106,14 @@ async def all_ids(meta: Meta, tvdb_handler: Any, tmdb_manager: TmdbManager) -> M
             mal_manual=int(meta.mal_manual) if isinstance(meta.mal_manual, int) or (isinstance(meta.mal_manual, str) and meta.mal_manual.isdigit()) else None,
             aka=meta.aka,
             original_language=meta.original_language,
-            poster=meta.poster,
+            poster=meta.artwork_url,
             debug=meta.debug,
             mode=(meta.mode if meta.mode is not None else "cli"),
             tvdb_id=meta.tvdb_id,
             filename=meta.filename,
+            base_dir=meta.base_dir,
         ),
-        imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language),
+        imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language, base_dir=meta.base_dir, config=tmdb_manager.config),
     ]
 
     # Always add get_tvdb_episodes for TV category
@@ -252,13 +258,14 @@ async def imdb_tmdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_mana
             mal_manual=int(meta.mal_manual) if isinstance(meta.mal_manual, int) or (isinstance(meta.mal_manual, str) and meta.mal_manual.isdigit()) else None,
             aka=meta.aka,
             original_language=meta.original_language,
-            poster=meta.poster,
+            poster=meta.artwork_url,
             debug=meta.debug,
             mode=(meta.mode if meta.mode is not None else "cli"),
             tvdb_id=meta.tvdb_id,
             filename=filename,
+            base_dir=meta.base_dir,
         ),
-        imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language),
+        imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language, base_dir=meta.base_dir, config=tmdb_manager.config),
     ]
 
     if meta.category == "TV":
@@ -271,6 +278,8 @@ async def imdb_tmdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_mana
                 manual_date=meta.manual_date,
                 tvmaze_manual=meta.tvmaze_manual,
                 return_full_tuple=False,
+                base_dir=meta.base_dir,
+                config=tmdb_manager.config,
             )
         )
 
@@ -396,7 +405,7 @@ async def imdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_manager: 
             meta.search_year,
             filename,
             debug=meta.debug,
-            mode=(meta.mode if meta.mode is not None else "discord"),
+            mode=(meta.mode if meta.mode is not None else "non_cli"),
             category_preference=meta.category,
         ),
         tvmaze_manager.search_tvmaze(
@@ -407,8 +416,10 @@ async def imdb_tvdb(meta: Meta, filename: str, tvdb_handler: Any, tmdb_manager: 
             manual_date=meta.manual_date,
             tvmaze_manual=meta.tvmaze_manual,
             return_full_tuple=False,
+            base_dir=meta.base_dir,
+            config=tmdb_manager.config,
         ),
-        imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language),
+        imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language, base_dir=meta.base_dir, config=tmdb_manager.config),
     ]
 
     if meta.category == "TV":
@@ -482,14 +493,15 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
             mal_manual=int(meta.mal_manual) if isinstance(meta.mal_manual, int) or (isinstance(meta.mal_manual, str) and meta.mal_manual.isdigit()) else None,
             aka=meta.aka,
             original_language=meta.original_language,
-            poster=meta.poster,
+            poster=meta.artwork_url,
             debug=meta.debug,
             mode=(meta.mode if meta.mode is not None else "cli"),
             tvdb_id=meta.tvdb_id,
             quickie_search=meta.quickie_search,
             filename=filename,
+            base_dir=meta.base_dir,
         ),
-        imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language),
+        imdb_manager.get_imdb_info_api(meta.imdb_id, manual_language=meta.manual_language, base_dir=meta.base_dir, config=tmdb_manager.config),
     ]
 
     # Add TVMaze search if it's a TV category
@@ -503,6 +515,8 @@ async def imdb_tmdb(meta: Meta, filename: str, _tvdb_handler: Any, tmdb_manager:
                 manual_date=meta.manual_date,
                 tvmaze_manual=meta.tvmaze_manual,
                 return_full_tuple=False,
+                base_dir=meta.base_dir,
+                config=tmdb_manager.config,
             )
         )
 
@@ -612,6 +626,8 @@ async def get_tvmaze_tvdb(
     tvmaze_manual: str | None = None,
     year: str = "",
     tv_movie: bool = False,
+    base_dir: str = "",
+    config: dict[str, Any] | None = None,
 ) -> tuple[int, int, Any | None, str]:
     tvdb_data = None
     tvmaze = 0
@@ -619,7 +635,19 @@ async def get_tvmaze_tvdb(
     tvdb_name = ""
     logger.debug("[yellow]Finding both TVMaze and TVDb IDs[/yellow]")
     # Core metadata tasks that run in parallel
-    tasks: list[Awaitable[Any]] = [tvmaze_manager.search_tvmaze(filename, search_year, imdb, 0, manual_date=manual_date, tvmaze_manual=tvmaze_manual, return_full_tuple=True)]
+    tasks: list[Awaitable[Any]] = [
+        tvmaze_manager.search_tvmaze(
+            filename,
+            search_year,
+            imdb,
+            0,
+            manual_date=manual_date,
+            tvmaze_manual=tvmaze_manual,
+            return_full_tuple=True,
+            base_dir=base_dir,
+            config=config,
+        )
+    ]
     if (imdb and imdb != 0) or (tmdb and tmdb != 0):
         tasks.append(tvdb_handler.get_tvdb_by_external_id(imdb=imdb, tmdb=tmdb, tv_movie=tv_movie))
     else:
@@ -943,6 +971,11 @@ async def get_douban_id(meta: Meta) -> int:
     if not imdb_id:
         return douban_id
 
+    cache = cache_for(meta.base_dir)
+    cached = await cache.get("douban", "imdb_lookup", str(imdb_id))
+    if not is_cache_miss(cached) and isinstance(cached, dict):
+        return int(cached.get("id", 0) or 0)
+
     search_url = f"https://m.douban.com/search/?query={imdb_id}"
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
 
@@ -980,9 +1013,12 @@ async def get_douban_id(meta: Meta) -> int:
                 link_mobile = str(link_tag["href"])
                 match = re.search(r"subject/(\d+)", link_mobile)
                 if match:
-                    return int(match.group(1))
+                    douban_id = int(match.group(1))
+                    await cache.set("douban", "imdb_lookup", str(imdb_id), {"id": douban_id})
+                    return douban_id
 
         logger.info(f"[bold yellow]No Douban ID found for IMDb ID {imdb_id}.[/bold yellow]")
+        await cache.set("douban", "imdb_lookup", str(imdb_id), {"id": 0}, negative=True)
         return douban_id
 
     except Exception as e:

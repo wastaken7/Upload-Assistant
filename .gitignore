@@ -5,6 +5,13 @@ data/config*
 data/cookies/
 data/tags.json
 data/tvdb/
+data/cache/*
+!data/cache/metadata/
+data/cache/metadata/*
+!data/cache/metadata/.gitkeep
+!data/cache/tracker_metadata/
+data/cache/tracker_metadata/*
+!data/cache/tracker_metadata/.gitkeep
 data/web_ui/*.*
 data/web_ui/templates/*.html
 data/web_ui/static/js/*.js
@@ -35,3 +42,5 @@ venv/*
 web_ui/static/js/node_modules/
 .stfolder
 .stignore
+AGENTS.md
+CLAUDE.md

@@ -15,9 +15,10 @@ import bencode
 import defusedxml.xmlrpc
 from torf import Torrent
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
+from src.torrent_clients.path_utils import coerce_str_list, is_path_under, map_save_path, tracker_directory
 from src.torrentcreate import TorrentCreator
 
 # Secure XML-RPC client using defusedxml to prevent XML attacks
@@ -39,18 +40,11 @@ class RtorrentClientMixin:
     def _extract_tracker_ids_from_comment(self, comment: str) -> dict[str, Any]:
         raise NotImplementedError
 
-    @staticmethod
-    def _coerce_str_list(value: Any) -> list[str]:
-        if isinstance(value, list):
-            value_list = value
-            return [str(v) for v in value_list if str(v)]
-        return [str(value)] if value is not None else []
-
     def rtorrent(self, path: str, torrent_path: str, torrent: Torrent, meta: Meta, local_path: str, remote_path: str, client: dict[str, Any], tracker: str) -> None:
         # Get the appropriate source path (same as in qbittorrent method)
         tracker_dir: str | None = None
         dst = path
-        filelist = self._coerce_str_list(meta.filelist)
+        filelist = coerce_str_list(meta.filelist)
         src = filelist[0] if len(filelist) == 1 and Path(filelist[0]).is_file() and not meta.keep_folder else meta.path
 
         if not src:
@@ -67,7 +61,7 @@ class RtorrentClientMixin:
         # Process linking if enabled
         if use_symlink or use_hardlink:
             # Get linked folder for this drive
-            linked_folder = self._coerce_str_list(client.get("linked_folder", []))
+            linked_folder = coerce_str_list(client.get("linked_folder", []))
             logger.debug(f"Linked folders: {linked_folder}")
 
             # Determine drive letter (Windows) or root (Linux)
@@ -122,7 +116,7 @@ class RtorrentClientMixin:
                 link_dir_name = str(tracker_cfg.get("link_dir_name", "")).strip()
                 if link_target is None:
                     raise RuntimeError("link_target cannot be None")
-                tracker_dir = Path(link_target) / link_dir_name or tracker
+                tracker_dir = tracker_directory(link_target, link_dir_name, tracker)
                 Path(tracker_dir).mkdir(parents=True, exist_ok=True)
 
                 logger.debug(f"[bold yellow]Linking to tracker directory: {tracker_dir}")
@@ -216,22 +210,7 @@ class RtorrentClientMixin:
         else:
             save_path = str(path)  # Default to the original path
 
-        # Handle remote path mapping
-        if local_path and remote_path and local_path.lower() != remote_path.lower():
-            # Normalize paths for comparison
-            norm_save_path = os.path.normpath(save_path).lower()
-            norm_local_path = os.path.normpath(local_path).lower()
-
-            # Check if the save_path starts with local_path
-            if norm_save_path.startswith(norm_local_path):
-                # Get the relative part of the path
-                rel_path = os.path.relpath(save_path, local_path)
-                # Combine remote path with relative path while keeping a string path
-                save_path = str(Path(remote_path) / rel_path)
-
-            # For direct replacement if the above approach doesn't work
-            elif local_path.lower() in save_path.lower():
-                save_path = save_path.replace(local_path, remote_path, 1)  # Replace only at the beginning
+        save_path = map_save_path(save_path, local_path, remote_path)
 
         logger.debug(f"[cyan]Original path: {path}")
         logger.debug(f"[cyan]Mapped save path: {save_path}")
@@ -265,16 +244,16 @@ class RtorrentClientMixin:
         # Remote path mount
         modified_fr = False
         path_dir = ""
-        if local_path.lower() in path.lower() and local_path.lower() != remote_path.lower():
+        path = str(path)
+        if is_path_under(path, local_path) and os.path.normcase(local_path) != os.path.normcase(remote_path):
             path_dir = str(Path(path).parent)
-            path = path.replace(local_path, remote_path)
-            path = path.replace(os.sep, "/")
+            path = map_save_path(path, local_path, remote_path, trailing_slash=False)
             shutil.copy(fr_file, f"{path_dir}/fr.torrent")
-            fr_file = f"{Path(path).parent}/fr.torrent"
+            fr_file = f"{Path(path).parent.as_posix()}/fr.torrent"
             modified_fr = True
             logger.debug(f"[cyan]Modified fast resume file path because path mapping: {fr_file}")
         if (meta.category in ("BOOK", "GAME") and len(filelist) > 1 and isdir) or isdir is False:
-            path = str(Path(path).parent)
+            path = Path(path).parent.as_posix()
         logger.debug(f"[cyan]Final path for rTorrent: {path}")
 
         logger.info("[bold yellow]Adding and starting torrent")
@@ -351,14 +330,15 @@ class RtorrentClientMixin:
 
         return metainfo
 
-    async def get_ptp_from_hash_rtorrent(self, meta: Meta, pathed: bool = False) -> Meta:
+    async def get_ptp_from_hash_rtorrent(self, meta: Meta, pathed: bool = False, client: dict[str, Any] | None = None) -> Meta:
         default_cfg = cast(dict[str, Any], self.config.get("DEFAULT", {}))
         default_client_value = default_cfg.get("default_torrent_client")
-        if not isinstance(default_client_value, str) or not default_client_value:
-            logger.info("[yellow]Missing default torrent client for rTorrent")
-            return meta
-        clients_cfg = cast(dict[str, Any], self.config.get("TORRENT_CLIENTS", {}))
-        client = cast(dict[str, Any], clients_cfg.get(default_client_value, {}))
+        if client is None:
+            if not isinstance(default_client_value, str) or not default_client_value:
+                logger.info("[yellow]Missing default torrent client for rTorrent")
+                return meta
+            clients_cfg = cast(dict[str, Any], self.config.get("TORRENT_CLIENTS", {}))
+            client = cast(dict[str, Any], clients_cfg.get(default_client_value, {}))
         torrent_storage_dir_value = client.get("torrent_storage_dir")
         torrent_storage_dir = torrent_storage_dir_value if isinstance(torrent_storage_dir_value, str) else None
         info_hash_value = meta.infohash

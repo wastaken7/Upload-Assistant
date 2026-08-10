@@ -27,8 +27,8 @@ except ImportError:
     logger = logging.getLogger(__name__)
 
 
-BDINFO_VERSION = "v1.0.8"
-BASE_RELEASE_URL = "https://github.com/Audionut/BDInfoCLI-ng/releases/download"
+BDINFO_VERSION = "v0.3.1"
+BASE_RELEASE_URL = "https://github.com/autobrr/go-bdinfo/releases/download"
 
 
 def download_file(url: str, output_path: Path) -> None:
@@ -96,17 +96,18 @@ def download_bdinfo_for_docker(base_dir: Path = Path("/Upload-Assistant"), versi
         raise Exception(f"This script is only for Linux containers, got: {system}")
 
     if machine in ("amd64", "x86_64"):
-        file_pattern = "bdinfo-linux-x64.tar.gz"
+        asset = "linux_amd64.tar.gz"
         folder = "linux/amd64"
     elif machine in ("arm64", "aarch64"):
-        file_pattern = "bdinfo-linux-arm64.tar.gz"
+        asset = "linux_arm64.tar.gz"
         folder = "linux/arm64"
     elif machine.startswith("arm"):
-        file_pattern = "bdinfo-linux-arm.tar.gz"
+        asset = "linux_arm.tar.gz"
         folder = "linux/arm"
     else:
         raise Exception(f"Unsupported architecture: {machine}")
 
+    file_pattern = f"bdinfo_{version.removeprefix('v')}_{asset}"
     bin_dir = base_dir / "bin" / "bdinfo" / folder
     bin_dir.mkdir(parents=True, exist_ok=True)
     binary_path = bin_dir / "bdinfo"
@@ -142,7 +143,7 @@ def download_bdinfo_for_docker(base_dir: Path = Path("/Upload-Assistant"), versi
     Path(binary_path).chmod(0o700)
 
     with Path(version_path).open("w", encoding="utf-8") as vf:
-        vf.write(f"BDInfoCLI-ng version {version} installed successfully.")
+        vf.write(f"autobrr/go-bdinfo version {version} installed successfully.")
 
     logger.info(f"Installed bdinfo: {binary_path}", extra={"markup": False})
     return str(binary_path)

@@ -33,6 +33,12 @@ def clear_progress_callback() -> None:
     set_progress_callback(None)
 
 
+def has_progress_callback() -> bool:
+    """Return whether the current process is publishing structured Web UI progress."""
+    with _callback_lock:
+        return _callback is not None
+
+
 def _emit(event: ProgressEvent) -> None:
     with _callback_lock:
         callback = _callback

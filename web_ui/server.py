@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 # ruff: noqa: I001
 import ast
+import asyncio
 import base64
 import contextlib
 import importlib
@@ -18,6 +19,8 @@ import subprocess
 import sys
 import threading
 import traceback
+import urllib.parse
+import weakref
 from contextlib import suppress
 from datetime import datetime, timedelta, UTC
 from types import ModuleType
@@ -101,7 +104,12 @@ class _GLike(Protocol):
 
 class _LimiterLike(Protocol):
     def limit(
-        self, limit_value: str, *, key_func: Callable[[], str] | None = None, error_message: str | None = None
+        self,
+        limit_value: str,
+        *,
+        key_func: Callable[[], str] | None = None,
+        error_message: str | None = None,
+        override_defaults: bool = True,
     ) -> Callable[[Callable[..., object]], Callable[..., object]]: ...
 
 
@@ -174,6 +182,42 @@ with contextlib.suppress(Exception):
 
 cfg_dir = auth_mod.get_config_dir()
 cfg_dir.mkdir(parents=True, exist_ok=True)
+
+ARGUMENT_PRESETS_PATH = Path(__file__).resolve().parent.parent / "data" / "argument_presets.json"
+MAX_ARGUMENT_PRESETS = 50
+_argument_presets_lock = threading.Lock()
+_description_review_locks: weakref.WeakValueDictionary[str, threading.Lock] = weakref.WeakValueDictionary()
+_description_review_locks_lock = threading.Lock()
+
+
+def _load_argument_presets() -> list[dict[str, str]]:
+    """Load the shared Web UI argument presets from the data directory."""
+    try:
+        if not ARGUMENT_PRESETS_PATH.exists():
+            return []
+        raw = json.loads(ARGUMENT_PRESETS_PATH.read_text(encoding="utf-8"))
+        if not isinstance(raw, list):
+            return []
+        presets: list[dict[str, str]] = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            arguments = item.get("arguments")
+            if isinstance(name, str) and isinstance(arguments, str) and name.strip() and arguments.strip():
+                presets.append({"name": name.strip(), "arguments": arguments.strip()})
+        return presets[-MAX_ARGUMENT_PRESETS:]
+    except OSError, TypeError, ValueError:
+        return []
+
+
+def _save_argument_presets(presets: list[dict[str, str]]) -> None:
+    """Persist shared Web UI argument presets with an atomic file replacement."""
+    ARGUMENT_PRESETS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = ARGUMENT_PRESETS_PATH.with_suffix(".json.tmp")
+    temp_path.write_text(json.dumps(presets, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temp_path.replace(ARGUMENT_PRESETS_PATH)
+
 
 # Access logging helper
 AccessLogger: Callable[[Path], _AccessLoggerLike] | None = None
@@ -932,6 +976,8 @@ def _validate_upload_assistant_args(args: Sequence[object]) -> list[str]:
     for a in args:
         if not isinstance(a, str):
             raise ValueError("Invalid arg type")
+        if a == "--paths-from-stdin":
+            raise ValueError("--paths-from-stdin is only available in CLI mode")
         if any(ch in a for ch in forbidden):
             raise ValueError("Invalid characters in arg")
         # Disallow arguments that are just parent-directory references
@@ -1286,10 +1332,28 @@ def _book_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: s
     if not meta_uuid:
         return ""
 
-    tmp_dir = Path(__file__).parent.parent / "tmp" / meta_uuid
+    tmp_dir = Path(__file__).parent.parent / "tmp" / meta_uuid / "artwork"
     for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg", "cover.jpg", "cover.png"):
         if (tmp_dir / filename).exists():
-            return f"/api/execution_preview_cover?session_id={preview_session_id}"
+            return _execution_preview_cover_url(preview_session_id, meta_uuid)
+    return ""
+
+
+def _execution_preview_cover_url(preview_session_id: str, cache_key: str) -> str:
+    """Return a per-item cover URL so the browser cannot reuse the prior cover."""
+    version = urllib.parse.quote(str(cache_key), safe="")
+    return f"/api/execution_preview_cover?session_id={urllib.parse.quote(preview_session_id, safe='')}&v={version}"
+
+
+def _music_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: str) -> str:
+    """Return a public cover URL or the authenticated local-preview endpoint."""
+    for key in ("cover", "poster"):
+        candidate = _stringify_preview_value(meta_data.get(key))
+        if _is_http_url(candidate):
+            return candidate
+    if _find_execution_preview_cover_file(preview_session_id) is not None:
+        cache_key = _stringify_preview_value(meta_data.get("uuid")) or _stringify_preview_value(meta_data.get("path"))
+        return _execution_preview_cover_url(preview_session_id, cache_key)
     return ""
 
 
@@ -1504,17 +1568,162 @@ def _extract_metadata_sources(meta_data: Mapping[str, object]) -> list[MetadataS
             isbn_value,
         )
 
+    if category == "MUSIC":
+        from src.music.sources import DiscogsEnricher
+
+        music_release = meta_data.get("music_release")
+        fields = music_release.get("fields", {}) if isinstance(music_release, Mapping) else {}
+        external_ids = music_release.get("external_ids", {}) if isinstance(music_release, Mapping) else {}
+        musicbrainz_release = ""
+        if isinstance(fields, Mapping):
+            musicbrainz_entry = fields.get("musicbrainz_release", {})
+            if isinstance(musicbrainz_entry, Mapping):
+                musicbrainz_release = _stringify_preview_value(musicbrainz_entry.get("value"))
+        if not musicbrainz_release and isinstance(external_ids, Mapping):
+            musicbrainz_release = _stringify_preview_value(external_ids.get("musicbrainz_release"))
+        if musicbrainz_release:
+            _append_metadata_source(
+                sources,
+                seen_keys,
+                "musicbrainz",
+                "MusicBrainz",
+                musicbrainz_release,
+                f"https://musicbrainz.org/release/{quote(musicbrainz_release)}",
+            )
+
+        if isinstance(external_ids, Mapping):
+            discogs_references = (
+                ("release", external_ids.get("discogs_release")),
+                ("master", external_ids.get("discogs_master")),
+            )
+            for reference_kind, reference_value in discogs_references:
+                parsed_reference = DiscogsEnricher.parse_reference(_stringify_preview_value(reference_value), reference_kind)
+                if parsed_reference:
+                    parsed_kind, discogs_id = parsed_reference
+                    _append_metadata_source(
+                        sources,
+                        seen_keys,
+                        f"discogs_{parsed_kind}",
+                        f"Discogs {parsed_kind.title()}",
+                        discogs_id,
+                        f"https://www.discogs.com/{parsed_kind}/{quote(discogs_id)}",
+                    )
+
     return sources
+
+
+def _music_preview_from_meta(meta_data: Mapping[str, object]) -> dict[str, object]:
+    """Extract display-safe MUSIC data from the normalized release snapshot."""
+    release = meta_data.get("music_release")
+    if not isinstance(release, Mapping):
+        return {}
+    fields = release.get("fields", {}) if isinstance(release.get("fields"), Mapping) else {}
+    tracks = release.get("tracks", []) if isinstance(release.get("tracks"), Sequence) else []
+    auxiliary = release.get("auxiliary", {}) if isinstance(release.get("auxiliary"), Mapping) else {}
+    warnings = release.get("warnings", []) if isinstance(release.get("warnings"), Sequence) else []
+    conflicts = release.get("conflicts", {}) if isinstance(release.get("conflicts"), Mapping) else {}
+
+    def field_value(name: str, fallback: object = "") -> object:
+        entry = fields.get(name, {}) if isinstance(fields, Mapping) else {}
+        if isinstance(entry, Mapping) and entry.get("value") not in (None, "", [], {}):
+            return entry["value"]
+        return fallback
+
+    def source(name: str) -> str:
+        entry = fields.get(name, {}) if isinstance(fields, Mapping) else {}
+        raw = _stringify_preview_value(entry.get("source")) if isinstance(entry, Mapping) else ""
+        return {
+            "file_tag": "File tags",
+            "auxiliary": "Auxiliary files",
+            "directory": "Folder name",
+            "external": "External metadata",
+            "user": "User input",
+            "tracker": "Tracker",
+            "inferred": "Inferred",
+        }.get(raw, "")
+
+    def text(name: str, fallback: object = "") -> str:
+        value = field_value(name, fallback)
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            return " & ".join(_stringify_preview_value(item) for item in value if _stringify_preview_value(item))
+        return _stringify_preview_value(value)
+
+    def technical_values(key: str, formatter: Callable[[object], str]) -> str:
+        values = {track.get(key) for track in tracks if isinstance(track, Mapping) and track.get(key) not in (None, "")}
+        if not values:
+            return ""
+        try:
+            ordered = sorted(values)
+        except TypeError:
+            ordered = sorted(values, key=str)
+        rendered = [formatter(value) for value in ordered]
+        return ", ".join(rendered) if len(rendered) <= 2 else f"{len(rendered)} variants"
+
+    formats = technical_values("format", _stringify_preview_value)
+    codecs = technical_values("codec", _stringify_preview_value)
+    if formats.casefold() == codecs.casefold():
+        codecs = ""
+    bit_depth = technical_values("bit_depth", lambda value: f"{value}-bit")
+    sample_rate = technical_values("sample_rate", lambda value: f"{int(value) / 1000:g} kHz")
+    channels = technical_values(
+        "channels",
+        lambda value: {1: "Mono", 2: "Stereo"}.get(int(value), f"{value} channels"),
+    )
+    bitrate = technical_values("bitrate", lambda value: f"{round(int(value) / 1000)} kbps")
+    technical = " / ".join(item for item in (formats or text("format", meta_data.get("format")), codecs, bit_depth, sample_rate, channels, bitrate) if item)
+
+    sidecars: list[str] = []
+    for label, key in (("log", "logs"), ("cue", "cues"), ("NFO", "nfos"), ("playlist", "playlists"), ("SFV", "sfvs"), ("artwork", "artwork"), ("scan", "scans")):
+        items = auxiliary.get(key, []) if isinstance(auxiliary, Mapping) else []
+        count = len(items) if isinstance(items, Sequence) and not isinstance(items, (str, bytes, bytearray)) else 0
+        if count:
+            sidecars.append(f"{count} {label}{'' if count == 1 else 's'}")
+
+    genres_value = field_value("genres", [])
+    genres = _string_list_preview_values(genres_value)
+    artist = text("artists", field_value("artist", meta_data.get("artist", "")))
+    return {
+        "artist": artist,
+        "artist_source": source("artists") or source("artist"),
+        "album": text("album", meta_data.get("title", "")),
+        "album_source": source("album"),
+        "original_year": text("year", meta_data.get("year", "")),
+        "year_source": source("year"),
+        "release_type": text("release_type"),
+        "release_type_source": source("release_type"),
+        "media": text("media", meta_data.get("source", "")),
+        "media_source": source("media"),
+        "technical": technical,
+        "track_count": text("track_count", len(tracks)),
+        "disc_count": text("disc_count", 1),
+        "release_year": text("release_year"),
+        "retail_date": text("retail_date"),
+        "release_label": text("release_label"),
+        "release_catalogue_number": text("release_catalogue_number"),
+        "edition": text("edition"),
+        "edition_year": text("edition_year"),
+        "genres": genres,
+        "auxiliary": sidecars,
+        "warnings": [_stringify_preview_value(item) for item in warnings[:5] if _stringify_preview_value(item)],
+        "conflicts": [str(name).replace("_", " ") for name in sorted(conflicts)[:5]],
+    }
 
 
 def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: str) -> ExecutionPreview:
     title = _stringify_preview_value(meta_data.get("title")) or _stringify_preview_value(meta_data.get("name"))
     original_title = _stringify_preview_value(meta_data.get("original_title"))
-    poster_url = _stringify_preview_value(meta_data.get("poster"))
-    tmdb_poster = _stringify_preview_value(meta_data.get("tmdb_poster"))
+    category = _stringify_preview_value(meta_data.get("category")).upper()
+    # ``artwork_url`` and ``tmdb_poster_path`` are the current metadata
+    # contract for MOVIE/TV.  Keep the older fields as fallbacks so previews
+    # remain available for already-created temp metadata.
+    poster_url = _stringify_preview_value(meta_data.get("artwork_url")) or _stringify_preview_value(meta_data.get("poster"))
+    if category == "MUSIC":
+        poster_url = _music_cover_from_meta(meta_data, _stringify_preview_value(meta_data.get("webui_session_id")))
+    tmdb_poster = _stringify_preview_value(meta_data.get("tmdb_poster_path")) or _stringify_preview_value(meta_data.get("tmdb_poster"))
     if not poster_url and tmdb_poster:
         poster_url = tmdb_poster if tmdb_poster.startswith("http") else f"https://image.tmdb.org/t/p/w500{tmdb_poster}"
-    genres = _string_list_preview_values(meta_data.get("genres"))
+    music = _music_preview_from_meta(meta_data)
+    genres = _string_list_preview_values(meta_data.get("genres")) or list(music.get("genres", []))
     networks = _string_list_preview_values(meta_data.get("networks"))
     audiobook_bitrate = _stringify_preview_value(meta_data.get("audiobook_bitrate"))
     if audiobook_bitrate.isdigit():
@@ -1524,7 +1733,7 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
     return {
         "path": _stringify_preview_value(meta_data.get("path")) or fallback_path,
         "filename": Path(fallback_path).name,
-        "title": title,
+        "title": title or _stringify_preview_value(music.get("album")),
         "original_title": original_title,
         "year": _stringify_preview_value(meta_data.get("year")),
         "category": _stringify_preview_value(meta_data.get("category")),
@@ -1563,6 +1772,7 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
         "game_region": _stringify_preview_value(meta_data.get("game_region")),
         "game_system": _stringify_preview_value(meta_data.get("game_system")),
         "developer": _stringify_preview_value(meta_data.get("developer")),
+        "music": music,
         "awaiting_input": False,
         "input_type": None,
     }
@@ -1587,6 +1797,8 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
                         meta_data = enriched_meta
                     except Exception as err:
                         console.print(f"Execution preview cover enrichment failed for session {session_id}: {err}", markup=False)
+            if _stringify_preview_value(meta_data.get("category")).upper() == "MUSIC":
+                meta_data = {**meta_data, "webui_session_id": session_id}
             preview = _extract_execution_preview(meta_data, execution_path)
             preview["awaiting_input"] = bool(process_info.get("awaiting_input"))
             preview["input_type"] = process_info.get("input_type")
@@ -1637,6 +1849,7 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
         "game_region": "",
         "game_system": "",
         "developer": "",
+        "music": {},
         "awaiting_input": bool(process_info.get("awaiting_input")),
         "input_type": process_info.get("input_type"),
         "progress": _progress_items_for_process(process_info),
@@ -1651,8 +1864,26 @@ def _find_execution_preview_cover_file(session_id: str) -> Path | None:
     meta_uuid = _stringify_preview_value(resolved_meta.get("uuid")) if resolved_meta is not None else ""
     candidate_dirs: list[Path] = []
     if meta_uuid:
-        candidate_dirs.append(Path(__file__).parent.parent / "tmp" / meta_uuid)
-    candidate_dirs.append(Path(__file__).parent.parent / "tmp" / Path(execution_path).name)
+        release_tmp = Path(__file__).parent.parent / "tmp" / meta_uuid
+        candidate_dirs.append(release_tmp / "artwork")
+    release_tmp = Path(__file__).parent.parent / "tmp" / Path(execution_path).name
+    candidate_dirs.append(release_tmp / "artwork")
+
+    # A music sidecar cover may stay beside the release, while embedded art is
+    # extracted into tmp/MUSIC_COVER.*.  Never serve an arbitrary configured
+    # path: accept it only when it is inside this release's selected root.
+    if isinstance(resolved_meta, Mapping):
+        cover_path = _stringify_preview_value(resolved_meta.get("cover_path"))
+        if cover_path:
+            try:
+                candidate = Path(cover_path).resolve()
+                release_path = Path(execution_path).resolve()
+                release_root = release_path if release_path.is_dir() else release_path.parent
+                candidate.relative_to(release_root)
+                if candidate.is_file() and candidate.suffix.casefold() in {".jpg", ".jpeg", ".png", ".webp"}:
+                    return candidate
+            except OSError, ValueError:
+                pass
 
     seen: set[str] = set()
     for tmp_dir in candidate_dirs:
@@ -1660,11 +1891,83 @@ def _find_execution_preview_cover_file(session_id: str) -> Path | None:
         if tmp_dir_key in seen or not tmp_dir.exists():
             continue
         seen.add(tmp_dir_key)
-        for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg", "cover.jpg", "cover.png"):
+        for filename in (
+            "MUSIC_COVER.jpg",
+            "MUSIC_COVER.png",
+            "MUSIC_COVER.webp",
+            "POSTER.png",
+            "poster.png",
+            "POSTER.jpg",
+            "poster.jpg",
+            "cover.jpg",
+            "cover.png",
+            "cover.webp",
+            "manual_cover.jpg",
+            "music_cover.jpg",
+        ):
             candidate = tmp_dir / filename
-            if candidate.exists():
+            if candidate.is_file():
                 return candidate
     return None
+
+
+def _resolve_execution_review_temp_dir(meta_data: Mapping[str, object]) -> Path | None:
+    """Resolve a release temp directory from trusted execution metadata."""
+    meta_uuid = _stringify_preview_value(meta_data.get("uuid"))
+    if not meta_uuid:
+        return None
+    temp_root = (Path(__file__).parent.parent / "tmp").resolve()
+    try:
+        temp_dir = (temp_root / meta_uuid).resolve()
+        temp_dir.relative_to(temp_root)
+    except OSError, ValueError:
+        return None
+    if not temp_dir.is_dir():
+        return None
+    return temp_dir
+
+
+def _resolve_execution_screenshot_review(session_id: str) -> tuple[Path, Mapping[str, object]] | None:
+    """Resolve the current execution's screenshot directory without trusting client paths."""
+    _execution_path, meta_file, meta_data = _resolve_execution_preview_meta(session_id)
+    if meta_file is None or meta_data is None:
+        return None
+    temp_dir = _resolve_execution_review_temp_dir(meta_data)
+    if temp_dir is None:
+        return None
+    return temp_dir, meta_data
+
+
+def _resolve_execution_description_review(session_id: str) -> tuple[Path, Path, dict[str, object]] | None:
+    """Resolve the active description draft through the execution session only."""
+    _execution_path, meta_file, meta_data = _resolve_execution_preview_meta(session_id)
+    if meta_file is None or meta_data is None:
+        return None
+    temp_dir = _resolve_execution_review_temp_dir(meta_data)
+    if temp_dir is None:
+        return None
+    return temp_dir, meta_file, dict(meta_data)
+
+
+def _description_review_lock(temp_dir: Path) -> threading.Lock:
+    """Return the in-process mutation lock for one execution's description."""
+    key = str(temp_dir.resolve())
+    with _description_review_locks_lock:
+        return _description_review_locks.setdefault(key, threading.Lock())
+
+
+def _screenshot_review_meta(temp_dir: Path, meta_data: Mapping[str, object]) -> Mapping[str, object]:
+    """Include cached hosted images when a resumed run has not restored them into meta.json yet."""
+    result = dict(meta_data)
+    if result.get("image_list"):
+        return result
+    try:
+        cached = _json_load_dict((temp_dir / "image_data.json").read_text(encoding="utf-8"))
+    except Exception:
+        cached = None
+    if cached and isinstance(cached.get("image_list"), list):
+        result["image_list"] = cached["image_list"]
+    return result
 
 
 class BrowseItem(TypedDict, total=False):
@@ -1744,6 +2047,7 @@ class ExecutionPreview(TypedDict, total=False):
     game_region: str
     game_system: str
     developer: str
+    music: dict[str, object]
     awaiting_input: bool
     input_type: str | None
     progress: list[ProgressItem]
@@ -2752,7 +3056,7 @@ def login_page():
             if auth_mod.verify_user(username, password):
                 if _totp_enabled() and not (totp_code and _verify_totp_code(totp_code)):
                     _handle_failed_auth(get_remote_address())
-                    return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled())
+                    return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled(), setup_mode=False)
 
                 _session_set("authenticated", True)
                 with contextlib.suppress(Exception):
@@ -2772,18 +3076,18 @@ def login_page():
                 return resp
             # Credentials don't match persisted user
             _handle_failed_auth(get_remote_address())
-            return render_template("login.html", error="Credentials did not match")
+            return render_template("login.html", error="Credentials did not match", setup_mode=False)
         # No persisted user: allow UI-driven creation (first-run setup)
         if username and password:
             if _totp_enabled() and not (totp_code and _verify_totp_code(totp_code)):
                 _handle_failed_auth(get_remote_address())
-                return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled())
+                return render_template("login.html", error="Credentials did not match", show_2fa=_totp_enabled(), setup_mode=True)
             try:
                 auth_mod.create_user(username, password)
             except ValueError as exc:
-                return render_template("login.html", error=str(exc), show_2fa=_totp_enabled())
+                return render_template("login.html", error=str(exc), show_2fa=_totp_enabled(), setup_mode=True)
             except Exception:
-                return render_template("login.html", error="Unable to create account", show_2fa=_totp_enabled())
+                return render_template("login.html", error="Unable to create account", show_2fa=_totp_enabled(), setup_mode=True)
 
             _session_set("authenticated", True)
             with contextlib.suppress(Exception):
@@ -2806,11 +3110,11 @@ def login_page():
             return redirect(url_for("config_page"))
         # No username/password provided
         _handle_failed_auth(get_remote_address())
-        return render_template("login.html", error="Credentials did not match")
+        return render_template("login.html", error="Credentials did not match", setup_mode=True)
 
     # Show 2FA field if enabled
     show_2fa = _totp_enabled()
-    return render_template("login.html", show_2fa=show_2fa)
+    return render_template("login.html", show_2fa=show_2fa, setup_mode=_load_user_record() is None)
 
 
 @app.errorhandler(429)
@@ -3980,17 +4284,67 @@ def browse_search():
 
 
 @app.route("/api/execution_preview")
+@limiter.limit("7200 per hour", key_func=_rate_limit_key_func, override_defaults=True)
 def execution_preview():
     """Return the current media preview for an active execution session."""
+
+    def no_store(response: object) -> object:
+        response.headers["Cache-Control"] = "no-store, max-age=0"  # type: ignore[attr-defined]
+        return response
+
     session_id = str(request.args.get("session_id", "")).strip()
     if not session_id:
-        return jsonify({"success": False, "error": "Missing session_id"}), 400
+        return no_store(jsonify({"success": False, "error": "Missing session_id"})), 400
 
     preview = _find_execution_preview(session_id)
     if preview is None:
-        return jsonify({"success": False, "error": "Session not found"}), 404
+        return no_store(jsonify({"success": False, "error": "Session not found"})), 404
 
-    return jsonify({"success": True, "media": preview})
+    return no_store(jsonify({"success": True, "media": preview}))
+
+
+@app.route("/api/argument_presets", methods=["GET", "POST", "DELETE"])
+def argument_presets():
+    """Read and persist shared Web UI argument presets in ``data``."""
+    if not _is_authenticated():
+        return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    with _argument_presets_lock:
+        presets = _load_argument_presets()
+        if request.method == "GET":
+            return jsonify({"success": True, "presets": presets})
+
+        data = _request_json_dict()
+        name_value = data.get("name")
+        name = name_value.strip() if isinstance(name_value, str) else ""
+        if not name:
+            return jsonify({"success": False, "error": "Preset name is required"}), 400
+
+        if request.method == "DELETE":
+            next_presets = [preset for preset in presets if preset["name"].casefold() != name.casefold()]
+        else:
+            arguments_value = data.get("arguments")
+            arguments = arguments_value.strip() if isinstance(arguments_value, str) else ""
+            if not arguments:
+                return jsonify({"success": False, "error": "Preset arguments are required"}), 400
+            replacement = {"name": name, "arguments": arguments}
+            existing_index = next(
+                (index for index, preset in enumerate(presets) if preset["name"].casefold() == name.casefold()),
+                None,
+            )
+            if existing_index is None:
+                next_presets = [*presets, replacement][-MAX_ARGUMENT_PRESETS:]
+            else:
+                next_presets = presets.copy()
+                next_presets[existing_index] = replacement
+
+        try:
+            _save_argument_presets(next_presets)
+        except OSError:
+            return jsonify({"success": False, "error": "Failed to persist argument presets"}), 500
+        return jsonify({"success": True, "presets": next_presets})
 
 
 @app.route("/api/execution_preview_cover")
@@ -4006,6 +4360,223 @@ def execution_preview_cover():
 
     mimetype = mimetypes.guess_type(str(cover_file))[0] or "application/octet-stream"
     return send_file(cover_file, mimetype=mimetype, conditional=True, max_age=30)
+
+
+@app.route("/api/execution_screenshots")
+@limiter.limit("7200 per hour", key_func=_rate_limit_key_func, override_defaults=True)
+def execution_screenshots():
+    """List local FFmpeg screenshots belonging to the active execution only."""
+    session_id = str(request.args.get("session_id", "")).strip()
+    if not session_id:
+        return jsonify({"success": False, "error": "Missing session_id"}), 400
+    resolved = _resolve_execution_screenshot_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
+
+    from src.screenshot_review import image_version, list_review_items
+
+    temp_dir, meta_data = resolved
+    meta_data = _screenshot_review_meta(temp_dir, meta_data)
+    items = list_review_items(temp_dir, meta_data)
+    can_capture = not meta_data.get("is_disc") or meta_data.get("is_disc") == "BDMV"
+    return jsonify(
+        {
+            "success": True,
+            "can_add": bool(items) and can_capture,
+            "screenshots": [
+                {
+                    "id": item.id,
+                    "filename": item.path.name if item.path else f"Remote image {item.index + 1}",
+                    "size": item.path.stat().st_size if item.path else None,
+                    "source": item.source,
+                    "group": item.group,
+                    "image_url": (
+                        f"/api/execution_screenshots/{item.id}/image?session_id={session_id}&v={image_version(temp_dir, item.id, item.path.stat().st_mtime_ns)}"
+                        if item.path
+                        else str((item.remote_image or {}).get("img_url") or (item.remote_image or {}).get("raw_url") or "")
+                    ),
+                    "can_replace": can_capture and item.source != "addition",
+                    "can_delete": item.source in {"local", "addition"},
+                }
+                for item in items
+            ],
+        }
+    )
+
+
+@app.route("/api/execution_description")
+@limiter.limit("7200 per hour", key_func=_rate_limit_key_func, override_defaults=True)
+def execution_description():
+    """Return the editable base-description draft and its read-only sources."""
+    session_id = str(request.args.get("session_id", "")).strip()
+    resolved = _resolve_execution_description_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Description is not available yet"}), 404
+    from src.description_review import draft, source_items
+
+    temp_dir, _meta_file, meta_data = resolved
+    content, version = draft(meta_data, temp_dir)
+    return jsonify(
+        {
+            "success": True,
+            "content": content,
+            "version": version,
+            "sources": source_items(meta_data),
+        }
+    )
+
+
+@app.route("/api/execution_description", methods=["PUT"])
+def save_execution_description():
+    """Persist an edited draft for the current execution with optimistic locking."""
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+    payload = _request_json_dict()
+    session_id = _stringify_preview_value(payload.get("session_id"))
+    content = payload.get("content")
+    if not isinstance(content, str):
+        return jsonify({"success": False, "error": "Description content must be text"}), 400
+    if len(content) > 1_000_000:
+        return jsonify({"success": False, "error": "Description exceeds the 1,000,000-character limit"}), 413
+    resolved = _resolve_execution_description_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Description is not available yet"}), 404
+
+    from src.description_review import draft, save_review
+
+    requested_version = payload.get("version")
+    if not isinstance(requested_version, int):
+        return jsonify({"success": False, "error": "Description version is required"}), 400
+
+    temp_dir, _meta_file, _meta_data = resolved
+    with _description_review_lock(temp_dir):
+        # Reload while holding the release-specific lock so the version check and
+        # write form one compare-and-swap operation across browser tabs.
+        locked_resolved = _resolve_execution_description_review(session_id)
+        if locked_resolved is None:
+            return jsonify({"success": False, "error": "Description is not available yet"}), 404
+        temp_dir, _meta_file, meta_data = locked_resolved
+        _current_content, current_version = draft(meta_data, temp_dir)
+        if requested_version != current_version:
+            return jsonify({"success": False, "error": "Description changed in another browser tab", "version": current_version}), 409
+
+        next_version = current_version + 1
+        save_review(temp_dir, content, next_version)
+    return jsonify({"success": True, "content": content, "version": next_version})
+
+
+@app.route("/api/execution_description/reset", methods=["POST"])
+def reset_execution_description():
+    """Restore the draft from one of the read-only sources."""
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+    payload = _request_json_dict()
+    session_id = _stringify_preview_value(payload.get("session_id"))
+    source_key = _stringify_preview_value(payload.get("source_key"))
+    resolved = _resolve_execution_description_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Description is not available yet"}), 404
+    requested_version = payload.get("version")
+    if not isinstance(requested_version, int):
+        return jsonify({"success": False, "error": "Description version is required"}), 400
+
+    from src.description_review import draft, save_review, source_items
+
+    temp_dir, _meta_file, _meta_data = resolved
+    with _description_review_lock(temp_dir):
+        locked_resolved = _resolve_execution_description_review(session_id)
+        if locked_resolved is None:
+            return jsonify({"success": False, "error": "Description is not available yet"}), 404
+        temp_dir, _meta_file, meta_data = locked_resolved
+        source = next((item for item in source_items(meta_data) if item["key"] == source_key), None)
+        if source is None:
+            return jsonify({"success": False, "error": "Description source was not found"}), 404
+        content = source["content"]
+        _current_content, current_version = draft(meta_data, temp_dir)
+        if requested_version != current_version:
+            return jsonify({"success": False, "error": "Description changed in another browser tab", "version": current_version}), 409
+
+        next_version = current_version + 1
+        save_review(temp_dir, content, next_version)
+    return jsonify({"success": True, "content": content, "version": next_version})
+
+
+@app.route("/api/execution_screenshots/<screenshot_id>/image")
+def execution_screenshot_image(screenshot_id: str):
+    """Serve one reviewed local screenshot after resolving it through its session."""
+    session_id = str(request.args.get("session_id", "")).strip()
+    resolved = _resolve_execution_screenshot_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
+    from src.screenshot_review import list_review_items
+
+    temp_dir, meta_data = resolved
+    meta_data = _screenshot_review_meta(temp_dir, meta_data)
+    screenshot = next((item for item in list_review_items(temp_dir, meta_data) if item.id == screenshot_id), None)
+    if screenshot is None or screenshot.path is None:
+        return jsonify({"success": False, "error": "Screenshot not found"}), 404
+    response = send_file(screenshot.path, mimetype="image/png", conditional=True, max_age=0)
+    response.headers["Cache-Control"] = "no-store, max-age=0"  # type: ignore[attr-defined]
+    return response
+
+
+@app.route("/api/execution_screenshots/add", methods=["POST"])
+def add_execution_screenshot():
+    """Capture one extra local screenshot for the active execution."""
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+    payload = _request_json_dict()
+    session_id = _stringify_preview_value(payload.get("session_id"))
+    group = _stringify_preview_value(payload.get("group")) or "main"
+    resolved = _resolve_execution_screenshot_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
+    temp_dir, meta_data = resolved
+    meta_data = _screenshot_review_meta(temp_dir, meta_data)
+
+    try:
+        from src.screenshot_review import add_screenshot
+
+        asyncio.run(add_screenshot(temp_dir, meta_data, group))
+    except (FileNotFoundError, ValueError) as error:
+        return jsonify({"success": False, "error": str(error)}), 404
+    except Exception as error:
+        console.print(f"Screenshot add failed for {session_id}: {error}", markup=False)
+        return jsonify({"success": False, "error": "Could not add screenshot"}), 500
+    return jsonify({"success": True})
+
+
+@app.route("/api/execution_screenshots/<screenshot_id>/<action>", methods=["POST"])
+def mutate_execution_screenshot(screenshot_id: str, action: str):
+    """Delete or replace a reviewed frame with CSRF and same-origin protection."""
+    if action not in {"delete", "replace", "undo"}:
+        return jsonify({"success": False, "error": "Unsupported screenshot action"}), 404
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+    payload = _request_json_dict()
+    session_id = _stringify_preview_value(payload.get("session_id"))
+    resolved = _resolve_execution_screenshot_review(session_id)
+    if resolved is None:
+        return jsonify({"success": False, "error": "Screenshots are not available yet"}), 404
+    temp_dir, meta_data = resolved
+    meta_data = _screenshot_review_meta(temp_dir, meta_data)
+
+    try:
+        from src.screenshot_review import delete_screenshot, replace_screenshot, undo_remote_replacement
+
+        if action == "delete":
+            delete_screenshot(temp_dir, meta_data, screenshot_id)
+        elif action == "undo":
+            undo_remote_replacement(temp_dir, screenshot_id)
+        else:
+            asyncio.run(replace_screenshot(temp_dir, meta_data, screenshot_id))
+    except (FileNotFoundError, ValueError) as error:
+        return jsonify({"success": False, "error": str(error)}), 404
+    except Exception as error:
+        console.print(f"Screenshot {action} failed for {session_id}: {error}", markup=False)
+        return jsonify({"success": False, "error": f"Could not {action} screenshot"}), 500
+
+    return jsonify({"success": True})
 
 
 @app.route("/api/save_queue", methods=["POST"])
@@ -4498,6 +5069,9 @@ def execute_command():
 
                         # Run the upload main loop in a separate thread to avoid blocking SSE generator
                         def run_upload():
+                            previous_webui_active = os.environ.get("UA_WEBUI_ACTIVE")
+                            os.environ["UA_WEBUI_ACTIVE"] = "1"
+
                             def emit_progress(event: ProgressEvent) -> None:
                                 event_copy = dict(event)
                                 if not _session_state_is_current(session_id, process_state):
@@ -4559,6 +5133,10 @@ def execute_command():
                                         console.print("In-process run ended", markup=False)
                             finally:
                                 clear_progress_callback()
+                                if previous_webui_active is None:
+                                    os.environ.pop("UA_WEBUI_ACTIVE", None)
+                                else:
+                                    os.environ["UA_WEBUI_ACTIVE"] = previous_webui_active
                                 # Restore sys.argv in finally block
                                 # Restore patched console
                                 console_key = id(src_console.console)
@@ -4720,6 +5298,9 @@ def execute_command():
                     env = os.environ.copy()
                     env["PYTHONUNBUFFERED"] = "1"
                     env["PYTHONIOENCODING"] = "utf-8"
+                    # Preserve Rich OSC 8 links so ansi_to_html can turn them into
+                    # clickable anchors for the browser terminal.
+                    env["UA_WEBUI_FORCE_COLOR"] = "1"
                     # Disable Python output buffering
 
                     # Sanity-check the working directory used for the subprocess.

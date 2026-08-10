@@ -9,9 +9,10 @@ import aiofiles
 import httpx
 import langcodes
 
-from cogs.redaction import Redaction
+from src.cogs.redaction import Redaction
 from src.console import logger
 from src.meta import Meta
+from src.tracker_images import get_tracker_image_collection
 from src.trackers.common import Common
 from src.trackers.USENET.search_helpers import build_newznab_search_query, parse_newznab_dupes
 
@@ -28,7 +29,89 @@ class Curupira:
     auth_type = "other_api"
     tracker = "CURUPIRA"
     display_name = "Curupira"
-    banned_groups = ()
+    banned_groups = (
+        "4K4U",
+        "afm72",
+        "Alcaide_Kira",
+        "AROMA",
+        "ASM",
+        "Bandi",
+        "BiTOR",
+        "BLUDV",
+        "Bluespots",
+        "BOLS",
+        "CaNNIBal",
+        "Comando",
+        "d3g",
+        "DepraveD",
+        "EMBER",
+        "Emmid",
+        "FGT",
+        "FreetheFish",
+        "Garshasp",
+        "Ghost",
+        "Grym",
+        "HDS",
+        "Hi10",
+        "HiQVE",
+        "Hiro360",
+        "ImE",
+        "ION10",
+        "iVy",
+        "Judas",
+        "LAMA",
+        "Langbard",
+        "Lapumia",
+        "LION",
+        "MeGusta",
+        "Memoriadatv",
+        "MONOLITH",
+        "MRCS",
+        "NaNi",
+        "Natty",
+        "nikt0",
+        "OEPlus",
+        "OFT",
+        "OsC",
+        "Panda",
+        "PANDEMONiUM",
+        "PHOCiS",
+        "PiRaTeS",
+        "PYC",
+        "r00t",
+        "Ralphy",
+        "RARBG",
+        "RetroPeeps",
+        "RZeroX",
+        "S74Ll10n",
+        "SAMPA",
+        "Sicario",
+        "SiCFoI",
+        "Silence",
+        "SkipTT",
+        "SM737",
+        "SPDVD",
+        "STUTTERSHIT",
+        "SWTYBLZ",
+        "t3nzin",
+        "TAoE",
+        "TEKNO3D",
+        "Telly",
+        "TGx",
+        "Tigole",
+        "TSP",
+        "TSPxL",
+        "TWA",
+        "UnKn0wn",
+        "VXT",
+        "Vyndros",
+        "W32",
+        "Will1869",
+        "x0r",
+        "YIFY",
+        "YTS.MX",
+        "YTS",
+    )
     upload_url = f"{base_url}/v1/releases"
     torrent_url = f"{base_url}/releases/"
     supported_categories = ("TV", "MOVIE", "GAME", "BOOK")
@@ -237,32 +320,34 @@ class Curupira:
                 async with aiofiles.open(info_file_path, encoding="utf-8") as f:
                     return await f.read()
             except Exception as e:
-                logger.info(f"[bold red]Erro ao ler o arquivo de info em {info_file_path}: {e}[/bold red]")
+                logger.info(f"{self.tracker}: [bold red]Erro ao ler o arquivo de info em {info_file_path}: {e}[/bold red]")
                 return ""
         else:
             logger.info(f"[bold red]Arquivo de info não encontrado: {info_file_path}[/bold red]")
             return ""
 
     def get_cover(self, meta: Meta) -> str:
-        covers = meta.covers
-        if isinstance(covers, list) and len(covers) > 0:
-            raw_url = covers[0].get("raw_url")
-            if raw_url:
-                return str(raw_url)
+        covers = meta.hosted_artwork
+        if isinstance(covers, list):
+            for entry in covers:
+                if not isinstance(entry, dict):
+                    continue
+                raw_url = entry.get("raw_url")
+                if isinstance(raw_url, str) and raw_url.startswith("https://"):
+                    return raw_url
 
-        # Fallback to poster URL if remote
-        poster_url = meta.poster
-        if isinstance(poster_url, str) and poster_url.startswith(("http://", "https://")):
-            return poster_url
+        artwork_url = meta.artwork_url
+        if isinstance(artwork_url, str) and artwork_url.startswith("https://"):
+            return artwork_url
 
         return ""
 
     async def get_screens(self, meta: Meta) -> list[str]:
-        menu_images = [cast(dict[str, Any], img) for img in meta.menu_images if isinstance(img, dict)]
-        images_value = meta.get(f"{self.tracker}_images_key", meta.image_list)
+        menu_images = [cast(dict[str, Any], img) for img in get_tracker_image_collection(meta, self.tracker, "menu_images") if isinstance(img, dict)]
+        images_value = get_tracker_image_collection(meta, self.tracker, "screenshots")
         image_entries: list[Any] = cast(list[Any], images_value) if isinstance(images_value, list) else []
         images_list = [cast(dict[str, Any], img) for img in image_entries if isinstance(img, dict)]
-        spectrograms_images = [cast(dict[str, Any], img) for img in meta.spectrograms_images if isinstance(img, dict)]
+        spectrograms_images = [cast(dict[str, Any], img) for img in get_tracker_image_collection(meta, self.tracker, "spectrograms_images") if isinstance(img, dict)]
 
         combined_images: list[dict[str, Any]] = []
         if menu_images:
@@ -364,19 +449,19 @@ class Curupira:
 
         files = await self._prepare_files(meta)
         if not files:
-            logger.error(f"[red]Error: NZB file not found for {self.tracker}.[/red]")
+            logger.error(f"{self.tracker}: [red]Error: NZB file not found for {self.tracker}.[/red]")
             status_dict["status_message"] = "data error: NZB file not found"
             return False
 
         data = await self._prepare_data(meta)
 
         if meta.debug:
-            logger.debug("[cyan]Curupira Upload (DEBUG MODE):[/cyan]")
-            logger.debug(f"URL: {self.upload_url}")
-            logger.debug(f"Category ID: {self.get_category_id(meta)}")
-            logger.debug("Fields:")
+            logger.debug(f"{self.tracker}: [cyan]Upload (DEBUG MODE):[/cyan]")
+            logger.debug(f"{self.tracker}: URL: {self.upload_url}")
+            logger.debug(f"{self.tracker}: Category ID: {self.get_category_id(meta)}")
+            logger.debug(f"{self.tracker}: Fields:")
             logger.debug(Redaction.redact_private_info(data))
-            logger.debug("Files:")
+            logger.debug(f"{self.tracker}: Files:")
             logger.debug({k: v[0] for k, v in files.items()})
 
             status_dict["status_message"] = "Debug mode enabled, skipping upload."
