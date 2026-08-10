@@ -176,7 +176,6 @@ def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
         "IS": "IMMORTALSEED",
         "IPT": "IPTORRENTS",
         "MKO": "MAKINGOFF",
-        "MTV": "MORETHANTV",
         "MTEAM": "MTEAM",
         "NBL": "NEBULANCE",
         "LAJIDUI": "LAJIDUI",

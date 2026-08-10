@@ -359,10 +359,6 @@ class QbittorrentClientMixin:
         qbt_session: httpx.AsyncClient | None = None,
         proxy_url: str | None = None,
     ) -> str | None:
-        trackers_config = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-        mtv_config_value = trackers_config.get("MORETHANTV", {})
-        mtv_config = cast(dict[str, Any], mtv_config_value) if isinstance(mtv_config_value, dict) else {}
-        prefer_small_pieces = bool(mtv_config.get("prefer_mtv_torrent", False))
         logger.debug("[green]Searching qBittorrent for an existing .torrent")
 
         torrent_storage_dir = client.get("torrent_storage_dir")
@@ -404,7 +400,6 @@ class QbittorrentClientMixin:
             Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
             # **Step 1: Find correct torrents using content_path**
-            best_match: dict[str, Any] | None = None
             matching_torrents: list[dict[str, Any]] = []
 
             try:
@@ -517,7 +512,6 @@ class QbittorrentClientMixin:
 
             # **Step 2: Extract and Save .torrent Files**
             processed_hashes: set[str] = set()
-            best_match = None
             video_only_fallback: str | None = None
             torrent_hash: str | None = None
             for matching_torrent in matching_torrents:
@@ -600,32 +594,12 @@ class QbittorrentClientMixin:
                         else:
                             logger.debug(f"[yellow]Skipping partial-subtitle torrent as fallback: {torrent_hash}")
                         continue
-                    if prefer_small_pieces:
-                        # **Track best match based on piece size**
-                        try:
-                            torrent_data = Torrent.read(torrent_file_path)
-                            piece_size = torrent_data.piece_size
-                            best_piece_size_raw_value: Any = best_match.get("piece_size") if best_match else None
-                            best_piece_size: int | None = best_piece_size_raw_value if isinstance(best_piece_size_raw_value, int) else None
-                            if best_match is None or (best_piece_size is not None and piece_size < best_piece_size):
-                                best_match = {"hash": torrent_hash, "torrent_path": torrent_path if torrent_path else torrent_file_path, "piece_size": piece_size}
-                                logger.info(f"[green]Updated best match: {best_match}")
-                        except Exception as e:
-                            logger.info(f"[bold red]Error reading torrent data for {torrent_hash}: {e}")
-                            continue
-                    else:
-                        # If `prefer_small_pieces` is False, return first valid torrent
-                        logger.debug(f"[green]Returning first valid torrent: {torrent_hash}")
-                        return torrent_hash
-                else:
-                    logger.debug(f"[bold red]{torrent_hash} failed validation")
-                    torrent_file_path.unlink()
+                    logger.debug(f"[green]Returning first valid torrent: {torrent_hash}")
+                    return torrent_hash
+                logger.debug(f"[bold red]{torrent_hash} failed validation")
+                torrent_file_path.unlink()
 
-            # **Return the best match if `prefer_small_pieces` is enabled**
-            if best_match:
-                logger.info(f"[green]Using best match torrent with hash: {best_match['hash']}")
-                result = str(best_match["hash"]) if "hash" in best_match else None
-            elif video_only_fallback:
+            if video_only_fallback:
                 logger.info(f"[yellow]No matching torrent with all local subtitles found; using video-only fallback: {video_only_fallback}")
                 result = video_only_fallback
             else:
@@ -1044,19 +1018,8 @@ class QbittorrentClientMixin:
         start_time = time.time()
         logger.debug(f"[yellow]Searching for torrents in qBittorrent for path: {content_path}[/yellow]")
         try:
-            trackers_config = cast(dict[str, Any], self.config.get("TRACKERS", {}))
-            mtv_config_value = trackers_config.get("MORETHANTV", {})
-            mtv_config = cast(dict[str, Any], mtv_config_value) if isinstance(mtv_config_value, dict) else {}
             piece_limit = bool(self.config["DEFAULT"].get("prefer_max_16_torrent", False))
-            mtv_torrent = bool(mtv_config.get("prefer_mtv_torrent", False))
-            piece_size_constraints_enabled: str | bool
-            # MORETHANTV preference takes priority as it's more restrictive (8 MiB vs 16 MiB)
-            if mtv_torrent:
-                piece_size_constraints_enabled = "MORETHANTV"
-            elif piece_limit:
-                piece_size_constraints_enabled = "16MiB"
-            else:
-                piece_size_constraints_enabled = False
+            piece_size_constraints_enabled: str | bool = "16MiB" if piece_limit else False
 
             meta.piece_size_constraints_enabled = piece_size_constraints_enabled
 
@@ -1109,10 +1072,7 @@ class QbittorrentClientMixin:
                     constraints_enabled = meta.piece_size_constraints_enabled
 
                     stop_due_to_constraints = (
-                        not constraints_enabled
-                        or found_piece_size == "no_constraints"
-                        or found_piece_size == "MORETHANTV"
-                        or (found_piece_size == "16MiB" and constraints_enabled == "16MiB")
+                        not constraints_enabled or found_piece_size == "no_constraints" or (found_piece_size == "16MiB" and constraints_enabled == "16MiB")
                     )
                     should_stop = stop_due_to_constraints
 
@@ -1585,12 +1545,9 @@ class QbittorrentClientMixin:
             Path(extracted_torrent_dir).mkdir(parents=True, exist_ok=True)
 
             # Set up piece size preference logic
-            mtv_config = self.config.get("TRACKERS", {}).get("MORETHANTV", {})
-            prefer_small_pieces = mtv_config.get("prefer_mtv_torrent", False)
             piece_limit = self.config["DEFAULT"].get("prefer_max_16_torrent", False)
 
-            # Use piece preference if MORETHANTV preference is true, otherwise use general piece limit
-            use_piece_preference = prefer_small_pieces or piece_limit
+            use_piece_preference = piece_limit
             piece_size_best_match: dict[str, Any] | None = None  # Track the best match for fallback if piece preference is enabled
             subtitle_fallback: dict[str, str] | None = None
             found_valid_torrent = False
@@ -1617,13 +1574,8 @@ class QbittorrentClientMixin:
                         try:
                             torrent_data = Torrent.read(torrent_file_path)
                             piece_size = torrent_data.piece_size
-                            # For prefer_small_pieces: prefer smallest pieces
-                            # For piece_limit: prefer torrents with piece size <= 16 MiB (16777216 bytes)
                             is_better_match = False
-                            if prefer_small_pieces:
-                                # MORETHANTV preference: always prefer smaller pieces
-                                is_better_match = True if piece_size_best_match is None else piece_size < piece_size_best_match["piece_size"]
-                            elif piece_limit and piece_size <= 16777216:
+                            if piece_limit and piece_size <= 16777216:
                                 # General preference: prefer <= 16 MiB pieces, then smaller within that range
                                 if piece_size_best_match is None:
                                     is_better_match = True
@@ -1681,13 +1633,8 @@ class QbittorrentClientMixin:
                                 try:
                                     torrent_data = Torrent.read(alt_torrent_file_path)
                                     piece_size = torrent_data.piece_size
-                                    # For prefer_small_pieces: prefer smallest pieces
-                                    # For piece_limit: prefer torrents with piece size <= 16 MiB (16777216 bytes)
                                     is_better_match = False
-                                    if prefer_small_pieces:
-                                        # MORETHANTV preference: always prefer smaller pieces
-                                        is_better_match = True if piece_size_best_match is None else piece_size < piece_size_best_match["piece_size"]
-                                    elif piece_limit and piece_size <= 16777216:
+                                    if piece_limit and piece_size <= 16777216:
                                         # General preference: prefer <= 16 MiB pieces, then smaller within that range
                                         if piece_size_best_match is None:
                                             is_better_match = True
@@ -1738,8 +1685,7 @@ class QbittorrentClientMixin:
             # **Return the best match if piece preference is enabled**
             if use_piece_preference and piece_size_best_match and not found_valid_torrent:
                 try:
-                    preference_type = "MORETHANTV preference" if prefer_small_pieces else "16 MiB piece limit"
-                    logger.info(f"[green]Using best match torrent ({preference_type}) with hash: {piece_size_best_match['hash']}")
+                    logger.info(f"[green]Using best match torrent (16 MiB piece limit) with hash: {piece_size_best_match['hash']}")
                     await TorrentCreator.create_base_from_existing_torrent(piece_size_best_match["torrent_path"], meta.base_dir, meta.uuid)
                     if meta.debug:
                         piece_size_mib = piece_size_best_match["piece_size"] / 1024 / 1024
@@ -1751,9 +1697,7 @@ class QbittorrentClientMixin:
 
                     # Check if the best match actually meets the piece size constraint
                     piece_size = piece_size_best_match["piece_size"]
-                    if prefer_small_pieces and piece_size <= 8388608:  # 8 MiB
-                        meta.found_preferred_piece_size = "MORETHANTV"
-                    elif piece_limit and piece_size <= 16777216:  # 16 MiB
+                    if piece_limit and piece_size <= 16777216:  # 16 MiB
                         meta.found_preferred_piece_size = "16MiB"
                     else:
                         # Found a torrent but it doesn't meet the constraint

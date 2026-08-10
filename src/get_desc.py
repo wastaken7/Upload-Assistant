@@ -1158,15 +1158,6 @@ class DescriptionBuilder:
                 bd_info = await self.get_bdinfo_section(meta)
                 if bd_info:
                     desc_parts.append(f"[left][font=consolas]{bd_info}[/font][/left]")
-            elif self.tracker == "MORETHANTV":
-                mediainfo_sec = await self.get_mediainfo_section(meta)
-                if mediainfo_sec:
-                    desc_parts.append(f"[mediainfo]{mediainfo_sec}[/mediainfo]\n\n")
-                bd_info = await self.get_bdinfo_section(meta)
-                if bd_info:
-                    desc_parts.append(f"[mediainfo]{bd_info}[/mediainfo]\n\n")
-                if meta.is_disc == "DVD" and isinstance(meta.discs, list) and len(meta.discs) > 0 and "vob_mi" in meta.discs[0]:
-                    desc_parts.append(f"[mediainfo]{meta.discs[0]['vob_mi']}[/mediainfo]\n\n")
             elif self.tracker == "TORRENTLEECH":
                 mediainfo_sec = await self.get_mediainfo_section(meta)
                 if mediainfo_sec:
@@ -1249,12 +1240,7 @@ class DescriptionBuilder:
                     if meta_description:
                         desc_parts.append(meta_description)
             elif meta_description:
-                if self.tracker == "MORETHANTV":
-                    meta_description = re.sub(r"\[/?quote\]", "", meta_description, flags=re.IGNORECASE).strip()
-                    if meta_description:
-                        desc_parts.append(f"[spoiler=Notes]{meta_description}[/spoiler]")
-                else:
-                    desc_parts.append(meta_description)
+                desc_parts.append(meta_description)
 
         # NFO details
         if nfo:
@@ -1970,8 +1956,6 @@ class DescriptionBuilder:
             if "imgbox" not in web_url:
                 return f"[url={web_url}][img]{img_url}[/img][/url]\n"
             return f"[url={web_url}][img]{img_url}[/img][/url] "
-        if self.tracker == "MORETHANTV":
-            return f"[url={raw_url}][img={thumb_size}]{img_url}[/img][/url] "
         return f"[url={web_url}][img={thumb_size}]{raw_url}[/img][/url] "
 
     def tracker_specific_formats(self, tracker: str, description: str) -> str:

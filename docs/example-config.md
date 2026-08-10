@@ -24,7 +24,7 @@ The config is a Python dict named `config` with these top-level sections:
 Notes:
 
 - Many numeric values are stored as strings (e.g. `"4"`, `"14000"`). Keep the same type unless you know a specific option is numeric.
-- Tracker lists are usually a comma-separated string using tracker identifiers (e.g. `"MORETHANTV, BEYONDHD"`).
+- Tracker lists are usually a comma-separated string using tracker identifiers (e.g. `"BEYONDHD, AITHER"`).
 
 ## How Upload Assistant uses this config (implementation context)
 
@@ -278,7 +278,7 @@ A comma-separated list of tracker identifiers to upload to by default.
 Example:
 
 ```python
-"default_trackers": "MORETHANTV, BEYONDHD, AITHER"
+"default_trackers": "BEYONDHD, AITHER"
 ```
 
 ### Per-tracker blocks
