@@ -441,7 +441,7 @@ def autofill_missing_keys(config_data: ConfigDict, example_config: ConfigDict) -
                         # Match by "torrent_client" property
                         client_type = client_settings.get("torrent_client")
                         if client_type:
-                            for _template_name, template_settings in example_section.values():
+                            for _template_name, template_settings in example_section.items():
                                 if isinstance(template_settings, dict) and template_settings.get("torrent_client") == client_type:
                                     example_client = template_settings
                                     break
