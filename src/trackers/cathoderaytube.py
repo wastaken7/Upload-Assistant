@@ -84,12 +84,13 @@ class CathodeRayTube:
     async def get_name(self, meta: Meta) -> str:
         """Format CRT titles according to its category-specific upload rules."""
         name = str(meta.title or meta.name).strip()
+        aka = str(meta.aka or "").strip()
         year = str(meta.year or "").strip()
         edition = str(meta.edition or "").strip()
         category = str(meta.category).upper()
 
         if category == "MOVIE":
-            return " ".join(part for part in (name, f"({year})" if year else "", edition) if part)
+            return " ".join(part for part in (name, aka, f"({year})" if year else "", edition) if part)
 
         if category == "TV":
             season = str(meta.season or "").strip()
