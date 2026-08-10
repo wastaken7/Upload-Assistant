@@ -881,6 +881,18 @@ const argumentCategories = [
     ],
   },
   {
+    title: "Dynamic HDR Metadata",
+    subtitle:
+      "Generates separate metadata plots only when the release contains Dolby Vision and/or HDR10+ dynamic metadata.",
+    args: [
+      {
+        label: "--dynamic-hdr-plot",
+        description:
+          "Generate and upload Dolby Vision and HDR10+ metadata plots. Required tools download automatically on first use.",
+      },
+    ],
+  },
+  {
     title: "Misc Options",
     args: [
       {

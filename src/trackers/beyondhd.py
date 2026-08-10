@@ -270,7 +270,7 @@ class BEYONDHD:
     async def edit_desc(self, meta: Meta) -> None:
         desc_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt"
         base = get_base_description(meta)
-        for collection_name in ("menu_images", "spectrograms_images"):
+        for collection_name in ("menu_images", "spectrograms_images", "dynamic_hdr_plot_images"):
             original_images = getattr(meta, collection_name, [])
             rehosted_images = get_tracker_image_collection(meta, self.tracker, collection_name)
             if not isinstance(original_images, list) or not isinstance(rehosted_images, list):

@@ -638,6 +638,28 @@ class DescriptionBuilder:
             logger.warning(f"[yellow]Warning: Error getting audio spectrogram section: {e!s}[/yellow]")
         return ""
 
+    async def get_dynamic_hdr_plot_section(self, meta: Meta) -> str:
+        """Return Dolby Vision/HDR10+ dynamic metadata plots, when enabled."""
+        if not (meta.dynamic_hdr_plot or self._get_bool_config("add_dynamic_hdr_plot", False)):
+            return ""
+        plot_images = get_tracker_image_collection(meta, self.tracker, "dynamic_hdr_plot_images")
+        if not plot_images:
+            return ""
+        header = self._get_str_config("dynamic_hdr_plot_header", "[center][b]Dynamic HDR Metadata[/b][/center]")
+        desc_parts: list[str] = [header] if header is not None else []
+        desc_parts.append("\n[center]")
+        for image in plot_images:
+            if not isinstance(image, dict):
+                continue
+            web_url = image.get("web_url")
+            raw_url = image.get("raw_url")
+            img_url = image.get("img_url", raw_url) or ""
+            if web_url and raw_url:
+                desc_parts.append(self.format_screenshot(web_url, raw_url, img_url))
+                desc_parts.append("\n")
+        desc_parts.append("[/center]\n")
+        return "".join(desc_parts)
+
     def _build_book_desc_section(self, meta: Meta, header_size: int = 0, table: bool = True, underline: bool = False, bullet: str = "") -> str:
         """Build the BBCode table or list for BOOK-category uploads."""
         if self.tracker in ("TORRENTLEECH", "IMMORTALSEED", "IPTORRENTS", "SPEEDAPP"):
@@ -1074,6 +1096,7 @@ class DescriptionBuilder:
         ua_signature: bool,
         user_description: bool,
         music: bool = True,
+        dynamic_hdr_plot: bool = True,
         approved_image_hosts: list[str] | None = None,
         signature: str = "",
         desc_header: str = "",
@@ -1278,6 +1301,10 @@ class DescriptionBuilder:
         # Audio Spectrograms
         if audio_spectrogram:
             desc_parts.append(await self.get_audio_spectrogram_section(meta))
+
+        # Dynamic HDR metadata plots (Dolby Vision / HDR10+)
+        if dynamic_hdr_plot:
+            desc_parts.append(await self.get_dynamic_hdr_plot_section(meta))
 
         # Custom Signature
         if custom_signature:

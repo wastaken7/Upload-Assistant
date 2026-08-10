@@ -10,6 +10,8 @@ from pathlib import Path
 import aiofiles
 import httpx
 
+from bin.download_integrity import verify_downloaded_asset
+
 try:
     from src.console import console, logger
 except ImportError:
@@ -132,6 +134,7 @@ class MkbrrBinaryManager:
                     async for chunk in response.aiter_bytes(chunk_size=8192):
                         await f.write(chunk)
             logger.debug(f"[green]Downloaded {file_pattern}[/green]")
+            verify_downloaded_asset(temp_archive, f"mkbrr_{version[1:]}_{file_pattern}")
 
             if file_pattern.endswith(".zip"):
                 with zipfile.ZipFile(temp_archive, "r") as zip_ref:
@@ -284,6 +287,7 @@ class MkbrrBinaryManager:
                         f.write(chunk)
 
             logger.info(f"Downloaded {file_pattern}", extra={"markup": False})
+            verify_downloaded_asset(temp_archive, f"mkbrr_{version[1:]}_{file_pattern}")
 
             with tarfile.open(temp_archive, "r:gz") as tar_ref:
 

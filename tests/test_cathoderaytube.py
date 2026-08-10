@@ -51,6 +51,7 @@ def meta(**overrides):
         "image_list": [],
         "menu_images": [],
         "spectrograms_images": [],
+        "dynamic_hdr_plot_images": [],
         "tracker_image_collections": {},
         "screens": 6,
         "base_dir": ".",
@@ -113,7 +114,7 @@ def test_uses_the_image_hosts_approved_by_crt():
 def test_cover_uses_only_an_approved_image_host():
     site = tracker()
     assert site.get_cover(meta(tmdb_poster_path="/poster.jpg", artwork_url="https://image.tmdb.org/t/p/w500/poster.jpg")) == ""  # noqa: S101
-    assert (
+    assert (  # noqa: S101
         site.get_cover(
             meta(
                 tmdb_poster_path="/poster.jpg",
@@ -319,3 +320,9 @@ def test_extracts_successful_upload_url():
     request = httpx.Request("POST", "https://www.cathode-ray.tube/torrents.php?id=123&torrentid=456")
     response = httpx.Response(200, request=request)
     assert CathodeRayTube._uploaded_torrent_url(response).endswith("id=123&torrentid=456")  # noqa: S101
+
+
+def test_excludes_images_without_raw_url_from_screenshot_validation():
+    valid_images = [{"raw_url": f"https://images.example/{index}.png"} for index in range(5)]
+
+    assert not asyncio.run(tracker().get_additional_checks(meta(image_list=valid_images, dynamic_hdr_plot_images=[{}])))  # noqa: S101

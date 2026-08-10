@@ -7,10 +7,15 @@ Docker-specific script to download bdinfo binaries for Linux containers.
 import os
 import platform
 import shutil
+import sys
 import tarfile
 from pathlib import Path
 
 import requests
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from bin.download_integrity import verify_downloaded_asset
 
 try:
     from src.console import console, logger
@@ -122,6 +127,7 @@ def download_bdinfo_for_docker(base_dir: Path = Path("/Upload-Assistant"), versi
 
     temp_archive = bin_dir / f"temp_{file_pattern}"
     download_file(download_url, temp_archive)
+    verify_downloaded_asset(temp_archive, file_pattern)
 
     logger.info(f"Extracting {temp_archive} to {bin_dir}", extra={"markup": False})
     secure_extract_tar(temp_archive, bin_dir)

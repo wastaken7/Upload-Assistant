@@ -135,6 +135,9 @@ Implementation notes:
 - `process_limit` (str): Max number of screenshot optimization processes.
 - `threads` (str): Thread limit per process during image optimization.
 - `ffmpeg_limit` (bool): Limit CPU usage when running ffmpeg.
+- `add_dynamic_hdr_plot` (bool): Generate and add Dolby Vision/HDR10+ metadata plots when dynamic metadata is detected. The required tools download automatically on first use. Extraction reads each selected video file in full and can take a while for large releases.
+- `dynamic_hdr_plot_header` (str): BBCode header used above dynamic HDR plots.
+- `dynamic_hdr_plot_max_files` (int): Maximum video files to plot for a multi-file release (default: `1`).
 
 Implementation notes:
 

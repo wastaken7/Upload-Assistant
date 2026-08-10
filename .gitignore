@@ -19,9 +19,11 @@ data/web_ui/*.py
 requirements.txt
 docker-compose.yml
 Dockerfile
-bin/mkbrr/*
-bin/bdinfo/*
 bin/7z/*
+bin/bdinfo/*
+bin/mkbrr/*
+bin/dovi_tool/*
+bin/hdr10plus_tool/*
 bin/nyuu/*
 bin/par2/*
 bin/pesto/*

@@ -52,6 +52,8 @@ Below is the detailed list of configuration variables that affect description bu
 - `audio_spectrogram_duration` (Integer): Seconds to analyse from each selected stream (default: `600`).
 - `audio_spectrogram_sample_rate` (Integer): Decode rate for analysis (default: `48000`, preserving frequencies up to 24 kHz).
 - `audio_spectrogram_max_files` (Integer): Maximum music tracks or audiobook chapters to process (default: `12`).
+- `add_dynamic_hdr_plot` (Boolean): If `True`, attaches Dolby Vision and HDR10+ metadata plot images to the description when applicable.
+- `dynamic_hdr_plot_header` (String): Custom BBCode header for dynamic HDR plots.
 
 ---
 

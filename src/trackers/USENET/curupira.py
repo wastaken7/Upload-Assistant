@@ -348,14 +348,13 @@ class Curupira:
         image_entries: list[Any] = cast(list[Any], images_value) if isinstance(images_value, list) else []
         images_list = [cast(dict[str, Any], img) for img in image_entries if isinstance(img, dict)]
         spectrograms_images = [cast(dict[str, Any], img) for img in get_tracker_image_collection(meta, self.tracker, "spectrograms_images") if isinstance(img, dict)]
+        dynamic_hdr_plot_images = [cast(dict[str, Any], img) for img in get_tracker_image_collection(meta, self.tracker, "dynamic_hdr_plot_images") if isinstance(img, dict)]
 
-        combined_images: list[dict[str, Any]] = []
-        if menu_images:
-            combined_images.extend(menu_images)
-        if images_list:
-            combined_images.extend(images_list)
-        if spectrograms_images:
-            combined_images.extend(spectrograms_images)
+        non_hdr_images = menu_images + images_list + spectrograms_images
+        valid_dynamic_hdr_plots = [image for image in dynamic_hdr_plot_images if isinstance(image.get("raw_url"), str) and image["raw_url"]]
+        # Curupira accepts at most six URLs. Reserve slots for metadata plots,
+        # which are appended after screenshots in the normal display order.
+        combined_images = non_hdr_images[: max(0, 6 - len(valid_dynamic_hdr_plots))] + valid_dynamic_hdr_plots
 
         urls: list[str] = []
         for image in combined_images:
@@ -363,7 +362,7 @@ class Curupira:
             if isinstance(raw_url, str) and raw_url:
                 urls.append(raw_url)
 
-        return urls
+        return urls[:6]
 
     async def _prepare_data(self, meta: Meta) -> dict[str, Any]:
         screenshot_urls = await self.get_screens(meta)

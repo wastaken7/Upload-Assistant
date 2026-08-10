@@ -319,6 +319,16 @@ class CathodeRayTube:
             links.append(meta.steam_url)
         return "\n".join(dict.fromkeys(links))
 
+    def _valid_screenshot_images(self, meta: Meta) -> list[dict[str, Any]]:
+        """Return CRT image records with usable raw URLs in publication order."""
+        collections = (
+            get_tracker_image_collection(meta, self.tracker, "menu_images"),
+            get_tracker_image_collection(meta, self.tracker, "screenshots"),
+            get_tracker_image_collection(meta, self.tracker, "spectrograms_images"),
+            get_tracker_image_collection(meta, self.tracker, "dynamic_hdr_plot_images"),
+        )
+        return [image for collection in collections for image in collection if isinstance(image, dict) and isinstance(image.get("raw_url"), str) and image["raw_url"]]
+
     async def generate_description(self, meta: Meta) -> str:
         """Render CRT's category-specific upload template from prepared metadata."""
         builder = DescriptionBuilder(self.tracker, self.config)
@@ -326,10 +336,7 @@ class CathodeRayTube:
         links = self._metadata_links(meta)
         overview = meta.overview or meta.overview_meta
         notes = "\n\n".join(part for part in (meta.description.strip(), await builder.get_user_description(meta)) if part)
-        images = get_tracker_image_collection(meta, self.tracker, "screenshots")
-        menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
-        spectrograms_images = get_tracker_image_collection(meta, self.tracker, "spectrograms_images")
-        screenshots = "\n".join(image["raw_url"] for image in (menu_images + images + spectrograms_images) if image.get("raw_url"))
+        screenshots = "\n".join(image["raw_url"] for image in self._valid_screenshot_images(meta))
 
         sections: list[str] = []
         if links:
@@ -412,10 +419,7 @@ class CathodeRayTube:
                 return False
 
             # Minimum 6 screenshots requirement
-            images = get_tracker_image_collection(meta, self.tracker, "screenshots")
-            menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
-            spectrograms_images = get_tracker_image_collection(meta, self.tracker, "spectrograms_images")
-            screens_count = len(menu_images) + len(images) + len(spectrograms_images)
+            screens_count = len(self._valid_screenshot_images(meta))
             if screens_count == 0 and hasattr(meta, "screens"):
                 try:
                     screens_count = int(meta.screens or 0)
