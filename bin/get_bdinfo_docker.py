@@ -7,10 +7,13 @@ Docker-specific script to download bdinfo binaries for Linux containers.
 import os
 import platform
 import shutil
+import sys
 import tarfile
 from pathlib import Path
 
 import requests
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from bin.download_integrity import verify_downloaded_asset
 
