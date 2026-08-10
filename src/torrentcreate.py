@@ -7,7 +7,6 @@ import os
 import platform
 import random
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -21,6 +20,7 @@ import torf
 from rich.progress import BarColumn, TaskProgressColumn, TextColumn
 from torf import Torrent
 
+from bin.get_mkbrr import MkbrrBinaryManager
 from src.console import console, is_cli_progress_suppressed, logger, progress_display
 from src.meta import Meta
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
@@ -602,9 +602,9 @@ class TorrentCreator:
     @staticmethod
     def get_mkbrr_path(meta: Meta) -> str:
         """Determine the correct mkbrr binary based on OS and architecture."""
-        system_mkbrr = shutil.which("mkbrr")
-        if system_mkbrr:
-            return system_mkbrr
+        existing_binary = MkbrrBinaryManager.find_existing_binary(meta.base_dir)
+        if existing_binary:
+            return existing_binary
 
         base_dir = Path(meta.base_dir) / "bin" / "mkbrr"
 
