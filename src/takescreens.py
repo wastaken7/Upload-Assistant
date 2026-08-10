@@ -667,7 +667,7 @@ async def dvd_screenshots(
             frame_rate = float(track.frame_rate)
     w_sar, h_sar = screenshot_par_scale_factors(width, height, par, dar)
 
-    async def _is_vob_good(n: int, loops: int, _num_screens: int) -> tuple[float, float]:
+    async def _is_vob_good(n: int, loops: int, _num_screens: int) -> tuple[float, int]:
         max_loops = 6
         fallback_duration = 300
         valid_tracks: list[dict[str, Any]] = []
@@ -696,10 +696,11 @@ async def dvd_screenshots(
             n = (n + 1) % len(main_set)
             loops += 1
 
-        return fallback_duration, 0.0
+        return fallback_duration, 0
 
     main_set = meta.discs[disc_num]["main_set"][1:] if len(meta.discs[disc_num]["main_set"]) > 1 else meta.discs[disc_num]["main_set"]
-    voblength, _vob_index = await _is_vob_good(0, 0, num_screens)
+    voblength, vob_index = await _is_vob_good(0, 0, num_screens)
+    capture_vob = main_set[vob_index]
     ss_times = await valid_ss_time([], num_screens, voblength, frame_rate, meta, retake=retry_cap)
     capture_tasks: list[Awaitable[tuple[int, str | None]]] = []
     existing_images_count = 0
@@ -707,7 +708,7 @@ async def dvd_screenshots(
 
     for i in range(num_screens + 1):
         image = str(screenshot_dir / f"{sanitized_disc_name}-{i}.png")
-        input_file = f"{meta.discs[disc_num]['path']}/VTS_{main_set[i % len(main_set)]}"
+        input_file = f"{meta.discs[disc_num]['path']}/VTS_{capture_vob}"
         if Path(image).exists() and not meta.retake:
             existing_images_count += 1
             existing_image_paths.append(image)
@@ -722,7 +723,7 @@ async def dvd_screenshots(
 
     for i in range(num_screens + 1):
         image = str(screenshot_dir / f"{sanitized_disc_name}-{i}.png")
-        input_file = f"{meta.discs[disc_num]['path']}/VTS_{main_set[i % len(main_set)]}"
+        input_file = f"{meta.discs[disc_num]['path']}/VTS_{capture_vob}"
         image_paths.append(image)
         input_files.append(input_file)
 
@@ -786,7 +787,7 @@ async def dvd_screenshots(
                 logger.info(f"[yellow]Retaking screenshot for: {image} (Attempt {attempt}/{retry_attempts})[/yellow]")
 
                 index = int(image.rsplit("-", 1)[-1].split(".")[0])
-                input_file = f"{meta.discs[disc_num]['path']}/VTS_{main_set[index % len(main_set)]}"
+                input_file = f"{meta.discs[disc_num]['path']}/VTS_{capture_vob}"
                 adjusted_time = random.uniform(0, voblength)  # nosec B311 - Random screenshot timing, not cryptographic  # noqa: S311
 
                 if Path(image).exists():  # Prevent unnecessary deletion error
