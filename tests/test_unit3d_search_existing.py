@@ -6,6 +6,7 @@ import pytest
 from src.meta import Meta
 from src.trackers.UNIT3D.aither import Aither
 from src.trackers.UNIT3D.samaritano import Samaritano
+from src.trackers.UNIT3D.torrentdesi import DesiTorrents
 
 
 class FakeResponse:
@@ -32,6 +33,12 @@ class FakeAsyncClient:
         _ = (url, headers)
         self.requests.append(params)
         return FakeResponse()
+
+
+def test_desitorrents_declares_metadata_id_endpoint() -> None:
+    tracker = DesiTorrents({"TRACKERS": {"DESITORRENTS": {}}})
+
+    assert tracker.id_url == "https://torrent.desi/api/v1/torrents/"  # noqa: S101
 
 
 @pytest.mark.parametrize("tracker_class", [Aither, Samaritano])
