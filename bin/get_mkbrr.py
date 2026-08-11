@@ -244,19 +244,10 @@ class MkbrrBinaryManager:
         if system != "linux":
             raise Exception(f"This script is for Docker/Linux only, detected: {system}")
 
-        platform_map = {
-            "x86_64": {"file": "linux_x86_64.tar.gz", "folder": "linux/amd64"},
-            "amd64": {"file": "linux_x86_64.tar.gz", "folder": "linux/amd64"},
-            "arm64": {"file": "linux_arm64.tar.gz", "folder": "linux/arm64"},
-            "aarch64": {"file": "linux_arm64.tar.gz", "folder": "linux/arm64"},
-            "armv7l": {"file": "linux_arm.tar.gz", "folder": "linux/arm"},
-            "arm": {"file": "linux_arm.tar.gz", "folder": "linux/arm"},
-        }
-
-        if machine not in platform_map:
+        platform_info = MkbrrBinaryManager.platform_map["linux"].get(machine)
+        if not platform_info:
             raise Exception(f"Unsupported architecture: {machine}")
 
-        platform_info = platform_map[machine]
         file_pattern = platform_info["file"]
         folder_path = platform_info["folder"]
 
