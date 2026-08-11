@@ -10,6 +10,7 @@ from typing import Any, cast
 import aiofiles
 from pymediainfo import MediaInfo
 
+from src.app_paths import CODE_DIR
 from src.console import logger
 from src.exceptions import NoAudioMediaError
 from src.meta import Meta
@@ -38,11 +39,11 @@ def validate_file_path(file_path: str) -> str:
     return str(path)
 
 
-def setup_mediainfo_library(base_dir: str) -> dict[str, Any] | None:
+def setup_mediainfo_library(_base_dir: str) -> dict[str, Any] | None:
     system = platform.system().lower()
 
     if system == "windows":
-        cli_path = Path(base_dir) / "bin" / "MI" / "windows" / "MediaInfo.exe"
+        cli_path = CODE_DIR / "bin" / "MI" / "windows" / "MediaInfo.exe"
         if Path(cli_path).exists():
             logger.debug(f"[blue]Windows MediaInfo CLI: {cli_path} (found)[/blue]")
             return {
@@ -54,7 +55,7 @@ def setup_mediainfo_library(base_dir: str) -> dict[str, Any] | None:
         return None
 
     if system == "linux":
-        lib_dir = Path(base_dir) / "linux" if base_dir.endswith("bin/MI") or base_dir.endswith("bin\\MI") else Path(base_dir) / "bin" / "MI" / "linux"
+        lib_dir = CODE_DIR / "bin" / "MI" / "linux"
 
         mediainfo_lib = Path(lib_dir) / "libmediainfo.so.0"
         mediainfo_cli = Path(lib_dir) / "mediainfo"

@@ -18,13 +18,10 @@ TARGET_GID="${PGID:-}"
 # ── Fix directory ownership (only possible when running as root) ──────
 if [ "$(id -u)" = "0" ]; then
     # Directories the app needs write access to
-    # - data, tmp: config, temp files
-    # - session_secret: when SESSION_SECRET_FILE points to a path that Docker
-    #   created as a directory (host path didn't exist), the app creates a
-    #   session_secret file inside it; the runtime user must be able to write
+    # - /state: config, caches and temporary release files
     # - /root/.config/upload-assistant: webui-auth mount; when PUID is set,
     #   the runtime user must traverse /root and write there
-    for dir in /Upload-Assistant/data /Upload-Assistant/tmp /Upload-Assistant/session_secret /root/.config/upload-assistant /Upload-Assistant/bin/dovi_tool /Upload-Assistant/bin/hdr10plus_tool; do
+    for dir in "${UA_DATA_DIR:-/state}" /root/.config/upload-assistant /Upload-Assistant/bin/dovi_tool /Upload-Assistant/bin/hdr10plus_tool; do
         # If the path already exists as a non-directory (e.g. a file bind-mount),
         # fix its ownership but don't try mkdir -p (which would fail under set -e).
         if [ -e "$dir" ] && [ ! -d "$dir" ]; then

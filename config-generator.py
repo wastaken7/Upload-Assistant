@@ -11,6 +11,7 @@ from typing import Any, TypedDict, cast
 from rich.console import Console
 from rich.text import Text
 
+from src.app_paths import CODE_DIR, CONFIG_PATH, DATA_DIR, LEGACY_CONFIG_PATH, ensure_data_dir
 from src.check_requirements import check_dependencies
 
 check_dependencies()
@@ -78,7 +79,7 @@ def tracker_sort_key(name: str) -> tuple[bool, bool, str]:
 
 def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
     """Read the example config file and return its structure and comments"""
-    example_path = Path("data/example_config.py")
+    example_path = CODE_DIR / "data" / "example_config.py"
     comments: ConfigComments = {}
 
     if not example_path.exists():
@@ -278,7 +279,7 @@ def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
 
 def load_existing_config() -> tuple[ConfigDict | None, Path | None]:
     """Load an existing config file if available"""
-    config_paths = [Path("data/config.py"), Path("data/config1.py")]
+    config_paths = [CONFIG_PATH, DATA_DIR / "config1.py", LEGACY_CONFIG_PATH]
 
     for path in config_paths:
         if path.exists():
@@ -296,7 +297,8 @@ def load_existing_config() -> tuple[ConfigDict | None, Path | None]:
                         console.print(f"\n[!] Error loading config from {path}: config is not a dict", markup=False)
                         continue
                     console.print(f"\n[OK] Found existing config at {path}", markup=False)
-                    return migrate_old_config(cast(ConfigDict, config_dict)), path
+                    destination = CONFIG_PATH if path == LEGACY_CONFIG_PATH else path
+                    return migrate_old_config(cast(ConfigDict, config_dict)), destination
             except Exception as e:
                 console.print(f"\n[!] Error loading config from {path}: {e}", markup=False)
 
@@ -989,7 +991,7 @@ def generate_config_file(
 ) -> bool:
     """Generate the config.py file from the config dictionary"""
     # Create output directory if it doesn't exist
-    Path("data").mkdir(parents=True, exist_ok=True)
+    ensure_data_dir()
 
     # Determine the output path
     if existing_path:
@@ -1001,8 +1003,9 @@ def generate_config_file(
                 dst.write(src.read())
             console.print(f"\n[OK] Created backup of existing config at {backup_path}", markup=False)
     else:
-        config_path = Path("data/config.py")
-        backup_path = Path("data/config.py.bak")
+        ensure_data_dir()
+        config_path = CONFIG_PATH
+        backup_path = DATA_DIR / "config.py.bak"
         if config_path.exists():
             overwrite = input(f"{config_path} already exists. Overwrite? (y/n): ").lower()
             if overwrite == "y":

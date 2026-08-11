@@ -21,6 +21,7 @@ from rich.progress import BarColumn, TaskProgressColumn, TextColumn
 from torf import Torrent
 
 from bin.get_mkbrr import MkbrrBinaryManager
+from src.app_paths import CODE_DIR
 from src.console import console, is_cli_progress_suppressed, logger, progress_display
 from src.meta import Meta
 from src.webui_progress import complete_progress, has_progress_callback, publish_progress
@@ -602,7 +603,7 @@ class TorrentCreator:
     @staticmethod
     def get_mkbrr_path(meta: Meta) -> str:
         """Determine the correct mkbrr binary based on OS and architecture."""
-        existing_binary = MkbrrBinaryManager.find_existing_binary(meta.base_dir)
+        existing_binary = MkbrrBinaryManager.find_existing_binary(CODE_DIR) or MkbrrBinaryManager.find_existing_binary(meta.base_dir)
         if existing_binary:
             return existing_binary
 
