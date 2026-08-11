@@ -4,6 +4,11 @@ import hashlib
 from pathlib import Path
 
 SHA256_BY_ASSET = {
+    "MediaInfo_CLI_26.05_Lambda_arm64.zip": "57268dcfc044cdcbe4641e26432392f002b7fa4bcb06e9d738be04cd047a2c1e",
+    "MediaInfo_CLI_26.05_Lambda_x86_64.zip": "1ae3744a78c93492b69f0b38bb2d1de1433c3eae04030ff1ea82ee1f60ac9a99",
+    "MediaInfo_CLI_26.05_Mac.dmg": "507605a7c8f1054a6996d99a4ef5b5a0711cfbf2f8ca2ef5161d6ee701ea8015",
+    "MediaInfo_CLI_26.05_Windows_ARM64.zip": "6b403fa1411730672adefa8d49d97cbf7163eed7fc5c1256c9a6e9f915fde1a8",
+    "MediaInfo_CLI_26.05_Windows_x64.zip": "f7f80620ce6d14f4995f0de6f98e3ef18ad29496db01899571152ee3311229f9",
     "mkbrr_1.24.0_windows_x86_64.zip": "23b923a26d50e3afabcd99938ea70a510904a98365f698bbeaae057ec1a51711",
     "mkbrr_1.24.0_darwin_arm64.tar.gz": "99c939d1b3e7329d1cf82c90adceb93291eefc34f72ca263577b9c4826172c1e",
     "mkbrr_1.24.0_darwin_x86_64.tar.gz": "26092fa6b59ec79ede4be8d09f9f6f3135af1ccf0f4df312215b2ed92691e7dd",

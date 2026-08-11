@@ -8,7 +8,7 @@ from typing import Any, cast
 import aiofiles
 
 from bin.get_bdinfo import BDInfoBinaryManager
-from bin.MI.get_linux_mi import download_dvd_mediainfo
+from bin.get_linux_mi import download_dvd_mediainfo
 from src.console import logger
 from src.discparse import DiscParse
 from src.meta import Meta

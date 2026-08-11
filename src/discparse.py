@@ -13,12 +13,12 @@ from typing import Any, cast
 import cli_ui
 import defusedxml.ElementTree as ElementTree
 from langcodes import Language
-from pymediainfo import MediaInfo
 from rich.progress import BarColumn, TaskProgressColumn, TextColumn
 
 from bin.get_playlist import MplsParser
 from src.console import console, logger, progress_display, prompt_in_thread
 from src.exportmi import setup_mediainfo_library
+from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.webui_progress import complete_progress, publish_progress
 
@@ -79,6 +79,15 @@ class DiscParse:
 
     def setup_mediainfo_for_dvd(self, base_dir: str | None) -> str | None:
         """Setup MediaInfo binary for DVD processing using the complete setup from exportmi"""
+        if base_dir is not None and platform.system().lower() == "linux":
+            dvd_dir = Path(base_dir) / "bin" / "MI" / "linux" / "dvd"
+            dvd_cli = dvd_dir / "mediainfo"
+            dvd_lib = dvd_dir / "libmediainfo.so.0"
+            if dvd_cli.is_file() and dvd_lib.is_file():
+                current_ld_path = os.environ.get("LD_LIBRARY_PATH", "")
+                if str(dvd_dir) not in current_ld_path.split(os.pathsep):
+                    os.environ["LD_LIBRARY_PATH"] = f"{dvd_dir}{os.pathsep}{current_ld_path}" if current_ld_path else str(dvd_dir)
+                return str(dvd_cli)
         if self.mediainfo_config is None:
             if base_dir is None:
                 return None

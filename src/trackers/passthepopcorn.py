@@ -14,7 +14,6 @@ import aiofiles
 import cli_ui
 import click
 import httpx
-from pymediainfo import MediaInfo
 from rich.markup import escape
 
 from src.bbcode import BBCODE
@@ -23,6 +22,7 @@ from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieValidator
 from src.exceptions import *  # noqa F403
 from src.exceptions import UploadError
+from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.rehostimages import ImageHostPolicy, RehostImagesManager
 from src.screenshot_manifest import files as manifest_files

@@ -792,7 +792,7 @@ def detect_newspaper(meta: Meta) -> None:
 
 async def get_audiobook_duration(filelist: list[str]) -> tuple[float, str]:
     """Calculate the sum of durations of all audio files in the file list using MediaInfo."""
-    from pymediainfo import MediaInfo
+    from src.mediainfo import MediaInfo
 
     audio_files = [f for f in filelist if Path(f).suffix.lower() in AUDIOBOOK_EXTENSIONS]
 
@@ -827,7 +827,7 @@ async def get_audiobook_duration(filelist: list[str]) -> tuple[float, str]:
 
 async def get_audiobook_bitrate(filelist: list[str]) -> int | None:
     """Calculate the average bitrate (in kbps) of a sample of audio files (max 5) in the file list using MediaInfo."""
-    from pymediainfo import MediaInfo
+    from src.mediainfo import MediaInfo
 
     audio_files = [f for f in filelist if Path(f).suffix.lower() in AUDIOBOOK_EXTENSIONS]
 

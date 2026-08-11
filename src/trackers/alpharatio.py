@@ -11,11 +11,11 @@ import aiofiles
 import cli_ui
 import httpx
 from bs4 import BeautifulSoup
-from pymediainfo import MediaInfo
 
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
 from src.exceptions import *  # noqa F403
+from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.trackers.common import Common
 

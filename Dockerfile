@@ -7,7 +7,6 @@ RUN apt-get update && \
     g++ \
     cargo \
     ffmpeg \
-    mediainfo \
     rustc \
     nano \
     ca-certificates \
@@ -30,17 +29,15 @@ RUN pip install --no-cache-dir --upgrade pip==25.3 wheel==0.45.1 requests==2.32.
 # ── Application setup ────────────────────────────────────────────────
 WORKDIR /Upload-Assistant
 
-# Copy DVD MediaInfo download script and run it
-# This downloads specialized MediaInfo binaries for DVD processing with language support
-COPY bin/get_dvd_mediainfo_docker.py bin/
-RUN python3 bin/get_dvd_mediainfo_docker.py
-
 # Copy the Python requirements file and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application
 COPY . .
+
+# Download the pinned official MediaInfo CLI used by the application.
+RUN python3 -c "import asyncio; from bin.get_mediainfo import MediaInfoBinaryManager; asyncio.run(MediaInfoBinaryManager.ensure_mediainfo_binary('/Upload-Assistant'))"
 
 # Preserve the built-in data/ directory outside the mount-point so that
 # volume mounts over /Upload-Assistant/data/ don't hide critical files
