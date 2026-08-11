@@ -1,5 +1,6 @@
 # ruff: noqa: S101
 import asyncio
+import subprocess
 from unittest.mock import Mock, patch
 
 import pytest
@@ -36,6 +37,14 @@ def test_text_reports_always_request_mediainfo_version() -> None:
         run_mediainfo("video.mkv", output="STRING", full=False)
 
     assert run.call_args.args[0] == ["mediainfo", "--inform_version=1", "video.mkv"]
+
+
+def test_mediainfo_timeout_becomes_runtime_error() -> None:
+    with patch("src.mediainfo._binary", return_value="mediainfo"), patch("src.mediainfo.subprocess.run", side_effect=subprocess.TimeoutExpired("mediainfo", 900)):
+        from src.mediainfo import run_mediainfo
+
+        with pytest.raises(RuntimeError, match="timed out"):
+            run_mediainfo("video.mkv")
 
 
 def test_all_supported_mediainfo_downloads_have_pinned_hashes() -> None:

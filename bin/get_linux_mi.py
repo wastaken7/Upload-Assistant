@@ -50,16 +50,18 @@ def extract_linux(cli_archive: Path, lib_archive: Path, output_dir: Path) -> Non
     with zipfile.ZipFile(cli_archive, "r") as zip_ref:
         mediainfo_file = output_dir / "mediainfo"
         member = next((name for name in zip_ref.namelist() if name.endswith("/mediainfo") or name == "mediainfo"), None)
-        if member is not None:
-            with zip_ref.open(member) as source, mediainfo_file.open("wb") as destination:
-                shutil.copyfileobj(source, destination)
+        if member is None:
+            raise RuntimeError("MediaInfo CLI archive does not contain mediainfo")
+        with zip_ref.open(member) as source, mediainfo_file.open("wb") as destination:
+            shutil.copyfileobj(source, destination)
 
     # Extract MediaInfo library
     with zipfile.ZipFile(lib_archive, "r") as zip_ref:
         lib_file = output_dir / "libmediainfo.so.0"
-        if "lib/libmediainfo.so.0.0.0" in zip_ref.namelist():
-            with zip_ref.open("lib/libmediainfo.so.0.0.0") as source, lib_file.open("wb") as destination:
-                shutil.copyfileobj(source, destination)
+        if "lib/libmediainfo.so.0.0.0" not in zip_ref.namelist():
+            raise RuntimeError("MediaInfo library archive does not contain libmediainfo.so.0.0.0")
+        with zip_ref.open("lib/libmediainfo.so.0.0.0") as source, lib_file.open("wb") as destination:
+            shutil.copyfileobj(source, destination)
 
 
 def download_dvd_mediainfo(base_dir: str) -> str | None:
@@ -116,7 +118,15 @@ def download_dvd_mediainfo(base_dir: str) -> str | None:
         download_file(lib_url, lib_archive)
         logger.debug(f"[green]Downloaded {lib_filename}[/green]")
 
-        extract_linux(cli_archive, lib_archive, output_dir)
+        with TemporaryDirectory(dir=output_dir.parent, prefix="mediainfo-dvd-") as staging_dir:
+            staging_dir_path = Path(staging_dir)
+            extract_linux(cli_archive, lib_archive, staging_dir_path)
+            staged_cli = staging_dir_path / "mediainfo"
+            staged_lib = staging_dir_path / "libmediainfo.so.0"
+            if not staged_cli.is_file() or not staged_lib.is_file():
+                raise RuntimeError("Failed to extract MediaInfo CLI and library for DVD processing")
+            staged_cli.replace(cli_file)
+            staged_lib.replace(lib_file)
 
         logger.debug("[green]Extracted library[/green]")
 

@@ -77,7 +77,7 @@ class DiscParse:
 
         return score
 
-    def setup_mediainfo_for_dvd(self, base_dir: str | None) -> str | None:
+    def setup_mediainfo_for_dvd(self, base_dir: str | None) -> tuple[str, dict[str, str]] | None:
         """Setup MediaInfo binary for DVD processing using the complete setup from exportmi"""
         if base_dir is not None and platform.system().lower() == "linux":
             dvd_dir = Path(base_dir) / "bin" / "MI" / "linux" / "dvd"
@@ -85,16 +85,16 @@ class DiscParse:
             dvd_lib = dvd_dir / "libmediainfo.so.0"
             if dvd_cli.is_file() and dvd_lib.is_file():
                 current_ld_path = os.environ.get("LD_LIBRARY_PATH", "")
-                if str(dvd_dir) not in current_ld_path.split(os.pathsep):
-                    os.environ["LD_LIBRARY_PATH"] = f"{dvd_dir}{os.pathsep}{current_ld_path}" if current_ld_path else str(dvd_dir)
-                return str(dvd_cli)
+                env = os.environ.copy()
+                env["LD_LIBRARY_PATH"] = f"{dvd_dir}{os.pathsep}{current_ld_path}" if current_ld_path else str(dvd_dir)
+                return str(dvd_cli), env
         if self.mediainfo_config is None:
             if base_dir is None:
                 return None
             self.mediainfo_config = setup_mediainfo_library(base_dir)
 
         if self.mediainfo_config and self.mediainfo_config["cli"]:
-            return self.mediainfo_config["cli"]
+            return str(self.mediainfo_config["cli"]), os.environ.copy()
         return None
 
     async def _run_bdinfo_with_progress(self, command: list[str], progress_id: str) -> int:
@@ -604,7 +604,8 @@ class DiscParse:
     """
 
     async def get_dvdinfo(self, discs: list[dict[str, Any]], base_dir: str | None = None) -> list[dict[str, Any]]:
-        mediainfo_binary = self.setup_mediainfo_for_dvd(base_dir)
+        mediainfo_config = self.setup_mediainfo_for_dvd(base_dir)
+        mediainfo_binary, mediainfo_env = mediainfo_config if mediainfo_config else (None, None)
 
         for each in discs:
             path = each.get("path")
@@ -629,7 +630,7 @@ class DiscParse:
                     try:
                         if mediainfo_binary:
                             process = await asyncio.create_subprocess_exec(
-                                mediainfo_binary, "--Output=JSON", ifo_file, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                                mediainfo_binary, "--Output=JSON", ifo_file, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=mediainfo_env
                             )
                             stdout, stderr = await process.communicate()
 
@@ -685,7 +686,9 @@ class DiscParse:
                 # Process VOB file
                 try:
                     if mediainfo_binary:
-                        process = await asyncio.create_subprocess_exec(mediainfo_binary, vob_basename, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                        process = await asyncio.create_subprocess_exec(
+                            mediainfo_binary, vob_basename, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=mediainfo_env
+                        )
                         stdout, stderr = await process.communicate()
 
                         if process.returncode == 0 and stdout:
@@ -708,7 +711,9 @@ class DiscParse:
                 # Process IFO file
                 try:
                     if mediainfo_binary:
-                        process = await asyncio.create_subprocess_exec(mediainfo_binary, ifo_basename, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                        process = await asyncio.create_subprocess_exec(
+                            mediainfo_binary, ifo_basename, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=mediainfo_env
+                        )
                         stdout, stderr = await process.communicate()
 
                         if process.returncode == 0 and stdout:

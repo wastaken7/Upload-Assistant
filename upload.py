@@ -2154,10 +2154,6 @@ async def update_notification(base_dir: str) -> str:
 
 
 async def do_the_thing(base_dir: str) -> None:
-    from bin.get_mediainfo import MediaInfoBinaryManager
-
-    await MediaInfoBinaryManager.ensure_mediainfo_binary(base_dir)
-
     # Reload config from disk so that changes made via the WebUI config
     # editor (or manual file edits between runs) are picked up.  The
     # module-level ``config`` dict is imported once at startup and would
@@ -2378,6 +2374,10 @@ async def do_the_thing(base_dir: str) -> None:
 
         if not meta.path:
             exit(0)
+
+        from bin.get_mediainfo import MediaInfoBinaryManager
+
+        await MediaInfoBinaryManager.ensure_mediainfo_binary(base_dir)
 
         path = meta.path
         path = str(Path(path).resolve())

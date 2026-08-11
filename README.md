@@ -210,7 +210,7 @@ For a manual Linux/macOS/Windows installation, Upload Assistant needs a few tool
 2. **MediaInfo & FFmpeg**:
    - These are helper tools used to scan files and generate screenshots/spectrograms.
    - The official MediaInfo CLI is downloaded and checksum-verified automatically on supported Windows, Linux, and macOS systems. Android/Termux uses its native `mediainfo` package (`pkg install mediainfo`).
-   - Install them using your system's software manager:
+   - Install FFmpeg using your system's software manager:
      - Debian/Ubuntu: `sudo apt install ffmpeg`
      - Arch Linux: `sudo pacman -S ffmpeg`
      - RedHat/Fedora: `sudo dnf install ffmpeg`

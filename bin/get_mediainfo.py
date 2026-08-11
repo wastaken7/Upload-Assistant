@@ -116,12 +116,8 @@ class MediaInfoBinaryManager:
                     info = zip_file.getinfo(member)
                     if stat.S_ISLNK(info.external_attr >> 16) or Path(member).is_absolute() or ".." in Path(member).parts:
                         raise RuntimeError(f"Unsafe MediaInfo archive member: {member}")
-                    extracted = binary.parent / member
-                    zip_file.extract(info, binary.parent)
-                    if extracted.resolve().parent != binary.parent.resolve() and binary not in extracted.resolve().parents:
-                        raise RuntimeError(f"MediaInfo archive member escapes target directory: {member}")
-                    if extracted != binary:
-                        shutil.move(str(extracted), str(binary))
+                    with zip_file.open(info) as source, binary.open("wb") as destination:
+                        shutil.copyfileobj(source, destination)
             elif archive_type == "dmg":
                 await cls._extract_macos_binary(archive, binary)
             else:
