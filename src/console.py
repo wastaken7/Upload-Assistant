@@ -159,13 +159,39 @@ class LogBufferHandler(logging.Handler):
         self.buffer.append(record)
 
 
-_log_buffer_lock = asyncio.Lock()
+_log_buffer_lock: asyncio.Lock | None = None
+_log_buffer_loop: asyncio.AbstractEventLoop | None = None
+_log_buffer_state_lock = threading.Lock()
+
+
+def _get_log_buffer_lock() -> asyncio.Lock:
+    """Return a lock owned by the active event loop.
+
+    The Web UI runs each in-process upload with a fresh ``asyncio.run`` call.
+    Asyncio locks cannot be reused after they have been bound to an earlier
+    event loop, so replace the lock once that earlier loop has stopped.
+    """
+    global _log_buffer_lock, _log_buffer_loop
+
+    current_loop = asyncio.get_running_loop()
+    with _log_buffer_state_lock:
+        if _log_buffer_loop is not current_loop:
+            if _log_buffer_loop is not None and _log_buffer_loop.is_running():
+                raise RuntimeError("Console log buffering cannot span concurrent event loops")
+            _log_buffer_loop = current_loop
+            _log_buffer_lock = None
+
+        lock = _log_buffer_lock
+        if lock is None:
+            lock = asyncio.Lock()
+            _log_buffer_lock = lock
+        return lock
 
 
 @contextlib.asynccontextmanager
 async def buffer_console_logs() -> AsyncGenerator[None]:
     """Temporarily hold console log output in memory while user prompts are active."""
-    async with _log_buffer_lock:
+    async with _get_log_buffer_lock():
         root_logger = logger
         original_rich_handlers = [h for h in root_logger.handlers if isinstance(h, RichHandler)]
         buffer_handler = LogBufferHandler()
