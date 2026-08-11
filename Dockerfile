@@ -41,7 +41,7 @@ RUN python3 -c "import asyncio; from bin.get_mediainfo import MediaInfoBinaryMan
 
 # Preserve the built-in data/ directory outside the mount-point so that
 # volume mounts over /Upload-Assistant/data/ don't hide critical files
-# (__init__.py, version.py, example-config.py, templates/).
+# (__init__.py, example-config.py, templates/).
 # At runtime the app restores any missing files from this copy.
 RUN rm -rf /Upload-Assistant/defaults \
     && mkdir -p /Upload-Assistant/defaults \
@@ -73,9 +73,12 @@ RUN mkdir -p /Upload-Assistant/bin/dovi_tool /Upload-Assistant/bin/hdr10plus_too
     && chown -R 1000:1000 /Upload-Assistant/bin/dovi_tool /Upload-Assistant/bin/hdr10plus_tool \
     && chmod -R o+rX /Upload-Assistant/bin/dovi_tool /Upload-Assistant/bin/hdr10plus_tool
 
-# Create tmp directory; world-writable so any UID can use it
-RUN mkdir -p /Upload-Assistant/tmp && chmod 1777 /Upload-Assistant/tmp
-ENV TMPDIR=/Upload-Assistant/tmp
+# All runtime state belongs outside the application checkout.  Mount /state to
+# persist configuration, caches, and temporary release artifacts.
+RUN mkdir -p /state && chmod 1777 /state
+ENV UA_DATA_DIR=/state
+ENV TMPDIR=/state/tmp
+ENV MPLCONFIGDIR=/state/matplotlib
 
 # ── Runtime metadata ─────────────────────────────────────────────────
 # Document the WebUI port (informational only; does not publish the port)

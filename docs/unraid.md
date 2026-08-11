@@ -63,9 +63,8 @@ docker run \
   --network=htpc \
   --entrypoint tail \
   -v '/mnt/user/share_media':'/data':'rw' \
-  -v '/mnt/user/appdata/upload-assistant/config.py':'/Upload-Assistant/data/config.py':'rw' \
+  -v '/mnt/user/appdata/upload-assistant':'/state':'rw' \
   -v '/mnt/user/appdata/qbittorrent/qBittorrent/BT_backup/':'/BT_backup':'rw' \
-  -v '/mnt/user/appdata/upload-assistant/tmp':'/Upload-Assistant/tmp':'rw' 'ghcr.io/wastaken7/upload-assistant:latest' \
   -f /dev/null
 docker exec -it upload-assistant-cli /bin/sh
 ## After this, you can python3 upload.py --help
@@ -107,9 +106,8 @@ services:
     command: -f /dev/null
     volumes:
       - /mnt/user/Data/torrents/:/data/torrents/:rw #map this to qbit download location, map exactly as qbittorent template on both sides.
-      - /mnt/user/appdata/Upload-Assistant/data/config.py:/Upload-Assistant/data/config.py:rw #map this to config.py exactly
+      - /mnt/user/appdata/Upload-Assistant:/state:rw #persistent application state
       - /mnt/user/appdata/qBittorrent/data/BT_backup/:/torrent_storage_dir:rw #map this to your qbittorrent bt_backup
-      - /mnt/user/appdata/Upload-Assistant/tmp/:/Upload-Assistant/tmp:rw #map this to your /tmp folder.
 networks:
   "changemetowhatyouputinnetworksabove":
     external: true
@@ -121,11 +119,9 @@ I will explain what each path mapping needs to be.
 
 - /mnt/user/Data/torrents/:/data/torrents/:rw Needs to be mapped exactly how your qbittorrent is mapped. Both on the Host and container side. Left side is how your host side is and right would be how qbit container side is. You can copy paste those values here. You also want to remove any local or remote locations you have mapped in config.py as the container will now be using this instead.
 
-- /mnt/user/appdata/Upload-Assistant/data/config.py:/Upload-Assistant/data/config.py:rw This is the location of your Upload-Assistants config.py. Please note, this has to be mapped to config.py and not config the folder
+- /mnt/user/appdata/Upload-Assistant:/state:rw This is the persistent application-state root. Configuration is stored at `/state/data/config.py`; caches and temporary upload files stay below this same mount.
 
 - /mnt/user/appdata/qBittorrent/data/BT_backup/:/torrent_storage_dir This is a important part, so please map this correctly if you dont want to rehash every time you upload. Left side is the location where you Bt_backup is, right side is what you want to map in your config.py. For example: "torrent_storage_dir" : "/torrent_storage_dir", This is how mine is mapped in config.py. So use the value on the right side in your config.py exactly.
-
-- /mnt/user/appdata/Upload-Assistant/tmp/:/Upload-Assistant/tmp:rw This is the location of your /tmp in upload-assistant folder.
 
 Once done click deploy and it will create the container for you.
 

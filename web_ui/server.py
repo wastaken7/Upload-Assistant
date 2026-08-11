@@ -31,6 +31,7 @@ from collections.abc import Iterator, Mapping, Sequence
 
 import web_ui.auth as auth_mod
 from src.webui_progress import ProgressEvent, clear_progress_callback, reset_progress, set_progress_callback
+from src.app_paths import CODE_DIR, STATE_DIR
 
 
 def _module_name(*parts: str) -> str:
@@ -1332,7 +1333,7 @@ def _book_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: s
     if not meta_uuid:
         return ""
 
-    tmp_dir = Path(__file__).parent.parent / "tmp" / meta_uuid / "artwork"
+    tmp_dir = STATE_DIR / "tmp" / meta_uuid / "artwork"
     for filename in ("POSTER.png", "poster.png", "POSTER.jpg", "poster.jpg", "cover.jpg", "cover.png"):
         if (tmp_dir / filename).exists():
             return _execution_preview_cover_url(preview_session_id, meta_uuid)
@@ -1374,7 +1375,7 @@ def _resolve_execution_preview_meta(session_id: str) -> tuple[str, Path | None, 
     if not execution_path:
         return "", None, None
 
-    base_tmp_dir = Path(__file__).parent.parent / "tmp"
+    base_tmp_dir = STATE_DIR / "tmp"
     alias_meta_file = base_tmp_dir / Path(execution_path).name / "meta.json"
     alias_meta = _read_execution_preview_meta_file(alias_meta_file) if alias_meta_file.exists() else None
     meta_uuid = _stringify_preview_value(process_info.get("meta_uuid"))
@@ -1864,9 +1865,9 @@ def _find_execution_preview_cover_file(session_id: str) -> Path | None:
     meta_uuid = _stringify_preview_value(resolved_meta.get("uuid")) if resolved_meta is not None else ""
     candidate_dirs: list[Path] = []
     if meta_uuid:
-        release_tmp = Path(__file__).parent.parent / "tmp" / meta_uuid
+        release_tmp = STATE_DIR / "tmp" / meta_uuid
         candidate_dirs.append(release_tmp / "artwork")
-    release_tmp = Path(__file__).parent.parent / "tmp" / Path(execution_path).name
+    release_tmp = STATE_DIR / "tmp" / Path(execution_path).name
     candidate_dirs.append(release_tmp / "artwork")
 
     # A music sidecar cover may stay beside the release, while embedded art is
@@ -1916,7 +1917,7 @@ def _resolve_execution_review_temp_dir(meta_data: Mapping[str, object]) -> Path 
     meta_uuid = _stringify_preview_value(meta_data.get("uuid"))
     if not meta_uuid:
         return None
-    temp_root = (Path(__file__).parent.parent / "tmp").resolve()
+    temp_root = (STATE_DIR / "tmp").resolve()
     try:
         temp_dir = (temp_root / meta_uuid).resolve()
         temp_dir.relative_to(temp_root)
@@ -2400,7 +2401,7 @@ def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: An
     not raise to callers.
     """
     try:
-        base_dir = Path(__file__).parent.parent
+        base_dir = STATE_DIR
         audit_path = base_dir / "data" / "config_audit.log"
         # Determine acting user: session -> Basic auth username -> persisted user -> remote_addr
         persisted = _load_user_record()
@@ -3648,8 +3649,8 @@ def config_options():
     if not _verify_csrf_header() or not _verify_same_origin():
         return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
 
-    base_dir = Path(__file__).parent.parent
-    example_path = base_dir / "data" / "example_config.py"
+    base_dir = STATE_DIR
+    example_path = CODE_DIR / "data" / "example_config.py"
     config_path = base_dir / "data" / "config.py"
 
     example_config_loaded = _load_config_from_file(example_path)
@@ -3745,7 +3746,7 @@ def torrent_clients():
     if not _verify_csrf_header() or not _verify_same_origin():
         return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
 
-    base_dir = Path(__file__).parent.parent
+    base_dir = STATE_DIR
     config_path = base_dir / "data" / "config.py"
 
     user_config = _load_config_from_file(config_path) or {}
@@ -3769,7 +3770,7 @@ def get_trackers():
     if not _verify_csrf_header() or not _verify_same_origin():
         return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
 
-    base_dir = Path(__file__).parent.parent
+    base_dir = STATE_DIR
     config_path = base_dir / "data" / "config.py"
     user_config = _load_config_from_file(config_path) or {}
 
@@ -3826,8 +3827,8 @@ def config_update():
     if not path:
         return jsonify({"success": False, "error": "Invalid path"}), 400
 
-    base_dir = Path(__file__).parent.parent
-    example_path = base_dir / "data" / "example_config.py"
+    base_dir = STATE_DIR
+    example_path = CODE_DIR / "data" / "example_config.py"
     config_path = base_dir / "data" / "config.py"
 
     example_config = _load_config_from_file(example_path) or {}
@@ -3911,7 +3912,7 @@ def config_remove_subsection():
     if not path:
         return jsonify({"success": False, "error": "Invalid path"}), 400
 
-    base_dir = Path(__file__).parent.parent
+    base_dir = STATE_DIR
     config_path = base_dir / "data" / "config.py"
 
     try:
@@ -4607,7 +4608,7 @@ def save_queue():
         if not items:
             return jsonify({"error": "No items provided", "success": False}), 400
 
-        base_dir = Path(__file__).parent.parent
+        base_dir = STATE_DIR
         tmp_dir = base_dir / "tmp"
         tmp_dir.mkdir(parents=True, exist_ok=True)
 
@@ -4761,8 +4762,8 @@ def execute_command():
                     yield f"data: {json.dumps({'type': 'error', 'data': 'Invalid execution path'})}\n\n"
                     return
 
-                base_dir = Path(__file__).parent.parent
-                upload_script = str(base_dir / "upload.py")
+                base_dir = STATE_DIR
+                upload_script = str(CODE_DIR / "upload.py")
                 command = [sys.executable, "-u", upload_script, validated_path]
 
                 process_state = _make_process_state(validated_path, args)
@@ -5331,7 +5332,7 @@ def execute_command():
 
                         # Ensure the upload_script is the expected script under the repo
                         try:
-                            expected_script = os.path.realpath(str(Path(base_dir) / "upload.py"))
+                            expected_script = os.path.realpath(str(CODE_DIR / "upload.py"))
                             script_real = os.path.realpath(command[2])
                             if script_real != expected_script:
                                 raise ValueError("Invalid script path")

@@ -2,15 +2,17 @@
 
 This document explains the configuration options found in `data/example_config.py`.
 
-Upload Assistant loads configuration from `data/config.py`.
+Upload Assistant loads configuration from its user-owned state directory: `%LOCALAPPDATA%\\Upload-Assistant\\data\\config.py` on Windows, `$XDG_DATA_HOME/upload-assistant/data/config.py` (normally `~/.local/share/upload-assistant/data/config.py`) on Linux, or `$UA_DATA_DIR/data/config.py` when overridden.
+
+On the first run after upgrading, a legacy `data/config.py` in the checkout is **moved** to this location, so only one active configuration remains.
 
 ## How to use
 
 - Generate a config interactively:
   - Run `python config-generator.py` from the repo root.
 - Or create your config manually:
-  - Copy `data/example_config.py` to `data/config.py`
-  - Edit `data/config.py` with your own values
+  - Run `config-generator.py`, or let the first start create the user config from `data/example_config.py`
+  - Edit the user-owned `config.py` with your own values
 
 ## Config file shape
 
@@ -32,7 +34,7 @@ Upload Assistant is structured around a runtime `meta` dict.
 
 At a high level:
 
-1. `data/config.py` is imported and read across the codebase.
+1. The user-owned `data/config.py` is imported and read across the codebase.
 2. `src/prep.py` builds and normalizes `meta` from the input path + CLI args + `config` defaults.
 3. Tracker metadata is fetched via `src/get_tracker_data.py` / `src/trackermeta.py` and individual tracker modules under `src/trackers/`.
 4. Screenshots are captured/optimized via `src/takescreens.py`.
@@ -41,7 +43,7 @@ At a high level:
 
 Important gotchas:
 
-- Some options are read at module import time (notably in `src/takescreens.py`). If you edit `data/config.py` while Upload Assistant is running, you may need to restart the process for changes to take effect.
+- Some options are read at module import time (notably in `src/takescreens.py`). If you edit the user `config.py` while Upload Assistant is running, you may need to restart the process for changes to take effect.
 - Many `DEFAULT` values are copied into `meta` during preparation, and later code reads `meta` rather than reading `config` again.
 - Several settings can be overridden by CLI flags (or by `user-args.json` overrides when enabled).
 
