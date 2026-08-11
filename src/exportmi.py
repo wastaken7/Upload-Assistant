@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
-from pymediainfo import MediaInfo
 
 from src.app_paths import CODE_DIR
 from src.console import logger
 from src.exceptions import NoAudioMediaError
+from src.mediainfo import MediaInfo
 from src.meta import Meta
 
 
@@ -428,6 +428,7 @@ async def export_info(
     if not isdir:
         os.chdir(Path(video).parent)
 
+    media_info_json = ""
     if mediainfo_cmd and is_dvd:
         result: subprocess.CompletedProcess[str] | None = None
         try:
@@ -457,13 +458,10 @@ async def export_info(
             logger.info("[bold yellow]Falling back to standard MediaInfo for text...")
             media_info = MediaInfo.parse(video, output="STRING", full=False)
     else:
-        media_info = MediaInfo.parse(video, output="STRING", full=False)
+        media_info = cast(str, MediaInfo.parse(video, output="STRING", full=False))
 
-    # Filter out unwanted lines from media info regardless of type
-    media_info_str = media_info
-    filtered_media_info = "\n".join(
-        line for line in media_info_str.splitlines() if not line.strip().startswith("ReportBy") and not line.strip().startswith("Report created by ")
-    )
+    # Keep the CLI footer so every exported text report identifies its MediaInfo version.
+    filtered_media_info = media_info
 
     async with aiofiles.open(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/MEDIAINFO.txt", "w", newline="", encoding="utf-8") as export:
         await export.write(filtered_media_info.replace(video, Path(video).name))
@@ -507,8 +505,7 @@ async def export_info(
             media_info_json = MediaInfo.parse(video, output="JSON")
             media_info_dict = json.loads(media_info_json)
     else:
-        # Use standard MediaInfo library for non-DVD or when specialized CLI not available
-        media_info_json = MediaInfo.parse(video, output="JSON")
+        media_info_json = cast(str, MediaInfo.parse(video, output="JSON"))
         media_info_dict = json.loads(media_info_json)
 
     filtered_info = filter_mediainfo(media_info_dict)

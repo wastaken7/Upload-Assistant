@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Any, cast
 
 from PIL import Image
-from pymediainfo import MediaInfo
 
 from src.console import logger
+from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.takescreens import screenshot_par_scale_factors, should_scale_screenshots_for_par
 from src.temp_paths import menu_screenshots_dir

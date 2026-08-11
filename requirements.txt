@@ -37,7 +37,6 @@ resvg-py==0.3.3
 psutil==7.2.2
 pycountry==24.6.1
 pyimgbox==1.0.7
-pymediainfo==7.0.1
 PyMuPDF==1.28.0
 pyotp==2.9.0
 qbittorrent-api==2026.6.0

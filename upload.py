@@ -2358,6 +2358,10 @@ async def do_the_thing(base_dir: str) -> None:
         if not meta.path:
             exit(0)
 
+        from bin.get_mediainfo import MediaInfoBinaryManager
+
+        await MediaInfoBinaryManager.ensure_mediainfo_binary(base_dir)
+
         path = meta.path
         path = str(Path(path).resolve())
         if path.endswith('"'):

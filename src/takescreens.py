@@ -19,12 +19,12 @@ from pathlib import Path
 from typing import Any, cast
 
 import ffmpeg
-from pymediainfo import MediaInfo
 
 from data import config as data_config
 from src.artwork import is_public_http_url, is_valid_cover_image, is_valid_image_bytes
 from src.cleanup import cleanup_manager
 from src.console import logger
+from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.screenshot_manifest import clear_group as clear_screenshot_group
 from src.screenshot_manifest import files as manifest_files

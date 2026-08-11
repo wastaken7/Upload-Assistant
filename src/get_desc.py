@@ -16,13 +16,13 @@ import httpx
 import langcodes
 from jinja2 import Template
 from langcodes.tag_parser import LanguageTagError
-from pymediainfo import MediaInfo
 
 from src.bbcode import BBCODE
 from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
 from src.description_review import apply_saved_draft
 from src.languages import languages_manager
+from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.takescreens import TakeScreensManager

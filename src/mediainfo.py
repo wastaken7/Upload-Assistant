@@ -1,0 +1,92 @@
+"""Compatibility layer backed by the official MediaInfo CLI."""
+
+import json
+import re
+import subprocess
+from pathlib import Path
+from typing import Any
+
+from bin.get_mediainfo import MediaInfoBinaryManager
+
+
+def _base_dir() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+def _binary() -> str:
+    binary = MediaInfoBinaryManager.find_existing_binary(_base_dir())
+    if binary is None:
+        raise RuntimeError("MediaInfo CLI is not installed; run Upload Assistant so it can download bin/MI first")
+    return binary
+
+
+def run_mediainfo(path: str | Path, *, output: str | None = None, full: bool = True, inform: str | None = None) -> str:
+    command = [_binary()]
+    if output != "JSON":
+        command.append("--inform_version=1")
+    if full:
+        command.append("--Full")
+    if inform:
+        command.append(f"--Inform={inform}")
+    elif output and output != "STRING":
+        command.append(f"--Output={output}")
+    command.append(str(path))
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=900)  # noqa: S603
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("MediaInfo timed out after 15 minutes") from exc
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or f"MediaInfo failed with exit code {result.returncode}")
+    return result.stdout
+
+
+def _snake_case(name: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).replace("@", "").strip("_").lower()
+
+
+class MediaInfoTrack:
+    def __init__(self, data: dict[str, Any]) -> None:
+        self._data = data
+
+    @property
+    def track_type(self) -> str | None:
+        value = self._data.get("@type")
+        return str(value) if value is not None else None
+
+    def to_data(self) -> dict[str, Any]:
+        return {_snake_case(key): value for key, value in self._data.items()}
+
+    def __getattr__(self, name: str) -> Any:
+        for key, value in self._data.items():
+            if _snake_case(key) == name:
+                if name == "duration" and value is not None:
+                    try:
+                        return float(value) * 1000
+                    except TypeError, ValueError:
+                        return value
+                return value
+        return None
+
+
+class MediaInfoResult:
+    def __init__(self, report: dict[str, Any]) -> None:
+        tracks = report.get("media", {}).get("track", [])
+        self.tracks = [MediaInfoTrack(track) for track in tracks if isinstance(track, dict)]
+
+
+class MediaInfo:
+    """Subset of the previous Python binding API used by Upload Assistant."""
+
+    @staticmethod
+    def parse(
+        filename: str | Path,
+        *,
+        output: str | None = None,
+        full: bool = True,
+        mediainfo_options: dict[str, str] | None = None,
+        **_kwargs: Any,
+    ) -> MediaInfoResult | str:
+        inform = (mediainfo_options or {}).get("inform")
+        if output is not None or inform:
+            return run_mediainfo(filename, output=output, full=full, inform=inform)
+        return MediaInfoResult(json.loads(run_mediainfo(filename, output="JSON", full=full)))

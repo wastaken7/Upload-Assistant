@@ -48,32 +48,20 @@ def download_file(url: str, output_path: Path) -> None:
 def extract_linux(cli_archive: Path, lib_archive: Path, output_dir: Path) -> None:
     # Extract MediaInfo CLI from zip file
     with zipfile.ZipFile(cli_archive, "r") as zip_ref:
-        file_list = zip_ref.namelist()
         mediainfo_file = output_dir / "mediainfo"
-
-        # Look for the mediainfo binary in the archive
-        for member in file_list:
-            if member.endswith("/mediainfo") or member == "mediainfo":
-                zip_ref.extract(member, output_dir.parent)
-                extracted_path = output_dir.parent / member
-                shutil.move(str(extracted_path), str(mediainfo_file))
-                break
+        member = next((name for name in zip_ref.namelist() if name.endswith("/mediainfo") or name == "mediainfo"), None)
+        if member is None:
+            raise RuntimeError("MediaInfo CLI archive does not contain mediainfo")
+        with zip_ref.open(member) as source, mediainfo_file.open("wb") as destination:
+            shutil.copyfileobj(source, destination)
 
     # Extract MediaInfo library
     with zipfile.ZipFile(lib_archive, "r") as zip_ref:
-        file_list = zip_ref.namelist()
         lib_file = output_dir / "libmediainfo.so.0"
-
-        # Look for the library file in the archive
-        if "lib/libmediainfo.so.0.0.0" in file_list:
-            zip_ref.extract("lib/libmediainfo.so.0.0.0", output_dir.parent)
-            extracted_path = output_dir.parent / "lib/libmediainfo.so.0.0.0"
-            shutil.move(str(extracted_path), str(lib_file))
-
-    # Clean up empty lib directory if it exists
-    lib_dir = output_dir.parent / "lib"
-    if lib_dir.exists() and not any(lib_dir.iterdir()):
-        lib_dir.rmdir()
+        if "lib/libmediainfo.so.0.0.0" not in zip_ref.namelist():
+            raise RuntimeError("MediaInfo library archive does not contain libmediainfo.so.0.0.0")
+        with zip_ref.open("lib/libmediainfo.so.0.0.0") as source, lib_file.open("wb") as destination:
+            shutil.copyfileobj(source, destination)
 
 
 def download_dvd_mediainfo(base_dir: str) -> str | None:
@@ -91,7 +79,7 @@ def download_dvd_mediainfo(base_dir: str) -> str | None:
     if machine == "amd64":
         machine = "x86_64"
 
-    platform_dir = "linux"
+    platform_dir = "linux/dvd"
     output_dir = Path(base_dir) / "bin" / "MI" / platform_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -130,7 +118,15 @@ def download_dvd_mediainfo(base_dir: str) -> str | None:
         download_file(lib_url, lib_archive)
         logger.debug(f"[green]Downloaded {lib_filename}[/green]")
 
-        extract_linux(cli_archive, lib_archive, output_dir)
+        with TemporaryDirectory(dir=output_dir.parent, prefix="mediainfo-dvd-") as staging_dir:
+            staging_dir_path = Path(staging_dir)
+            extract_linux(cli_archive, lib_archive, staging_dir_path)
+            staged_cli = staging_dir_path / "mediainfo"
+            staged_lib = staging_dir_path / "libmediainfo.so.0"
+            if not staged_cli.is_file() or not staged_lib.is_file():
+                raise RuntimeError("Failed to extract MediaInfo CLI and library for DVD processing")
+            staged_cli.replace(cli_file)
+            staged_lib.replace(lib_file)
 
         logger.debug("[green]Extracted library[/green]")
 
