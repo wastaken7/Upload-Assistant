@@ -6,6 +6,7 @@ import stat
 import tarfile
 import zipfile
 from pathlib import Path
+from typing import ClassVar
 
 import aiofiles
 import httpx
@@ -29,6 +30,33 @@ except ImportError:
 
 
 class MkbrrBinaryManager:
+    platform_map: ClassVar[dict[str, dict[str, dict[str, str]]]] = {
+        "windows": {
+            "x86_64": {"file": "windows_x86_64.zip", "folder": "windows/x86_64"},
+            "amd64": {"file": "windows_x86_64.zip", "folder": "windows/x86_64"},
+            "arm64": {"file": "windows_x86_64.zip", "folder": "windows/x86_64"},
+            "aarch64": {"file": "windows_x86_64.zip", "folder": "windows/x86_64"},
+        },
+        "darwin": {
+            "arm64": {"file": "darwin_arm64.tar.gz", "folder": "macos/arm64"},
+            "x86_64": {"file": "darwin_x86_64.tar.gz", "folder": "macos/x86_64"},
+            "amd64": {"file": "darwin_x86_64.tar.gz", "folder": "macos/x86_64"},
+        },
+        "linux": {
+            "x86_64": {"file": "linux_x86_64.tar.gz", "folder": "linux/amd64"},
+            "amd64": {"file": "linux_x86_64.tar.gz", "folder": "linux/amd64"},
+            "arm64": {"file": "linux_arm64.tar.gz", "folder": "linux/arm64"},
+            "aarch64": {"file": "linux_arm64.tar.gz", "folder": "linux/arm64"},
+            "armv7l": {"file": "linux_arm.tar.gz", "folder": "linux/arm"},
+            "armv6l": {"file": "linux_arm.tar.gz", "folder": "linux/armv6"},
+            "arm": {"file": "linux_arm.tar.gz", "folder": "linux/arm"},
+        },
+        "freebsd": {
+            "x86_64": {"file": "freebsd_x86_64.tar.gz", "folder": "freebsd/x86_64"},
+            "amd64": {"file": "freebsd_x86_64.tar.gz", "folder": "freebsd/x86_64"},
+        },
+    }
+
     @staticmethod
     def find_existing_binary(base_dir: str | Path) -> str | None:
         """Return a user-provided mkbrr binary before attempting a download."""
@@ -36,22 +64,10 @@ class MkbrrBinaryManager:
         machine = platform.machine().lower()
         binary_name = "mkbrr.exe" if system == "windows" else "mkbrr"
         bin_root = Path(base_dir) / "bin"
-        platform_folder = {
-            "windows": "windows/x86_64",
-            "darwin": "macos/arm64" if machine in {"arm64", "aarch64"} else "macos/x86_64",
-            "linux": {
-                "x86_64": "linux/amd64",
-                "amd64": "linux/amd64",
-                "arm64": "linux/arm64",
-                "aarch64": "linux/arm64",
-                "armv6l": "linux/armv6",
-                "armv7l": "linux/arm",
-                "arm": "linux/arm",
-            }.get(machine),
-        }.get(system)
+        platform_info = MkbrrBinaryManager.platform_map.get(system, {}).get(machine)
         candidates = [bin_root / binary_name, bin_root / "mkbrr" / binary_name]
-        if platform_folder:
-            candidates.append(bin_root / "mkbrr" / platform_folder / binary_name)
+        if platform_info:
+            candidates.append(bin_root / "mkbrr" / platform_info["folder"] / binary_name)
 
         for binary_path in candidates:
             if binary_path.is_file() and (binary_name.endswith(".exe") or os.access(binary_path, os.X_OK)):
@@ -70,37 +86,10 @@ class MkbrrBinaryManager:
         machine = platform.machine().lower()
         logger.debug(f"[blue]Detected system: {system}, architecture: {machine}[/blue]")
 
-        platform_map: dict[str, dict[str, dict[str, str]]] = {
-            "windows": {
-                "x86_64": {"file": "windows_x86_64.zip", "folder": "windows/x86_64"},
-                "amd64": {"file": "windows_x86_64.zip", "folder": "windows/x86_64"},
-                "arm64": {"file": "windows_x86_64.zip", "folder": "windows/x86_64"},
-                "aarch64": {"file": "windows_x86_64.zip", "folder": "windows/x86_64"},
-            },
-            "darwin": {
-                "arm64": {"file": "darwin_arm64.tar.gz", "folder": "macos/arm64"},
-                "x86_64": {"file": "darwin_x86_64.tar.gz", "folder": "macos/x86_64"},
-                "amd64": {"file": "darwin_x86_64.tar.gz", "folder": "macos/x86_64"},
-            },
-            "linux": {
-                "x86_64": {"file": "linux_x86_64.tar.gz", "folder": "linux/amd64"},
-                "amd64": {"file": "linux_x86_64.tar.gz", "folder": "linux/amd64"},
-                "arm64": {"file": "linux_arm64.tar.gz", "folder": "linux/arm64"},
-                "aarch64": {"file": "linux_arm64.tar.gz", "folder": "linux/arm64"},
-                "armv7l": {"file": "linux_arm.tar.gz", "folder": "linux/arm"},
-                "armv6l": {"file": "linux_arm.tar.gz", "folder": "linux/armv6"},
-                "arm": {"file": "linux_arm.tar.gz", "folder": "linux/arm"},
-            },
-            "freebsd": {
-                "x86_64": {"file": "freebsd_x86_64.tar.gz", "folder": "freebsd/x86_64"},
-                "amd64": {"file": "freebsd_x86_64.tar.gz", "folder": "freebsd/x86_64"},
-            },
-        }
-
-        if system not in platform_map or machine not in platform_map[system]:
+        platform_info = MkbrrBinaryManager.platform_map.get(system, {}).get(machine)
+        if not platform_info:
             raise Exception(f"Unsupported platform: {system} {machine}")
 
-        platform_info = platform_map[system][machine]
         file_pattern = platform_info["file"]
         folder_path = platform_info["folder"]
         logger.debug(f"[blue]Using file pattern: {file_pattern}[/blue]")

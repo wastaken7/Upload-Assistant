@@ -30,3 +30,25 @@ def test_find_existing_binary_uses_docker_platform_layout(tmp_path: Path, monkey
     monkeypatch.setattr("bin.get_mkbrr.platform.machine", lambda: "x86_64")
 
     assert MkbrrBinaryManager.find_existing_binary(tmp_path) == str(binary_path)  # noqa: S101
+
+
+def test_find_existing_binary_uses_freebsd_platform_layout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    binary_path = tmp_path / "bin" / "mkbrr" / "freebsd" / "x86_64" / "mkbrr"
+    binary_path.parent.mkdir(parents=True)
+    binary_path.write_text("#!/bin/sh\n", encoding="utf-8")
+    binary_path.chmod(binary_path.stat().st_mode | stat.S_IXUSR)
+    monkeypatch.setattr("bin.get_mkbrr.platform.system", lambda: "FreeBSD")
+    monkeypatch.setattr("bin.get_mkbrr.platform.machine", lambda: "amd64")
+
+    assert MkbrrBinaryManager.find_existing_binary(tmp_path) == str(binary_path)  # noqa: S101
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("system", "machine"), [("Windows", "i686"), ("Darwin", "ppc64")])
+async def test_ensure_mkbrr_binary_rejects_unsupported_platforms(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, system: str, machine: str) -> None:
+    monkeypatch.setattr("bin.get_mkbrr.platform.system", lambda: system)
+    monkeypatch.setattr("bin.get_mkbrr.platform.machine", lambda: machine)
+    monkeypatch.setattr("bin.get_mkbrr.shutil.which", lambda _: None)
+
+    with pytest.raises(Exception, match=f"Unsupported platform: {system.lower()} {machine}"):
+        await MkbrrBinaryManager.ensure_mkbrr_binary(tmp_path, "v1.24.0")
