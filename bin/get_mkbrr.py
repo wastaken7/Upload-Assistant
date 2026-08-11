@@ -58,15 +58,15 @@ class MkbrrBinaryManager:
     }
 
     @staticmethod
-    def find_existing_binary(base_dir: str | Path) -> str | None:
-        """Return a user-provided mkbrr binary before attempting a download."""
+    def find_existing_binary(base_dir: str | Path, version: str | None = None) -> str | None:
+        """Return an existing mkbrr binary, version-checking the managed cache when requested."""
         system = platform.system().lower()
         machine = platform.machine().lower()
         binary_name = "mkbrr.exe" if system == "windows" else "mkbrr"
         bin_root = Path(base_dir) / "bin"
         platform_info = MkbrrBinaryManager.platform_map.get(system, {}).get(machine)
         candidates = [bin_root / binary_name, bin_root / "mkbrr" / binary_name]
-        if platform_info:
+        if platform_info and (version is None or (bin_root / "mkbrr" / platform_info["folder"] / version).is_file()):
             candidates.append(bin_root / "mkbrr" / platform_info["folder"] / binary_name)
 
         for binary_path in candidates:
@@ -78,7 +78,7 @@ class MkbrrBinaryManager:
 
     @staticmethod
     async def ensure_mkbrr_binary(base_dir: str | Path, version: str) -> str:
-        existing_binary = MkbrrBinaryManager.find_existing_binary(base_dir)
+        existing_binary = MkbrrBinaryManager.find_existing_binary(base_dir, version)
         if existing_binary:
             return existing_binary
 

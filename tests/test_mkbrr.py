@@ -32,6 +32,22 @@ def test_find_existing_binary_uses_docker_platform_layout(tmp_path: Path, monkey
     assert MkbrrBinaryManager.find_existing_binary(tmp_path) == str(binary_path)  # noqa: S101
 
 
+def test_find_existing_binary_version_checks_managed_platform_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    binary_path = tmp_path / "bin" / "mkbrr" / "linux" / "amd64" / "mkbrr"
+    binary_path.parent.mkdir(parents=True)
+    binary_path.write_text("#!/bin/sh\n", encoding="utf-8")
+    binary_path.chmod(binary_path.stat().st_mode | stat.S_IXUSR)
+    (binary_path.parent / "v1.23.0").touch()
+    monkeypatch.setattr("bin.get_mkbrr.platform.system", lambda: "Linux")
+    monkeypatch.setattr("bin.get_mkbrr.platform.machine", lambda: "x86_64")
+    monkeypatch.setattr("bin.get_mkbrr.shutil.which", lambda _: None)
+
+    assert MkbrrBinaryManager.find_existing_binary(tmp_path, "v1.24.0") is None  # noqa: S101
+
+    (binary_path.parent / "v1.24.0").touch()
+    assert MkbrrBinaryManager.find_existing_binary(tmp_path, "v1.24.0") == str(binary_path)  # noqa: S101
+
+
 def test_find_existing_binary_uses_freebsd_platform_layout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     binary_path = tmp_path / "bin" / "mkbrr" / "freebsd" / "x86_64" / "mkbrr"
     binary_path.parent.mkdir(parents=True)
