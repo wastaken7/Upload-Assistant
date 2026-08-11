@@ -3,7 +3,6 @@
 import ast
 import asyncio
 import contextlib
-import filecmp
 import gc
 import json
 import os
@@ -34,6 +33,7 @@ from torf import Torrent as _Torrent  # pyright: ignore[reportMissingImports,rep
 
 from bin.get_mkbrr import MkbrrBinaryManager
 from src.add_comparison import ComparisonManager
+from src.app_paths import CODE_DIR, STATE_DIR
 from src.args import Args, read_paths_from_stdin
 from src.artwork import is_public_http_url, is_valid_cover_image
 from src.audio_spectrogram import process_audio_spectrograms
@@ -68,7 +68,8 @@ from src.trackerstatus import TrackerStatusManager
 from src.uphelper import UploadHelper
 from src.uploadscreens import UploadScreensManager
 
-base_dir = str(Path(__file__).resolve().parent)
+# Runtime artifacts are user-owned; CODE_DIR remains the read-only checkout.
+base_dir = str(STATE_DIR)
 CLI_UI: Any = cli_ui
 TORF_Torrent: Any = cast(Any, _Torrent)
 RICH_HANDLER: Any = cast(Any, _rich_handler)
@@ -161,25 +162,19 @@ def _handle_shutdown_signal(signum: int, _frame: Any) -> None:
 # ── Restore built-in data/ files when a Docker volume mount hides them ──
 # The Dockerfile copies the original data/ tree to defaults/data/ so that
 # volume mounts over /Upload-Assistant/data/ don't lose critical files
-# (__init__.py, version.py, example_config.py, templates/).
+# (__init__.py, example_config.py, templates/).
 _data_dir = Path(base_dir) / "data"
-_defaults_data_dir = Path(base_dir) / "defaults" / "data"
+_defaults_data_dir = CODE_DIR / "data"
 
 # Directories that should never be copied into user-facing data/
 _SKIP_DIRS = {"__pycache__", ".mypy_cache", ".ruff_cache"}
 
-# Built-in metadata files that should track the image version even when
-# /Upload-Assistant/data is a persistent volume from an older container.
-_ALWAYS_SYNC_ROOT_FILES = {"version.py"}
-
 if Path(_defaults_data_dir).is_dir():
     Path(_data_dir).mkdir(parents=True, exist_ok=True)
     _restored_count = 0
-    _synced_count = 0
     _restore_errors: list[str] = []
     # Walk the defaults tree and copy anything missing in the live data dir.
     # Never overwrite user files (config.py, cookies/, tags.json, etc.).
-    # Root version.py is image metadata, not user config, so keep it current.
     for dirpath, dirnames, filenames in os.walk(_defaults_data_dir):
         # Prune unwanted directories in-place so os.walk skips them entirely
         dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
@@ -197,25 +192,14 @@ if Path(_defaults_data_dir).is_dir():
                 continue
             target_file = Path(target_dir) / fname
             src_file = Path(dirpath) / fname
-            should_sync = False
-            if rel_dir == "." and fname in _ALWAYS_SYNC_ROOT_FILES and Path(target_file).exists():
-                try:
-                    should_sync = not filecmp.cmp(src_file, target_file, shallow=False)
-                except OSError:
-                    should_sync = True
-            if not Path(target_file).exists() or should_sync:
+            if not Path(target_file).exists():
                 try:
                     shutil.copy2(src_file, target_file)
-                    if should_sync:
-                        _synced_count += 1
-                    else:
-                        _restored_count += 1
+                    _restored_count += 1
                 except OSError as exc:
                     _restore_errors.append(f"{Path(rel_dir) / fname}: {exc}")
     if _restored_count:
         logger.info(f"Restored {_restored_count} built-in file(s) into data/ from defaults.", extra={"markup": False})
-    if _synced_count:
-        logger.info(f"Synced {_synced_count} built-in metadata file(s) into data/ from defaults.", extra={"markup": False})
     if _restore_errors:
         logger.warning(f"[red]Warning: failed to restore {len(_restore_errors)} file(s) into data/:[/red]")
         for _err in _restore_errors[:5]:
@@ -2120,9 +2104,9 @@ def extract_changelog(content: str, to_version: str) -> str | None:
     return None
 
 
-async def update_notification(base_dir: str) -> str:
-    version_file = Path(base_dir) / "data" / "version.py"
-    remote_version_url = "https://raw.githubusercontent.com/wastaken7/Upload-Assistant/master/data/version.py"
+async def update_notification() -> str:
+    version_file = CODE_DIR / "src" / "version.py"
+    remote_version_url = "https://raw.githubusercontent.com/wastaken7/Upload-Assistant/master/src/version.py"
 
     notice = config["DEFAULT"].get("update_notification", True)
     verbose = config["DEFAULT"].get("verbose_notification", False)
@@ -2141,7 +2125,6 @@ async def update_notification(base_dir: str) -> str:
     if _parse_version_tuple(remote_version) > _parse_version_tuple(local_version):
         logger.info(f"[red][NOTICE] [green]Update available: [/green][yellow]{remote_version}")
         logger.info(f"[red][NOTICE] [green]Current version: [/green][yellow]{local_version}")
-        await asyncio.sleep(1)
         if verbose and remote_content:
             changelog = extract_changelog(remote_content, remote_version)
             if changelog:
@@ -2223,7 +2206,7 @@ async def do_the_thing(base_dir: str) -> None:
             break
 
     meta.ua_name = "Upload-Assistant"
-    meta.current_version = await update_notification(base_dir)
+    meta.current_version = await update_notification()
 
     signature = f"Shared with {meta.ua_name}"
     if meta.current_version:
@@ -2992,7 +2975,11 @@ async def process_cross_seeds(meta: Meta) -> None:
 
 async def get_mkbrr_path(base_dir: str | None = None) -> str | None:
     try:
-        resolved_base_dir = base_dir or str(Path(__file__).resolve().parent)
+        # Prefer the immutable binary shipped with the application. Downloads
+        # are cached in the user-owned runtime directory only when needed.
+        if bundled_mkbrr := MkbrrBinaryManager.find_existing_binary(CODE_DIR):
+            return bundled_mkbrr
+        resolved_base_dir = base_dir or str(STATE_DIR)
         mkbrr_path = await MkbrrBinaryManager.ensure_mkbrr_binary(resolved_base_dir, version="v1.24.0")
         return mkbrr_path if mkbrr_path else None
     except Exception as e:

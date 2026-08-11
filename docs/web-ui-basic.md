@@ -55,8 +55,8 @@ Notes:
 
 ### Config editor
 
-- The "View Config" button opens a config editor served at `/config`. The editor reads options from `data/example_config.py` and applies overrides in `data/config.py`. Users without a config.py file will have a file created from the example_config.py file.
-- The editor performs type coercion and writes updates back into the config file `data/config.py`. Changes are audited to `data/config_audit.log`.
+- The "View Config" button opens a config editor served at `/config`. The editor reads bundled options from `data/example_config.py` and applies overrides in the user-state `data/config.py`. Users without a config.py file will have one created from the example.
+- The editor performs type coercion and writes updates back into the user-state config file. Changes are audited to the user-state `data/config_audit.log`.
 - Use the config editor for common changes like adding torrent clients, image hosts, or toggling features.
 
 ### Access control

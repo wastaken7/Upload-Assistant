@@ -55,7 +55,7 @@ jobs:
             -f target_commitish="$GITHUB_SHA" \
             --jq .body > "$RUNNER_TEMP/release-notes.md"
 
-      - name: Update data/version.py
+      - name: Update src/version.py
         env:
           NEW_VERSION: ${{ inputs.version }}
         run: |
@@ -65,7 +65,7 @@ jobs:
           import re
           from pathlib import Path
 
-          path = Path("data/version.py")
+          path = Path("src/version.py")
           content = path.read_text(encoding="utf-8")
           notes = Path(os.environ["RUNNER_TEMP"], "release-notes.md").read_text(encoding="utf-8").strip()
           serialized_notes = json.dumps(notes, ensure_ascii=False)
@@ -78,7 +78,7 @@ jobs:
               flags=re.DOTALL,
           )
           if count != 1:
-              raise SystemExit("Could not find the version and release-notes block in data/version.py")
+              raise SystemExit("Could not find the version and release-notes block in src/version.py")
           path.write_text(updated, encoding="utf-8")
           PY
 
@@ -89,7 +89,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/version.py
+          git add src/version.py
           git diff --cached --check
           git commit -m "bump: version to ${NEW_VERSION#v}"
           git push origin "HEAD:$TARGET_BRANCH"
