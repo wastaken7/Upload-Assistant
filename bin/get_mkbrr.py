@@ -32,9 +32,26 @@ class MkbrrBinaryManager:
     @staticmethod
     def find_existing_binary(base_dir: str | Path) -> str | None:
         """Return a user-provided mkbrr binary before attempting a download."""
-        binary_name = "mkbrr.exe" if platform.system().lower() == "windows" else "mkbrr"
+        system = platform.system().lower()
+        machine = platform.machine().lower()
+        binary_name = "mkbrr.exe" if system == "windows" else "mkbrr"
         bin_root = Path(base_dir) / "bin"
-        candidates = (bin_root / binary_name, bin_root / "mkbrr" / binary_name)
+        platform_folder = {
+            "windows": "windows/x86_64",
+            "darwin": "macos/arm64" if machine in {"arm64", "aarch64"} else "macos/x86_64",
+            "linux": {
+                "x86_64": "linux/amd64",
+                "amd64": "linux/amd64",
+                "arm64": "linux/arm64",
+                "aarch64": "linux/arm64",
+                "armv6l": "linux/armv6",
+                "armv7l": "linux/arm",
+                "arm": "linux/arm",
+            }.get(machine),
+        }.get(system)
+        candidates = [bin_root / binary_name, bin_root / "mkbrr" / binary_name]
+        if platform_folder:
+            candidates.append(bin_root / "mkbrr" / platform_folder / binary_name)
 
         for binary_path in candidates:
             if binary_path.is_file() and (binary_name.endswith(".exe") or os.access(binary_path, os.X_OK)):

@@ -297,7 +297,8 @@ def load_existing_config() -> tuple[ConfigDict | None, Path | None]:
                         console.print(f"\n[!] Error loading config from {path}: config is not a dict", markup=False)
                         continue
                     console.print(f"\n[OK] Found existing config at {path}", markup=False)
-                    return migrate_old_config(cast(ConfigDict, config_dict)), path
+                    destination = CONFIG_PATH if path == LEGACY_CONFIG_PATH else path
+                    return migrate_old_config(cast(ConfigDict, config_dict)), destination
             except Exception as e:
                 console.print(f"\n[!] Error loading config from {path}: {e}", markup=False)
 

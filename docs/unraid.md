@@ -123,7 +123,6 @@ I will explain what each path mapping needs to be.
 
 - /mnt/user/appdata/qBittorrent/data/BT_backup/:/torrent_storage_dir This is a important part, so please map this correctly if you dont want to rehash every time you upload. Left side is the location where you Bt_backup is, right side is what you want to map in your config.py. For example: "torrent_storage_dir" : "/torrent_storage_dir", This is how mine is mapped in config.py. So use the value on the right side in your config.py exactly.
 
-
 Once done click deploy and it will create the container for you.
 
 Example usage: You can use bash to run commands directly with dockge or unraid terminal. whichever you prefer.
