@@ -2295,8 +2295,8 @@ def set_runtime_browse_roots(browse_roots: str) -> None:
 def _load_config_from_file(path: Path) -> dict[str, Any] | None:
     """Load and return the ``config`` dict from a Python config file.
 
-    Only files inside the repository ``data/`` directory with a ``.py``
-    extension are accepted.  No ownership or permission checks are
+    Only files inside the repository or runtime ``data/`` directories with a
+    ``.py`` extension are accepted.  No ownership or permission checks are
     performed — the file lives in a user-controlled directory and the app
     already writes to it freely via ``config_update``.
 
@@ -2306,10 +2306,15 @@ def _load_config_from_file(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
 
-    # Restrict to the repository `data` directory and ensure .py extension.
-    repo_data_dir = Path(__file__).resolve().parent.parent / "data"
+    # Preserve support for Python files beneath the repository data directory
+    # while also accepting files beneath the user-owned runtime data directory.
+    allowed_data_dirs = {
+        (CODE_DIR / "data").resolve(),
+        (STATE_DIR / "data").resolve(),
+    }
     try:
-        if not path.resolve().is_relative_to(repo_data_dir.resolve()) or path.suffix != ".py":
+        resolved_path = path.resolve()
+        if path.suffix != ".py" or not any(resolved_path.is_relative_to(directory) for directory in allowed_data_dirs):
             return None
     except Exception:
         return None
