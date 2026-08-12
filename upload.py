@@ -1266,6 +1266,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         trackers = meta.trackers
 
         for tracker in [
+            "1PTBA",
             "ASIANCINEMA",
             "AITHER",
             "AMIGOSSHARE",
@@ -1280,6 +1281,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             "INFINITYHD",
             "LAJIDUI",
             "LASTDIGITALUNDERGROUND",
+            "LEMONHD",
             "LONGPT",
             "LATTEAM",
             "MAKINGOFF",
@@ -1287,6 +1289,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             "PTCAFE",
             "PTGTK",
             "PTSKIT",
+            "PTZONE",
             "RAILGUNPT",
             "SAMARITANO",
             "SHAREISLAND",
@@ -1295,6 +1298,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             "TORRENTEROS",
             "TVCHAOSUK",
             "ULCX",
+            "XINGYUNGEPT",
         ]:
             if tracker in trackers:
                 status_dict = meta.tracker_status.setdefault(tracker, {})
