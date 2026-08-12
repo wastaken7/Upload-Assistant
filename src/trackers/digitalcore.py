@@ -26,7 +26,8 @@ class DigitalCore:
     base_url = "https://digitalcore.club"
     api_base_url = f"{base_url}/api/v1/torrents"
     banned_groups = ("",)
-    approved_image_hosts = ("imgbox", "imgbb", "bhd", "imgur", "postimg", "sharex")
+    # PTScreens is allowed by DigitalCore's CSP img-src directive.
+    approved_image_hosts = ("imgbox", "imgbb", "bhd", "imgur", "postimg", "sharex", "ptscreens")
     image_host_policy = ImageHostPolicy(
         {
             "ibb.co": "imgbb",
@@ -36,6 +37,7 @@ class DigitalCore:
             "postimg.cc": "postimg",
             "digitalcore.club": "sharex",
             "img.digitalcore.club": "sharex",
+            "ptscreens.com": "ptscreens",
         },
         approved_image_hosts,
     )
