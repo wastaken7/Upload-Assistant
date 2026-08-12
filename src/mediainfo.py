@@ -32,7 +32,15 @@ def run_mediainfo(path: str | Path, *, output: str | None = None, full: bool = T
         command.append(f"--Output={output}")
     command.append(str(path))
     try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=900)  # noqa: S603
+        result = subprocess.run(  # noqa: S603
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=900,
+        )
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError("MediaInfo timed out after 15 minutes") from exc
     if result.returncode != 0:
