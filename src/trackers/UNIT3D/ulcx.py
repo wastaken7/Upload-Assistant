@@ -166,6 +166,10 @@ class ULCX(UNIT3D):
                     match = re.search(r"\d+", str(c))
                     return int(match.group(0)) if match else 0
 
+                # Helper to determine if audio format is lossless
+                def is_lossless_audio(fmt: str, profile: str) -> bool:
+                    return fmt in ("PCM", "LPCM", "TRUEHD", "FLAC") or (fmt.startswith("DTS") and "MA" in profile)
+
                 # Section 6.9: FLAC mono/stereo only on non-disc
                 if not meta.is_disc:
                     for a in audio_tracks:
@@ -180,7 +184,7 @@ class ULCX(UNIT3D):
                         fmt = str(a.get("Format", "")).upper()
                         profile = str(a.get("Format_Profile", "")).upper()
                         ch = get_channels(a)
-                        is_lossless = fmt in ("PCM", "LPCM", "TRUEHD", "FLAC") or (fmt.startswith("DTS") and "MA" in profile)
+                        is_lossless = is_lossless_audio(fmt, profile)
 
                         # 4.2.1.1: Lossless stereo must be FLAC 2.0
                         if is_lossless and ch == 2 and fmt != "FLAC":
@@ -206,7 +210,7 @@ class ULCX(UNIT3D):
                             fmt = str(a.get("Format", "")).upper()
                             profile = str(a.get("Format_Profile", "")).upper()
                             ch = get_channels(a)
-                            is_lossless = fmt in ("PCM", "LPCM", "TRUEHD", "FLAC") or (fmt == "DTS" and "MA" in profile)
+                            is_lossless = is_lossless_audio(fmt, profile)
                             if is_lossless and ch > 2:
                                 logger.info(f"{self.tracker}: [bold red]Lossless multi-channel audio is not permitted on 1080p or lower encodes.[/bold red]")
                                 return False
