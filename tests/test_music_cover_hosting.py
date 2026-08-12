@@ -5,7 +5,12 @@ import json
 from unittest.mock import AsyncMock, patch
 
 from src.meta import Meta
-from upload import _host_music_cover, _is_public_music_cover_url
+from upload import _host_music_cover, _is_public_music_cover_url, _music_cover_allowed_hosts
+
+
+def test_music_cover_allowed_hosts_only_constrains_selected_trackers():
+    assert _music_cover_allowed_hosts(["DIGITALCORE"]) == ["bhd", "imgbb", "imgbox", "imgur", "postimg", "ptscreens", "sharex"]  # noqa: S101
+    assert _music_cover_allowed_hosts(["ORPHEUS"]) is None  # noqa: S101
 
 
 def test_music_cover_reuses_cached_hosted_url_before_downloading(tmp_path):
