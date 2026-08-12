@@ -102,7 +102,7 @@ This branch introduces new media categories and automation features not present 
 
 |                                                                                            | Site                   | Usage                  | Supported Categories         |
 | ------------------------------------------------------------------------------------------ | ---------------------- | ---------------------- | ---------------------------- |
-| <img src="web_ui/static/img/trackers/1ptba.png" width="16" height="16" />                 | 1PTBA                  | 1PTBA                  | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/1ptba.png" width="16" height="16" />                  | 1PTBA                  | 1PTBA                  | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/aither.png" width="16" height="16" />                 | Aither                 | AITHER                 | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/alpharatio.png" width="16" height="16" />             | Alpharatio             | ALPHARATIO             | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/amigosshare.png" width="16" height="16" />            | Amigos-Share           | AMIGOSSHARE            | MOVIE, TV, BOOK, GAME        |

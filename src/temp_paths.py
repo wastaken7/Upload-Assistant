@@ -9,10 +9,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from src.app_paths import STATE_DIR
+
 
 def release_temp_dir(base_dir: str | Path, release_id: str) -> Path:
     """Return the root temporary directory for one release."""
     return Path(base_dir) / "tmp" / str(release_id)
+
+
+def music_release_snapshot_path(base_dir: str | Path | None, release_id: str) -> Path:
+    """Return the music metadata snapshot path under a user-owned state directory."""
+    return release_temp_dir(base_dir or STATE_DIR, release_id) / "music_release.json"
 
 
 def image_dir(base_dir: str | Path, release_id: str, kind: str) -> Path:

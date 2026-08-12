@@ -19,7 +19,7 @@ from src.music.analyzer import MusicReleaseAnalyzer
 from src.music.models import MetadataSource, MusicRelease
 from src.music.sources import DiscogsEnricher, MusicBrainzEnricher
 from src.music.validation import MusicValidator
-from src.temp_paths import artwork_dir
+from src.temp_paths import artwork_dir, music_release_snapshot_path
 
 
 def _preferred_artwork(release: Any) -> Path | None:
@@ -374,7 +374,7 @@ def _sync_release_to_meta(meta: Meta, release: MusicRelease) -> None:
 
 async def _write_music_release_snapshot(meta: Meta, release: MusicRelease) -> None:
     """Persist the current release snapshot for review and later upload stages."""
-    path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "music_release.json"
+    path = music_release_snapshot_path(meta.base_dir, str(meta.uuid))
     path.parent.mkdir(parents=True, exist_ok=True)
     async with aiofiles.open(path, "w", encoding="utf-8") as file:
         await file.write(json.dumps(release.to_dict(), indent=2, cls=PathAwareEncoder))
