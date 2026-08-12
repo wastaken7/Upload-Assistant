@@ -119,3 +119,15 @@ def test_macos_falls_back_to_path_when_downloaded_binary_is_unavailable(tmp_path
         patch("bin.get_mediainfo.shutil.which", return_value="/opt/homebrew/bin/mediainfo"),
     ):
         assert MediaInfoBinaryManager.find_existing_binary(tmp_path) == "/opt/homebrew/bin/mediainfo"
+
+
+def test_linux_falls_back_to_path_when_downloaded_binary_is_unavailable(tmp_path) -> None:
+    from bin.get_mediainfo import MediaInfoBinaryManager
+
+    with (
+        patch.object(MediaInfoBinaryManager, "_is_android", return_value=False),
+        patch.object(MediaInfoBinaryManager, "_is_macos", return_value=False),
+        patch.object(MediaInfoBinaryManager, "_platform_info", return_value=("linux", "MediaInfo_CLI_26.05_Lambda_x86_64.zip", "mediainfo", "zip")),
+        patch("bin.get_mediainfo.shutil.which", return_value="/usr/bin/mediainfo"),
+    ):
+        assert MediaInfoBinaryManager.find_existing_binary(tmp_path) == "/usr/bin/mediainfo"
