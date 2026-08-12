@@ -16,7 +16,7 @@ class XingyungePT(NEXUSPHP):
     banned_groups = ()
     display_name = "XingyungePT"
     base_url = "https://pt.xingyungept.org"
-    source_flag = "[pt.xingyungept.org] XingyungePT"
+    source_flag = "[pt.xingyungept.org] 星陨阁"
     torrent_url = f"{base_url}/details.php?id="
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://pt.xingyungept.org",)

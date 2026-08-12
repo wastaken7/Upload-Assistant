@@ -16,7 +16,7 @@ class PTZone(NEXUSPHP):
     banned_groups = ()
     display_name = "PTZone"
     base_url = "https://ptzone.xyz"
-    source_flag = "[ptzone.xyz] PTZone"
+    source_flag = "[ptzone.xyz] PTzone"
     torrent_url = f"{base_url}/details.php?id="
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://ptzone.xyz",)

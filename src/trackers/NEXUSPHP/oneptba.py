@@ -16,7 +16,7 @@ class OnePTBA(NEXUSPHP):
     banned_groups = ()
     display_name = "1PTBA"
     base_url = "https://1ptba.com"
-    source_flag = "[1ptba.com] 1PTBA"
+    source_flag = "[1ptba.com] 1PTBA.COM"
     torrent_url = f"{base_url}/details.php?id="
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://1ptba.com",)
