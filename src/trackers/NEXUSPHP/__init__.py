@@ -394,7 +394,7 @@ class NEXUSPHP:
         return {"tags[4][]": checkboxes} if checkboxes else {}
 
     async def get_anonymous_data(self, meta: Meta) -> dict[str, str]:
-        anonymous = not (meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
+        anonymous = not (meta.anon == 0 and not self.tracker_config.get("anon", False))
         return {"uplver": "yes"} if anonymous else {}
 
     async def get_imdb_data(self, meta: Meta) -> dict[str, str]:

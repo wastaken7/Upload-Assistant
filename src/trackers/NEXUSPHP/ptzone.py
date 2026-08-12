@@ -229,5 +229,5 @@ class PTZone(NEXUSPHP):
         return ""
 
     async def get_anonymous_data(self, meta: Meta) -> dict[str, str]:
-        anonymous = not (meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
+        anonymous = not (meta.anon == 0 and not self.tracker_config.get("anon", False))
         return {"anonymous": "1"} if anonymous else {}
