@@ -70,7 +70,7 @@ class MediaInfoBinaryManager:
         try:
             binary = cls.binary_path(base_dir)
         except RuntimeError:
-            return None
+            return shutil.which("mediainfo")
         if binary.is_file() and (binary.suffix.lower() == ".exe" or os.access(binary, os.X_OK)):
             return str(binary)
         return shutil.which("mediainfo")
