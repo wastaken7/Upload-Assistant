@@ -1692,7 +1692,7 @@ class MakingOff:
             logger.warning(f"{self.tracker}: [bold red]Only films may be uploaded to this forum.[/bold red]")
             return False
 
-        if bool(getattr(meta, "adult_media", False) or getattr(meta, "tmdb_adult_media", False) or getattr(meta, "nsfw", False)):
+        if bool(getattr(meta, "adult_media", False) or getattr(meta, "tmdb_adult_media", False)):
             logger.warning(f"{self.tracker}: [bold red]Adult releases are not allowed on this forum.[/bold red]")
             return False
 

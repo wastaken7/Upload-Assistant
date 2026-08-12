@@ -388,7 +388,7 @@ class CathodeRayTube:
         category = str(meta.category).upper()
 
         # Explicit pornography is forbidden for all categories
-        if meta.adult_media or meta.tmdb_adult_media or meta.nsfw:
+        if meta.adult_media or meta.tmdb_adult_media:
             logger.warning(f"{self.tracker}: [red]Explicit pornography is forbidden.[/red]")
             return False
 

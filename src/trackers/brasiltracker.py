@@ -1075,7 +1075,7 @@ class BrasilTracker:
                 )
 
                 if magazine:
-                    data["adulto"] = "1" if meta.xxx or meta.nsfw else "0"
+                    data["adulto"] = "1" if meta.adult_media or meta.tmdb_adult_media else "0"
 
                     months_pt = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
                     months_en = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]

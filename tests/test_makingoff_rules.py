@@ -9,7 +9,6 @@ def make_meta(**overrides):
         "category": "MOVIE",
         "adult_media": False,
         "tmdb_adult_media": False,
-        "nsfw": False,
         "is_disc": "",
         "container": "MKV",
         "video_codec": "H.264",

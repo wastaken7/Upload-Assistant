@@ -108,7 +108,27 @@ class DarkPeers(UNIT3D):
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         audio_spectrogram = str(meta.category or "").strip().upper() == "MUSIC"
-        description = await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, audio_spectrogram=audio_spectrogram)
+        description = await DescriptionBuilder(self.tracker, self.config).general_description_generator(
+            meta,
+            audio_spectrogram=audio_spectrogram,
+            bluray=True,
+            book=True,
+            custom_header=True,
+            custom_signature=True,
+            description=True,
+            game=True,
+            languages=False,
+            logo=True,
+            mediainfo=False,
+            menu_screenshots=True,
+            nfo=False,
+            screenshots=True,
+            tonemapped_header=True,
+            tv_info=True,
+            ua_signature=True,
+            user_description=True,
+            music=True,
+        )
         return {"description": description}
 
     async def get_additional_checks(self, meta: Meta) -> bool:

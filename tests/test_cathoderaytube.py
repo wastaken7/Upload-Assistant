@@ -63,7 +63,6 @@ def meta(**overrides):
         "debug": False,
         "adult_media": False,
         "tmdb_adult_media": False,
-        "nsfw": False,
         "anon": False,
         "filelist": ["Example.Movie.2010.mkv"],
         "season": 0,

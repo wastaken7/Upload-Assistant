@@ -101,7 +101,30 @@ class Locadora(UNIT3D):
 
     async def get_description(self, meta: Meta) -> dict[str, str]:
         signature = f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=4]Compartilhado com {meta.ua_name} {meta.current_version} (fork)[/size][/url][/right]"
-        return {"description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta, signature=signature)}
+        return {
+            "description": await DescriptionBuilder(self.tracker, self.config).general_description_generator(
+                meta,
+                audio_spectrogram=True,
+                bluray=True,
+                book=True,
+                custom_header=True,
+                custom_signature=True,
+                description=True,
+                game=True,
+                languages=False,
+                logo=True,
+                mediainfo=False,
+                menu_screenshots=True,
+                nfo=False,
+                screenshots=True,
+                tonemapped_header=True,
+                tv_info=True,
+                ua_signature=True,
+                user_description=True,
+                music=True,
+                signature=signature,
+            )
+        }
 
     async def get_category_id(self, meta: Meta, category: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
         _ = (category, reverse, mapping_only)
