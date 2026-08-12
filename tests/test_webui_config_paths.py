@@ -35,3 +35,13 @@ def test_load_config_rejects_unrelated_python_file(tmp_path: Path, monkeypatch) 
     monkeypatch.setattr(server, "STATE_DIR", state_dir)
 
     assert server._load_config_from_file(unrelated_path) is None
+
+
+def test_load_config_rejects_non_python_file_inside_runtime_data(tmp_path: Path, monkeypatch) -> None:
+    state_dir = tmp_path / "state"
+    config_path = state_dir / "data" / "config.txt"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("config = {'DEFAULT': {}}\n", encoding="utf-8")
+    monkeypatch.setattr(server, "STATE_DIR", state_dir)
+
+    assert server._load_config_from_file(config_path) is None
