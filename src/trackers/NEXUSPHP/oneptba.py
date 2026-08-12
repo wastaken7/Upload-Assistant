@@ -93,7 +93,10 @@ class OnePTBA(NEXUSPHP):
         if mtype == "remux":
             return remux
 
-        if "tv" in mtype:
+        if "web" in mtype:
+            return encode
+
+        if mtype == "hdtv":
             return hdtv
 
         if mtype == "encode":

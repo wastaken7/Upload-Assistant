@@ -20,6 +20,10 @@ def test_lemonhd_methods():
     assert tracker.get_resolution(meta_movie) == 2
     assert tracker.get_audio_codec(meta_movie) == 5
 
+    assert tracker.get_type(Meta(category="TV", type="HDTV")) == 5
+    assert tracker.get_douban_url(Meta(douban_id=12345)) == "https://movie.douban.com/subject/12345/"
+    assert tracker.get_imdb_url(Meta(imdb_id="tt1234567", imdb_info={"imdb_url": "https://imdb.com/title/tt1234567"})) == ""
+
     meta_tv = Meta(category="TV", genres=["Documentary"])
     assert tracker.get_category(meta_tv) == 405
 
@@ -37,6 +41,9 @@ def test_oneptba_methods():
     assert tracker.get_audio_codec(meta_movie) == 1
     assert tracker.get_region(meta_movie) == 22
     assert "7" in tracker.get_checkboxes(meta_movie)
+    assert tracker.get_type(Meta(category="MOVIE", type="WEB-DL")) == 7
+    assert tracker.get_region(Meta(category="MOVIE", type="WEB-DL")) == 23
+    assert tracker.get_type(Meta(category="TV", type="HDTV")) == 5
 
 
 def test_xingyungept_methods():
@@ -51,6 +58,9 @@ def test_xingyungept_methods():
     assert tracker.get_resolution(meta_tv) == 3
     assert tracker.get_audio_codec(meta_tv) == 14
     assert "11" in tracker.get_checkboxes(meta_tv)
+    assert tracker.get_type(Meta(category="TV", type="HDTV")) == 5
+    assert tracker.get_douban_url(Meta(douban_id=12345)) == "https://movie.douban.com/subject/12345/"
+    assert tracker.get_imdb_url(Meta(imdb_id="tt1234567", imdb_info={"imdb_url": "https://imdb.com/title/tt1234567"})) == ""
 
 
 def test_ptzone_methods():
@@ -64,3 +74,6 @@ def test_ptzone_methods():
     assert tracker.get_codec(meta_movie) == 6
     assert tracker.get_resolution(meta_movie) == 6
     assert tracker.get_audio_codec(meta_movie) == 14
+    assert tracker.get_type(Meta(category="TV", type="HDTV")) == 5
+    assert tracker.get_douban_url(Meta(douban_id=12345)) == "https://movie.douban.com/subject/12345/"
+    assert tracker.get_imdb_url(Meta(imdb_id="tt1234567", imdb_info={"imdb_url": "https://imdb.com/title/tt1234567"})) == ""

@@ -91,7 +91,7 @@ class XingyungePT(NEXUSPHP):
         if "web" in mtype:
             return web_dl
 
-        if "tv" in mtype:
+        if mtype == "hdtv":
             return hdtv
 
         if mtype == "encode":
@@ -236,5 +236,8 @@ class XingyungePT(NEXUSPHP):
         return checkboxes
 
     def get_douban_url(self, meta: Meta) -> str:
+        return super().get_douban_url(meta)
+
+    def get_imdb_url(self, meta: Meta) -> str:
         _ = meta
         return ""
