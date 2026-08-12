@@ -68,11 +68,17 @@ def guessit_fn(value: str, options: dict[str, Any] | None = None) -> dict[str, A
 
 
 def _normalize_search_year(value: Any) -> str | None:
-    if value in (None, ""):
+    if value is None or value == "":
         return None
-    if isinstance(value, (str, int)):
-        return str(value)
-    return str(value)
+    if isinstance(value, (list, tuple, set)):
+        for candidate in value:
+            normalized = _normalize_search_year(candidate)
+            if normalized is not None:
+                return normalized
+        return None
+
+    year_match = re.search(r"\b(?:18|19|20)\d{2}\b", str(value))
+    return year_match.group(0) if year_match else None
 
 
 def _to_int(value: Any, default: int = 0) -> int:
