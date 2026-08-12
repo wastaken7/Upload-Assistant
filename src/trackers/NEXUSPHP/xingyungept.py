@@ -208,7 +208,7 @@ class XingyungePT(NEXUSPHP):
         subtitle_tracks = meta.subtitle_languages or []
         mhdr = meta.hdr
 
-        checkboxes = []
+        checkboxes: list[str] = []
 
         if meta.exclusive:
             checkboxes.append(str(reposting_prohibited))
@@ -241,3 +241,7 @@ class XingyungePT(NEXUSPHP):
     def get_imdb_url(self, meta: Meta) -> str:
         _ = meta
         return ""
+
+    async def get_anonymous_data(self, meta: Meta) -> dict[str, str]:
+        anonymous = not (meta.anon == 0 and not self.tracker_config.get("anon", False))
+        return {"anonymous": "1"} if anonymous else {}

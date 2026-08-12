@@ -227,3 +227,7 @@ class PTZone(NEXUSPHP):
     def get_imdb_url(self, meta: Meta) -> str:
         _ = meta
         return ""
+
+    async def get_anonymous_data(self, meta: Meta) -> dict[str, str]:
+        anonymous = not (meta.anon == 0 and not self.tracker_config.get("anon", False))
+        return {"anonymous": "1"} if anonymous else {}

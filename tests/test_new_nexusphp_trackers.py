@@ -1,4 +1,6 @@
 # ruff: noqa: S101
+import asyncio
+
 from src.meta import Meta
 from src.trackers.NEXUSPHP.lemonhd import LemonHD
 from src.trackers.NEXUSPHP.oneptba import OnePTBA
@@ -26,6 +28,25 @@ def test_lemonhd_methods():
 
     meta_tv = Meta(category="TV", genres=["Documentary"])
     assert tracker.get_category(meta_tv) == 405
+
+
+def test_lemonhd_data_getters_return_single_field_dictionaries():
+    tracker = LemonHD(dummy_config)
+    meta = Meta(category="MOVIE", type="ENCODE", resolution="1080p", video_codec="H.264", audio="DTS")
+
+    assert asyncio.run(tracker.get_name(meta)) == {"name": meta.name}
+    assert asyncio.run(tracker.get_category_data(meta)) == {"type": 401}
+    assert asyncio.run(tracker.get_type_data(meta)) == {"medium_sel[4]": 2}
+    assert asyncio.run(tracker.get_codec_data(meta)) == {"codec_sel[4]": 1}
+    assert asyncio.run(tracker.get_resolution_data(meta)) == {"standard_sel[4]": 2}
+    assert asyncio.run(tracker.get_audio_codec_data(meta)) == {"audiocodec_sel[4]": 5}
+    assert asyncio.run(tracker.get_group_tag_data(meta)) == {"team_sel[4]": 5}
+    assert asyncio.run(tracker.get_checkboxes_data(meta)) == {}
+    assert asyncio.run(tracker.get_anonymous_data(meta)) == {}
+    assert asyncio.run(tracker.get_imdb_data(meta)) == {}
+    assert asyncio.run(tracker.get_douban_data(meta)) == {}
+    assert asyncio.run(tracker.get_region_data(meta)) == {}
+    assert asyncio.run(tracker.get_container_data(meta)) == {}
 
 
 def test_oneptba_methods():

@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
 import platform
 from typing import Any, ClassVar
 
@@ -291,11 +292,11 @@ class NEXUSPHP:
 
         return "\n".join(desc_parts)
 
-    async def get_description(self, meta: Meta) -> str:
+    async def get_description(self, meta: Meta) -> dict[str, str]:
         builder = DescriptionBuilder(self.tracker, self.config)
         meta.nexusphp_description = await self.standard_desc(meta)
 
-        return await builder.general_description_generator(
+        description = await builder.general_description_generator(
             meta,
             audio_spectrogram=True,
             bluray=True,
@@ -316,6 +317,7 @@ class NEXUSPHP:
             user_description=True,
             signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta.ua_signature}[/size][/url][/right]",
         )
+        return {"descr": description}
 
     def get_category(self, meta: Meta) -> int:
         meta = meta
@@ -341,10 +343,6 @@ class NEXUSPHP:
         meta = meta
         return []
 
-    def get_anonymous(self, meta: Meta) -> bool:
-        meta = meta
-        return False
-
     def get_audio_codec(self, meta: Meta) -> int:
         meta = meta
         return 0
@@ -367,59 +365,86 @@ class NEXUSPHP:
         meta = meta
         return 0
 
-    async def get_technical_info(self, meta: Meta) -> str:
+    async def get_technical_info(self, meta: Meta) -> dict[str, str]:
         file = "BD_SUMMARY_00" if meta.is_disc == "BDMV" else "MEDIAINFO_CLEANPATH"
         async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{file}.txt", encoding="utf-8") as f:
-            return await f.read()
+            return {"technical_info": await f.read()}
 
-    async def get_data(self, meta: Meta):
+    async def get_name(self, meta: Meta) -> dict[str, str]:
+        return {"name": meta.name}
+
+    async def get_category_data(self, meta: Meta) -> dict[str, int]:
+        return {"type": self.get_category(meta)}
+
+    async def get_type_data(self, meta: Meta) -> dict[str, int]:
+        return {"medium_sel[4]": self.get_type(meta)}
+
+    async def get_codec_data(self, meta: Meta) -> dict[str, int]:
+        return {"codec_sel[4]": self.get_codec(meta)}
+
+    async def get_resolution_data(self, meta: Meta) -> dict[str, int]:
+        return {"standard_sel[4]": self.get_resolution(meta)}
+
+    async def get_group_tag_data(self, meta: Meta) -> dict[str, int]:
+        group_tag = self.get_group_tag(meta)
+        return {"team_sel[4]": group_tag} if group_tag else {}
+
+    async def get_checkboxes_data(self, meta: Meta) -> dict[str, list[str]]:
+        checkboxes = self.get_checkboxes(meta)
+        return {"tags[4][]": checkboxes} if checkboxes else {}
+
+    async def get_anonymous_data(self, meta: Meta) -> dict[str, str]:
+        anonymous = not (meta.anon == 0 and not self.tracker_config.get("anon", False))
+        return {"uplver": "yes"} if anonymous else {}
+
+    async def get_imdb_data(self, meta: Meta) -> dict[str, str]:
+        imdb_url = self.get_imdb_url(meta)
+        return {"url": imdb_url} if imdb_url else {}
+
+    async def get_douban_data(self, meta: Meta) -> dict[str, str]:
+        douban_url = self.get_douban_url(meta)
+        return {"pt_gen": douban_url} if douban_url else {}
+
+    async def get_audio_codec_data(self, meta: Meta) -> dict[str, int]:
+        audio = self.get_audio_codec(meta)
+        return {"audiocodec_sel[4]": audio} if audio else {}
+
+    async def get_region_data(self, meta: Meta) -> dict[str, int]:
+        region = self.get_region(meta)
+        return {"source_sel[4]": region} if region else {}
+
+    async def get_container_data(self, meta: Meta) -> dict[str, int]:
+        container = self.get_container(meta)
+        return {"processing_sel[4]": container} if container else {}
+
+    async def get_data(self, meta: Meta) -> dict[str, Any]:
         await self.load_localized_data(meta)
+        results = await asyncio.gather(
+            self.get_name(meta),
+            self.get_description(meta),
+            self.get_technical_info(meta),
+            self.get_category_data(meta),
+            self.get_type_data(meta),
+            self.get_codec_data(meta),
+            self.get_resolution_data(meta),
+            self.get_group_tag_data(meta),
+            self.get_checkboxes_data(meta),
+            self.get_anonymous_data(meta),
+            self.get_imdb_data(meta),
+            self.get_douban_data(meta),
+            self.get_audio_codec_data(meta),
+            self.get_region_data(meta),
+            self.get_container_data(meta),
+        )
+
         data: dict[str, Any] = {
-            "codec_sel[4]": self.get_codec(meta),
             "color": 0,
-            "descr": await self.get_description(meta),
             "font": 0,
-            "medium_sel[4]": self.get_type(meta),
-            "name": await self.get_name(meta),
             "size": 0,
             "small_descr": self.common.get_small_description(meta),
-            "standard_sel[4]": self.get_resolution(meta),
-            "technical_info": await self.get_technical_info(meta),
-            "type": self.get_category(meta),
         }
-
-        group_tag = self.get_group_tag(meta)
-        if group_tag:
-            data["team_sel[4]"] = group_tag
-
-        checkboxes = self.get_checkboxes(meta)
-        if checkboxes:
-            data["tags[4][]"] = checkboxes
-
-        anonymous = self.get_anonymous(meta)
-        if anonymous:
-            data["uplver"] = "yes"
-
-        imdb_url = self.get_imdb_url(meta)
-        if imdb_url:
-            data["url"] = imdb_url
-
-        douban_url = self.get_douban_url(meta)
-        if douban_url:
-            data["pt_gen"] = douban_url
-
-        audio = self.get_audio_codec(meta)
-        if audio:
-            data["audiocodec_sel[4]"] = audio
-
-        region = self.get_region(meta)
-        if region:
-            data["source_sel[4]"] = region
-
-        container = self.get_container(meta)
-        if container:
-            data["processing_sel[4]"] = container
-
+        for result in results:
+            data.update(result)
         return data
 
     async def upload(self, meta: Meta) -> bool:
@@ -441,6 +466,3 @@ class NEXUSPHP:
             upload_url=f"{self.base_url}/takeupload.php",
             success_text="download.php?id=",
         )
-
-    async def get_name(self, meta: Meta) -> str:
-        return meta.name
