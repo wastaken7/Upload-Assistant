@@ -1228,7 +1228,23 @@ class DescriptionBuilder:
         if self.tracker == "MTEAM" and meta.mteam_description:
             desc_parts.append(meta.mteam_description)
 
-        if self.tracker in {"LAJIDUI", "LONGPT", "PTCAFE", "PTFANS", "PTGTK", "RAILGUNPT", "NEXUSPHP"} and meta.nexusphp_description:
+        if (
+            self.tracker
+            in {
+                "1PTBA",
+                "LAJIDUI",
+                "LEMONHD",
+                "LONGPT",
+                "PTCAFE",
+                "PTFANS",
+                "PTGTK",
+                "PTZONE",
+                "RAILGUNPT",
+                "XINGYUNGEPT",
+                "NEXUSPHP",
+            }
+            and meta.nexusphp_description
+        ):
             desc_parts.append(meta.nexusphp_description)
 
         meta_description_value = meta.description
@@ -1968,7 +1984,19 @@ class DescriptionBuilder:
         if not thumb_size:
             thumb_size = self._get_int_config("thumbnail_size", 350)
 
-        nexusphp_trackers = {"LAJIDUI", "LONGPT", "PTCAFE", "PTFANS", "PTGTK", "RAILGUNPT", "NEXUSPHP"}
+        nexusphp_trackers = {
+            "1PTBA",
+            "LAJIDUI",
+            "LEMONHD",
+            "LONGPT",
+            "PTCAFE",
+            "PTFANS",
+            "PTGTK",
+            "PTZONE",
+            "RAILGUNPT",
+            "XINGYUNGEPT",
+            "NEXUSPHP",
+        }
         if self.tracker in nexusphp_trackers:
             return f"[img]{raw_url}[/img]"
         if self.tracker == "HDTORRENTS":
