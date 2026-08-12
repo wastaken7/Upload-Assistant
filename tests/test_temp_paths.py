@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from src.temp_paths import artwork_dir, menu_screenshots_dir, screenshots_dir, spectrograms_dir
+import src.temp_paths as temp_paths
+from src.temp_paths import artwork_dir, menu_screenshots_dir, music_release_snapshot_path, screenshots_dir, spectrograms_dir
 
 
 def test_typed_image_directories_are_isolated_per_release(tmp_path: Path) -> None:
@@ -25,3 +26,10 @@ def test_typed_image_directories_are_isolated_per_release(tmp_path: Path) -> Non
     assert directories.isdisjoint(other_directories)
     assert {path.name for path in directories} == {"screenshots", "artwork", "menu_screenshots", "spectrograms"}
     assert all(path.is_dir() for path in directories)
+
+
+def test_music_release_snapshot_uses_state_dir_when_base_dir_is_empty(tmp_path: Path, monkeypatch) -> None:
+    state_dir = tmp_path / "state"
+    monkeypatch.setattr(temp_paths, "STATE_DIR", state_dir)
+
+    assert music_release_snapshot_path("", "release") == state_dir / "tmp" / "release" / "music_release.json"

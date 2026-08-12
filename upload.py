@@ -56,7 +56,7 @@ from src.qbitwait import Wait
 from src.queuemanage import QueueManager
 from src.rehostimages import check_tracker_image_hosts
 from src.takescreens import TakeScreensManager, download_artwork_from_meta
-from src.temp_paths import artwork_dir, screenshots_dir
+from src.temp_paths import artwork_dir, music_release_snapshot_path, screenshots_dir
 from src.torrentcreate import TorrentCreator
 from src.trackerhandle import process_trackers
 from src.trackers.alpharatio import AlphaRatio
@@ -882,7 +882,7 @@ def _download_music_cover(url: str) -> bytes | None:
 
 
 async def _write_music_snapshot(meta: Meta) -> None:
-    path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / "music_release.json"
+    path = music_release_snapshot_path(meta.base_dir, str(meta.uuid))
     path.parent.mkdir(parents=True, exist_ok=True)
     async with aiofiles.open(path, "w", encoding="utf-8") as file:
         await file.write(json.dumps(meta.music_release, indent=2, cls=PathAwareEncoder))
