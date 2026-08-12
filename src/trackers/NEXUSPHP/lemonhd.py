@@ -191,7 +191,7 @@ class LemonHD(NEXUSPHP):
         mhdr = meta.hdr
         resolution = meta.resolution.lower()
 
-        checkboxes = []
+        checkboxes: list[str] = []
 
         if meta.exclusive:
             checkboxes.append(str(reposting_prohibited))
@@ -222,3 +222,7 @@ class LemonHD(NEXUSPHP):
     def get_imdb_url(self, meta: Meta) -> str:
         _ = meta
         return ""
+
+    async def get_anonymous_data(self, meta: Meta) -> dict[str, str]:
+        _ = meta
+        return {}

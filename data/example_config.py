@@ -1484,7 +1484,6 @@ config: dict[str, Any] = {
             # Cookies required (export from https://lemonhd.net/ to data/cookies/LEMONHD.txt).
             # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
             "announce_url": "",
-            "anon": True,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
