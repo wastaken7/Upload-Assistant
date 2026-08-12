@@ -178,7 +178,29 @@ class UNIT3D:
         return {"name": meta.name}
 
     async def get_description(self, meta: Meta) -> Any:
-        return {"description": await DescriptionBuilder(self.tracker, self.config).unit3d_edit_desc(meta)}
+        return {
+            "description": await DescriptionBuilder(self.tracker, self.config).general_description_generator(
+                meta,
+                audio_spectrogram=True,
+                bluray=True,
+                book=True,
+                custom_header=True,
+                custom_signature=True,
+                description=True,
+                game=True,
+                languages=False,
+                logo=True,
+                mediainfo=False,
+                menu_screenshots=True,
+                nfo=False,
+                screenshots=True,
+                tonemapped_header=True,
+                tv_info=True,
+                ua_signature=True,
+                user_description=True,
+                music=True,
+            )
+        }
 
     async def get_mediainfo(self, meta: Meta) -> dict[str, str]:
         if meta.bdinfo or (meta.category in ["GAME", "BOOK"] and not meta.audiobook):

@@ -88,6 +88,25 @@ def _to_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def check_pre_release(meta: Meta) -> bool:
+    release_type = (meta.type or "").upper()
+    rel_source = (meta.source or "").upper()
+    forbidden_types = (
+        "CAM",
+        "DCP",
+        "HDCAM",
+        "SCR",
+        "SCREENER",
+        "TC",
+        "TELECINE",
+        "TELESYNC",
+        "TS",
+        "WORKPRINT",
+        "WP",
+    )
+    return release_type in forbidden_types or rel_source in forbidden_types or "CAM" in release_type
+
+
 def _title_without_leading_article(title: str) -> str:
     return re.sub(r"^(the|a|an)\s+", "", title.strip().lower(), flags=re.IGNORECASE)
 
@@ -141,6 +160,7 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     meta.not_anime = False
     meta.subtitle_files = cast(list[str], [])
     meta.adult_media = False
+    meta.pre_release = check_pre_release(meta)
 
     folder_id = Path(meta.path or "").name
     if not meta.uuid:
@@ -1707,3 +1727,5 @@ async def finalize_metadata(
                         meta.tmdb_localized_data.setdefault(lang, {})[data_type] = result
         except Exception as e:
             logger.error(f"[red]Error pre-fetching TMDB localized data: {e}[/red]")
+
+    meta.pre_release = check_pre_release(meta)

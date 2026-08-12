@@ -198,6 +198,7 @@ class Meta:
     infohash: str = ""
     initial_dupes: dict[str, Any] = field(default_factory=dict)
     is_disc: str = ""
+    pre_release: bool = False
     isbn: str = ""
     isdir: bool = False
     item_args: list[str] | None = None
@@ -287,7 +288,6 @@ class Meta:
     nohash: bool = False
     non_disc_has_pcm_audio_tracks: bool = False
     not_anime: bool = False
-    nsfw: bool | None = None
     nzb_path: str = ""
     ocr: bool | None = None
     oe: str | int | None = None
@@ -508,7 +508,6 @@ class Meta:
     write_audio_languages: bool | None = None
     write_hc_languages: bool | None = None
     write_subtitle_languages: bool | None = None
-    xxx: bool | None = None
     year: int | None = None
     youtube: str | None = ""
 

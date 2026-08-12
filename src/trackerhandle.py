@@ -312,7 +312,28 @@ async def process_trackers(
                         try:
                             await check_tracker_image_hosts(meta, tracker_class)
                             if manual_tracker in api_trackers:
-                                await DescriptionBuilder(manual_tracker, config).unit3d_edit_desc(meta, manual_tracker)
+                                await DescriptionBuilder(manual_tracker, config).general_description_generator(
+                                    meta,
+                                    audio_spectrogram=True,
+                                    bluray=True,
+                                    book=True,
+                                    custom_header=True,
+                                    custom_signature=True,
+                                    description=True,
+                                    game=True,
+                                    languages=False,
+                                    logo=True,
+                                    mediainfo=False,
+                                    menu_screenshots=True,
+                                    nfo=False,
+                                    screenshots=True,
+                                    tonemapped_header=True,
+                                    tv_info=True,
+                                    ua_signature=True,
+                                    user_description=True,
+                                    music=True,
+                                    signature=manual_tracker,
+                                )
                             else:
                                 await tracker_class.edit_desc(meta)
                         except Exception as e:
