@@ -25,12 +25,15 @@ def test_torrentleech_uses_original_ua_screenshot_layout() -> None:
 
 def test_other_trackers_keep_configured_screenshot_layout() -> None:
     config = {
-        "DEFAULT": {"screens_per_row": 4, "thumbnail_size": 450},
-        "TRACKERS": {"TEST": {}},
+        "DEFAULT": {"screens_per_row": 2, "thumbnail_size": 350},
+        "TRACKERS": {"TEST": {"screens_per_row": 4, "thumbnail_size": 450}},
     }
     builder = DescriptionBuilder("TEST", config)
 
     assert asyncio.run(builder.get_screens_per_row()) == 4
+    assert builder.format_screenshot("https://example.com/page", "https://example.com/raw.png", "https://example.com/thumb.png") == (
+        "[url=https://example.com/page][img=450]https://example.com/raw.png[/img][/url] "
+    )
 
     parts: list[str] = []
     assert builder._append_screenshot_row_separator(parts, 3, 4) == "\n"
