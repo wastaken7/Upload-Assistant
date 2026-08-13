@@ -71,6 +71,8 @@ def check_dependencies() -> None:
                 try:
                     if has_packaging:
                         req = packaging.requirements.Requirement(line)
+                        if req.marker is not None and not req.marker.evaluate():
+                            continue
                         try:
                             installed_version = importlib.metadata.version(req.name)
                             if not req.specifier.contains(installed_version, prereleases=True):
