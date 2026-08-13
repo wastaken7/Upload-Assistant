@@ -42,7 +42,7 @@
         return [...fieldset.querySelectorAll('input')]
             .filter((input) => input.getAttribute('wire:model.live') === group.key)
             .map((input) => {
-                const label = input.closest('label');
+                const label = input.labels?.[0];
                 const name = label ? normalizeText(label.textContent) : '';
                 return { id: input.value.trim(), name };
             })
