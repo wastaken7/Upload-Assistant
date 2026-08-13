@@ -57,7 +57,6 @@ from src.trackers.ptskit import Ptskit
 from src.trackers.retroflix import RetroFlix
 from src.trackers.speedapp import SpeedApp
 from src.trackers.swarmazon import Swarmazon
-from src.trackers.torrenthr import TorrentHR
 from src.trackers.torrentleech import TorrentLeech
 from src.trackers.totheglory import ToTheGlory
 from src.trackers.tvchaosuk import TVChaosUK
@@ -1418,7 +1417,6 @@ tracker_class_map: dict[str, Any] = {
     "SPEEDAPP": SpeedApp,
     "SKIPTHECOMMERCIALS": SkipTheCommercials,
     "SUIO": Suio,
-    "TORRENTHR": TorrentHR,
     "CINEMATIK": Cinematik,
     "TORRENTLEECH": TorrentLeech,
     "THELEACHZONE": TheLeachZone,

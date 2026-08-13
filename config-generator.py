@@ -193,7 +193,6 @@ def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
         "SPD": "SPEEDAPP",
         "SN": "SWARMAZON",
         "TTG": "TOTHEGLORY",
-        "THR": "TORRENTHR",
         "TL": "TORRENTLEECH",
         "TVC": "TVCHAOSUK",
         "AITHER": "AITHER",

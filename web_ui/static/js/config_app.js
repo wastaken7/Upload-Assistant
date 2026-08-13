@@ -345,7 +345,6 @@ const trackerNameMap = {
   THELEACHZONE: "TheLeachZone",
   THEOLDSCHOOL: "TheOldSchool",
   TOTHEGLORY: "ToTheGlory",
-  TORRENTHR: "TorrentHR",
   TORRENTEROS: "Torrenteros",
   TORRENTLEECH: "TorrentLeech",
   TVCHAOSUK: "TVChaosUK",
