@@ -224,8 +224,9 @@ class ULCX(UNIT3D):
                             logger.info(f"{self.tracker}: [bold red]TrueHD audio tracks must include an AC3 compatibility track.[/bold red]")
                             return False
 
-                # Section 6.12: Default subtitles on English content
-                if not meta.is_disc:
+                # Section 6.12: Default subtitles on English content.
+                # This SHOULD become a MUST for personal releases.
+                if meta.personalrelease and not meta.is_disc:
                     orig_lang = (meta.original_language or meta.language or "").lower()
                     if orig_lang in ("en", "eng", "english"):
                         for s in sub_tracks:
