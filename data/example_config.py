@@ -442,7 +442,7 @@ config: dict[str, Any] = {
         # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
         # Available tracker: 1PTBA, AURA4K, ASIANCINEMA, AITHER, ANTHELION, ALPHARATIO, AMIGOSSHARE, AVISTAZ, BEYONDHD, BITHDTV, BJSHARE, BLUTOPIA, BRASILTRACKER, CAPYBARABR, CURUPIRA, SUIO, CINEMAZ, DIGITALCORE, DRUNKENSLUG, DARKPEERS, DESITORRENTS, EMUWAREZ, FUNFILE, FILELIST,
         # GREATPOSTERWALL, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK, HAWKEUNO, INFINITYHD, IMMORTALSEED, ITATORRENTS, LAJIDUI, LEMONHD, LOCADORA, LASTDIGITALUNDERGROUND, LONGPT, LST, LATTEAM, LUMINARR, MIDNIGHTSCENE, MTEAM, NEBULANCE, ONLYENCODES,
-        # NORDICQUALITY, OLDTOONSWORLD, PRIVATEHD, PORTUGAS, PTCAFE, PTERCLUB, PTFANS, PTGTK, PTZONE, PASSTHEPOPCORN, PEERGARDEN, PTSKIT, POLISHTORRENT, RACING4EVERYONE, RASTASTUGAN, REELFLIX, RAILGUNPT, RETROFLIX, RETROMOVIESCLUB, SAMARITANO, SHAREISLAND, SWARMAZON, SEEDPOOL, SPEEDAPP, SKIPTHECOMMERCIALS, TORRENTHR,
+        # NORDICQUALITY, OLDTOONSWORLD, PRIVATEHD, PORTUGAS, PTCAFE, PTERCLUB, PTFANS, PTGTK, PTZONE, PASSTHEPOPCORN, PEERGARDEN, PTSKIT, POLISHTORRENT, RACING4EVERYONE, RASTASTUGAN, REELFLIX, RAILGUNPT, RETROFLIX, RETROMOVIESCLUB, SAMARITANO, SHAREISLAND, SWARMAZON, SEEDPOOL, SPEEDAPP, SKIPTHECOMMERCIALS,
         # CINEMATIK, MAKINGOFF, ORPHEUS, TORRENTLEECH, THELEACHZONE, THEOLDSCHOOL, TOTHEGLORY, TORRENTEROS, TVCHAOSUK, ULCX, UTOPIA, XINGYUNGEPT, YUSCENE, ZENITH
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
@@ -2586,19 +2586,6 @@ config: dict[str, Any] = {
             "use_bluray_images": True,
             "bluray_image_size": "",
             "add_audio_spectrogram": True,
-            "inject_delay": 0,
-        },
-        "TORRENTHR": {
-            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
-            "link_dir_name": "",
-            "username": "",
-            "password": "",
-            "img_api": "get this from the forum post",
-            "announce_url": "",
-            "pronfo_api_key": "",
-            "pronfo_theme": "pronfo theme code",
-            "pronfo_rapi_id": "pronfo remote api id",
-            "anon": True,
             "inject_delay": 0,
         },
         "TORRENTLEECH": {
