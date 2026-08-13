@@ -9,7 +9,7 @@ Config = dict[str, Any]
 
 
 class Unit3dTemplate(UNIT3D):  # EDIT 'Unit3dTemplate' AS ABBREVIATED TRACKER NAME
-    # Use scripts/UNIT3D ID Report/UNIT3D-id-report.user.js to discover tracker IDs before implementing mappings.
+    # Use scripts/UNIT3D-ID-Report/UNIT3D-id-report.user.js to discover tracker IDs before implementing mappings.
     tracker = "Abbreviated Tracker Name"
     base_url = "https://domain.tld"
     banned_groups = ("",)
