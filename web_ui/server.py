@@ -5659,7 +5659,7 @@ def execute_command():
                         yield f"data: {json.dumps({'type': 'exit', 'code': exit_code})}\n\n"
                     finally:
                         with contextlib.suppress(Exception):
-                            if process is not None and not _session_state_is_current(session_id, process_state) and process.poll() is None:
+                            if process is not None and process.poll() is None:
                                 _terminate_process_tree(process)
                         if process is not None:
                             _close_webui_process_io(process)
@@ -5877,7 +5877,8 @@ def kill_process():
             _close_webui_process_io(process)
 
         finally:
-            # Clean up tracking entry regardless
+            # Keep the session available for another Kill attempt if the
+            # process tree could not be terminated.
             # Attempt to join reader threads if present
             with contextlib.suppress(Exception):
                 info = active_processes.get(session_id, {})
@@ -5890,8 +5891,9 @@ def kill_process():
                     console.print(f"Joining stderr thread for session {session_id}", markup=False)
                     stderr_t.join(timeout=1)
 
-            with contextlib.suppress(Exception):
-                active_processes.pop(session_id, None)
+            if terminated:
+                with contextlib.suppress(Exception):
+                    active_processes.pop(session_id, None)
 
         if not terminated:
             return jsonify({"error": "Failed to terminate process tree", "success": False}), 500
