@@ -184,6 +184,7 @@ async def test_ulcx_audio_subtitle_mediainfo_rules():
 
     # Default subtitles on English content rejected
     meta_default_sub_english = make_ulcx_meta(
+        personalrelease=True,
         language="en",
         original_language="en",
         mediainfo={
@@ -196,3 +197,18 @@ async def test_ulcx_audio_subtitle_mediainfo_rules():
         },
     )
     assert await tracker.get_additional_checks(meta_default_sub_english) is False
+
+    # Default subtitles on non-personal English releases are permitted by the SHOULD rule
+    meta_default_sub_non_personal = make_ulcx_meta(
+        language="en",
+        original_language="en",
+        mediainfo={
+            "media": {
+                "track": [
+                    {"@type": "Audio", "Format": "AAC", "Channels": "2"},
+                    {"@type": "Text", "Language": "english", "Default": "Yes"},
+                ]
+            }
+        },
+    )
+    assert await tracker.get_additional_checks(meta_default_sub_non_personal) is True
