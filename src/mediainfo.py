@@ -9,7 +9,7 @@ from typing import Any
 from bin.get_mediainfo import MediaInfoBinaryManager
 
 
-_REPORT_BY_LINE = re.compile(r"^[ \t]*ReportBy[ \t]*:[^\r\n]*(?:\r?\n|\r)?", re.IGNORECASE | re.MULTILINE)
+_REPORT_BY_LINE = re.compile(r"(?<![^\r\n])[ \t]*ReportBy[ \t]*:[^\r\n]*(?:\r\n?|\n)?", re.IGNORECASE)
 
 
 def strip_report_by_line(report: str) -> str:

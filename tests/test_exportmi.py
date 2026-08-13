@@ -43,6 +43,12 @@ def test_strip_report_by_line_handles_mediainfo_formatting(report_by_line: str) 
     assert strip_report_by_line(report) == "General\nComplete name : example.mkv\n\nVideo\nFormat : AVC\n"
 
 
+def test_strip_report_by_line_handles_bare_carriage_return_boundaries() -> None:
+    report = "General\rComplete name : example.mkv\rReportBy : MediaInfoLib - v26.05\rVideo\rFormat : AVC\r"
+
+    assert strip_report_by_line(report) == "General\rComplete name : example.mkv\rVideo\rFormat : AVC\r"
+
+
 def test_text_reports_always_request_mediainfo_version() -> None:
     completed = Mock(returncode=0, stdout="General", stderr="")
     with patch("src.mediainfo._binary", return_value="mediainfo"), patch("src.mediainfo.subprocess.run", return_value=completed) as run:
