@@ -9,6 +9,14 @@ from typing import Any
 from bin.get_mediainfo import MediaInfoBinaryManager
 
 
+_REPORT_BY_LINE = re.compile(r"(?<![^\r\n])[ \t]*ReportBy[ \t]*:[^\r\n]*(?:\r\n?|\n)?", re.IGNORECASE)
+
+
+def strip_report_by_line(report: str) -> str:
+    """Remove MediaInfo's optional ReportBy version line from a text report."""
+    return _REPORT_BY_LINE.sub("", report)
+
+
 def _base_dir() -> Path:
     return Path(__file__).resolve().parent.parent
 

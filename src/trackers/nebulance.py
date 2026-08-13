@@ -10,6 +10,7 @@ import httpx
 
 from src.cogs.redaction import Redaction
 from src.console import logger
+from src.mediainfo import strip_report_by_line
 from src.meta import Meta
 from src.trackers.common import Common
 
@@ -122,7 +123,7 @@ class Nebulance:
                 mi_dump = await f.read()
         else:
             async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO.txt", encoding="utf-8") as f:
-                mi_dump = await f.read()
+                mi_dump = strip_report_by_line(await f.read())
         torrent_file_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}].torrent"
         async with aiofiles.open(torrent_file_path, "rb") as f:
             torrent_bytes = await f.read()
@@ -157,6 +158,10 @@ class Nebulance:
                         meta.tracker_status[self.tracker]["status_message"] = response_data
                     return False
             else:
+                debug_mediainfo_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/{self.tracker}_MEDIAINFO.txt"
+                async with aiofiles.open(debug_mediainfo_path, "w", newline="", encoding="utf-8") as f:
+                    await f.write(mi_dump)
+                logger.info(f"{self.tracker}: [green]Final MediaInfo payload written to {debug_mediainfo_path}[/green]")
                 logger.info(f"{self.tracker}: Request Data:")
                 logger.info(Redaction.redact_private_info(data))
                 meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."

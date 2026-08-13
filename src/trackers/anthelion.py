@@ -13,6 +13,7 @@ from rich.markup import escape
 from src.cogs.redaction import Redaction
 from src.console import logger, prompt_in_thread
 from src.get_desc import DescriptionBuilder
+from src.mediainfo import strip_report_by_line
 from src.meta import Meta
 from src.torrentcreate import TorrentCreator
 from src.trackers.common import Common
@@ -295,7 +296,7 @@ class Anthelion:
         else:
             mi_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/MEDIAINFO_CLEANPATH.txt"
             async with aiofiles.open(mi_path, encoding="utf-8") as f:
-                mediainfo_output = await f.read()
+                mediainfo_output = strip_report_by_line(await f.read())
             data.update({"mediainfo": mediainfo_output})
         if meta.scene:
             # ID of "Scene?" checkbox on upload form is actually "censored"
@@ -357,6 +358,11 @@ class Anthelion:
                     meta.tracker_status[self.tracker]["status_message"] = f"data error - {response_data}"
                     return False
             else:
+                if "mediainfo" in data:
+                    debug_mediainfo_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / f"{self.tracker}_MEDIAINFO.txt"
+                    async with aiofiles.open(debug_mediainfo_path, "w", newline="", encoding="utf-8") as f:
+                        await f.write(str(data["mediainfo"]))
+                    logger.info(f"{self.tracker}: [green]Final MediaInfo payload written to {debug_mediainfo_path}[/green]")
                 logger.info(f"{self.tracker}: Request Data:")
                 logger.info(Redaction.redact_private_info(data))
                 meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
