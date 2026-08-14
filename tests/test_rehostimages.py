@@ -4,6 +4,7 @@
 
 import asyncio
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import AsyncMock
 
 from src.meta import Meta
@@ -23,11 +24,28 @@ class _Unrestricted:
     pass
 
 
+class _LegacySetPolicy:
+    approved_image_hosts: ClassVar[set[str]] = {"imgbb", "onlyimage"}
+
+    async def check_image_hosts(self, _meta: Meta) -> None:
+        pass
+
+
 def test_select_common_image_host_uses_first_configured_shared_host() -> None:
     selected = select_common_image_host(
         {"img_host_1": "imgbox", "img_host_2": "imgbb", "img_host_3": "ptscreens"},
         ["ALPHA", "BETA", "UNRESTRICTED"],
         {"ALPHA": _Alpha, "BETA": _Beta, "UNRESTRICTED": _Unrestricted},
+    )
+
+    assert selected == "imgbb"
+
+
+def test_select_common_image_host_accepts_legacy_set_policy() -> None:
+    selected = select_common_image_host(
+        {"img_host_1": "imgbox", "img_host_2": "imgbb"},
+        ["ALPHA", "LEGACY"],
+        {"ALPHA": _Alpha, "LEGACY": _LegacySetPolicy},
     )
 
     assert selected == "imgbb"

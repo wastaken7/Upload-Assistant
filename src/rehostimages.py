@@ -60,7 +60,7 @@ def select_common_image_host(
             continue
 
         approved_hosts = getattr(tracker_class, "approved_image_hosts", None)
-        if callable(getattr(tracker_class, "check_image_hosts", None)) and isinstance(approved_hosts, tuple | list):
+        if callable(getattr(tracker_class, "check_image_hosts", None)) and isinstance(approved_hosts, tuple | list | set):
             approved_sets.append({host for host in approved_hosts if isinstance(host, str)})
 
     if not approved_sets:
