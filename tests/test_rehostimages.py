@@ -8,7 +8,12 @@ from typing import ClassVar
 from unittest.mock import AsyncMock
 
 from src.meta import Meta
-from src.rehostimages import ImageHostPolicy, RehostImagesManager, select_common_image_host
+from src.rehostimages import (
+    ImageHostPolicy,
+    RehostImagesManager,
+    has_restricted_image_hosts,
+    select_common_image_host,
+)
 from src.tracker_images import get_tracker_image_collection, has_tracker_image_collection
 
 
@@ -29,6 +34,19 @@ class _LegacySetPolicy:
 
     async def check_image_hosts(self, _meta: Meta) -> None:
         pass
+
+
+def test_has_restricted_image_hosts() -> None:
+    tracker_map = {
+        "ALPHA": _Alpha,
+        "BETA": _Beta,
+        "UNRESTRICTED": _Unrestricted,
+        "LEGACY": _LegacySetPolicy,
+    }
+    assert not has_restricted_image_hosts([], tracker_map)
+    assert not has_restricted_image_hosts(["UNRESTRICTED"], tracker_map)
+    assert has_restricted_image_hosts(["ALPHA"], tracker_map)
+    assert has_restricted_image_hosts(["UNRESTRICTED", "LEGACY"], tracker_map)
 
 
 def test_select_common_image_host_uses_first_configured_shared_host() -> None:
