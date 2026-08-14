@@ -192,10 +192,11 @@ This branch introduces new media categories and automation features not present 
 <details>
 <summary><strong>Click to view Supported Usenet Indexers</strong></summary>
 
-|                                                                                 | Site        | Usage       | Supported Categories  |
-| ------------------------------------------------------------------------------- | ----------- | ----------- | --------------------- |
-| <img src="web_ui/static/img/trackers/curupira.png" width="16" height="16" />    | Curupira    | CURUPIRA    | MOVIE, TV, BOOK, GAME |
-| <img src="web_ui/static/img/trackers/drunkenslug.png" width="16" height="16" /> | DrunkenSlug | DRUNKENSLUG | MOVIE, TV, BOOK, GAME |
+|                                                                                 | Site        | Usage       | Supported Categories         |
+| ------------------------------------------------------------------------------- | ----------- | ----------- | ---------------------------- |
+| <img src="web_ui/static/img/trackers/curupira.png" width="16" height="16" />    | Curupira    | CURUPIRA    | MOVIE, TV, BOOK, GAME        |
+| <img src="web_ui/static/img/trackers/drunkenslug.png" width="16" height="16" /> | DrunkenSlug | DRUNKENSLUG | MOVIE, TV, BOOK, GAME        |
+| <img src="web_ui/static/img/trackers/nzbgeek.ico" width="16" height="16" />     | NZBGeek     | NZBGEEK     | MOVIE, TV, BOOK, GAME, MUSIC |
 
 </details>
 

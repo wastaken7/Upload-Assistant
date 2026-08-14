@@ -103,6 +103,7 @@ from src.trackers.UNIT3D.yuscene import YUSCENE
 from src.trackers.UNIT3D.znth import Zenith
 from src.trackers.USENET.curupira import Curupira
 from src.trackers.USENET.drunkenslug import DrunkenSlug
+from src.trackers.USENET.nzbgeek import NZBGeek
 from src.trackers.USENET.suio import Suio
 
 JsonDict = dict[str, Any]
@@ -1364,6 +1365,7 @@ tracker_class_map: dict[str, Any] = {
     "DIGITALCORE": DigitalCore,
     "DARKPEERS": DarkPeers,
     "DRUNKENSLUG": DrunkenSlug,
+    "NZBGEEK": NZBGeek,
     "DESITORRENTS": DesiTorrents,
     "EMUWAREZ": Emuwarez,
     "FUNFILE": FunFile,
