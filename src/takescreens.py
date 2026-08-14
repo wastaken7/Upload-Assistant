@@ -49,6 +49,141 @@ def is_valid_lostimg_image_size(image_size: int) -> bool:
     return LOSTIMG_MIN_SIZE < image_size <= LOSTIMG_MAX_SIZE
 
 
+def _positive_config_int(key: str, default: int) -> int:
+    try:
+        return max(1, int(default_config.get(key, default) or default))
+    except (TypeError, ValueError):
+        return default
+
+
+def xxx_contact_sheet_settings() -> tuple[int, int, int]:
+    """Return configured XXX contact-sheet rows, columns, and video limit."""
+    return (
+        _positive_config_int("xxx_contact_sheet_rows", 12),
+        _positive_config_int("xxx_contact_sheet_columns", 5),
+        _positive_config_int("xxx_contact_sheet_max_videos", 6),
+    )
+
+
+def xxx_contact_sheet_animation_settings() -> tuple[bool, float]:
+    """Return whether XXX contact sheets are animated and their duration."""
+    animated = _as_bool(default_config.get("xxx_contact_sheet_animated_webp"), default=False)
+    try:
+        duration = max(0.1, float(default_config.get("xxx_contact_sheet_animation_seconds", 5) or 5))
+    except (TypeError, ValueError):
+        duration = 5.0
+    return animated, duration
+
+
+def _xxx_contact_sheet_fontfile() -> str | None:
+    candidates = (
+        Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "arial.ttf",
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        Path("/Library/Fonts/Arial.ttf"),
+    )
+    return next((str(path) for path in candidates if path.is_file()), None)
+
+
+def _xxx_contact_sheet_title_filter(stream: Any, title: str, include_title: bool, fontfile: str | None) -> Any:
+    if not include_title or fontfile is None:
+        return stream
+    escaped_title = title.replace("\\", r"\\\\").replace(":", r"\:").replace("'", r"\'")
+    return stream.filter("pad", width="iw", height="ih+44", x=0, y=44, color="black").filter(
+        "drawtext", text=escaped_title, x="(w-text_w)/2", y=10, fontsize=24, fontcolor="white", fontfile=fontfile
+    )
+
+
+def _xxx_contact_sheet_timestamp_filter(stream: Any, timestamp: str, fontfile: str | None) -> Any:
+    if fontfile is None:
+        return stream
+    return stream.filter(
+        "drawtext", text=timestamp, x=8, y="h-text_h-8", fontsize=18, fontcolor="white", box=1, boxcolor="black@0.65", boxborderw=4, fontfile=fontfile
+    )
+
+
+def _format_contact_sheet_timestamp(seconds: float) -> str:
+    whole_seconds = max(0, int(seconds))
+    hours, remainder = divmod(whole_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def _xxx_contact_sheet_static_stream(video_path: Path, frame_count: int, duration: float, columns: int, rows: int, fontfile: str | None) -> Any:
+    stream = ffmpeg.input(str(video_path))
+    stream = _xxx_contact_sheet_timestamp_filter(stream, r"%{pts\\:hms}", fontfile)
+    return (
+        stream
+        .filter("fps", fps=f"{frame_count}/{duration:.6f}")
+        .filter("scale", 320, -2)
+        .filter("tile", layout=f"{columns}x{rows}", margin=2, padding=2)
+    )
+
+
+def _xxx_contact_sheet_animated_stream(
+    video_path: Path, frame_count: int, duration: float, columns: int, rows: int, animation_seconds: float, fontfile: str | None
+) -> Any:
+    max_start = max(0.0, duration - animation_seconds)
+    streams = []
+    for index in range(frame_count):
+        start_time = max_start * index / max(frame_count - 1, 1)
+        stream = ffmpeg.input(str(video_path), ss=start_time, t=animation_seconds).filter("fps", fps=8).filter("scale", 320, -2)
+        stream = _xxx_contact_sheet_timestamp_filter(stream, _format_contact_sheet_timestamp(start_time), fontfile).filter("setpts", "PTS-STARTPTS")
+        streams.append(stream)
+    rows_streams = [ffmpeg.filter(streams[row * columns : (row + 1) * columns], "hstack", inputs=columns) for row in range(rows)]
+    return ffmpeg.filter(rows_streams, "vstack", inputs=rows)
+
+
+async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main") -> list[str]:
+    """Create one evenly sampled contact sheet for each selected XXX video."""
+    rows, columns, max_videos = xxx_contact_sheet_settings()
+    animated_webp, animation_seconds = xxx_contact_sheet_animation_settings()
+    video_paths = [Path(path) for path in paths if Path(path).is_file()][:max_videos]
+    if not video_paths:
+        return []
+
+    existing = manifest_files(base_dir, folder_id, capture_group)
+    if meta.retake or (existing and len(existing) < len(video_paths)):
+        clear_screenshot_group(base_dir, folder_id, capture_group)
+        existing = []
+    if not meta.retake and len(existing) >= len(video_paths):
+        return [str(path) for path in existing[: len(video_paths)]]
+
+    screenshot_dir = screenshots_dir(base_dir, folder_id)
+    results: list[str] = []
+    frame_count = rows * columns
+    fontfile = _xxx_contact_sheet_fontfile()
+    if fontfile is None:
+        logger.warning("[yellow]No system font found for XXX contact-sheet labels; generating sheets without labels.[/yellow]")
+    for index, video_path in enumerate(video_paths, start=1):
+        output_path = screenshot_dir / f"xxx-contact-sheet-{index}.{'webp' if animated_webp else 'png'}"
+        if output_path.exists() and not meta.retake:
+            results.append(str(output_path))
+            continue
+
+        try:
+            probe = await asyncio.to_thread(ffmpeg.probe, str(video_path))
+            duration = float(probe["format"]["duration"])
+            if duration <= 0:
+                raise ValueError("duration must be positive")
+            if animated_webp:
+                stream = _xxx_contact_sheet_animated_stream(video_path, frame_count, duration, columns, rows, animation_seconds, fontfile)
+                output_options: dict[str, Any] = {"vcodec": "libwebp_anim", "loop": 0, "r": 8, "t": animation_seconds}
+            else:
+                stream = _xxx_contact_sheet_static_stream(video_path, frame_count, duration, columns, rows, fontfile)
+                output_options = {"vframes": 1, "compression_level": ffmpeg_compression}
+            stream = _xxx_contact_sheet_title_filter(stream, video_path.name, len(video_paths) > 1, fontfile)
+            command = ffmpeg.output(stream, str(output_path), **output_options).global_args("-y", "-loglevel", "verbose" if meta.ffdebug else "quiet")
+            return_code, _stdout, stderr = await run_ffmpeg(command)
+            if return_code != 0 or not output_path.is_file():
+                logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {stderr.decode(errors='replace')}[/yellow]")
+                continue
+            results.append(str(output_path))
+        except Exception as error:
+            logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {error}[/yellow]")
+
+    return [str(path) for path in register_screenshots(base_dir, folder_id, results, capture_group)] if results else []
+
+
 def compile_ffmpeg_command(command: Any) -> list[str]:
     """Compile an ffmpeg-python command into subprocess-safe string arguments."""
     return [str(argument) for argument in command.compile()]
@@ -2622,6 +2757,15 @@ class TakeScreensManager:
         capture_group: str | None = None,
     ) -> list[str] | None:
         return await screenshots(path, filename, folder_id, base_dir, meta, num_screens, force_screenshots, manual_frames, cleanup_after_capture, capture_group)
+
+    def xxx_contact_sheet_settings(self) -> tuple[int, int, int]:
+        return xxx_contact_sheet_settings()
+
+    def xxx_contact_sheet_animation_settings(self) -> tuple[bool, float]:
+        return xxx_contact_sheet_animation_settings()
+
+    async def xxx_contact_sheets(self, paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main") -> list[str]:
+        return await xxx_contact_sheets(paths, folder_id, base_dir, meta, capture_group)
 
     async def prepare_book_cover(self, path: str, folder_id: str, base_dir: str, meta: Meta) -> str | None:
         return await prepare_book_cover(path, folder_id, base_dir, meta)

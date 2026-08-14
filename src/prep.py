@@ -164,6 +164,10 @@ class Prep:
         # 3. File information and basic media processing
         filename, untouched_filename, videopath, search_term, search_file_folder, mi, video = await prep_helpers.process_media_files(self, meta, videoloc, bdinfo)
 
+        if meta.category == "XXX" and meta.screens > 0:
+            _rows, _columns, max_videos = self.takescreens_manager.xxx_contact_sheet_settings() if hasattr(self.takescreens_manager, "xxx_contact_sheet_settings") else (12, 5, 6)
+            meta.screens = min(len(meta.filelist or []), max_videos)
+
         # HDR is normally finalized after the metadata searches, but ffmpeg
         # needs it while the early capture is running (for optional tonemapping).
         if meta.category in ("TV", "MOVIE") and not meta.hdr:
@@ -295,6 +299,8 @@ class Prep:
                     retry_cap=False,
                     cleanup_after_capture=False,
                 )
+            elif meta.category == "XXX":
+                await self.takescreens_manager.xxx_contact_sheets(meta.filelist or [], meta.uuid, meta.base_dir, meta)
             elif videopath:
                 await self.takescreens_manager.screenshots(
                     videopath,
@@ -312,7 +318,9 @@ class Prep:
         except Exception as error:
             logger.warning(f"[yellow]Early screenshot generation failed; upload stage will retry: {error}[/yellow]")
 
-    def check_adult_media(self, meta) -> bool:
+    def check_adult_media(self, meta: Meta) -> bool:
+        if meta.category == "XXX":
+            return True
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
         if meta.tmdb_adult_media:
             return True
@@ -330,6 +338,10 @@ class Prep:
         candidate = Path(meta.path or "")
         if candidate.suffix.lower() in music_extensions:
             return "MUSIC"
+
+        if prep_helpers.is_xxx_video_release(candidate):
+            logger.debug("[cyan]Matched XXX platform marker in release name[/cyan]")
+            return "XXX"
 
         path_patterns = [
             r"(?i)[\\/](?:tv|tvshows|tv.shows|series|shows)[\\/]",

@@ -31,10 +31,26 @@ from src.region import get_distributor, get_region, get_service
 from src.tags import get_tag, tag_override
 from src.tvmaze import tvmaze_manager
 from src.video import video_manager
+from src.xxx_platforms import XXX_PLATFORM_KEYWORDS
 
 guessit_module: Any = cast(Any, guessit)
 
 _URL_TOKEN_RE = re.compile(r"https?://[^\s<>'\"()]+", re.IGNORECASE)
+
+XXX_RELEASE_MARKERS = XXX_PLATFORM_KEYWORDS | {"xxx"}
+_XXX_RELEASE_MARKER_RE = re.compile(rf"(?<![a-z0-9])(?:{'|'.join(re.escape(marker) for marker in sorted(XXX_RELEASE_MARKERS))})(?![a-z0-9])", re.IGNORECASE)
+_VIDEO_EXTENSIONS = frozenset({".avi", ".m2ts", ".m4v", ".mkv", ".mov", ".mp4", ".mpeg", ".mpg", ".ts", ".webm", ".wmv"})
+
+
+def is_xxx_video_release(path: str | Path) -> bool:
+    """Return whether a video release name carries a specific XXX platform marker."""
+    candidate = Path(path)
+    if candidate.is_file():
+        return candidate.suffix.lower() in _VIDEO_EXTENSIONS and bool(_XXX_RELEASE_MARKER_RE.search(candidate.name))
+
+    if not candidate.is_dir() or not _XXX_RELEASE_MARKER_RE.search(candidate.name):
+        return False
+    return any(file.is_file() and file.suffix.lower() in _VIDEO_EXTENSIONS for file in candidate.rglob("*"))
 
 
 def _is_igdb_url(url: str) -> bool:
@@ -373,6 +389,13 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
         if is_game:
             meta.category = "GAME"
             logger.debug("[cyan]Auto-detected category: GAME[/cyan]")
+
+    # Auto-detect XXX video releases from specific platform markers in the
+    # release file or directory name.  This runs after file-type detection so
+    # a similarly named non-video download is never classified as XXX.
+    if not meta.category and not meta.manual_category and not meta.is_disc and meta.path and is_xxx_video_release(meta.path):
+        meta.category = "XXX"
+        logger.debug("[cyan]Auto-detected category: XXX[/cyan]")
 
     return videoloc, bdinfo
 
@@ -993,7 +1016,7 @@ async def search_metadata(
     mi_data: dict[str, Any] = mi or {}
 
     # Run a check against mediainfo to see if it has tmdb/imdb
-    if (meta.tmdb_id == 0 or meta.imdb_id == 0) and meta.category not in ("BOOK", "GAME"):
+    if (meta.tmdb_id == 0 or meta.imdb_id == 0) and meta.category not in ("BOOK", "GAME", "XXX"):
         meta.category, meta.tmdb_id, meta.imdb_id, meta.tvdb_id = await prep_instance.tmdb_manager.get_tmdb_imdb_from_mediainfo(mi_data, meta)
 
     meta.video_duration = await video_manager.get_video_duration(meta)
@@ -1003,7 +1026,7 @@ async def search_metadata(
     debug = bool(meta.debug)
 
     # run a search to find tmdb and imdb ids if we don't have them
-    if int(meta.tmdb_id or 0) == 0 and int(meta.imdb_id or 0) == 0 and meta.category not in ("BOOK", "GAME"):
+    if int(meta.tmdb_id or 0) == 0 and int(meta.imdb_id or 0) == 0 and meta.category not in ("BOOK", "GAME", "XXX"):
         year = meta.manual_year or meta.search_year or meta.year if meta.category == "TV" else meta.manual_year or meta.year or meta.search_year
         year_value = _normalize_search_year(year)
         category_pref = meta.category or ""
@@ -1040,7 +1063,7 @@ async def search_metadata(
         meta.no_ids = True
 
     # If we have an IMDb ID but no TMDb ID, fetch TMDb ID from IMDb
-    if int(meta.imdb_id or 0) != 0 and int(meta.tmdb_id or 0) == 0 and meta.category not in ("BOOK", "GAME"):
+    if int(meta.imdb_id or 0) != 0 and int(meta.tmdb_id or 0) == 0 and meta.category not in ("BOOK", "GAME", "XXX"):
         imdb_id_value = _to_int(meta.imdb_id)
         tvdb_id_value = _to_int(meta.tvdb_id)
         search_year_value = _normalize_search_year(meta.search_year)
@@ -1097,7 +1120,7 @@ async def search_metadata(
         meta.imdb_info = {}
 
     # Get IMDb ID if not set
-    if meta.imdb_id == 0 and meta.category not in ("BOOK", "GAME"):
+    if meta.imdb_id == 0 and meta.category not in ("BOOK", "GAME", "XXX"):
         try:
             search_year_value = _normalize_search_year(meta.search_year)
             meta.imdb_id = await imdb_manager.search_imdb(
@@ -1116,7 +1139,7 @@ async def search_metadata(
             raise Exception(f"Error searching IMDb: {e}") from e
 
     # user might have skipped tmdb earlier, lets double check
-    if meta.imdb_id != 0 and meta.tmdb_id == 0 and meta.category not in ("BOOK", "GAME"):
+    if meta.imdb_id != 0 and meta.tmdb_id == 0 and meta.category not in ("BOOK", "GAME", "XXX"):
         logger.info("[yellow]No TMDB ID found, attempting to fetch from IMDb...[/yellow]")
         imdb_id_value = _to_int(meta.imdb_id)
         tvdb_id_value = _to_int(meta.tvdb_id)
@@ -1138,12 +1161,12 @@ async def search_metadata(
         meta.no_ids = filename_search
 
     tmdb_id_value = _to_int(meta.tmdb_id)
-    if tmdb_id_value != 0 and meta.category not in ("BOOK", "GAME"):
+    if tmdb_id_value != 0 and meta.category not in ("BOOK", "GAME", "XXX"):
         await prep_instance.tmdb_manager.set_tmdb_metadata(meta, filename)
 
     # Ensure IMDb info is retrieved if it wasn't already fetched or was cleared.
     imdb_id_value = _to_int(meta.imdb_id)
-    if not meta.imdb_info and imdb_id_value != 0 and meta.category not in ("BOOK", "GAME"):
+    if not meta.imdb_info and imdb_id_value != 0 and meta.category not in ("BOOK", "GAME", "XXX"):
         imdb_info = await imdb_manager.get_imdb_info_api(imdb_id_value, manual_language=meta.manual_language, base_dir=meta.base_dir, config=prep_instance.config)
         meta.imdb_info = imdb_info
 

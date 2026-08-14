@@ -27,7 +27,7 @@ class LST(UNIT3D):
     search_url = f"{base_url}/api/torrents/filter"
     torrent_url = f"{base_url}/torrents/"
     trumping_url = f"{base_url}/api/reports/torrents/"
-    supported_categories = ("TV", "MOVIE", "BOOK", "MUSIC")
+    supported_categories = ("TV", "MOVIE", "BOOK", "MUSIC", "XXX")
     tracker_urls = ("https://lst.gg",)
 
     def __init__(self, config: Config) -> None:
@@ -36,7 +36,7 @@ class LST(UNIT3D):
         self.common = Common(config)
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if meta.category in ("BOOK", "MUSIC"):
+        if meta.category not in ("MOVIE", "TV"):
             return True
 
         should_continue = True
@@ -57,6 +57,7 @@ class LST(UNIT3D):
             "TV": "2",
             "MUSIC": "3",
             "BOOK": "9",
+            "XXX": "8",
         }
         if mapping_only:
             return category_id

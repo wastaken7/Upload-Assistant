@@ -624,6 +624,8 @@ async def _handle_image_upload(
                 )
             elif meta.is_disc == "DVD":
                 await takescreens_manager.dvd_screenshots(meta, disc_num=0, retry_cap=True)
+            elif meta.category == "XXX":
+                await takescreens_manager.xxx_contact_sheets(meta.filelist or [], folder_id, base_dir, meta)
             else:
                 if path:
                     await takescreens_manager.screenshots(
