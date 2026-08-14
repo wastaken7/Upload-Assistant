@@ -1362,7 +1362,7 @@ class BJShare:
         imdb_data: dict[str, Any] = meta.imdb_info
         imdb_names = imdb_data.get(imdb_key, [])
         tmdb_names = meta.get(tmdb_key, [])
-        names = imdb_names + tmdb_names
+        names = meta.cast if role == "cast" else imdb_names + tmdb_names
 
         limit = 1 if role in ("director", "creator") else 5
         unique_names = self._collect_credit_names(names, limit)

@@ -1170,6 +1170,8 @@ async def search_metadata(
         imdb_info = await imdb_manager.get_imdb_info_api(imdb_id_value, manual_language=meta.manual_language, base_dir=meta.base_dir, config=prep_instance.config)
         meta.imdb_info = imdb_info
 
+    meta.populate_cast()
+
 
 async def finalize_metadata(
     prep_instance: Any, meta: Meta, videopath: str, bdinfo: dict[str, Any], mi: dict[str, Any] | None, filename: str, _untouched_filename: str, video: str
