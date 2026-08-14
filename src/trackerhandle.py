@@ -19,7 +19,7 @@ from src.get_desc import DescriptionBuilder
 from src.manualpackage import ManualPackageManager
 from src.meta import Meta
 from src.qbitwait import Wait
-from src.rehostimages import check_tracker_image_hosts, select_common_image_host
+from src.rehostimages import check_tracker_image_hosts, has_restricted_image_hosts, select_common_image_host
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup
 
@@ -85,7 +85,7 @@ async def process_trackers(
             meta.imghost = selected_host
             if selected_host != current_host:
                 logger.info(f"[green]Smart image-host selection changed the target host: {current_host or 'unset'} -> {selected_host}[/green]")
-        else:
+        elif has_restricted_image_hosts(target_trackers, tracker_class_map):
             logger.info("[yellow]No shared approved image host found; using per-tracker image-host selection.[/yellow]")
     manual_packager = ManualPackageManager(config)
     tracker_label_width = max(

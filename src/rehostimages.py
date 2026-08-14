@@ -40,6 +40,28 @@ def _as_str(value: Any) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def has_restricted_image_hosts(
+    target_trackers: Iterable[str],
+    tracker_class_map: Mapping[str, Any],
+) -> bool:
+    """Return True if any of the target trackers define image-host restrictions."""
+    for tracker_name in target_trackers:
+        tracker_class = tracker_class_map.get(str(tracker_name).replace(" ", "").upper())
+        policy = getattr(tracker_class, "image_host_policy", None)
+        if isinstance(policy, ImageHostPolicy) and policy.approved_image_hosts:
+            return True
+
+        approved_hosts = getattr(tracker_class, "approved_image_hosts", None)
+        if (
+            callable(getattr(tracker_class, "check_image_hosts", None))
+            and isinstance(approved_hosts, tuple | list | set)
+            and any(isinstance(host, str) for host in approved_hosts)
+        ):
+            return True
+
+    return False
+
+
 def select_common_image_host(
     default_config: Mapping[str, Any],
     target_trackers: Iterable[str],
