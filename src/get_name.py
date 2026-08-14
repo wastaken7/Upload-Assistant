@@ -115,7 +115,9 @@ class NameManager:
         # YAY NAMING FUN
         name = ""
         potential_missing: list[str] = []
-        if meta.category == "XXX":
+        if meta.manual_name is not None:
+            name = str(meta.manual_name).strip()
+        elif meta.category == "XXX":
             release_name = str(meta.scene_name or meta.basename_no_ext or meta.uuid or meta.title)
             name = release_name.replace(".", " ")
         elif meta.category == "MOVIE":  # MOVIE SPECIFIC
@@ -207,7 +209,7 @@ class NameManager:
         name_notag = name
 
         tag_already_present = meta.category == "XXX" and bool(tag) and name_notag.casefold().endswith(tag.casefold())
-        name = name_notag if tag_already_present else name_notag + tag
+        name = name_notag if meta.manual_name is not None or tag_already_present else name_notag + tag
 
         clean_name = await self.clean_filename(name)
         return name_notag, name, clean_name, potential_missing
