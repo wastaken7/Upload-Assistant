@@ -4,11 +4,61 @@
 
 import asyncio
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import AsyncMock
 
 from src.meta import Meta
-from src.rehostimages import ImageHostPolicy, RehostImagesManager
+from src.rehostimages import ImageHostPolicy, RehostImagesManager, select_common_image_host
 from src.tracker_images import get_tracker_image_collection, has_tracker_image_collection
+
+
+class _Alpha:
+    image_host_policy = ImageHostPolicy({}, ("imgbox", "imgbb"))
+
+
+class _Beta:
+    image_host_policy = ImageHostPolicy({}, ("imgbb", "ptscreens"))
+
+
+class _Unrestricted:
+    pass
+
+
+class _LegacySetPolicy:
+    approved_image_hosts: ClassVar[set[str]] = {"imgbb", "onlyimage"}
+
+    async def check_image_hosts(self, _meta: Meta) -> None:
+        pass
+
+
+def test_select_common_image_host_uses_first_configured_shared_host() -> None:
+    selected = select_common_image_host(
+        {"img_host_1": "imgbox", "img_host_2": "imgbb", "img_host_3": "ptscreens"},
+        ["ALPHA", "BETA", "UNRESTRICTED"],
+        {"ALPHA": _Alpha, "BETA": _Beta, "UNRESTRICTED": _Unrestricted},
+    )
+
+    assert selected == "imgbb"
+
+
+def test_select_common_image_host_accepts_legacy_set_policy() -> None:
+    selected = select_common_image_host(
+        {"img_host_1": "imgbox", "img_host_2": "imgbb"},
+        ["ALPHA", "LEGACY"],
+        {"ALPHA": _Alpha, "LEGACY": _LegacySetPolicy},
+    )
+
+    assert selected == "imgbb"
+
+
+def test_select_common_image_host_keeps_per_tracker_fallback_without_common_host() -> None:
+    selected = select_common_image_host(
+        {"img_host_1": "imgbox", "img_host_2": "ptscreens"},
+        ["ALPHA", "BETA"],
+        {"ALPHA": _Alpha, "BETA": _Beta},
+    )
+
+    assert selected is None
 
 
 def test_rehosts_menu_and_spectrogram_images_without_touching_main_screens(tmp_path: Path):

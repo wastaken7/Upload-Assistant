@@ -755,6 +755,9 @@ class Args:
                         meta[key] = str(Path(value2).resolve())
                     elif key == "screens":
                         meta[key] = int(value2)
+                    elif key == "imghost":
+                        meta.imghost = value2
+                        meta.imghost_from_cli = True
                     elif key == "season":
                         meta.manual_season = value2
                     elif key == "episode":

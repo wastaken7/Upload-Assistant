@@ -138,6 +138,13 @@ async def test_category_artwork_path_is_normalized_without_a_named_sidecar(tmp_p
     assert Image.open(meta.artwork_path).format == "PNG"
 
 
+def test_imghost_cli_arg_takes_precedence_over_automatic_selection(tmp_path: Path) -> None:
+    meta, _, _ = Args({"DEFAULT": {"screens": 4, "img_host_1": "imgbox"}}).parse([str(tmp_path), "-ih", "imgbb"], Meta())
+
+    assert meta.imghost == "imgbb"
+    assert meta.imghost_from_cli is True
+
+
 def test_invalid_cover_is_not_accepted() -> None:
     from src.artwork import is_valid_cover_image
 
