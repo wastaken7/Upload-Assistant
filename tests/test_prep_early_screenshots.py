@@ -67,6 +67,14 @@ def test_early_capture_populates_hdr_before_category_detection(monkeypatch) -> N
     assert meta.hdr == "HDR"
 
 
+def test_early_capture_skips_hdr_probe_without_video_metadata() -> None:
+    meta = Meta(category="BOOK")
+
+    asyncio.run(populate_hdr_for_early_capture(meta, None, None))
+
+    assert meta.hdr == ""
+
+
 def test_registered_main_screenshots_are_reused_when_title_changes(tmp_path: Path) -> None:
     release_id = "release"
     screenshot_dir = tmp_path / "tmp" / release_id / "screenshots"

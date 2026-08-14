@@ -127,6 +127,20 @@ async def test_determine_tonemapping_uses_verified_libplacebo(monkeypatch, tmp_p
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("hdr", ["DV", "HLG"])
+async def test_determine_tonemapping_uses_zscale_fallback_for_dv_and_hlg(monkeypatch, tmp_path, hdr):
+    monkeypatch.setattr(takescreens, "tone_map", True)
+    monkeypatch.setattr(takescreens, "use_libplacebo", False)
+    meta = Meta(hdr=hdr)
+
+    enabled = await takescreens.determine_tonemapping(1, 1, 1920, 1080, "source.mkv", "10", str(tmp_path / "frame.png"), "quiet", meta)
+
+    assert enabled is True
+    assert meta.tonemapped is True
+    assert meta.libplacebo is False
+
+
+@pytest.mark.asyncio
 async def test_capture_screenshot_applies_selected_libplacebo_tonemapping(monkeypatch, tmp_path):
     source = tmp_path / "source.mkv"
     output = tmp_path / "frame.png"

@@ -2596,7 +2596,7 @@ async def determine_tonemapping(w_sar: float, h_sar: float, width: float, height
         meta.tonemapped = True
         return True
 
-    if "HDR" in meta.hdr:
+    if any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
         meta.tonemapped = True
         return True
     return False

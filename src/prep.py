@@ -54,10 +54,11 @@ except KeyboardInterrupt:
     exit()
 
 
-async def populate_hdr_for_early_capture(meta: Meta, mi: dict[str, Any] | None, bdinfo: dict[str, Any]) -> None:
+async def populate_hdr_for_early_capture(meta: Meta, mi: dict[str, Any] | None, bdinfo: dict[str, Any] | None) -> None:
     """Populate HDR before category detection starts asynchronous screenshot capture."""
-    if not meta.hdr:
-        meta.hdr = await prep_helpers.video_manager.get_hdr(mi or {}, bdinfo)
+    if meta.hdr or not (mi or bdinfo):
+        return
+    meta.hdr = await prep_helpers.video_manager.get_hdr(mi or {}, bdinfo)
 
 
 class Prep:
