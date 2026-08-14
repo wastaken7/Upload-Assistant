@@ -87,7 +87,7 @@ def _xxx_contact_sheet_fontfile() -> str | None:
 def _xxx_contact_sheet_title_filter(stream: Any, title: str, include_title: bool, fontfile: str | None) -> Any:
     if not include_title or fontfile is None:
         return stream
-    escaped_title = title.replace("\\", r"\\\\").replace(":", r"\:").replace("'", r"\'")
+    escaped_title = title.replace("\\", r"\\\\").replace(":", r"\:").replace("'", r"\'").replace("%", r"\%")
     return stream.filter("pad", width="iw", height="ih+44", x=0, y=44, color="black").filter(
         "drawtext", text=escaped_title, x="(w-text_w)/2", y=10, fontsize=24, fontcolor="white", fontfile=fontfile
     )
@@ -130,6 +130,7 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
     animated_webp, animation_seconds = xxx_contact_sheet_animation_settings()
     video_paths = [Path(path) for path in paths if Path(path).is_file()][:max_videos]
     if not video_paths:
+        meta.screens = 0
         return []
 
     existing = manifest_files(base_dir, folder_id, capture_group)
@@ -137,7 +138,9 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
         clear_screenshot_group(base_dir, folder_id, capture_group)
         existing = []
     if not meta.retake and len(existing) >= len(video_paths):
-        return [str(path) for path in existing[: len(video_paths)]]
+        sheets = [str(path) for path in existing[: len(video_paths)]]
+        meta.screens = len(sheets)
+        return sheets
 
     screenshot_dir = screenshots_dir(base_dir, folder_id)
     results: list[str] = []
@@ -172,7 +175,9 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
         except Exception as error:
             logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {error}[/yellow]")
 
-    return [str(path) for path in register_screenshots(base_dir, folder_id, results, capture_group)] if results else []
+    sheets = [str(path) for path in register_screenshots(base_dir, folder_id, results, capture_group)] if results else []
+    meta.screens = len(sheets)
+    return sheets
 
 
 def compile_ffmpeg_command(command: Any) -> list[str]:

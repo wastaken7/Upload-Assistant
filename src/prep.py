@@ -10,6 +10,7 @@ from src.artwork import prepare_artwork
 from src.cogs.redaction import PathAwareEncoder
 from src.meta import Meta
 from src.metadata_cache import set_run_disabled
+from src.screenshot_manifest import files as manifest_files
 
 console: Any = None
 
@@ -155,11 +156,11 @@ class Prep:
         # stage exports and validates without rehashing the music release.
         if meta.category == "MUSIC":
             await self._gather_music_prep(meta)
-            await prepare_artwork(meta)
             prep_helpers.calculate_source_size(self, meta, str(meta.path or ""))
             await prep_helpers.process_trackers_and_torrent(self, meta, client, hash_ids, tracker_ids, "", "")
             await _enrich_music_from_orpheus_fn(meta, self.config)
             await _enrich_music_from_discogs_fn(meta, self.config)
+            await prepare_artwork(meta)
             logger.debug(f"Music metadata processed in {time.time() - meta_start_time:.2f} seconds")
             return meta
 
@@ -219,6 +220,8 @@ class Prep:
         # helper; the existing upload-stage capture remains the fallback.
         if early_screenshots_task is not None:
             await early_screenshots_task
+        if meta.category == "XXX":
+            meta.screens = len(manifest_files(meta.base_dir, meta.uuid, "main"))
 
         if meta.category == "BOOK":
             await self.rehost_images_manager.takescreens_manager.prepare_book_cover(videopath, meta.uuid, meta.base_dir, meta)
@@ -346,7 +349,7 @@ class Prep:
         if candidate.suffix.lower() in music_extensions:
             return "MUSIC"
 
-        if prep_helpers.is_xxx_video_release(candidate):
+        if not meta.is_disc and await asyncio.to_thread(prep_helpers.is_xxx_video_release, candidate):
             logger.debug("[cyan]Matched XXX platform marker in release name[/cyan]")
             return "XXX"
 

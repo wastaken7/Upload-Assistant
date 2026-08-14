@@ -393,7 +393,7 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
     # Auto-detect XXX video releases from specific platform markers in the
     # release file or directory name.  This runs after file-type detection so
     # a similarly named non-video download is never classified as XXX.
-    if not meta.category and not meta.manual_category and not meta.is_disc and meta.path and is_xxx_video_release(meta.path):
+    if not meta.category and not meta.manual_category and not meta.is_disc and meta.path and await asyncio.to_thread(is_xxx_video_release, meta.path):
         meta.category = "XXX"
         logger.debug("[cyan]Auto-detected category: XXX[/cyan]")
 
@@ -1580,6 +1580,8 @@ async def finalize_metadata(
                 unique_genres.append(genre)
 
         meta.combined_genres = ", ".join(unique_genres) if unique_genres else ""
+
+    if meta.category in ("TV", "MOVIE", "XXX"):
         meta.adult_media = prep_instance.check_adult_media(meta)
 
     # Process group tag for all categories (TV, MOVIE, BOOK, etc.)

@@ -62,6 +62,7 @@ async def test_xxx_contact_sheets_create_one_grid_per_video_up_to_configured_lim
     sheets = await takescreens.xxx_contact_sheets(videos, meta.uuid, meta.base_dir, meta)
 
     assert len(sheets) == 2
+    assert meta.screens == 2
     assert len(manifest_files(meta.base_dir, meta.uuid, "main")) == 2
     assert all("tile=layout=3x2" in command for command in commands)
     assert all("drawtext" in command for command in commands)

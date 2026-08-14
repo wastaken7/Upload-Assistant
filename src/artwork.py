@@ -4,6 +4,7 @@ import asyncio
 import ipaddress
 import re
 import socket
+import warnings
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
@@ -16,6 +17,8 @@ from src.meta import Meta
 from src.temp_paths import artwork_dir
 
 _SUPPORTED_COVER_FORMATS = {"GIF", "JPEG", "PNG", "WEBP"}
+MAX_ARTWORK_BYTES = 10 * 1024 * 1024
+MAX_ARTWORK_PIXELS = 40_000_000
 _POSTER_KEYWORDS = ("poster", "cover", "front", "folder", "artwork", "capa")
 _BANNER_KEYWORDS = ("banner", "backdrop", "landscape", "header")
 
@@ -38,12 +41,14 @@ def is_valid_image_bytes(image_bytes: bytes) -> bool:
         return False
 
     try:
-        with Image.open(BytesIO(image_bytes)) as image:
-            if image.format not in _SUPPORTED_COVER_FORMATS or image.width <= 0 or image.height <= 0:
-                return False
-            image.verify()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(BytesIO(image_bytes)) as image:
+                if image.format not in _SUPPORTED_COVER_FORMATS or image.width <= 0 or image.height <= 0 or image.width * image.height > MAX_ARTWORK_PIXELS:
+                    return False
+                image.verify()
         return True
-    except OSError, SyntaxError, ValueError:
+    except OSError, SyntaxError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning:
         return False
 
 
@@ -90,22 +95,32 @@ async def _download_public_image(url: str) -> bytes | None:
     """Download an explicit image without following redirects to private hosts."""
     current_url = url
     try:
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=False, trust_env=False) as client:
             for _ in range(4):
                 if not is_public_http_url(current_url):
                     logger.warning("[yellow]Artwork URL is not a public HTTP(S) URL; ignoring it.[/yellow]")
                     return None
-                response = await client.get(current_url)
-                if response.is_redirect:
-                    location = response.headers.get("Location")
-                    if not location:
+                async with client.stream("GET", current_url) as response:
+                    if response.is_redirect:
+                        location = response.headers.get("Location")
+                        if not location:
+                            return None
+                        current_url = str(response.url.join(location))
+                        continue
+                    content_length = response.headers.get("Content-Length")
+                    if response.status_code != 200 or (content_length and (not content_length.isdigit() or int(content_length) > MAX_ARTWORK_BYTES)):
+                        logger.warning("[yellow]Artwork URL did not return a supported image; ignoring it.[/yellow]")
                         return None
-                    current_url = str(response.url.join(location))
-                    continue
-                if response.status_code != 200 or not is_valid_image_bytes(response.content):
-                    logger.warning("[yellow]Artwork URL did not return a supported image; ignoring it.[/yellow]")
-                    return None
-                return response.content
+                    content = bytearray()
+                    async for chunk in response.aiter_bytes():
+                        content.extend(chunk)
+                        if len(content) > MAX_ARTWORK_BYTES:
+                            logger.warning("[yellow]Artwork download exceeds the 10 MiB limit; ignoring it.[/yellow]")
+                            return None
+                    if not is_valid_image_bytes(bytes(content)):
+                        logger.warning("[yellow]Artwork URL did not return a supported image; ignoring it.[/yellow]")
+                        return None
+                    return bytes(content)
     except httpx.HTTPError as error:
         logger.warning(f"[yellow]Unable to download artwork: {error}[/yellow]")
     return None
