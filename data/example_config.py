@@ -266,6 +266,17 @@ config: dict[str, Any] = {
         # Set ffmpeg compression level for screenshots (0-9)
         # 6 is a good balance between compression and speed
         "ffmpeg_compression": "6",
+        # Optional paths to external media tools. Leave blank to use the bundled
+        # tool (when available) or the system PATH. MediaInfo DVD must remain
+        # on 23.04 because newer versions do not preserve its DVD parsing.
+        "ffmpeg_path": "",
+        "ffprobe_path": "",
+        "mediainfo_path": "",
+        "dvd_mediainfo_path": "",
+        "bdinfo_path": "",
+        "mkbrr_path": "",
+        "dovi_tool_path": "",
+        "hdr10plus_tool_path": "",
         # Optional path to the unRAR executable for CBR/CBZ extraction.
         # Leave blank to use the system PATH.
         # Example: "C:\\Program Files\\WinRAR\\UnRAR.exe"

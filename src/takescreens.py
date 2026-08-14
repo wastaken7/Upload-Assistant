@@ -22,6 +22,7 @@ import ffmpeg
 
 from data import config as data_config
 from src.artwork import is_public_http_url, is_valid_cover_image, is_valid_image_bytes
+from src.binaries import configured_binary
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.mediainfo import MediaInfo
@@ -283,8 +284,10 @@ async def run_ffmpeg(command: Any) -> tuple[int | None, bytes, bytes]:
     else:
         process_env.pop("FFREPORT", None)
 
+    if configured := configured_binary("ffmpeg_path", {"DEFAULT": default_config}):
+        cmd_list[0] = configured
     # On Linux prefer bundled amd/arm binary when present; otherwise fall back to system ffmpeg.
-    if platform.system() == "Linux":
+    elif platform.system() == "Linux":
         base_dir = str(Path(__file__).parent.parent)
         ff_bin_dir = Path(base_dir) / "bin" / "ffmpeg"
 

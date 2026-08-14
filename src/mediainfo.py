@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from bin.get_mediainfo import MediaInfoBinaryManager
+from src.binaries import configured_binary
 
 _REPORT_BY_LINE = re.compile(r"(?<![^\r\n])[ \t]*ReportBy[ \t]*:[^\r\n]*(?:\r\n?|\n)?", re.IGNORECASE)
 
@@ -21,6 +22,8 @@ def _base_dir() -> Path:
 
 
 def _binary() -> str:
+    if configured := configured_binary("mediainfo_path"):
+        return configured
     binary = MediaInfoBinaryManager.find_existing_binary(_base_dir())
     if binary is None:
         raise RuntimeError("MediaInfo CLI is not installed; run Upload Assistant so it can download bin/MI first")

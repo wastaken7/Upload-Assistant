@@ -9,6 +9,7 @@ from typing import Any, cast
 
 from PIL import Image
 
+from src.binaries import configured_binary
 from src.console import logger
 from src.mediainfo import MediaInfo
 from src.meta import Meta
@@ -100,8 +101,8 @@ class DiscMenus:
         output_dir = menu_screenshots_dir(meta.base_dir, meta.uuid)
 
         # Get ffmpeg path
-        ffmpeg_path = "ffmpeg"
-        if platform.system() == "Linux":
+        ffmpeg_path = configured_binary("ffmpeg_path", self.config) or "ffmpeg"
+        if ffmpeg_path == "ffmpeg" and platform.system() == "Linux":
             ff_bin_dir = Path(meta.base_dir) / "bin" / "ffmpeg"
             machine = platform.machine().lower()
             arch = "amd" if machine in ("x86_64", "amd64") else ("arm" if machine in ("aarch64", "arm64") else None)

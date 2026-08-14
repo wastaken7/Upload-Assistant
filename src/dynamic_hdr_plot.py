@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from bin.get_dynamic_hdr_tools import TOOLS, get_tool
+from src.binaries import configured_binary
 from src.console import logger
 from src.meta import Meta
 from src.temp_paths import dynamic_hdr_plots_dir, release_temp_dir
@@ -69,7 +70,7 @@ def _run(command: list[str]) -> None:
         raise RuntimeError(detail or f"{' '.join(command[:2])} failed with exit code {result.returncode}")
 
 
-async def _generate_plot(binary: str, kind: str, source: Path, output_dir: Path) -> Path:
+async def _generate_plot(binary: str, kind: str, source: Path, output_dir: Path, ffmpeg_binary: str = "ffmpeg") -> Path:
     stem = source.stem
     artifact_id = hashlib.sha256(str(source.resolve()).encode()).hexdigest()[:12]
     artifact_name = f"{stem}_{artifact_id}"
@@ -83,7 +84,7 @@ async def _generate_plot(binary: str, kind: str, source: Path, output_dir: Path)
         input_source = work_dir / f"{artifact_name}.hevc"
         await asyncio.to_thread(
             _run,
-            ["ffmpeg", "-y", "-i", str(source), "-map", "0:v:0", "-c:v", "copy", "-bsf:v", "hevc_mp4toannexb", "-f", "hevc", str(input_source)],
+            [ffmpeg_binary, "-y", "-i", str(source), "-map", "0:v:0", "-c:v", "copy", "-bsf:v", "hevc_mp4toannexb", "-f", "hevc", str(input_source)],
         )
     if kind == "dovi":
         rpu = work_dir / f"{artifact_name}.rpu.bin"
@@ -143,13 +144,14 @@ async def process_dynamic_hdr_plots(meta: Meta, config: dict[str, Any], uploadsc
     progress_id = f"dynamic-hdr-plot-{meta.uuid}"
     publish_progress(progress_id, "Generating dynamic HDR plots", current=0, total=len(jobs), detail="Preparing metadata tools", group="dynamic_hdr", unit="plots")
     tools: dict[str, str] = {}
+    ffmpeg_binary = configured_binary("ffmpeg_path", config) or "ffmpeg"
     generated: list[str] = []
     for position, (kind, source) in enumerate(jobs, start=1):
         try:
             if kind not in tools:
-                tools[kind] = await get_tool(meta.base_dir, kind)
+                tools[kind] = configured_binary(f"{TOOLS[kind]['command']}_path", config) or await get_tool(meta.base_dir, kind)
             binary = tools[kind]
-            plot = await _generate_plot(binary, kind, source, output_dir)
+            plot = await _generate_plot(binary, kind, source, output_dir, ffmpeg_binary)
             generated.append(str(plot))
             detail = f"Generated {kind} plot for {source.name}"
         except Exception as error:

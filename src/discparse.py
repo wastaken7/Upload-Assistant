@@ -16,8 +16,9 @@ from langcodes import Language
 from rich.progress import BarColumn, TaskProgressColumn, TextColumn
 
 from bin.get_playlist import MplsParser
+from src.binaries import configured_binary
 from src.console import console, logger, progress_display, prompt_in_thread
-from src.exportmi import setup_mediainfo_library
+from src.exportmi import find_dvd_mediainfo
 from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.webui_progress import complete_progress, publish_progress
@@ -79,6 +80,12 @@ class DiscParse:
 
     def setup_mediainfo_for_dvd(self, base_dir: str | None) -> tuple[str, dict[str, str]] | None:
         """Setup MediaInfo binary for DVD processing using the complete setup from exportmi"""
+        if configured := configured_binary("dvd_mediainfo_path", self.config):
+            return configured, os.environ.copy()
+        if base_dir is not None and platform.system().lower() == "windows":
+            dvd_cli = Path(base_dir) / "bin" / "MI" / "windows" / "dvd" / "MediaInfo.exe"
+            if dvd_cli.is_file():
+                return str(dvd_cli), os.environ.copy()
         if base_dir is not None and platform.system().lower() == "linux":
             dvd_dir = Path(base_dir) / "bin" / "MI" / "linux" / "dvd"
             dvd_cli = dvd_dir / "mediainfo"
@@ -91,7 +98,7 @@ class DiscParse:
         if self.mediainfo_config is None:
             if base_dir is None:
                 return None
-            self.mediainfo_config = setup_mediainfo_library(base_dir)
+            self.mediainfo_config = find_dvd_mediainfo(base_dir)
 
         if self.mediainfo_config and self.mediainfo_config["cli"]:
             return str(self.mediainfo_config["cli"]), os.environ.copy()
@@ -325,10 +332,12 @@ class DiscParse:
                     else:
                         try:
                             bdinfo_executable = None
-                            # Prefer the bundled bdinfo binary for the detected OS/arch
+                            if configured := configured_binary("bdinfo_path", self.config):
+                                bdinfo_executable = [configured, path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
+                            # Prefer the bundled bdinfo binary for the detected OS/arch.
                             system = platform.system().lower()
                             machine = platform.machine().lower()
-                            if system == "linux":
+                            if bdinfo_executable is None and system == "linux":
                                 if machine in ("x86_64", "amd64"):
                                     folder = "linux/amd64"
                                 elif machine in ("arm64", "aarch64"):
@@ -338,12 +347,12 @@ class DiscParse:
                                 bdinfo_path = f"{base_dir}/bin/bdinfo/{folder}/bdinfo"
                                 if Path(bdinfo_path).exists():
                                     bdinfo_executable = [bdinfo_path, path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
-                            elif system == "darwin":
+                            elif bdinfo_executable is None and system == "darwin":
                                 folder = "macos/arm64" if machine in ("arm64",) else "macos/x86_64"
                                 bdinfo_path = f"{base_dir}/bin/bdinfo/{folder}/bdinfo"
                                 if Path(bdinfo_path).exists():
                                     bdinfo_executable = [bdinfo_path, path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
-                            elif system == "windows":
+                            elif bdinfo_executable is None and system == "windows":
                                 # Windows builds are provided as x64
                                 bdinfo_path = f"{base_dir}/bin/bdinfo/windows/x86_64/bdinfo.exe"
                                 if Path(bdinfo_path).exists():

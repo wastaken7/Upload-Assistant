@@ -18,6 +18,7 @@ bin/7z/*
 bin/bdinfo/*
 bin/dovi_tool/*
 bin/hdr10plus_tool/*
+bin/MI/*
 bin/mkbrr/*
 bin/nyuu/*
 bin/par2/*

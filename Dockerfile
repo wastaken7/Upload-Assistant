@@ -61,7 +61,8 @@ RUN find bin/mkbrr -name "mkbrr" -print0 | xargs -0 chmod +x && \
 # ── Permissions ──────────────────────────────────────────────────────
 # Give UID 1000 ownership (runtime binary updates need chmod) and let
 # any other UID (e.g. Unraid 99:100) read/execute.
-RUN chown -R 1000:1000 /Upload-Assistant/bin/mkbrr \
+RUN mkdir -p /Upload-Assistant/bin/MI \
+    && chown -R 1000:1000 /Upload-Assistant/bin/mkbrr \
     && chown -R 1000:1000 /Upload-Assistant/bin/MI \
     && chown -R 1000:1000 /Upload-Assistant/bin/bdinfo \
     && chmod -R o+rX /Upload-Assistant/bin/mkbrr \

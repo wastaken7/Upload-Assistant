@@ -61,6 +61,29 @@ async def test_run_ffmpeg_writes_report_next_to_output(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_run_ffmpeg_prefers_configured_binary(tmp_path, monkeypatch):
+    executable = tmp_path / "ffmpeg.exe"
+    executable.touch()
+    captured: list[tuple[object, ...]] = []
+
+    async def fake_create_subprocess_exec(*args, **_kwargs):
+        captured.append(args)
+
+        async def fake_communicate():
+            return b"", b""
+
+        return SimpleNamespace(returncode=0, communicate=fake_communicate)
+
+    monkeypatch.setattr(takescreens.asyncio, "create_subprocess_exec", fake_create_subprocess_exec)
+    monkeypatch.setattr(takescreens, "default_config", {"ffmpeg_path": str(executable)})
+
+    command = ffmpeg.input(str(tmp_path / "source.mkv")).output(str(tmp_path / "frame.png"), vframes=1)
+    await takescreens.run_ffmpeg(command)
+
+    assert captured[0][0] == str(executable)
+
+
+@pytest.mark.asyncio
 async def test_cancelling_run_ffmpeg_terminates_only_its_owned_process(tmp_path, monkeypatch):
     unrelated = await asyncio.create_subprocess_exec(sys.executable, "-c", "import time; time.sleep(60)")
     original_create_subprocess_exec = asyncio.create_subprocess_exec
