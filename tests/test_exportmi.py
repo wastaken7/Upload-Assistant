@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from bin.download_integrity import SHA256_BY_ASSET
-from src.mediainfo import MediaInfo, strip_report_by_line
+from src.mediainfo import MediaInfo, _binary, strip_report_by_line
 
 
 def test_cli_backed_mediainfo_preserves_track_access() -> None:
@@ -68,6 +68,13 @@ def test_mediainfo_uses_tolerant_utf8_output_decoding() -> None:
 
     assert run.call_args.kwargs["encoding"] == "utf-8"
     assert run.call_args.kwargs["errors"] == "replace"
+
+
+def test_mediainfo_uses_state_managed_binary_before_system_path() -> None:
+    with patch("src.mediainfo.MediaInfoBinaryManager.find_existing_binary", return_value="/home/user/.local/share/upload-assistant/bin/MI/linux/mediainfo") as find_existing:
+        assert _binary() == "/home/user/.local/share/upload-assistant/bin/MI/linux/mediainfo"
+
+    find_existing.assert_called_once()
 
 
 def test_mediainfo_failure_reports_command_and_both_output_streams() -> None:
