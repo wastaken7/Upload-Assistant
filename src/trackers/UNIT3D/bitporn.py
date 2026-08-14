@@ -164,7 +164,6 @@ class BitPorn(UNIT3D):
         return {"category_id": self.category_ids["Uncategorized"]}
 
     async def get_type_id(self, meta: Meta, type: str | None = None, reverse: bool = False, mapping_only: bool = False) -> dict[str, str]:
-        """BitPorn has no type field in its upload form."""
         _ = meta, type, reverse, mapping_only
         return {"type_id": "1"}
 

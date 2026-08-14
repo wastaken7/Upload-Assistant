@@ -34,7 +34,7 @@ def test_bitporn_category_mappings_and_no_type_field() -> None:
 
     assert asyncio.run(bitporn.get_category_id(meta, mapping_only=True))["Ai Generated"] == "54"  # noqa: S101
     assert asyncio.run(bitporn.get_category_id(meta, reverse=True))["52"] == "Uncategorized"  # noqa: S101
-    assert asyncio.run(bitporn.get_type_id(meta)) == {}  # noqa: S101
+    assert asyncio.run(bitporn.get_type_id(meta)) == {"type_id": "1"}  # noqa: S101
 
 
 def test_bitporn_resolution_mapping() -> None:
