@@ -29,6 +29,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "img_host_1": (str,),
     "img_host_2": (str,),
     "img_host_3": (str,),
+    "smart_image_host_selection": (bool,),
     "image_upload_concurrency": (str, int),
     "image_upload_delay": (str, float, int),
     "imgbb_api": (str,),

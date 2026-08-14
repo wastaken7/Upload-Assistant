@@ -142,6 +142,10 @@ config: dict[str, Any] = {
         "img_host_4": "",
         "img_host_5": "",
         "img_host_6": "",
+        # Prefer one configured host accepted by every selected tracker that
+        # declares an image-host policy. If none is shared, use per-tracker
+        # fallback hosting as usual.
+        "smart_image_host_selection": True,
         # Maximum number of image uploads running at once. Set to 0 to use host defaults.
         "image_upload_concurrency": 0,
         # Delay between starting image uploads, in seconds.

@@ -195,6 +195,7 @@ class Meta:
     imdb_tt: str = ""
     imdb: str | None = ""
     imghost: str = ""
+    imghost_from_cli: bool = False
     infohash: str = ""
     initial_dupes: dict[str, Any] = field(default_factory=dict)
     is_disc: str = ""

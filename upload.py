@@ -1632,7 +1632,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                 # not possible, keep processing the compatible trackers and skip only
                 # those for which the user has no acceptable configured host.
                 allowed_hosts: list[str] | None = None
-                if relevant_trackers:
+                if relevant_trackers and config.get("DEFAULT", {}).get("smart_image_host_selection", True) and not meta.imghost_from_cli:
                     try:
                         tracker_instances = {tracker_name: tracker_class_map[tracker_name](config=config) for tracker_name in relevant_trackers}
 
