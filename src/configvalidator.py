@@ -339,7 +339,7 @@ def validate_config(config: Any, active_trackers: list[str] | None = None, activ
                 is_usenet_tracker_active = True
                 break
     except ImportError:
-        if any(ut in trackers_upper for ut in ("CURUPIRA", "SUIO", "DRUNKENSLUG")):
+        if any(ut in trackers_upper for ut in ("CURUPIRA", "SUIO", "DRUNKENSLUG", "NZBGEEK")):
             is_usenet_tracker_active = True
 
     if "USENET" in config_dict:

@@ -318,6 +318,7 @@ const trackerNameMap = {
   MTEAM: "MTeam",
   NEBULANCE: "Nebulance",
   NORDICQUALITY: "NordicQuality",
+  NZBGEEK: "NZBGeek",
   OLDTOONSWORLD: "OldToonsWorld",
   ONLYENCODES: "OnlyEncodes+",
   PASSTHEPOPCORN: "PassThePopcorn",
