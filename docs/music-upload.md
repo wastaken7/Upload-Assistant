@@ -15,12 +15,12 @@ Use the existing `--year` for the original release/group year and `--edition` fo
 --music-media web --music-release-type album --music-release-year 2024
 --music-label "Example Records" --music-catalogue-number ABC-123
 --edition "Deluxe Edition" --music-edition-year 2025
---music-genre "Rock, Alternative Rock" --music-cover "C:\covers\album.jpg"
+--music-genre "Rock, Alternative Rock" --poster "C:\covers\album.jpg"
 --music-discogs-id "https://www.discogs.com/release/1234567"
 # or: --music-discogs-release-id 1234567 --music-discogs-master-id 765432
 ```
 
-`--music-cover` accepts either an existing local image or a public HTTP(S) URL. `--music-enrich` enables MusicBrainz only for the current run; `--no-music-enrich` disables it even when the default configuration enables enrichment. `--music-discogs-id` accepts a bare release ID, a Discogs release/master URL, or `release/123`/`master/123`; the explicit release/master variants make the intent unambiguous. The legacy `--source WEB` and `--source DVD` are also reused for MUSIC when they map unambiguously to a supported music medium; use `--music-media` for all other media.
+`--poster` accepts either an existing local image or a public HTTP(S) URL and saves it as `tmp/<uuid>/artwork/POSTER.png`; use `--banner` for `POSTER_BANNER.png`. `--music-enrich` enables MusicBrainz only for the current run; `--no-music-enrich` disables it even when the default configuration enables enrichment. `--music-discogs-id` accepts a bare release ID, a Discogs release/master URL, or `release/123`/`master/123`; the explicit release/master variants make the intent unambiguous. The legacy `--source WEB` and `--source DVD` are also reused for MUSIC when they map unambiguously to a supported music medium; use `--music-media` for all other media.
 
 The analyzer keeps the original album group, a concrete release, and an audio-distinct edition separate. A leading folder year is the original group year; tag dates, imprint and catalogue identify the concrete release; they do not by themselves prove a different edition. Edition fields are populated only from explicit remaster/deluxe/reissue evidence and are confirmed when incomplete. Multi-artist tags are preserved as separate main artists, and a rip log from EAC/XLD/CUERipper/whipper can establish `CD` media without guessing from a `.log` filename alone.
 

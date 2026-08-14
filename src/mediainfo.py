@@ -8,7 +8,6 @@ from typing import Any
 
 from bin.get_mediainfo import MediaInfoBinaryManager
 
-
 _REPORT_BY_LINE = re.compile(r"(?<![^\r\n])[ \t]*ReportBy[ \t]*:[^\r\n]*(?:\r\n?|\n)?", re.IGNORECASE)
 
 
