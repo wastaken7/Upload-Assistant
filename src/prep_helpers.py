@@ -31,6 +31,7 @@ from src.region import get_distributor, get_region, get_service
 from src.tags import get_tag, tag_override
 from src.tvmaze import tvmaze_manager
 from src.video import video_manager
+from src.xxx_keywords import extract_xxx_keywords
 from src.xxx_platforms import XXX_PLATFORM_KEYWORDS
 
 guessit_module: Any = cast(Any, guessit)
@@ -641,6 +642,8 @@ async def process_media_files(prep_instance: Any, meta: Meta, videoloc: str, bdi
         filename = filename.split("AKA")[0]
     meta.filename = filename
     meta.bdinfo = bdinfo
+    if meta.category == "XXX":
+        meta.keywords = extract_xxx_keywords(meta.basename_no_ext, meta.keywords)
 
     return filename, untouched_filename, videopath, search_term, search_file_folder, mi, video
 
