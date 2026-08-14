@@ -60,5 +60,6 @@ def test_nzbgeek_requires_all_success_attributes() -> None:
 def test_nzbgeek_maps_supported_categories() -> None:
     tracker = NZBGeek({"TRACKERS": {"NZBGEEK": {}}})
     assert tracker.get_category_id(Meta(category="TV", resolution="1080p")) == "5040"  # noqa: S101
+    assert tracker.get_category_id(Meta(category="TV", resolution="1080p", anime=True)) == "5070"  # noqa: S101
     assert tracker.get_category_id(Meta(category="MUSIC", format="FLAC")) == "3040"  # noqa: S101
     assert tracker.get_category_id(Meta(category="BOOK")) == "7020"  # noqa: S101

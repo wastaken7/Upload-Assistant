@@ -102,6 +102,8 @@ class NZBGeek:
         if category == "MOVIE":
             return "2045" if is_uhd else "2040" if is_hd else "2030"
         if category == "TV":
+            if meta.anime:
+                return "5070"
             return "5045" if is_uhd else "5040" if is_hd else "5030"
         if category == "XXX":
             return "6040" if is_hd or is_uhd else "6070"

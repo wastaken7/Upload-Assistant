@@ -70,6 +70,19 @@ def test_mediainfo_uses_tolerant_utf8_output_decoding() -> None:
     assert run.call_args.kwargs["errors"] == "replace"
 
 
+def test_mediainfo_failure_reports_command_and_both_output_streams() -> None:
+    completed = Mock(returncode=1, stdout="could not parse file", stderr="input error")
+    with patch("src.mediainfo._binary", return_value="mediainfo"), patch("src.mediainfo.subprocess.run", return_value=completed):
+        from src.mediainfo import run_mediainfo
+
+        with pytest.raises(RuntimeError) as exc_info:
+            run_mediainfo("video.mkv", output="STRING", full=False)
+
+    assert str(exc_info.value) == (
+        "MediaInfo failed with exit code 1\nCommand: ['mediainfo', '--inform_version=1', 'video.mkv']\nstdout:\ncould not parse file\nstderr:\ninput error"
+    )
+
+
 def test_mediainfo_timeout_becomes_runtime_error() -> None:
     with patch("src.mediainfo._binary", return_value="mediainfo"), patch("src.mediainfo.subprocess.run", side_effect=subprocess.TimeoutExpired("mediainfo", 900)):
         from src.mediainfo import run_mediainfo

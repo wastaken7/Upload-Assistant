@@ -51,7 +51,12 @@ def run_mediainfo(path: str | Path, *, output: str | None = None, full: bool = T
     except subprocess.TimeoutExpired as exc:
         raise RuntimeError("MediaInfo timed out after 15 minutes") from exc
     if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or f"MediaInfo failed with exit code {result.returncode}")
+        raise RuntimeError(
+            f"MediaInfo failed with exit code {result.returncode}\n"
+            f"Command: {command!r}\n"
+            f"stdout:\n{result.stdout.strip() or '(empty)'}\n"
+            f"stderr:\n{result.stderr.strip() or '(empty)'}"
+        )
     return result.stdout
 
 
