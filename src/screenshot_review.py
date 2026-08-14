@@ -18,7 +18,7 @@ from typing import Any
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import forget_file, group_for
-from src.takescreens import capture_screenshot, disc_screenshots, get_frame_info, screenshot_par_scale_factors, tone_map
+from src.takescreens import capture_screenshot, determine_tonemapping, disc_screenshots, get_frame_info, screenshot_par_scale_factors
 
 _SCREENSHOT_FILE = re.compile(r"^(?P<prefix>.+)-(?P<index>\d+)\.png$", re.IGNORECASE)
 _EXCLUDED_NAMES = {"poster.png", "cover.png", "music_cover.png"}
@@ -321,7 +321,7 @@ async def _capture_fresh_frame(temp_dir: Path, meta_data: Mapping[str, object], 
         meta.frame_info_map = {str(timestamp): await get_frame_info(source, timestamp, meta)}
 
     staged = target.path.with_name(f".{target.path.stem}.capture-{secrets.token_hex(4)}.png")
-    hdr_tonemap = bool(tone_map and any(marker in str(meta.hdr) for marker in ("HDR", "DV", "HLG")))
+    hdr_tonemap = await determine_tonemapping(w_sar, h_sar, width, height, source, str(timestamp), str(staged), "verbose" if meta.ffdebug else "quiet", meta)
     try:
         result = await capture_screenshot(
             (target.index, source, timestamp, str(staged), width, height, w_sar, h_sar, "verbose" if meta.ffdebug else "quiet", hdr_tonemap, meta)
