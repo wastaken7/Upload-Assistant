@@ -26,6 +26,8 @@ class Meta:
     artwork_banner_path: str | None = None
     artwork_path: str = ""
     artwork_url: str = ""
+    explicit_banner: str = ""
+    explicit_poster: str = ""
     asian: bool = False
     asin: str = ""
     ask_dupe: bool = False
@@ -254,7 +256,6 @@ class Meta:
     music_album: str = ""
     music_artist: str = ""
     music_catalogue_number: str = ""
-    music_cover: str = ""
     music_discogs_enabled: bool = True
     music_discogs_id: str = ""
     music_discogs_master_id: str = ""

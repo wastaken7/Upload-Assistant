@@ -6,6 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
+from src.artwork import prepare_artwork
 from src.cogs.redaction import PathAwareEncoder
 from src.meta import Meta
 from src.metadata_cache import set_run_disabled
@@ -154,6 +155,7 @@ class Prep:
         # stage exports and validates without rehashing the music release.
         if meta.category == "MUSIC":
             await self._gather_music_prep(meta)
+            await prepare_artwork(meta)
             prep_helpers.calculate_source_size(self, meta, str(meta.path or ""))
             await prep_helpers.process_trackers_and_torrent(self, meta, client, hash_ids, tracker_ids, "", "")
             await _enrich_music_from_orpheus_fn(meta, self.config)
@@ -208,6 +210,8 @@ class Prep:
         # 8. Set Final Metadata and tags
         await prep_helpers.finalize_metadata(self, meta, videopath, bdinfo, mi, filename, untouched_filename, video)
 
+        await prepare_artwork(meta)
+
         await languages_manager.process_desc_language(meta)
 
         # Ensure the background capture is complete before the upload stage
@@ -218,6 +222,7 @@ class Prep:
 
         if meta.category == "BOOK":
             await self.rehost_images_manager.takescreens_manager.prepare_book_cover(videopath, meta.uuid, meta.base_dir, meta)
+            await prepare_artwork(meta)
             meta_path = Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json")
             meta_path.parent.mkdir(parents=True, exist_ok=True)
             async with aiofiles.open(meta_path, "w", encoding="utf-8") as meta_file:

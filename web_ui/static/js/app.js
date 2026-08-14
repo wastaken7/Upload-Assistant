@@ -272,6 +272,16 @@ const argumentCategories = [
     subtitle: "Getting these correct is 90% of a successful upload!",
     args: [
       {
+        label: "--poster",
+        placeholder: "URL_OR_PATH",
+        description: "Artwork URL or local poster path for any category",
+      },
+      {
+        label: "--banner",
+        placeholder: "URL_OR_PATH",
+        description: "Artwork URL or local banner path for any category",
+      },
+      {
         label: "--category",
         placeholder: "MOVIE",
         description: "Override detected category",
@@ -353,11 +363,6 @@ const argumentCategories = [
         label: "--music-genre",
         placeholder: "GENRE1,GENRE2",
         description: "Comma-separated genre override",
-      },
-      {
-        label: "--music-cover",
-        placeholder: "URL_OR_PATH",
-        description: "Artwork URL or local cover path",
       },
       {
         label: "--music-discogs-id",
@@ -552,11 +557,6 @@ const argumentCategories = [
         label: "--book-title",
         placeholder: "TITLE",
         description: "Override detected book title",
-      },
-      {
-        label: "--book-cover",
-        placeholder: "PATH_OR_URL",
-        description: "Required BOOK cover image path or public image URL",
       },
       {
         label: "--book-overview",

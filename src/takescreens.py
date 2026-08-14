@@ -1066,29 +1066,6 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
         return (index, None)
 
 
-async def load_local_cover_if_exists(path: str, dest_path: str) -> bool:
-    import shutil
-
-    def _check_and_copy():
-        search_dir = path if Path(path).is_dir() else str(Path(path).parent)
-        valid_names = {"cover.png", "cover.jpg", "cover.jpeg", "folder.png", "folder.jpg", "folder.jpeg", "poster.png", "poster.jpg", "poster.jpeg"}
-        if Path(search_dir).exists():
-            for f in (p.name for p in Path(search_dir).iterdir()):
-                if f.lower() in valid_names:
-                    local_file = Path(search_dir) / f
-                    if not is_valid_cover_image(local_file):
-                        continue
-                    shutil.copy2(local_file, dest_path)
-                    return is_valid_cover_image(dest_path)
-        return False
-
-    try:
-        return await asyncio.to_thread(_check_and_copy)
-    except Exception as e:
-        logger.info(f"[yellow]Error checking/copying local cover: {e}[/yellow]")
-        return False
-
-
 async def extract_embedded_cover_from_audiobook(meta: Meta, dest_path: str, confirmed_only: bool = False) -> bool:
     import mutagen
 
@@ -1492,10 +1469,6 @@ async def prepare_book_cover(path: str, folder_id: str, base_dir: str, meta: Met
     artwork_path = output_dir / "POSTER.png"
 
     if is_valid_cover_image(artwork_path) and not meta.retake:
-        meta.artwork_path = str(artwork_path)
-        return str(artwork_path)
-
-    if await load_local_cover_if_exists(path, str(artwork_path)):
         meta.artwork_path = str(artwork_path)
         return str(artwork_path)
 

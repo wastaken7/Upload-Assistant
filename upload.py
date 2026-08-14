@@ -540,7 +540,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
         logger.info(
             f"[yellow]BOOK upload: the following required fields are missing: "
             f"{', '.join(book_missing)}. "
-            f"Re-run with -btitle / -author / -year / -blang / --book-cover to supply them, "
+            f"Re-run with -btitle / -author / -year / -blang / --poster to supply them, "
             f"or trackers that require them will be skipped.[/yellow]"
         )
         return
