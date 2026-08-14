@@ -64,6 +64,7 @@ async def test_run_ffmpeg_writes_report_next_to_output(tmp_path, monkeypatch):
 async def test_run_ffmpeg_prefers_configured_binary(tmp_path, monkeypatch):
     executable = tmp_path / "ffmpeg.exe"
     executable.touch()
+    executable.chmod(executable.stat().st_mode | 0o111)
     captured: list[tuple[object, ...]] = []
 
     async def fake_create_subprocess_exec(*args, **_kwargs):
