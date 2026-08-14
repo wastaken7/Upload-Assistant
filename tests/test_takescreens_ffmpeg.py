@@ -3,12 +3,14 @@
 
 import asyncio
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import ffmpeg
 import pytest
 
 from src import takescreens
+from src.meta import Meta
 
 
 async def _stop_process(process: asyncio.subprocess.Process) -> None:
@@ -100,3 +102,46 @@ async def test_cancelling_run_ffmpeg_terminates_only_its_owned_process(tmp_path,
         for process in owned_processes:
             await _stop_process(process)
         await _stop_process(unrelated)
+
+
+@pytest.mark.asyncio
+async def test_determine_tonemapping_uses_verified_libplacebo(monkeypatch, tmp_path):
+    meta = Meta(hdr="HDR")
+    compatibility_calls = []
+
+    async def compatible(*args):
+        compatibility_calls.append(args)
+        return True, True
+
+    monkeypatch.setattr(takescreens, "tone_map", True)
+    monkeypatch.setattr(takescreens, "use_libplacebo", True)
+    monkeypatch.setattr(takescreens, "ffmpeg_is_good", False)
+    monkeypatch.setattr(takescreens, "check_libplacebo_compatibility", compatible)
+
+    enabled = await takescreens.determine_tonemapping(1, 1, 1920, 1080, "source.mkv", "10", str(tmp_path / "frame.png"), "quiet", meta)
+
+    assert enabled is True
+    assert meta.tonemapped is True
+    assert meta.libplacebo is True
+    assert len(compatibility_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_capture_screenshot_applies_selected_libplacebo_tonemapping(monkeypatch, tmp_path):
+    source = tmp_path / "source.mkv"
+    output = tmp_path / "frame.png"
+    source.write_bytes(b"video")
+    commands: list[list[str]] = []
+
+    async def run_stub(command):
+        compiled = takescreens.compile_ffmpeg_command(command)
+        commands.append(compiled)
+        Path(takescreens.get_ffmpeg_output_path(command, compiled)).write_bytes(b"png")
+        return 0, b"", b""
+
+    monkeypatch.setattr(takescreens, "run_ffmpeg", run_stub)
+
+    result = await takescreens.capture_screenshot((0, str(source), 10, str(output), 1920, 1080, 1, 1, "quiet", True, Meta(libplacebo=True)))
+
+    assert result == (0, str(output))
+    assert any("libplacebo=tonemapping=hable" in argument for argument in commands[0])

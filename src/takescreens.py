@@ -1877,38 +1877,8 @@ async def screenshots(
     num_tasks = num_capture
     num_workers = min(num_tasks, task_limit)
 
-    meta.libplacebo = False
-    hdr_tonemap: bool = False
-    if tone_map and ("HDR" in meta.hdr or "DV" in meta.hdr or "HLG" in meta.hdr):
-        if use_libplacebo and not meta.frame_overlay:
-            if not ffmpeg_is_good:
-                test_time = str(ss_times[0] if ss_times else 0)
-                libplacebo, compatible = await check_libplacebo_compatibility(w_sar, h_sar, width, height, path, test_time, test_image_path, loglevel, meta)
-                if compatible:
-                    hdr_tonemap = True
-                    meta.tonemapped = True
-                if libplacebo:
-                    hdr_tonemap = True
-                    meta.tonemapped = True
-                    meta.libplacebo = True
-                if not compatible and not libplacebo:
-                    hdr_tonemap = False
-                    logger.info("[yellow]FFMPEG failed tonemap checking.[/yellow]")
-                    await asyncio.sleep(2)
-                if not libplacebo and "HDR" not in meta.hdr:
-                    hdr_tonemap = False
-            else:
-                hdr_tonemap = True
-                meta.tonemapped = True
-                meta.libplacebo = True
-        else:
-            if "HDR" not in meta.hdr:
-                hdr_tonemap = False
-            else:
-                hdr_tonemap = True
-                meta.tonemapped = True
-    else:
-        hdr_tonemap = False
+    test_time = str(ss_times[0] if ss_times else 0)
+    hdr_tonemap = await determine_tonemapping(w_sar, h_sar, width, height, path, test_time, test_image_path, loglevel, meta)
 
     logger.debug(f"Using {num_workers} worker(s) for {num_capture} image(s)")
 
@@ -2605,6 +2575,31 @@ async def check_libplacebo_compatibility(
                     Path(test_image_path).unlink()
             return False, True
     return False, False
+
+
+async def determine_tonemapping(w_sar: float, h_sar: float, width: float, height: float, path: str, ss_time: str, image_path: str, loglevel: str, meta: Meta) -> bool:
+    """Select a verified tonemapping path and record its actual metadata state."""
+    meta.libplacebo = False
+    meta.tonemapped = False
+    if not tone_map or not any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
+        return False
+
+    if use_libplacebo and not meta.frame_overlay:
+        if ffmpeg_is_good:
+            meta.libplacebo = True
+        else:
+            libplacebo, compatible = await check_libplacebo_compatibility(w_sar, h_sar, width, height, path, ss_time, image_path, loglevel, meta)
+            if not compatible:
+                logger.info("[yellow]FFMPEG failed tonemap checking.[/yellow]")
+                return False
+            meta.libplacebo = libplacebo
+        meta.tonemapped = True
+        return True
+
+    if "HDR" in meta.hdr:
+        meta.tonemapped = True
+        return True
+    return False
 
 
 async def libplacebo_warmup(path: str, meta: Meta, loglevel: str) -> None:

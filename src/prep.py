@@ -54,6 +54,12 @@ except KeyboardInterrupt:
     exit()
 
 
+async def populate_hdr_for_early_capture(meta: Meta, mi: dict[str, Any] | None, bdinfo: dict[str, Any]) -> None:
+    """Populate HDR before category detection starts asynchronous screenshot capture."""
+    if not meta.hdr:
+        meta.hdr = await prep_helpers.video_manager.get_hdr(mi or {}, bdinfo)
+
+
 class Prep:
     """
     Prepare for upload:
@@ -175,8 +181,8 @@ class Prep:
 
         # HDR is normally finalized after the metadata searches, but ffmpeg
         # needs it while the early capture is running (for optional tonemapping).
-        if meta.category in ("TV", "MOVIE") and not meta.hdr:
-            meta.hdr = await prep_helpers.video_manager.get_hdr(mi or {}, bdinfo)
+        # Category detection occurs later, so it must not gate this early probe.
+        await populate_hdr_for_early_capture(meta, mi, bdinfo)
 
         # Screenshot capture is CPU/IO-heavy and independent from the metadata
         # requests below. Start it with a snapshot so ffmpeg can run while the
