@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+"""Provision the legacy MediaInfo CLI required for DVD parsing."""
+
 import platform
 import shutil
 import zipfile
@@ -8,6 +10,7 @@ from tempfile import TemporaryDirectory
 
 import requests
 
+from bin.download_integrity import verify_downloaded_asset
 from src.console import logger
 
 MEDIAINFO_VERSION = "23.04"
@@ -16,6 +19,8 @@ MEDIAINFO_LIB_BASE_URL = "https://mediaarea.net/download/binary/libmediainfo0"
 
 
 def get_filename(system: str, arch: str, library_type: str = "cli") -> str:
+    if system == "windows" and library_type == "cli" and arch == "x86_64":
+        return f"MediaInfo_CLI_{MEDIAINFO_VERSION}_Windows_x64.zip"
     if system == "linux":
         if library_type == "cli":
             # MediaInfo CLI uses Lambda (pre-compiled) version
@@ -64,20 +69,59 @@ def extract_linux(cli_archive: Path, lib_archive: Path, output_dir: Path) -> Non
             shutil.copyfileobj(source, destination)
 
 
+def extract_windows(cli_archive: Path, output_dir: Path) -> None:
+    """Extract the legacy Windows DVD CLI without unpacking arbitrary archive members."""
+    with zipfile.ZipFile(cli_archive, "r") as zip_ref:
+        member = next((name for name in zip_ref.namelist() if Path(name).name == "MediaInfo.exe"), None)
+        if member is None:
+            raise RuntimeError("MediaInfo CLI archive does not contain MediaInfo.exe")
+        info = zip_ref.getinfo(member)
+        if Path(member).is_absolute() or ".." in Path(member).parts:
+            raise RuntimeError(f"Unsafe MediaInfo archive member: {member}")
+        with zip_ref.open(info) as source, (output_dir / "MediaInfo.exe").open("wb") as destination:
+            shutil.copyfileobj(source, destination)
+
+
 def download_dvd_mediainfo(base_dir: str) -> str | None:
     system = platform.system().lower()
     machine = platform.machine().lower()
 
     logger.debug(f"[blue]System: {system}, arch: {machine}[/blue]")
 
-    if system not in ["linux"]:
-        return None
-
-    if system == "linux" and machine not in ["x86_64", "arm64"]:
-        return None
-
     if machine == "amd64":
         machine = "x86_64"
+
+    if system == "windows":
+        if machine != "x86_64":
+            raise RuntimeError("MediaInfo 23.04 is unavailable for Windows ARM64; DVD language parsing cannot use the newer CLI")
+
+        output_dir = Path(base_dir) / "bin" / "MI" / "windows" / "dvd"
+        cli_file = output_dir / "MediaInfo.exe"
+        version_file = output_dir / f"version_{MEDIAINFO_VERSION}"
+        if cli_file.is_file() and version_file.is_file():
+            return str(cli_file)
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+        cli_filename = get_filename(system, machine)
+        with TemporaryDirectory() as tmp_dir:
+            cli_archive = Path(tmp_dir) / cli_filename
+            download_file(get_url(system, machine), cli_archive)
+            verify_downloaded_asset(cli_archive, cli_filename)
+            with TemporaryDirectory(dir=output_dir.parent, prefix="mediainfo-dvd-") as staging_dir:
+                staging_dir_path = Path(staging_dir)
+                extract_windows(cli_archive, staging_dir_path)
+                staged_cli = staging_dir_path / "MediaInfo.exe"
+                if not staged_cli.is_file():
+                    raise RuntimeError("Failed to extract MediaInfo CLI for DVD processing")
+                staged_cli.replace(cli_file)
+        version_file.write_text(f"MediaInfo {MEDIAINFO_VERSION}\n", encoding="utf-8")
+        return str(cli_file)
+
+    if system != "linux":
+        return None
+
+    if machine not in ["x86_64", "arm64"]:
+        return None
 
     platform_dir = "linux/dvd"
     output_dir = Path(base_dir) / "bin" / "MI" / platform_dir

@@ -17,6 +17,7 @@ import cli_ui
 import matplotlib.pyplot as plt
 import numpy as np
 
+from src.binaries import configured_binary
 from src.console import logger
 from src.meta import Meta
 from src.temp_paths import spectrograms_dir
@@ -46,7 +47,18 @@ def prompt_audio_stream_positions() -> str:
 
 def get_audio_streams(file_path: str | Path) -> list[dict[str, Any]]:
     """Return the audio streams reported by ffprobe, or raise a useful error."""
-    command = ["ffprobe", "-v", "error", "-show_entries", "stream=index:stream_tags=language,title", "-select_streams", "a", "-of", "json", str(file_path)]
+    command = [
+        configured_binary("ffprobe_path") or "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "stream=index:stream_tags=language,title",
+        "-select_streams",
+        "a",
+        "-of",
+        "json",
+        str(file_path),
+    ]
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=60)  # noqa: S603
     except (OSError, subprocess.TimeoutExpired) as error:
@@ -154,7 +166,7 @@ def generate_spectrogram(
 ) -> Path:
     """Decode one stream and generate a frequency/time image suitable for review."""
     command = [
-        "ffmpeg",
+        configured_binary("ffmpeg_path") or "ffmpeg",
         "-v",
         "error",
         "-nostdin",

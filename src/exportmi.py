@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import aiofiles
 
-from src.app_paths import CODE_DIR
+from src.binaries import configured_binary
 from src.console import logger
 from src.exceptions import NoAudioMediaError
 from src.mediainfo import MediaInfo
@@ -39,12 +39,16 @@ def validate_file_path(file_path: str) -> str:
     return str(path)
 
 
-def setup_mediainfo_library(_base_dir: str) -> dict[str, Any] | None:
+def find_dvd_mediainfo(base_dir: str | Path) -> dict[str, Any] | None:
+    """Return the MediaInfo components installed for DVD processing."""
+    if configured := configured_binary("dvd_mediainfo_path"):
+        return {"cli": Path(configured), "lib": None, "lib_dir": None}
     system = platform.system().lower()
+    binary_root = Path(base_dir) / "bin" / "MI"
 
     if system == "windows":
-        cli_path = CODE_DIR / "bin" / "MI" / "windows" / "MediaInfo.exe"
-        if Path(cli_path).exists():
+        cli_path = binary_root / "windows" / "dvd" / "MediaInfo.exe"
+        if cli_path.exists():
             logger.debug(f"[blue]Windows MediaInfo CLI: {cli_path} (found)[/blue]")
             return {
                 "cli": cli_path,
@@ -55,7 +59,7 @@ def setup_mediainfo_library(_base_dir: str) -> dict[str, Any] | None:
         return None
 
     if system == "linux":
-        lib_dir = CODE_DIR / "bin" / "MI" / "linux"
+        lib_dir = binary_root / "linux" / "dvd"
 
         mediainfo_lib = Path(lib_dir) / "libmediainfo.so.0"
         mediainfo_cli = Path(lib_dir) / "mediainfo"
@@ -390,7 +394,6 @@ async def export_info(
         return filtered
 
     mediainfo_cmd = None
-    mediainfo_config = None
 
     if is_dvd:
         logger.debug("[bold yellow]DVD detected, using specialized MediaInfo...")
@@ -398,27 +401,12 @@ async def export_info(
         current_platform = platform.system().lower()
 
         if current_platform in ["linux", "windows"]:
-            mediainfo_config = setup_mediainfo_library(base_dir)
+            mediainfo_config = find_dvd_mediainfo(base_dir)
             if mediainfo_config:
                 if mediainfo_config["cli"]:
                     mediainfo_cmd = mediainfo_config["cli"]
-
-                # Configure library if available (Linux only)
-                if mediainfo_config["lib"]:
-                    try:
-                        if hasattr(MediaInfo, "_library_file"):
-                            cast(Any, MediaInfo)._library_file = mediainfo_config["lib"]
-
-                        test_parse = MediaInfo.can_parse()
-                        logger.debug(f"[green]Configured specialized MediaInfo library (can_parse: {test_parse})[/green]")
-
-                        if not test_parse:
-                            logger.debug("[yellow]Library test failed, may fall back to system MediaInfo[/yellow]")
-
-                    except Exception as e:
-                        logger.debug(f"[yellow]Could not configure specialized library: {e}[/yellow]")
                 else:
-                    logger.debug("[yellow]MediaInfo library not available[/yellow]")
+                    logger.debug("[yellow]DVD MediaInfo CLI not available[/yellow]")
             else:
                 logger.debug("[yellow]No specialized MediaInfo components found, using system MediaInfo[/yellow]")
         else:
@@ -517,11 +505,6 @@ async def export_info(
     async with aiofiles.open(f"{base_dir}{'/' + 'tmp' + '/'}{folder_id}/MediaInfo.json", encoding="utf-8") as f:
         mi = cast(dict[str, Any], json.loads(await f.read()))
 
-    # Cleanup: Reset library configuration if we modified it
-    if is_dvd and platform.system().lower() in ["linux", "windows"]:
-        # Reset MediaInfo library file to default (Linux only)
-        if hasattr(MediaInfo, "_library_file"):
-            cast(Any, MediaInfo)._library_file = None
         logger.debug("[blue]Reset MediaInfo library configuration[/blue]")
 
     return mi
