@@ -165,7 +165,9 @@ class Prep:
         filename, untouched_filename, videopath, search_term, search_file_folder, mi, video = await prep_helpers.process_media_files(self, meta, videoloc, bdinfo)
 
         if meta.category == "XXX" and meta.screens > 0:
-            _rows, _columns, max_videos = self.takescreens_manager.xxx_contact_sheet_settings() if hasattr(self.takescreens_manager, "xxx_contact_sheet_settings") else (12, 5, 6)
+            _rows, _columns, max_videos = (
+                self.takescreens_manager.xxx_contact_sheet_settings() if hasattr(self.takescreens_manager, "xxx_contact_sheet_settings") else (12, 5, 6)
+            )
             meta.screens = min(len(meta.filelist or []), max_videos)
 
         # HDR is normally finalized after the metadata searches, but ffmpeg

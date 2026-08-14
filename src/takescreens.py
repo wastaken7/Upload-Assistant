@@ -52,7 +52,7 @@ def is_valid_lostimg_image_size(image_size: int) -> bool:
 def _positive_config_int(key: str, default: int) -> int:
     try:
         return max(1, int(default_config.get(key, default) or default))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -70,7 +70,7 @@ def xxx_contact_sheet_animation_settings() -> tuple[bool, float]:
     animated = _as_bool(default_config.get("xxx_contact_sheet_animated_webp"), default=False)
     try:
         duration = max(0.1, float(default_config.get("xxx_contact_sheet_animation_seconds", 5) or 5))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         duration = 5.0
     return animated, duration
 
@@ -96,9 +96,7 @@ def _xxx_contact_sheet_title_filter(stream: Any, title: str, include_title: bool
 def _xxx_contact_sheet_timestamp_filter(stream: Any, timestamp: str, fontfile: str | None) -> Any:
     if fontfile is None:
         return stream
-    return stream.filter(
-        "drawtext", text=timestamp, x=8, y="h-text_h-8", fontsize=18, fontcolor="white", box=1, boxcolor="black@0.65", boxborderw=4, fontfile=fontfile
-    )
+    return stream.filter("drawtext", text=timestamp, x=8, y="h-text_h-8", fontsize=18, fontcolor="white", box=1, boxcolor="black@0.65", boxborderw=4, fontfile=fontfile)
 
 
 def _format_contact_sheet_timestamp(seconds: float) -> str:
@@ -111,17 +109,10 @@ def _format_contact_sheet_timestamp(seconds: float) -> str:
 def _xxx_contact_sheet_static_stream(video_path: Path, frame_count: int, duration: float, columns: int, rows: int, fontfile: str | None) -> Any:
     stream = ffmpeg.input(str(video_path))
     stream = _xxx_contact_sheet_timestamp_filter(stream, r"%{pts\\:hms}", fontfile)
-    return (
-        stream
-        .filter("fps", fps=f"{frame_count}/{duration:.6f}")
-        .filter("scale", 320, -2)
-        .filter("tile", layout=f"{columns}x{rows}", margin=2, padding=2)
-    )
+    return stream.filter("fps", fps=f"{frame_count}/{duration:.6f}").filter("scale", 320, -2).filter("tile", layout=f"{columns}x{rows}", margin=2, padding=2)
 
 
-def _xxx_contact_sheet_animated_stream(
-    video_path: Path, frame_count: int, duration: float, columns: int, rows: int, animation_seconds: float, fontfile: str | None
-) -> Any:
+def _xxx_contact_sheet_animated_stream(video_path: Path, frame_count: int, duration: float, columns: int, rows: int, animation_seconds: float, fontfile: str | None) -> Any:
     max_start = max(0.0, duration - animation_seconds)
     streams = []
     for index in range(frame_count):

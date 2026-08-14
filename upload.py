@@ -1092,7 +1092,7 @@ def xxx_min_successful_uploads(meta: Meta, min_successful_uploads: int) -> int:
     """Cap XXX image uploads to its one-contact-sheet-per-video contract."""
     try:
         contact_sheet_count = int(meta.screens or 0)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         contact_sheet_count = 0
     return min(min_successful_uploads, max(1, contact_sheet_count))
 
