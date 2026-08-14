@@ -3,7 +3,6 @@ import asyncio
 import contextlib
 import datetime
 import html
-import io
 import json
 import os
 import re
@@ -15,13 +14,11 @@ from typing import Any
 import aiofiles
 import cli_ui
 import httpx
-from PIL import Image
 
 from src.console import logger
 from src.igdb import IGDBAPI
 from src.meta import Meta
 from src.metadata_cache import cache_for, is_cache_miss
-from src.temp_paths import artwork_dir
 
 
 def normalize_version(version_str: str) -> str:
@@ -672,21 +669,6 @@ async def gather_game_prep(
             cover_url = "https:" + cover_url
         cover_url = cover_url.replace("t_thumb", "t_cover_big")
         meta.artwork_url = cover_url
-
-        # Download and save cover locally as POSTER.png
-        poster_png_path = artwork_dir(base_dir, meta.uuid) / "POSTER.png"
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.get(cover_url)
-                if response.status_code == 200:
-                    img = Image.open(io.BytesIO(response.content))
-                    img.save(poster_png_path, "PNG")
-                    meta.artwork_path = str(poster_png_path)
-                    logger.info("[green]IGDB: Cover downloaded and saved to POSTER.png[/green]")
-                else:
-                    logger.info(f"[yellow]IGDB: Failed to download cover. Status: {response.status_code}[/yellow]")
-        except Exception as e:
-            logger.info(f"[yellow]IGDB: Failed to save cover as POSTER.png: {e}[/yellow]")
 
     # Genres
     genres = [g.get("name") for g in selected_game.get("genres", []) if g.get("name")]

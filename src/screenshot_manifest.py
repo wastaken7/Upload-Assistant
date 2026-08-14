@@ -56,10 +56,11 @@ def register(base_dir: str | Path, release_id: str, paths: list[str | Path], gro
             if not source.is_file():
                 continue
             screenshot_id = uuid.uuid4().hex
-            target = source.with_name(f"{screenshot_id}.png")
+            suffix = source.suffix.lower() or ".png"
+            target = source.with_name(f"{screenshot_id}{suffix}")
             while target.exists():
                 screenshot_id = uuid.uuid4().hex
-                target = source.with_name(f"{screenshot_id}.png")
+                target = source.with_name(f"{screenshot_id}{suffix}")
             source.replace(target)
             entries[screenshot_id] = {"file": target.name, "group": group}
             result.append(target)

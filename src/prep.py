@@ -6,9 +6,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
+from src.artwork import prepare_artwork
 from src.cogs.redaction import PathAwareEncoder
 from src.meta import Meta
 from src.metadata_cache import set_run_disabled
+from src.screenshot_manifest import files as manifest_files
 
 console: Any = None
 
@@ -158,11 +160,18 @@ class Prep:
             await prep_helpers.process_trackers_and_torrent(self, meta, client, hash_ids, tracker_ids, "", "")
             await _enrich_music_from_orpheus_fn(meta, self.config)
             await _enrich_music_from_discogs_fn(meta, self.config)
+            await prepare_artwork(meta)
             logger.debug(f"Music metadata processed in {time.time() - meta_start_time:.2f} seconds")
             return meta
 
         # 3. File information and basic media processing
         filename, untouched_filename, videopath, search_term, search_file_folder, mi, video = await prep_helpers.process_media_files(self, meta, videoloc, bdinfo)
+
+        if meta.category == "XXX" and meta.screens > 0:
+            _rows, _columns, max_videos = (
+                self.takescreens_manager.xxx_contact_sheet_settings() if hasattr(self.takescreens_manager, "xxx_contact_sheet_settings") else (12, 5, 6)
+            )
+            meta.screens = min(len(meta.filelist or []), max_videos)
 
         # HDR is normally finalized after the metadata searches, but ffmpeg
         # needs it while the early capture is running (for optional tonemapping).
@@ -202,6 +211,8 @@ class Prep:
         # 8. Set Final Metadata and tags
         await prep_helpers.finalize_metadata(self, meta, videopath, bdinfo, mi, filename, untouched_filename, video)
 
+        await prepare_artwork(meta)
+
         await languages_manager.process_desc_language(meta)
 
         # Ensure the background capture is complete before the upload stage
@@ -209,9 +220,12 @@ class Prep:
         # helper; the existing upload-stage capture remains the fallback.
         if early_screenshots_task is not None:
             await early_screenshots_task
+        if meta.category == "XXX":
+            meta.screens = len(manifest_files(meta.base_dir, meta.uuid, "main"))
 
         if meta.category == "BOOK":
             await self.rehost_images_manager.takescreens_manager.prepare_book_cover(videopath, meta.uuid, meta.base_dir, meta)
+            await prepare_artwork(meta)
             meta_path = Path(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json")
             meta_path.parent.mkdir(parents=True, exist_ok=True)
             async with aiofiles.open(meta_path, "w", encoding="utf-8") as meta_file:
@@ -295,6 +309,8 @@ class Prep:
                     retry_cap=False,
                     cleanup_after_capture=False,
                 )
+            elif meta.category == "XXX":
+                await self.takescreens_manager.xxx_contact_sheets(meta.filelist or [], meta.uuid, meta.base_dir, meta)
             elif videopath:
                 await self.takescreens_manager.screenshots(
                     videopath,
@@ -312,7 +328,9 @@ class Prep:
         except Exception as error:
             logger.warning(f"[yellow]Early screenshot generation failed; upload stage will retry: {error}[/yellow]")
 
-    def check_adult_media(self, meta) -> bool:
+    def check_adult_media(self, meta: Meta) -> bool:
+        if meta.category == "XXX":
+            return True
         adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy"]
         if meta.tmdb_adult_media:
             return True
@@ -330,6 +348,10 @@ class Prep:
         candidate = Path(meta.path or "")
         if candidate.suffix.lower() in music_extensions:
             return "MUSIC"
+
+        if not meta.is_disc and await asyncio.to_thread(prep_helpers.is_xxx_video_release, candidate):
+            logger.debug("[cyan]Matched XXX platform marker in release name[/cyan]")
+            return "XXX"
 
         path_patterns = [
             r"(?i)[\\/](?:tv|tvshows|tv.shows|series|shows)[\\/]",

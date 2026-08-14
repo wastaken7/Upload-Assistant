@@ -219,6 +219,15 @@ config: dict[str, Any] = {
         # SCREENSHOT HANDLING
         # Number of screenshots to capture
         "screens": "4",
+        # XXX releases generate one contact sheet per video instead of individual frames.
+        # Rows are vertical and columns are horizontal: 12 x 5 produces 60 thumbnails.
+        "xxx_contact_sheet_rows": "12",
+        "xxx_contact_sheet_columns": "5",
+        # Maximum number of video files for which to generate XXX contact sheets.
+        "xxx_contact_sheet_max_videos": "6",
+        # Create XXX contact sheets as 5-second animated WebP files instead of PNG.
+        "xxx_contact_sheet_animated_webp": False,
+        "xxx_contact_sheet_animation_seconds": "5",
         # Set true to automatically capture DVD menu screenshots from menu VOBs
         "auto_dvd_menus": True,
         # Keep screenshots at the coded dimensions reported by MediaInfo.
@@ -444,7 +453,7 @@ config: dict[str, Any] = {
         # Which trackers do you want to upload to?
         # Note: Description layout settings (like screenshot grids, logos, etc.) can be overridden per-tracker.
         # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
-        # Available tracker: 1PTBA, AURA4K, ASIANCINEMA, AITHER, ANTHELION, ALPHARATIO, AMIGOSSHARE, AVISTAZ, BEYONDHD, BITHDTV, BJSHARE, BLUTOPIA, BRASILTRACKER, CAPYBARABR, CURUPIRA, SUIO, CINEMAZ, DIGITALCORE, DRUNKENSLUG, DARKPEERS, DESITORRENTS, EMUWAREZ, FUNFILE, FILELIST,
+        # Available tracker: 1PTBA, AURA4K, ASIANCINEMA, AITHER, ANTHELION, ALPHARATIO, AMIGOSSHARE, AVISTAZ, BEYONDHD, BITHDTV, BITPORN, BJSHARE, BLUTOPIA, BRASILTRACKER, CAPYBARABR, CURUPIRA, SUIO, CINEMAZ, DIGITALCORE, DRUNKENSLUG, DARKPEERS, DESITORRENTS, EMUWAREZ, FUNFILE, FILELIST,
         # GREATPOSTERWALL, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK, HAWKEUNO, INFINITYHD, IMMORTALSEED, ITATORRENTS, LAJIDUI, LEMONHD, LOCADORA, LASTDIGITALUNDERGROUND, LONGPT, LST, LATTEAM, LUMINARR, MIDNIGHTSCENE, MTEAM, NEBULANCE, ONLYENCODES,
         # NORDICQUALITY, OLDTOONSWORLD, PRIVATEHD, PORTUGAS, PTCAFE, PTERCLUB, PTFANS, PTGTK, PTZONE, PASSTHEPOPCORN, PEERGARDEN, PTSKIT, POLISHTORRENT, RACING4EVERYONE, RASTASTUGAN, REELFLIX, RAILGUNPT, RETROFLIX, RETROMOVIESCLUB, SAMARITANO, SHAREISLAND, SWARMAZON, SEEDPOOL, SPEEDAPP, SKIPTHECOMMERCIALS, TORRENTHR,
         # CINEMATIK, MAKINGOFF, ORPHEUS, TORRENTLEECH, THELEACHZONE, THEOLDSCHOOL, TOTHEGLORY, TORRENTEROS, TVCHAOSUK, ULCX, UTOPIA, XINGYUNGEPT, YUSCENE, ZENITH
@@ -680,6 +689,35 @@ config: dict[str, Any] = {
             # passkey found under https://www.bit-hdtv.com/my.php
             "my_announce_url": "https://trackerr.bit-hdtv.com/passkey/announce",
             "anon": True,
+            "inject_delay": 0,
+        },
+        "BITPORN": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            "api_key": "",
+            "anon": True,
+            # The configurations below override the DEFAULT configuration
+            "add_logo": True,
+            "logo_size": "",
+            "thumbnail_size": "",
+            "screens_per_row": "",
+            "episode_overview": True,
+            "tonemapped_header": "[note]Screenshots have been adapted for SDR viewing, for reference only.[/note]",
+            "multiScreens": "",
+            "pack_thumb_size": "",
+            "charLimit": "",
+            "fileLimit": "",
+            "processLimit": "",
+            "custom_description_header": "",
+            "screenshot_header": "[h2]Screenshots[/h2]",
+            "disc_menu_header": "[h2]Disc Menu Screenshots[/h2]",
+            "audio_spectrogram_header": "[h2]Audio Spectrogram[/h2]",
+            "dynamic_hdr_plot_header": "[h2]Dynamic HDR Metadata[/h2]",
+            "custom_signature": "",
+            "add_bluray_link": True,
+            "use_bluray_images": True,
+            "bluray_image_size": "",
+            "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
         "BJSHARE": {

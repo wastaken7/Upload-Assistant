@@ -42,6 +42,11 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "logo_size": (str, int),
     "episode_overview": (bool,),
     "screens": (str, int),
+    "xxx_contact_sheet_rows": (str, int),
+    "xxx_contact_sheet_columns": (str, int),
+    "xxx_contact_sheet_max_videos": (str, int),
+    "xxx_contact_sheet_animated_webp": (bool,),
+    "xxx_contact_sheet_animation_seconds": (str, int, float),
     "cutoff_screens": (str, int),
     "max_menu_screens": (str, int),
     "thumbnail_size": (str, int),
@@ -529,6 +534,10 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
     # Validate numeric string values can be parsed
     numeric_keys = [
         "screens",
+        "xxx_contact_sheet_rows",
+        "xxx_contact_sheet_columns",
+        "xxx_contact_sheet_max_videos",
+        "xxx_contact_sheet_animation_seconds",
         "cutoff_screens",
         "max_menu_screens",
         "thumbnail_size",
@@ -549,9 +558,10 @@ def _validate_default_section(default: dict[str, Any]) -> tuple[list[str], list[
             value = default[key]
             if isinstance(value, str):
                 try:
-                    int(value)
+                    (float if key == "xxx_contact_sheet_animation_seconds" else int)(value)
                 except ValueError:
-                    warnings.append(ConfigValidationWarning(f"Cannot parse '{value}' as integer", key=key, section="DEFAULT"))
+                    expected = "number" if key == "xxx_contact_sheet_animation_seconds" else "integer"
+                    warnings.append(ConfigValidationWarning(f"Cannot parse '{value}' as {expected}", key=key, section="DEFAULT"))
 
     image_upload_concurrency = default.get("image_upload_concurrency")
     if image_upload_concurrency is not None:
