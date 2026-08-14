@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -27,4 +28,6 @@ def configured_binary(key: str, config: Mapping[str, Any] | None = None) -> str 
     path = Path(path_text).expanduser()
     if not path.is_file():
         raise FileNotFoundError(f"Configured {key} does not exist or is not a file: {path}")
-    return str(path)
+    if os.name != "nt" and not os.access(path, os.X_OK):
+        raise FileNotFoundError(f"Configured {key} is not executable: {path}")
+    return str(path) if path_text.startswith("~") else path_text

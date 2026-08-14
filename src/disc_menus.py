@@ -101,8 +101,9 @@ class DiscMenus:
         output_dir = menu_screenshots_dir(meta.base_dir, meta.uuid)
 
         # Get ffmpeg path
-        ffmpeg_path = configured_binary("ffmpeg_path", self.config) or "ffmpeg"
-        if ffmpeg_path == "ffmpeg" and platform.system() == "Linux":
+        configured_ffmpeg = configured_binary("ffmpeg_path", self.config)
+        ffmpeg_path = configured_ffmpeg or "ffmpeg"
+        if configured_ffmpeg is None and platform.system() == "Linux":
             ff_bin_dir = Path(meta.base_dir) / "bin" / "ffmpeg"
             machine = platform.machine().lower()
             arch = "amd" if machine in ("x86_64", "amd64") else ("arm" if machine in ("aarch64", "arm64") else None)
