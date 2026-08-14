@@ -59,6 +59,16 @@ def test_text_reports_always_request_mediainfo_version() -> None:
     assert run.call_args.args[0] == ["mediainfo", "--inform_version=1", "video.mkv"]
 
 
+def test_mediainfo_prefers_configured_binary(tmp_path) -> None:
+    executable = tmp_path / "MediaInfo.exe"
+    executable.touch()
+
+    with patch("src.mediainfo.configured_binary", return_value=str(executable)):
+        from src.mediainfo import _binary
+
+        assert _binary() == str(executable)
+
+
 def test_mediainfo_uses_tolerant_utf8_output_decoding() -> None:
     completed = Mock(returncode=0, stdout="General", stderr="")
     with patch("src.mediainfo._binary", return_value="mediainfo"), patch("src.mediainfo.subprocess.run", return_value=completed) as run:
