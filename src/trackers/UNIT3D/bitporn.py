@@ -2,7 +2,9 @@
 import re
 from typing import Any, ClassVar
 
+from src.get_desc import DescriptionBuilder
 from src.meta import Meta
+from src.screenshot_manifest import files as manifest_files
 from src.trackers.UNIT3D import UNIT3D
 
 Config = dict[str, Any]
@@ -175,3 +177,73 @@ class BitPorn(UNIT3D):
 
         resolved_resolution = resolution if resolution else meta.resolution
         return {"resolution_id": self.resolution_ids.get(str(resolved_resolution), self.resolution_ids["OTHER"])}
+
+    async def _description_image_files(self, meta: Meta) -> list[tuple[str, bytes, str]]:
+        """Return local XXX contact sheets for BitPorn to host during upload."""
+        images: list[tuple[str, bytes, str]] = []
+        for path in manifest_files(meta.base_dir, meta.uuid, "main"):
+            image = await self.get_image_file(path, max_size=10 * 1024 * 1024)
+            if image:
+                images.append(image)
+        return images
+
+    async def get_description(self, meta: Meta) -> dict[str, str]:
+        """Use BitPorn placeholders so its API, rather than an external host, serves screenshots."""
+        description = await DescriptionBuilder(self.tracker, self.config).general_description_generator(
+            meta,
+            audio_spectrogram=False,
+            bluray=False,
+            book=True,
+            custom_header=True,
+            custom_signature=True,
+            description=True,
+            game=True,
+            languages=False,
+            logo=False,
+            mediainfo=False,
+            menu_screenshots=False,
+            nfo=False,
+            screenshots=False,
+            tonemapped_header=True,
+            tv_info=True,
+            ua_signature=True,
+            user_description=True,
+            music=True,
+        )
+        images = await self._description_image_files(meta)
+        if images:
+            placeholders = "".join(f"[upimg{index}]" for index in range(1, len(images) + 1))
+            description = f"{description}\n[center]{placeholders}[/center]"
+        return {"description": description}
+
+    async def get_data(self, meta: Meta) -> dict[str, str]:
+        """Build only the documented BitPorn upload fields."""
+        data: dict[str, str] = {}
+        for getter in (
+            self.get_name,
+            self.get_description,
+            self.get_mediainfo,
+            self.get_bdinfo,
+            self.get_category_id,
+            self.get_type_id,
+            self.get_resolution_id,
+            self.get_anonymous,
+            self.get_keywords,
+        ):
+            data.update(await getter(meta))
+
+        for index, _ in enumerate(await self._description_image_files(meta), start=1):
+            data[f"description_image_widths[{index}]"] = "450"
+        return data
+
+    async def get_additional_files(self, meta: Meta) -> dict[str, tuple[str, bytes, str]]:
+        """Use BitPorn's multipart names for tracker-hosted artwork and screenshots."""
+        files = await super().get_additional_files(meta)
+        if cover := files.pop("torrent-cover", None):
+            files["cover"] = cover
+        if banner := files.pop("torrent-banner", None):
+            files["banner"] = banner
+
+        for index, image in enumerate(await self._description_image_files(meta)):
+            files[f"description_images[{index}]"] = image
+        return files

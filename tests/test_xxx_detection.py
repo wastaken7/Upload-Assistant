@@ -1,4 +1,5 @@
 """Regression tests for automatic XXX video category detection."""
+# ruff: noqa: S101
 
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ from src.meta import Meta
 from src.prep import Prep
 from src.prep_helpers import detect_disc_and_category, is_xxx_video_release
 from src.trackers.USENET.suio import Suio
+from src.xxx_keywords import extract_xxx_keywords
 from src.xxx_platforms import XXX_PLATFORM_KEYWORDS
 
 
@@ -94,6 +96,18 @@ def test_xxx_category_is_always_marked_as_adult_media():
     meta = Meta(category="XXX")
 
     assert Prep.check_adult_media(SimpleNamespace(), meta)
+
+
+def test_xxx_keywords_extract_platform_and_descriptive_tags_from_release_name():
+    keywords = extract_xxx_keywords("Studio.Brazzers.Amateur.Vintage.1080p.WEB-DL", ["custom tag"])
+
+    assert keywords == ["custom tag", "brazzers", "amateur", "vintage"]
+
+
+def test_xxx_keywords_prefer_specific_phrases_and_normalize_manual_keywords():
+    keywords = extract_xxx_keywords("Creator.Double.Penetration.OnlyFans.mp4", "custom tag, OnlyFans")
+
+    assert keywords == ["custom tag", "OnlyFans", "double-penetration"]
 
 
 def test_suio_advertises_its_existing_xxx_upload_mapping():
