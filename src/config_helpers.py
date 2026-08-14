@@ -33,4 +33,4 @@ def format_terminal_link(text: str, url: str, default_config: Mapping[str, Any])
         except ValueError:
             safe_url = quote(url, safe=":/?#@!$&'()*+,;=%")
         return f"[link={safe_url}]{escape(text)}[/link]"
-    return f"{escape(text)} - {escape(url)}"
+    return escape(url)
