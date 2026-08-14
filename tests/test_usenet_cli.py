@@ -18,6 +18,18 @@ def test_archive_password_cli_override_marks_static_password(tmp_path):
     assert meta.usenet_archive_password_is_random is False
 
 
+def test_name_cli_override_sets_manual_release_name(tmp_path):
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--name", "Custom.Release.Name"], Meta())
+
+    assert meta.manual_name == "Custom.Release.Name"
+
+
+def test_cast_cli_override_is_split_into_manual_names(tmp_path):
+    meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--cast", "Jane Doe, John Smith"], Meta())
+
+    assert meta.manual_cast == ["Jane Doe", "John Smith"]
+
+
 def test_book_overview_cli_override_long_flag(tmp_path):
     meta, _, _ = Args({"DEFAULT": {"screens": 1}}).parse([str(tmp_path), "--book-overview", "Custom", "book", "synopsis"], Meta())
 

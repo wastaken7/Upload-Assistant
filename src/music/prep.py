@@ -22,22 +22,6 @@ from src.music.validation import MusicValidator
 from src.temp_paths import artwork_dir, music_release_snapshot_path
 
 
-def _preferred_artwork(release: Any) -> Path | None:
-    """Choose a likely front cover from sidecar artwork without touching it."""
-    root = Path(release.root)
-    candidates = [root / relative for relative in release.auxiliary.artwork]
-    candidates = [candidate for candidate in candidates if candidate.is_file()]
-    if not candidates:
-        return None
-
-    def sort_key(candidate: Path) -> tuple[int, str]:
-        stem = candidate.stem.casefold()
-        priority = 0 if re.search(r"(?:^|[ _.-])(cover|front|folder|album)(?:$|[ _.-])", stem) else 1
-        return priority, str(candidate).casefold()
-
-    return min(candidates, key=sort_key)
-
-
 def _image_suffix(data: bytes, mime: str = "") -> str:
     """Infer a safe suffix for extracted embedded artwork."""
     mime = mime.casefold()
@@ -91,11 +75,6 @@ async def prepare_music_cover(meta: Meta, release: Any) -> str:
     configured = Path(str(meta.artwork_path or ""))
     if configured.is_file():
         return str(configured)
-    local_cover = _preferred_artwork(release)
-    if local_cover:
-        meta.artwork_path = str(local_cover)
-        return meta.artwork_path
-
     output_dir = artwork_dir(meta.base_dir, str(meta.uuid))
     extracted = await asyncio.to_thread(_extract_embedded_artwork, [track.path for track in release.tracks], output_dir)
     if extracted:
@@ -208,17 +187,6 @@ def _apply_music_cli_overrides(meta: Meta, release: Any) -> None:
         edition = " ".join(str(item).strip() for item in edition if str(item).strip())
     if str(edition or "").strip():
         set_user("edition", str(edition).strip())
-
-    cover = str(meta.music_cover or "").strip()
-    if cover.startswith(("http://", "https://")):
-        meta.artwork_url = cover
-        set_user("cover_url", cover)
-    elif cover:
-        cover_path = Path(cover).expanduser()
-        if cover_path.is_file():
-            meta.artwork_path = str(cover_path.resolve())
-        else:
-            logger.warning("[yellow]MUSIC: --music-cover is neither a public HTTP(S) URL nor an existing image file; ignoring it.[/yellow]")
 
 
 def _discogs_ids(meta: Meta, release: Any) -> tuple[str, str]:

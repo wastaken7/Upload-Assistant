@@ -222,7 +222,7 @@ class MTeam:
         writers = imdb.get("writers", [])
         creators_str = " / ".join(writers)
 
-        cast = meta.tmdb_cast
+        cast = meta.cast or meta.tmdb_cast
         actors_str = " / ".join(cast)
 
         plot = imdb.get("plot", meta.overview)

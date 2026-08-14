@@ -43,7 +43,7 @@ class Suio:
     torrent_url: str | None = None
     search_url: str | None = None
     base_url = "https://suio.cc"
-    supported_categories = ("MOVIE", "TV", "GAME", "BOOK")
+    supported_categories = ("MOVIE", "TV", "GAME", "BOOK", "XXX")
     is_usenet = True
 
     def __init__(self, config: Config) -> None:

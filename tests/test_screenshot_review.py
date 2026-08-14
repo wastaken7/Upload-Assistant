@@ -5,6 +5,8 @@ from pathlib import Path
 
 from src.meta import Meta
 from src.screenshot_review import (
+    ReviewedScreenshot,
+    _capture_fresh_frame,
     _disc_bdinfo_for_group,
     add_screenshot,
     apply_staged_remote_uploads,
@@ -103,6 +105,38 @@ def test_add_bdmv_screenshot_uses_disc_capture_and_opaque_id(tmp_path: Path, mon
     assert addition.path.name.endswith(".png")
     assert len(addition.path.stem) == 32
     assert addition.path != screenshots_dir / existing.name
+
+
+def test_review_capture_uses_shared_tonemapping_decision(tmp_path: Path, monkeypatch) -> None:
+    source = tmp_path / "source.mkv"
+    source.write_bytes(b"video")
+    screenshots_dir = tmp_path / "screenshots"
+    screenshots_dir.mkdir()
+    target = ReviewedScreenshot("local-test", screenshots_dir / "frame.png", 0)
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr("src.screenshot_review._video_properties", lambda _temp_dir: (1920, 1080, 1, 1, 100, 24))
+
+    async def determine_stub(*_args):
+        meta = _args[-1]
+        meta.tonemapped = True
+        meta.libplacebo = True
+        return True
+
+    async def capture_stub(args):
+        captured["tonemapped"] = args[-1].tonemapped
+        captured["libplacebo"] = args[-1].libplacebo
+        captured["hdr_tonemap"] = args[-2]
+        Path(args[3]).write_bytes(b"tonemapped")
+        return args[0], args[3]
+
+    monkeypatch.setattr("src.screenshot_review.determine_tonemapping", determine_stub)
+    monkeypatch.setattr("src.screenshot_review.capture_screenshot", capture_stub)
+
+    asyncio.run(_capture_fresh_frame(tmp_path, {"filelist": [str(source)], "hdr": "HDR"}, target))
+
+    assert captured == {"tonemapped": True, "libplacebo": True, "hdr_tonemap": True}
+    assert target.path.read_bytes() == b"tonemapped"
 
 
 def test_disc_review_keeps_late_local_playlist_frames_visible_with_remote_images(tmp_path: Path) -> None:

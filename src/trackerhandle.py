@@ -19,7 +19,7 @@ from src.get_desc import DescriptionBuilder
 from src.manualpackage import ManualPackageManager
 from src.meta import Meta
 from src.qbitwait import Wait
-from src.rehostimages import check_tracker_image_hosts
+from src.rehostimages import check_tracker_image_hosts, select_common_image_host
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup
 
@@ -72,6 +72,21 @@ async def process_trackers(
     tracker_setup = TrackerSetup(config=config)
     tracker_setup_any = cast(Any, tracker_setup)
     enabled_trackers = list(cast(Sequence[str], tracker_setup_any.trackers_enabled(meta)))
+    if config.get("DEFAULT", {}).get("smart_image_host_selection", True) and not meta.imghost_from_cli:
+        manual_targets = "MANUAL" in enabled_trackers
+        target_trackers = [
+            tracker
+            for tracker in enabled_trackers
+            if tracker != "MANUAL" and (manual_targets or bool(cast(Mapping[str, Any], meta.tracker_status.get(tracker, {})).get("upload", False)))
+        ]
+        selected_host = select_common_image_host(config["DEFAULT"], target_trackers, tracker_class_map)
+        if selected_host:
+            current_host = str(meta.imghost or config["DEFAULT"].get("img_host_1", "")).strip().lower()
+            meta.imghost = selected_host
+            if selected_host != current_host:
+                logger.info(f"[green]Smart image-host selection changed the target host: {current_host or 'unset'} -> {selected_host}[/green]")
+        else:
+            logger.info("[yellow]No shared approved image host found; using per-tracker image-host selection.[/yellow]")
     manual_packager = ManualPackageManager(config)
     tracker_label_width = max(
         (len(str(tracker).replace(" ", "").upper().strip()) for tracker in enabled_trackers),

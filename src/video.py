@@ -35,7 +35,7 @@ class VideoManager:
     async def get_hdr(self, mi: Any, bdinfo: Any | None) -> str:
         hdr = ""
         dv = ""
-        if bdinfo is not None:  # Disks
+        if bdinfo:  # Disks
             bdinfo_dict = cast(dict[str, Any], bdinfo)
             for track in bdinfo_dict.get("video", []):
                 hdr_mi = track.get("hdr_dv", "")

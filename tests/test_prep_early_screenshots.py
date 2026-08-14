@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.meta import Meta
-from src.prep import Prep
+from src.prep import Prep, populate_hdr_for_early_capture
 from src.screenshot_manifest import register
 from src.takescreens import screenshots
 from src.uploadscreens import _upload_screens
@@ -50,6 +50,29 @@ def test_early_screenshots_remain_enabled_without_description_images() -> None:
 
     assert len(screenshot_spy.calls) == 1
     assert screenshot_spy.calls[0][1]["capture_group"] == "main"
+
+
+def test_early_capture_populates_hdr_before_category_detection(monkeypatch) -> None:
+    meta = Meta(category="")
+
+    async def hdr_stub(mi, bdinfo):
+        assert mi == {"media": {"track": []}}
+        assert bdinfo == {}
+        return "HDR"
+
+    monkeypatch.setattr("src.prep.prep_helpers.video_manager.get_hdr", hdr_stub)
+
+    asyncio.run(populate_hdr_for_early_capture(meta, {"media": {"track": []}}, {}))
+
+    assert meta.hdr == "HDR"
+
+
+def test_early_capture_skips_hdr_probe_without_video_metadata() -> None:
+    meta = Meta(category="BOOK")
+
+    asyncio.run(populate_hdr_for_early_capture(meta, None, None))
+
+    assert meta.hdr == ""
 
 
 def test_registered_main_screenshots_are_reused_when_title_changes(tmp_path: Path) -> None:

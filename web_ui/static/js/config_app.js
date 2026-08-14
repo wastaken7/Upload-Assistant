@@ -280,6 +280,7 @@ const trackerNameMap = {
   AVISTAZ: "AvistaZ",
   BEYONDHD: "Beyond-HD",
   BITHDTV: "BitHDTV",
+  BITPORN: "BitPorn",
   BLUTOPIA: "Blutopia",
   BJSHARE: "BrasilJapão-Share",
   BRASILTRACKER: "BrasilTracker",

@@ -540,7 +540,7 @@ async def _prompt_book_meta(meta: Meta) -> None:
         logger.info(
             f"[yellow]BOOK upload: the following required fields are missing: "
             f"{', '.join(book_missing)}. "
-            f"Re-run with -btitle / -author / -year / -blang / --book-cover to supply them, "
+            f"Re-run with -btitle / -author / -year / -blang / --poster to supply them, "
             f"or trackers that require them will be skipped.[/yellow]"
         )
         return
@@ -1088,6 +1088,15 @@ def book_screens(meta: Meta, min_successful_uploads: int) -> tuple[int, int]:
     return actual_screens, capped_min
 
 
+def xxx_min_successful_uploads(meta: Meta, min_successful_uploads: int) -> int:
+    """Cap XXX image uploads to its one-contact-sheet-per-video contract."""
+    try:
+        contact_sheet_count = int(meta.screens or 0)
+    except TypeError, ValueError:
+        contact_sheet_count = 0
+    return min(min_successful_uploads, max(1, contact_sheet_count))
+
+
 async def process_meta(meta: Meta, base_dir: str) -> bool:
     """Process the metadata for each queued path."""
     if not meta.imghost:
@@ -1632,7 +1641,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                 # not possible, keep processing the compatible trackers and skip only
                 # those for which the user has no acceptable configured host.
                 allowed_hosts: list[str] | None = None
-                if relevant_trackers:
+                if relevant_trackers and config.get("DEFAULT", {}).get("smart_image_host_selection", True) and not meta.imghost_from_cli:
                     try:
                         tracker_instances = {tracker_name: tracker_class_map[tracker_name](config=config) for tracker_name in relevant_trackers}
 
@@ -1751,6 +1760,8 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
                     min_successful_uploads = int(default_cfg.get("min_successful_image_uploads", 3))
                     if meta.category == "BOOK":
                         meta.screens, min_successful_uploads = book_screens(meta, min_successful_uploads)
+                    elif meta.category == "XXX":
+                        min_successful_uploads = xxx_min_successful_uploads(meta, min_successful_uploads)
 
                     host_order: list[str] = []
                     for host_index in range(1, 10):

@@ -26,6 +26,8 @@ class Meta:
     artwork_banner_path: str | None = None
     artwork_path: str = ""
     artwork_url: str = ""
+    explicit_banner: str = ""
+    explicit_poster: str = ""
     asian: bool = False
     asin: str = ""
     ask_dupe: bool = False
@@ -71,7 +73,7 @@ class Meta:
     book_title: str | None = None
     book_translator: str | None = None
     btn: str | int | None = None
-    cast: list[str] | None = None
+    cast: list[str] = field(default_factory=list)
     category_id: str | None = None
     category: str = ""
     channels: str = ""
@@ -195,6 +197,7 @@ class Meta:
     imdb_tt: str = ""
     imdb: str | None = ""
     imghost: str = ""
+    imghost_from_cli: bool = False
     infohash: str = ""
     initial_dupes: dict[str, Any] = field(default_factory=dict)
     is_disc: str = ""
@@ -226,6 +229,7 @@ class Meta:
     manual_commentary: bool = False
     manual_data: str | None = None
     manual_date: str | None = None
+    manual_cast: list[str] = field(default_factory=list)
     manual_dvds: str | None = None
     manual_edition: str | list[str] | None = None
     manual_episode_title: str = ""
@@ -233,6 +237,7 @@ class Meta:
     manual_frames: str | list[int] | list[str] | None = None
     manual_language: str | dict[str, Any] | None = None
     manual_multi: bool = False
+    manual_name: str | None = None
     manual_platform: str | None = None
     manual_season: str | int | None = None
     manual_source: str | None = None
@@ -253,7 +258,6 @@ class Meta:
     music_album: str = ""
     music_artist: str = ""
     music_catalogue_number: str = ""
-    music_cover: str = ""
     music_discogs_enabled: bool = True
     music_discogs_id: str = ""
     music_discogs_master_id: str = ""
@@ -542,6 +546,29 @@ class Meta:
 
         copied_dict = {k: copy.deepcopy(self[k], memo) for k in self.to_dict()}
         return Meta(copied_dict)
+
+    def populate_cast(self, limit: int = 5) -> None:
+        """Build the canonical cast list from manual, IMDb, and TMDb sources."""
+        source_lists = [self.manual_cast, self.imdb_info.get("stars", []) if isinstance(self.imdb_info, dict) else [], self.tmdb_cast]
+        names: list[str] = []
+        seen: set[str] = set()
+
+        for source in source_lists:
+            values = source.split(",") if isinstance(source, str) else source if isinstance(source, list) else []
+            for value in values:
+                if not isinstance(value, str):
+                    continue
+                name = " ".join(value.split())
+                key = name.casefold()
+                if not name or key in seen:
+                    continue
+                seen.add(key)
+                names.append(name)
+                if len(names) >= limit:
+                    self.cast = names
+                    return
+
+        self.cast = names
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to a dictionary representing defined fields."""

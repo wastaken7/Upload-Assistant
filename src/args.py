@@ -81,6 +81,7 @@ class ShortHelpFormatter(argparse.HelpFormatter):
 Common options:
   -tmdb, --tmdb              Specify the TMDb id to use with movie/ or tv/ prefix
   -imdb, --imdb              Specify the IMDb id to use
+  --cast                     Comma-separated cast override (takes priority over API metadata)
   -tvmaze, --tvmaze          Specify the TVMaze id to use
   -tvdb, --tvdb              Specify the TVDB id to use
   --queue (queue name)       Process an entire folder (including files/subfolders) in a queue
@@ -180,6 +181,8 @@ class Args:
             default=None,
         )
         parser.add_argument("-mf", "--manual_frames", nargs=1, required=False, help="Comma-separated frame numbers to use as screenshots", type=str, default=None)
+        parser.add_argument("--poster", nargs=1, required=False, help="Public artwork URL or local poster image path", dest="explicit_poster")
+        parser.add_argument("--banner", nargs=1, required=False, help="Public artwork URL or local banner image path", dest="explicit_banner")
         parser.add_argument(
             "-c",
             "--category",
@@ -216,7 +219,6 @@ class Args:
         parser.add_argument("--music-label", nargs=1, required=False, help="MUSIC: label for this release", dest="music_label")
         parser.add_argument("--music-catalogue-number", nargs=1, required=False, help="MUSIC: catalogue number for this release", dest="music_catalogue_number")
         parser.add_argument("--music-genre", nargs=1, required=False, help="MUSIC: comma-separated genre override", dest="music_genres")
-        parser.add_argument("--music-cover", nargs=1, required=False, help="MUSIC: public artwork URL or local cover image path", dest="music_cover")
         parser.add_argument(
             "--music-discogs-id",
             nargs=1,
@@ -256,6 +258,7 @@ class Args:
         )
         parser.add_argument("-tmdb", "--tmdb", nargs=1, required=False, help="TMDb ID (use movie/ or tv/ prefix)", type=str, dest="tmdb_manual")
         parser.add_argument("-imdb", "--imdb", nargs=1, required=False, help="IMDb ID", type=str, dest="imdb_manual")
+        parser.add_argument("--cast", nargs=1, required=False, help="Comma-separated cast override (takes priority over API metadata)", type=str, dest="manual_cast")
         parser.add_argument("-mal", "--mal", nargs=1, required=False, help="MAL ID", type=str, dest="mal_manual")
         parser.add_argument("-tvmaze", "--tvmaze", nargs=1, required=False, help="TVMAZE ID", type=str, dest="tvmaze_manual")
         parser.add_argument("-tvdb", "--tvdb", nargs=1, required=False, help="TVDB ID", type=str, dest="tvdb_manual")
@@ -289,6 +292,7 @@ class Args:
         parser.add_argument("--no-dub", dest="no_dub", action="store_true", required=False, help="Remove Dubbed from title")
         parser.add_argument("--no-dual", dest="no_dual", action="store_true", required=False, help="Remove Dual-Audio from title")
         parser.add_argument("--no-tag", dest="no_tag", action="store_true", required=False, help="Remove Group Tag from title")
+        parser.add_argument("--name", nargs=1, required=False, help="Override the generated release name", type=str, dest="manual_name")
         parser.add_argument("--no-edition", dest="no_edition", action="store_true", required=False, help="Remove Edition from title")
         parser.add_argument("--dual-audio", dest="dual_audio", action="store_true", required=False, help="Add Dual-Audio to the title")
         parser.add_argument("-ol", "--original-language", dest="manual_language", nargs=1, required=False, help="Set original audio language")
@@ -305,7 +309,6 @@ class Args:
         parser.add_argument("-year", "--year", dest="manual_year", nargs=1, required=False, help="Override the year found", type=int, default=0)
         parser.add_argument("-author", "--author", nargs="*", required=False, help="Book/Audiobook author name (overrides auto-detected value)", type=str, dest="book_author")
         parser.add_argument("-btitle", "--book-title", nargs="*", required=False, help="Book/Audiobook title (overrides auto-detected value)", type=str, dest="book_title")
-        parser.add_argument("--book-cover", nargs=1, required=False, help="BOOK: public artwork URL or local cover image path", dest="book_cover")
         parser.add_argument("--comic", "-comic", action="store_true", required=False, help="Identify the book upload as a Comic", dest="comic", default=False)
         parser.add_argument("--manga", "-manga", action="store_true", required=False, help="Identify the book upload as a Manga", dest="manga", default=False)
         parser.add_argument("--magazine", "-magazine", action="store_true", required=False, help="Identify the book upload as a Magazine", dest="magazine", default=False)
@@ -754,6 +757,9 @@ class Args:
                         meta[key] = str(Path(value2).resolve())
                     elif key == "screens":
                         meta[key] = int(value2)
+                    elif key == "imghost":
+                        meta.imghost = value2
+                        meta.imghost_from_cli = True
                     elif key == "season":
                         meta.manual_season = value2
                     elif key == "episode":
@@ -762,6 +768,8 @@ class Args:
                         meta.manual_date = value2
                     elif key == "tmdb_manual":
                         meta.category, meta.tmdb_manual = self.parse_tmdb_id(value2, meta.category)
+                    elif key == "manual_cast":
+                        meta.manual_cast = [name.strip() for name in value2.split(",") if name.strip()]
                     elif key == "ptp":
                         if value2.startswith("http"):
                             parsed = urllib.parse.urlparse(value2)
@@ -1126,18 +1134,6 @@ class Args:
         book_publisher_arg = meta.book_publisher
         if book_publisher_arg not in (None, ""):
             meta.publisher = str(book_publisher_arg).strip()
-
-        book_cover_arg = meta.book_cover
-        if book_cover_arg not in (None, "", []):
-            cover = " ".join(str(x) for x in book_cover_arg if str(x)).strip() if isinstance(book_cover_arg, list) else str(book_cover_arg).strip()
-            if cover.startswith(("http://", "https://")):
-                meta.artwork_url = cover
-            elif cover:
-                cover_path = Path(cover).expanduser()
-                if cover_path.is_file():
-                    meta.artwork_path = str(cover_path.resolve())
-                else:
-                    logger.warning("[yellow]BOOK: --book-cover is neither a public HTTP(S) URL nor an existing image file; ignoring it.[/yellow]")
 
         book_translator_arg = meta.book_translator
         if book_translator_arg not in (None, ""):
