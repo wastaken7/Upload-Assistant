@@ -178,6 +178,7 @@ This branch introduces new media categories and automation features not present 
 | <img src="web_ui/static/img/trackers/theleachzone.png" width="16" height="16" />           | The Leach Zone         | THELEACHZONE           | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/theoldschool.png" width="16" height="16" />           | TheOldSchool           | THEOLDSCHOOL           | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/torrenteros.png" width="16" height="16" />            | Torrenteros            | TORRENTEROS            | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/torrenthr.png" width="16" height="16" />              | TorrentHR              | TORRENTHR              | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/torrentleech.png" width="16" height="16" />           | TorrentLeech           | TORRENTLEECH           | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/totheglory.png" width="16" height="16" />             | ToTheGlory             | TOTHEGLORY             | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/tvchaosuk.png" width="16" height="16" />              | TVChaosUK              | TVCHAOSUK              | MOVIE, TV                    |
