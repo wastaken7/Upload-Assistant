@@ -639,7 +639,7 @@ class UploadHelper:
             if meta.tvdb_id or 0 != 0:
                 lines.append(("TVDB", f"https://www.thetvdb.com/?id={meta.tvdb_id}&tab=series"))
             if meta.tvmaze_id or 0 != 0:
-                lines.append(("TVMaze", f"https://www.thetvmaze.com/shows/{meta.tvmaze_id}"))
+                lines.append(("TVMaze", f"https://www.tvmaze.com/shows/{meta.tvmaze_id}"))
             if meta.mal_id or 0 != 0:
                 lines.append(("MAL", f"https://myanimelist.net/anime/{meta.mal_id}"))
 
