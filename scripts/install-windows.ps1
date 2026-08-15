@@ -577,6 +577,7 @@ function Write-GlobalLauncher {
     $launcherCmdPath = Join-Path $LauncherDir "ua.cmd"
     $updateCmdPath = Join-Path $LauncherDir "ua-update.cmd"
     $configCmdPath = Join-Path $LauncherDir "ua-config.cmd"
+    $webuiCmdPath = Join-Path $LauncherDir "ua-webui.cmd"
     $launcherCmdContents = @"
 @echo off
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$UaDir\run-ua.ps1" %*
@@ -595,13 +596,20 @@ set "exit_code=%errorlevel%"
 popd
 exit /b %exit_code%
 "@
+    $webuiCmdContents = @"
+@echo off
+start "" "%SystemRoot%\System32\wscript.exe" "$UaDir\scripts\run-webui-tray.vbs" "$UaDir" %*
+exit /b 0
+"@
 
     Remove-Item -LiteralPath (Join-Path $LauncherDir "ua.ps1") -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath (Join-Path $LauncherDir "ua-update.ps1") -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath (Join-Path $LauncherDir "ua-config.ps1") -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $LauncherDir "ua-webui.ps1") -Force -ErrorAction SilentlyContinue
     Set-Content -LiteralPath $launcherCmdPath -Value $launcherCmdContents -Encoding ASCII
     Set-Content -LiteralPath $updateCmdPath -Value $updateCmdContents -Encoding ASCII
     Set-Content -LiteralPath $configCmdPath -Value $configCmdContents -Encoding ASCII
+    Set-Content -LiteralPath $webuiCmdPath -Value $webuiCmdContents -Encoding ASCII
     Add-DirectoryToUserPath -DirectoryPath $LauncherDir
 }
 
@@ -616,6 +624,7 @@ $venvPythonPath = Join-Path $UaDir ".venv\Scripts\python.exe"
 $launcherCmdPath = Join-Path $LauncherDir "ua.cmd"
 $updateCmdPath = Join-Path $LauncherDir "ua-update.cmd"
 $configCmdPath = Join-Path $LauncherDir "ua-config.cmd"
+$webuiCmdPath = Join-Path $LauncherDir "ua-webui.cmd"
 
 Write-Host ""
 Write-Host "Installation complete."
@@ -633,14 +642,16 @@ Write-Host ""
 Write-Host "Run:"
 Write-Host "  ua `"/path/to/content`" --trackers yourtracker"
 Write-Host "  ua-update"
+Write-Host "  ua-webui"
 Write-Host ""
 Write-Host "Global launcher:"
 Write-Host "  $launcherCmdPath"
 Write-Host "  $updateCmdPath"
 Write-Host "  $configCmdPath"
+Write-Host "  $webuiCmdPath"
 Write-Host ""
 Write-Host "PATH note:"
-Write-Host "  A new PowerShell or Command Prompt window may be required before 'ua', 'ua-update', and 'ua-config' are available everywhere."
+Write-Host "  A new PowerShell or Command Prompt window may be required before 'ua', 'ua-update', 'ua-config', and 'ua-webui' are available everywhere."
 Write-Host ""
 Write-Host "Configuration command (equivalent):"
 Write-Host "  & `"$venvPythonPath`" `"$UaDir\config-generator.py`""
