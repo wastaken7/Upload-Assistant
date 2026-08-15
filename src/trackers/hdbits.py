@@ -17,6 +17,7 @@ from src.console import console, logger
 from src.description_review import get_base_description
 from src.exceptions import *  # noqa F403
 from src.meta import Meta
+from src.temp_paths import screenshots_dir
 from src.torrentcreate import TorrentCreator
 from src.trackers.common import Common
 
@@ -667,7 +668,7 @@ class HDBits:
                 logger.debug(f"{self.tracker}: [cyan]{i}: {Path(path).name}")
         else:
             thumb_size = "w300"
-            screenshot_dir = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}"
+            screenshot_dir = screenshots_dir(meta.base_dir, meta.uuid)
             # similar to uploadscreens.py L546
             image_patterns = ["*.png", ".[!.]*.png"]
             image_glob: list[str] = []
