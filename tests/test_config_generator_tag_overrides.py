@@ -61,3 +61,24 @@ def test_configure_trackers_keeps_existing_tag_overrides(config_generator_module
 
     assert configured["AITHER"]["tag_overrides"] == existing["AITHER"]["tag_overrides"]
     assert configured["AITHER"]["tag_overrides"] is not existing["AITHER"]["tag_overrides"]
+
+
+def test_generator_writes_tag_override_comments(config_generator_module, monkeypatch, tmp_path):
+    monkeypatch.setattr(config_generator_module, "ensure_data_dir", lambda: None)
+    _example, comments = config_generator_module.read_example_config()
+    output = tmp_path / "config.py"
+
+    assert comments["DEFAULT.tag_overrides"] == [
+        "# Override description text fields for specific release groups. Tags are matched",
+        "# case-insensitively, with or without their leading hyphen.",
+        "# Per-tracker tag_overrides take precedence over these DEFAULT overrides.",
+    ]
+    assert config_generator_module.generate_config_file(
+        {"DEFAULT": {"tag_overrides": {"MyAwesomeGroupTag": {"custom_signature": "signature"}}}},
+        output,
+        comments,
+    )
+
+    content = output.read_text(encoding="utf-8")
+    assert "        # Override description text fields for specific release groups. Tags are matched\n" in content
+    assert '        # Per-tracker tag_overrides take precedence over these DEFAULT overrides.\n        "tag_overrides": {\n' in content
