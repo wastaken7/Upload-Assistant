@@ -195,6 +195,12 @@ class RehostImagesManager:
 
 async def check_tracker_image_hosts(meta: Meta, tracker_class: Any) -> None:
     """Apply a tracker's image-host policy when it defines one."""
+    # MUSIC artwork is hosted before tracker processing.  It has no video
+    # screenshots, so a missing screenshot collection must not trigger the
+    # generic reupload path (which would attempt to capture the audio file).
+    if meta.category == "MUSIC":
+        return
+
     policy = getattr(tracker_class, "image_host_policy", None)
     rehost_manager = getattr(tracker_class, "rehost_images_manager", None)
     if isinstance(policy, ImageHostPolicy) and rehost_manager is not None:
