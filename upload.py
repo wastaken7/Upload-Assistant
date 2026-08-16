@@ -350,7 +350,6 @@ async def merge_meta(meta: Meta, saved_meta: dict[str, Any]) -> dict[str, Any]:
         "audiobook_duration_formatted",
         "audiobook_duration",
         "author",
-        "blu",
         "book_asin",
         "book_author",
         "book_isbn",
@@ -374,7 +373,6 @@ async def merge_meta(meta: Meta, saved_meta: dict[str, Any]) -> dict[str, Any]:
         "game_system",
         "game_version",
         "hardcoded_subs",
-        "hdb",
         "igdb_manual",
         "imdb",
         "imghost",
@@ -404,7 +402,6 @@ async def merge_meta(meta: Meta, saved_meta: dict[str, Any]) -> dict[str, Any]:
         "openlibrary",
         "personalrelease",
         "platform",
-        "ptp",
         "qbit_cat",
         "qbit_tag",
         "region",
@@ -415,6 +412,7 @@ async def merge_meta(meta: Meta, saved_meta: dict[str, Any]) -> dict[str, Any]:
         "tmdb_manual",
         "torrent_creation",
         "trackers",
+        "tracker_ids",
         "tvmaze_manual",
         "type",
         "unattended",
@@ -2532,15 +2530,12 @@ async def do_the_thing(base_dir: str) -> None:
 
                 keep_meta = config["DEFAULT"].get("keep_meta", False)
 
-                if not keep_meta or meta.delete_meta:
-                    if Path(meta_file).exists():
-                        try:
-                            meta_file.unlink()
-                            logger.debug(f"[bold yellow]Found and deleted existing metadata file: {meta_file}")
-                        except Exception as e:
-                            logger.info(f"[bold red]Failed to delete metadata file {meta_file}: {e!s}")
-                    else:
-                        logger.debug(f"[yellow]No metadata file found at {meta_file}")
+                if (not keep_meta or meta.delete_meta) and Path(meta_file).exists():
+                    try:
+                        meta_file.unlink()
+                        logger.debug(f"[bold yellow]Found and deleted existing metadata file: {meta_file}")
+                    except Exception as e:
+                        logger.info(f"[bold red]Failed to delete metadata file {meta_file}: {e!s}")
 
                 if keep_meta and Path(meta_file).exists():
                     async with aiofiles.open(meta_file, encoding="utf-8") as f:

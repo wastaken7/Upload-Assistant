@@ -369,10 +369,10 @@ def _orpheus_people(group: dict[str, Any], role: str) -> list[str]:
 async def enrich_music_from_orpheus(meta: Meta, config: dict[str, Any]) -> bool:
     """Enrich an analyzed MUSIC release from an explicitly known Orpheus torrent.
 
-    The ID is obtained from a matched client's torrent comment or ``--orpheus``;
+    The ID is obtained from a matched client's torrent comment or ``--tracker-id``;
     this never searches Orpheus by name and never performs a state-changing call.
     """
-    identifier = str(meta.orpheus or "").strip()
+    identifier = meta.get_tracker_id("ORPHEUS") or ""
     if meta.category != "MUSIC" or not identifier.isdigit() or not isinstance(meta.music_release, dict):
         return False
 

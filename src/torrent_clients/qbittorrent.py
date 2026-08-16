@@ -57,6 +57,15 @@ class QbittorrentClientMixin:
     def _extract_tracker_ids_from_comment(self, comment: str) -> dict[str, str]:
         raise NotImplementedError
 
+    @staticmethod
+    def _matches_qbit_content_path(torrent: Any, meta: Meta) -> bool:
+        """Match a qBittorrent content path before falling back to its display name."""
+        expected_path = str(meta.path or "")
+        content_path = str(getattr(torrent, "content_path", "") or "")
+        if expected_path and content_path and os.path.normcase(os.path.normpath(content_path)) == os.path.normcase(os.path.normpath(expected_path)):
+            return True
+        return str(getattr(torrent, "name", "") or "").lower() == str(meta.uuid or "").lower()
+
     async def is_valid_torrent(self, meta: Meta, torrent_path: str, torrenthash: str, torrent_client: str, client: dict[str, Any]) -> tuple[bool, str]:
         raise NotImplementedError
 
@@ -166,7 +175,7 @@ class QbittorrentClientMixin:
                     logger.debug(f"[cyan]Stored comment for torrent: {comment[:100]}...")
 
                     tracker_ids: dict[str, str] = self._extract_tracker_ids_from_comment(comment)
-                    meta.update(tracker_ids)
+                    meta.set_tracker_ids(tracker_ids)
 
                     if meta.torrent_comments and meta.debug:
                         logger.info(f"[green]Stored {len(meta.torrent_comments)} torrent comments for later use")
@@ -508,13 +517,13 @@ class QbittorrentClientMixin:
                 except AttributeError:
                     continue  # Ignore torrents with missing attributes
 
-                if meta.uuid.lower() != torrent_path.lower():
+                if not self._matches_qbit_content_path(torrent, meta):
                     continue
 
                 logger.debug(f"[cyan]Matched Torrent: {torrent.hash}")
                 logger.debug(f"Name: {torrent.name}")
                 logger.debug(f"Save Path: {torrent.save_path}")
-                logger.debug(f"Content Path: {torrent_path}")
+                logger.debug(f"Content Path: {getattr(torrent, 'content_path', torrent_path)}")
 
                 # The early cached-search path must retain the same tracker
                 # discovery side effect as the former get_pathed_torrents flow.
@@ -535,6 +544,33 @@ class QbittorrentClientMixin:
                             tracker_urls.append(str(tracker))
                 if tracker_urls:
                     await match_tracker_url(tracker_urls, meta)
+
+                # The first valid torrent is later reused as BASE.torrent, but
+                # it is not necessarily the torrent whose comment contains
+                # the metadata source. Inspect every matching comment, keeping
+                # any explicitly supplied tracker IDs authoritative.
+                comment = str(getattr(torrent, "comment", "") or "")
+                if not comment:
+                    try:
+                        if proxy_url:
+                            if qbt_session is None:
+                                raise RuntimeError("qBittorrent proxy session is not initialized")
+                            response = await qbt_session.get(f"{proxy_url.rstrip('/')}/api/v2/torrents/properties", params={"hash": torrent.hash})
+                            if response.status_code == 200:
+                                comment = str(response.json().get("comment", "") or "")
+                        elif qbt_client is not None:
+                            properties = await self.retry_qbt_operation(
+                                lambda qbt_client=qbt_client, torrent_hash=torrent.hash: asyncio.to_thread(qbt_client.torrents_properties, torrent_hash=torrent_hash),
+                                f"Get properties for torrent {torrent.name}",
+                            )
+                            comment = str(properties.get("comment", "") or "")
+                    except Exception as error:
+                        logger.debug(f"[yellow]Could not inspect torrent comment for {torrent.hash}: {error}[/yellow]")
+
+                tracker_ids = {key: value for key, value in self._extract_tracker_ids_from_comment(comment).items() if not meta.get_tracker_id(key)}
+                if tracker_ids:
+                    meta.set_tracker_ids(tracker_ids)
+                    logger.debug(f"[bold cyan]Found tracker IDs in matching torrent comment: {', '.join(sorted(tracker_ids))}")
 
                 matching_torrents.append({"hash": torrent.hash, "name": torrent.name})
 
@@ -1216,7 +1252,7 @@ class QbittorrentClientMixin:
                 if match:
                     tracker_id_value = match.group(1)
                     tracker_id_matches.append({"id": tracker_id, "tracker_id": tracker_id_value})
-                    meta[tracker_id] = tracker_id_value
+                    meta.set_tracker_ids({tracker_id: tracker_id_value})
                     tracker_found = True
 
         if torrent.tracker and "hawke.uno" in torrent.tracker and has_working_tracker:
@@ -1233,7 +1269,7 @@ class QbittorrentClientMixin:
                         "tracker_id": huno_id,
                     }
                 )
-                meta.huno = huno_id
+                meta.set_tracker_ids({"HAWKEUNO": huno_id})
                 tracker_found = True
 
         if torrent.tracker and "tracker.anthelion.me" in torrent.tracker:
@@ -1245,7 +1281,7 @@ class QbittorrentClientMixin:
                         "tracker_id": ant_id,
                     }
                 )
-                meta.ant = ant_id
+                meta.set_tracker_ids({"anthelion": ant_id})
                 tracker_found = True
 
         return tracker_id_matches, tracker_found

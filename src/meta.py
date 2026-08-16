@@ -4,6 +4,17 @@
 from dataclasses import MISSING, dataclass, field, fields
 from typing import Any
 
+_TRACKER_ID_ALIASES = {
+    "ANT": "ANTHELION",
+    "BHD": "BEYONDHD",
+    "BLU": "BLUTOPIA",
+    "BTN": "BTN",
+    "HDB": "HDBITS",
+    "HUNO": "HAWKEUNO",
+    "OE": "ONLYENCODES",
+    "PTP": "PASSTHEPOPCORN",
+}
+
 
 @dataclass(init=False)
 class Meta:
@@ -14,12 +25,10 @@ class Meta:
 
     adult_media: bool = False
     aither_trumpable: list[Any] | None = field(default_factory=list)
-    aither: str | None = None
     aka: str = ""
     anime: bool = False
     anon: bool = False
     ant_user_tags: bool | None = None
-    ant: int | None = None
     archive_password: str | None = None
     args_line_queue: bool | None = None
     artist: str = ""
@@ -53,10 +62,8 @@ class Meta:
     basename_no_ext: str = ""
     bdinfo: dict[str, Any] = field(default_factory=dict)
     bhd_nfo: bool | None = None
-    bhd: str | int | None = None
     bit_depth: str = ""
     bloated: bool = False
-    blu: str | int | None = None
     bluray_audio_skip: bool = False
     bluray_cover_urls: dict[str, Any] = field(default_factory=dict)
     bluray_score: int = 100
@@ -72,7 +79,6 @@ class Meta:
     book_series: str = ""
     book_title: str | None = None
     book_translator: str | None = None
-    btn: str | int | None = None
     cast: list[str] = field(default_factory=list)
     category_id: str | None = None
     category: str = ""
@@ -175,13 +181,11 @@ class Meta:
     hash_used: str | None = None
     hdb_description: str | None = None
     hdb_name: str | None = None
-    hdb: str | int | None = None
     HDDVD_PLAYLIST: dict[str, Any] | None = None
     hdr: str = ""
     HDR: str = ""
     hfr: bool | None = None
     hosted_artwork: list[dict[str, Any]] | None = None
-    huno: str | int | None = None
     igdb_first_release_date: str = ""
     igdb_id: int = 0
     igdb_manual: str | None = None
@@ -219,7 +223,6 @@ class Meta:
     linking_failed: bool = False
     localized_overviews: dict[str, Any] = field(default_factory=dict)
     logo: str = ""
-    lst: str | int | None = None
     magazine: bool = False
     mal_id: int = 0
     mal_manual: str | int | None = None
@@ -294,7 +297,6 @@ class Meta:
     not_anime: bool = False
     nzb_path: str = ""
     ocr: bool | None = None
-    oe: str | int | None = None
     only_id: bool | None = None
     openlibrary_book_id: int | None = None
     openlibrary_id: int | None = None
@@ -310,7 +312,6 @@ class Meta:
     original_tmdb: int = 0
     original_tvdb: int = 0
     original_tvmaze: int = 0
-    orpheus: str | int | None = None
     overview_meta: str = ""
     overview: str = ""
     part: str = ""
@@ -327,7 +328,6 @@ class Meta:
     production_countries: list[Any] = field(default_factory=list)
     ptgen: dict[str, Any] = field(default_factory=dict)
     ptp_groupid: str | None = None
-    ptp: str | int | None = None
     publisher: str = ""
     qbit_bandwidth_control: bool = False
     qbit_bandwidth_threshold: int = 0
@@ -366,6 +366,7 @@ class Meta:
     description_fingerprint: str = ""
     description_provenance: dict[str, Any] = field(default_factory=dict)
     tracker_description_raw: dict[str, str] = field(default_factory=dict)
+    tracker_ids: dict[str, str] = field(default_factory=dict)
     tracker_description_mode: str = ""
     tracker_search_term: str = ""
     persist_description: bool = True
@@ -473,7 +474,6 @@ class Meta:
     ua_name: str = ""
     ua_signature: str = ""
     uhd: str | bool = False
-    ulcx: str | int | None = None
     unattended_audio_skip: bool = False
     unattended_confirm: bool = False
     unattended_subtitle_skip: bool = False
@@ -600,6 +600,26 @@ class Meta:
         else:
             for k, v in other.items():
                 setattr(self, k, v)
+
+    def get_tracker_id(self, tracker_name: str) -> str | None:
+        """Return the known torrent ID for a tracker."""
+        key = _TRACKER_ID_ALIASES.get(tracker_name.upper(), tracker_name.upper())
+        value = self.tracker_ids.get(key)
+        return str(value) if value is not None else None
+
+    def set_tracker_ids(self, tracker_ids: dict[str, str | int]) -> None:
+        """Persist tracker torrent IDs under their canonical tracker names."""
+        normalized = dict(self.tracker_ids or {})
+        for tracker_name, torrent_id in tracker_ids.items():
+            key = _TRACKER_ID_ALIASES.get(str(tracker_name).upper(), str(tracker_name).upper())
+            value = str(torrent_id)
+            normalized[key] = value
+        self.tracker_ids = normalized
+
+    def clear_tracker_id(self, tracker_name: str) -> None:
+        """Forget a tracker torrent ID."""
+        key = _TRACKER_ID_ALIASES.get(tracker_name.upper(), tracker_name.upper())
+        self.tracker_ids.pop(key, None)
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get attribute value by name, returning default if not set or None."""

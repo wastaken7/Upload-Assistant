@@ -773,7 +773,7 @@ def test_orpheus_enrichment_extracts_discogs_master_from_group_wiki(tmp_path):
     release = MusicRelease(root=str(tmp_path))
     release.set_field("artist", "Kanye West", MetadataSource.FILE_TAG, 1.0)
     release.set_field("album", "808s & Heartbreak", MetadataSource.FILE_TAG, 1.0)
-    meta = Meta(category="MUSIC", orpheus="953914", base_dir=str(tmp_path), uuid="orpheus-master", music_release=release.to_dict())
+    meta = Meta(category="MUSIC", tracker_ids={"ORPHEUS": "953914"}, base_dir=str(tmp_path), uuid="orpheus-master", music_release=release.to_dict())
     response = {
         "group": {"id": 610888, "name": "808s & Heartbreak", "year": 2008, "wikiBBcode": "https://www.discogs.com/master/8489"},
         "torrent": {"media": "CD", "encoding": "Lossless", "remasterYear": 2008, "remasterRecordLabel": "Roc-A-Fella Records", "remasterCatalogueNumber": "B001219802"},

@@ -2622,6 +2622,7 @@ class Common:
         id: str | int | None = None,
         file_name: str | list[str] | None = None,
         skip_tracker_descriptions: bool = False,
+        public_torrent_url: str | None = None,
     ) -> tuple[
         int | None,
         int | None,
@@ -2660,7 +2661,10 @@ class Common:
         # Make the GET request with proper encoding handled by 'params'
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                logger.info(f"Searching for information on [bold cyan]{tracker}[/bold cyan]")
+                if id and public_torrent_url:
+                    logger.info(f"Searching for information on [bold cyan]{tracker.title()}[/bold cyan] ({public_torrent_url.rstrip('/')}/{id})")
+                else:
+                    logger.info(f"Searching for information on [bold cyan]{tracker}[/bold cyan]")
                 response = await client.get(url=url, params=params, headers=headers)
                 json_response = response.json()
         except (httpx.RequestError, httpx.TimeoutException) as e:
@@ -2754,9 +2758,11 @@ class Common:
                     logger.info(f"[green]Successfully grabbed description from {tracker}")
                     logger.info(f"Extracted description: \n\n{description}\n\n", extra={"markup": False, "highlighter": None})
 
-                    from src.trackersetup import api_trackers
-
-                    if meta.unattended or any(meta.get(t.lower()) for t in api_trackers):
+                    # A tracker ID only identifies the source of this metadata.  It
+                    # must not suppress the interactive review of the description.
+                    # Candidate collection sets ``unattended`` explicitly and is
+                    # therefore still non-interactive.
+                    if meta.unattended:
                         return tmdb, imdb, tvdb, mal, description, category, infohash, imagelist, file_name
                     logger.info("[cyan]Do you want to edit, discard or keep the description?[/cyan]")
                     edit_choice = cli_ui.ask_string("Enter 'e' to edit, 'd' to discard, or press Enter to keep it as is:")
