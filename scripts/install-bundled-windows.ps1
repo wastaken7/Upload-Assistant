@@ -4,8 +4,7 @@ param(
     [string]$InstallDir,
 
     [string]$PythonVersion = "3.14",
-    [string]$PythonDownloadBaseUrl = "https://www.python.org/ftp/python",
-    [string]$FfmpegDownloadUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+    [string]$PythonDownloadBaseUrl = "https://www.python.org/ftp/python"
 )
 
 Set-StrictMode -Version Latest
@@ -215,7 +214,8 @@ function Invoke-Process {
     param(
         [Parameter(Mandatory)][string]$FilePath,
         [Parameter(Mandatory)][string[]]$ArgumentList,
-        [Parameter(Mandatory)][string]$Description
+        [Parameter(Mandatory)][string]$Description,
+        [string]$ProgressMessage
     )
 
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
@@ -231,15 +231,56 @@ function Invoke-Process {
         $startInfo.Arguments = ConvertTo-ProcessArgumentString -Arguments $ArgumentList
     }
 
-    $process = [System.Diagnostics.Process]::Start($startInfo)
+    $process = $null
+    $progressForm = $null
     try {
+        if (-not [string]::IsNullOrWhiteSpace($ProgressMessage)) {
+            Add-Type -AssemblyName System.Windows.Forms
+            Add-Type -AssemblyName System.Drawing
+
+            $progressForm = New-Object System.Windows.Forms.Form
+            $progressForm.Text = "Upload Assistant Setup"
+            $progressForm.ClientSize = New-Object System.Drawing.Size(440, 105)
+            $progressForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+            $progressForm.ControlBox = $false
+            $progressForm.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+            $progressForm.TopMost = $true
+
+            $statusLabel = New-Object System.Windows.Forms.Label
+            $statusLabel.AutoSize = $false
+            $statusLabel.Location = New-Object System.Drawing.Point(18, 16)
+            $statusLabel.Size = New-Object System.Drawing.Size(404, 32)
+            $statusLabel.Text = $ProgressMessage
+            $progressForm.Controls.Add($statusLabel)
+
+            $progressBar = New-Object System.Windows.Forms.ProgressBar
+            $progressBar.Location = New-Object System.Drawing.Point(18, 56)
+            $progressBar.Size = New-Object System.Drawing.Size(404, 24)
+            $progressBar.Style = [System.Windows.Forms.ProgressBarStyle]::Marquee
+            $progressForm.Controls.Add($progressBar)
+            $progressForm.Show()
+        }
+
+        $process = [System.Diagnostics.Process]::Start($startInfo)
+        while (-not $process.HasExited) {
+            if ($progressForm) {
+                [System.Windows.Forms.Application]::DoEvents()
+            }
+            Start-Sleep -Milliseconds 100
+        }
         $process.WaitForExit()
         if ($process.ExitCode -ne 0) {
             throw "$Description failed with exit code $($process.ExitCode)."
         }
     }
     finally {
-        $process.Dispose()
+        if ($null -ne $process) {
+            $process.Dispose()
+        }
+        if ($null -ne $progressForm) {
+            $progressForm.Close()
+            $progressForm.Dispose()
+        }
     }
 }
 
@@ -336,53 +377,6 @@ function Ensure-DestinationPython {
     return $pythonExe
 }
 
-function Ensure-DestinationFfmpeg {
-    param(
-        [Parameter(Mandatory)][string]$DestinationDir,
-        [Parameter(Mandatory)][string]$DownloadUrl
-    )
-
-    $ffmpegDir = Join-Path $DestinationDir "ffmpeg"
-    $ffmpegExe = Join-Path $ffmpegDir "bin\ffmpeg.exe"
-
-    if (Test-Path -LiteralPath $ffmpegExe) {
-        Write-Step "Using existing FFmpeg in destination folder at $ffmpegDir"
-        return
-    }
-
-    if (Test-Path -LiteralPath (Join-Path $ffmpegDir "ffmpeg.exe")) {
-        Write-Step "Using existing FFmpeg in destination folder at $ffmpegDir"
-        return
-    }
-
-    Write-Step "Downloading FFmpeg"
-    $tempZip = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantFfmpeg-" + [guid]::NewGuid().ToString("N") + ".zip")
-    $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantFfmpegExtract-" + [guid]::NewGuid().ToString("N"))
-
-    try {
-        Invoke-DownloadFile -Url $DownloadUrl -DestinationPath $tempZip -Label "FFmpeg archive"
-        Write-Step "Extracting FFmpeg"
-        Expand-Archive -LiteralPath $tempZip -DestinationPath $extractDir -Force
-
-        $foundFfmpegExe = Get-ChildItem -Path $extractDir -Filter ffmpeg.exe -Recurse | Select-Object -First 1 -ExpandProperty FullName
-        if (-not $foundFfmpegExe) {
-            throw "Downloaded FFmpeg archive did not contain ffmpeg.exe."
-        }
-
-        $ffmpegRoot = Split-Path -Parent (Split-Path -Parent $foundFfmpegExe)
-        if (Test-Path -LiteralPath $ffmpegDir) {
-            Remove-Item -LiteralPath $ffmpegDir -Recurse -Force
-        }
-
-        New-Item -ItemType Directory -Path (Split-Path -Parent $ffmpegDir) -Force | Out-Null
-        Move-Item -LiteralPath $ffmpegRoot -Destination $ffmpegDir
-    }
-    finally {
-        Remove-Item -LiteralPath $tempZip -Force -ErrorAction SilentlyContinue
-        Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
-}
-
 function Write-Runner {
     param([Parameter(Mandatory)][string]$AppDirectory)
 
@@ -420,9 +414,9 @@ function Write-Launchers {
     $escapedAppDirectory = $AppDirectory.Replace('"', '""')
     $launchers = @{
         "ua.cmd" = "@echo off`r`npowershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$escapedAppDirectory\run-ua.ps1`" %*`r`nexit /b %errorlevel%`r`n"
-        "ua-update.cmd" = "@echo off`r`npowershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$escapedAppDirectory\scripts\update-windows.ps1`" -UaDir `"$escapedAppDirectory`" -PythonInstallDir `"$escapedAppDirectory\python`" -LauncherDir `"$escapedAppDirectory\bin`" -FfmpegInstallDir `"$escapedAppDirectory\ffmpeg`" %*`r`nexit /b %errorlevel%`r`n"
+        "ua-update.cmd" = "@echo off`r`npowershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$escapedAppDirectory\scripts\update-windows.ps1`" -UaDir `"$escapedAppDirectory`" -PythonInstallDir `"$escapedAppDirectory\python`" -LauncherDir `"$escapedAppDirectory\bin`" %*`r`nexit /b %errorlevel%`r`n"
         "ua-config.cmd" = "@echo off`r`npushd `"$escapedAppDirectory`"`r`n`"$escapedAppDirectory\.venv\Scripts\python.exe`" `"$escapedAppDirectory\config-generator.py`" %*`r`nset `"exit_code=%errorlevel%`"`r`npopd`r`nexit /b %exit_code%`r`n"
-        "ua-webui.cmd" = "@echo off`r`nstart `"`" `"%SystemRoot%\System32\wscript.exe`" `"$escapedAppDirectory\scripts\run-webui-tray.vbs`" `"$escapedAppDirectory`" %*`r`nexit /b 0`r`n"
+        "ua-webui.cmd" = "@echo off`r`nstart `"`" `"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$escapedAppDirectory\scripts\run-webui-tray.ps1`" -AppDir `"$escapedAppDirectory`" %*`r`nexit /b 0`r`n"
     }
 
     foreach ($launcher in $launchers.GetEnumerator()) {
@@ -434,14 +428,12 @@ $resolvedInstallDir = [System.IO.Path]::GetFullPath($InstallDir)
 $venvDir = Join-Path $resolvedInstallDir ".venv"
 $venvPython = Join-Path $venvDir "Scripts\python.exe"
 $launcherDir = Join-Path $resolvedInstallDir "bin"
-$ffmpegDir = Join-Path $resolvedInstallDir "ffmpeg"
 
 if (-not (Test-Path -LiteralPath (Join-Path $resolvedInstallDir "upload.py"))) {
     throw "Upload Assistant files are missing from $resolvedInstallDir."
 }
 
 $pythonExe = Ensure-DestinationPython -DestinationDir $resolvedInstallDir -ExpectedMinorVersion $PythonVersion -DownloadBaseUrl $PythonDownloadBaseUrl
-Ensure-DestinationFfmpeg -DestinationDir $resolvedInstallDir -DownloadUrl $FfmpegDownloadUrl
 
 if (-not (Test-Path -LiteralPath $venvPython)) {
     Write-Step "Creating virtual environment"
@@ -452,17 +444,9 @@ Write-Runner -AppDirectory $resolvedInstallDir
 Write-Launchers -AppDirectory $resolvedInstallDir -LauncherDirectory $launcherDir
 Add-DirectoryToUserPath -DirectoryPath $launcherDir
 
-$ffmpegBinDir = Join-Path $ffmpegDir "bin"
-if (Test-Path -LiteralPath $ffmpegBinDir) {
-    Add-DirectoryToUserPath -DirectoryPath $ffmpegBinDir
-}
-elseif (Test-Path -LiteralPath $ffmpegDir) {
-    Add-DirectoryToUserPath -DirectoryPath $ffmpegDir
-}
-
 Write-Step "Installing Upload Assistant dependencies"
-Invoke-Process -FilePath $venvPython -Description "Pip upgrade" -ArgumentList @("-m", "pip", "install", "--upgrade", "pip")
-Invoke-Process -FilePath $venvPython -Description "Base dependency installation" -ArgumentList @("-m", "pip", "install", "-r", (Join-Path $resolvedInstallDir "requirements.txt"))
+Invoke-Process -FilePath $venvPython -Description "Pip upgrade" -ProgressMessage "Updating pip..." -ArgumentList @("-m", "pip", "install", "--upgrade", "pip")
+Invoke-Process -FilePath $venvPython -Description "Base dependency installation" -ProgressMessage "Downloading and installing Upload Assistant dependencies. This may take several minutes..." -ArgumentList @("-m", "pip", "install", "-r", (Join-Path $resolvedInstallDir "requirements.txt"))
 
 Write-Step "Installation complete."
 Write-Host ""

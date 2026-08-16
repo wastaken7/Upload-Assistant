@@ -4,13 +4,10 @@ param(
     [string]$PythonVersion = "3.14",
     [string]$PythonInstallDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\python\3.14"),
     [string]$LauncherDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\bin"),
-    [string]$FfmpegInstallDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\ffmpeg"),
     [string]$PythonDownloadBaseUrl = "https://www.python.org/ftp/python",
     [string]$RepositoryZipUrl = "https://github.com/wastaken7/Upload-Assistant/archive/refs/heads/development.zip",
     [string]$InstallerUrl = "https://raw.githubusercontent.com/wastaken7/Upload-Assistant/development/scripts/install-windows.ps1",
-    [string]$FfmpegDownloadUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
-    [switch]$ForceUpdate,
-    [switch]$SkipFfmpegInstall
+    [switch]$ForceUpdate
 )
 
 Set-StrictMode -Version Latest
@@ -33,18 +30,12 @@ $installArguments = @{
     PythonVersion = $PythonVersion
     PythonInstallDir = $PythonInstallDir
     LauncherDir = $LauncherDir
-    FfmpegInstallDir = $FfmpegInstallDir
     PythonDownloadBaseUrl = $PythonDownloadBaseUrl
     RepositoryZipUrl = $RepositoryZipUrl
-    FfmpegDownloadUrl = $FfmpegDownloadUrl
 }
 
 if ($ForceUpdate) {
     $installArguments.ForceUpdate = $true
-}
-
-if ($SkipFfmpegInstall) {
-    $installArguments.SkipFfmpegInstall = $true
 }
 
 $installerPath = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantInstaller-" + [guid]::NewGuid().ToString("N") + ".ps1")

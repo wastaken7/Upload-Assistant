@@ -28,6 +28,24 @@ def test_configured_binary_ignores_empty_override() -> None:
     assert configured_binary("ffmpeg_path", {"DEFAULT": {"ffmpeg_path": ""}}) is None
 
 
+def test_configured_binary_uses_runtime_managed_ffmpeg(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    executable = tmp_path / "ffmpeg.exe"
+    executable.touch()
+    monkeypatch.setenv("UA_FFMPEG_PATH", str(executable))
+
+    assert configured_binary("ffmpeg_path", {"DEFAULT": {"ffmpeg_path": ""}}) == str(executable)
+
+
+def test_configured_binary_prioritizes_explicit_ffmpeg_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    configured = tmp_path / "configured-ffmpeg.exe"
+    managed = tmp_path / "managed-ffmpeg.exe"
+    configured.touch()
+    managed.touch()
+    monkeypatch.setenv("UA_FFMPEG_PATH", str(managed))
+
+    assert configured_binary("ffmpeg_path", {"DEFAULT": {"ffmpeg_path": str(configured)}}) == str(configured)
+
+
 def test_configured_binary_rejects_missing_override(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="ffmpeg_path"):
         configured_binary("ffmpeg_path", {"DEFAULT": {"ffmpeg_path": str(tmp_path / "missing.exe")}})

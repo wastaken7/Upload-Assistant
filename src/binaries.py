@@ -23,7 +23,14 @@ def configured_binary(key: str, config: Mapping[str, Any] | None = None) -> str 
     value = default.get(key, "") if isinstance(default, Mapping) else ""
     path_text = str(value or "").strip()
     if not path_text:
-        return None
+        if key == "ffmpeg_path":
+            managed_path = os.environ.get("UA_FFMPEG_PATH", "").strip()
+            if managed_path:
+                path_text = managed_path
+            else:
+                return None
+        else:
+            return None
 
     path = Path(path_text).expanduser()
     if not path.is_file():

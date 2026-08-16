@@ -4,12 +4,9 @@ param(
     [string]$PythonVersion = "3.14",
     [string]$PythonInstallDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\python\3.14"),
     [string]$LauncherDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\bin"),
-    [string]$FfmpegInstallDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\ffmpeg"),
     [string]$PythonDownloadBaseUrl = "https://www.python.org/ftp/python",
     [string]$RepositoryZipUrl = "https://github.com/wastaken7/Upload-Assistant/archive/refs/heads/development.zip",
-    [string]$FfmpegDownloadUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
-    [switch]$ForceUpdate,
-    [switch]$SkipFfmpegInstall
+    [switch]$ForceUpdate
 )
 
 Set-StrictMode -Version Latest
@@ -327,44 +324,6 @@ function Ensure-IsolatedPython {
     return $pythonExe
 }
 
-function Ensure-Ffmpeg {
-    if ($SkipFfmpegInstall) {
-        return
-    }
-
-    $managedFfmpegExe = Join-Path $FfmpegInstallDir "bin\ffmpeg.exe"
-    if (Test-Path -LiteralPath $managedFfmpegExe) {
-        Add-DirectoryToUserPath -DirectoryPath (Split-Path -Parent $managedFfmpegExe)
-        return
-    }
-
-    $ffmpegCommand = Resolve-CommandPath -CommandName "ffmpeg.exe"
-    if ($ffmpegCommand) {
-        return
-    }
-
-    $ffmpegArchivePath = New-TemporaryDownloadPath -FileName ([System.IO.Path]::GetFileName(([System.Uri]$FfmpegDownloadUrl).AbsolutePath))
-    $extractRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantFfmpeg-" + [guid]::NewGuid().ToString("N"))
-
-    Invoke-DownloadFile -Url $FfmpegDownloadUrl -DestinationPath $ffmpegArchivePath -Label "FFmpeg"
-    Write-Step "Installing FFmpeg"
-    Expand-Archive -LiteralPath $ffmpegArchivePath -DestinationPath $extractRoot -Force
-
-    $ffmpegExe = Get-ChildItem -Path $extractRoot -Filter ffmpeg.exe -Recurse | Select-Object -First 1 -ExpandProperty FullName
-    if (-not $ffmpegExe) {
-        Fail "Downloaded FFmpeg archive did not contain ffmpeg.exe."
-    }
-
-    $ffmpegRoot = Split-Path -Parent (Split-Path -Parent $ffmpegExe)
-    if (Test-Path -LiteralPath $FfmpegInstallDir) {
-        Remove-Item -LiteralPath $FfmpegInstallDir -Recurse -Force
-    }
-
-    New-Item -ItemType Directory -Path (Split-Path -Parent $FfmpegInstallDir) -Force | Out-Null
-    Move-Item -LiteralPath $ffmpegRoot -Destination $FfmpegInstallDir
-    Add-DirectoryToUserPath -DirectoryPath (Join-Path $FfmpegInstallDir "bin")
-}
-
 function Install-RepositoryFromZip {
     param([string[]]$PreserveDirectories = @())
 
@@ -585,7 +544,7 @@ exit /b %errorlevel%
 "@
 $updateCmdContents = @"
 @echo off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$UaDir\scripts\update-windows.ps1" -UaDir "$UaDir" -PythonInstallDir "$PythonInstallDir" -LauncherDir "$LauncherDir" -FfmpegInstallDir "$FfmpegInstallDir" %*
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$UaDir\scripts\update-windows.ps1" -UaDir "$UaDir" -PythonInstallDir "$PythonInstallDir" -LauncherDir "$LauncherDir" %*
 exit /b %errorlevel%
 "@
     $configCmdContents = @"
@@ -598,7 +557,7 @@ exit /b %exit_code%
 "@
     $webuiCmdContents = @"
 @echo off
-start "" "%SystemRoot%\System32\wscript.exe" "$UaDir\scripts\run-webui-tray.vbs" "$UaDir" %*
+start "" "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "$UaDir\scripts\run-webui-tray.ps1" -AppDir "$UaDir" %*
 exit /b 0
 "@
 
@@ -614,8 +573,7 @@ exit /b 0
 }
 
 $PythonExe = Ensure-IsolatedPython
-Ensure-Ffmpeg
-Install-RepositoryFromZip -PreserveDirectories @($PythonInstallDir, $FfmpegInstallDir)
+Install-RepositoryFromZip -PreserveDirectories @($PythonInstallDir)
 Install-Dependencies -PythonExe $PythonExe
 Write-Runner
 Write-GlobalLauncher

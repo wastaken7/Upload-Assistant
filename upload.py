@@ -31,12 +31,14 @@ import cli_ui  # pyright: ignore[reportMissingImports]
 import requests
 from torf import Torrent as _Torrent  # pyright: ignore[reportMissingImports,reportUnknownVariableType]
 
+from bin.get_ffmpeg import FfmpegBinaryManager
 from bin.get_mkbrr import MkbrrBinaryManager
 from src.add_comparison import ComparisonManager
 from src.app_paths import CODE_DIR, STATE_DIR
 from src.args import Args, read_paths_from_stdin
 from src.artwork import is_public_http_url, is_valid_cover_image
 from src.audio_spectrogram import process_audio_spectrograms
+from src.binaries import configured_binary
 from src.book_prep import detect_newspaper, is_valid_book_language, resolve_book_language
 from src.cleanup import cleanup_manager
 from src.clients import Clients
@@ -2375,6 +2377,8 @@ async def do_the_thing(base_dir: str) -> None:
 
         from bin.get_mediainfo import MediaInfoBinaryManager
 
+        if not configured_binary("ffmpeg_path", config):
+            os.environ["UA_FFMPEG_PATH"] = await FfmpegBinaryManager.ensure_ffmpeg_binary(STATE_DIR)
         await MediaInfoBinaryManager.ensure_mediainfo_binary(base_dir)
 
         path = meta.path

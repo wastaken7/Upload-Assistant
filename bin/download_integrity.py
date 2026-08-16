@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 
 SHA256_BY_ASSET = {
+    "ffmpeg-9.0.1-essentials_build.zip": "fec81ae03971d9dd4be3ebe02e263bd2ec1d789483f931bdba5f5715e65da2e9",
     "MediaInfo_CLI_23.04_Windows_x64.zip": "b1beafae0a15168ca37db8a3061d55eba55c1a120d6a6423ac1d3f30ed869270",
     "MediaInfo_CLI_26.05_Lambda_arm64.zip": "57268dcfc044cdcbe4641e26432392f002b7fa4bcb06e9d738be04cd047a2c1e",
     "MediaInfo_CLI_26.05_Lambda_x86_64.zip": "1ae3744a78c93492b69f0b38bb2d1de1433c3eae04030ff1ea82ee1f60ac9a99",
