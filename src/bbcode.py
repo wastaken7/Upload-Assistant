@@ -520,15 +520,15 @@ class BBCODE:
         # Remove Upload-Assistant signatures imported from another release.
         ua_signature_regex = r"""
             ^[ \t]*
-            \[(?:right|center|align=right)\][ \t]*
-            \[url=https:\/\/github\.com\/[^\]]*\/Upload-Assistant\][ \t]*
-            (?:\[size=\d+\][ \t]*)?
+            \[(?:right|center|align=(?:right|center))\][ \t]*(?:\n[ \t]*)?
+            \[url=https:\/\/github\.com\/[^\]]*\/Upload-Assistant\][ \t]*(?:\n[ \t]*)?
+            (?:\[size=\d+\][ \t]*(?:\n[ \t]*)?)?
             (?:Shared\s+with|Compartilhado\s+com)\s+Upload[-\s]+Assistant
-            (?:\s+v?[\w.+-]+)?
-            (?:\s+\(fork\))?
-            [ \t]*
-            (?:\[\/size\][ \t]*)?
-            \[\/url\][ \t]*
+            (?:[ \t]+v?\d+(?:[.+-]\d+)*)?
+            (?:[ \t]+\(fork\))?
+            [ \t]*(?:\n[ \t]*)?
+            (?:\[\/size\][ \t]*(?:\n[ \t]*)?)?
+            \[\/url\][ \t]*(?:\n[ \t]*)?
             \[\/(?:right|center|align)\][ \t]*$
         """
         desc = re.sub(ua_signature_regex, "", desc, flags=re.IGNORECASE | re.MULTILINE | re.VERBOSE)
