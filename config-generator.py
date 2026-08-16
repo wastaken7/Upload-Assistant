@@ -531,7 +531,7 @@ def configure_default_section(
 
     # Settings that should only be prompted if a parent setting has a specific value
     linked_settings: dict[str, LinkedSetting] = {
-        "update_notification": {"condition": lambda value: value.lower() == "true", "settings": ["verbose_notification"]},
+        "update_notification": {"condition": lambda value: value.lower() == "true", "settings": ["verbose_notification", "update_notification_cache_hours"]},
         "tone_map": {"condition": lambda value: value.lower() == "true", "settings": ["algorithm", "desat", "tonemapped_header"]},
         "add_logo": {"condition": lambda value: value.lower() == "true", "settings": ["logo_size", "logo_language"]},
         "frame_overlay": {"condition": lambda value: value.lower() == "true", "settings": ["overlay_text_size"]},

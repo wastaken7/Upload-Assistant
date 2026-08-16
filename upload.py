@@ -2083,6 +2083,41 @@ def get_remote_version(url: str) -> tuple[str | None, str | None]:
         return None, None
 
 
+def _update_notification_cache_path() -> Path:
+    return STATE_DIR / "update_notification.json"
+
+
+def _read_update_notification_cache(cache_hours: float) -> tuple[str, str] | None:
+    """Return a still-valid remote version response from the runtime cache."""
+    try:
+        cached = json.loads(_update_notification_cache_path().read_text(encoding="utf-8"))
+        checked_at = cached["checked_at"]
+        remote_version = cached["remote_version"]
+        remote_content = cached["remote_content"]
+        if not isinstance(checked_at, (int, float)) or not isinstance(remote_version, str) or not isinstance(remote_content, str):
+            return None
+        if time.time() - checked_at >= cache_hours * 3600:
+            return None
+        return remote_version, remote_content
+    except FileNotFoundError, OSError, TypeError, ValueError, KeyError, json.JSONDecodeError:
+        return None
+
+
+def _write_update_notification_cache(remote_version: str, remote_content: str) -> None:
+    """Persist a successful remote version response for later runs."""
+    try:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        cache_path = _update_notification_cache_path()
+        temporary_path = cache_path.with_suffix(".tmp")
+        temporary_path.write_text(
+            json.dumps({"checked_at": time.time(), "remote_version": remote_version, "remote_content": remote_content}),
+            encoding="utf-8",
+        )
+        temporary_path.replace(cache_path)
+    except OSError as exc:
+        logger.debug(f"Could not cache update notification: {exc}")
+
+
 def extract_changelog(content: str, to_version: str) -> str | None:
     """Extracts the changelog entries between the specified versions."""
     try:
@@ -2125,6 +2160,12 @@ async def update_notification() -> str:
 
     notice = config["DEFAULT"].get("update_notification", True)
     verbose = config["DEFAULT"].get("verbose_notification", False)
+    cache_hours = config["DEFAULT"].get("update_notification_cache_hours", 4)
+    try:
+        cache_hours = max(0.0, float(cache_hours))
+    except TypeError, ValueError:
+        logger.warning("[yellow]Invalid update_notification_cache_hours; using 4 hours.[/yellow]")
+        cache_hours = 4.0
 
     local_version = get_local_version(version_file)
     if not local_version:
@@ -2133,7 +2174,13 @@ async def update_notification() -> str:
     if not notice:
         return local_version
 
-    remote_version, remote_content = get_remote_version(remote_version_url)
+    cached_response = _read_update_notification_cache(cache_hours) if cache_hours else None
+    if cached_response:
+        remote_version, remote_content = cached_response
+    else:
+        remote_version, remote_content = get_remote_version(remote_version_url)
+        if remote_version and remote_content:
+            _write_update_notification_cache(remote_version, remote_content)
     if not remote_version:
         return local_version
 
