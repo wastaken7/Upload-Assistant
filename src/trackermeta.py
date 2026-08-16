@@ -289,11 +289,12 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
         logger.debug(f"set MAL ID: {meta.mal_id}")
     mode = resolve_description_mode(meta.tracker_description_mode)
     if desc:
+        tracker_id = meta.get_tracker_id(tracker_name) or ""
         raw_descriptions = getattr(meta, "tracker_description_raw", {}) or {}
         raw_description = str(raw_descriptions.get(tracker_name, desc))
         candidate = DescriptionCandidate(
             source=tracker_name,
-            release_id=str(meta.get(tracker_name.lower(), "") or ""),
+            release_id=tracker_id,
             release_name=str(filename or ""),
             raw_description=raw_description,
             cleaned_description=str(desc),
@@ -301,7 +302,7 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
             score=score_release_name(
                 getattr(meta, "tracker_search_term", ""),
                 filename,
-                explicit_id=bool(meta.get(tracker_name.lower())),
+                explicit_id=bool(tracker_id),
             ),
         )
         add_candidate(meta, candidate, selected=mode.imports_text)
@@ -321,7 +322,7 @@ async def update_meta_with_unit3d_data(meta: Meta, tracker_data: Sequence[Any], 
         valid_images = await check_images_concurrently(imagelist_typed, meta)
         if valid_images:
             meta.image_list = valid_images
-            if meta.image_list and (not any(meta.get(t.lower()) for t in api_trackers) or meta.unattended):
+            if meta.image_list and (not meta.tracker_ids or meta.unattended):
                 await handle_image_list(meta, tracker_name, valid_images)
 
     if desc and mode.imports_text:
@@ -344,9 +345,6 @@ async def update_metadata_from_tracker(
     *,
     torrent_id: str = "",
 ) -> tuple[Meta, bool]:
-    # HDBITS stores its torrent ID in ``meta.hdb`` rather than ``meta.hdbits``.
-    # Keep the generic key for every other tracker so all bracket accesses in
-    # the HDBITS branch address the field that was detected upstream.
     tracker_key = "hdb" if tracker_name == "HDBITS" else tracker_name.lower()
     meta.tracker_search_term = search_term
     manual_key = f"{tracker_key}_manual"
@@ -355,7 +353,8 @@ async def update_metadata_from_tracker(
     if tracker_name == "PASSTHEPOPCORN":
         imdb_id: int = 0
         ptp_imagelist: list[ImageDict] = []
-        if meta.ptp is None:
+        ptp_torrent_id = meta.get_tracker_id(tracker_name)
+        if ptp_torrent_id is None:
             ptp_result = await tracker_instance.get_ptp_id_imdb(search_term, search_file_folder, meta)
             imdb_id, ptp_torrent_id, meta.ext_torrenthash = cast(tuple[int, int | None, str | None], ptp_result)
             if ptp_torrent_id:
@@ -366,7 +365,7 @@ async def update_metadata_from_tracker(
                     if await prompt_user_for_confirmation("Do you want to use this ID data from PASSTHEPOPCORN?"):
                         meta.imdb_id = imdb_id
                         found_match = True
-                        meta.ptp = ptp_torrent_id
+                        meta.set_tracker_ids({tracker_name: ptp_torrent_id})
 
                         if not skip_tracker_descriptions or meta.keep_images:
                             ptp_imagelist = cast(
@@ -382,7 +381,7 @@ async def update_metadata_from_tracker(
                     else:
                         found_match = False
                         meta.imdb_id = meta.imdb_id if meta.imdb_id else 0
-                        meta.ptp = None
+                        meta.clear_tracker_id(tracker_name)
                         meta.description = ""
                         meta.image_list = []
 
@@ -403,8 +402,8 @@ async def update_metadata_from_tracker(
                 found_match = False
 
         else:
-            ptp_torrent_id = cast(int, meta.ptp)
-            ptp_imdb_result = await tracker_instance.get_imdb_from_torrent_id(ptp_torrent_id)
+            ptp_torrent_id_int = int(ptp_torrent_id)
+            ptp_imdb_result = await tracker_instance.get_imdb_from_torrent_id(ptp_torrent_id_int)
             imdb_id, meta.ext_torrenthash = cast(tuple[int, str | None], ptp_imdb_result)
             if imdb_id:
                 meta.imdb_id = imdb_id
@@ -414,7 +413,7 @@ async def update_metadata_from_tracker(
                 if not skip_tracker_descriptions or meta.keep_images:
                     ptp_imagelist = cast(
                         list[ImageDict],
-                        await tracker_instance.get_ptp_description(meta.ptp, meta, meta.is_disc),
+                        await tracker_instance.get_ptp_description(ptp_torrent_id_int, meta, meta.is_disc),
                     )
                 if ptp_imagelist:
                     valid_images = await check_images_concurrently(ptp_imagelist, meta)
@@ -422,7 +421,7 @@ async def update_metadata_from_tracker(
                         meta.image_list = valid_images
                         logger.info("[green]PASSTHEPOPCORN images added to metadata.[/green]")
             else:
-                logger.info(f"[yellow]Could not find IMDb ID using PASSTHEPOPCORN ID: {ptp_torrent_id}[/yellow]")
+                logger.info(f"[yellow]Could not find IMDb ID using PASSTHEPOPCORN ID: {ptp_torrent_id_int}[/yellow]")
                 found_match = False
 
     elif tracker_name == "BEYONDHD":
@@ -443,10 +442,11 @@ async def update_metadata_from_tracker(
             return meta, False
         use_foldername = bool(meta.is_disc) or meta.keep_folder is True or meta.isdir is True
 
-        if meta.bhd:
+        bhd_torrent_id = meta.get_tracker_id(tracker_name)
+        if bhd_torrent_id:
             imdb, tmdb = cast(
                 tuple[int | None, int | None],
-                await BtnIdManager.get_bhd_torrents(bhd_api, bhd_rss_key, meta, skip_tracker_descriptions=skip_tracker_descriptions, torrent_id=int(meta.bhd)),
+                await BtnIdManager.get_bhd_torrents(bhd_api, bhd_rss_key, meta, skip_tracker_descriptions=skip_tracker_descriptions, torrent_id=int(bhd_torrent_id)),
             )
         elif use_foldername:
             # Use folder name from path if available, fall back to UUID
@@ -550,7 +550,7 @@ async def update_metadata_from_tracker(
 
                 else:
                     logger.info(f"[yellow]{tracker_name} data discarded.[/yellow]")
-                    meta[tracker_key] = None
+                    meta.clear_tracker_id(tracker_name)
                     meta.imdb_id = meta.imdb_id if meta.imdb_id else 0
                     meta.tmdb_id = meta.tmdb_id if meta.tmdb_id else 0
                     meta.framestor = False
@@ -589,7 +589,7 @@ async def update_metadata_from_tracker(
             found_match = False
 
     elif tracker_name in api_trackers:
-        resolved_torrent_id = torrent_id or meta.get(tracker_key)
+        resolved_torrent_id = torrent_id or meta.get_tracker_id(tracker_name)
         if resolved_torrent_id:
             logger.debug(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {resolved_torrent_id}[/cyan]")
             tracker_data = cast(
@@ -601,6 +601,7 @@ async def update_metadata_from_tracker(
                     meta,
                     id=resolved_torrent_id,
                     skip_tracker_descriptions=skip_tracker_descriptions,
+                    public_torrent_url=tracker_instance.torrent_url,
                 ),
             )
         else:
@@ -627,12 +628,13 @@ async def update_metadata_from_tracker(
 
     elif tracker_name == "HDBITS":
         bbcode = BBCODE()
-        if meta.hdb is not None:
-            meta[manual_key] = meta[tracker_key]
-            logger.info(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {meta[tracker_key]}[/cyan]")
+        hdb_torrent_id = meta.get_tracker_id(tracker_name)
+        if hdb_torrent_id is not None:
+            meta[manual_key] = hdb_torrent_id
+            logger.info(f"[cyan]{tracker_name} ID found in meta, reusing existing ID: {hdb_torrent_id}[/cyan]")
 
             # Use get_info_from_torrent_id function if ID is found in meta
-            hdb_info = await tracker_instance.get_info_from_torrent_id(meta[tracker_key])
+            hdb_info = await tracker_instance.get_info_from_torrent_id(hdb_torrent_id)
             imdb, tvdb_id, hdb_name, meta.ext_torrenthash, meta.hdb_description = cast(
                 tuple[int | None, int | None, str | None, str | None, str | None],
                 hdb_info,
@@ -664,7 +666,7 @@ async def update_metadata_from_tracker(
 
                 logger.info(f"[green]{tracker_name} data found: IMDb ID: {imdb}, TVDb ID: {meta.tvdb_id}, HDBITS Name: {meta.hdb_name}[/green]")
             else:
-                logger.info(f"[yellow]{tracker_name} data not found for ID: {meta[tracker_key]}[/yellow]")
+                logger.info(f"[yellow]{tracker_name} data not found for ID: {hdb_torrent_id}[/yellow]")
                 found_match = False
         else:
             logger.debug("[yellow]No ID found in meta for HDBITS, searching by file name[/yellow]")
@@ -677,7 +679,7 @@ async def update_metadata_from_tracker(
             )
             meta.hdb_name = hdb_name
             if tracker_id:
-                meta[tracker_key] = tracker_id
+                meta.set_tracker_ids({tracker_name: tracker_id})
 
             if imdb or tvdb_id or meta.hdb_description:
                 if not meta.unattended:
@@ -723,7 +725,7 @@ async def update_metadata_from_tracker(
                                 await handle_image_list(meta, tracker_name, valid_images)
                     else:
                         logger.info(f"[yellow]{tracker_name} data discarded.[/yellow]")
-                        meta[tracker_key] = None
+                        meta.clear_tracker_id(tracker_name)
                         meta.tvdb_id = meta.tvdb_id if meta.tvdb_id else 0
                         meta.imdb_id = meta.imdb_id if meta.imdb_id else 0
                         meta.hdb_name = None
@@ -751,7 +753,7 @@ async def update_metadata_from_tracker(
             else:
                 meta.hdb_name = None
                 meta.hdb_description = ""
-                meta[tracker_key] = None
+                meta.clear_tracker_id(tracker_name)
                 found_match = False
 
     return meta, found_match

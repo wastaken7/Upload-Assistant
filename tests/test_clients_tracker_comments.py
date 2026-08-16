@@ -1,4 +1,7 @@
+from types import SimpleNamespace
+
 from src.clients import Clients
+from src.meta import Meta
 from src.trackers.orpheus import Orpheus
 
 
@@ -25,6 +28,30 @@ def test_uses_orpheus_default_host_without_config_override():
     tracker_ids = client._extract_tracker_ids_from_comment("https://orpheus.network/torrents.php?torrentid=42")
 
     assert tracker_ids == {"orpheus": "42"}  # noqa: S101
+
+
+def test_uses_aither_torrent_comment_id():
+    client = Clients({"TRACKERS": {}})
+
+    tracker_ids = client._extract_tracker_ids_from_comment("This torrent was downloaded from Aither.cc. https://aither.cc/torrents/50049")
+
+    assert tracker_ids == {"aither": "50049"}  # noqa: S101
+
+
+def test_matches_single_file_inside_folder_torrent_content_path():
+    client = Clients({"TRACKERS": {}})
+    media = r"F:\Filmes\Heat\Heat.mkv"
+    torrent = SimpleNamespace(name="Heat", content_path=media)
+
+    assert client._matches_qbit_content_path(torrent, Meta({"path": media, "uuid": "Heat.mkv"}))  # noqa: S101
+
+
+def test_matches_torrent_name_when_content_path_is_unavailable():
+    client = Clients({"TRACKERS": {}})
+    media = r"F:\Filmes\Heat\Heat.mkv"
+    torrent = SimpleNamespace(name="Heat.mkv", content_path="")
+
+    assert client._matches_qbit_content_path(torrent, Meta({"path": media, "filelist": [media], "uuid": "different"}))  # noqa: S101
 
 
 def test_orpheus_uses_its_fixed_base_url():

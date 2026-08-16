@@ -25,26 +25,6 @@ from src.tracker_descriptions import description_fingerprint
 from src.trackermeta import TrackerMetaManager
 from src.trackersetup import tracker_class_map
 
-_TRACKER_ID_FIELDS = {
-    "AITHER": "aither",
-    "ANTHELION": "ant",
-    "BEYONDHD": "bhd",
-    "BLUTOPIA": "blu",
-    "BTN": "btn",
-    "DARKPEERS": "dp",
-    "HAWKEUNO": "huno",
-    "HDBITS": "hdb",
-    "LASTDIGITALUNDERGROUND": "ldu",
-    "LST": "lst",
-    "OLDTOONSWORLD": "otw",
-    "ONLYENCODES": "oe",
-    "PASSTHEPOPCORN": "ptp",
-    "REELFLIX": "rf",
-    "SEEDPOOL": "sp",
-    "ULCX": "ulcx",
-    "YUSCENE": "yus",
-}
-
 
 class TrackerDataManager:
     def __init__(self, config: dict[str, Any]) -> None:
@@ -74,8 +54,7 @@ class TrackerDataManager:
         use_cache: bool = True,
     ) -> tuple[Meta, bool]:
         """Reuse a cached tracker response only when the user supplied a torrent ID."""
-        tracker_field = _TRACKER_ID_FIELDS.get(tracker_name, tracker_name.lower())
-        tracker_id = str(meta.get(tracker_field, "") or meta.get(tracker_name.lower(), "") or "").strip()
+        tracker_id = (meta.get_tracker_id(tracker_name) or "").strip()
         if not tracker_id:
             return await self.tracker_meta_manager.update_metadata_from_tracker(
                 tracker_name, tracker_instance, meta, search_term, search_file_folder, skip_tracker_descriptions
@@ -155,7 +134,7 @@ class TrackerDataManager:
         await asyncio.to_thread(candidate_dir.mkdir, mode=0o700, parents=True, exist_ok=True)
         try:
             if tracker_name == "BTN":
-                btn_id = str(candidate.btn or "")
+                btn_id = candidate.get_tracker_id("BTN") or ""
                 btn_api = self.default_config.get("btn_api")
                 if not isinstance(btn_api, str) or len(btn_api) <= 25:
                     return None
@@ -328,7 +307,7 @@ class TrackerDataManager:
         search_file_folder_value = search_file_folder or ""
         if search_term:
             # Check if a specific tracker is already set in meta
-            specific_tracker = sorted(tracker_name for tracker_name, tracker_key in _TRACKER_ID_FIELDS.items() if meta.get(tracker_key) is not None)
+            specific_tracker = sorted(meta.tracker_ids)
 
             # Filter out trackers that don't have valid config or api_key/announce_url
             if specific_tracker:
@@ -418,6 +397,10 @@ class TrackerDataManager:
                     logger.debug("[yellow]No matches found on any available specific trackers.[/yellow]")
 
             else:
+                if self.default_config.get("tracker_comment_only", True):
+                    logger.debug("[cyan]Skipping filename-based tracker metadata searches because DEFAULT.tracker_comment_only is enabled.[/cyan]")
+                    return meta
+
                 # Process all trackers with API = true if no specific tracker is set in meta
                 from src.trackersetup import api_trackers
 

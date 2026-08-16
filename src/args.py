@@ -424,17 +424,12 @@ class Args:
             required=False,
             help="Use the largest video file for processing instead of the first video file found",
         )
-        parser.add_argument("-ptp", "--ptp", nargs=1, required=False, help="PASSTHEPOPCORN torrent id/permalink", type=str)
-        parser.add_argument("-blu", "--blu", nargs=1, required=False, help="BLUTOPIA torrent id/link", type=str)
-        parser.add_argument("-aither", "--aither", nargs=1, required=False, help="AITHER torrent id/link", type=str)
-        parser.add_argument("-lst", "--lst", nargs=1, required=False, help="LST torrent id/link", type=str)
-        parser.add_argument("-oe", "--oe", nargs=1, required=False, help="ONLYENCODES torrent id/link", type=str)
-        parser.add_argument("-hdb", "--hdb", nargs=1, required=False, help="HDBITS torrent id/link", type=str)
-        parser.add_argument("-btn", "--btn", nargs=1, required=False, help="BTN torrent id/link", type=str)
-        parser.add_argument("-bhd", "--bhd", nargs=1, required=False, help="BEYONDHD torrent_id/link", type=str)
-        parser.add_argument("--orpheus", nargs=1, required=False, help="Orpheus torrent id/permalink (MUSIC metadata enrichment)", type=str)
-        parser.add_argument("-huno", "--huno", nargs=1, required=False, help="HAWKEUNO torrent id/link", type=str)
-        parser.add_argument("-ulcx", "--ulcx", nargs=1, required=False, help="ULCX torrent id/link", type=str)
+        parser.add_argument(
+            "--tracker-id",
+            action="append",
+            metavar="TRACKER=ID|URL",
+            help="Tracker torrent ID, as TRACKER=ID, TRACKER=URL, or a tracker torrent URL. May be repeated.",
+        )
         parser.add_argument("-req", "--search_requests", action="store_true", required=False, help="Search for matching requests on supported trackers", default=None)
         parser.add_argument("-sat", "--skip_auto_torrent", action="store_true", required=False, help="Skip automated qbittorrent client torrent searching", default=None)
         parser.add_argument(
@@ -768,57 +763,12 @@ class Args:
                         meta.manual_date = value2
                     elif key == "tmdb_manual":
                         meta.category, meta.tmdb_manual = self.parse_tmdb_id(value2, meta.category)
+                    elif key == "tracker_id":
+                        for tracker_id_value in value_list:
+                            tracker_name, torrent_id = self.parse_tracker_id(tracker_id_value)
+                            meta.set_tracker_ids({tracker_name: torrent_id})
                     elif key == "manual_cast":
                         meta.manual_cast = [name.strip() for name in value2.split(",") if name.strip()]
-                    elif key == "ptp":
-                        if value2.startswith("http"):
-                            parsed = urllib.parse.urlparse(value2)
-                            try:
-                                meta.ptp = urllib.parse.parse_qs(parsed.query)["torrentid"][0]
-                            except Exception:
-                                logger.info("[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid")
-                                logger.info("[red]Continuing without -ptp")
-                        else:
-                            meta.ptp = value2
-                    elif key == "blu":
-                        if value2.startswith("http"):
-                            parsed = urllib.parse.urlparse(value2)
-                            try:
-                                blupath = parsed.path
-                                if blupath.endswith("/"):
-                                    blupath = blupath[:-1]
-                                meta.blu = blupath.split("/")[-1]
-                            except Exception:
-                                logger.info("[red]Unable to parse id from url")
-                                logger.info("[red]Continuing without --blu")
-                        else:
-                            meta.blu = value2
-                    elif key == "aither":
-                        if value2.startswith("http"):
-                            parsed = urllib.parse.urlparse(value2)
-                            try:
-                                aitherpath = parsed.path
-                                if aitherpath.endswith("/"):
-                                    aitherpath = aitherpath[:-1]
-                                meta.aither = aitherpath.split("/")[-1]
-                            except Exception:
-                                logger.info("[red]Unable to parse id from url")
-                                logger.info("[red]Continuing without --aither")
-                        else:
-                            meta.aither = value2
-                    elif key == "lst":
-                        if value2.startswith("http"):
-                            parsed = urllib.parse.urlparse(value2)
-                            try:
-                                lstpath = parsed.path
-                                if lstpath.endswith("/"):
-                                    lstpath = lstpath[:-1]
-                                meta.lst = lstpath.split("/")[-1]
-                            except Exception:
-                                logger.info("[red]Unable to parse id from url")
-                                logger.info("[red]Continuing without --lst")
-                        else:
-                            meta.lst = value2
                     elif key == "openlibrary":
                         if value2.startswith("http"):
                             parsed = urllib.parse.urlparse(value2)
@@ -835,105 +785,6 @@ class Args:
                                 logger.info("[red]Continuing without --openlibrary")
                         else:
                             meta.openlibrary = value2
-                    elif key == "oe":
-                        if value2.startswith("http"):
-                            parsed = urllib.parse.urlparse(value2)
-                            try:
-                                oepath = parsed.path
-                                if oepath.endswith("/"):
-                                    oepath = oepath[:-1]
-                                meta.oe = oepath.split("/")[-1]
-                            except Exception:
-                                logger.info("[red]Unable to parse id from url")
-                                logger.info("[red]Continuing without --oe")
-                        else:
-                            meta.oe = value2
-                    elif key == "ulcx":
-                        if value2.startswith("http"):
-                            parsed = urllib.parse.urlparse(value2)
-                            try:
-                                ulcxpath = parsed.path
-                                if ulcxpath.endswith("/"):
-                                    ulcxpath = ulcxpath[:-1]
-                                meta.ulcx = ulcxpath.split("/")[-1]
-                            except Exception:
-                                logger.info("[red]Unable to parse id from url")
-                                logger.info("[red]Continuing without --ulcx")
-                        else:
-                            meta.ulcx = value2
-                    elif key == "hdb":
-                        if value2.startswith("http"):
-                            parsed = urllib.parse.urlparse(value2)
-                            try:
-                                meta.hdb = urllib.parse.parse_qs(parsed.query)["id"][0]
-                            except Exception:
-                                logger.info("[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid")
-                                logger.info("[red]Continuing without -hdb")
-                        else:
-                            meta.hdb = value2
-
-                    elif key == "btn":
-                        if value2.startswith("http"):
-                            parsed = urllib.parse.urlparse(value2)
-                            try:
-                                meta.btn = urllib.parse.parse_qs(parsed.query)["id"][0]
-                            except Exception:
-                                logger.info("[red]Your terminal ate  part of the url, please surround in quotes next time, or pass only the torrentid")
-                                logger.info("[red]Continuing without -hdb")
-                        else:
-                            meta.btn = value2
-
-                    elif key == "bhd":
-                        if value2.startswith("http"):
-                            parsed = urllib.parse.urlparse(value2)
-                            try:
-                                bhdpath = parsed.path
-                                if bhdpath.endswith("/"):
-                                    bhdpath = bhdpath[:-1]
-
-                                if "/download/" in bhdpath or "/torrents/" in bhdpath:
-                                    torrent_id_match = re.search(r"\.(\d+)$", bhdpath)
-                                    if torrent_id_match:
-                                        meta.bhd = torrent_id_match.group(1)
-                                    else:
-                                        meta.bhd = bhdpath.split("/")[-1]
-                                else:
-                                    meta.bhd = bhdpath.split("/")[-1]
-
-                                logger.info(f"[green]Parsed BEYONDHD torrent ID: {meta.bhd}")
-                            except Exception as e:
-                                logger.info(f"[red]Unable to parse id from url: {e}")
-                                logger.info("[red]Continuing without --bhd")
-                        else:
-                            meta.bhd = value2
-
-                    elif key == "orpheus":
-                        if value2.startswith("http"):
-                            parsed = urllib.parse.urlparse(value2)
-                            torrent_id = urllib.parse.parse_qs(parsed.query).get("torrentid", [""])[0]
-                            if torrent_id.isdigit():
-                                meta.orpheus = torrent_id
-                            else:
-                                logger.info("[red]Unable to parse torrentid from --orpheus URL; pass a torrent ID or permalink.[/red]")
-                        elif value2.isdigit():
-                            meta.orpheus = value2
-                        else:
-                            logger.info("[red]Invalid --orpheus value; pass a numeric torrent ID or permalink.[/red]")
-
-                    elif key == "huno":
-                        if value2.startswith("http"):
-                            parsed = urllib.parse.urlparse(value2)
-                            try:
-                                hunopath = parsed.path
-                                if hunopath.endswith("/"):
-                                    hunopath = hunopath[:-1]
-                                meta.huno = hunopath.split("/")[-1]
-                            except Exception:
-                                logger.info("[red]Unable to parse id from url")
-                                logger.info("[red]Continuing without --huno")
-                        else:
-                            meta.huno = value2
-
                     elif key == "steam_manual":
                         if value2.startswith("http"):
                             parsed = urllib.parse.urlparse(value2)
@@ -1231,6 +1082,42 @@ class Args:
         except Exception:
             result = "None"
         return result
+
+    def parse_tracker_id(self, value: str) -> tuple[str, str]:
+        """Normalize ``--tracker-id`` values without exposing tracker-specific CLI flags."""
+        from src.trackersetup import get_tracker_comment_hosts, tracker_class_map
+
+        candidate = value.strip()
+        tracker_name = ""
+        id_value = candidate
+        if "=" in candidate and not candidate.startswith(("http://", "https://")):
+            tracker_name, id_value = (part.strip() for part in candidate.split("=", 1))
+            tracker_name = Meta.canonical_tracker_name(tracker_name)
+
+        if id_value.startswith(("http://", "https://")):
+            parsed = urllib.parse.urlparse(id_value)
+            host = (parsed.hostname or "").lower()
+            matched_trackers = [
+                name for name, domains in get_tracker_comment_hosts(self.config).items() if any(host == domain or host.endswith(f".{domain}") for domain in domains)
+            ]
+            if len(matched_trackers) != 1:
+                raise ValueError(f"--tracker-id URL host is unknown or ambiguous: {host or id_value}")
+            url_tracker = Meta.canonical_tracker_name(matched_trackers[0])
+            if tracker_name and tracker_name != url_tracker:
+                raise ValueError(f"--tracker-id tracker {tracker_name} does not match URL host {host}")
+            tracker_name = url_tracker
+            query = urllib.parse.parse_qs(parsed.query)
+            id_value = (query.get("torrentid") or query.get("id") or [""])[0]
+            if not id_value:
+                path = parsed.path.rstrip("/")
+                dotted_id = re.search(r"\.(\d+)$", path)
+                id_value = dotted_id.group(1) if dotted_id else path.split("/")[-1]
+
+        if tracker_name not in tracker_class_map:
+            raise ValueError(f"--tracker-id requires a supported tracker name, got: {tracker_name or value}")
+        if not id_value or not id_value.isdigit():
+            raise ValueError(f"--tracker-id requires a numeric torrent ID, got: {value}")
+        return tracker_name, id_value
 
     def parse_tmdb_id(self, id_str: str, category: str | None) -> tuple[str, int]:
         if category is None:

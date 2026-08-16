@@ -41,13 +41,13 @@ def test_explicit_tracker_id_reuses_cached_metadata(tmp_path):
         first_manager = TrackerDataManager(config)
         first_fake = _FakeTrackerMetadataManager()
         first_manager.tracker_meta_manager = first_fake
-        first_meta = Meta({"base_dir": str(tmp_path), "ptp": "12345"})
+        first_meta = Meta({"base_dir": str(tmp_path), "tracker_ids": {"PASSTHEPOPCORN": "12345"}})
         _, first_match = await first_manager.update_metadata_from_explicit_tracker("PASSTHEPOPCORN", object(), first_meta, "Amour", "Amour", False)
 
         second_manager = TrackerDataManager(config)
         second_fake = _FakeTrackerMetadataManager()
         second_manager.tracker_meta_manager = second_fake
-        second_meta = Meta({"base_dir": str(tmp_path), "ptp": "12345"})
+        second_meta = Meta({"base_dir": str(tmp_path), "tracker_ids": {"PASSTHEPOPCORN": "12345"}})
         _, second_match = await second_manager.update_metadata_from_explicit_tracker("PASSTHEPOPCORN", object(), second_meta, "Amour", "Amour", False)
 
         assert first_match and second_match

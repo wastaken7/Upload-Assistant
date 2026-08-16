@@ -407,12 +407,11 @@ class RtorrentClientMixin:
 
             # Handle various tracker URL formats in the comment
             tracker_ids = self._extract_tracker_ids_from_comment(comment)
-            meta.update(tracker_ids)
+            meta.set_tracker_ids(tracker_ids)
 
             # If we found a tracker ID, log it
-            for tracker in ["ptp", "bhd", "btn", "blu", "aither", "lst", "oe", "hdb"]:
-                if meta.get(tracker):
-                    logger.info(f"[bold cyan]meta updated with {tracker.upper()} ID: {meta[tracker]}")
+            for tracker_name, torrent_id in tracker_ids.items():
+                logger.info(f"[bold cyan]meta updated with {tracker_name.upper()} ID: {torrent_id}")
 
             if torrent_comments and meta.debug:
                 logger.info(f"[green]Stored {len(torrent_comments)} torrent comments for later use")

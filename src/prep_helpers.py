@@ -749,7 +749,7 @@ async def validate_media(_prep_instance: Any, meta: Meta) -> None:
 
 
 async def process_trackers_and_torrent(
-    prep_instance: Any, meta: Meta, client: Clients, hash_ids: list[str], tracker_ids: list[str], _search_term: str, _search_file_folder: str
+    prep_instance: Any, meta: Meta, client: Clients, hash_ids: list[str], _tracker_ids: list[str], _search_term: str, _search_file_folder: str
 ) -> None:
     if "description" not in meta or meta.description is None:
         meta.description = ""
@@ -772,7 +772,7 @@ async def process_trackers_and_torrent(
     # Find one reusable torrent while all local files (including external
     # subtitles) are known. Its path is cached for the upload stage, which
     # prevents a second full client search later in the run.
-    if not any(meta.get(id_type) for id_type in hash_ids + tracker_ids) and not meta.skip_trackers and not meta.edit:
+    if not (any(meta.get(id_type) for id_type in hash_ids) or meta.tracker_ids) and not meta.skip_trackers and not meta.edit:
         reuse_torrent_path = await client.find_existing_torrent(meta)
         if reuse_torrent_path:
             meta.reuse_torrent_path = reuse_torrent_path
