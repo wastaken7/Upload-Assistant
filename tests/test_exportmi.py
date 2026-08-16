@@ -81,8 +81,8 @@ def test_mediainfo_uses_tolerant_utf8_output_decoding() -> None:
 
 
 def test_mediainfo_uses_state_managed_binary_before_system_path() -> None:
-    with patch("src.mediainfo.MediaInfoBinaryManager.find_existing_binary", return_value="/home/user/.local/share/upload-assistant/bin/MI/linux/mediainfo") as find_existing:
-        assert _binary() == "/home/user/.local/share/upload-assistant/bin/MI/linux/mediainfo"
+    with patch("src.mediainfo.MediaInfoBinaryManager.find_existing_binary", return_value="/home/user/.local/share/Upload-Assistant/bin/MI/linux/mediainfo") as find_existing:
+        assert _binary() == "/home/user/.local/share/Upload-Assistant/bin/MI/linux/mediainfo"
 
     find_existing.assert_called_once()
 

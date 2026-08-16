@@ -17,7 +17,12 @@ def _default_data_dir() -> Path:
     if os.name == "nt":
         return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "Upload-Assistant"
     xdg_data_home = os.environ.get("XDG_DATA_HOME", "").strip()
-    return Path(xdg_data_home).expanduser() / "upload-assistant" if xdg_data_home else Path.home() / ".local" / "share" / "upload-assistant"
+    base = Path(xdg_data_home).expanduser() if xdg_data_home else Path.home() / ".local" / "share"
+    primary = base / "Upload-Assistant"
+    legacy = base / "upload-assistant"
+    if not primary.exists() and legacy.exists():
+        return legacy
+    return primary
 
 
 STATE_DIR = _default_data_dir()

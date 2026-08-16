@@ -2923,7 +2923,7 @@ config: dict[str, Any] = {
         # Name your torrent clients here, for example, this example is named "qbittorrent" and is set as default_torrent_client above
         # All options relate to the webui, make sure you have the webui secured if it has WAN access
         # **DO NOT** modify torrent_client name, eg: "qbit"
-        # See https://github.com/Audionut/Upload-Assistant/wiki
+        # See https://github.com/wastaken7/Upload-Assistant/blob/development/docs/configuration.md#torrent-clients
         "qbittorrent": {
             "torrent_client": "qbit",
             # QUI reverse proxy: https://getqui.com/docs/features/reverse-proxy
