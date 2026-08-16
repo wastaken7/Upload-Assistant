@@ -8,6 +8,8 @@ config: dict[str, Any] = {
         "update_notification": True,
         # will print the changelog if an update is available
         "verbose_notification": False,
+        # Number of hours to reuse a successful update check. Set to 0 to check every run.
+        "update_notification_cache_hours": 4,
         # tmdb api key **REQUIRED**
         # visit "https://www.themoviedb.org/settings/api" copy api key and insert below
         "tmdb_api": "",

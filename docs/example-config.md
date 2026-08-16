@@ -55,6 +55,7 @@ Important gotchas:
 
 - `update_notification` (bool): Print a notice when an update is available.
 - `verbose_notification` (bool): Print the changelog when an update is available.
+- `update_notification_cache_hours` (number, default `4`): Reuse a successful update check for this many hours. Set `0` to check every run.
 
 ### Metadata APIs
 

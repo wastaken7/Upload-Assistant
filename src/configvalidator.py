@@ -22,6 +22,7 @@ REQUIRED_DEFAULT_KEYS: dict[str, type] = {
 DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "update_notification": (bool,),
     "verbose_notification": (bool,),
+    "update_notification_cache_hours": (str, int, float),
     "tmdb_api": (str,),
     "tvdb_api": (str,),
     "tvdb_token": (str,),
