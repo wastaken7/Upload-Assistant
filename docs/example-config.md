@@ -167,7 +167,48 @@ These can be [overridden per-tracker](#tracker-overridable-settings) by adding t
 - `custom_description_header` (str): BBCode header added at top of description section.
 - `screenshot_header` (str): BBCode header added above screenshots.
 - `disc_menu_header` (str): BBCode header added above disc menu screenshots (discs only).
+- `audio_spectrogram_header` (str): BBCode header added above audio spectrograms.
+- `dynamic_hdr_plot_header` (str): BBCode header added above dynamic HDR metadata plots.
+- `tonemapped_header` (str): BBCode header added for tone-mapped releases.
 - `custom_signature` (str): BBCode signature appended at bottom of description.
+- `tag_overrides` (dict): Per-release-group overrides for these text fields. The
+  group key is matched against `meta.tag` case-insensitively and may be written
+  with or without its leading hyphen. A tracker-level `tag_overrides` entry has
+  precedence over a `DEFAULT` entry; unspecified fields use their normal
+  tracker/default value.
+
+  Default overrides apply to every tracker that supports the description field:
+
+  ```python
+  config = {
+      "DEFAULT": {
+          "tag_overrides": {
+              "MyAwesomeGroupTag": {
+                  "custom_signature": "[center]Group signature[/center]",
+                  "screenshot_header": "[h2]Group screenshots[/h2]",
+              },
+          },
+      },
+  }
+  ```
+
+  Tracker overrides apply only to that tracker and take precedence over the
+  `DEFAULT` entry for the same group and field:
+
+  ```python
+  config = {
+      "TRACKERS": {
+          "AITHER": {
+              "tag_overrides": {
+                  "MyAwesomeGroupTag": {
+                      "custom_signature": "[center]AITHER group signature[/center]",
+                      "disc_menu_header": "[h2]AITHER group menus[/h2]",
+                  },
+              },
+          },
+      },
+  }
+  ```
 
 ### Torrent client integration
 
