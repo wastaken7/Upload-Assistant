@@ -531,6 +531,7 @@ class Meta:
                 setattr(self, k, v)
         for k, v in kwargs.items():
             setattr(self, k, v)
+        self.set_tracker_ids(self.tracker_ids)
 
     def copy(self) -> Meta:
         """Ensure copy returns a Meta instance with deep copied attributes."""
@@ -601,24 +602,32 @@ class Meta:
             for k, v in other.items():
                 setattr(self, k, v)
 
+    @staticmethod
+    def canonical_tracker_name(tracker_name: str) -> str:
+        """Return the canonical tracker name for an accepted alias."""
+        normalized_name = tracker_name.upper()
+        return _TRACKER_ID_ALIASES.get(normalized_name, normalized_name)
+
     def get_tracker_id(self, tracker_name: str) -> str | None:
         """Return the known torrent ID for a tracker."""
-        key = _TRACKER_ID_ALIASES.get(tracker_name.upper(), tracker_name.upper())
+        key = self.canonical_tracker_name(tracker_name)
         value = self.tracker_ids.get(key)
         return str(value) if value is not None else None
 
     def set_tracker_ids(self, tracker_ids: dict[str, str | int]) -> None:
         """Persist tracker torrent IDs under their canonical tracker names."""
-        normalized = dict(self.tracker_ids or {})
-        for tracker_name, torrent_id in tracker_ids.items():
-            key = _TRACKER_ID_ALIASES.get(str(tracker_name).upper(), str(tracker_name).upper())
+        normalized: dict[str, str] = {}
+        for tracker_name, torrent_id in (self.tracker_ids or {}).items():
+            normalized[self.canonical_tracker_name(str(tracker_name))] = str(torrent_id)
+        for tracker_name, torrent_id in (tracker_ids or {}).items():
+            key = self.canonical_tracker_name(str(tracker_name))
             value = str(torrent_id)
             normalized[key] = value
         self.tracker_ids = normalized
 
     def clear_tracker_id(self, tracker_name: str) -> None:
         """Forget a tracker torrent ID."""
-        key = _TRACKER_ID_ALIASES.get(tracker_name.upper(), tracker_name.upper())
+        key = self.canonical_tracker_name(tracker_name)
         self.tracker_ids.pop(key, None)
 
     def get(self, key: str, default: Any = None) -> Any:

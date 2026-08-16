@@ -57,14 +57,13 @@ class QbittorrentClientMixin:
     def _extract_tracker_ids_from_comment(self, comment: str) -> dict[str, str]:
         raise NotImplementedError
 
-    @staticmethod
-    def _matches_qbit_content_path(torrent: Any, meta: Meta) -> bool:
+    def _matches_qbit_content_path(self, torrent: Any, meta: Meta) -> bool:
         """Match a qBittorrent content path before falling back to its display name."""
         expected_path = str(meta.path or "")
         content_path = str(getattr(torrent, "content_path", "") or "")
         if expected_path and content_path and os.path.normcase(os.path.normpath(content_path)) == os.path.normcase(os.path.normpath(expected_path)):
             return True
-        return str(getattr(torrent, "name", "") or "").lower() == str(meta.uuid or "").lower()
+        return self._torrent_name_matches(str(getattr(torrent, "name", "") or ""), meta)
 
     async def is_valid_torrent(self, meta: Meta, torrent_path: str, torrenthash: str, torrent_client: str, client: dict[str, Any]) -> tuple[bool, str]:
         raise NotImplementedError

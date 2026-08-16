@@ -24,6 +24,12 @@ def test_tracker_id_accepts_beyondhd_dotted_torrent_url():
     assert args.parse_tracker_id("https://beyond-hd.me/download/release.12345") == ("BEYONDHD", "12345")
 
 
+def test_tracker_id_accepts_beyondhd_alias():
+    args = Args({"TRACKERS": {}})
+
+    assert args.parse_tracker_id("BHD=123") == ("BEYONDHD", "123")
+
+
 def test_tracker_id_rejects_mismatched_tracker_url():
     args = Args({"TRACKERS": {}})
 
@@ -59,3 +65,9 @@ def test_tracker_id_aliases_are_stored_under_canonical_tracker_names(alias, trac
     assert meta.tracker_ids == {tracker_name: "123"}
     assert meta.get_tracker_id(alias) == "123"
     assert meta.get_tracker_id(tracker_name) == "123"
+
+
+def test_restored_tracker_ids_are_canonicalized():
+    meta = Meta({"tracker_ids": {"bhd": "123"}})
+
+    assert meta.tracker_ids == {"BEYONDHD": "123"}

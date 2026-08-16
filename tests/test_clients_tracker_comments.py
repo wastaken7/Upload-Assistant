@@ -46,6 +46,14 @@ def test_matches_single_file_inside_folder_torrent_content_path():
     assert client._matches_qbit_content_path(torrent, Meta({"path": media, "uuid": "Heat.mkv"}))  # noqa: S101
 
 
+def test_matches_torrent_name_when_content_path_is_unavailable():
+    client = Clients({"TRACKERS": {}})
+    media = r"F:\Filmes\Heat\Heat.mkv"
+    torrent = SimpleNamespace(name="Heat.mkv", content_path="")
+
+    assert client._matches_qbit_content_path(torrent, Meta({"path": media, "filelist": [media], "uuid": "different"}))  # noqa: S101
+
+
 def test_orpheus_uses_its_fixed_base_url():
     tracker = Orpheus({"TRACKERS": {"ORPHEUS": {"base_url": "https://not-orheus.example"}}})
 

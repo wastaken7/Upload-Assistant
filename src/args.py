@@ -1092,7 +1092,7 @@ class Args:
         id_value = candidate
         if "=" in candidate and not candidate.startswith(("http://", "https://")):
             tracker_name, id_value = (part.strip() for part in candidate.split("=", 1))
-            tracker_name = tracker_name.upper()
+            tracker_name = Meta.canonical_tracker_name(tracker_name)
 
         if id_value.startswith(("http://", "https://")):
             parsed = urllib.parse.urlparse(id_value)
@@ -1102,7 +1102,7 @@ class Args:
             ]
             if len(matched_trackers) != 1:
                 raise ValueError(f"--tracker-id URL host is unknown or ambiguous: {host or id_value}")
-            url_tracker = matched_trackers[0]
+            url_tracker = Meta.canonical_tracker_name(matched_trackers[0])
             if tracker_name and tracker_name != url_tracker:
                 raise ValueError(f"--tracker-id tracker {tracker_name} does not match URL host {host}")
             tracker_name = url_tracker

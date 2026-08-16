@@ -412,7 +412,6 @@ async def merge_meta(meta: Meta, saved_meta: dict[str, Any]) -> dict[str, Any]:
         "tmdb_manual",
         "torrent_creation",
         "trackers",
-        "tracker_ids",
         "tvmaze_manual",
         "type",
         "unattended",
@@ -422,7 +421,10 @@ async def merge_meta(meta: Meta, saved_meta: dict[str, Any]) -> dict[str, Any]:
     sanitized_saved_meta: dict[str, Any] = {}
     for key, value in saved_meta.items():
         clean_key = key.strip().strip("'").strip('"')
-        if clean_key in overwrite_list:
+        if clean_key == "tracker_ids":
+            current_tracker_ids = meta.tracker_ids
+            sanitized_saved_meta[clean_key] = current_tracker_ids if current_tracker_ids else value
+        elif clean_key in overwrite_list:
             if clean_key in meta and getattr(meta, clean_key, None) is not None:
                 sanitized_saved_meta[clean_key] = meta[clean_key]
                 logger.debug(f"Overriding {clean_key} with meta value: {meta[clean_key]}")
