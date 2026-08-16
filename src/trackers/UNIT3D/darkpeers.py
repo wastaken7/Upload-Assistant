@@ -111,23 +111,8 @@ class DarkPeers(UNIT3D):
         description = await DescriptionBuilder(self.tracker, self.config).general_description_generator(
             meta,
             audio_spectrogram=audio_spectrogram,
-            bluray=True,
-            book=True,
-            custom_header=True,
-            custom_signature=True,
-            description=True,
-            game=True,
-            languages=False,
-            logo=True,
             mediainfo=False,
-            menu_screenshots=True,
             nfo=False,
-            screenshots=True,
-            tonemapped_header=True,
-            tv_info=True,
-            ua_signature=True,
-            user_description=True,
-            music=True,
         )
         return {"description": description}
 

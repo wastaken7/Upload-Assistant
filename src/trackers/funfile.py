@@ -183,23 +183,11 @@ class FunFile:
         builder = DescriptionBuilder(self.tracker, self.config)
         return await builder.general_description_generator(
             meta,
-            audio_spectrogram=True,
             bluray=False,
             book=False,
-            custom_header=True,
             custom_signature=False,
-            description=True,
             game=False,
-            languages=False,
-            logo=True,
-            mediainfo=True,
-            menu_screenshots=True,
             nfo=False,
-            screenshots=True,
-            tonemapped_header=True,
-            tv_info=True,
-            ua_signature=True,
-            user_description=True,
             signature=f"[url=https://github.com/wastaken7/Upload-Assistant][center][size=1]{meta.ua_signature}[/size][/center][/url]",
         )
 

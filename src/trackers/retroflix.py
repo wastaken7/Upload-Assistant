@@ -51,24 +51,8 @@ class RetroFlix:
         await common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         await DescriptionBuilder(self.tracker, self.config).general_description_generator(
             meta,
-            audio_spectrogram=True,
-            bluray=True,
-            book=True,
-            custom_header=True,
-            custom_signature=True,
-            description=True,
-            game=True,
-            languages=False,
-            logo=True,
             mediainfo=False,
-            menu_screenshots=True,
             nfo=False,
-            screenshots=True,
-            tonemapped_header=True,
-            tv_info=True,
-            ua_signature=True,
-            user_description=True,
-            music=True,
             signature=self.forum_link,
         )
         if meta.bdinfo:

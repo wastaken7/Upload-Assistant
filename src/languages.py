@@ -182,6 +182,9 @@ class LanguagesManager:
             meta.subtitle_languages = []
             return
 
+        if meta.language_checked:
+            return
+
         if "language_checked" not in meta:
             meta.language_checked = False
         status_dict = meta.tracker_status.setdefault(tracker, {}) if tracker else {}

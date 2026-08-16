@@ -48,25 +48,9 @@ class ImmortalSeed:
         builder = DescriptionBuilder(self.tracker, self.config)
         return await builder.general_description_generator(
             meta,
-            audio_spectrogram=True,
-            bluray=True,
-            book=True,
-            custom_header=True,
-            custom_signature=True,
-            description=True,
-            game=True,
-            languages=False,
             logo=False,
-            mediainfo=True,
-            menu_screenshots=True,
-            music=True,
             nfo=False,
-            screenshots=True,
             signature=f"\n{meta.ua_signature} (https://github.com/wastaken7/Upload-Assistant)",
-            tonemapped_header=True,
-            tv_info=True,
-            ua_signature=True,
-            user_description=True,
         )
 
     async def search_existing(self, meta: Meta) -> list[dict[str, str | None]]:

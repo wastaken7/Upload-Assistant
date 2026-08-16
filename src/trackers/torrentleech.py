@@ -81,23 +81,8 @@ class TorrentLeech:
         return await builder.general_description_generator(
             meta,
             audio_spectrogram=process_screenshot,
-            bluray=True,
-            book=True,
-            custom_header=True,
-            custom_signature=True,
-            description=True,
-            game=True,
-            languages=False,
-            logo=True,
-            mediainfo=True,
             menu_screenshots=process_screenshot,
-            music=True,
-            nfo=True,
             screenshots=process_screenshot,
-            tonemapped_header=True,
-            tv_info=True,
-            ua_signature=True,
-            user_description=True,
             signature=f"""<div style="text-align: right; font-size: 11px;"><a href="https://github.com/wastaken7/Upload-Assistant">{meta.ua_signature}</a></div>""",
         )
 

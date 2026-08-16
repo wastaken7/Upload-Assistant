@@ -301,23 +301,13 @@ class GreatPosterWall:
         builder = DescriptionBuilder(self.tracker, self.config)
         return await builder.general_description_generator(
             meta,
-            audio_spectrogram=True,
             bluray=False,
             book=False,
-            custom_header=True,
             custom_signature=False,
-            description=True,
             game=False,
-            languages=False,
             logo=False,
             mediainfo=False,
-            menu_screenshots=True,
-            nfo=True,
-            screenshots=True,
-            tonemapped_header=True,
             tv_info=False,
-            ua_signature=True,
-            user_description=True,
             signature=f"[align=right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta.ua_signature}[/size][/url][/align]",
         )
 

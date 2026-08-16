@@ -1,12 +1,40 @@
 # ruff: noqa: S101
 
 import asyncio
+import inspect
 import json
 
 from src.description_review import load_review
 from src.get_desc import DescriptionBuilder, gen_desc
 from src.meta import Meta
 from web_ui import server
+
+
+def test_description_section_controls_default_to_true():
+    controls = (
+        "audio_spectrogram",
+        "bluray",
+        "book",
+        "custom_header",
+        "custom_signature",
+        "description",
+        "game",
+        "languages",
+        "logo",
+        "mediainfo",
+        "menu_screenshots",
+        "nfo",
+        "screenshots",
+        "tonemapped_header",
+        "tv_info",
+        "ua_signature",
+        "user_description",
+        "music",
+        "dynamic_hdr_plot",
+    )
+    parameters = inspect.signature(DescriptionBuilder.general_description_generator).parameters
+
+    assert all(parameters[control].default is True for control in controls)
 
 
 def test_webui_description_api_saves_an_execution_scoped_override(tmp_path, monkeypatch):
@@ -101,9 +129,7 @@ def test_description_file_is_not_rendered_twice_when_both_sections_are_enabled(t
             book=False,
             custom_header=False,
             custom_signature=False,
-            description=True,
             game=False,
-            languages=False,
             logo=False,
             mediainfo=False,
             menu_screenshots=False,
@@ -112,7 +138,6 @@ def test_description_file_is_not_rendered_twice_when_both_sections_are_enabled(t
             tonemapped_header=False,
             tv_info=False,
             ua_signature=False,
-            user_description=True,
         )
 
         assert result == "release notes"
