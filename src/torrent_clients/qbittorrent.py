@@ -299,6 +299,41 @@ class QbittorrentClientMixin:
             retryable_errors=(TimeoutError, httpx.HTTPError, _RetryableProxyResponseError),
         )
 
+    async def _add_torrent_direct(
+        self,
+        qbt_client: qbittorrentapi.Client,
+        infohash: str,
+        add_kwargs: dict[str, Any],
+    ) -> None:
+        add_attempt = 0
+
+        async def add_direct() -> None:
+            nonlocal add_attempt
+            if add_attempt:
+                with contextlib.suppress(Exception):
+                    torrents = await asyncio.to_thread(qbt_client.torrents_info, torrent_hashes=infohash)
+                    if torrents:
+                        logger.info("[green]Torrent was added to qBittorrent despite the previous connection issue.")
+                        return
+
+            add_attempt += 1
+            try:
+                result = await asyncio.to_thread(qbt_client.torrents_add, **add_kwargs)
+                if isinstance(result, str) and result.strip() == "Fails.":
+                    torrents = await asyncio.to_thread(qbt_client.torrents_info, torrent_hashes=infohash)
+                    if not torrents:
+                        raise qbittorrentapi.APIError("qBittorrent returned 'Fails.' when adding torrent")
+            except qbittorrentapi.Conflict409Error:
+                logger.info("[yellow]Torrent already exists in qBittorrent.")
+                return
+
+        await self.retry_qbt_operation(
+            add_direct,
+            "Add torrent to qBittorrent",
+            initial_timeout=14.0,
+            retryable_errors=(TimeoutError, httpx.HTTPError, qbittorrentapi.APIConnectionError),
+        )
+
     async def init_qbittorrent_client(self, client: dict[str, Any]) -> qbittorrentapi.Client | None:
         # Creates and logs into a qbittorrent client, with caching to avoid redundant logins
         # If login fails, returns None
@@ -853,31 +888,42 @@ class QbittorrentClientMixin:
             else:
                 if qbt_client is None:
                     raise RuntimeError("qbt_client cannot be None")
-                await self.retry_qbt_operation(
-                    lambda: asyncio.to_thread(
-                        qbt_client.torrents_add,
-                        torrent_files=torrent.dump(),
-                        save_path=save_path,
-                        use_auto_torrent_management=auto_management,
-                        is_skip_checking=skip_checking,
-                        paused=paused_on_add,
-                        content_layout=content_layout,
-                        category=qbt_category,
-                        tags=tag,
-                    ),
-                    "Add torrent to qBittorrent",
-                    initial_timeout=14.0,
-                )
+                add_kwargs = {
+                    "torrent_files": torrent.dump(),
+                    "save_path": save_path,
+                    "use_auto_torrent_management": auto_management,
+                    "is_skip_checking": skip_checking,
+                    "is_paused": paused_on_add,
+                    "is_stopped": paused_on_add,
+                    "paused": paused_on_add,
+                    "content_layout": content_layout,
+                    "category": qbt_category,
+                    "tags": tag,
+                }
+                await self._add_torrent_direct(qbt_client, torrent.infohash, add_kwargs)
         except _ProxyResponseError as e:
             logger.info(f"[bold red]Failed to add torrent via proxy: {e}")
             if qbt_session:
                 await qbt_session.aclose()
             return
-        except TimeoutError, httpx.HTTPError, qbittorrentapi.APIConnectionError:
-            logger.info("[bold red]Failed to add torrent to qBittorrent")
-            if qbt_session:
-                await qbt_session.aclose()
-            return
+        except (TimeoutError, httpx.HTTPError, qbittorrentapi.APIConnectionError) as e:
+            torrent_added = False
+            with contextlib.suppress(Exception):
+                if proxy_url and qbt_session:
+                    info_resp = await qbt_session.get(f"{qbt_proxy_url}/api/v2/torrents/info", params={"hashes": torrent.infohash})
+                    if info_resp.status_code == 200 and info_resp.json():
+                        torrent_added = True
+                elif qbt_client:
+                    torrents = await asyncio.to_thread(qbt_client.torrents_info, torrent_hashes=torrent.infohash)
+                    if torrents:
+                        torrent_added = True
+
+            if not torrent_added:
+                logger.info(f"[bold red]Failed to add torrent to qBittorrent: {e}")
+                if qbt_session:
+                    await qbt_session.aclose()
+                return
+            logger.info("[green]Torrent was confirmed in qBittorrent.")
         except Exception as e:
             logger.info(f"[bold red]Error adding torrent: {e}")
             if qbt_session:
@@ -917,6 +963,8 @@ class QbittorrentClientMixin:
             if qbt_session:
                 await qbt_session.aclose()
             return
+
+        logger.debug(f"[green]Successfully added torrent to qBittorrent ({tracker})[/green]")
 
         if not cross:
             try:
