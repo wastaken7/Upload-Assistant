@@ -11,7 +11,7 @@ import time
 import traceback
 import urllib.parse
 from collections.abc import Awaitable, Callable
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, TypedDict, cast
 
 import httpx
@@ -1230,9 +1230,9 @@ class QbittorrentClientMixin:
         is_disc = meta.is_disc
         if is_disc in ("", None) and len(meta.filelist) == 1:
             file_path = meta.filelist[0]
-            file_name = Path(file_path).name
-            parent_dir = Path(file_path).parent.name
-            return torrent_name.lower() == file_name.lower() or torrent_name.lower() == meta.uuid.lower() or (parent_dir and torrent_name.lower() == parent_dir.lower())
+            file_name = PureWindowsPath(file_path).name
+            parent_dir = PureWindowsPath(file_path).parent.name
+            return bool(torrent_name.lower() == file_name.lower() or torrent_name.lower() == meta.uuid.lower() or (parent_dir and torrent_name.lower() == parent_dir.lower()))
         return torrent_name.lower() == meta.uuid.lower()
 
     def _extract_tracker_matches(
