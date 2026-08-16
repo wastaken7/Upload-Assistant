@@ -432,7 +432,11 @@ async def merge_meta(meta: Meta, saved_meta: dict[str, Any]) -> dict[str, Any]:
                 sanitized_saved_meta[clean_key] = value
         else:
             sanitized_saved_meta[clean_key] = value
+    tracker_ids = sanitized_saved_meta.pop("tracker_ids", None)
     meta.update(sanitized_saved_meta)
+    if isinstance(tracker_ids, dict):
+        meta.set_tracker_ids(tracker_ids)
+        sanitized_saved_meta["tracker_ids"] = dict(meta.tracker_ids)
     sanitize_book_language(meta)
     sanitize_book_author(meta)
     return sanitized_saved_meta
