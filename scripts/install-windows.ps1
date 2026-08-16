@@ -4,12 +4,9 @@ param(
     [string]$PythonVersion = "3.14",
     [string]$PythonInstallDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\python\3.14"),
     [string]$LauncherDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\bin"),
-    [string]$FfmpegInstallDir = (Join-Path $env:LOCALAPPDATA "UploadAssistant\ffmpeg"),
     [string]$PythonDownloadBaseUrl = "https://www.python.org/ftp/python",
     [string]$RepositoryZipUrl = "https://github.com/wastaken7/Upload-Assistant/archive/refs/heads/development.zip",
-    [string]$FfmpegDownloadUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
-    [switch]$ForceUpdate,
-    [switch]$SkipFfmpegInstall
+    [switch]$ForceUpdate
 )
 
 Set-StrictMode -Version Latest
@@ -327,44 +324,6 @@ function Ensure-IsolatedPython {
     return $pythonExe
 }
 
-function Ensure-Ffmpeg {
-    if ($SkipFfmpegInstall) {
-        return
-    }
-
-    $managedFfmpegExe = Join-Path $FfmpegInstallDir "bin\ffmpeg.exe"
-    if (Test-Path -LiteralPath $managedFfmpegExe) {
-        Add-DirectoryToUserPath -DirectoryPath (Split-Path -Parent $managedFfmpegExe)
-        return
-    }
-
-    $ffmpegCommand = Resolve-CommandPath -CommandName "ffmpeg.exe"
-    if ($ffmpegCommand) {
-        return
-    }
-
-    $ffmpegArchivePath = New-TemporaryDownloadPath -FileName ([System.IO.Path]::GetFileName(([System.Uri]$FfmpegDownloadUrl).AbsolutePath))
-    $extractRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantFfmpeg-" + [guid]::NewGuid().ToString("N"))
-
-    Invoke-DownloadFile -Url $FfmpegDownloadUrl -DestinationPath $ffmpegArchivePath -Label "FFmpeg"
-    Write-Step "Installing FFmpeg"
-    Expand-Archive -LiteralPath $ffmpegArchivePath -DestinationPath $extractRoot -Force
-
-    $ffmpegExe = Get-ChildItem -Path $extractRoot -Filter ffmpeg.exe -Recurse | Select-Object -First 1 -ExpandProperty FullName
-    if (-not $ffmpegExe) {
-        Fail "Downloaded FFmpeg archive did not contain ffmpeg.exe."
-    }
-
-    $ffmpegRoot = Split-Path -Parent (Split-Path -Parent $ffmpegExe)
-    if (Test-Path -LiteralPath $FfmpegInstallDir) {
-        Remove-Item -LiteralPath $FfmpegInstallDir -Recurse -Force
-    }
-
-    New-Item -ItemType Directory -Path (Split-Path -Parent $FfmpegInstallDir) -Force | Out-Null
-    Move-Item -LiteralPath $ffmpegRoot -Destination $FfmpegInstallDir
-    Add-DirectoryToUserPath -DirectoryPath (Join-Path $FfmpegInstallDir "bin")
-}
-
 function Install-RepositoryFromZip {
     param([string[]]$PreserveDirectories = @())
 
@@ -577,6 +536,7 @@ function Write-GlobalLauncher {
     $launcherCmdPath = Join-Path $LauncherDir "ua.cmd"
     $updateCmdPath = Join-Path $LauncherDir "ua-update.cmd"
     $configCmdPath = Join-Path $LauncherDir "ua-config.cmd"
+    $webuiCmdPath = Join-Path $LauncherDir "ua-webui.cmd"
     $launcherCmdContents = @"
 @echo off
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$UaDir\run-ua.ps1" %*
@@ -584,7 +544,7 @@ exit /b %errorlevel%
 "@
 $updateCmdContents = @"
 @echo off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$UaDir\scripts\update-windows.ps1" -UaDir "$UaDir" -PythonInstallDir "$PythonInstallDir" -LauncherDir "$LauncherDir" -FfmpegInstallDir "$FfmpegInstallDir" %*
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$UaDir\scripts\update-windows.ps1" -UaDir "$UaDir" -PythonInstallDir "$PythonInstallDir" -LauncherDir "$LauncherDir" %*
 exit /b %errorlevel%
 "@
     $configCmdContents = @"
@@ -595,19 +555,25 @@ set "exit_code=%errorlevel%"
 popd
 exit /b %exit_code%
 "@
+    $webuiCmdContents = @"
+@echo off
+start "" "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "$UaDir\scripts\run-webui-tray.ps1" -AppDir "$UaDir" %*
+exit /b 0
+"@
 
     Remove-Item -LiteralPath (Join-Path $LauncherDir "ua.ps1") -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath (Join-Path $LauncherDir "ua-update.ps1") -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath (Join-Path $LauncherDir "ua-config.ps1") -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $LauncherDir "ua-webui.ps1") -Force -ErrorAction SilentlyContinue
     Set-Content -LiteralPath $launcherCmdPath -Value $launcherCmdContents -Encoding ASCII
     Set-Content -LiteralPath $updateCmdPath -Value $updateCmdContents -Encoding ASCII
     Set-Content -LiteralPath $configCmdPath -Value $configCmdContents -Encoding ASCII
+    Set-Content -LiteralPath $webuiCmdPath -Value $webuiCmdContents -Encoding ASCII
     Add-DirectoryToUserPath -DirectoryPath $LauncherDir
 }
 
 $PythonExe = Ensure-IsolatedPython
-Ensure-Ffmpeg
-Install-RepositoryFromZip -PreserveDirectories @($PythonInstallDir, $FfmpegInstallDir)
+Install-RepositoryFromZip -PreserveDirectories @($PythonInstallDir)
 Install-Dependencies -PythonExe $PythonExe
 Write-Runner
 Write-GlobalLauncher
@@ -616,6 +582,7 @@ $venvPythonPath = Join-Path $UaDir ".venv\Scripts\python.exe"
 $launcherCmdPath = Join-Path $LauncherDir "ua.cmd"
 $updateCmdPath = Join-Path $LauncherDir "ua-update.cmd"
 $configCmdPath = Join-Path $LauncherDir "ua-config.cmd"
+$webuiCmdPath = Join-Path $LauncherDir "ua-webui.cmd"
 
 Write-Host ""
 Write-Host "Installation complete."
@@ -633,14 +600,16 @@ Write-Host ""
 Write-Host "Run:"
 Write-Host "  ua `"/path/to/content`" --trackers yourtracker"
 Write-Host "  ua-update"
+Write-Host "  ua-webui"
 Write-Host ""
 Write-Host "Global launcher:"
 Write-Host "  $launcherCmdPath"
 Write-Host "  $updateCmdPath"
 Write-Host "  $configCmdPath"
+Write-Host "  $webuiCmdPath"
 Write-Host ""
 Write-Host "PATH note:"
-Write-Host "  A new PowerShell or Command Prompt window may be required before 'ua', 'ua-update', and 'ua-config' are available everywhere."
+Write-Host "  A new PowerShell or Command Prompt window may be required before 'ua', 'ua-update', 'ua-config', and 'ua-webui' are available everywhere."
 Write-Host ""
 Write-Host "Configuration command (equivalent):"
 Write-Host "  & `"$venvPythonPath`" `"$UaDir\config-generator.py`""

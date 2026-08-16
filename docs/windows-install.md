@@ -6,7 +6,7 @@
 2. Run the installer and follow the setup wizard.
 3. Open a new PowerShell or Command Prompt window after the installation.
 
-The installer includes the Python runtime, dependencies, FFmpeg, and MediaInfo needed by Upload Assistant. Windows users do not need to install Python, Git, or FFmpeg separately.
+The installer automatically sets up the Python runtime and dependencies. On the first upload that needs it, Upload Assistant uses an FFmpeg already on your PATH or downloads its verified FFmpeg runtime into its user data `bin` directory. Windows users do not need to install Python, Git, or FFmpeg separately.
 
 ## Create the configuration
 
