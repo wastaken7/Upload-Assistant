@@ -32,7 +32,8 @@ class FfmpegBinaryManager:
         version_marker = binary.parent / f"version_{cls.VERSION}"
         if binary.is_file() and version_marker.is_file():
             return str(binary)
-        return shutil.which("ffmpeg.exe")
+        binary_name = "ffmpeg.exe" if platform.system().lower() == "windows" else "ffmpeg"
+        return shutil.which(binary_name)
 
     @classmethod
     async def ensure_ffmpeg_binary(cls, base_dir: str | Path) -> str:

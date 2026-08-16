@@ -183,6 +183,16 @@ function Get-PythonInstallerUrl {
     return "$DownloadBaseUrl/$fullVersion/python-$fullVersion-$archName.exe"
 }
 
+function Assert-TrustedPythonInstaller {
+    param([Parameter(Mandatory)][string]$InstallerPath)
+
+    $signature = Get-AuthenticodeSignature -FilePath $InstallerPath
+    if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or
+        $signature.SignerCertificate.Subject -notmatch '(^|,\s*)CN=Python Software Foundation(,|$)') {
+        throw "Downloaded Python installer failed signature validation: $($signature.Status)."
+    }
+}
+
 function Add-DirectoryToUserPath {
     param([Parameter(Mandatory)][string]$DirectoryPath)
 
@@ -348,6 +358,7 @@ function Ensure-DestinationPython {
 
     try {
         Invoke-DownloadFile -Url $pythonInstallerUrl -DestinationPath $tempInstallerPath -Label "Python $ExpectedMinorVersion installer"
+        Assert-TrustedPythonInstaller -InstallerPath $tempInstallerPath
         Write-Step "Installing Python $ExpectedMinorVersion to $pythonDir"
         Invoke-Process -FilePath $tempInstallerPath -Description "Python installation" -ArgumentList @(
             "/quiet",
