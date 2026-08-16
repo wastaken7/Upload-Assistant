@@ -11,6 +11,7 @@ from src.meta import Meta
 from src.rehostimages import (
     ImageHostPolicy,
     RehostImagesManager,
+    check_tracker_image_hosts,
     has_restricted_image_hosts,
     select_common_image_host,
 )
@@ -34,6 +35,14 @@ class _LegacySetPolicy:
 
     async def check_image_hosts(self, _meta: Meta) -> None:
         pass
+
+
+class _PolicyTracker:
+    tracker = "TEST"
+    image_host_policy = ImageHostPolicy({}, ("imgbb",))
+
+    def __init__(self) -> None:
+        self.rehost_images_manager = AsyncMock()
 
 
 def test_has_restricted_image_hosts() -> None:
@@ -77,6 +86,14 @@ def test_select_common_image_host_keeps_per_tracker_fallback_without_common_host
     )
 
     assert selected is None
+
+
+def test_music_does_not_rehost_missing_screenshots() -> None:
+    tracker = _PolicyTracker()
+
+    asyncio.run(check_tracker_image_hosts(Meta(category="MUSIC"), tracker))
+
+    tracker.rehost_images_manager.check_policy.assert_not_awaited()
 
 
 def test_rehosts_menu_and_spectrogram_images_without_touching_main_screens(tmp_path: Path):
