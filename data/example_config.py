@@ -350,6 +350,20 @@ config: dict[str, Any] = {
         # Allows adding a custom signature, in BBCode, at the bottom of the description section
         # Can be overridden in a per-tracker setting by adding this same config
         "custom_signature": "",
+        # Override description text fields for specific release groups. Tags are matched
+        # case-insensitively, with or without their leading hyphen.
+        # Per-tracker tag_overrides take precedence over these DEFAULT overrides.
+        "tag_overrides": {
+            "MyAwesomeGroupTag": {
+                "custom_description_header": "[center]MyAwesomeGroupTag release[/center]",
+                "screenshot_header": "[h2]MyAwesomeGroupTag Screenshots[/h2]",
+                "disc_menu_header": "[h2]MyAwesomeGroupTag Disc Menu Screenshots[/h2]",
+                "audio_spectrogram_header": "[h2]MyAwesomeGroupTag Audio Spectrogram[/h2]",
+                "dynamic_hdr_plot_header": "[h2]MyAwesomeGroupTag Dynamic HDR Metadata[/h2]",
+                "tonemapped_header": "[center]MyAwesomeGroupTag SDR reference screenshots[/center]",
+                "custom_signature": "[center]MyAwesomeGroupTag signature[/center]",
+            },
+        },
         # Add bluray.com link to description
         # Requires "get_bluray_info" to be set to True
         "add_bluray_link": True,

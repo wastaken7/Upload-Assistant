@@ -70,6 +70,7 @@ class LinkedSetting(TypedDict):
 ConfigDict = dict[str, Any]
 ConfigComments = dict[str, list[str]]
 UnexpectedKey = tuple[str, ConfigDict, str]
+DYNAMIC_CONFIG_MAP_KEYS = frozenset({"tag_overrides"})
 
 
 def tracker_sort_key(name: str) -> tuple[bool, bool, str]:
@@ -320,6 +321,8 @@ def validate_config(existing_config: ConfigDict, example_config: ConfigDict) -> 
         for key in existing_section:
             current_path = f"{path}.{key}" if path else key
 
+            if key in DYNAMIC_CONFIG_MAP_KEYS and isinstance(existing_section[key], dict):
+                continue
             if key not in example_section:
                 unexpected_keys.append((current_path, existing_section, key))
             elif isinstance(existing_section[key], dict) and isinstance(example_section.get(key), dict):
@@ -571,6 +574,10 @@ def configure_default_section(
         if key in ["default_torrent_client"]:
             continue
 
+        if key in DYNAMIC_CONFIG_MAP_KEYS and isinstance(default_value, dict):
+            config_defaults[key] = deepcopy(existing_defaults.get(key, default_value))
+            continue
+
         # Skip if this setting should be skipped based on linked settings
         if key in skip_settings:
             # Copy default value from example config
@@ -784,11 +791,20 @@ def configure_trackers(
         example_tracker: ConfigDict = cast(ConfigDict, example_trackers.get(tracker, {}))
         tracker_config: dict[str, Any] = {}
 
+        for key in DYNAMIC_CONFIG_MAP_KEYS:
+            value = existing_tracker_config.get(key)
+            if isinstance(value, dict):
+                tracker_config[key] = deepcopy(value)
+
         if example_tracker:
             for key, default_value in example_tracker.items():
                 # Skip keys that should not be prompted
                 if tracker == "HDTORRENTS" and key == "announce_url":
                     tracker_config[key] = example_tracker[key]
+                    continue
+
+                if key in DYNAMIC_CONFIG_MAP_KEYS and isinstance(default_value, dict):
+                    tracker_config[key] = deepcopy(existing_tracker_config.get(key, default_value))
                     continue
 
                 comment_key = f"TRACKERS.{tracker}.{key}"

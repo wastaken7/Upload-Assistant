@@ -257,8 +257,36 @@ class DescriptionBuilder:
             except ValueError, TypeError:
                 return 0
 
-    def _get_str_config(self, key: str, default: str = "") -> str:
-        """Helper to get a string config value safely. Empty string is returned if it is a valid override."""
+    def _get_tag_override(self, key: str, meta: Meta | None) -> str | None:
+        """Return a tag-specific string override, if configured."""
+        if not meta or not meta.tag:
+            return None
+
+        tag = str(meta.tag).strip().lstrip("-").casefold()
+        if not tag:
+            return None
+
+        default_config = self.config.get("DEFAULT", {})
+        config_sources = (self.tracker_config, default_config)
+        for config_source in config_sources:
+            if not isinstance(config_source, dict):
+                continue
+            tag_overrides = config_source.get("tag_overrides", {})
+            if not isinstance(tag_overrides, dict):
+                continue
+            for configured_tag, overrides in tag_overrides.items():
+                if str(configured_tag).strip().lstrip("-").casefold() != tag or not isinstance(overrides, dict):
+                    continue
+                if key in overrides and overrides[key] is not None:
+                    return str(overrides[key])
+
+        return None
+
+    def _get_str_config(self, key: str, default: str = "", meta: Meta | None = None) -> str:
+        """Get a string config value, optionally overridden by the release group tag."""
+        tag_override = self._get_tag_override(key, meta)
+        if tag_override is not None:
+            return tag_override
         if key in self.tracker_config:
             val = self.tracker_config[key]
             if val is not None:
@@ -266,10 +294,10 @@ class DescriptionBuilder:
         val = self.config["DEFAULT"].get(key, default)
         return str(val) if val is not None else default
 
-    async def get_custom_header(self) -> str:
+    async def get_custom_header(self, meta: Meta) -> str:
         """Returns a custom header if configured."""
         try:
-            custom_description_header = self._get_str_config("custom_description_header", "")
+            custom_description_header = self._get_str_config("custom_description_header", "", meta)
             if custom_description_header:
                 return custom_description_header
         except Exception as e:
@@ -279,7 +307,7 @@ class DescriptionBuilder:
 
     async def get_tonemapped_header(self, meta: Meta) -> str:
         try:
-            tonemapped_description_header = self._get_str_config("tonemapped_header", "")
+            tonemapped_description_header = self._get_str_config("tonemapped_header", "", meta)
             if tonemapped_description_header and meta.tonemapped:
                 return tonemapped_description_header
         except Exception as e:
@@ -516,10 +544,10 @@ class DescriptionBuilder:
 
         return ""
 
-    async def screenshot_header(self) -> str:
+    async def screenshot_header(self, meta: Meta) -> str:
         """Returns the screenshot header if applicable."""
         try:
-            screenheader = self._get_str_config("screenshot_header", "")
+            screenheader = self._get_str_config("screenshot_header", "", meta)
             if screenheader:
                 return screenheader
         except Exception as e:
@@ -532,7 +560,7 @@ class DescriptionBuilder:
         try:
             menu_images = get_tracker_image_collection(meta, self.tracker, "menu_images")
             if meta.is_disc and menu_images:
-                disc_menu_header = self._get_str_config("disc_menu_header", "")
+                disc_menu_header = self._get_str_config("disc_menu_header", "", meta)
                 if disc_menu_header:
                     return disc_menu_header
         except Exception as e:
@@ -558,10 +586,10 @@ class DescriptionBuilder:
 
         return ""
 
-    async def get_custom_signature(self) -> str:
+    async def get_custom_signature(self, meta: Meta) -> str:
         custom_signature: str = ""
         try:
-            custom_signature = self._get_str_config("custom_signature", "")
+            custom_signature = self._get_str_config("custom_signature", "", meta)
         except Exception as e:
             logger.warning(f"[yellow]Warning: Error setting custom signature: {e!s}[/yellow]")
 
@@ -619,7 +647,7 @@ class DescriptionBuilder:
             spectrograms_images = get_tracker_image_collection(meta, self.tracker, "spectrograms_images")
             if not spectrograms_images:
                 return ""
-            audio_spectrogram_header = self._get_str_config("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]")
+            audio_spectrogram_header = self._get_str_config("audio_spectrogram_header", "[center][b]Audio Spectrogram[/b][/center]", meta)
             desc_parts: list[str] = [audio_spectrogram_header] if audio_spectrogram_header is not None else []
             desc_parts.append("\n[center]")
             screens_per_row = await self.get_screens_per_row()
@@ -644,7 +672,7 @@ class DescriptionBuilder:
         plot_images = get_tracker_image_collection(meta, self.tracker, "dynamic_hdr_plot_images")
         if not plot_images:
             return ""
-        header = self._get_str_config("dynamic_hdr_plot_header", "[center][b]Dynamic HDR Metadata[/b][/center]")
+        header = self._get_str_config("dynamic_hdr_plot_header", "[center][b]Dynamic HDR Metadata[/b][/center]", meta)
         desc_parts: list[str] = [header] if header is not None else []
         desc_parts.append("\n[center]")
         for image in plot_images:
@@ -1122,7 +1150,7 @@ class DescriptionBuilder:
         # Custom Header
         if custom_header:
             if not desc_header:
-                desc_header = await self.get_custom_header()
+                desc_header = await self.get_custom_header(meta)
             if desc_header:
                 desc_parts.append(desc_header + "\n")
 
@@ -1323,7 +1351,7 @@ class DescriptionBuilder:
 
         # Custom Signature
         if custom_signature:
-            desc_parts.append(await self.get_custom_signature())
+            desc_parts.append(await self.get_custom_signature(meta))
 
         # UA Signature
         if ua_signature:
@@ -1414,7 +1442,7 @@ class DescriptionBuilder:
         if not images:
             return ""
         try:
-            screenheader = await self.screenshot_header()
+            screenheader = await self.screenshot_header(meta)
         except Exception:
             screenheader = None
 
