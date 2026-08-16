@@ -59,16 +59,12 @@ def is_valid_cover_image(path: str | Path | None) -> bool:
     if not path:
         return False
     image_path = Path(path)
-    # Reject by name and size before reading. _find_local_artwork_sources calls
-    # this for every file sitting next to the media, so without these guards a
-    # release stored beside large files reads all of them in full just to find
-    # out they are not covers - minutes of pointless I/O locally, effectively
-    # forever over a network share.
-    if image_path.suffix.casefold() not in _COVER_SUFFIXES:
-        return False
     try:
         if not image_path.is_file():
             return False
+        # Check the size before reading: artwork above the limit is rejected
+        # later anyway, and reading it first is pure waste. This stays here
+        # rather than in the caller because it never rejects a usable cover.
         size = image_path.stat().st_size
         if size == 0 or size > MAX_ARTWORK_BYTES:
             return False
@@ -88,6 +84,14 @@ def _find_local_artwork_sources(media_path: str) -> dict[str, Path]:
 
     candidates: dict[str, list[tuple[tuple[int, int, str], Path]]] = {"poster": [], "banner": []}
     for candidate in directory.iterdir():
+        # Filter by suffix before opening anything: this runs over every file
+        # sitting next to the media, so without it a release stored beside other
+        # media reads those files in full just to find out they are not covers.
+        # The check belongs here rather than in is_valid_cover_image(), which
+        # also validates paths the user supplied explicitly and must not reject
+        # an image for having an unusual or missing extension.
+        if candidate.suffix.casefold() not in _COVER_SUFFIXES:
+            continue
         if not candidate.is_file() or not is_valid_cover_image(candidate):
             continue
         words = set(re.findall(r"[a-z0-9]+", candidate.stem.casefold()))

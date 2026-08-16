@@ -151,17 +151,18 @@ def test_invalid_cover_is_not_accepted() -> None:
     assert not is_valid_cover_image(None)
 
 
-def test_media_file_is_rejected_without_being_read(tmp_path: Path) -> None:
-    """_find_local_artwork_sources checks every file beside the release, so a
-    non-image must be rejected by name alone. Reading it would pull whole media
-    files - hundreds of gigabytes over a network share - just to find no cover."""
-    from src.artwork import is_valid_cover_image
+def test_local_artwork_discovery_does_not_read_media_files(tmp_path: Path) -> None:
+    """The scan touches every file beside the release, so non-images must be
+    skipped by suffix. Reading them would pull whole media files - hundreds of
+    gigabytes over a network share - only to find they are not cover art."""
+    from src.artwork import _find_local_artwork_sources
 
     media_file = tmp_path / "Release.mkv"
     media_file.write_bytes(b"\x00" * 2048)
+    (tmp_path / "Release.iso").write_bytes(b"\x00" * 2048)
 
     with patch.object(Path, "read_bytes", side_effect=AssertionError("must not read a non-image")):
-        assert not is_valid_cover_image(media_file)
+        assert _find_local_artwork_sources(str(media_file)) == {}
 
 
 def test_oversized_image_is_rejected_without_being_read(tmp_path: Path) -> None:
@@ -172,6 +173,17 @@ def test_oversized_image_is_rejected_without_being_read(tmp_path: Path) -> None:
 
     with patch.object(Path, "read_bytes", side_effect=AssertionError("must not read an oversized file")):
         assert not is_valid_cover_image(oversized)
+
+
+def test_user_supplied_cover_without_extension_is_accepted(tmp_path: Path) -> None:
+    """Paths the user provides explicitly are validated by content, not by name:
+    a decodable image must not be rejected for lacking a known suffix."""
+    from src.artwork import is_valid_cover_image
+
+    extensionless = tmp_path / "cover_no_extension"
+    Image.new("RGB", (32, 48), "teal").save(extensionless, format="PNG")
+
+    assert is_valid_cover_image(extensionless)
 
 
 def test_empty_image_file_is_rejected(tmp_path: Path) -> None:
