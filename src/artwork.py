@@ -17,6 +17,8 @@ from src.meta import Meta
 from src.temp_paths import artwork_dir
 
 _SUPPORTED_COVER_FORMATS = {"GIF", "JPEG", "PNG", "WEBP"}
+# File extensions worth opening at all when scanning a directory for artwork.
+_COVER_SUFFIXES = {".gif", ".jpg", ".jpeg", ".png", ".webp"}
 MAX_ARTWORK_BYTES = 10 * 1024 * 1024
 MAX_ARTWORK_PIXELS = 40_000_000
 _POSTER_KEYWORDS = ("poster", "cover", "front", "folder", "artwork", "capa")
@@ -58,7 +60,13 @@ def is_valid_cover_image(path: str | Path | None) -> bool:
         return False
     image_path = Path(path)
     try:
-        if not image_path.is_file() or image_path.stat().st_size == 0:
+        if not image_path.is_file():
+            return False
+        # Check the size before reading: artwork above the limit is rejected
+        # later anyway, and reading it first is pure waste. This stays here
+        # rather than in the caller because it never rejects a usable cover.
+        size = image_path.stat().st_size
+        if size == 0 or size > MAX_ARTWORK_BYTES:
             return False
         return is_valid_image_bytes(image_path.read_bytes())
     except OSError:
@@ -76,6 +84,14 @@ def _find_local_artwork_sources(media_path: str) -> dict[str, Path]:
 
     candidates: dict[str, list[tuple[tuple[int, int, str], Path]]] = {"poster": [], "banner": []}
     for candidate in directory.iterdir():
+        # Filter by suffix before opening anything: this runs over every file
+        # sitting next to the media, so without it a release stored beside other
+        # media reads those files in full just to find out they are not covers.
+        # The check belongs here rather than in is_valid_cover_image(), which
+        # also validates paths the user supplied explicitly and must not reject
+        # an image for having an unusual or missing extension.
+        if candidate.suffix.casefold() not in _COVER_SUFFIXES:
+            continue
         if not candidate.is_file() or not is_valid_cover_image(candidate):
             continue
         words = set(re.findall(r"[a-z0-9]+", candidate.stem.casefold()))
