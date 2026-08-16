@@ -397,6 +397,10 @@ class TrackerDataManager:
                     logger.debug("[yellow]No matches found on any available specific trackers.[/yellow]")
 
             else:
+                if self.default_config.get("tracker_comment_only", True):
+                    logger.debug("[cyan]Skipping filename-based tracker metadata searches because DEFAULT.tracker_comment_only is enabled.[/cyan]")
+                    return meta
+
                 # Process all trackers with API = true if no specific tracker is set in meta
                 from src.trackersetup import api_trackers
 

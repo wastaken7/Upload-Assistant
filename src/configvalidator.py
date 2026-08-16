@@ -95,6 +95,7 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "use_largest_playlist": (bool,),
     "tracker_description_mode": (str,),
     "tracker_search_concurrency": (str, int),
+    "tracker_comment_only": (bool,),
     "use_sonarr": (bool,),
     "use_radarr": (bool,),
     "mkbrr": (bool,),

@@ -197,7 +197,7 @@ def test_saved_webui_draft_replaces_the_tracker_description(tmp_path):
 def test_explicit_tracker_ids_are_collected_concurrently_and_best_candidate_is_applied(tmp_path, monkeypatch):
     async def run():
         config = {
-            "DEFAULT": {"tracker_description_mode": "text"},
+            "DEFAULT": {"tracker_comment_only": True, "tracker_description_mode": "text"},
             "TRACKERS": {
                 "AITHER": {"use_for_search": True},
                 "BLUTOPIA": {"use_for_search": True},
@@ -238,5 +238,23 @@ def test_explicit_tracker_ids_are_collected_concurrently_and_best_candidate_is_a
         assert meta.matched_tracker == "BLUTOPIA"
         assert meta.imdb_id == 2
         assert meta.description == "BLUTOPIA"
+
+    asyncio.run(run())
+
+
+def test_tracker_comment_only_defaults_to_skipping_filename_searches(tmp_path, monkeypatch):
+    async def run():
+        manager = TrackerDataManager({"DEFAULT": {}, "TRACKERS": {"AITHER": {"use_for_search": True}}})
+        meta = Meta({"base_dir": str(tmp_path), "uuid": "release"})
+
+        async def unexpected_search(*_args, **_kwargs):
+            raise AssertionError("filename-based tracker search must not run")
+
+        monkeypatch.setattr(manager, "update_metadata_from_explicit_tracker", unexpected_search)
+
+        result = await manager.get_tracker_data(None, meta, "Release", "Release")
+
+        assert result is meta
+        assert meta.no_tracker_match is False
 
     asyncio.run(run())

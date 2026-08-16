@@ -228,11 +228,13 @@ Implementation notes:
 - `use_largest_playlist` (bool): Always use the largest Blu-ray playlist without prompting.
 - `tracker_description_mode` (str, required): Import policy for other tracker releases: `ids`, `images`, `text`, or `text_and_images`.
 - `tracker_search_concurrency` (int): Maximum number of tracker IDs queried concurrently; default `4`.
+- `tracker_comment_only` (bool, default `True`): Only query tracker metadata when a torrent ID was obtained from a client comment or supplied with `--tracker-id`; disables filename-based tracker searches. Set `False` to re-enable filename-based tracker searches.
 
 Implementation notes:
 
 - `tracker_pass_checks` is used to determine how many trackers must pass early validation before continuing (see `upload.py`).
 - `tracker_description_mode` is the only configuration that controls imported tracker description text and screenshots. `--onlyID` temporarily forces `ids` for that execution.
+- `tracker_comment_only` does not disable explicit IDs supplied through `--tracker-id`.
 
 ### Sonarr / Radarr integration
 
