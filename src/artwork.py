@@ -17,6 +17,8 @@ from src.meta import Meta
 from src.temp_paths import artwork_dir
 
 _SUPPORTED_COVER_FORMATS = {"GIF", "JPEG", "PNG", "WEBP"}
+# File extensions worth opening at all when scanning a directory for artwork.
+_COVER_SUFFIXES = {".gif", ".jpg", ".jpeg", ".png", ".webp"}
 MAX_ARTWORK_BYTES = 10 * 1024 * 1024
 MAX_ARTWORK_PIXELS = 40_000_000
 _POSTER_KEYWORDS = ("poster", "cover", "front", "folder", "artwork", "capa")
@@ -57,8 +59,18 @@ def is_valid_cover_image(path: str | Path | None) -> bool:
     if not path:
         return False
     image_path = Path(path)
+    # Reject by name and size before reading. _find_local_artwork_sources calls
+    # this for every file sitting next to the media, so without these guards a
+    # release stored beside large files reads all of them in full just to find
+    # out they are not covers - minutes of pointless I/O locally, effectively
+    # forever over a network share.
+    if image_path.suffix.casefold() not in _COVER_SUFFIXES:
+        return False
     try:
-        if not image_path.is_file() or image_path.stat().st_size == 0:
+        if not image_path.is_file():
+            return False
+        size = image_path.stat().st_size
+        if size == 0 or size > MAX_ARTWORK_BYTES:
             return False
         return is_valid_image_bytes(image_path.read_bytes())
     except OSError:
