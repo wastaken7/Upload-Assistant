@@ -108,6 +108,11 @@ def read_example_config() -> tuple[ConfigDict | None, ConfigComments]:
                     if key_stack:
                         key_stack.pop()
                     indent_stack.pop()
+                fq_key = ".".join([*key_stack, key]) if key_stack else key
+                if current_comments:
+                    comments[key] = list(current_comments)
+                    comments[fq_key] = list(current_comments)
+                    current_comments = []
                 key_stack.append(key)
                 indent_stack.append(indent)
             elif "}" in stripped:
