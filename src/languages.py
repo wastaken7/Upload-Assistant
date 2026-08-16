@@ -184,6 +184,9 @@ class LanguagesManager:
 
         if "language_checked" not in meta:
             meta.language_checked = False
+
+        if meta.language_checked:
+            return
         status_dict = meta.tracker_status.setdefault(tracker, {}) if tracker else {}
         if "unattended_audio_skip" not in meta:
             meta.unattended_audio_skip = False
@@ -464,7 +467,7 @@ class LanguagesManager:
     def _find_language_name(self, word: str) -> str | None:
         try:
             lang = langcodes.find(word)
-        except LanguageTagError, LookupError:
+        except (LanguageTagError, LookupError):
             return None
         if lang and lang.is_valid():
             return lang.display_name()

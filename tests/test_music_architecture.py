@@ -110,7 +110,6 @@ def test_description_generator_includes_music_release_details():
             custom_signature=False,
             description=False,
             game=False,
-            languages=False,
             logo=False,
             mediainfo=False,
             menu_screenshots=False,
@@ -120,7 +119,6 @@ def test_description_generator_includes_music_release_details():
             tv_info=False,
             ua_signature=False,
             user_description=False,
-            music=True,
         )
     )
 

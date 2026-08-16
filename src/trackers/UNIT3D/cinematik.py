@@ -174,24 +174,8 @@ class Cinematik(UNIT3D):
         if meta.description_link or meta.description_file:
             desc = await DescriptionBuilder(self.tracker, self.config).general_description_generator(
                 meta,
-                audio_spectrogram=True,
-                bluray=True,
-                book=True,
-                custom_header=True,
-                custom_signature=True,
-                description=True,
-                game=True,
-                languages=False,
-                logo=True,
                 mediainfo=False,
-                menu_screenshots=True,
                 nfo=False,
-                screenshots=True,
-                tonemapped_header=True,
-                tv_info=True,
-                ua_signature=True,
-                user_description=True,
-                music=True,
             )
 
             logger.info(f"{self.tracker}: Custom Description Link/File Path: {desc}", extra={"markup": False})

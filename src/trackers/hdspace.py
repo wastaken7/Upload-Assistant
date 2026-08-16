@@ -52,23 +52,11 @@ class HDSpace:
             builder = DescriptionBuilder(self.tracker, self.config)
             description = await builder.general_description_generator(
                 meta,
-                audio_spectrogram=True,
                 bluray=False,
                 book=False,
-                custom_header=True,
                 custom_signature=False,
-                description=True,
                 game=False,
-                languages=False,
-                logo=True,
-                mediainfo=True,
-                menu_screenshots=True,
                 nfo=False,
-                screenshots=True,
-                tonemapped_header=True,
-                tv_info=True,
-                ua_signature=True,
-                user_description=True,
                 signature=f"[center][url=https://github.com/wastaken7/Upload-Assistant][size=2]{meta.ua_signature}[/size][/url][/center]",
             )
         except Exception as e:

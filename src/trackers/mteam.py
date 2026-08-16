@@ -249,23 +249,9 @@ class MTeam:
 
         description = await builder.general_description_generator(
             meta,
-            audio_spectrogram=True,
-            bluray=True,
-            book=True,
-            custom_header=True,
-            custom_signature=True,
-            description=True,
-            game=True,
-            languages=False,
-            logo=True,
             mediainfo=False,
-            menu_screenshots=True,
             nfo=False,
-            screenshots=True,
-            tonemapped_header=True,
             tv_info=False,
-            ua_signature=True,
-            user_description=True,
             signature=f"[{meta.ua_signature}](https://github.com/wastaken7/Upload-Assistant)",
         )
 

@@ -193,22 +193,11 @@ class BitPorn(UNIT3D):
             meta,
             audio_spectrogram=False,
             bluray=False,
-            book=True,
-            custom_header=True,
-            custom_signature=True,
-            description=True,
-            game=True,
-            languages=False,
             logo=False,
             mediainfo=False,
             menu_screenshots=False,
             nfo=False,
             screenshots=False,
-            tonemapped_header=True,
-            tv_info=True,
-            ua_signature=True,
-            user_description=True,
-            music=True,
         )
         images = await self._description_image_files(meta)
         if images:

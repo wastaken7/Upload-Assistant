@@ -298,23 +298,9 @@ class NEXUSPHP:
 
         description = await builder.general_description_generator(
             meta,
-            audio_spectrogram=True,
-            bluray=True,
-            book=True,
-            custom_header=True,
-            custom_signature=True,
-            description=True,
-            game=True,
-            languages=False,
             logo=False,
             mediainfo=False,
-            menu_screenshots=True,
             nfo=False,
-            screenshots=True,
-            tonemapped_header=True,
-            tv_info=True,
-            ua_signature=True,
-            user_description=True,
             signature=f"[right][url=https://github.com/wastaken7/Upload-Assistant][size=1]{meta.ua_signature}[/size][/url][/right]",
         )
         return {"descr": description}
