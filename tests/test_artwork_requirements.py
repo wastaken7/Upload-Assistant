@@ -151,6 +151,74 @@ def test_invalid_cover_is_not_accepted() -> None:
     assert not is_valid_cover_image(None)
 
 
+def test_local_artwork_discovery_does_not_read_media_files(tmp_path: Path) -> None:
+    """The scan touches every file beside the release, so non-images must be
+    skipped by suffix. Reading them would pull whole media files - hundreds of
+    gigabytes over a network share - only to find they are not cover art."""
+    from src.artwork import _find_local_artwork_sources
+
+    media_file = tmp_path / "Release.mkv"
+    media_file.write_bytes(b"\x00" * 2048)
+    (tmp_path / "Release.iso").write_bytes(b"\x00" * 2048)
+
+    with patch.object(Path, "read_bytes", side_effect=AssertionError("must not read a non-image")):
+        assert _find_local_artwork_sources(str(media_file)) == {}
+
+
+def test_oversized_image_is_rejected_without_being_read(tmp_path: Path) -> None:
+    from src.artwork import MAX_ARTWORK_BYTES, is_valid_cover_image
+
+    oversized = tmp_path / "huge.png"
+    oversized.write_bytes(b"\x00" * (MAX_ARTWORK_BYTES + 1))
+
+    with patch.object(Path, "read_bytes", side_effect=AssertionError("must not read an oversized file")):
+        assert not is_valid_cover_image(oversized)
+
+
+def test_user_supplied_cover_without_extension_is_accepted(tmp_path: Path) -> None:
+    """Paths the user provides explicitly are validated by content, not by name:
+    a decodable image must not be rejected for lacking a known suffix."""
+    from src.artwork import is_valid_cover_image
+
+    extensionless = tmp_path / "cover_no_extension"
+    Image.new("RGB", (32, 48), "teal").save(extensionless, format="PNG")
+
+    assert is_valid_cover_image(extensionless)
+
+
+def test_empty_image_file_is_rejected(tmp_path: Path) -> None:
+    from src.artwork import is_valid_cover_image
+
+    empty = tmp_path / "cover.png"
+    empty.touch()
+
+    assert not is_valid_cover_image(empty)
+
+
+def test_valid_cover_within_size_limit_is_still_accepted(tmp_path: Path) -> None:
+    from src.artwork import is_valid_cover_image
+
+    cover_file = tmp_path / "cover.png"
+    Image.new("RGB", (32, 48), "blue").save(cover_file)
+
+    assert is_valid_cover_image(cover_file)
+
+
+def test_local_artwork_discovery_skips_media_files(tmp_path: Path) -> None:
+    """The scan must still find the cover while ignoring the media beside it."""
+    from src.artwork import _find_local_artwork_sources
+
+    media_file = tmp_path / "Release.mkv"
+    media_file.write_bytes(b"\x00" * 4096)
+    (tmp_path / "Release.iso").write_bytes(b"\x00" * 4096)
+    cover_file = tmp_path / "Release.Cover.jpg"
+    Image.new("RGB", (32, 48), "blue").save(cover_file)
+
+    sources = _find_local_artwork_sources(str(media_file))
+
+    assert sources.get("poster") == cover_file
+
+
 @pytest.mark.asyncio
 async def test_unit3d_attaches_only_a_decodable_book_cover(tmp_path: Path) -> None:
     cover_file = tmp_path / "cover.png"
