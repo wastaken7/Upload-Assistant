@@ -581,7 +581,19 @@ async def disc_screenshots(
                     else:
                         logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
                         retake = True
-                elif img_host and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "passtheimage", "seedpool_cdn", "sharex", "utppm"]:
+                elif img_host and img_host in [
+                    "lensdump",
+                    "ptscreens",
+                    "onlyimage",
+                    "dalexni",
+                    "zipline",
+                    "midnightscene",
+                    "bioma",
+                    "passtheimage",
+                    "seedpool_cdn",
+                    "sharex",
+                    "utppm",
+                ]:
                     logger.debug(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
                 else:
                     logger.info(f"[red]Unknown image host or image doesn't meet requirements for host: {img_host}, retaking.")
@@ -615,7 +627,8 @@ async def disc_screenshots(
                                 valid_image = True
                         elif (
                             img_host
-                            and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
+                            and img_host
+                            in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "bioma", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
                             and new_size > 75000
                         ):
                             logger.info(f"[green]Successfully retaken screenshot for: {image_path} ({new_size} bytes)[/green]")
@@ -1977,7 +1990,19 @@ async def screenshots(
                     else:
                         logger.info(f"[red]Image {image_path} with size {image_size} bytes: does not meet size requirements for {img_host}, retaking.")
                         retake = True
-                elif img_host and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "passtheimage", "seedpool_cdn", "sharex", "utppm"]:
+                elif img_host and img_host in [
+                    "lensdump",
+                    "ptscreens",
+                    "onlyimage",
+                    "dalexni",
+                    "zipline",
+                    "midnightscene",
+                    "bioma",
+                    "passtheimage",
+                    "seedpool_cdn",
+                    "sharex",
+                    "utppm",
+                ]:
                     logger.debug(f"[green]Image {image_path} meets size requirements for {img_host}.[/green]")
                 else:
                     logger.info(f"[red]Unknown image host or image doesn't meet requirements for host: {img_host}, retaking.")
@@ -2030,7 +2055,8 @@ async def screenshots(
                                     valid_image = True
                             elif (
                                 img_host
-                                and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
+                                and img_host
+                                in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "bioma", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
                                 and new_size > 75000
                             ):
                                 logger.info(f"[green]Successfully retaken screenshot for: {screenshot_path} ({new_size} bytes)[/green]")
@@ -2075,7 +2101,8 @@ async def screenshots(
                             valid_image = True
                     elif (
                         img_host
-                        and img_host in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
+                        and img_host
+                        in ["lensdump", "ptscreens", "onlyimage", "dalexni", "zipline", "midnightscene", "bioma", "passtheimage", "seedpool_cdn", "sharex", "utppm"]
                         and new_size > 75000
                     ):
                         valid_image = True

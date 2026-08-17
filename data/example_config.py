@@ -858,6 +858,8 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # BiOMA Zipline API key/token for rehosting screenshots when uploading releases with tag 'BiOMA' (Host: https://img.thebioma.space/)
+            "bioma_api_key": "",
             # Send uploads to CAPYBARABR modq for staff approval
             "modq": False,
             # Set this to True if you want to allow external subtitles to be included in the upload
