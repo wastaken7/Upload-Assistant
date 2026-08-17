@@ -5,13 +5,17 @@ Validates the user's config.py against expected structure and types.
 """
 
 import math
+from pathlib import Path
 from typing import Any, cast
+
+from src.app_paths import STATE_DIR
 
 # Required top-level sections
 REQUIRED_SECTIONS = ["DEFAULT", "TRACKERS"]
 
 # Optional top-level sections
 OPTIONAL_SECTIONS = ["IMAGES", "TORRENT_CLIENTS", "USENET"]
+HOOKS_DIR = STATE_DIR / "custom_hooks"
 
 # Required keys in DEFAULT section (critical for operation)
 REQUIRED_DEFAULT_KEYS: dict[str, type] = {
@@ -112,6 +116,9 @@ DEFAULT_KEY_TYPES: dict[str, tuple[type, ...]] = {
     "bluray_score": (float, int),
     "bluray_single_score": (float, int),
     "keep_meta": (bool,),
+    "post_upload_hooks": (list, tuple),
+    "post_upload_inprocess_hooks": (list, tuple),
+    "post_upload_hook_timeout": (str, int, float),
     "show_upload_duration": (bool,),
     "print_tracker_messages": (bool,),
     "print_tracker_links": (bool,),
@@ -263,6 +270,19 @@ def _as_dict(value: Any) -> dict[str, Any]:
     return cast(dict[str, Any], value) if isinstance(value, dict) else {}
 
 
+def _inactive_hook_files(default: dict[str, Any]) -> list[str]:
+    """Return hook scripts present in state but absent from both hook settings."""
+    configured: set[str] = set()
+    for key in ("post_upload_hooks", "post_upload_inprocess_hooks"):
+        names = default.get(key, [])
+        if isinstance(names, (list, tuple)):
+            configured.update(Path(name.strip()).as_posix() for name in names if isinstance(name, str) and name.strip())
+    try:
+        return sorted(path.relative_to(HOOKS_DIR).as_posix() for path in HOOKS_DIR.rglob("*.py") if path.relative_to(HOOKS_DIR).as_posix() not in configured)
+    except OSError:
+        return []
+
+
 def validate_config(config: Any, active_trackers: list[str] | None = None, active_imghost: str | None = None) -> tuple[bool, list[str], list[ConfigValidationWarning]]:
     """
     Validate the config dictionary structure and types.
@@ -305,6 +325,15 @@ def validate_config(config: Any, active_trackers: list[str] | None = None, activ
     default_errors, default_warnings = _validate_default_section(_as_dict(config_dict.get("DEFAULT")))
     errors.extend(default_errors)
     warnings.extend(default_warnings)
+    inactive_hooks = _inactive_hook_files(_as_dict(config_dict.get("DEFAULT")))
+    if inactive_hooks:
+        warnings.append(
+            ConfigValidationWarning(
+                f"Hook scripts are present but not enabled in post_upload_hooks or post_upload_inprocess_hooks: {', '.join(inactive_hooks)}",
+                key="post_upload_hooks",
+                section="DEFAULT",
+            )
+        )
 
     # Validate TRACKERS section
     # Determine which trackers are active
