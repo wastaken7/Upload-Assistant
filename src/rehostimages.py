@@ -222,6 +222,8 @@ def _image_host(raw_url: str, url_host_mapping: Mapping[str, str]) -> str:
 
 
 def _collection_directory(meta: Meta, collection_name: str) -> Path | None:
+    if collection_name == "screenshots":
+        return screenshots_dir(meta.base_dir, meta.uuid)
     if collection_name == "menu_images":
         return menu_screenshots_dir(meta.base_dir, meta.uuid)
     if collection_name == "spectrograms_images":
