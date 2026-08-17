@@ -143,8 +143,8 @@ def send_discord_notification(payload: dict) -> None:
     tracker_status = meta.get("tracker_status", {})
 
     # Build list of successful trackers
-    successful_trackers = [tracker for tracker, status in tracker_status.items() if isinstance(status, dict) and status.get("success")]
-    failed_trackers = [tracker for tracker, status in tracker_status.items() if isinstance(status, dict) and not status.get("success")]
+    successful_trackers = [tracker for tracker, status in tracker_status.items() if isinstance(status, dict) and status.get("upload_success")]
+    failed_trackers = [tracker for tracker, status in tracker_status.items() if isinstance(status, dict) and not status.get("upload_success")]
 
     embed = {
         "title": "🚀 Upload Finished",

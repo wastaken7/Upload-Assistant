@@ -1,5 +1,8 @@
 import asyncio
 import json
+import time
+
+import psutil
 
 from src import post_upload_hooks
 from src.meta import Meta
@@ -64,3 +67,25 @@ def test_inprocess_hook_receives_an_isolated_meta_copy(tmp_path, monkeypatch):
     assert observed.read_text(encoding="utf-8") == "changedchanged"  # noqa: S101
     assert meta.name == "Example.Release"  # noqa: S101
     assert config["DEFAULT"]["value"] == "original"  # noqa: S101
+
+
+def test_timeout_terminates_hook_child_processes(tmp_path, monkeypatch):
+    hooks_dir = tmp_path / "custom_hooks"
+    hooks_dir.mkdir()
+    child_pid_file = tmp_path / "child.pid"
+    (hooks_dir / "spawn_child.py").write_text(
+        "import subprocess, sys, time\n"
+        f"child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\nopen({str(child_pid_file)!r}, 'w').write(str(child.pid))\ntime.sleep(60)\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(post_upload_hooks, "HOOKS_DIR", hooks_dir)
+
+    started = time.monotonic()
+    asyncio.run(post_upload_hooks.run_post_upload_hooks(Meta(), {"DEFAULT": {"post_upload_hooks": ["spawn_child.py"], "post_upload_hook_timeout": 0.1}}))
+
+    assert time.monotonic() - started < 5  # noqa: S101
+    child_pid = int(child_pid_file.read_text(encoding="utf-8"))
+    deadline = time.monotonic() + 2
+    while psutil.pid_exists(child_pid) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not psutil.pid_exists(child_pid)  # noqa: S101

@@ -5,6 +5,9 @@ import copy
 import importlib.util
 import inspect
 import json
+import os
+import signal
+import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -54,6 +57,46 @@ async def _relay(stream: asyncio.StreamReader | None, hook_name: str, error: boo
         line = raw_line.decode(errors="replace").rstrip()
         if line:
             log(f"[hook: {hook_name}] {line}", extra={"markup": False})
+
+
+def _hook_process_group_kwargs() -> dict[str, Any]:
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+async def _terminate_hook_process_tree(process: asyncio.subprocess.Process) -> None:
+    """Terminate the hook and every process that can retain its output pipes."""
+    if process.returncode is not None:
+        return
+    try:
+        if os.name == "nt":
+            taskkill = await asyncio.create_subprocess_exec(
+                "taskkill",
+                "/PID",
+                str(process.pid),
+                "/T",
+                "/F",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await taskkill.wait()
+        elif process.pid is not None:
+            os.killpg(process.pid, signal.SIGTERM)
+    except OSError, ProcessLookupError:
+        pass
+
+    try:
+        await asyncio.wait_for(process.wait(), timeout=2)
+    except TimeoutError:
+        try:
+            if os.name == "nt":
+                process.kill()
+            elif process.pid is not None:
+                os.killpg(process.pid, signal.SIGKILL)
+        except OSError, ProcessLookupError:
+            pass
+        await process.wait()
 
 
 async def _run_inprocess_hook(path: Path, meta: Meta, config: Mapping[str, Any]) -> None:
@@ -126,6 +169,7 @@ async def run_post_upload_hooks(meta: Meta, config: Mapping[str, Any]) -> None:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=HOOKS_DIR,
+                    **_hook_process_group_kwargs(),
                 )
                 if process.stdin is not None:
                     process.stdin.write(payload)
@@ -137,8 +181,7 @@ async def run_post_upload_hooks(meta: Meta, config: Mapping[str, Any]) -> None:
                 try:
                     returncode = await asyncio.wait_for(process.wait(), timeout=timeout)
                 except TimeoutError:
-                    process.kill()
-                    await process.wait()
+                    await _terminate_hook_process_tree(process)
                     logger.error(f"[hook: {path.stem}] Timed out after {timeout:g} seconds.", extra={"markup": False})
                     continue
                 finally:
