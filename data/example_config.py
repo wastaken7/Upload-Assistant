@@ -135,6 +135,17 @@ config: dict[str, Any] = {
         # NOT RECOMMENDED UNLESS YOU KNOW WHAT YOU ARE DOING.
         # Will prevent meta.json file from being deleted before running
         "keep_meta": False,
+        # Optional trusted scripts from STATE_DIR/custom_hooks/ (Docker: /state/custom_hooks/),
+        # run after each item's tracker uploads and request search. Scripts receive
+        # final meta as JSON through stdin and may write status lines to the terminal.
+        # Example: ["notify.py"]
+        "post_upload_hooks": [],
+        # Trusted hooks loaded in Upload Assistant's process. Each must expose
+        # async or sync on_upload_finished(meta, config); it receives deep copies.
+        "post_upload_inprocess_hooks": [],
+        # Maximum time allowed for each subprocess post-upload script. Invalid or
+        # zero values use 30 seconds. A failed hook never changes the upload result.
+        "post_upload_hook_timeout": 30,
         # IMAGE HOSTING SETTINGS
         # Order of image hosts. primary host as first with others as backup
         # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, midnightscene, passtheimage, seedpool_cdn, sharex, utppm, lostimg
