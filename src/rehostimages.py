@@ -13,6 +13,7 @@ import aiofiles
 import httpx
 from aiofiles import os as aio_os
 
+from src.artwork import is_public_http_url, is_valid_image_bytes
 from src.console import logger
 from src.meta import Meta
 from src.screenshot_manifest import files as manifest_files
@@ -251,6 +252,11 @@ async def _local_image_path(meta: Meta, collection_name: str, image: Mapping[str
 
 
 async def _download_image_for_rehost(meta: Meta, collection_name: str, raw_url: str) -> Path | None:
+    # Validate the URL up front to prevent SSRF attacks
+    if not is_public_http_url(raw_url):
+        logger.warning(f"[yellow]Cannot download {collection_name} image: {raw_url} is not a public HTTP(S) URL[/yellow]")
+        return None
+
     directory = Path(meta.base_dir) / "tmp" / meta.uuid / "rehosted_images" / collection_name
     directory.mkdir(parents=True, exist_ok=True)
     parsed = urlparse(raw_url)
@@ -259,10 +265,38 @@ async def _download_image_for_rehost(meta: Meta, collection_name: str, raw_url: 
         suffix = ".png"
     filename = await sanitize_filename(Path(parsed.path).stem or "image")
     destination = directory / f"{filename}{suffix}"
+
     try:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
-            response = await client.get(raw_url)
-            response.raise_for_status()
+        # Manually follow redirects to validate each hop against SSRF
+        current_url = raw_url
+        async with httpx.AsyncClient(follow_redirects=False, trust_env=False, timeout=60.0) as client:
+            for _ in range(4):
+                if not is_public_http_url(current_url):
+                    logger.warning(f"[yellow]Cannot download {collection_name} image: redirect target {current_url} is not a public HTTP(S) URL[/yellow]")
+                    return None
+
+                response = await client.get(current_url)
+                if response.is_redirect:
+                    location = response.headers.get("Location")
+                    if not location:
+                        logger.warning(f"[yellow]Could not download {collection_name} image for {raw_url}: redirect missing Location header[/yellow]")
+                        return None
+                    # Resolve relative redirects against the current URL
+                    current_url = str(response.url.join(location))
+                    continue
+
+                response.raise_for_status()
+                break
+            else:
+                # Too many redirects
+                logger.warning(f"[yellow]Could not download {collection_name} image for {raw_url}: too many redirects[/yellow]")
+                return None
+
+        # Validate the downloaded content is actually a valid image
+        if not is_valid_image_bytes(response.content):
+            logger.warning(f"[yellow]Could not download {collection_name} image for {raw_url}: not a valid image[/yellow]")
+            return None
+
         await asyncio.to_thread(destination.write_bytes, response.content)
         return destination
     except (httpx.HTTPError, OSError) as error:
