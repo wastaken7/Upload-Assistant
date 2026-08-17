@@ -228,6 +228,7 @@ if _is_webui_arg and not Path(_config_path).exists():
 
 from src.book_prep import sanitize_book_author, sanitize_book_language
 from src.meta import Meta
+from src.post_upload_hooks import run_post_upload_hooks
 from src.prep import Prep
 
 # Enable ANSI colors on Windows
@@ -2809,6 +2810,13 @@ async def do_the_thing(base_dir: str) -> None:
                     trackers = [t for t in cast(list[Any], meta.trackers) if isinstance(t, str)]
                     logger.debug(f"[cyan]Using trackers for request search: {trackers}[/cyan]")
                 await tracker_setup.tracker_request(meta, trackers)
+
+            # Persist and expose the completed item before user-managed hooks run.
+            # Hooks may inspect the final tracker status and files have not yet been cleaned.
+            async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/meta.json", "w", encoding="utf-8") as f:
+                await f.write(json.dumps(meta.to_dict(), indent=4, cls=PathAwareEncoder))
+            _publish_webui_preview_target(cast(str, meta.path or ""), meta.uuid or None)
+            await run_post_upload_hooks(meta, config)
 
             if meta.site_check and "queue" in meta and meta.queue is not None:
                 processed_files_count += 1

@@ -1,4 +1,5 @@
 [Configuration](configuration.md)
+[Custom Hooks](custom-hooks.md)
 
 [Docker](docker.md)
 

@@ -25,6 +25,8 @@ bin/par2/*
 bin/pesto/*
 build/
 CLAUDE.md
+custom_hooks
+custom_hooks/
 data/*.json
 data/banned/*.*
 data/cache/*
