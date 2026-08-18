@@ -189,11 +189,6 @@ class Anthelion:
 
             if tags:
                 logger.info(f"{self.tracker}: [green]Using IMDb genres for tagging: {', '.join(tags)}")
-                logger.info(
-                    f"{self.tracker}: [yellow]api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
-                )
-                await asyncio.sleep(3)
-                meta.ant_user_tags = True
 
         if not tags:
             if meta.unattended and not meta.unattended_confirm:
@@ -201,7 +196,6 @@ class Anthelion:
                 meta.skipping = f"{self.tracker}"
                 return ""
             logger.info(f"{self.tracker}: [yellow]No genres found for tagging. Tag required.")
-            logger.info(f"{self.tracker}: [yellow]Only use a tag in the approved list found in the site search box.")
             logger.info(
                 f"{self.tracker}: [yellow]api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
             )
@@ -211,7 +205,7 @@ class Anthelion:
                 tags.append(user_tag.replace(" ", ".").lower())
                 meta.ant_user_tags = True
 
-        return tags if not no_tags else ""
+        return tags
 
     async def get_type(self, meta: Meta) -> int:
         ant_type = None
@@ -314,6 +308,9 @@ class Anthelion:
         else:
             data.update({"noreleasegroup": 1})
 
+        if meta.anon or self.tracker_config.get("anon", False):
+            data.update({"anonymous": 1})
+
         if meta.adult_media:
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 logger.info(f"{self.tracker}: [bold red]Adult content detected[/bold red]")
@@ -336,54 +333,83 @@ class Anthelion:
             "User-Agent": f"{meta.ua_name} {(meta.current_version if meta.current_version is not None else 'github.com/wastaken7/Upload-Assistant')} ({platform.system()} {platform.release()})"
         }
 
-        try:
-            if not meta.debug:
-                async with httpx.AsyncClient(timeout=40) as client:
-                    response = await client.post(url=self.api_url, files=files, data=data, headers=headers)
-                    try:
-                        response_data: dict[str, Any] = response.json()
-                    except json.JSONDecodeError:
-                        meta.tracker_status[self.tracker]["status_message"] = "data error: ANTHELION json decode error, the API is probably down"
+        if not meta.debug:
+            response_data: dict[str, Any] = {}
+            try:
+                default_retries = self.config.get("DEFAULT", {}).get("max_retries", 5)
+                max_retries = max(1, int(self.tracker_config.get("max_retries", default_retries)))
+            except ValueError, TypeError:
+                max_retries = 5
+            retry_delay = 5
+            timeout = 40.0
+
+            for attempt in range(max_retries):
+                try:
+                    async with httpx.AsyncClient(timeout=timeout) as client:
+                        response = await client.post(url=self.api_url, files=files, data=data, headers=headers)
+                        if response.status_code in [200, 201]:
+                            try:
+                                response_data = response.json()
+                            except json.JSONDecodeError:
+                                if attempt < max_retries - 1:
+                                    logger.info(
+                                        f"{self.tracker}: [yellow]JSON decode error (HTTP {response.status_code}), retrying in {retry_delay}s... (attempt {attempt + 1}/{max_retries})[/yellow]"
+                                    )
+                                    await asyncio.sleep(retry_delay)
+                                    continue
+                                meta.tracker_status[self.tracker]["status_message"] = "data error: ANTHELION json decode error, the API is probably down"
+                                return False
+
+                            is_success = bool(response_data["success"]) if "success" in response_data else str(response_data.get("status", "")).lower() == "success"
+                            if not is_success:
+                                meta.tracker_status[self.tracker]["status_message"] = f"data error: {response_data}"
+                                return False
+                            meta.tracker_status[self.tracker]["status_message"] = response_data
+                            return True
+
+                        if response.status_code in [401, 403]:
+                            meta.tracker_status[self.tracker]["status_message"] = f"data error: HTTP {response.status_code} - {response.text}"
+                            return False
+
+                        if attempt < max_retries - 1:
+                            logger.info(
+                                f"{self.tracker}: [yellow]HTTP {response.status_code} error, retrying in {retry_delay} seconds... (attempt {attempt + 1}/{max_retries})[/yellow]"
+                            )
+                            await asyncio.sleep(retry_delay)
+                            continue
+
+                        response_data = {"error": f"ANTHELION returned status code: {response.status_code}", "response_content": response.text}
+                        meta.tracker_status[self.tracker]["status_message"] = f"data error - {response_data}"
                         return False
 
-                    if response.status_code in [200, 201]:
-                        is_success = ("success" in response_data) or (str(response_data.get("status", "")).lower() == "success")
-                        if not is_success:
-                            meta.tracker_status[self.tracker]["status_message"] = f"data error: {response_data}"
-                            return False
-                        meta.tracker_status[self.tracker]["status_message"] = response_data
-                        return True
-
-                    response_data = {"error": f"ANTHELION returned status code: {response.status_code}", "response_content": response.text}
-                    meta.tracker_status[self.tracker]["status_message"] = f"data error - {response_data}"
+                except httpx.TimeoutException:
+                    meta.tracker_status[self.tracker]["status_message"] = "data error: ANTHELION request timed out; it may have uploaded, check the tracker before retrying."
                     return False
-            else:
-                if "mediainfo" in data:
-                    debug_mediainfo_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / f"{self.tracker}_MEDIAINFO.txt"
-                    async with aiofiles.open(debug_mediainfo_path, "w", newline="", encoding="utf-8") as f:
-                        await f.write(str(data["mediainfo"]))
-                    logger.info(f"{self.tracker}: [green]Final MediaInfo payload written to {debug_mediainfo_path}[/green]")
-                logger.info(f"{self.tracker}: Request Data:")
-                logger.info(Redaction.redact_private_info(data))
-                meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
-                await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
-                return True
-        except httpx.TimeoutException:
-            meta.tracker_status[self.tracker]["status_message"] = "data error: ANTHELION request timed out while uploading."
-            return False
-        except httpx.RequestError as e:
-            meta.tracker_status[self.tracker]["status_message"] = f"data error: An error occurred while making the request: {e}"
-            return False
-        except Exception as e:
-            import traceback
+                except httpx.RequestError as e:
+                    meta.tracker_status[self.tracker]["status_message"] = f"data error: ANTHELION request failed and may have uploaded; check the tracker before retrying: {e}"
+                    return False
+                except Exception as e:
+                    import traceback
 
-            error_type = type(e).__name__
-            error_msg = str(e) if str(e) else "No error message"
-            traceback_str = traceback.format_exc()
-            logger.info(f"{self.tracker}: [bold red]upload exception ({error_type}): {escape(error_msg)}[/bold red]")
-            logger.info(f"{self.tracker}: [red]Traceback:\n{escape(traceback_str)}[/red]")
-            meta.tracker_status[self.tracker]["status_message"] = "data error: double check if it uploaded"
+                    error_type = type(e).__name__
+                    error_msg = str(e) if str(e) else "No error message"
+                    traceback_str = traceback.format_exc()
+                    logger.info(f"{self.tracker}: [bold red]upload exception ({error_type}): {escape(error_msg)}[/bold red]")
+                    logger.info(f"{self.tracker}: [red]Traceback:\n{escape(traceback_str)}[/red]")
+                    meta.tracker_status[self.tracker]["status_message"] = "data error: double check if it uploaded"
+                    return False
+
             return False
+        if "mediainfo" in data:
+            debug_mediainfo_path = Path(meta.base_dir) / "tmp" / str(meta.uuid) / f"{self.tracker}_MEDIAINFO.txt"
+            async with aiofiles.open(debug_mediainfo_path, "w", newline="", encoding="utf-8") as f:
+                await f.write(str(data["mediainfo"]))
+            logger.info(f"{self.tracker}: [green]Final MediaInfo payload written to {debug_mediainfo_path}[/green]")
+        logger.info(f"{self.tracker}: Request Data:")
+        logger.info(Redaction.redact_private_info(data))
+        meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled, not uploading."
+        await self.common.create_torrent_for_upload(meta, f"{self.tracker}" + "_DEBUG", f"{self.tracker}" + "_DEBUG", announce_url="https://fake.tracker")
+        return True
 
     async def get_audio(self, meta: Meta) -> str:
         """

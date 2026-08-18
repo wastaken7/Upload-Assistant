@@ -515,7 +515,11 @@ class UNIT3D:
 
         if meta.debug is False:
             response_data = {}
-            max_retries = 2
+            try:
+                default_retries = self.config.get("DEFAULT", {}).get("max_retries", 2)
+                max_retries = max(1, int(self.tracker_config.get("max_retries", default_retries)))
+            except ValueError, TypeError:
+                max_retries = 2
             retry_delay = 5
             timeout = 40.0
             download_url: str | None = None
