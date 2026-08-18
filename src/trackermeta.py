@@ -602,6 +602,7 @@ async def update_metadata_from_tracker(
                     id=resolved_torrent_id,
                     skip_tracker_descriptions=skip_tracker_descriptions,
                     public_torrent_url=tracker_instance.torrent_url,
+                    region_resolver=getattr(tracker_instance, "get_region_name", None),
                 ),
             )
         else:
@@ -615,6 +616,7 @@ async def update_metadata_from_tracker(
                     meta,
                     file_name=search_term,
                     skip_tracker_descriptions=skip_tracker_descriptions,
+                    region_resolver=getattr(tracker_instance, "get_region_name", None),
                 ),
             )
 

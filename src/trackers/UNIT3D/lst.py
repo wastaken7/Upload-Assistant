@@ -29,6 +29,11 @@ class LST(UNIT3D):
     trumping_url = f"{base_url}/api/reports/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK", "MUSIC", "XXX")
     tracker_urls = ("https://lst.gg",)
+    REGION_IDS = {
+        "CZE": "244",
+        "FIN": "245",
+        "SWE": "246",
+    }
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="LST")
@@ -146,6 +151,22 @@ class LST(UNIT3D):
                 data["release_exists_on_discogs"] = "1"
 
         return data
+
+    async def get_region_id(self, meta: Meta) -> dict[str, str]:
+        region_id = self.REGION_IDS.get(str(meta.region or "").upper())
+        if region_id:
+            return {"region_id": region_id}
+        return await super().get_region_id(meta)
+
+    async def get_region_name(self, region_id: int | str | None) -> str:
+        region_name = {value: key for key, value in self.REGION_IDS.items()}.get(str(region_id), "")
+        if region_name:
+            return region_name
+        try:
+            normalized_id = int(region_id) if region_id is not None else 0
+        except (TypeError, ValueError):
+            return ""
+        return await self.common.unit3d_region_ids(reverse=True, region_id=normalized_id)
 
     async def get_edition(self, meta: Meta) -> int | None:
         edition_mapping = {

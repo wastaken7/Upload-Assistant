@@ -113,6 +113,14 @@ class Blutopia(UNIT3D):
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://blutopia.cc",)
+    REGION_IDS = {
+        "CZE": "244",
+        "SVK": "245",
+        "FIN": "246",
+        "SWE": "247",
+        "BGR": "248",
+        "DNK": "249",
+    }
     allowed_bloated_audio_languages = ("en",)
 
     def __init__(self, config: dict[str, Any]) -> None:
@@ -195,6 +203,22 @@ class Blutopia(UNIT3D):
         return {
             "mod_queue_opt_in": await self.get_flag(meta, "modq"),
         }
+
+    async def get_region_id(self, meta: Meta) -> dict[str, str]:
+        region_id = self.REGION_IDS.get(str(meta.region or "").upper())
+        if region_id:
+            return {"region_id": region_id}
+        return await super().get_region_id(meta)
+
+    async def get_region_name(self, region_id: int | str | None) -> str:
+        region_name = {value: key for key, value in self.REGION_IDS.items()}.get(str(region_id), "")
+        if region_name:
+            return region_name
+        try:
+            normalized_id = int(region_id) if region_id is not None else 0
+        except (TypeError, ValueError):
+            return ""
+        return await self.common.unit3d_region_ids(reverse=True, region_id=normalized_id)
 
     async def get_category_id(
         self,

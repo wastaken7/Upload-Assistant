@@ -2623,6 +2623,7 @@ class Common:
         file_name: str | list[str] | None = None,
         skip_tracker_descriptions: bool = False,
         public_torrent_url: str | None = None,
+        region_resolver: Callable[[Any], Any] | None = None,
     ) -> tuple[
         int | None,
         int | None,
@@ -2697,7 +2698,7 @@ class Common:
                 imdb = 0 if imdb == 0 else imdb
                 if not meta.region and meta.is_disc in ("BDMV", "DVD"):
                     region_id = attributes.get("region_id")
-                    region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
+                    region_name = await region_resolver(region_id) if region_resolver else await self.unit3d_region_ids(reverse=True, region_id=region_id)
                     if region_name:
                         meta.region = region_name
                 if not meta.distributor and meta.is_disc in ("BDMV", "DVD"):
@@ -2724,7 +2725,7 @@ class Common:
                     imdb = 0 if imdb == 0 else imdb
                     if not meta.region and meta.is_disc in ("BDMV", "DVD"):
                         region_id = attributes.get("region_id")
-                        region_name = await self.unit3d_region_ids(reverse=True, region_id=region_id)
+                        region_name = await region_resolver(region_id) if region_resolver else await self.unit3d_region_ids(reverse=True, region_id=region_id)
                         if region_name:
                             meta.region = region_name
                     if not meta.distributor and meta.is_disc in ("BDMV", "DVD"):
