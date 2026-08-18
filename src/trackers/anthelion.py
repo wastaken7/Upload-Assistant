@@ -189,11 +189,6 @@ class Anthelion:
 
             if tags:
                 logger.info(f"{self.tracker}: [green]Using IMDb genres for tagging: {', '.join(tags)}")
-                logger.info(
-                    f"{self.tracker}: [yellow]api will accept this upload, but no tag will be added.\nYou must manually add at least one tag from the approved list when uploaded."
-                )
-                await asyncio.sleep(3)
-                meta.ant_user_tags = True
 
         if not tags:
             if meta.unattended and not meta.unattended_confirm:
@@ -365,7 +360,7 @@ class Anthelion:
                                 meta.tracker_status[self.tracker]["status_message"] = "data error: ANTHELION json decode error, the API is probably down"
                                 return False
 
-                            is_success = ("success" in response_data) or (str(response_data.get("status", "")).lower() == "success")
+                            is_success = bool(response_data["success"]) if "success" in response_data else str(response_data.get("status", "")).lower() == "success"
                             if not is_success:
                                 meta.tracker_status[self.tracker]["status_message"] = f"data error: {response_data}"
                                 return False
@@ -388,21 +383,10 @@ class Anthelion:
                         return False
 
                 except httpx.TimeoutException:
-                    if attempt < max_retries - 1:
-                        timeout = timeout * 1.5
-                        logger.info(
-                            f"{self.tracker}: [yellow]Request timed out, retrying in {retry_delay} seconds with {timeout}s timeout... (attempt {attempt + 1}/{max_retries})[/yellow]"
-                        )
-                        await asyncio.sleep(retry_delay)
-                        continue
-                    meta.tracker_status[self.tracker]["status_message"] = "data error: ANTHELION request timed out after multiple attempts."
+                    meta.tracker_status[self.tracker]["status_message"] = "data error: ANTHELION request timed out; it may have uploaded, check the tracker before retrying."
                     return False
                 except httpx.RequestError as e:
-                    if attempt < max_retries - 1:
-                        logger.info(f"{self.tracker}: [yellow]Request error ({e}), retrying in {retry_delay} seconds... (attempt {attempt + 1}/{max_retries})[/yellow]")
-                        await asyncio.sleep(retry_delay)
-                        continue
-                    meta.tracker_status[self.tracker]["status_message"] = f"data error: An error occurred while making the request: {e}"
+                    meta.tracker_status[self.tracker]["status_message"] = f"data error: ANTHELION request failed and may have uploaded; check the tracker before retrying: {e}"
                     return False
                 except Exception as e:
                     import traceback
