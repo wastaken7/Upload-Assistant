@@ -121,6 +121,9 @@ config: dict[str, Any] = {
         # Default = 1. If 1 (or more) tracker/s pass banned_group, content and dupe checking, uploading will continue
         # If less than the number of trackers pass the checking, exit immediately.
         "tracker_pass_checks": 1,
+        # Number of upload retry attempts for network/server errors (e.g. 500, timeouts).
+        # Trackers can override this individually in their section.
+        "max_retries": 3,
         # Set true to suppress config warnings on startup
         "suppress_warnings": False,
         # Set true to embed terminal links using hyperlinks (OSC 8)
@@ -585,6 +588,8 @@ config: dict[str, Any] = {
             "api_key": "",
             "announce_url": "",
             "anon": True,
+            # Number of upload retry attempts for network/server errors (e.g. 500, timeouts).
+            "max_retries": 5,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "thumbnail_size": "",
