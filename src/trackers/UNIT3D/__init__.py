@@ -1,5 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
+import contextlib
+import functools
 import json
 import platform
 import re
@@ -18,6 +20,18 @@ from src.trackers.common import Common
 
 type QueryValue = str | int | float | bool | None
 type ParamsList = list[tuple[str, QueryValue]]
+
+
+@functools.lru_cache(maxsize=32)
+def get_tracker_unit3d_overrides(tracker_name: str) -> dict[str, dict[str, str]]:
+    if not tracker_name:
+        return {}
+    base_data_dir = Path(__file__).resolve().parent.parent.parent.parent / "data" / "trackers" / "unit3d"
+    file_path = base_data_dir / f"{tracker_name.lower()}.json"
+    if file_path.exists():
+        with contextlib.suppress(Exception), file_path.open(encoding="utf-8") as f:
+            return json.load(f)
+    return {}
 
 
 class UNIT3D:
@@ -251,6 +265,7 @@ class UNIT3D:
             "480p": "8",
             "480i": "9",
         }
+
         if mapping_only:
             return resolution_id
         if reverse:
@@ -287,6 +302,11 @@ class UNIT3D:
         return "0"
 
     async def get_distributor_id(self, meta: Meta) -> dict[str, str]:
+        overrides = get_tracker_unit3d_overrides(self.tracker).get("distributors", {})
+        distributor_name = str(meta.distributor or "").upper()
+        if distributor_name and distributor_name in overrides:
+            return {"distributor_id": str(overrides[distributor_name])}
+
         distributor_id = await self.common.unit3d_distributor_ids(meta.distributor)
         if distributor_id:
             return {"distributor_id": distributor_id}
@@ -294,11 +314,30 @@ class UNIT3D:
         return {}
 
     async def get_region_id(self, meta: Meta) -> dict[str, str]:
+        overrides = get_tracker_unit3d_overrides(self.tracker).get("regions", {})
+        region_code = str(meta.region or "").upper()
+        if region_code and region_code in overrides:
+            return {"region_id": str(overrides[region_code])}
+
         region_id = await self.common.unit3d_region_ids(meta.region)
         if region_id:
             return {"region_id": region_id}
 
         return {}
+
+    async def get_region_name(self, region_id: int | str | None) -> str:
+        if region_id is None:
+            return ""
+        target_id = str(region_id).strip()
+        overrides = get_tracker_unit3d_overrides(self.tracker).get("regions", {})
+        for name, id_val in overrides.items():
+            if str(id_val) == target_id:
+                return name
+        try:
+            normalized_id = int(target_id)
+        except TypeError, ValueError:
+            return ""
+        return await self.common.unit3d_region_ids(reverse=True, region_id=normalized_id)
 
     async def get_tmdb(self, meta: Meta) -> dict[str, str]:
         return {"tmdb": str(meta.tmdb) if meta.tmdb is not None else "0"}

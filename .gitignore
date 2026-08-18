@@ -28,6 +28,8 @@ CLAUDE.md
 custom_hooks
 custom_hooks/
 data/*.json
+!data/unit3d_default_ids.json
+!data/trackers/
 data/banned/*.*
 data/cache/*
 data/cache/metadata/*
@@ -37,7 +39,6 @@ data/config.py
 data/config*
 data/cookies/
 data/nfos/*
-data/tags.json
 data/tvdb/
 data/web_ui/*.*
 data/web_ui/*.py
