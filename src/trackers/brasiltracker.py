@@ -615,9 +615,6 @@ class BrasilTracker:
         return await builder.general_description_generator(
             meta,
             audio_spectrogram=False,
-            bluray=False,
-            custom_signature=False,
-            description=False,
             menu_screenshots=False,
             nfo=False,
             screenshots=False,
