@@ -713,7 +713,11 @@ async def _upload_screens(
     else:
         registered_screens = manifest_files(meta.base_dir, meta.uuid, "main")
         if registered_screens:
-            image_glob = [str(path.relative_to(Path.cwd())) for path in registered_screens]
+            # Manifest entries are absolute paths and can live outside the
+            # process working directory on seedboxes.  Keep them absolute:
+            # every image-host adapter accepts a path, and this avoids a
+            # process-global ``cwd`` race between concurrent uploads.
+            image_glob = [str(path) for path in registered_screens]
         else:
             image_patterns = ["*.png", ".[!.]*.png"]
             image_glob = []
