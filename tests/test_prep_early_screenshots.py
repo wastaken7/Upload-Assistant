@@ -190,7 +190,7 @@ def test_upload_uses_only_registered_main_screenshots(tmp_path: Path, monkeypatc
         _, uploaded_count = asyncio.run(_upload_screens(config, meta, 1, 1, 0, 1, [], {}))
 
     assert uploaded_count == 1
-    assert calls == [main_screen.name]
+    assert calls == [str(main_screen)]
 
 
 def test_early_bdmv_capture_includes_alternate_playlists() -> None:

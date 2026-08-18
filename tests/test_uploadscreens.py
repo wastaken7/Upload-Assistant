@@ -69,6 +69,43 @@ def test_upload_screens_does_not_reupload_source_on_fallback(tmp_path: Path) -> 
     assert calls == ["image-1.png"]
 
 
+def test_upload_screens_accepts_manifest_paths_outside_working_directory(tmp_path: Path) -> None:
+    uploaded: list[str] = []
+
+    async def fake_upload(args: object) -> dict[str, str]:
+        assert isinstance(args, list)
+        uploaded.append(str(args[0]))
+        return {
+            "status": "success",
+            "img_url": "https://img.example/image.png",
+            "raw_url": "https://img.example/image.png",
+            "web_url": "https://img.example/image.png",
+        }
+
+    async def exercise() -> None:
+        source_screenshots = tmp_path / "source" / "screenshots"
+        state_screenshots = tmp_path / "state" / "tmp" / "release" / "screenshots"
+        source_screenshots.mkdir(parents=True)
+        state_screenshots.mkdir(parents=True)
+        screenshot = state_screenshots / "image.png"
+        screenshot.write_bytes(b"image")
+        meta = Meta({"base_dir": str(tmp_path), "uuid": "release", "imghost": "imgbox"})
+        config = {"DEFAULT": {"img_host_1": "imgbox", "image_upload_delay": 0}, "TRACKERS": {}}
+
+        with (
+            patch("src.uploadscreens.screenshots_dir", return_value=source_screenshots),
+            patch("src.uploadscreens.os.chdir"),
+            patch("src.uploadscreens.Path.cwd", return_value=source_screenshots),
+            patch("src.uploadscreens.manifest_files", return_value=[screenshot]),
+            patch("src.uploadscreens.upload_image_task", new=fake_upload),
+        ):
+            await _upload_screens(config, meta, 1, 1, 0, 1, [], {})
+
+        assert uploaded == [str(screenshot)]
+
+    asyncio.run(exercise())
+
+
 def test_upload_screens_preserves_partial_successes_across_fallback(tmp_path: Path) -> None:
     calls: list[tuple[str, str]] = []
 
