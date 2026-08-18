@@ -158,11 +158,12 @@ class CapybaraBR(UNIT3D):
     async def get_name(self, meta: Meta) -> dict[str, str]:
         category = meta.category
         cbr_name = meta.name
+        bioma_tag = "[BiOMA]" if "bioma" in (meta.tag or "").lower() and self.tracker == "CAPYBARABR" else ""
 
         if category == "BOOK":
             book_title = self.common.portuguese_title_capitalization(meta.title)
             year_str = str(meta.year) if meta.year is not None else ""
-            cbr_name = f"{book_title} - {meta.author} [{year_str}] [AUDIOBOOK]" if meta.audiobook else f"{book_title} - {meta.author} [{year_str}]"
+            cbr_name = f"{book_title} - {meta.author} [{year_str}] [AUDIOBOOK] {bioma_tag}" if meta.audiobook else f"{book_title} - {meta.author} [{year_str}]"
             book_language_iso = meta.book_language_iso
             if book_language_iso and book_language_iso != "por":
                 cbr_name += f" [{book_language_iso.upper()}]"
@@ -189,7 +190,7 @@ class CapybaraBR(UNIT3D):
                 dlc = f" {dlc}"
 
             year_str = str(meta.year) if meta.year is not None else ""
-            cbr_name = f"{meta.title} {update} {meta.game_version} {year_str} - {tag} {game_lang}{dlc}"
+            cbr_name = f"{meta.title} {update} {meta.game_version} {year_str} - {tag} {game_lang}{dlc} {bioma_tag}"
 
         elif category in ("MOVIE", "TV"):
             cbr_name = cbr_name.replace("DD+ ", "DDP").replace("DD ", "DD").replace("AAC ", "AAC").replace("FLAC ", "FLAC").replace("Dubbed", "").replace("Dual-Audio", "")

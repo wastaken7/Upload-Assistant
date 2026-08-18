@@ -1,5 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-from typing import Any
+from typing import Any, ClassVar
 
 import cli_ui
 
@@ -113,7 +113,7 @@ class Blutopia(UNIT3D):
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://blutopia.cc",)
-    REGION_IDS = {
+    REGION_IDS: ClassVar[dict[str, str]] = {
         "CZE": "244",
         "SVK": "245",
         "FIN": "246",
@@ -216,7 +216,7 @@ class Blutopia(UNIT3D):
             return region_name
         try:
             normalized_id = int(region_id) if region_id is not None else 0
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return ""
         return await self.common.unit3d_region_ids(reverse=True, region_id=normalized_id)
 

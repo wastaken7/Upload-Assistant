@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import re
-from typing import Any
+from typing import Any, ClassVar
 
 from src.console import logger
 from src.meta import Meta
@@ -29,7 +29,7 @@ class LST(UNIT3D):
     trumping_url = f"{base_url}/api/reports/torrents/"
     supported_categories = ("TV", "MOVIE", "BOOK", "MUSIC", "XXX")
     tracker_urls = ("https://lst.gg",)
-    REGION_IDS = {
+    REGION_IDS: ClassVar[dict[str, str]] = {
         "CZE": "244",
         "FIN": "245",
         "SWE": "246",
@@ -164,7 +164,7 @@ class LST(UNIT3D):
             return region_name
         try:
             normalized_id = int(region_id) if region_id is not None else 0
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return ""
         return await self.common.unit3d_region_ids(reverse=True, region_id=normalized_id)
 
