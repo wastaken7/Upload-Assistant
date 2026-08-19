@@ -723,8 +723,15 @@ config: dict[str, Any] = {
             # This does not cover all tracker rules. Set to False to disable.
             "check_for_rules": True,
             # The configurations below override the DEFAULT configuration
+            "thumbnail_size": "",
+            "screens_per_row": "",
             "episode_overview": True,
+            "custom_description_header": "",
+            "audio_spectrogram_header": "",
+            "dynamic_hdr_plot_header": "",
+            "custom_signature": "",
             "add_audio_spectrogram": True,
+            "add_dynamic_hdr_plot": True,
             "inject_delay": 0,
         },
         "BEYONDHD": {
@@ -1013,8 +1020,15 @@ config: dict[str, Any] = {
             # This does not cover all tracker rules. Set to False to disable.
             "check_for_rules": True,
             # The configurations below override the DEFAULT configuration
+            "thumbnail_size": "",
+            "screens_per_row": "",
             "episode_overview": True,
+            "custom_description_header": "",
+            "audio_spectrogram_header": "",
+            "dynamic_hdr_plot_header": "",
+            "custom_signature": "",
             "add_audio_spectrogram": True,
+            "add_dynamic_hdr_plot": True,
             "inject_delay": 0,
         },
         "CURUPIRA": {
@@ -2313,8 +2327,15 @@ config: dict[str, Any] = {
             # This does not cover all tracker rules. Set to False to disable.
             "check_for_rules": True,
             # The configurations below override the DEFAULT configuration
+            "thumbnail_size": "",
+            "screens_per_row": "",
             "episode_overview": True,
+            "custom_description_header": "",
+            "audio_spectrogram_header": "",
+            "dynamic_hdr_plot_header": "",
+            "custom_signature": "",
             "add_audio_spectrogram": True,
+            "add_dynamic_hdr_plot": True,
             "inject_delay": 0,
         },
         "PTCAFE": {

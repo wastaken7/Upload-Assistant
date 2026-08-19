@@ -648,6 +648,9 @@ class AZTrackerBase:
         builder = DescriptionBuilder(self.tracker, self.config)
         desc_parts: list[str] = []
 
+        # Custom Header
+        desc_parts.append(await builder.get_custom_header(meta))
+
         # TV stuff
         title, episode_overview = await builder.get_tv_info(meta)
         if episode_overview:
@@ -665,6 +668,9 @@ class AZTrackerBase:
 
         # Dynamic HDR metadata plots (Dolby Vision / HDR10+)
         desc_parts.append(await builder.get_dynamic_hdr_plot_section(meta))
+
+        # Custom Signature
+        desc_parts.append(await builder.get_custom_signature(meta))
 
         description = "\n\n".join(part for part in desc_parts if part.strip())
 
