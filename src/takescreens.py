@@ -53,7 +53,7 @@ def is_valid_lostimg_image_size(image_size: int) -> bool:
 def _positive_config_int(key: str, default: int) -> int:
     try:
         return max(1, int(default_config.get(key, default) or default))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 
@@ -71,7 +71,7 @@ def xxx_contact_sheet_animation_settings() -> tuple[bool, float]:
     animated = _as_bool(default_config.get("xxx_contact_sheet_animated_webp"), default=False)
     try:
         duration = max(0.1, float(default_config.get("xxx_contact_sheet_animation_seconds", 5) or 5))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         duration = 5.0
     return animated, duration
 
@@ -223,12 +223,12 @@ def _apply_config(config: Mapping[str, Any]) -> None:
 
     try:
         task_limit = int(default_config.get("process_limit", 1) or 1)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         task_limit = 1
 
     try:
         cutoff = int(default_config.get("cutoff_screens", 1) or 1)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         cutoff = 1
 
     ffmpeg_limit = default_config.get("ffmpeg_limit", False)
@@ -239,7 +239,7 @@ def _apply_config(config: Mapping[str, Any]) -> None:
     algorithm = str(default_config.get("algorithm", "mobius")).strip()
     try:
         desat = float(default_config.get("desat", 10.0))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         desat = 10.0
 
 
@@ -446,6 +446,12 @@ async def disc_screenshots(
     existing_screens = [p.name for p in manifest_files(base_dir, folder_id, capture_group or sanitized_filename)]
     total_existing = len(existing_screens) + len(existing_images)
     num_screens = max(0, screens - total_existing) if not force_screenshots else num_screens
+    is_hdr = any(marker in meta.hdr for marker in ("HDR", "DV", "HLG"))
+    if tone_map and is_hdr:
+        hdr_tonemap = True
+        meta.tonemapped = True
+    else:
+        hdr_tonemap = False
 
     if num_screens == 0 and not force_screenshots:
         logger.info("[bold green]Reusing existing screenshots. No additional screenshots needed.")
@@ -453,12 +459,6 @@ async def disc_screenshots(
 
     if meta.debug and not force_screenshots:
         logger.info(f"[bold yellow]Saving Screens... Total needed: {screens}, Existing: {total_existing}, To capture: {num_screens}")
-
-    if tone_map and "HDR" in meta.hdr:
-        hdr_tonemap = True
-        meta.tonemapped = True
-    else:
-        hdr_tonemap = False
 
     ss_times = await valid_ss_time([], num_screens, length, frame_rate or 24.0, meta, retake=force_screenshots)
 
@@ -1003,7 +1003,7 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
                 try:
                     if track.duration is not None:
                         video_duration = float(track.duration)
-                except TypeError, ValueError:
+                except (TypeError, ValueError):
                     video_duration = None
                 break
 
@@ -1770,6 +1770,8 @@ async def screenshots(
     # MediaInfo so an already-complete early capture is a true no-op.
     if not force_screenshots and not meta.retake and len(registered_screens) >= requested_screens:
         logger.debug(f"[yellow]Reusing {len(registered_screens)} registered screenshots from group '{group}'.[/yellow]")
+        if tone_map and any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
+            meta.tonemapped = True
         return [str(screen) for screen in registered_screens[:requested_screens]]
 
     try:
@@ -1837,6 +1839,8 @@ async def screenshots(
     if not force_screenshots and not meta.retake:
         num_screens = max(0, num_screens - len(registered_screens))
     if num_screens <= 0:
+        if tone_map and any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
+            meta.tonemapped = True
         return [str(screen) for screen in registered_screens] or None
 
     sanitized_filename = await sanitize_filename(filename)
@@ -1853,6 +1857,8 @@ async def screenshots(
 
     if existing_images_count == num_screens and not meta.retake:
         logger.debug("[yellow]The correct number of screenshots already exists. Skipping capture process.")
+        if tone_map and any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
+            meta.tonemapped = True
         return existing_image_paths
 
     num_capture = num_screens - existing_images_count
