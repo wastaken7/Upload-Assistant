@@ -446,6 +446,12 @@ async def disc_screenshots(
     existing_screens = [p.name for p in manifest_files(base_dir, folder_id, capture_group or sanitized_filename)]
     total_existing = len(existing_screens) + len(existing_images)
     num_screens = max(0, screens - total_existing) if not force_screenshots else num_screens
+    is_hdr = any(marker in meta.hdr for marker in ("HDR", "DV", "HLG"))
+    if tone_map and is_hdr:
+        hdr_tonemap = True
+        meta.tonemapped = True
+    else:
+        hdr_tonemap = False
 
     if num_screens == 0 and not force_screenshots:
         logger.info("[bold green]Reusing existing screenshots. No additional screenshots needed.")
@@ -453,12 +459,6 @@ async def disc_screenshots(
 
     if meta.debug and not force_screenshots:
         logger.info(f"[bold yellow]Saving Screens... Total needed: {screens}, Existing: {total_existing}, To capture: {num_screens}")
-
-    if tone_map and "HDR" in meta.hdr:
-        hdr_tonemap = True
-        meta.tonemapped = True
-    else:
-        hdr_tonemap = False
 
     ss_times = await valid_ss_time([], num_screens, length, frame_rate or 24.0, meta, retake=force_screenshots)
 
@@ -1837,6 +1837,8 @@ async def screenshots(
     if not force_screenshots and not meta.retake:
         num_screens = max(0, num_screens - len(registered_screens))
     if num_screens <= 0:
+        if tone_map and any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
+            meta.tonemapped = True
         return [str(screen) for screen in registered_screens] or None
 
     sanitized_filename = await sanitize_filename(filename)
@@ -1853,6 +1855,8 @@ async def screenshots(
 
     if existing_images_count == num_screens and not meta.retake:
         logger.debug("[yellow]The correct number of screenshots already exists. Skipping capture process.")
+        if tone_map and any(marker in meta.hdr for marker in ("HDR", "DV", "HLG")):
+            meta.tonemapped = True
         return existing_image_paths
 
     num_capture = num_screens - existing_images_count

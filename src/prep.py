@@ -191,7 +191,7 @@ class Prep:
         # When description images are enabled, however, tracker metadata may
         # satisfy cutoff_screens. Do not generate local frames that would then
         # be discarded solely because that lookup has not completed yet.
-        early_screenshots_task: asyncio.Task[None] | None = None
+        early_screenshots_task: asyncio.Task[Meta | None] | None = None
         if not meta.keep_images:
             early_screenshots_task = asyncio.create_task(self._capture_early_screenshots(meta.copy(), filename, videopath, bdinfo))
         else:
@@ -226,7 +226,14 @@ class Prep:
         # starts consuming the generated files. Any error is logged by the
         # helper; the existing upload-stage capture remains the fallback.
         if early_screenshots_task is not None:
-            await early_screenshots_task
+            early_meta = await early_screenshots_task
+            if early_meta is not None:
+                if early_meta.tonemapped:
+                    meta.tonemapped = True
+                if early_meta.libplacebo:
+                    meta.libplacebo = True
+                if getattr(early_meta, "frame_info_map", None):
+                    meta.frame_info_map = early_meta.frame_info_map
         if meta.category == "XXX":
             meta.screens = len(manifest_files(meta.base_dir, meta.uuid, "main"))
 
@@ -242,12 +249,12 @@ class Prep:
 
         return meta
 
-    async def _capture_early_screenshots(self, meta: Meta, filename: str, videopath: str, bdinfo: dict[str, Any]) -> None:
+    async def _capture_early_screenshots(self, meta: Meta, filename: str, videopath: str, bdinfo: dict[str, Any]) -> Meta | None:
         """Generate local screenshots while metadata and tracker IDs are fetched."""
         if meta.keep_images:
-            return
+            return None
         if meta.category in ("MUSIC", "GAME", "BOOK") or meta.screens <= 0:
-            return
+            return None
 
         try:
             if meta.is_disc == "BDMV":
@@ -330,10 +337,12 @@ class Prep:
                     capture_group="main",
                 )
             logger.debug("[cyan]Early screenshot generation completed.[/cyan]")
+            return meta
         except asyncio.CancelledError:
             raise
         except Exception as error:
             logger.warning(f"[yellow]Early screenshot generation failed; upload stage will retry: {error}[/yellow]")
+            return None
 
     def check_adult_media(self, meta: Meta) -> bool:
         if meta.category == "XXX":
