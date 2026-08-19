@@ -690,7 +690,24 @@ def _validate_trackers_section(trackers: dict[str, Any], active_trackers: list[s
                 errors.append(f"[TRACKERS][{tracker_name}] announce_url contains placeholder (e.g., <PASSKEY>) - replace with actual value")
 
         # Check boolean fields are actually booleans (must be real bool, not string)
-        bool_fields = ["anon", "useAPI", "use_for_search", "modq", "draft", "draft_default", "img_rehost", "allow_ext_subtitles", "resolve_language"]
+        bool_fields = [
+            "anon",
+            "useAPI",
+            "use_for_search",
+            "modq",
+            "draft",
+            "draft_default",
+            "img_rehost",
+            "allow_ext_subtitles",
+            "resolve_language",
+            "featured",
+            "doubleup",
+            "double_upload",
+            "double_up",
+            "refundable",
+            "sticky",
+            "exclusive",
+        ]
         for field in bool_fields:
             if field in tracker_config_dict:
                 value = tracker_config_dict[field]
@@ -698,6 +715,24 @@ def _validate_trackers_section(trackers: dict[str, Any], active_trackers: list[s
                     warnings.append(
                         ConfigValidationWarning(f"'{field}' must be a boolean type (True/False), got {type(value).__name__}: {value!r}", key=tracker_name, section="TRACKERS")
                     )
+
+        # Check integer fields
+        int_fields = [
+            "freeleech_until",
+            "double_upload_until",
+        ]
+        for field in int_fields:
+            if field in tracker_config_dict:
+                value = tracker_config_dict[field]
+                if isinstance(value, bool) or not isinstance(value, int):
+                    try:
+                        int_val = int(str(value))
+                        if int_val < 0:
+                            warnings.append(ConfigValidationWarning(f"'{field}' must be a non-negative integer, got {value!r}", key=tracker_name, section="TRACKERS"))
+                    except ValueError, TypeError:
+                        warnings.append(ConfigValidationWarning(f"'{field}' must be an integer, got {type(value).__name__}: {value!r}", key=tracker_name, section="TRACKERS"))
+                elif isinstance(value, int) and value < 0:
+                    warnings.append(ConfigValidationWarning(f"'{field}' must be a non-negative integer, got {value!r}", key=tracker_name, section="TRACKERS"))
 
     return errors, warnings
 

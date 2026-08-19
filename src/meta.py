@@ -121,6 +121,8 @@ class Meta:
     douban_manual: int | str | None = None
     douban_rating: float | str | None = None
     douban_votes: int | str | None = None
+    doubleup: bool = False
+    double_upload_until: int = 0
     downloaded_bluray_cover_paths: dict[str, str] = field(default_factory=dict)
     draft: bool | None = None
     dual_audio: bool = False
@@ -146,6 +148,7 @@ class Meta:
     ext_torrenthash: str | None = None
     extra_openlibrary_ids: int | None = None
     extras: bool | None = None
+    featured: bool = False
     ffdebug: bool = False
     file_count_match: int | bool = False
     filelist: list[Any] = field(default_factory=list)
@@ -164,6 +167,7 @@ class Meta:
     frame_rate: float | None = None
     framestor: bool | None = None
     freeleech: int = 0
+    freeleech_until: int = 0
     game_region: str = ""
     game_subcategory: str = ""
     game_system: str = ""
@@ -341,6 +345,7 @@ class Meta:
     regex_title: str = ""
     regex_year: str = ""
     region: str = ""
+    refundable: bool = False
     rehash: bool = False
     rehosted_artwork_url: str | None = None
     release_date: str = ""
@@ -416,6 +421,7 @@ class Meta:
     dynamic_hdr_plot_images: list[Any] = field(default_factory=list)
     steam_manual: str | None = None
     steam_url: str | None = None
+    sticky: bool = False
     stream: bool = False
     studios: list[str] | str | None = None
     subs_reuse_torrent_path: str | None = None

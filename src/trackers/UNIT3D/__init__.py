@@ -372,8 +372,8 @@ class UNIT3D:
         return data
 
     async def get_featured(self, meta: Meta) -> dict[str, str]:
-        _meta = meta
-        return {"featured": "0"}
+        featured = await self.get_flag(meta, "featured")
+        return {"featured": featured}
 
     async def get_free(self, meta: Meta) -> dict[str, str]:
         free = "0"
@@ -383,12 +383,16 @@ class UNIT3D:
         return {"free": free}
 
     async def get_doubleup(self, meta: Meta) -> dict[str, str]:
-        _meta = meta
-        return {"doubleup": "0"}
+        doubleup = await self.get_flag(meta, "doubleup")
+        if doubleup == "0":
+            doubleup = await self.get_flag(meta, "double_upload")
+        if doubleup == "0":
+            doubleup = await self.get_flag(meta, "double_up")
+        return {"doubleup": doubleup}
 
     async def get_sticky(self, meta: Meta) -> dict[str, str]:
-        _meta = meta
-        return {"sticky": "0"}
+        sticky = await self.get_flag(meta, "sticky")
+        return {"sticky": sticky}
 
     async def get_data(self, meta: Meta) -> dict[str, str]:
         results = await asyncio.gather(

@@ -598,6 +598,26 @@ class Args:
         )
         parser.add_argument("-dr", "--draft", action="store_true", required=False, help="Send to drafts (BEYONDHD, LST)")
         parser.add_argument("-mq", "--modq", action="store_true", required=False, help="Send to modQ")
+        parser.add_argument("-feat", "--featured", action="store_true", required=False, help="Featured torrent")
+        parser.add_argument(
+            "-dup",
+            "--double-upload",
+            action="store_true",
+            required=False,
+            help="Double upload (UNIT3D internal/staff only)",
+            dest="doubleup",
+        )
+        parser.add_argument(
+            "-dupuntil",
+            "--double-upload-until",
+            nargs=1,
+            required=False,
+            help="Double upload duration in days (Aither, internal/staff only)",
+            default=0,
+            dest="double_upload_until",
+        )
+        parser.add_argument("-stk", "--sticky", action="store_true", required=False, help="Sticky torrent (Pinned)")
+        parser.add_argument("-ref", "--refundable", action="store_true", required=False, help="Refundable torrent (Aither, internal/staff only)")
         parser.add_argument("-client", "--client", nargs=1, required=False, help="Use this torrent client instead of default")
         parser.add_argument("-qbt", "--qbit-tag", dest="qbit_tag", nargs=1, required=False, help="Add to qbit with this tag")
         parser.add_argument("-qbc", "--qbit-cat", dest="qbit_cat", nargs=1, required=False, help="Add to qbit with this category")
@@ -666,6 +686,15 @@ class Args:
             help="Freeleech Percentage. Any value 1-100 works, but site search is limited to certain values",
             default=0,
             dest="freeleech",
+        )
+        parser.add_argument(
+            "-fl-until",
+            "--freeleech-until",
+            nargs=1,
+            required=False,
+            help="Freeleech duration in days (Aither, internal/staff only)",
+            default=0,
+            dest="freeleech_until",
         )
         parser.add_argument("--infohash", nargs=1, required=False, help="V1 Info Hash")
         parser.add_argument(
@@ -861,15 +890,23 @@ class Args:
                     meta[key] = float(str(value))
                 else:
                     meta[key] = None
-            if key in ("freeleech"):
+            if key in ("freeleech", "freeleech_until", "double_upload_until"):
                 if isinstance(value, list):
                     value_list = [str(item) for item in value]
                     if len(value_list) == 1 and value_list[0] != "":
-                        meta[key] = int(value_list[0])
+                        try:
+                            parsed_int = int(value_list[0])
+                            meta[key] = parsed_int if parsed_int >= 0 else 0
+                        except ValueError, TypeError:
+                            meta[key] = 0
                     else:
                         meta[key] = 0
                 elif value not in (None, [], 0, ""):
-                    meta[key] = int(str(value))
+                    try:
+                        parsed_int = int(str(value))
+                        meta[key] = parsed_int if parsed_int >= 0 else 0
+                    except ValueError, TypeError:
+                        meta[key] = 0
                 else:
                     meta[key] = 0
             if key in ["manual_episode_title"] and value == []:
