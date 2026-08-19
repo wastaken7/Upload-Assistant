@@ -511,6 +511,24 @@ config: dict[str, Any] = {
             "anon": True,
             # Send uploads to AITHER modq for staff approval
             "modq": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Double upload duration in days
+            "double_upload_until": 0,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Freeleech duration in days
+            "freeleech_until": 0,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as refundable
+            "refundable": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -619,6 +637,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -652,6 +679,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Send uploads to AURA4K modq for staff approval
             "modq": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -741,6 +777,15 @@ config: dict[str, Any] = {
             "link_dir_name": "",
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -806,6 +851,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -869,6 +923,15 @@ config: dict[str, Any] = {
             "modq": False,
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -906,6 +969,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -962,6 +1034,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Send uploads to DARKPEERS modq for staff approval
             "modq": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -994,6 +1075,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1068,6 +1158,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Use Spanish title instead of English title, if available
             "use_spanish_title": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1174,6 +1273,15 @@ config: dict[str, Any] = {
             # You can find your announce URL at https://hawke.uno/upload
             "announce_url": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1287,6 +1395,15 @@ config: dict[str, Any] = {
             "link_dir_name": "",
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1350,6 +1467,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1417,6 +1543,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1510,6 +1645,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1543,6 +1687,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Send uploads to LATTEAM modq for staff approval
             "modq": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1607,6 +1760,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1672,6 +1834,15 @@ config: dict[str, Any] = {
             "modq": False,
             # Send uploads to LST drafts
             "draft": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1705,6 +1876,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Send uploads to LUMINARR modq for staff approval
             "modq": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1750,6 +1930,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Send uploads to MIDNIGHTSCENE modq for staff approval
             "modq": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1817,6 +2006,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1857,6 +2055,15 @@ config: dict[str, Any] = {
             # Send uploads to OLDTOONSWORLD modq for staff approval
             "modq": False,
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1888,6 +2095,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -1973,6 +2189,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Send uploads to PEERGARDEN modq for staff approval
             "modq": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2004,6 +2229,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2035,6 +2269,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2212,6 +2455,15 @@ config: dict[str, Any] = {
             "api_key": "",
             "announce_url": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2273,6 +2525,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2304,6 +2565,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2369,6 +2639,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Send uploads to Retro Movies Club modq for staff approval
             "modq": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2402,6 +2681,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Set this to True if you want to allow external subtitles to be included in the upload
             "allow_ext_subtitles": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2432,6 +2720,15 @@ config: dict[str, Any] = {
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "use_for_search": False,
             "api_key": "",
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2465,6 +2762,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Use Italian title instead of English title, if available
             "use_italian_title": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2496,6 +2802,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2591,6 +2906,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2627,6 +2951,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Upload with Exclusive flag (team of staff only)
             "exclusive": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2660,6 +2993,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Send to modq for staff approval
             "modq": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2690,6 +3032,15 @@ config: dict[str, Any] = {
             # "use_for_search": False, set to True if using this tracker for automatic ID searching or description parsing
             "use_for_search": False,
             "api_key": "",
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2783,6 +3134,15 @@ config: dict[str, Any] = {
             "anon": True,
             # Send to modq for staff approval
             "modq": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2814,6 +3174,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2877,6 +3246,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",
@@ -2908,6 +3286,15 @@ config: dict[str, Any] = {
             "use_for_search": False,
             "api_key": "",
             "anon": True,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as featured
+            "featured": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload with double upload credit
+            "doubleup": False,
+            # For authorized users only. Do not change this unless you know what you are doing
+            # Upload as sticky/pinned
+            "sticky": False,
             # The configurations below override the DEFAULT configuration
             "add_logo": True,
             "logo_size": "",

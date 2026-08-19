@@ -68,6 +68,18 @@ class Aither(UNIT3D):
         elif not has_hdr10p and any(flag in hdr_value for flag in ["HDR", "HLG"]):
             data["hdr"] = 1
 
+        refundable = await self.get_flag(meta, "refundable")
+        if refundable:
+            data["refundable"] = bool(refundable)
+
+        freeleech_until = await self.get_flag(meta, "freeleech_until")
+        if freeleech_until:
+            data["fl_until"] = freeleech_until
+
+        double_upload_until = await self.get_flag(meta, "double_upload_until")
+        if double_upload_until:
+            data["du_until"] = double_upload_until
+
         return data
 
     async def get_region_id(self, meta: Meta) -> dict[str, str]:
