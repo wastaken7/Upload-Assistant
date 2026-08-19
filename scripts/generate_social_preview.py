@@ -90,16 +90,7 @@ def draw_social_preview():
     img = Image.alpha_composite(img, glow_layer)
     draw = ImageDraw.Draw(img)
 
-    # 6. Grid Overlay
-    grid_color = (41, 37, 36, 51)  # #292524 with ~20% alpha
-    # Vertical grid lines
-    for x in range(0, 1280, 40):
-        draw.line([(x, 0), (x, 640)], fill=grid_color, width=1)
-    # Horizontal grid lines
-    for y in range(0, 640, 40):
-        draw.line([(0, y), (1280, y)], fill=grid_color, width=1)
-
-    # 7. Typography (Left Column)
+    # 6. Typography (Left Column)
     title_x = x_start - title_bbox[0]
     draw.text((title_x, title_y), title_text, fill=(255, 255, 255, 255), font=title_font)
 
@@ -109,7 +100,7 @@ def draw_social_preview():
     # Divider
     draw.line([(x_start, divider_y), (x_start + left_column_w, divider_y)], fill=(41, 37, 36, 255), width=divider_h)
 
-    # 8. Badges (Left Column)
+    # 7. Badges (Left Column)
     def draw_badge(x, y, w, h, bg_color, border_color, text, text_color):
         badge_layer = Image.new("RGBA", (1280, 640), (0, 0, 0, 0))
         b_draw = ImageDraw.Draw(badge_layer)
@@ -138,7 +129,7 @@ def draw_social_preview():
     # Badge 3: CLI
     draw_badge(x_start + (badge_w + badge_gap) * 2, badges_y, badge_w, badges_h, (41, 37, 36, 102), (87, 83, 78, 255), "CLI & Automation", (231, 229, 228, 255))
 
-    # 9. Render and Paste Logo
+    # 8. Render and Paste Logo
     logo_img = draw_logo(logo_size)
     img.paste(logo_img, (int(logo_x), int(logo_y)), mask=logo_img)
 
