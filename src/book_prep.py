@@ -43,6 +43,7 @@ from src.book_extractors import (
 )
 from src.console import logger
 from src.exportmi import export_info
+from src.genre_map import map_audiobook_keywords
 from src.meta import Meta
 
 # ---------------------------------------------------------------------------
@@ -427,8 +428,7 @@ async def gather_book_prep(
                 # 8. Genre -> Keywords
                 genre = _unescape_meta_val(general_track.get("Genre") or general_track.get("genre"))
                 if genre:
-                    words = re.split(r"[;,]", genre)
-                    cleaned_words = [w.strip().lower() for w in words if w.strip()]
+                    cleaned_words = map_audiobook_keywords(genre)
                     if cleaned_words:
                         existing_keywords = meta.keywords
                         existing_list: list[str] = []
@@ -669,6 +669,9 @@ async def gather_book_prep(
         avg_bitrate = await get_audiobook_bitrate(filelist)
         if avg_bitrate is not None:
             meta.audiobook_bitrate = avg_bitrate
+
+        if meta.keywords:
+            meta.keywords = map_audiobook_keywords(meta.keywords)
 
     detect_newspaper(meta)
     sanitize_book_language(meta)

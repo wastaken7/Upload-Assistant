@@ -743,7 +743,10 @@ const argumentCategories = [
         description: "Set exclusive flag where supported",
       },
       { label: "--featured", description: "Mark upload as Featured (UNIT3D)" },
-      { label: "--double-upload", description: "Mark upload as Double Upload (UNIT3D)" },
+      {
+        label: "--double-upload",
+        description: "Mark upload as Double Upload (UNIT3D)",
+      },
       {
         label: "--double-upload-until",
         placeholder: "N",
@@ -754,8 +757,14 @@ const argumentCategories = [
         placeholder: "N",
         description: "Freeleech duration in days (UNIT3D)",
       },
-      { label: "--refundable", description: "Mark upload as Refundable (UNIT3D)" },
-      { label: "--sticky", description: "Mark upload as Sticky / pinned (UNIT3D)" },
+      {
+        label: "--refundable",
+        description: "Mark upload as Refundable (UNIT3D)",
+      },
+      {
+        label: "--sticky",
+        description: "Mark upload as Sticky / pinned (UNIT3D)",
+      },
     ],
   },
   {

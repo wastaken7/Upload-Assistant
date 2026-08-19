@@ -63,3 +63,23 @@ def test_text_sidecars_are_excluded_when_a_richer_book_format_exists(tmp_path):
 
     assert videopath == str(book.resolve())
     assert filelist == [str(book.resolve())]
+
+
+def test_map_audiobook_keywords():
+    from src.genre_map import map_audiobook_keywords
+
+    # PT-BR compound genre
+    assert map_audiobook_keywords("Ação e Aventura") == ["ação", "aventura"]
+    assert map_audiobook_keywords("22. Ação e Aventura") == ["ação", "aventura"]
+
+    # English compound genre
+    assert map_audiobook_keywords("Action & Adventure") == ["action", "adventure"]
+    assert map_audiobook_keywords("Science Fiction & Fantasy") == ["science fiction", "fantasy"]
+
+    # Multiple genres in list
+    assert map_audiobook_keywords(["Ação e Aventura", "Romance"]) == ["ação", "aventura", "romance"]
+
+    # Fallback to original cleaned genre when not in map
+    assert map_audiobook_keywords("Custom Unmapped Genre") == ["custom unmapped genre"]
+    assert map_audiobook_keywords("Custom Genre A; Custom Genre B") == ["custom genre a", "custom genre b"]
+

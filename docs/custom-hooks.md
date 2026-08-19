@@ -43,11 +43,11 @@ flowchart LR
 
 All hook scripts must be located inside the `custom_hooks/` directory in your `STATE_DIR`:
 
-| Environment | Directory Path |
-| :--- | :--- |
-| **Docker** | `/state/custom_hooks/` |
+| Environment                    | Directory Path                                                          |
+| :----------------------------- | :---------------------------------------------------------------------- |
+| **Docker**                     | `/state/custom_hooks/`                                                  |
 | **Linux / macOS (Bare metal)** | `~/.local/state/Upload-Assistant/custom_hooks/` or `data/custom_hooks/` |
-| **Windows (Bare metal)** | `%LOCALAPPDATA%\Upload-Assistant\custom_hooks\` or `data\custom_hooks\` |
+| **Windows (Bare metal)**       | `%LOCALAPPDATA%\Upload-Assistant\custom_hooks\` or `data\custom_hooks\` |
 
 ---
 
