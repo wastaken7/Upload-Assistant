@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, ClassVar, cast
 
 import aiofiles
-import cli_ui
 import fitz
 import httpx
 import langcodes
@@ -15,11 +14,9 @@ import rarfile
 from bs4 import BeautifulSoup
 from langcodes.tag_parser import LanguageTagError
 from rich.markup import escape
-from unidecode import unidecode
 
-from src.console import logger, prompt_in_thread
+from src.console import logger
 from src.cookie_auth import CookieAuthUploader, CookieValidator
-from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder, html_to_bbcode
 from src.languages import languages_manager
 from src.meta import Meta
@@ -645,46 +642,6 @@ class BrasilTracker:
 
         return youtube
 
-    async def get_tags(self, meta: Meta) -> str:
-        """Map genres from meta.genres or TMDB to Portuguese tags."""
-        if meta.category == "BOOK":
-            return ""
-
-        matched_tags: list[str] = []
-
-        genres_list = meta.genres or meta.keywords or []
-        for genre in genres_list:
-            genre_lower = genre.strip().lower()
-            mapped = ENG_TO_PTBR_GENRE_MAP.get(genre_lower)
-
-            if not mapped and genre_lower in ENG_TO_PTBR_GENRE_MAP.values():
-                mapped = genre_lower
-
-            if mapped and mapped not in matched_tags:
-                matched_tags.append(mapped)
-
-        if meta.category in ("TV", "MOVIE") and not matched_tags:
-            genres_data: list[dict[str, Any]] = self.main_tmdb_data.get("genres", [])
-            for g in genres_data:
-                name = str(g.get("name", "")).lower()
-                if name.strip():
-                    mapped = ENG_TO_PTBR_GENRE_MAP.get(name)
-                    if mapped and mapped not in matched_tags:
-                        matched_tags.append(mapped)
-
-        # If we have matched tags, return them
-        if matched_tags:
-            return unidecode(", ".join(matched_tags))
-
-        # Final fallback: ask user
-        if meta.unattended and not meta.unattended_confirm:
-            logger.info(f"{self.tracker}: [yellow]Gêneros não encontrados em modo unattended. Plando upload para {self.tracker}.[/yellow]")
-            meta.skipping = f"{self.tracker}"
-            return ""
-
-        tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
-        return unidecode((tags_raw or "").strip())
-
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         dupes: list[dict[str, Any]] = []
         is_book = meta.category == "BOOK"
@@ -972,6 +929,7 @@ class BrasilTracker:
             "year": str(meta.year) if meta.year is not None else "",
             "title": original_title,
             "type": await self.get_type(meta),
+            "tags": await self.common.get_portuguese_tags(meta, tracker=self.tracker, tmdb_data=self.main_tmdb_data),
         }
 
         if meta.category == "GAME":
@@ -997,7 +955,6 @@ class BrasilTracker:
                     "plataforma_jogo": self.get_game_platform_bt(meta),
                     "sys_jogo": self.get_game_os(meta),
                     "format": self.get_game_format(meta),
-                    "tags": await self.get_tags(meta),
                     "image": cover_url,
                     "sinopse": overview,
                     "especificas": description,
@@ -1054,7 +1011,6 @@ class BrasilTracker:
                         "diretor": meta.publisher or meta.author,
                         "edicao": edicao_str,
                         "paginas": self.get_book_pages(meta),
-                        "tags": await self.get_tags(meta),
                         "desc": html_to_bbcode(meta.overview),
                         "especificas": description,
                         "screen[]": await self.get_screens(meta),
@@ -1079,7 +1035,6 @@ class BrasilTracker:
                 data.update(
                     {
                         "diretor": meta.author,
-                        "tags": await self.get_tags(meta),
                         "desc": html_to_bbcode(meta.overview),
                         "screen[]": await self.get_screens(meta),
                     }
@@ -1106,7 +1061,6 @@ class BrasilTracker:
                     "screen[]": await self.get_screens(meta),
                     "sinopse": self.main_tmdb_data.get("overview", "Nenhuma sinopse disponível."),
                     "subtitles[]": subtitle_ids,
-                    "tags": await self.get_tags(meta),
                     "video_c": await self.get_video_codec(meta),
                     "youtube": await self.get_trailer(meta),
                 }

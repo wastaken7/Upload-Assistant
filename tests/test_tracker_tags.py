@@ -3,17 +3,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.trackers.bjshare import BJShare
-from src.trackers.brasiltracker import BrasilTracker
+from src.trackers.common import Common
 
 
-@pytest.mark.parametrize("tracker_class", [BJShare, BrasilTracker])
-def test_get_tags_removes_accents_from_mapped_tags(tracker_class):
-    tracker = object.__new__(tracker_class)
-    tracker.main_tmdb_data = {}
-    meta = SimpleNamespace(category="MOVIE", genres=["Action", "Mystery"], keywords=[])
+@pytest.mark.parametrize("tracker_name", ["BJShare", "BrasilTracker"])
+def test_get_tags_removes_accents_from_mapped_tags(tracker_name):
+    common = Common(config={})
+    meta = SimpleNamespace(category="MOVIE", genres=["Action", "Mystery"], keywords=[], unattended=False, unattended_confirm=False)
 
-    tags = asyncio.run(tracker.get_tags(meta))
+    tags = asyncio.run(common.get_portuguese_tags(meta, tracker=tracker_name, tmdb_data={}))
 
     assert tags == "acao, misterio"  # noqa: S101
     assert tags.isascii()  # noqa: S101

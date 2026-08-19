@@ -18,7 +18,6 @@ from unidecode import unidecode
 
 from src.console import logger, prompt_in_thread
 from src.cookie_auth import CookieAuthUploader, CookieValidator
-from src.genre_map import ENG_TO_PTBR_GENRE_MAP
 from src.get_desc import DescriptionBuilder
 from src.languages import languages_manager
 from src.meta import Meta
@@ -619,43 +618,6 @@ class BJShare:
                 us_rating = item.get("rating", "")
 
         return br_rating or us_rating or ""
-
-    async def get_tags(self, meta: Meta) -> str:
-        """Map genres from meta.genres or TMDB to Portuguese tags."""
-        matched_tags: list[str] = []
-
-        genres_list = meta.genres or meta.keywords or []
-        for genre in genres_list:
-            genre_lower = genre.strip().lower()
-            mapped = ENG_TO_PTBR_GENRE_MAP.get(genre_lower)
-
-            if not mapped and genre_lower in ENG_TO_PTBR_GENRE_MAP.values():
-                mapped = genre_lower
-
-            if mapped and mapped not in matched_tags:
-                matched_tags.append(mapped)
-
-        if meta.category in ("TV", "MOVIE") and not matched_tags:
-            genres_data: list[dict[str, Any]] = self.main_tmdb_data.get("genres", [])
-            for g in genres_data:
-                name = str(g.get("name", "")).lower()
-                if name.strip():
-                    mapped = ENG_TO_PTBR_GENRE_MAP.get(name)
-                    if mapped and mapped not in matched_tags:
-                        matched_tags.append(mapped)
-
-        # If we have matched tags, return them
-        if matched_tags:
-            return unidecode(", ".join(matched_tags))
-
-        # Final fallback: ask user
-        if meta.unattended and not meta.unattended_confirm:
-            logger.info(f"{self.tracker}: [yellow]Unattended mode: Gêneros não encontrados. Plando upload para {self.tracker}.[/yellow]")
-            meta.skipping = f"{self.tracker}"
-            return ""
-
-        tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")
-        return unidecode((tags_raw or "").strip())
 
     def get_database_title(self, soup: BeautifulSoup) -> str:
         """
@@ -1482,6 +1444,7 @@ class BJShare:
             "formato": self.get_container(meta),
             "type": str(self.get_type(meta)),
             "year": self.get_year(meta),
+            "tags": await self.common.get_portuguese_tags(meta, tracker=self.tracker, tmdb_data=self.main_tmdb_data),
         }
 
         if category == "BOOK":
@@ -1513,7 +1476,6 @@ class BJShare:
                     "title": original_title,
                     "plataforma": self.get_game_platform(meta),
                     "idioma": self.get_game_language(meta),
-                    "tags": await self.get_tags(meta),
                     "adulto": self.get_adulto(meta),
                     "release_desc": release_desc,
                     "fichatecnica": await self.build_description(meta),
@@ -1571,7 +1533,6 @@ class BJShare:
                     "resolucaoh": height,
                     "resolucaow": width,
                     "sinopse": await self.get_overview(meta),
-                    "tags": await self.get_tags(meta),
                     "tipolegenda": await self.get_subtitle(meta),
                     "title": original_title,
                     "titulobrasileiro": brazilian_title,

@@ -544,6 +544,7 @@ class UploadHelper:
         lines.append(("Title", f"{meta.title} ({meta.year})"))
         lines.append(("Category", meta.category))
         edition = meta.edition
+        keywords = ", ".join(meta.keywords) if meta.keywords else ""
 
         # BOOK
         if meta.category == "BOOK":
@@ -629,6 +630,8 @@ class UploadHelper:
             if meta.category == "TV" and not meta.tv_pack and meta.overview_meta:
                 lines.append(("Episode overview:", meta.overview_meta[:60] + "...."))
             lines.append(("Genre", ", ".join(meta.genres)))
+            if meta.category == "BOOK":
+                lines.append(("Keywords", keywords))
             if meta.demographic != "":
                 lines.append(("Demographic", meta.demographic))
 
