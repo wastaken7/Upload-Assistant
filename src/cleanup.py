@@ -246,13 +246,13 @@ class CleanupManager:
 
 
 # Wrapped "erase key check and save" in tty check so that Python won't complain if UA is called by a script
-if hasattr(sys.stdin, "isatty") and sys.stdin.isatty() and not sys.stdin.closed:
+if os.name == "posix" and not IS_ANDROID and hasattr(sys.stdin, "isatty") and sys.stdin.isatty() and not sys.stdin.closed:
     try:
-        output = subprocess.check_output(["stty", "-a"]).decode()  # noqa: S607
+        output = subprocess.check_output(["stty", "-a"], stderr=subprocess.DEVNULL).decode()  # noqa: S607
         match = re.search(r" erase = (\S+);", output)
         if match:
             erase_key = match.group(1)
-    except OSError:
+    except OSError, subprocess.SubprocessError:
         pass
 
 

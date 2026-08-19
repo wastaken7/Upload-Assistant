@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import argparse
 import ast
 import json
 import re
@@ -1099,6 +1100,9 @@ def generate_config_file(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Upload-Assistant Configuration Generator")
+    parser.parse_args()
+
     console.print("\nUpload-Assistant Configuration Generator", markup=False)
     console.print("========================================", markup=False)
 
