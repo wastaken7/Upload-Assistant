@@ -4,6 +4,8 @@
 from dataclasses import MISSING, dataclass, field, fields
 from typing import Any
 
+from src.app_paths import STATE_DIR
+
 _TRACKER_ID_ALIASES = {
     "ANT": "ANTHELION",
     "BHD": "BEYONDHD",
@@ -55,7 +57,7 @@ class Meta:
     auto_nfo: bool = False
     available_platforms: list[Any] = field(default_factory=list)
     backdrop: str = ""
-    base_dir: str = ""
+    base_dir: str = field(default_factory=lambda: str(STATE_DIR))
     base_reuse_torrent_path: str | None = None
     base_torrent_created: bool | None = None
     base_torrent_piece_mb: int = 0
@@ -537,6 +539,8 @@ class Meta:
                 setattr(self, k, v)
         for k, v in kwargs.items():
             setattr(self, k, v)
+        if not self.base_dir:
+            self.base_dir = str(STATE_DIR)
         self.set_tracker_ids(self.tracker_ids)
 
     def copy(self) -> Meta:

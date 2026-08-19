@@ -11,20 +11,20 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from src.temp_paths import screenshots_dir
+from src.temp_paths import release_temp_dir, screenshots_dir
 
 _locks: dict[str, threading.RLock] = {}
 _locks_guard = threading.Lock()
 
 
-def _lock(base_dir: str | Path, release_id: str) -> threading.RLock:
+def _lock(base_dir: str | Path | None, release_id: str) -> threading.RLock:
     key = str(_path(base_dir, release_id).resolve()).casefold()
     with _locks_guard:
         return _locks.setdefault(key, threading.RLock())
 
 
-def _path(base_dir: str | Path, release_id: str) -> Path:
-    return Path(base_dir) / "tmp" / release_id / "screenshot_manifest.json"
+def _path(base_dir: str | Path | None, release_id: str) -> Path:
+    return release_temp_dir(base_dir, release_id) / "screenshot_manifest.json"
 
 
 def _load(base_dir: str | Path, release_id: str) -> dict[str, Any]:
