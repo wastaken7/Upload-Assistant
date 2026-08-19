@@ -1714,11 +1714,11 @@ class MakingOff:
         Returns:
             bool: True if the release meets all requirements.
         """
-        if str(getattr(meta, "category", "")).upper() != "MOVIE":
+        if meta.category.upper() != "MOVIE":
             logger.warning(f"{self.tracker}: [bold red]Only films may be uploaded to this forum.[/bold red]")
             return False
 
-        if bool(getattr(meta, "adult_media", False) or getattr(meta, "tmdb_adult_media", False)):
+        if meta.adult_media or meta.tmdb_adult_media:
             logger.warning(f"{self.tracker}: [bold red]Adult releases are not allowed on this forum.[/bold red]")
             return False
 
@@ -1730,7 +1730,7 @@ class MakingOff:
             logger.warning(f"{self.tracker}: [bold red]Only MKV/AVI containers are allowed on this forum.[/bold red]")
             return False
 
-        video = f"{getattr(meta, 'video_codec', '')} {getattr(meta, 'video_encode', '')}".upper()
+        video = f"{meta.video_codec} {meta.video_encode}".upper()
         if any(codec in video for codec in ("HEVC", "H.265", "H265", "X265")):
             logger.warning(f"{self.tracker}: [bold red]HEVC/H.265 video is not allowed on this forum.[/bold red]")
             return False
@@ -1766,7 +1766,7 @@ class MakingOff:
             logger.warning(f"{self.tracker}: [bold red]Torrent contains prohibited archive/executable file: {bad_file}.[/bold red]")
             return False
 
-        if not self._has_portuguese_subtitle(meta):
+        if not self._has_portuguese_subtitle(meta) and str(meta.original_language).lower() != "pt":
             logger.warning(f"{self.tracker}: [bold red]A Portuguese subtitle is required for this forum.[/bold red]")
             return False
 
