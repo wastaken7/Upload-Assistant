@@ -433,9 +433,10 @@ async def merge_meta(meta: Meta, saved_meta: dict[str, Any]) -> dict[str, Any]:
             current_tracker_ids = meta.tracker_ids
             sanitized_saved_meta[clean_key] = current_tracker_ids if current_tracker_ids else value
         elif clean_key in overwrite_list:
-            if clean_key in meta and getattr(meta, clean_key, None) is not None:
-                sanitized_saved_meta[clean_key] = meta[clean_key]
-                logger.debug(f"Overriding {clean_key} with meta value: {meta[clean_key]}")
+            meta_val = getattr(meta, clean_key, None)
+            if meta_val not in (None, False, 0, "", [], {}):
+                sanitized_saved_meta[clean_key] = meta_val
+                logger.debug(f"Overriding {clean_key} with meta value: {meta_val}")
             else:
                 sanitized_saved_meta[clean_key] = value
         else:

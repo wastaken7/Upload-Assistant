@@ -894,11 +894,19 @@ class Args:
                 if isinstance(value, list):
                     value_list = [str(item) for item in value]
                     if len(value_list) == 1 and value_list[0] != "":
-                        meta[key] = int(value_list[0])
+                        try:
+                            parsed_int = int(value_list[0])
+                            meta[key] = parsed_int if parsed_int >= 0 else 0
+                        except ValueError, TypeError:
+                            meta[key] = 0
                     else:
                         meta[key] = 0
                 elif value not in (None, [], 0, ""):
-                    meta[key] = int(str(value))
+                    try:
+                        parsed_int = int(str(value))
+                        meta[key] = parsed_int if parsed_int >= 0 else 0
+                    except ValueError, TypeError:
+                        meta[key] = 0
                 else:
                     meta[key] = 0
             if key in ["manual_episode_title"] and value == []:

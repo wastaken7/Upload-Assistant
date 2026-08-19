@@ -181,10 +181,10 @@ Thise will use the specified hash to get tracker ids from qBitTorrent or rTorren
 - `-dr`, `--draft`: Send to drafts (BEYONDHD, LST).
 - `-mq`, `--modq`: Send to modQ. NOTE: only for suppported UNIT3D type sites.
 - `-fl`, `--freeleech N`: Freeleech percentage (1–100). Default `0`. NOTE: accepts any numeric value, although UNIT3D defaults to only allowing filtering of specific percentages.
-- `-flu`, `--freeleech-until`, `--fl-until N`: Number of days the torrent should offer freeleech (supported UNIT3D trackers, internal/staff only).
+- `-fl-until`, `--freeleech-until N`: Number of days the torrent should offer freeleech (supported UNIT3D trackers, internal/staff only).
 - `-feat`, `--featured`: Mark upload as Featured (supported UNIT3D tracker, internal/staff only).
-- `-dup`, `--doubleup`, `--double-upload`: Mark upload as Double Upload (supported UNIT3D trackers, internal/staff only).
-- `-duu`, `--double-upload-until`, `--doubleup-until`, `--du-until N`: Number of days the torrent should offer double upload (supported UNIT3D trackers, internal/staff only).
+- `-dup`, `--double-upload`: Mark upload as Double Upload (supported UNIT3D trackers, internal/staff only).
+- `-dupuntil`, `--double-upload-until N`: Number of days the torrent should offer double upload (supported UNIT3D trackers, internal/staff only).
 - `-ref`, `--refundable`: Mark upload as Refundable (supported UNIT3D trackers, internal/staff only).
 - `-stk`, `--sticky`: Mark upload as Sticky / pinned (supported UNIT3D trackers, internal/staff only).
 

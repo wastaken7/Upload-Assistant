@@ -743,7 +743,7 @@ const argumentCategories = [
         description: "Set exclusive flag where supported",
       },
       { label: "--featured", description: "Mark upload as Featured (UNIT3D)" },
-      { label: "--doubleup", description: "Mark upload as Double Upload (UNIT3D)" },
+      { label: "--double-upload", description: "Mark upload as Double Upload (UNIT3D)" },
       {
         label: "--double-upload-until",
         placeholder: "N",

@@ -703,6 +703,7 @@ def _validate_trackers_section(trackers: dict[str, Any], active_trackers: list[s
             "featured",
             "doubleup",
             "double_upload",
+            "double_up",
             "refundable",
             "sticky",
             "exclusive",
@@ -725,9 +726,13 @@ def _validate_trackers_section(trackers: dict[str, Any], active_trackers: list[s
                 value = tracker_config_dict[field]
                 if isinstance(value, bool) or not isinstance(value, int):
                     try:
-                        int(str(value))
+                        int_val = int(str(value))
+                        if int_val < 0:
+                            warnings.append(ConfigValidationWarning(f"'{field}' must be a non-negative integer, got {value!r}", key=tracker_name, section="TRACKERS"))
                     except ValueError, TypeError:
                         warnings.append(ConfigValidationWarning(f"'{field}' must be an integer, got {type(value).__name__}: {value!r}", key=tracker_name, section="TRACKERS"))
+                elif isinstance(value, int) and value < 0:
+                    warnings.append(ConfigValidationWarning(f"'{field}' must be a non-negative integer, got {value!r}", key=tracker_name, section="TRACKERS"))
 
     return errors, warnings
 

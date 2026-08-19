@@ -68,17 +68,26 @@ class Aither(UNIT3D):
         elif not has_hdr10p and any(flag in hdr_value for flag in ["HDR", "HLG"]):
             data["hdr"] = 1
 
-        refundable = await self.get_flag(meta, "refundable")
-        if refundable:
-            data["refundable"] = bool(refundable)
+        if await self.get_flag(meta, "refundable") == "1":
+            data["refundable"] = True
 
-        freeleech_until = await self.get_flag(meta, "freeleech_until")
+        freeleech_until = meta.get("freeleech_until", 0) or self.tracker_config.get("freeleech_until", 0)
         if freeleech_until:
-            data["fl_until"] = freeleech_until
+            try:
+                fl_until_val = int(freeleech_until)
+                if fl_until_val > 0:
+                    data["fl_until"] = fl_until_val
+            except ValueError, TypeError:
+                pass
 
-        double_upload_until = await self.get_flag(meta, "double_upload_until")
+        double_upload_until = meta.get("double_upload_until", 0) or self.tracker_config.get("double_upload_until", 0)
         if double_upload_until:
-            data["du_until"] = double_upload_until
+            try:
+                du_until_val = int(double_upload_until)
+                if du_until_val > 0:
+                    data["du_until"] = du_until_val
+            except ValueError, TypeError:
+                pass
 
         return data
 
