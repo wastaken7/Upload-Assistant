@@ -4,9 +4,8 @@ import json
 import platform
 import re
 import uuid
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from urllib.parse import urlparse
 
 import aiofiles
@@ -482,15 +481,6 @@ class AZTrackerBase:
             :12
         ]  # minimum number of screenshots is 3, so we can allow up to 12 menu images
 
-        audio_spectrogram_links = (
-            [img.get("raw_url") for img in meta.spectrograms_images if img.get("raw_url")] if self.config["TRACKERS"][self.tracker].get("add_audio_spectrogram", False) else []
-        )
-        dynamic_hdr_plot_links = (
-            [img.get("raw_url") for img in meta.dynamic_hdr_plot_images if img.get("raw_url")]
-            if meta.dynamic_hdr_plot or self.config["DEFAULT"].get("add_dynamic_hdr_plot", False) or self.config["TRACKERS"][self.tracker].get("add_dynamic_hdr_plot", False)
-            else []
-        )
-
         upload_referer = f"{self.base_url}/upload/{meta.category.lower()}"
 
         async def upload_local_file(path: Path):
@@ -523,11 +513,9 @@ class AZTrackerBase:
             if result:
                 results.append(result)
 
-        remaining_slots = max(0, limit - len(results) - len(audio_spectrogram_links) - len(dynamic_hdr_plot_links))
-
-        if local_files and remaining_slots > 0:
+        if local_files and len(results) < limit:
             for path in local_files:
-                if len(results) >= limit - len(audio_spectrogram_links) - len(dynamic_hdr_plot_links):
+                if len(results) >= limit:
                     break
                 result = await upload_local_file(path)
                 if result:
@@ -536,26 +524,8 @@ class AZTrackerBase:
         # Always fill remaining slots from remote image_list after processing local files
         image_links = [str(img.get("raw_url")) for img in meta.image_list if img.get("raw_url")]
 
-        for url in image_links:
-            if len(results) >= limit - len(audio_spectrogram_links) - len(dynamic_hdr_plot_links):
-                break
-            result = await upload_remote_file(url)
-            if result:
-                results.append(result)
-
-        # Upload audio spectrogram images
-        remaining_slots = max(0, limit - len(results))
-        if remaining_slots > 0 and audio_spectrogram_links:
-            for url in audio_spectrogram_links:
-                if len(results) >= limit:
-                    break
-                result = await upload_remote_file(url)
-                if result:
-                    results.append(result)
-
-        # Upload dynamic HDR metadata plots after screenshots and spectrograms.
-        if len(results) < limit and dynamic_hdr_plot_links:
-            for url in dynamic_hdr_plot_links:
+        if len(results) < limit:
+            for url in image_links:
                 if len(results) >= limit:
                     break
                 result = await upload_remote_file(url)
@@ -690,6 +660,12 @@ class AZTrackerBase:
         # Tonemapped Header
         desc_parts.append(await builder.get_tonemapped_header(meta))
 
+        # Audio Spectrograms
+        desc_parts.append(await builder.get_audio_spectrogram_section(meta))
+
+        # Dynamic HDR metadata plots (Dolby Vision / HDR10+)
+        desc_parts.append(await builder.get_dynamic_hdr_plot_section(meta))
+
         description = "\n\n".join(part for part in desc_parts if part.strip())
 
         description = description.replace("[*]", "• ")
@@ -701,19 +677,30 @@ class AZTrackerBase:
         if amount > 0:
             logger.info(f"{self.tracker}: Deleted from description: {amount} NFO section.")
 
-        processed_desc, amount = re.subn(r"http[s]?://\S+|www\.\S+", "", processed_desc)
-        if amount > 0:
-            logger.info(f"{self.tracker}: Deleted from description: {amount} link(s).")
+        parser = bbcode.Parser(replace_links=False)
 
-        bbcode_tags_pattern = r"\[/?(size|align|left|center|right|img|table|tr|td|spoiler|url)[^\]]*\]"
-        processed_desc, amount = re.subn(bbcode_tags_pattern, "", processed_desc, flags=re.IGNORECASE)
-        if amount > 0:
-            logger.info(f"{self.tracker}: Deleted from description: {amount} BBCode tag(s).")
+        def render_img(_name: str, value: str, options: dict[str, Any], _parent: Any, _context: Any) -> str:
+            width = options.get("img") or options.get("width")
+            if width:
+                return f'<img src="{value}" width="{width}" />'
+            return f'<img src="{value}" />'
 
-        render_html = getattr(bbcode, "render_html", None)
-        final_html_desc = cast(Callable[[str], str], render_html)(processed_desc) if callable(render_html) else cast(Any, bbcode).Parser().format(processed_desc)
+        def render_align(_name: str, value: str, options: dict[str, Any], _parent: Any, _context: Any) -> str:
+            align = options.get("align", "left")
+            return f'<div style="text-align:{align};">{value}</div>'
 
-        async with aiofiles.open(f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as description_file:
+        def render_spoiler(_name: str, value: str, options: dict[str, Any], _parent: Any, _context: Any) -> str:
+            title = options.get("spoiler", "Spoiler")
+            return f"<details><summary>{title}</summary>{value}</details>"
+
+        parser.add_formatter("img", render_img, render_embedded=False, replace_links=False)
+        parser.add_formatter("align", render_align)
+        parser.add_formatter("spoiler", render_spoiler)
+        final_html_desc = parser.format(processed_desc)
+
+        desc_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}]DESCRIPTION.txt"
+        desc_file_path.parent.mkdir(parents=True, exist_ok=True)
+        async with aiofiles.open(desc_file_path, "w", encoding="utf-8") as description_file:
             await description_file.write(final_html_desc)
 
         return final_html_desc
