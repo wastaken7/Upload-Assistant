@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from bin.download_integrity import SHA256_BY_ASSET
-from src.mediainfo import MediaInfo, _binary, strip_report_by_line
+from src.mediainfo import MediaInfo, _binary, _input_path, strip_report_by_line
 
 
 def test_cli_backed_mediainfo_preserves_track_access() -> None:
@@ -57,6 +57,47 @@ def test_text_reports_always_request_mediainfo_version() -> None:
         run_mediainfo("video.mkv", output="STRING", full=False)
 
     assert run.call_args.args[0] == ["mediainfo", "--inform_version=1", "video.mkv"]
+
+
+def test_mediainfo_uses_extended_windows_path_for_long_local_files() -> None:
+    path = "C:\\" + "a" * 257
+
+    with patch("src.mediainfo.platform.system", return_value="Windows"):
+        assert _input_path(path) == f"\\\\?\\{path}"
+
+
+def test_mediainfo_uses_extended_windows_path_for_long_unc_files() -> None:
+    path = "\\\\server\\share\\" + "a" * 250
+
+    with patch("src.mediainfo.platform.system", return_value="Windows"):
+        assert _input_path(path) == f"\\\\?\\UNC\\{path[2:]}"
+
+
+def test_mediainfo_does_not_modify_short_or_non_windows_paths() -> None:
+    short_path = "C:\\short\\file.m4b"
+    long_path = "C:\\" + "a" * 257
+
+    with patch("src.mediainfo.platform.system", return_value="Windows"):
+        assert _input_path(short_path) == short_path
+        assert _input_path(f"\\\\?\\{long_path}") == f"\\\\?\\{long_path}"
+    with patch("src.mediainfo.platform.system", return_value="Linux"):
+        assert _input_path(long_path) == long_path
+
+
+def test_mediainfo_passes_extended_path_to_cli() -> None:
+    path = "C:\\" + "a" * 257
+    completed = Mock(returncode=0, stdout="General", stderr="")
+
+    with (
+        patch("src.mediainfo.platform.system", return_value="Windows"),
+        patch("src.mediainfo._binary", return_value="mediainfo"),
+        patch("src.mediainfo.subprocess.run", return_value=completed) as run,
+    ):
+        from src.mediainfo import run_mediainfo
+
+        run_mediainfo(path, output="STRING", full=False)
+
+    assert run.call_args.args[0][-1] == f"\\\\?\\{path}"
 
 
 def test_mediainfo_prefers_configured_binary(tmp_path) -> None:
