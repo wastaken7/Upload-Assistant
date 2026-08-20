@@ -1343,16 +1343,25 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
         successful_trackers = await TrackerStatusManager(config=config).process_all_trackers(meta)
 
         if meta.trackers_pass is not None:
-            meta.skip_uploading = meta.trackers_pass
+            try:
+                meta.skip_uploading = int(meta.trackers_pass)
+            except ValueError, TypeError:
+                meta.skip_uploading = 1
         else:
             tracker_pass_checks = config["DEFAULT"].get("tracker_pass_checks")
             if isinstance(tracker_pass_checks, (int, str)):
-                meta.skip_uploading = int(tracker_pass_checks)
+                try:
+                    meta.skip_uploading = int(tracker_pass_checks)
+                except ValueError, TypeError:
+                    meta.skip_uploading = 1
             else:
                 meta.skip_uploading = 1
 
     skip_uploading = meta.skip_uploading
-    skip_uploading_int = skip_uploading if skip_uploading else 0
+    try:
+        skip_uploading_int = int(skip_uploading) if skip_uploading else 0
+    except ValueError, TypeError:
+        skip_uploading_int = 0
 
     if successful_trackers < skip_uploading_int and not meta.debug:
         logger.info(f"[red]Not enough successful trackers ({successful_trackers}/{skip_uploading_int}). No uploads being processed.[/red]")
@@ -2658,7 +2667,10 @@ async def do_the_thing(base_dir: str) -> None:
                         successful_trackers = 0
 
                 skip_uploading = meta.skip_uploading
-                skip_uploading_int = int(skip_uploading) if isinstance(skip_uploading, (int, str)) else 0
+                try:
+                    skip_uploading_int = int(skip_uploading) if skip_uploading else 0
+                except ValueError, TypeError:
+                    skip_uploading_int = 0
 
                 if successful_trackers < skip_uploading_int and not meta.debug:
                     logger.info(f"[red]Not enough successful trackers ({successful_trackers}/{skip_uploading_int}). No uploads being processed.[/red]")
