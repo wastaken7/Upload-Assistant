@@ -79,3 +79,100 @@ def test_trackers_pass_parsed_as_int(tmp_path):
     assert meta.trackers_pass == 2
     assert isinstance(meta.trackers_pass, int)
 
+
+def test_numeric_cli_arguments_parsed_as_correct_types(tmp_path):
+    config = {"DEFAULT": {"screens": 2}}
+    args = Args(config)
+
+    cli_input = [
+        str(tmp_path),
+        "--trackers-pass",
+        "3",
+        "--screens",
+        "5",
+        "--limit-queue",
+        "10",
+        "--comparison_index",
+        "2",
+        "--randomized",
+        "4",
+        "--max-piece-size",
+        "64",
+        "--entropy",
+        "32",
+        "--douban",
+        "123456",
+        "--music-release-year",
+        "2021",
+        "--music-edition-year",
+        "2023",
+        "--qbit-bw-threshold",
+        "500",
+        "--qbit-bw-time",
+        "30",
+        "--year",
+        "1994",
+        "--dupe-size-difference-tolerance",
+        "15.5",
+        "--freeleech",
+        "100",
+        "--freeleech-until",
+        "7",
+        "--double-upload-until",
+        "14",
+    ]
+
+    meta, _, _ = args.parse(cli_input, Meta())
+
+    assert meta.trackers_pass == 3
+    assert isinstance(meta.trackers_pass, int)
+
+    assert meta.screens == 5
+    assert isinstance(meta.screens, int)
+
+    assert meta.limit_queue == 10
+    assert isinstance(meta.limit_queue, int)
+
+    assert meta.comparison_index == 2
+    assert isinstance(meta.comparison_index, int)
+
+    assert meta.randomized == 4
+    assert isinstance(meta.randomized, int)
+
+    assert meta.max_piece_size == 64
+    assert isinstance(meta.max_piece_size, int)
+
+    assert meta.entropy == 32
+    assert isinstance(meta.entropy, int)
+
+    assert meta.douban_manual == 123456
+    assert isinstance(meta.douban_manual, int)
+
+    assert meta.music_release_year == 2021
+    assert isinstance(meta.music_release_year, int)
+
+    assert meta.music_edition_year == 2023
+    assert isinstance(meta.music_edition_year, int)
+
+    assert meta.qbit_bandwidth_threshold == 500
+    assert isinstance(meta.qbit_bandwidth_threshold, int)
+
+    assert meta.qbit_bandwidth_time == 30
+    assert isinstance(meta.qbit_bandwidth_time, int)
+
+    assert meta.manual_year == 1994
+    assert isinstance(meta.manual_year, int)
+
+    assert meta.dupe_size_difference_tolerance == 15.5
+    assert isinstance(meta.dupe_size_difference_tolerance, float)
+
+    assert meta.freeleech == 100
+    assert isinstance(meta.freeleech, int)
+
+    assert meta.freeleech_until == 7
+    assert isinstance(meta.freeleech_until, int)
+
+    assert meta.double_upload_until == 14
+    assert isinstance(meta.double_upload_until, int)
+
+

@@ -780,12 +780,30 @@ class Args:
                     elif key == "description_file" or key == "comparison":
                         meta[key] = str(Path(value2).resolve())
                     elif key == "screens":
-                        meta[key] = int(value2)
-                    elif key == "trackers_pass":
                         try:
-                            meta.trackers_pass = int(value2)
+                            meta[key] = int(value2)
                         except ValueError, TypeError:
-                            meta.trackers_pass = None
+                            meta[key] = int(self.config.get("DEFAULT", {}).get("screens", 1))
+                    elif key in ("trackers_pass", "comparison_index"):
+                        try:
+                            meta[key] = int(value2)
+                        except ValueError, TypeError:
+                            meta[key] = None
+                    elif key in (
+                        "limit_queue",
+                        "randomized",
+                        "max_piece_size",
+                        "entropy",
+                        "douban_manual",
+                        "music_release_year",
+                        "music_edition_year",
+                        "qbit_bandwidth_threshold",
+                        "qbit_bandwidth_time",
+                    ):
+                        try:
+                            meta[key] = int(value2)
+                        except ValueError, TypeError:
+                            meta[key] = 0
                     elif key == "imghost":
                         meta.imghost = value2
                         meta.imghost_from_cli = True
@@ -855,11 +873,17 @@ class Args:
                 if isinstance(value, list):
                     value_list = [str(item) for item in value]
                     if len(value_list) == 1 and value_list[0] != "":
-                        meta[key] = int(value_list[0])
+                        try:
+                            meta[key] = int(value_list[0])
+                        except ValueError, TypeError:
+                            meta[key] = 0
                     else:
                         meta[key] = 0
                 elif value not in (None, [], 0, ""):
-                    meta[key] = int(str(value))
+                    try:
+                        meta[key] = int(str(value))
+                    except ValueError, TypeError:
+                        meta[key] = 0
                 else:
                     meta[key] = 0
             if key in ("manual_edition"):
@@ -888,11 +912,17 @@ class Args:
                 if isinstance(value, list):
                     value_list = [str(item) for item in value]
                     if len(value_list) == 1 and value_list[0] != "":
-                        meta[key] = float(value_list[0])
+                        try:
+                            meta[key] = float(value_list[0])
+                        except ValueError, TypeError:
+                            meta[key] = None
                     else:
                         meta[key] = None
                 elif value not in (None, [], ""):
-                    meta[key] = float(str(value))
+                    try:
+                        meta[key] = float(str(value))
+                    except ValueError, TypeError:
+                        meta[key] = None
                 else:
                     meta[key] = None
             if key in ("freeleech", "freeleech_until", "double_upload_until"):
