@@ -2797,6 +2797,7 @@ async def do_the_thing(base_dir: str) -> None:
                         processed_files_count += 1
                         tracker_statuses = [status for status in meta.tracker_status.values() if isinstance(status, Mapping)]
                         upload_succeeded = any(status.get("upload_success") is True for status in tracker_statuses)
+
                         if not upload_succeeded and not meta.debug:
                             skipped_files_count += 1
                             logger.info(f"[yellow]Processed {processed_files_count}/{total_files} files; no tracker upload succeeded.[/yellow]")
