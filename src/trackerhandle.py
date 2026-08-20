@@ -31,7 +31,6 @@ async def check_mod_q_and_draft(
     meta: Meta,
 ) -> tuple[str | None, str | None, dict[str, Any]]:
     tracker_capabilities = {
-        "AURA4K": {"mod_q": True, "draft": False},
         "AITHER": {"mod_q": True, "draft": False},
         "BEYONDHD": {"draft_live": True},
         "BLUTOPIA": {"mod_q": True, "draft": False},

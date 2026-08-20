@@ -204,7 +204,6 @@ def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
         "TVC": "TVCHAOSUK",
         "AITHER": "AITHER",
         "ACM": "ASIANCINEMA",
-        "A4K": "AURA4K",
         "CRP": "CURUPIRA",
         "DS": "DRUNKENSLUG",
         "BLU": "BLUTOPIA",
