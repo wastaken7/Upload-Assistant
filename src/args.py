@@ -781,6 +781,11 @@ class Args:
                         meta[key] = str(Path(value2).resolve())
                     elif key == "screens":
                         meta[key] = int(value2)
+                    elif key == "trackers_pass":
+                        try:
+                            meta.trackers_pass = int(value2)
+                        except ValueError, TypeError:
+                            meta.trackers_pass = None
                     elif key == "imghost":
                         meta.imghost = value2
                         meta.imghost_from_cli = True

@@ -71,3 +71,11 @@ def test_restored_tracker_ids_are_canonicalized():
     meta = Meta({"tracker_ids": {"bhd": "123"}})
 
     assert meta.tracker_ids == {"BEYONDHD": "123"}
+
+
+def test_trackers_pass_parsed_as_int(tmp_path):
+    args = Args({"DEFAULT": {"screens": 1}})
+    meta, _, _ = args.parse([str(tmp_path), "--trackers-pass", "2"], Meta())
+    assert meta.trackers_pass == 2
+    assert isinstance(meta.trackers_pass, int)
+
