@@ -276,7 +276,6 @@ const trackerNameMap = {
   AMIGOSSHARE: "Amigos-Share",
   ANTHELION: "Anthelion",
   ASIANCINEMA: "AsianCinema",
-  AURA4K: "Aura4K",
   AVISTAZ: "AvistaZ",
   BEYONDHD: "Beyond-HD",
   BITHDTV: "BitHDTV",

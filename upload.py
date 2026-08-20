@@ -1648,7 +1648,6 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
             if (len(meta.image_list) < cutoff or reviewed_uploads) and meta.skip_imghost_upload is False and meta.category not in ("GAME", "MUSIC"):
                 # Validate and (if needed) rehost images to tracker-approved hosts before uploading any new screenshots.
                 trackers_with_image_host_requirements = {
-                    "AURA4K",
                     "BEYONDHD",
                     "DIGITALCORE",
                     "GREATPOSTERWALL",
