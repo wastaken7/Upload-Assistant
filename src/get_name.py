@@ -224,6 +224,8 @@ class NameManager:
         author = meta.author.strip()
         publisher = meta.publisher.strip()
         title = meta.title.strip()
+        book_series = f"{meta.book_series.strip()}:" if meta.book_series else ""
+        book_series_index = meta.book_series_index
         year = str(meta.year).strip() if meta.year is not None else ""
 
         # Edition/Issue logic
@@ -275,10 +277,10 @@ class NameManager:
             ebook_type = ebook_type.upper()
 
         # Construct final string parts based on subtype
-        parts = []
+        parts: list[str] = []
 
         if audiobook:
-            parts.extend([author, "-", title, edition, year, lang_display, "AUDIOBOOK"])
+            parts.extend([author, "-", book_series, title, book_series_index, edition, year, lang_display, "AUDIOBOOK"])
         elif comic:
             vol_str = f"Vol {volume}" if volume else ""
             no_str = f"No {issue}" if issue else ""
@@ -293,7 +295,7 @@ class NameManager:
             parts.extend([title, year, lang_display, source, ebook_type, "eBOOK"])
         else:
             author_or_publisher = author or publisher
-            parts.extend([author_or_publisher, "-", title, edition, year, lang_display, source, ebook_type, "eBOOK"])
+            parts.extend([author_or_publisher, "-", book_series, title, book_series_index, edition, year, lang_display, source, ebook_type, "eBOOK"])
 
         cleaned_parts = [p for p in parts if p]
         base_name = " ".join(cleaned_parts)

@@ -161,7 +161,11 @@ class CapybaraBR(UNIT3D):
         bioma_tag = "[BiOMA]" if "bioma" in (meta.tag or "").lower() and self.tracker == "CAPYBARABR" else ""
 
         if category == "BOOK":
-            book_title = self.common.portuguese_title_capitalization(meta.title)
+            book_title = f"{meta.book_series.strip()}: " if meta.book_series else ""
+            book_title += meta.title.strip()
+            book_title += f" {meta.book_series_index.strip()}" if meta.book_series_index else ""
+            book_title = self.common.portuguese_title_capitalization(book_title)
+
             year_str = str(meta.year) if meta.year is not None else ""
             cbr_name = f"{book_title} - {meta.author} [{year_str}] [AUDIOBOOK] {bioma_tag}" if meta.audiobook else f"{book_title} - {meta.author} [{year_str}]"
             book_language_iso = meta.book_language_iso

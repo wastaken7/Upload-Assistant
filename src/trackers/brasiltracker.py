@@ -584,7 +584,10 @@ class BrasilTracker:
 
     def get_titles(self, meta: Meta) -> tuple[str, str]:
         if meta.category == "BOOK":
-            return self.common.portuguese_title_capitalization(meta.title), ""
+            title = f"{meta.book_series.strip()}: " if meta.book_series else ""
+            title += meta.title.strip()
+            title += f" {meta.book_series_index.strip()}" if meta.book_series_index else ""
+            return self.common.portuguese_title_capitalization(title), ""
 
         if meta.category == "GAME":
             return meta.title, ""
