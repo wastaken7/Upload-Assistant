@@ -311,7 +311,9 @@ function Install-RepositoryFromZip {
     }
 
     $zipPath = New-TemporaryDownloadPath -FileName ("UploadAssistant-" + [guid]::NewGuid().ToString("N") + ".zip")
-    $extractRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantRepo-" + [guid]::NewGuid().ToString("N"))
+    $parentDir = Split-Path -Parent $resolvedDestinationDir
+    New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+    $extractRoot = Join-Path $parentDir (".UploadAssistant-extract-" + [guid]::NewGuid().ToString("N"))
 
     try {
         Invoke-DownloadFile -Url $RepositoryZipUrl -DestinationPath $zipPath -Label "Upload Assistant"
@@ -324,7 +326,7 @@ function Install-RepositoryFromZip {
         }
 
         if (Test-Path -LiteralPath $resolvedDestinationDir) {
-            Fail "Staging directory already exists: $resolvedDestinationDir"
+            Fail "Destination directory already exists and must be preserved. This appears to be a staging directory collision."
         }
 
         Move-Item -LiteralPath $sourceDir -Destination $resolvedDestinationDir
@@ -614,18 +616,34 @@ function Complete-StagedInstallation {
 $PythonExe = Ensure-IsolatedPython
 $resolvedUaDir = [System.IO.Path]::GetFullPath($UaDir)
 $stagingDir = Join-Path (Split-Path -Parent $resolvedUaDir) (".UploadAssistant-staging-" + [guid]::NewGuid().ToString("N"))
+$actualPythonPath = $null
 try {
     Install-RepositoryFromZip -DestinationDir $stagingDir
-    Install-Dependencies -PythonExe $PythonExe -AppDir $stagingDir
+    $actualPythonPath = Install-Dependencies -PythonExe $PythonExe -AppDir $stagingDir
     Write-Runner -AppDir $stagingDir
-    Complete-StagedInstallation -StagingDir $stagingDir -DestinationDir $resolvedUaDir -PreserveDirectories @($PythonInstallDir)
+    $preservePaths = @(
+        (Join-Path $resolvedUaDir "data")
+        (Join-Path $resolvedUaDir "tmp")
+    )
+    Complete-StagedInstallation -StagingDir $stagingDir -DestinationDir $resolvedUaDir -PreserveDirectories $preservePaths
     Write-GlobalLauncher -AppDir $resolvedUaDir
 }
 finally {
     Remove-Item -LiteralPath $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-$venvPythonPath = Join-Path $UaDir ".venv\Scripts\python.exe"
+if ($actualPythonPath -and $actualPythonPath.StartsWith($stagingDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $relativePath = $actualPythonPath.Substring($stagingDir.Length).TrimStart('\')
+    $actualPythonPath = Join-Path $resolvedUaDir $relativePath
+}
+
+if (-not $actualPythonPath) {
+    $actualPythonPath = Join-Path $resolvedUaDir ".venv\Scripts\python.exe"
+    if (-not (Test-Path -LiteralPath $actualPythonPath)) {
+        $actualPythonPath = $PythonExe
+    }
+}
+
 $launcherCmdPath = Join-Path $LauncherDir "ua.cmd"
 $updateCmdPath = Join-Path $LauncherDir "ua-update.cmd"
 $configCmdPath = Join-Path $LauncherDir "ua-config.cmd"
@@ -637,8 +655,8 @@ Write-Host ""
 Write-Host "Location:"
 Write-Host "  $UaDir"
 Write-Host ""
-Write-Host "Isolated Python:"
-Write-Host "  $PythonExe"
+Write-Host "Python interpreter:"
+Write-Host "  $actualPythonPath"
 Write-Host ""
 Write-Host "First step:"
 Write-Host "  Configure UA with: ua-config"
@@ -659,4 +677,4 @@ Write-Host "PATH note:"
 Write-Host "  A new PowerShell or Command Prompt window may be required before 'ua', 'ua-update', 'ua-config', and 'ua-webui' are available everywhere."
 Write-Host ""
 Write-Host "Configuration command (equivalent):"
-Write-Host "  & `"$venvPythonPath`" `"$UaDir\config-generator.py`""
+Write-Host "  & `"$actualPythonPath`" `"$UaDir\config-generator.py`""

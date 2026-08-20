@@ -355,11 +355,22 @@ function Ensure-DestinationPython {
     if (Test-Path -LiteralPath $pythonExe) {
         if (Test-PythonVersionMatch -PythonPath $pythonExe -ExpectedMinorVersion $ExpectedMinorVersion) {
             Enable-EmbeddedPythonSite -PythonDirectory $pythonDir
-            Write-Step "Using existing Python in destination folder at $pythonExe"
-            return $pythonExe
+            try {
+                $pipCheck = & $pythonExe -m pip --version 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Step "Using existing Python in destination folder at $pythonExe"
+                    return $pythonExe
+                }
+            }
+            catch {
+            }
+            Write-Step "Existing Python at $pythonExe is missing pip. Reinstalling..."
+            Remove-Item -LiteralPath $pythonDir -Recurse -Force
         }
-        Write-Step "Existing Python at $pythonExe does not match version $ExpectedMinorVersion. Reinstalling..."
-        Remove-Item -LiteralPath $pythonDir -Recurse -Force
+        else {
+            Write-Step "Existing Python at $pythonExe does not match version $ExpectedMinorVersion. Reinstalling..."
+            Remove-Item -LiteralPath $pythonDir -Recurse -Force
+        }
     }
 
     Write-Step "Extracting bundled isolated Python $ExpectedMinorVersion runtime"
@@ -396,7 +407,7 @@ function Ensure-DestinationFfmpeg {
         Remove-Item -LiteralPath $ffmpegDir -Recurse -Force
     }
 
-    $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantFfmpeg-" + [guid]::NewGuid().ToString("N"))
+    $extractDir = Join-Path $DestinationDir (".ffmpeg-extract-" + [guid]::NewGuid().ToString("N"))
     try {
         Write-Step "Extracting bundled FFmpeg"
         Expand-ZipArchive -ArchivePath $ArchivePath -DestinationPath $extractDir
