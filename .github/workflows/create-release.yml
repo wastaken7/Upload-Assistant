@@ -134,6 +134,7 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           NEW_VERSION: ${{ inputs.version }}
           RELEASE_SHA: ${{ needs.prepare-release.outputs.release_sha }}
         run: |
@@ -147,6 +148,7 @@ jobs:
       - name: Start Docker release build
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           NEW_VERSION: ${{ inputs.version }}
         run: |
           gh workflow run docker-image.yml --ref "$NEW_VERSION" -f use_latest_tag=true
