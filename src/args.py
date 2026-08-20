@@ -141,7 +141,7 @@ class Args:
             help="Read one full path per line from standard input (finish an interactive paste with an empty line)",
         )
         parser.add_argument("--queue", nargs=1, required=False, help="(--queue queue_name) Process an entire folder (files/subfolders) in a queue")
-        parser.add_argument("-lq", "--limit-queue", dest="limit_queue", nargs=1, required=False, help="Limit the amount of queue files processed", type=int, default=0)
+        parser.add_argument("-lq", "--limit-queue", dest="limit_queue", nargs=1, required=False, help="Limit the amount of queue files processed", default=0)
         parser.add_argument(
             "-sc",
             "--site-check",
@@ -177,7 +177,6 @@ class Args:
             nargs=1,
             required=False,
             help="Which of your comparison indexes is the main images (required when comps)",
-            type=int,
             default=None,
         )
         parser.add_argument("-mf", "--manual_frames", nargs=1, required=False, help="Comma-separated frame numbers to use as screenshots", type=str, default=None)
@@ -213,9 +212,9 @@ class Args:
             dest="music_release_type",
         )
         parser.add_argument(
-            "--music-release-year", nargs=1, required=False, type=int, help="MUSIC: concrete release/pressing year (not the original group year)", dest="music_release_year"
+            "--music-release-year", nargs=1, required=False, help="MUSIC: concrete release/pressing year (not the original group year)", dest="music_release_year"
         )
-        parser.add_argument("--music-edition-year", nargs=1, required=False, type=int, help="MUSIC: remaster/reissue/edition year", dest="music_edition_year")
+        parser.add_argument("--music-edition-year", nargs=1, required=False, help="MUSIC: remaster/reissue/edition year", dest="music_edition_year")
         parser.add_argument("--music-label", nargs=1, required=False, help="MUSIC: label for this release", dest="music_label")
         parser.add_argument("--music-catalogue-number", nargs=1, required=False, help="MUSIC: catalogue number for this release", dest="music_catalogue_number")
         parser.add_argument("--music-genre", nargs=1, required=False, help="MUSIC: comma-separated genre override", dest="music_genres")
@@ -262,7 +261,7 @@ class Args:
         parser.add_argument("-mal", "--mal", nargs=1, required=False, help="MAL ID", type=str, dest="mal_manual")
         parser.add_argument("-tvmaze", "--tvmaze", nargs=1, required=False, help="TVMAZE ID", type=str, dest="tvmaze_manual")
         parser.add_argument("-tvdb", "--tvdb", nargs=1, required=False, help="TVDB ID", type=str, dest="tvdb_manual")
-        parser.add_argument("-douban", "--douban", nargs=1, required=False, help="Douban ID (Number only)", type=int, dest="douban_manual", default=0)
+        parser.add_argument("-douban", "--douban", nargs=1, required=False, help="Douban ID (Number only)", dest="douban_manual", default=0)
         parser.add_argument("--no-metadata-cache", action="store_true", required=False, help="Do not read or write the persistent metadata cache", dest="no_metadata_cache")
         parser.add_argument("-igdb", "--igdb", nargs=1, required=False, help="IGDB ID", type=str, dest="igdb_manual")
         parser.add_argument("-steam", "--steam", nargs=1, required=False, help="Steam App ID or URL", type=str, dest="steam_manual")
@@ -306,7 +305,7 @@ class Args:
             type=str,
         )
         parser.add_argument("-ns", "--no-seed", action="store_true", required=False, help="Do not add torrent to the client")
-        parser.add_argument("-year", "--year", dest="manual_year", nargs=1, required=False, help="Override the year found", type=int, default=0)
+        parser.add_argument("-year", "--year", dest="manual_year", nargs=1, required=False, help="Override the year found", default=0)
         parser.add_argument("-author", "--author", nargs="*", required=False, help="Book/Audiobook author name (overrides auto-detected value)", type=str, dest="book_author")
         parser.add_argument("-btitle", "--book-title", nargs="*", required=False, help="Book/Audiobook title (overrides auto-detected value)", type=str, dest="book_title")
         parser.add_argument("--comic", "-comic", action="store_true", required=False, help="Identify the book upload as a Comic", dest="comic", default=False)
@@ -568,7 +567,6 @@ class Args:
             nargs=1,
             required=False,
             help="Ignore dupes if their size difference is greater than or equal to this percentage (e.g. 20)",
-            type=float,
         )
         parser.add_argument(
             "-debug", "--debug", action="store_true", required=False, help="Debug Mode, will run through all the motions providing extra info, but will not upload to trackers."
@@ -625,10 +623,10 @@ class Args:
             "-qbcon", "--qbit-bw-control", action="store_true", required=False, help="Enable qBittorrent bandwidth control logic before upload", dest="qbit_bandwidth_control"
         )
         parser.add_argument(
-            "-qbcrl", "--qbit-bw-threshold", nargs=1, required=False, help="qBittorrent bandwidth limit threshold (KB/s)", type=int, dest="qbit_bandwidth_threshold"
+            "-qbcrl", "--qbit-bw-threshold", nargs=1, required=False, help="qBittorrent bandwidth limit threshold (KB/s)", dest="qbit_bandwidth_threshold"
         )
         parser.add_argument(
-            "-qbctime", "--qbit-bw-time", nargs=1, required=False, help="Time to stay under qBittorrent threshold (seconds)", type=int, dest="qbit_bandwidth_time"
+            "-qbctime", "--qbit-bw-time", nargs=1, required=False, help="Time to stay under qBittorrent threshold (seconds)", dest="qbit_bandwidth_time"
         )
         parser.add_argument(
             "-uo",
@@ -656,7 +654,6 @@ class Args:
             nargs=1,
             required=False,
             help="How many trackers need to pass all checks (dupe/banned group/etc) to actually proceed to uploading",
-            type=int,
         )
         parser.add_argument("-rt", "--randomized", nargs=1, required=False, help="Number of extra, torrents with random infohash", default=0)
         parser.add_argument(
@@ -666,7 +663,6 @@ class Args:
             nargs=1,
             required=False,
             help="Use entropy in created torrents. (32 or 64) bits (ie: -entropy 32). Not supported at all sites, you many need to redownload the torrent",
-            type=int,
             default=0,
         )
         parser.add_argument("-ua", "--unattended", action="store_true", required=False, help=argparse.SUPPRESS)
@@ -782,12 +778,12 @@ class Args:
                     elif key == "screens":
                         try:
                             meta[key] = int(value2)
-                        except ValueError, TypeError:
+                        except (ValueError, TypeError):
                             meta[key] = int(self.config.get("DEFAULT", {}).get("screens", 1))
                     elif key in ("trackers_pass", "comparison_index"):
                         try:
                             meta[key] = int(value2)
-                        except ValueError, TypeError:
+                        except (ValueError, TypeError):
                             meta[key] = None
                     elif key in (
                         "limit_queue",
@@ -802,7 +798,7 @@ class Args:
                     ):
                         try:
                             meta[key] = int(value2)
-                        except ValueError, TypeError:
+                        except (ValueError, TypeError):
                             meta[key] = 0
                     elif key == "imghost":
                         meta.imghost = value2
@@ -875,14 +871,14 @@ class Args:
                     if len(value_list) == 1 and value_list[0] != "":
                         try:
                             meta[key] = int(value_list[0])
-                        except ValueError, TypeError:
+                        except (ValueError, TypeError):
                             meta[key] = 0
                     else:
                         meta[key] = 0
                 elif value not in (None, [], 0, ""):
                     try:
                         meta[key] = int(str(value))
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         meta[key] = 0
                 else:
                     meta[key] = 0
@@ -914,14 +910,14 @@ class Args:
                     if len(value_list) == 1 and value_list[0] != "":
                         try:
                             meta[key] = float(value_list[0])
-                        except ValueError, TypeError:
+                        except (ValueError, TypeError):
                             meta[key] = None
                     else:
                         meta[key] = None
                 elif value not in (None, [], ""):
                     try:
                         meta[key] = float(str(value))
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         meta[key] = None
                 else:
                     meta[key] = None
@@ -932,7 +928,7 @@ class Args:
                         try:
                             parsed_int = int(value_list[0])
                             meta[key] = parsed_int if parsed_int >= 0 else 0
-                        except ValueError, TypeError:
+                        except (ValueError, TypeError):
                             meta[key] = 0
                     else:
                         meta[key] = 0
@@ -940,7 +936,7 @@ class Args:
                     try:
                         parsed_int = int(str(value))
                         meta[key] = parsed_int if parsed_int >= 0 else 0
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         meta[key] = 0
                 else:
                     meta[key] = 0

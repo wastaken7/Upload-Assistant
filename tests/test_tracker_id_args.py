@@ -176,3 +176,113 @@ def test_numeric_cli_arguments_parsed_as_correct_types(tmp_path):
     assert isinstance(meta.double_upload_until, int)
 
 
+def test_invalid_trackers_pass_defaults_to_none(tmp_path):
+    """Test that invalid trackers_pass values are handled by fallback logic (defaults to None)."""
+    config = {"DEFAULT": {"screens": 1}}
+    args = Args(config)
+
+    meta, _, _ = args.parse([str(tmp_path), "--trackers-pass", "invalid"], Meta())
+
+    assert meta.trackers_pass is None
+
+
+def test_invalid_comparison_index_defaults_to_none(tmp_path):
+    """Test that invalid comparison_index values are handled by fallback logic (defaults to None)."""
+    config = {"DEFAULT": {"screens": 1}}
+    args = Args(config)
+
+    meta, _, _ = args.parse([str(tmp_path), "--comparison_index", "not-a-number"], Meta())
+
+    assert meta.comparison_index is None
+
+
+def test_invalid_limit_queue_defaults_to_zero(tmp_path):
+    """Test that invalid limit_queue values are handled by fallback logic (defaults to 0)."""
+    config = {"DEFAULT": {"screens": 1}}
+    args = Args(config)
+
+    meta, _, _ = args.parse([str(tmp_path), "--limit-queue", "invalid"], Meta())
+
+    assert meta.limit_queue == 0
+
+
+def test_invalid_year_defaults_to_zero(tmp_path):
+    """Test that invalid year values are handled by fallback logic (defaults to 0)."""
+    config = {"DEFAULT": {"screens": 1}}
+    args = Args(config)
+
+    meta, _, _ = args.parse([str(tmp_path), "--year", "invalid"], Meta())
+
+    assert meta.manual_year == 0
+
+
+def test_invalid_dupe_size_difference_tolerance_defaults_to_none(tmp_path):
+    """Test that invalid dupe-size-difference-tolerance values are handled by fallback logic (defaults to None)."""
+    config = {"DEFAULT": {"screens": 1}}
+    args = Args(config)
+
+    meta, _, _ = args.parse([str(tmp_path), "--dupe-size-difference-tolerance", "not-a-float"], Meta())
+
+    assert meta.dupe_size_difference_tolerance is None
+
+
+def test_invalid_entropy_defaults_to_zero(tmp_path):
+    """Test that invalid entropy values are handled by fallback logic (defaults to 0)."""
+    config = {"DEFAULT": {"screens": 1}}
+    args = Args(config)
+
+    meta, _, _ = args.parse([str(tmp_path), "--entropy", "invalid"], Meta())
+
+    assert meta.entropy == 0
+
+
+def test_invalid_douban_defaults_to_zero(tmp_path):
+    """Test that invalid douban values are handled by fallback logic (defaults to 0)."""
+    config = {"DEFAULT": {"screens": 1}}
+    args = Args(config)
+
+    meta, _, _ = args.parse([str(tmp_path), "--douban", "invalid"], Meta())
+
+    assert meta.douban_manual == 0
+
+
+def test_invalid_music_release_year_defaults_to_zero(tmp_path):
+    """Test that invalid music-release-year values are handled by fallback logic (defaults to 0)."""
+    config = {"DEFAULT": {"screens": 1}}
+    args = Args(config)
+
+    meta, _, _ = args.parse([str(tmp_path), "--music-release-year", "not-a-year"], Meta())
+
+    assert meta.music_release_year == 0
+
+
+def test_invalid_music_edition_year_defaults_to_zero(tmp_path):
+    """Test that invalid music-edition-year values are handled by fallback logic (defaults to 0)."""
+    config = {"DEFAULT": {"screens": 1}}
+    args = Args(config)
+
+    meta, _, _ = args.parse([str(tmp_path), "--music-edition-year", "not-a-year"], Meta())
+
+    assert meta.music_edition_year == 0
+
+
+def test_invalid_qbit_bandwidth_threshold_defaults_to_zero(tmp_path):
+    """Test that invalid qbit-bw-threshold values are handled by fallback logic (defaults to 0)."""
+    config = {"DEFAULT": {"screens": 1}}
+    args = Args(config)
+
+    meta, _, _ = args.parse([str(tmp_path), "--qbit-bw-threshold", "invalid"], Meta())
+
+    assert meta.qbit_bandwidth_threshold == 0
+
+
+def test_invalid_qbit_bandwidth_time_defaults_to_zero(tmp_path):
+    """Test that invalid qbit-bw-time values are handled by fallback logic (defaults to 0)."""
+    config = {"DEFAULT": {"screens": 1}}
+    args = Args(config)
+
+    meta, _, _ = args.parse([str(tmp_path), "--qbit-bw-time", "invalid"], Meta())
+
+    assert meta.qbit_bandwidth_time == 0
+
+
