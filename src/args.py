@@ -622,12 +622,8 @@ class Args:
         parser.add_argument(
             "-qbcon", "--qbit-bw-control", action="store_true", required=False, help="Enable qBittorrent bandwidth control logic before upload", dest="qbit_bandwidth_control"
         )
-        parser.add_argument(
-            "-qbcrl", "--qbit-bw-threshold", nargs=1, required=False, help="qBittorrent bandwidth limit threshold (KB/s)", dest="qbit_bandwidth_threshold"
-        )
-        parser.add_argument(
-            "-qbctime", "--qbit-bw-time", nargs=1, required=False, help="Time to stay under qBittorrent threshold (seconds)", dest="qbit_bandwidth_time"
-        )
+        parser.add_argument("-qbcrl", "--qbit-bw-threshold", nargs=1, required=False, help="qBittorrent bandwidth limit threshold (KB/s)", dest="qbit_bandwidth_threshold")
+        parser.add_argument("-qbctime", "--qbit-bw-time", nargs=1, required=False, help="Time to stay under qBittorrent threshold (seconds)", dest="qbit_bandwidth_time")
         parser.add_argument(
             "-uo",
             "--upload-order",
@@ -778,12 +774,12 @@ class Args:
                     elif key == "screens":
                         try:
                             meta[key] = int(value2)
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             meta[key] = int(self.config.get("DEFAULT", {}).get("screens", 1))
                     elif key in ("trackers_pass", "comparison_index"):
                         try:
                             meta[key] = int(value2)
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             meta[key] = None
                     elif key in (
                         "limit_queue",
@@ -798,7 +794,7 @@ class Args:
                     ):
                         try:
                             meta[key] = int(value2)
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             meta[key] = 0
                     elif key == "imghost":
                         meta.imghost = value2
@@ -871,14 +867,14 @@ class Args:
                     if len(value_list) == 1 and value_list[0] != "":
                         try:
                             meta[key] = int(value_list[0])
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             meta[key] = 0
                     else:
                         meta[key] = 0
                 elif value not in (None, [], 0, ""):
                     try:
                         meta[key] = int(str(value))
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         meta[key] = 0
                 else:
                     meta[key] = 0
@@ -910,14 +906,14 @@ class Args:
                     if len(value_list) == 1 and value_list[0] != "":
                         try:
                             meta[key] = float(value_list[0])
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             meta[key] = None
                     else:
                         meta[key] = None
                 elif value not in (None, [], ""):
                     try:
                         meta[key] = float(str(value))
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         meta[key] = None
                 else:
                     meta[key] = None
@@ -928,7 +924,7 @@ class Args:
                         try:
                             parsed_int = int(value_list[0])
                             meta[key] = parsed_int if parsed_int >= 0 else 0
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             meta[key] = 0
                     else:
                         meta[key] = 0
@@ -936,7 +932,7 @@ class Args:
                     try:
                         parsed_int = int(str(value))
                         meta[key] = parsed_int if parsed_int >= 0 else 0
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         meta[key] = 0
                 else:
                     meta[key] = 0
