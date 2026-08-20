@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
 import contextlib
+import contextvars
 import json
 import re
 import sys
@@ -20,6 +21,8 @@ from src.config_helpers import format_terminal_link
 from src.console import logger, prompt_in_thread
 from src.meta import Meta
 from src.trackersetup import tracker_class_map
+
+_dupe_prompt_lock_held = contextvars.ContextVar("dupe_prompt_lock_held", default=False)
 
 DupeEntry = dict[str, Any]
 
@@ -252,10 +255,21 @@ class UploadHelper:
 
     async def prompt_yes_no(self, question: str, *, default: bool = False) -> bool:
         """Ask one interactive question at a time without blocking the event loop."""
+        if _dupe_prompt_lock_held.get():
+            return await prompt_in_thread(cli_ui.ask_yes_no, question, default=default)
         async with self._prompt_lock:
             return await prompt_in_thread(cli_ui.ask_yes_no, question, default=default)
 
     async def dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str) -> tuple[bool, Meta]:
+        """Show duplicate results and their confirmation as one atomic console interaction."""
+        async with self._prompt_lock:
+            token = _dupe_prompt_lock_held.set(True)
+            try:
+                return await self._dupe_check(dupes, meta, tracker_name)
+            finally:
+                _dupe_prompt_lock_held.reset(token)
+
+    async def _dupe_check(self, dupes: list[DupeEntry | str], meta: Meta, tracker_name: str) -> tuple[bool, Meta]:
         def _format_dupe(entry: DupeEntry | str) -> str:
             if isinstance(entry, dict):
                 name = str(entry.get("name", ""))
