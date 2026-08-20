@@ -39,6 +39,44 @@ async def test_prompt_yes_no_serializes_concurrent_prompts(monkeypatch: pytest.M
 
 
 @pytest.mark.asyncio
+async def test_dupe_check_keeps_each_result_list_with_its_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
+    first_started = threading.Event()
+    release_first = threading.Event()
+    messages: list[str] = []
+    prompts: list[str] = []
+
+    class Tracker:
+        async def get_name(self, meta: Meta) -> dict[str, str]:
+            return {"name": meta.name}
+
+    def ask_yes_no(question: str, default: bool = False) -> bool:
+        del default
+        prompts.append(question)
+        if len(prompts) == 1:
+            first_started.set()
+            assert release_first.wait(timeout=1)
+        return True
+
+    helper = UploadHelper({"DEFAULT": {}})
+    helper.tracker_class_map = {"FIRST": lambda **_kwargs: Tracker(), "SECOND": lambda **_kwargs: Tracker()}
+    monkeypatch.setattr("src.uphelper.cli_ui.ask_yes_no", ask_yes_no)
+    monkeypatch.setattr("src.uphelper.logger.info", lambda message, **_kwargs: messages.append(message))
+
+    first = asyncio.create_task(helper.dupe_check(["first dupe"], Meta(category="TV", name="First"), "FIRST"))
+    assert await asyncio.to_thread(first_started.wait, 1)
+
+    second = asyncio.create_task(helper.dupe_check(["second dupe"], Meta(category="TV", name="Second"), "SECOND"))
+    await asyncio.sleep(0)
+    assert messages == ["[bold blue]FIRST[/bold blue]: Check if these are actually dupes:", "", "[bold cyan]first dupe[/bold cyan]"]
+
+    release_first.set()
+    await asyncio.gather(first, second)
+
+    assert prompts == ["Upload to FIRST anyway?", "Upload to SECOND anyway?"]
+    assert messages[-3:] == ["[bold blue]SECOND[/bold blue]: Check if these are actually dupes:", "", "[bold cyan]second dupe[/bold cyan]"]
+
+
+@pytest.mark.asyncio
 async def test_bdinfo_comparison_prompt_uses_rich_markup(monkeypatch: pytest.MonkeyPatch) -> None:
     question: str | None = None
 
