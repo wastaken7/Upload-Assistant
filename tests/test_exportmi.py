@@ -1,5 +1,6 @@
 # ruff: noqa: S101
 import asyncio
+import ntpath
 import subprocess
 from unittest.mock import Mock, patch
 
@@ -71,6 +72,20 @@ def test_mediainfo_uses_extended_windows_path_for_long_unc_files() -> None:
 
     with patch("src.mediainfo.platform.system", return_value="Windows"):
         assert _input_path(path) == f"\\\\?\\UNC\\{path[2:]}"
+
+
+@pytest.mark.parametrize(
+    ("path", "prefix"),
+    [
+        ("C:/" + "segment/" * 90 + "./nested/../file.m4b", "\\\\?\\"),
+        ("//server/share/" + "segment/" * 90 + "./nested/../file.m4b", "\\\\?\\UNC\\"),
+    ],
+)
+def test_mediainfo_normalizes_long_windows_paths_before_prefixing(path: str, prefix: str) -> None:
+    normalized = ntpath.normpath(path)
+
+    with patch("src.mediainfo.platform.system", return_value="Windows"):
+        assert _input_path(path) == f"{prefix}{normalized[2:] if prefix.endswith('UNC\\') else normalized}"
 
 
 def test_mediainfo_does_not_modify_short_or_non_windows_paths() -> None:

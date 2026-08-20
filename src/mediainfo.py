@@ -32,11 +32,14 @@ def _binary() -> str:
 def _input_path(path: str | Path) -> str:
     """Return a Windows extended-length path when MediaInfo needs one."""
     value = str(path)
-    if platform.system() != "Windows" or len(value) < 260 or value.startswith("\\\\?\\") or not ntpath.isabs(value):
+    if platform.system() != "Windows" or value.startswith("\\\\?\\") or not ntpath.isabs(value):
         return value
-    if value.startswith("\\\\"):
-        return f"\\\\?\\UNC\\{value[2:]}"
-    return f"\\\\?\\{value}"
+    normalized = ntpath.normpath(value)
+    if len(normalized) < 260:
+        return value
+    if normalized.startswith("\\\\"):
+        return f"\\\\?\\UNC\\{normalized[2:]}"
+    return f"\\\\?\\{normalized}"
 
 
 def run_mediainfo(path: str | Path, *, output: str | None = None, full: bool = True, inform: str | None = None) -> str:
