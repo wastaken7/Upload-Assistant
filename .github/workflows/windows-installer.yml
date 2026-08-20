@@ -25,11 +25,12 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Python for the Windows wheelhouse
         uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: ${{ env.PYTHON_MINOR }}
 
       - name: Prepare installer payload
         shell: pwsh
@@ -54,6 +55,24 @@ jobs:
           New-Item -ItemType Directory -Force -Path build/payload/wheels | Out-Null
           python -m pip wheel --wheel-dir build/payload/wheels pip -r requirements.txt
           "UA_VERSION=$env:UA_VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Smoke-test the embedded Python runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $smokeDir = Join-Path $env:RUNNER_TEMP 'embedded-python-smoke'
+          if (Test-Path -LiteralPath $smokeDir) {
+            Remove-Item -LiteralPath $smokeDir -Recurse -Force
+          }
+          Expand-Archive -LiteralPath build/payload/python-runtime.zip -DestinationPath $smokeDir
+          $pth = Get-ChildItem -LiteralPath $smokeDir -Filter 'python*._pth' | Select-Object -First 1
+          if (-not $pth) { throw 'The embedded Python archive does not contain a python._pth file.' }
+          Add-Content -LiteralPath $pth.FullName -Value "`nimport site"
+          $python = Join-Path $smokeDir 'python.exe'
+          & $python build/payload/get-pip.py --no-index --find-links build/payload/wheels --disable-pip-version-check --no-warn-script-location
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $python -m pip install --no-index --find-links build/payload/wheels -r build/payload/source/requirements.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install Inno Setup
         shell: pwsh

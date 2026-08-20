@@ -381,12 +381,12 @@ function Ensure-DestinationPython {
 
     Enable-EmbeddedPythonSite -PythonDirectory $pythonDir
 
-    Write-Step "Bootstrapping bundled pip"
-    Invoke-Process -FilePath $pythonExe -Description "bundled pip bootstrap" -ArgumentList @($BootstrapScript, "--no-index", "--find-links", $OfflineWheelhouse, "--disable-pip-version-check", "--no-warn-script-location")
-
     if (-not (Test-Path -LiteralPath $pythonExe)) {
         throw "Python installation did not create $pythonExe. Re-run the Upload Assistant installer; it must create and use its isolated Python runtime."
     }
+
+    Write-Step "Bootstrapping bundled pip"
+    Invoke-Process -FilePath $pythonExe -Description "bundled pip bootstrap" -ArgumentList @($BootstrapScript, "--no-index", "--find-links", $OfflineWheelhouse, "--disable-pip-version-check", "--no-warn-script-location")
 
     return $pythonExe
 }

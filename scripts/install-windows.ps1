@@ -564,7 +564,7 @@ function Complete-StagedInstallation {
                 }
 
                 $resolvedDirectory = [System.IO.Path]::GetFullPath($directory)
-                $destinationPrefix = $resolvedDestinationDir.TrimEnd('\\') + '\\'
+                $destinationPrefix = $resolvedDestinationDir.TrimEnd('\') + '\'
                 if (-not $resolvedDirectory.StartsWith($destinationPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
                     continue
                 }

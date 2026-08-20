@@ -17,6 +17,8 @@ def test_release_publication_waits_for_the_windows_installer():
     for expected_text in (
         "uses: ./.github/workflows/windows-installer.yml",
         "needs: [prepare-release, build-windows-installer]",
+        "ref: ${{ needs.prepare-release.outputs.release_sha }}",
+        '--target "$RELEASE_SHA"',
         "Download Windows installer",
         '"$RUNNER_TEMP/windows-installer"/*.exe',
     ):
