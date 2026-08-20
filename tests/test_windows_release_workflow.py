@@ -18,6 +18,7 @@ def test_release_publication_waits_for_the_windows_installer():
         "uses: ./.github/workflows/windows-installer.yml",
         "needs: [prepare-release, build-windows-installer]",
         "ref: ${{ needs.prepare-release.outputs.release_sha }}",
+        "GH_REPO: ${{ github.repository }}",
         '--target "$RELEASE_SHA"',
         "Download Windows installer",
         '"$RUNNER_TEMP/windows-installer"/*.exe',

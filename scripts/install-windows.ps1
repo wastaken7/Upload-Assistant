@@ -624,6 +624,8 @@ try {
     $preservePaths = @(
         (Join-Path $resolvedUaDir "data")
         (Join-Path $resolvedUaDir "tmp")
+        $PythonInstallDir
+        (Join-Path $resolvedUaDir "ffmpeg")
     )
     Complete-StagedInstallation -StagingDir $stagingDir -DestinationDir $resolvedUaDir -PreserveDirectories $preservePaths
     Write-GlobalLauncher -AppDir $resolvedUaDir

@@ -18,6 +18,14 @@ def test_update_stages_dependencies_before_replacing_installation():
         raise AssertionError("The previous installation must be backed up before activation")
     if "Move-Item -LiteralPath $backupDir -Destination $resolvedDestinationDir" not in SCRIPT:
         raise AssertionError("A failed activation must restore the previous installation")
+    for preserved_path in (
+        '(Join-Path $resolvedUaDir "data")',
+        '(Join-Path $resolvedUaDir "tmp")',
+        "$PythonInstallDir",
+        '(Join-Path $resolvedUaDir "ffmpeg")',
+    ):
+        if preserved_path not in SCRIPT:
+            raise AssertionError(f"The updater must preserve {preserved_path} during activation")
 
 
 def test_installer_aborts_when_post_installation_fails():
