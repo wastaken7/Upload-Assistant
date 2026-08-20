@@ -1,6 +1,8 @@
 """Compatibility layer backed by the official MediaInfo CLI."""
 
 import json
+import ntpath
+import platform
 import re
 import subprocess
 from pathlib import Path
@@ -27,6 +29,19 @@ def _binary() -> str:
     return binary
 
 
+def _input_path(path: str | Path) -> str:
+    """Return a Windows extended-length path when MediaInfo needs one."""
+    value = str(path)
+    if platform.system() != "Windows" or value.startswith("\\\\?\\") or not ntpath.isabs(value):
+        return value
+    normalized = ntpath.normpath(value)
+    if len(normalized) < 260:
+        return value
+    if normalized.startswith("\\\\"):
+        return f"\\\\?\\UNC\\{normalized[2:]}"
+    return f"\\\\?\\{normalized}"
+
+
 def run_mediainfo(path: str | Path, *, output: str | None = None, full: bool = True, inform: str | None = None) -> str:
     command = [_binary()]
     if output != "JSON":
@@ -37,7 +52,7 @@ def run_mediainfo(path: str | Path, *, output: str | None = None, full: bool = T
         command.append(f"--Inform={inform}")
     elif output and output != "STRING":
         command.append(f"--Output={output}")
-    command.append(str(path))
+    command.append(_input_path(path))
     try:
         result = subprocess.run(  # noqa: S603
             command,
