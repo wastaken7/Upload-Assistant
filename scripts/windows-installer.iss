@@ -1,5 +1,5 @@
 ; Build input supplied by .github/workflows/windows-installer.yml:
-; ..\build\payload\source
+; ..\build\payload\source plus the offline Python runtime, wheelhouse, and FFmpeg archive.
 #define AppName "Upload-Assistant"
 #define AppVersion GetEnv("UA_VERSION")
 #define AppPublisher "Upload-Assistant"
@@ -31,6 +31,10 @@ UninstallDisplayIcon={app}\logo.ico
 [Files]
 Source: "..\build\payload\source\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
 Source: "logo.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\build\payload\python-runtime.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "..\build\payload\get-pip.py"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "..\build\payload\ffmpeg.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "..\build\payload\wheels\*"; DestDir: "{tmp}\wheels"; Flags: recursesubdirs deleteafterinstall
 Source: "install-bundled-windows.ps1"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Tasks]
@@ -41,9 +45,6 @@ Name: "{group}\Upload Assistant WebUI"; Filename: "{sys}\WindowsPowerShell\v1.0\
 Name: "{group}\Upload Assistant Configuration"; Filename: "{app}\bin\ua-config.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\logo.ico"
 Name: "{group}\Upload Assistant Command Prompt"; Filename: "{cmd}"; Parameters: "/k set PATH={app}\bin;%PATH% & title Upload Assistant"; WorkingDir: "{app}"; IconFilename: "{app}\logo.ico"
 Name: "{autodesktop}\Upload Assistant WebUI"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ""{app}\scripts\run-webui-tray.ps1"" -AppDir ""{app}"""; WorkingDir: "{app}"; IconFilename: "{app}\logo.ico"; Tasks: desktopicon
-
-[Run]
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{tmp}\install-bundled-windows.ps1"" -InstallDir ""{app}"""; StatusMsg: "Installing Upload-Assistant and configuring environment (first installation may take a while)..."; Flags: waituntilterminated runhidden
 
 [Messages]
 FinishedHeadingLabel=Completing the [name] Setup Wizard
@@ -79,5 +80,28 @@ begin
     end;
 
     DeleteFile(TestFile);
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+begin
+  if CurStep <> ssPostInstall then
+    Exit;
+
+  if not Exec(
+    ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{tmp}\install-bundled-windows.ps1') + '" -InstallDir "' + ExpandConstant('{app}') + '" -PythonRuntimeArchive "' + ExpandConstant('{tmp}\python-runtime.zip') + '" -PipBootstrap "' + ExpandConstant('{tmp}\get-pip.py') + '" -Wheelhouse "' + ExpandConstant('{tmp}\wheels') + '" -FfmpegArchive "' + ExpandConstant('{tmp}\ffmpeg.zip') + '"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    MsgBox('Upload Assistant could not start its post-installation setup.', mbError, MB_OK);
+    RaiseException('Post-installation setup could not be started.');
+  end;
+
+  if ResultCode <> 0 then
+  begin
+    MsgBox('Upload Assistant post-installation setup failed (exit code ' + IntToStr(ResultCode) + '). The installation may be incomplete; see install.log in the selected folder for details.', mbError, MB_OK);
+    RaiseException('Post-installation setup failed with exit code ' + IntToStr(ResultCode) + '.');
   end;
 end;

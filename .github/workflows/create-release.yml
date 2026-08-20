@@ -17,8 +17,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  prepare-release:
     runs-on: ubuntu-24.04
+    outputs:
+      release_sha: ${{ steps.version_commit.outputs.release_sha }}
     steps:
       - name: Check out the selected branch
         uses: actions/checkout@v4
@@ -55,6 +57,13 @@ jobs:
             -f target_commitish="$GITHUB_SHA" \
             --jq .body > "$RUNNER_TEMP/release-notes.md"
 
+      - name: Save release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes-${{ inputs.version }}
+          path: ${{ runner.temp }}/release-notes.md
+          if-no-files-found: error
+
       - name: Update src/version.py
         env:
           NEW_VERSION: ${{ inputs.version }}
@@ -83,6 +92,7 @@ jobs:
           PY
 
       - name: Commit the version bump
+        id: version_commit
         env:
           NEW_VERSION: ${{ inputs.version }}
           TARGET_BRANCH: ${{ github.ref_name }}
@@ -93,27 +103,50 @@ jobs:
           git diff --cached --check
           git commit -m "bump: version to ${NEW_VERSION#v}"
           git push origin "HEAD:$TARGET_BRANCH"
+          echo "release_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build-windows-installer:
+    needs: prepare-release
+    uses: ./.github/workflows/windows-installer.yml
+    with:
+      ref: ${{ needs.prepare-release.outputs.release_sha }}
+      version: ${{ inputs.version }}
+
+  publish-release:
+    needs: [prepare-release, build-windows-installer]
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: write
+    steps:
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes-${{ inputs.version }}
+          path: ${{ runner.temp }}
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: Upload-Assistant-Windows-Setup-${{ inputs.version }}
+          path: ${{ runner.temp }}/windows-installer
 
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           NEW_VERSION: ${{ inputs.version }}
+          RELEASE_SHA: ${{ needs.prepare-release.outputs.release_sha }}
         run: |
           gh release create "$NEW_VERSION" \
-            --target "$(git rev-parse HEAD)" \
+            --target "$RELEASE_SHA" \
             --title "$NEW_VERSION" \
             --notes-file "$RUNNER_TEMP/release-notes.md" \
+            "$RUNNER_TEMP/windows-installer"/*.exe \
             --verify-tag=false
 
-      # Releases created by GITHUB_TOKEN do not emit new workflow runs, so
-      # dispatch the existing packaging workflows explicitly.
-      - name: Start release builds
+      - name: Start Docker release build
         env:
           GH_TOKEN: ${{ github.token }}
           NEW_VERSION: ${{ inputs.version }}
         run: |
           gh workflow run docker-image.yml --ref "$NEW_VERSION" -f use_latest_tag=true
-          gh workflow run windows-installer.yml --ref "$NEW_VERSION" \
-            -f ref="$NEW_VERSION" \
-            -f version="$NEW_VERSION" \
-            -f release_tag="$NEW_VERSION"
