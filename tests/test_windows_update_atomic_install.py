@@ -9,7 +9,7 @@ WORKFLOW = (pathlib.Path(__file__).parents[1] / ".github" / "workflows" / "windo
 def test_update_stages_dependencies_before_replacing_installation():
     """A failed pip install must leave the currently installed command usable."""
     stage = SCRIPT.index("Install-RepositoryFromZip -DestinationDir $stagingDir")
-    dependencies = SCRIPT.index("Install-Dependencies -PythonExe $PythonExe -AppDir $stagingDir")
+    dependencies = SCRIPT.index("Install-Dependencies -PythonExe $stagedPythonExe -AppDir $stagingDir")
     activate = SCRIPT.index("Complete-StagedInstallation -StagingDir $stagingDir")
 
     if not stage < dependencies < activate:
@@ -26,6 +26,18 @@ def test_update_stages_dependencies_before_replacing_installation():
     ):
         if preserved_path not in SCRIPT:
             raise AssertionError(f"The updater must preserve {preserved_path} during activation")
+
+
+def test_windows_updater_stages_embedded_python_runtime_before_dependencies():
+    if "$stagedPythonExe = $PythonExe" not in SCRIPT:
+        raise AssertionError("The updater must initialize staged Python executable")
+    if "Copy-Item -LiteralPath $resolvedPythonInstallDir -Destination $stagedPythonDir" not in SCRIPT:
+        raise AssertionError("The updater must stage embedded Python into the staging directory")
+    if "$stagedPythonExe = Join-Path $stagedPythonDir $relativePythonExe" not in SCRIPT:
+        raise AssertionError("The updater must use staged Python executable for dependencies")
+    if "if (Test-Path -LiteralPath $stagedPath) {" not in SCRIPT:
+        raise AssertionError("Activation must not overwrite staged directories")
+
 
 
 def test_installer_aborts_when_post_installation_fails():

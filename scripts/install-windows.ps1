@@ -576,6 +576,9 @@ function Complete-StagedInstallation {
                 }
 
                 $stagedPath = Join-Path $resolvedStagingDir $relativeDirectory
+                if (Test-Path -LiteralPath $stagedPath) {
+                    continue
+                }
                 New-Item -ItemType Directory -Path (Split-Path -Parent $stagedPath) -Force | Out-Null
                 Move-Item -LiteralPath $backupPath -Destination $stagedPath
                 $movedDirectories += [pscustomobject]@{
@@ -619,7 +622,19 @@ $stagingDir = Join-Path (Split-Path -Parent $resolvedUaDir) (".UploadAssistant-s
 $actualPythonPath = $null
 try {
     Install-RepositoryFromZip -DestinationDir $stagingDir
-    $actualPythonPath = Install-Dependencies -PythonExe $PythonExe -AppDir $stagingDir
+
+    $stagedPythonExe = $PythonExe
+    $resolvedPythonInstallDir = [System.IO.Path]::GetFullPath($PythonInstallDir)
+    $destinationPrefix = $resolvedUaDir.TrimEnd('\') + '\'
+    if ($resolvedPythonInstallDir.StartsWith($destinationPrefix, [System.StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $resolvedPythonInstallDir)) {
+        $relativePythonDir = $resolvedPythonInstallDir.Substring($destinationPrefix.Length)
+        $stagedPythonDir = Join-Path $stagingDir $relativePythonDir
+        Copy-Item -LiteralPath $resolvedPythonInstallDir -Destination $stagedPythonDir -Recurse -Force
+        $relativePythonExe = $PythonExe.Substring($resolvedPythonInstallDir.Length).TrimStart('\')
+        $stagedPythonExe = Join-Path $stagedPythonDir $relativePythonExe
+    }
+
+    $actualPythonPath = Install-Dependencies -PythonExe $stagedPythonExe -AppDir $stagingDir
     Write-Runner -AppDir $stagingDir
     $preservePaths = @(
         (Join-Path $resolvedUaDir "data")
