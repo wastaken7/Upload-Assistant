@@ -15,11 +15,11 @@ class BtnIdManager:
         return str(uuid.uuid4())
 
     @staticmethod
-    async def get_btn_torrents(btn_api: str, btn_id: str) -> tuple[int, int]:
+    async def get_btn_torrents(btn_api: str, btn_id: str, api_url: str = "https://api.broadcasthe.net/") -> tuple[int, int]:
         imdb_id = 0
         tvdb_id = 0
         logger.debug("Fetching BTN data...", extra={"markup": False})
-        post_query_url = "https://api.broadcasthe.net/"
+        post_query_url = api_url
         post_data = {"jsonrpc": "2.0", "id": (await BtnIdManager.generate_guid())[:8], "method": "getTorrentsSearch", "params": [btn_api, {"id": btn_id}, 50]}
         headers = {"Content-Type": "application/json"}
 
@@ -219,8 +219,8 @@ async def generate_guid() -> str:
     return await BtnIdManager.generate_guid()
 
 
-async def get_btn_torrents(btn_api: str, btn_id: str) -> tuple[int, int]:
-    return await BtnIdManager.get_btn_torrents(btn_api, btn_id)
+async def get_btn_torrents(btn_api: str, btn_id: str, api_url: str = "https://api.broadcasthe.net/") -> tuple[int, int]:
+    return await BtnIdManager.get_btn_torrents(btn_api, btn_id, api_url)
 
 
 async def get_bhd_torrents(

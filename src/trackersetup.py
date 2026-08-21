@@ -26,6 +26,7 @@ from src.trackers.beyondhd import BEYONDHD
 from src.trackers.bithdtv import BitHDTV
 from src.trackers.bjshare import BJShare
 from src.trackers.brasiltracker import BrasilTracker
+from src.trackers.broadcasthenet import BroadcasTheNet
 from src.trackers.cathoderaytube import CathodeRayTube
 from src.trackers.common import Common
 from src.trackers.digitalcore import DigitalCore
@@ -136,11 +137,12 @@ class TrackerSetup:
                 supported_trackers.append(tracker_name)
                 continue
 
-            tracker_config: dict[str, Any] = self.config["TRACKERS"].get(tracker_name, {})
+            tracker_config: dict[str, Any] = self.config["TRACKERS"].get(tracker_name, self.config["TRACKERS"].get("BTN", {}))
             example_tracker_config = example_config["TRACKERS"].get(tracker_name, {})
 
             if isinstance(example_tracker_config, dict) and isinstance(tracker_config, dict):
-                if "api_key" in example_tracker_config and not tracker_config.get("api_key"):
+                has_legacy_btn_api = tracker_name == "BROADCASTHENET" and bool(self.config.get("DEFAULT", {}).get("btn_api"))
+                if "api_key" in example_tracker_config and not tracker_config.get("api_key") and not has_legacy_btn_api:
                     logger.info(f"{tracker_name}: [bold red]Tracker is missing an API key and will be ignored.[/bold red]")
                     if not meta.debug:
                         continue
@@ -177,7 +179,7 @@ class TrackerSetup:
         else:
             trackers_list = []
 
-        trackers = [str(s).strip().upper() for s in trackers_list]
+        trackers = [Meta.canonical_tracker_name(str(s).strip()) for s in trackers_list]
         meta.trackers = trackers
 
         self.filter_unsupported_trackers(meta)
@@ -1358,6 +1360,7 @@ tracker_class_map: dict[str, Any] = {
     "BJSHARE": BJShare,
     "BLUTOPIA": Blutopia,
     "BRASILTRACKER": BrasilTracker,
+    "BROADCASTHENET": BroadcasTheNet,
     "CAPYBARABR": CapybaraBR,
     "CATHODERAYTUBE": CathodeRayTube,
     "CURUPIRA": Curupira,

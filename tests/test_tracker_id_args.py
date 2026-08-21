@@ -24,6 +24,12 @@ def test_tracker_id_accepts_beyondhd_dotted_torrent_url():
     assert args.parse_tracker_id("https://beyond-hd.me/download/release.12345") == ("BEYONDHD", "12345")
 
 
+def test_tracker_id_accepts_btn_torrent_url():
+    args = Args({"TRACKERS": {}})
+
+    assert args.parse_tracker_id("https://backup.landof.tv/torrents.php?id=415499&torrentid=415500") == ("BROADCASTHENET", "415500")
+
+
 def test_tracker_id_accepts_beyondhd_alias():
     args = Args({"TRACKERS": {}})
 
@@ -49,6 +55,7 @@ def test_tracker_ids_persist_and_expose_tracker_field():
 @pytest.mark.parametrize(
     ("alias", "tracker_name"),
     [
+        ("btn", "BROADCASTHENET"),
         ("ptp", "PASSTHEPOPCORN"),
         ("hdb", "HDBITS"),
         ("bhd", "BEYONDHD"),
@@ -284,5 +291,3 @@ def test_invalid_qbit_bandwidth_time_defaults_to_zero(tmp_path):
     meta, _, _ = args.parse([str(tmp_path), "--qbit-bw-time", "invalid"], Meta())
 
     assert meta.qbit_bandwidth_time == 0
-
-
