@@ -550,9 +550,39 @@ class BJShare:
 
     def get_titles(self, meta: Meta) -> tuple[str, str]:
         if meta.category == "BOOK":
-            title = f"{meta.book_series.strip()}: " if meta.book_series else ""
-            title += meta.title.strip()
-            title += f" {meta.book_series_index.strip()}" if meta.book_series_index else ""
+            title = meta.title.strip()
+            series = meta.book_series.strip()
+            series_index = meta.book_series_index.strip()
+
+            # Some older audiobook metadata uses the legacy form
+            # "Book title: História N de Series".
+            legacy_match = re.fullmatch(
+                r"(?P<book>.+?)\s*:\s*Hist[oó]ria\s+(?P<index>\d+(?:\.\d+)?)\s+de\s+(?P<series>.+)",
+                title,
+                re.IGNORECASE,
+            )
+            if legacy_match:
+                title = legacy_match.group("book").strip()
+                series = legacy_match.group("series").strip()
+                series_index = legacy_match.group("index")
+            elif series:
+                legacy_match = re.fullmatch(
+                    r"Hist[oó]ria\s+(?P<index>\d+(?:\.\d+)?)\s+de\s+(?P<series>.+)",
+                    title,
+                    re.IGNORECASE,
+                )
+                if legacy_match:
+                    title = series
+                    series = legacy_match.group("series").strip()
+                    series_index = legacy_match.group("index")
+
+            if series:
+                title = f"{series}: {title}"
+            if series_index:
+                normalized_index = legacy_match.group("index") if legacy_match else series_index
+                if re.fullmatch(r"\d+", normalized_index):
+                    normalized_index = normalized_index.zfill(2)
+                title += f" - Vol. {normalized_index}"
             return self.common.portuguese_title_capitalization(title), ""
 
         if meta.category == "GAME":
