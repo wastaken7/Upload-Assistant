@@ -58,12 +58,6 @@ class BroadcasTheNet:
         return
 
     async def get_additional_checks(self, meta: Meta) -> bool:
-        if meta.category != "TV":
-            logger.info(f"{self.tracker}: [red]BTN only accepts TV uploads.[/red]")
-            return False
-        if not self.api_key:
-            logger.info(f"{self.tracker}: [red]BTN requires api_key (or legacy DEFAULT.btn_api) for duplicate checks and torrent retrieval.[/red]")
-            return False
         if not int(meta.tvdb_id or 0) and not int(meta.imdb_id or 0):
             logger.info(f"{self.tracker}: [red]BTN requires a TVDB or IMDb ID.[/red]")
             return False
