@@ -90,6 +90,19 @@ def test_list_screenshots_includes_webp_contact_sheets(tmp_path: Path) -> None:
     assert [item.path for item in items] == [webp]
 
 
+def test_list_screenshots_orders_numeric_jpeg_and_webp_frames(tmp_path: Path) -> None:
+    screenshots_dir = tmp_path / "screenshots"
+    screenshots_dir.mkdir()
+    ten = screenshots_dir / "Release-10.webp"
+    two = screenshots_dir / "Release-2.jpg"
+    ten.write_bytes(b"webp")
+    two.write_bytes(b"jpg")
+
+    items = list_screenshots(tmp_path, {"category": "XXX"})
+
+    assert [item.path for item in items] == [two, ten]
+
+
 def test_add_bdmv_screenshot_uses_disc_capture_and_opaque_id(tmp_path: Path, monkeypatch) -> None:
     release_id = "release"
     screenshots_dir = tmp_path / "tmp" / release_id / "screenshots"

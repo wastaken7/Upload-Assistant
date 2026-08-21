@@ -4780,7 +4780,10 @@ function AudionutsUAGUI() {
                     className="max-w-full max-h-full object-contain"
                   />
                 </div>
-                {category === "XXX" && (
+                {category === "XXX" &&
+                  String(media.poster_url).startsWith(
+                    "/api/execution_preview_cover?",
+                  ) && (
                   <button
                     type="button"
                     onClick={regenerateExecutionCover}

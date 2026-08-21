@@ -131,3 +131,34 @@ async def test_xxx_fallback_cover_uses_a_video_frame(tmp_path, monkeypatch):
     assert meta.artwork_url == ""
     assert "scale=1200:-2:force_original_aspect_ratio=decrease" in commands[0]
     assert "-ss 6.0" in commands[0]
+
+
+@pytest.mark.asyncio
+async def test_xxx_fallback_cover_skips_unprobeable_candidates(tmp_path, monkeypatch):
+    invalid = tmp_path / "release.nfo"
+    video = tmp_path / "OnlyFans.Creator.mp4"
+    invalid.write_bytes(b"nfo")
+    video.write_bytes(b"video")
+    probed = []
+
+    def fake_probe(path):
+        probed.append(Path(path).name)
+        if Path(path) == invalid:
+            return {"format": {"duration": "0"}}
+        return {"format": {"duration": "60"}}
+
+    async def fake_run_ffmpeg(command):
+        command_args = takescreens.compile_ffmpeg_command(command)
+        output = Path(takescreens.get_ffmpeg_output_path(command, command_args))
+        output.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (120, 80), "purple").save(output, format="PNG")
+        return 0, b"", b""
+
+    monkeypatch.setattr(takescreens.ffmpeg, "probe", fake_probe)
+    monkeypatch.setattr(takescreens, "run_ffmpeg", fake_run_ffmpeg)
+    meta = Meta(base_dir=str(tmp_path), uuid="fallback-candidate", category="XXX")
+
+    cover = await takescreens.xxx_fallback_cover([str(invalid), str(video)], meta.uuid, meta.base_dir, meta)
+
+    assert cover is not None
+    assert probed == [invalid.name, video.name]

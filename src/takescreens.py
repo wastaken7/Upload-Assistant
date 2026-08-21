@@ -187,18 +187,29 @@ async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, me
     if meta.category != "XXX" or (is_valid_cover_image(meta.artwork_path) and not random_frame):
         return meta.artwork_path if is_valid_cover_image(meta.artwork_path) else None
 
-    video_path = next((Path(path) for path in paths if Path(path).is_file()), None)
+    video_path: Path | None = None
+    duration = 0.0
+    for candidate in paths:
+        candidate_path = Path(candidate)
+        if not candidate_path.is_file():
+            continue
+        try:
+            probe = await asyncio.to_thread(ffmpeg.probe, str(candidate_path))
+            candidate_duration = float(probe["format"]["duration"])
+            if candidate_duration <= 0:
+                continue
+        except OSError, KeyError, TypeError, ValueError, ffmpeg.Error:
+            continue
+        video_path = candidate_path
+        duration = candidate_duration
+        break
+
     if video_path is None:
         logger.warning("[yellow]XXX has no valid video available to generate a fallback cover.[/yellow]")
         return None
 
     output_path = artwork_dir(base_dir, folder_id) / "POSTER.png"
     try:
-        probe = await asyncio.to_thread(ffmpeg.probe, str(video_path))
-        duration = float(probe["format"]["duration"])
-        if duration <= 0:
-            raise ValueError("duration must be positive")
-
         # Avoid the opening frame, which is frequently black or only a logo.
         lower = min(max(duration * 0.10, 1.0), max(duration - 0.1, 0.0))
         upper = max(lower, min(duration * 0.85, max(duration - 0.1, 0.0)))
