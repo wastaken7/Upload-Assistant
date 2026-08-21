@@ -1879,7 +1879,6 @@ async def match_tracker_url(tracker_urls: list[str], meta: Meta) -> None:
             urls = getattr(tracker_class, "tracker_urls", None)
             if urls:
                 patterns[name.lower()] = urls
-        patterns.setdefault("btn", ["https://broadcasthe.net"])
         _cached_tracker_url_patterns = patterns
 
     tracker_url_patterns = _cached_tracker_url_patterns

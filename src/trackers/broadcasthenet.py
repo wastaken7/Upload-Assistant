@@ -127,7 +127,7 @@ class BroadcasTheNet:
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         if not self.api_key:
             return []
-        filters: dict[str, Any] = {"category": "Episode"}
+        filters: dict[str, Any] = {"category": "Season" if meta.tv_pack else "Episode"}
         if int(meta.tvdb_id or 0):
             filters["tvdb"] = str(meta.tvdb_id)
         elif int(meta.imdb_id or 0):

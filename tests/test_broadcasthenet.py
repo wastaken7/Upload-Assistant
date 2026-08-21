@@ -44,8 +44,22 @@ def test_btn_dupe_search_projects_api_rows(monkeypatch) -> None:
     assert dupes == [{"name": "Show.S01E01", "size": 1024, "files": "", "file_count": 2, "link": "https://backup.landof.tv/torrents.php?id=789&torrentid=456"}]  # noqa: S101
 
 
-def test_btn_rejects_non_tv_before_upload() -> None:
-    assert asyncio.run(tracker().get_additional_checks(Meta(category="MOVIE", tvdb_id=123))) is False  # noqa: S101
+def test_btn_requires_tvdb_or_imdb_id_before_upload() -> None:
+    assert asyncio.run(tracker().get_additional_checks(Meta(category="TV"))) is False  # noqa: S101
+    assert asyncio.run(tracker().get_additional_checks(Meta(category="TV", tvdb_id=123))) is True  # noqa: S101
+    assert asyncio.run(tracker().get_additional_checks(Meta(category="TV", imdb_id=456))) is True  # noqa: S101
+
+
+def test_btn_dupe_search_uses_season_category_for_packs(monkeypatch) -> None:
+    async def fake_api(method: str, params: list[object]) -> dict[str, object]:
+        if method != "getTorrents" or params[0] != {"category": "Season", "tvdb": "123"}:
+            raise AssertionError("unexpected BTN API request")
+        return {"result": {"torrents": {}}}
+
+    btn = tracker()
+    monkeypatch.setattr(btn, "_api", fake_api)
+
+    assert asyncio.run(btn.search_existing(Meta(category="TV", tv_pack=True, tvdb_id=123))) == []  # noqa: S101
 
 
 def test_btn_preserves_legacy_default_api_key_during_tracker_filtering() -> None:
