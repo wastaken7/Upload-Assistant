@@ -103,6 +103,15 @@ def test_list_screenshots_orders_numeric_jpeg_and_webp_frames(tmp_path: Path) ->
     assert [item.path for item in items] == [two, ten]
 
 
+def test_list_screenshots_excludes_reserved_artwork_stems_for_all_formats(tmp_path: Path) -> None:
+    screenshots_dir = tmp_path / "screenshots"
+    screenshots_dir.mkdir()
+    for filename in ("poster.jpg", "cover.jpeg", "music_cover.webp"):
+        (screenshots_dir / filename).write_bytes(b"artwork")
+
+    assert list_screenshots(tmp_path, {"category": "XXX"}) == []
+
+
 def test_add_bdmv_screenshot_uses_disc_capture_and_opaque_id(tmp_path: Path, monkeypatch) -> None:
     release_id = "release"
     screenshots_dir = tmp_path / "tmp" / release_id / "screenshots"

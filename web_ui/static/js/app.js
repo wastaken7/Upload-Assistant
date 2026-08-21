@@ -1497,6 +1497,7 @@ function AudionutsUAGUI() {
     useState(false);
   const [screenshotActionId, setScreenshotActionId] = useState("");
   const [coverAction, setCoverAction] = useState("");
+  const coverRequestRef = useRef(0);
   const [expandedScreenshot, setExpandedScreenshot] = useState(null);
   const themePaletteRef = useRef(null);
   const screenshotModalRef = useRef(null);
@@ -2277,6 +2278,7 @@ function AudionutsUAGUI() {
   }, [hasDescFile, hasDescLink]);
 
   useEffect(() => {
+    coverRequestRef.current += 1;
     if (!isExecuting || !sessionId) {
       setExecutionPreview(null);
       setProgressItems([]);
@@ -2435,6 +2437,7 @@ function AudionutsUAGUI() {
 
   const regenerateExecutionCover = async () => {
     if (!sessionId || coverAction) return;
+    const requestToken = ++coverRequestRef.current;
     setCoverAction("regenerate");
     try {
       const response = await apiFetch(`${API_BASE}/execution_preview_cover/regenerate`, {
@@ -2447,14 +2450,16 @@ function AudionutsUAGUI() {
         window.alert(data?.error || "Could not regenerate the XXX cover.");
         return;
       }
-      setExecutionPreview((previous) =>
-        previous ? { ...previous, poster_url: data.poster_url } : previous,
-      );
+      if (coverRequestRef.current === requestToken) {
+        setExecutionPreview((previous) =>
+          previous ? { ...previous, poster_url: data.poster_url } : previous,
+        );
+      }
     } catch (error) {
       console.error("Could not regenerate XXX cover:", error);
       window.alert("Could not regenerate the XXX cover. Please try again.");
     } finally {
-      setCoverAction("");
+      if (coverRequestRef.current === requestToken) setCoverAction("");
     }
   };
 
@@ -4788,10 +4793,17 @@ function AudionutsUAGUI() {
                     type="button"
                     onClick={regenerateExecutionCover}
                     disabled={Boolean(coverAction)}
+                    aria-label={
+                      coverAction === "regenerate"
+                        ? "Generating a new XXX cover"
+                        : "Generate a new XXX cover"
+                    }
                     className={`flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "bg-purple-700 text-white hover:bg-purple-600" : "bg-purple-600 text-white hover:bg-purple-700"}`}
                     title="Generate another cover from a different video frame"
                   >
-                    {coverAction === "regenerate" ? <SpinnerIcon /> : <RefreshIcon />}
+                    <span aria-hidden="true">
+                      {coverAction === "regenerate" ? <SpinnerIcon /> : <RefreshIcon />}
+                    </span>
                   </button>
                 )}
               </div>

@@ -22,6 +22,7 @@ from src.takescreens import capture_screenshot, determine_tonemapping, disc_scre
 
 _SCREENSHOT_FILE = re.compile(r"^(?P<prefix>.+)-(?P<index>\d+)\.(?:png|jpe?g|webp)$", re.IGNORECASE)
 _EXCLUDED_NAMES = {"poster.png", "cover.png", "music_cover.png"}
+_EXCLUDED_STEMS = {Path(name).stem.casefold() for name in _EXCLUDED_NAMES}
 _review_locks: dict[str, threading.Lock] = {}
 _review_locks_guard = threading.Lock()
 
@@ -63,7 +64,7 @@ def _save_review(temp_dir: Path, review: Mapping[str, Any]) -> None:
 
 def _is_reviewable_file(path: Path) -> bool:
     name = path.name.casefold()
-    return path.is_file() and path.suffix.casefold() in {".png", ".jpg", ".jpeg", ".webp"} and name not in _EXCLUDED_NAMES and "libplacebo-test" not in name
+    return path.is_file() and path.suffix.casefold() in {".png", ".jpg", ".jpeg", ".webp"} and path.stem.casefold() not in _EXCLUDED_STEMS and "libplacebo-test" not in name
 
 
 def _local_id(temp_dir: Path, path: Path) -> str:

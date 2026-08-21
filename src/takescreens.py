@@ -196,7 +196,9 @@ async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, me
         try:
             probe = await asyncio.to_thread(ffmpeg.probe, str(candidate_path))
             candidate_duration = float(probe["format"]["duration"])
-            if candidate_duration <= 0:
+            streams = probe.get("streams", [])
+            has_video_stream = isinstance(streams, list) and any(isinstance(stream, Mapping) and stream.get("codec_type") == "video" for stream in streams)
+            if candidate_duration <= 0 or not has_video_stream:
                 continue
         except OSError, KeyError, TypeError, ValueError, ffmpeg.Error:
             continue
