@@ -348,12 +348,12 @@ function Install-Dependencies {
 
     if (-not $supportsVirtualEnvironments) {
         Write-Step "Installing dependencies in the embedded Python runtime"
-        & $PythonExe -m pip install -U pip
+        & $PythonExe -m pip install -U pip --no-warn-script-location
         if ($LASTEXITCODE -ne 0) {
             Fail "pip upgrade failed"
         }
 
-        & $PythonExe -m pip install -r (Join-Path $AppDir "requirements.txt")
+        & $PythonExe -m pip install --no-warn-script-location -r (Join-Path $AppDir "requirements.txt")
         if ($LASTEXITCODE -ne 0) {
             Fail "Base dependency installation failed"
         }
@@ -393,13 +393,13 @@ function Install-Dependencies {
     }
 
     Write-Step "Upgrading pip"
-    & $venvPython -m pip install -U pip
+    & $venvPython -m pip install -U pip --no-warn-script-location
     if ($LASTEXITCODE -ne 0) {
         Fail "pip upgrade failed"
     }
 
     Write-Step "Installing Upload Assistant dependencies"
-    & $venvPython -m pip install -r (Join-Path $AppDir "requirements.txt")
+    & $venvPython -m pip install --no-warn-script-location -r (Join-Path $AppDir "requirements.txt")
     if ($LASTEXITCODE -ne 0) {
         Fail "Base dependency installation failed"
     }

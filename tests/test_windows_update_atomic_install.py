@@ -44,6 +44,10 @@ def test_bundled_installer_records_post_installation_output():
         raise AssertionError("The bundled installer must define a persistent installation log")
     if "Start-Transcript -LiteralPath $installLog -Append" not in BUNDLED_INSTALLER:
         raise AssertionError("The bundled installer must record post-installation output")
+    if "$startInfo.RedirectStandardOutput = $true" not in BUNDLED_INSTALLER:
+        raise AssertionError("The bundled installer must redirect child process standard output")
+    if "$startInfo.RedirectStandardError = $true" not in BUNDLED_INSTALLER:
+        raise AssertionError("The bundled installer must redirect child process standard error")
 
 
 def test_windows_installers_do_not_fall_back_to_existing_python():

@@ -259,6 +259,8 @@ function Invoke-Process {
     $startInfo.FileName = $FilePath
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
     if ($startInfo.PSObject.Properties.Name -contains 'ArgumentList') {
         foreach ($argument in $ArgumentList) {
             [void]$startInfo.ArgumentList.Add($argument)
@@ -270,6 +272,8 @@ function Invoke-Process {
 
     $process = $null
     $progressForm = $null
+    $stdoutTask = $null
+    $stderrTask = $null
     try {
         if (-not [string]::IsNullOrWhiteSpace($ProgressMessage)) {
             Add-Type -AssemblyName System.Windows.Forms
@@ -298,15 +302,44 @@ function Invoke-Process {
             $progressForm.Show()
         }
 
-        $process = [System.Diagnostics.Process]::Start($startInfo)
-        while (-not $process.HasExited) {
+        $process = [System.Diagnostics.Process]::new()
+        $process.StartInfo = $startInfo
+        [void]$process.Start()
+
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+
+        while (-not $process.WaitForExit(100)) {
             if ($progressForm) {
                 [System.Windows.Forms.Application]::DoEvents()
             }
-            Start-Sleep -Milliseconds 100
         }
-        $process.WaitForExit()
+
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+
+        if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+            $stdout.TrimEnd("`r", "`n") | Write-Host
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+            $stderr.TrimEnd("`r", "`n") | Write-Host
+        }
+
         if ($process.ExitCode -ne 0) {
+            $detail = if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                $stderr.Trim()
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($stdout)) {
+                $stdout.Trim()
+            }
+            else {
+                ""
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($detail)) {
+                throw "$Description failed with exit code $($process.ExitCode):`n$detail"
+            }
             throw "$Description failed with exit code $($process.ExitCode)."
         }
     }
@@ -499,8 +532,8 @@ try {
     Add-DirectoryToUserPath -DirectoryPath $ffmpegBinDir
 
     Write-Step "Installing Upload Assistant dependencies"
-    Invoke-Process -FilePath $pythonExe -Description "Bundled pip upgrade" -ProgressMessage "Installing bundled dependencies..." -ArgumentList @("-m", "pip", "install", "--no-index", "--find-links", $resolvedWheelhouse, "--upgrade", "pip")
-    Invoke-Process -FilePath $pythonExe -Description "Bundled base dependency installation" -ProgressMessage "Installing bundled Upload Assistant dependencies. This may take several minutes..." -ArgumentList @("-m", "pip", "install", "--no-index", "--find-links", $resolvedWheelhouse, "-r", (Join-Path $resolvedInstallDir "requirements.txt"))
+    Invoke-Process -FilePath $pythonExe -Description "Bundled pip upgrade" -ProgressMessage "Installing bundled dependencies..." -ArgumentList @("-m", "pip", "install", "--no-index", "--find-links", $resolvedWheelhouse, "--upgrade", "pip", "--no-warn-script-location")
+    Invoke-Process -FilePath $pythonExe -Description "Bundled base dependency installation" -ProgressMessage "Installing bundled Upload Assistant dependencies. This may take several minutes..." -ArgumentList @("-m", "pip", "install", "--no-index", "--find-links", $resolvedWheelhouse, "--no-warn-script-location", "-r", (Join-Path $resolvedInstallDir "requirements.txt"))
 
     Write-Step "Installation complete."
     Write-Host ""
