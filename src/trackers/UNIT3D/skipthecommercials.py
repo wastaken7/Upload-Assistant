@@ -24,8 +24,8 @@ class SkipTheCommercials(UNIT3D):
     allows_bloated_audio = True
     base_url = "https://skipthecommercials.xyz"
     banned_groups = ("",)
-    approved_image_hosts = ("imgbox", "imgbb")
-    image_host_policy = ImageHostPolicy({"ibb.co": "imgbb", "imgbox.com": "imgbox"}, approved_image_hosts)
+    approved_image_hosts = ("imgbox", "imgbb", "onlyimage", "ptscreens")
+    image_host_policy = ImageHostPolicy({"ibb.co": "imgbb", "imgbox.com": "imgbox", "onlyimage.org": "onlyimage", "ptscreens.com": "ptscreens"}, approved_image_hosts)
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents/filter"
