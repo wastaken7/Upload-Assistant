@@ -135,7 +135,7 @@ async def test_xxx_fallback_cover_uses_a_video_frame(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_xxx_fallback_cover_skips_unprobeable_candidates(tmp_path, monkeypatch):
-    invalid = tmp_path / "release.nfo"
+    invalid = tmp_path / "release.mkv"
     video = tmp_path / "OnlyFans.Creator.mp4"
     invalid.write_bytes(b"nfo")
     video.write_bytes(b"video")
@@ -166,7 +166,7 @@ async def test_xxx_fallback_cover_skips_unprobeable_candidates(tmp_path, monkeyp
 
 @pytest.mark.asyncio
 async def test_xxx_fallback_cover_skips_audio_only_candidates(tmp_path, monkeypatch):
-    audio = tmp_path / "release.flac"
+    audio = tmp_path / "release.mkv"
     video = tmp_path / "OnlyFans.Creator.mp4"
     audio.write_bytes(b"audio")
     video.write_bytes(b"video")

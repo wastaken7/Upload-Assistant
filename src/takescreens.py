@@ -26,6 +26,7 @@ from src.artwork import is_public_http_url, is_valid_cover_image, is_valid_image
 from src.binaries import configured_binary
 from src.cleanup import cleanup_manager
 from src.console import logger
+from src.media_extensions import VIDEO_EXTENSIONS
 from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.screenshot_manifest import clear_group as clear_screenshot_group
@@ -192,6 +193,8 @@ async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, me
     for candidate in paths:
         candidate_path = Path(candidate)
         if not candidate_path.is_file():
+            continue
+        if candidate_path.suffix and candidate_path.suffix.casefold() not in VIDEO_EXTENSIONS:
             continue
         try:
             probe = await asyncio.to_thread(ffmpeg.probe, str(candidate_path))
