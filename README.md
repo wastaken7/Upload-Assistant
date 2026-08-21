@@ -124,6 +124,7 @@ This branch introduces new media categories and automation features not present 
 | <img src="web_ui/static/img/trackers/digitalcore.png" width="16" height="16" />            | DigitalCore            | DIGITALCORE            | MOVIE, TV, BOOK, GAME, MUSIC |
 | <img src="web_ui/static/img/trackers/emuwarez.png" width="16" height="16" />               | Emuwarez               | EMUWAREZ               | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/filelist.png" width="16" height="16" />               | FileList               | FILELIST               | MOVIE, TV                    |
+| <img src="web_ui/static/img/trackers/flood.png" width="16" height="16" />                  | Flood                  | FLOOD                  | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/funfile.png" width="16" height="16" />                | FunFile                | FUNFILE                | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/greatposterwall.png" width="16" height="16" />        | GreatPosterWall        | GREATPOSTERWALL        | MOVIE                        |
 | <img src="web_ui/static/img/trackers/hawkeuno.png" width="16" height="16" />               | hawke-uno              | HAWKEUNO               | MOVIE, TV                    |

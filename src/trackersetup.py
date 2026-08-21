@@ -30,6 +30,7 @@ from src.trackers.cathoderaytube import CathodeRayTube
 from src.trackers.common import Common
 from src.trackers.digitalcore import DigitalCore
 from src.trackers.filelist import FileList
+from src.trackers.flood import Flood
 from src.trackers.funfile import FunFile
 from src.trackers.greatposterwall import GreatPosterWall
 from src.trackers.hdbits import HDBits
@@ -1371,6 +1372,7 @@ tracker_class_map: dict[str, Any] = {
     "EMUWAREZ": Emuwarez,
     "FUNFILE": FunFile,
     "FILELIST": FileList,
+    "FLOOD": Flood,
     "GREATPOSTERWALL": GreatPosterWall,
     "HDBITS": HDBits,
     "HDSPACE": HDSpace,
