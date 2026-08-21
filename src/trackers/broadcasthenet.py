@@ -255,7 +255,7 @@ class BroadcasTheNet:
                 autofill_data["auto_season"] = f"S{int(meta.season_int or 0):02d}"
         else:
             autofill_data = {"type": upload_type, "tvdb": "Get Info", "scene_yesno": "Yes", "autofill": release_name}
-        async with aiofiles.open(Path(meta.base_dir) / "tmp" / meta.uuid / "MEDIAINFO.txt", encoding="utf-8") as handle:
+        async with aiofiles.open(Path(meta.base_dir) / "tmp" / meta.uuid / "MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as handle:
             mediainfo = strip_report_by_line(await handle.read())
         async with aiofiles.open(torrent_path, "rb") as handle:
             torrent = await handle.read()
