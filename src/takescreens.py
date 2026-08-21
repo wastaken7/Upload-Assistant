@@ -7,6 +7,7 @@ import os
 import platform
 import random
 import re
+import secrets
 import sys
 import time
 import traceback
@@ -179,6 +180,54 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
     sheets = [str(path) for path in register_screenshots(base_dir, folder_id, results, capture_group)] if results else []
     meta.screens = len(sheets)
     return sheets
+
+
+async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, meta: Meta, random_frame: bool = False) -> str | None:
+    """Create a poster from a representative frame when XXX has no artwork."""
+    if meta.category != "XXX" or (is_valid_cover_image(meta.artwork_path) and not random_frame):
+        return meta.artwork_path if is_valid_cover_image(meta.artwork_path) else None
+
+    video_path = next((Path(path) for path in paths if Path(path).is_file()), None)
+    if video_path is None:
+        logger.warning("[yellow]XXX has no valid video available to generate a fallback cover.[/yellow]")
+        return None
+
+    output_path = artwork_dir(base_dir, folder_id) / "POSTER.png"
+    try:
+        probe = await asyncio.to_thread(ffmpeg.probe, str(video_path))
+        duration = float(probe["format"]["duration"])
+        if duration <= 0:
+            raise ValueError("duration must be positive")
+
+        # Avoid the opening frame, which is frequently black or only a logo.
+        lower = min(max(duration * 0.10, 1.0), max(duration - 0.1, 0.0))
+        upper = max(lower, min(duration * 0.85, max(duration - 0.1, 0.0)))
+        timestamp = secrets.SystemRandom().uniform(lower, upper) if random_frame and upper > lower else lower
+        stream = ffmpeg.input(str(video_path), ss=str(timestamp))
+        command = ffmpeg.output(
+            stream,
+            str(output_path),
+            vframes=1,
+            vf="scale=1200:-2:force_original_aspect_ratio=decrease",
+            compression_level=ffmpeg_compression,
+        ).global_args("-y", "-loglevel", "verbose" if meta.ffdebug else "quiet")
+        return_code, _stdout, stderr = await run_ffmpeg(command)
+        if return_code != 0 or not is_valid_cover_image(output_path):
+            raise RuntimeError(stderr.decode(errors="replace").strip() or "FFmpeg did not produce a valid image")
+    except Exception as error:
+        logger.warning(f"[yellow]Unable to generate the XXX fallback cover from {video_path.name}: {error}[/yellow]")
+        return None
+
+    meta.artwork_path = str(output_path)
+    meta.artwork_url = ""
+    logger.warning(
+        "[yellow]No XXX cover was found after checking, in order: explicit --poster, "
+        "a local artwork sidecar, and provider artwork. For the local search, place a valid "
+        "GIF/JPG/JPEG/PNG/WEBP image beside the media (or inside the release folder) with a "
+        "filename containing one of: poster, cover, front, folder, artwork. "
+        f"Generated a fallback cover from a video frame: {output_path.name}.[/yellow]"
+    )
+    return str(output_path)
 
 
 def compile_ffmpeg_command(command: Any) -> list[str]:
@@ -2766,6 +2815,9 @@ class TakeScreensManager:
 
     async def xxx_contact_sheets(self, paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main") -> list[str]:
         return await xxx_contact_sheets(paths, folder_id, base_dir, meta, capture_group)
+
+    async def xxx_fallback_cover(self, paths: list[str], folder_id: str, base_dir: str, meta: Meta, random_frame: bool = False) -> str | None:
+        return await xxx_fallback_cover(paths, folder_id, base_dir, meta, random_frame)
 
     async def prepare_book_cover(self, path: str, folder_id: str, base_dir: str, meta: Meta) -> str | None:
         return await prepare_book_cover(path, folder_id, base_dir, meta)

@@ -34,6 +34,7 @@ import psutil
 import web_ui.auth as auth_mod
 from src.webui_progress import ProgressEvent, clear_progress_callback, reset_progress, set_progress_callback
 from src.app_paths import CODE_DIR, STATE_DIR
+from src.meta import Meta
 
 
 def _module_name(*parts: str) -> str:
@@ -1488,6 +1489,16 @@ def _execution_preview_cover_url(preview_session_id: str, cache_key: str) -> str
     return f"/api/execution_preview_cover?session_id={urllib.parse.quote(preview_session_id, safe='')}&v={version}"
 
 
+def _execution_preview_cover_cache_key(session_id: str, fallback: str) -> str:
+    cover_file = _find_execution_preview_cover_file(session_id)
+    if cover_file is None:
+        return fallback
+    try:
+        return f"{fallback}:{cover_file.stat().st_mtime_ns}"
+    except OSError:
+        return fallback
+
+
 def _music_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: str) -> str:
     """Return a public cover URL or the authenticated local-preview endpoint."""
     for key in ("cover", "poster"):
@@ -1860,7 +1871,7 @@ def _music_preview_from_meta(meta_data: Mapping[str, object]) -> dict[str, objec
     }
 
 
-def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: str) -> ExecutionPreview:
+def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: str, preview_session_id: str = "") -> ExecutionPreview:
     title = _stringify_preview_value(meta_data.get("title")) or _stringify_preview_value(meta_data.get("name"))
     original_title = _stringify_preview_value(meta_data.get("original_title"))
     category = _stringify_preview_value(meta_data.get("category")).upper()
@@ -1868,6 +1879,12 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
     # contract for MOVIE/TV.  Keep the older fields as fallbacks so previews
     # remain available for already-created temp metadata.
     poster_url = _stringify_preview_value(meta_data.get("artwork_url")) or _stringify_preview_value(meta_data.get("poster"))
+    if not poster_url and preview_session_id and _find_execution_preview_cover_file(preview_session_id) is not None:
+        cache_key = _execution_preview_cover_cache_key(
+            preview_session_id,
+            _stringify_preview_value(meta_data.get("uuid")) or fallback_path,
+        )
+        poster_url = _execution_preview_cover_url(preview_session_id, cache_key)
     if category == "MUSIC":
         poster_url = _music_cover_from_meta(meta_data, _stringify_preview_value(meta_data.get("webui_session_id")))
     tmdb_poster = _stringify_preview_value(meta_data.get("tmdb_poster_path")) or _stringify_preview_value(meta_data.get("tmdb_poster"))
@@ -1950,7 +1967,7 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
                         console.print(f"Execution preview cover enrichment failed for session {session_id}: {err}", markup=False)
             if _stringify_preview_value(meta_data.get("category")).upper() == "MUSIC":
                 meta_data = {**meta_data, "webui_session_id": session_id}
-            preview = _extract_execution_preview(meta_data, execution_path)
+            preview = _extract_execution_preview(meta_data, execution_path, session_id)
             preview["awaiting_input"] = bool(process_info.get("awaiting_input"))
             preview["input_type"] = process_info.get("input_type")
             preview["progress"] = _progress_items_for_process(process_info)
@@ -4516,6 +4533,41 @@ def execution_preview_cover():
 
     mimetype = mimetypes.guess_type(str(cover_file))[0] or "application/octet-stream"
     return send_file(cover_file, mimetype=mimetype, conditional=True, max_age=30)
+
+
+@app.route("/api/execution_preview_cover/regenerate", methods=["POST"])
+def regenerate_execution_preview_cover():
+    """Regenerate the local XXX preview cover from another video frame."""
+    if not _verify_csrf_header() or not _verify_same_origin():
+        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
+
+    payload = _request_json_dict()
+    session_id = _stringify_preview_value(payload.get("session_id"))
+    _execution_path, meta_file, meta_data = _resolve_execution_preview_meta(session_id)
+    if meta_file is None or meta_data is None:
+        return jsonify({"success": False, "error": "Execution metadata is not available yet"}), 404
+    if _stringify_preview_value(meta_data.get("category")).upper() != "XXX":
+        return jsonify({"success": False, "error": "Cover regeneration is only available for XXX"}), 400
+
+    try:
+        from src.takescreens import xxx_fallback_cover
+
+        meta = Meta(dict(meta_data))
+        cover = asyncio.run(xxx_fallback_cover(list(meta.filelist or []), meta.uuid, meta.base_dir, meta, random_frame=True))
+        if not cover:
+            return jsonify({"success": False, "error": "Could not generate a new cover from the source video"}), 422
+        cache_key = _execution_preview_cover_cache_key(session_id, meta.uuid or str(meta_file))
+        return jsonify(
+            {
+                "success": True,
+                "poster_url": _execution_preview_cover_url(session_id, cache_key),
+            }
+        )
+    except (FileNotFoundError, ValueError) as error:
+        return jsonify({"success": False, "error": str(error)}), 404
+    except Exception as error:
+        console.print(f"XXX cover regeneration failed for {session_id}: {error}", markup=False)
+        return jsonify({"success": False, "error": "Could not regenerate the XXX cover"}), 500
 
 
 @app.route("/api/execution_screenshots")

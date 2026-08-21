@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from src import takescreens
 from src.meta import Meta
@@ -100,3 +101,33 @@ async def test_animated_xxx_contact_sheet_is_registered_as_webp(tmp_path, monkey
     assert "libwebp_anim" in commands[0]
     assert "-t 5.0" in commands[0]
     assert "drawtext" in commands[0]
+
+
+@pytest.mark.asyncio
+async def test_xxx_fallback_cover_uses_a_video_frame(tmp_path, monkeypatch):
+    video = tmp_path / "OnlyFans.Creator.mp4"
+    video.write_bytes(b"video")
+    commands = []
+
+    def fake_probe(_path):
+        return {"format": {"duration": "60"}}
+
+    async def fake_run_ffmpeg(command):
+        command_args = takescreens.compile_ffmpeg_command(command)
+        commands.append(" ".join(command_args))
+        output = Path(takescreens.get_ffmpeg_output_path(command, command_args))
+        output.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (120, 80), "purple").save(output, format="PNG")
+        return 0, b"", b""
+
+    monkeypatch.setattr(takescreens.ffmpeg, "probe", fake_probe)
+    monkeypatch.setattr(takescreens, "run_ffmpeg", fake_run_ffmpeg)
+    meta = Meta(base_dir=str(tmp_path), uuid="fallback-cover", category="XXX")
+
+    cover = await takescreens.xxx_fallback_cover([str(video)], meta.uuid, meta.base_dir, meta)
+
+    assert cover == str(tmp_path / "tmp" / "fallback-cover" / "artwork" / "POSTER.png")
+    assert meta.artwork_path == cover
+    assert meta.artwork_url == ""
+    assert "scale=1200:-2:force_original_aspect_ratio=decrease" in commands[0]
+    assert "-ss 6.0" in commands[0]

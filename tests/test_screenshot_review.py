@@ -79,6 +79,17 @@ def test_list_screenshots_includes_disc_video_frames_with_stable_opaque_ids(tmp_
     assert regular[0].id.startswith("local-")
 
 
+def test_list_screenshots_includes_webp_contact_sheets(tmp_path: Path) -> None:
+    screenshots_dir = tmp_path / "screenshots"
+    screenshots_dir.mkdir()
+    webp = screenshots_dir / "xxx-contact-sheet-1.webp"
+    webp.write_bytes(b"webp")
+
+    items = list_screenshots(tmp_path, {"category": "XXX"})
+
+    assert [item.path for item in items] == [webp]
+
+
 def test_add_bdmv_screenshot_uses_disc_capture_and_opaque_id(tmp_path: Path, monkeypatch) -> None:
     release_id = "release"
     screenshots_dir = tmp_path / "tmp" / release_id / "screenshots"
