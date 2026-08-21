@@ -1,5 +1,5 @@
 ; Build input supplied by .github/workflows/windows-installer.yml:
-; ..\build\payload\source
+; ..\build\payload\source plus the offline Python runtime, wheelhouse, and FFmpeg archive.
 #define AppName "Upload-Assistant"
 #define AppVersion GetEnv("UA_VERSION")
 #define AppPublisher "Upload-Assistant"
@@ -31,6 +31,10 @@ UninstallDisplayIcon={app}\logo.ico
 [Files]
 Source: "..\build\payload\source\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
 Source: "logo.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\build\payload\python-runtime.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "..\build\payload\get-pip.py"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "..\build\payload\ffmpeg.zip"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "..\build\payload\wheels\*"; DestDir: "{tmp}\wheels"; Flags: recursesubdirs deleteafterinstall
 Source: "install-bundled-windows.ps1"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Tasks]
@@ -42,8 +46,16 @@ Name: "{group}\Upload Assistant Configuration"; Filename: "{app}\bin\ua-config.c
 Name: "{group}\Upload Assistant Command Prompt"; Filename: "{cmd}"; Parameters: "/k set PATH={app}\bin;%PATH% & title Upload Assistant"; WorkingDir: "{app}"; IconFilename: "{app}\logo.ico"
 Name: "{autodesktop}\Upload Assistant WebUI"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ""{app}\scripts\run-webui-tray.ps1"" -AppDir ""{app}"""; WorkingDir: "{app}"; IconFilename: "{app}\logo.ico"; Tasks: desktopicon
 
-[Run]
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{tmp}\install-bundled-windows.ps1"" -InstallDir ""{app}"""; StatusMsg: "Installing Upload-Assistant and configuring environment (first installation may take a while)..."; Flags: waituntilterminated runhidden
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\python"
+Type: filesandordirs; Name: "{app}\ffmpeg"
+Type: filesandordirs; Name: "{app}\.venv"
+Type: files; Name: "{app}\install.log"
+Type: files; Name: "{app}\run-ua.ps1"
+Type: filesandordirs; Name: "{app}\bin\ua.cmd"
+Type: filesandordirs; Name: "{app}\bin\ua-update.cmd"
+Type: filesandordirs; Name: "{app}\bin\ua-config.cmd"
+Type: filesandordirs; Name: "{app}\bin\ua-webui.cmd"
 
 [Messages]
 FinishedHeadingLabel=Completing the [name] Setup Wizard
@@ -79,5 +91,92 @@ begin
     end;
 
     DeleteFile(TestFile);
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+begin
+  if CurStep <> ssPostInstall then
+    Exit;
+
+  if not Exec(
+    ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{tmp}\install-bundled-windows.ps1') + '" -InstallDir "' + ExpandConstant('{app}') + '" -PythonRuntimeArchive "' + ExpandConstant('{tmp}\python-runtime.zip') + '" -PipBootstrap "' + ExpandConstant('{tmp}\get-pip.py') + '" -Wheelhouse "' + ExpandConstant('{tmp}\wheels') + '" -FfmpegArchive "' + ExpandConstant('{tmp}\ffmpeg.zip') + '"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    MsgBox('Upload Assistant could not start its post-installation setup.', mbError, MB_OK);
+    RaiseException('Post-installation setup could not be started.');
+  end;
+
+  if ResultCode <> 0 then
+  begin
+    MsgBox('Upload Assistant post-installation setup failed (exit code ' + IntToStr(ResultCode) + '). The installation may be incomplete; see install.log in the selected folder for details.', mbError, MB_OK);
+    RaiseException('Post-installation setup failed with exit code ' + IntToStr(ResultCode) + '.');
+  end;
+end;
+
+procedure RemovePathEntry(const PathToRemove: String);
+var
+  Path: String;
+  PathArray: TArrayOfString;
+  I, J: Integer;
+  Found: Boolean;
+  NewPath: String;
+begin
+  if RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', Path) then
+  begin
+    PathArray := [];
+    J := 0;
+    I := 1;
+    while I <= Length(Path) do
+    begin
+      if (I = Length(Path)) or (Path[I] = ';') then
+      begin
+        SetArrayLength(PathArray, J + 1);
+        if I = Length(Path) then
+          PathArray[J] := Copy(Path, 1, I)
+        else
+          PathArray[J] := Copy(Path, 1, I - 1);
+
+        Path := Copy(Path, I + 1, Length(Path) - I);
+        I := 1;
+        J := J + 1;
+      end
+      else
+        I := I + 1;
+    end;
+
+    NewPath := '';
+    Found := False;
+    for I := 0 to GetArrayLength(PathArray) - 1 do
+    begin
+      if CompareText(Trim(PathArray[I]), PathToRemove) <> 0 then
+      begin
+        if NewPath <> '' then
+          NewPath := NewPath + ';';
+        NewPath := NewPath + PathArray[I];
+      end
+      else
+        Found := True;
+    end;
+
+    if Found then
+      RegWriteStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', NewPath);
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  AppBinDir: String;
+  FfmpegBinDir: String;
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    AppBinDir := ExpandConstant('{app}\bin');
+    FfmpegBinDir := ExpandConstant('{app}\ffmpeg\bin');
+    RemovePathEntry(AppBinDir);
+    RemovePathEntry(FfmpegBinDir);
   end;
 end;

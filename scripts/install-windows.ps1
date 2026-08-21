@@ -213,28 +213,6 @@ function Get-PythonInstallerUrl {
     return "$PythonDownloadBaseUrl/$fullVersion/python-$fullVersion-$archName.exe"
 }
 
-function Find-InstalledPython {
-    $pythonDirectoryName = "Python" + ($PythonVersion -replace '\.', '')
-    $candidates = @(
-        (Join-Path $env:LOCALAPPDATA "Programs\Python\$pythonDirectoryName\python.exe"),
-        (Join-Path $env:ProgramFiles "Python$($PythonVersion -replace '\.', '')\python.exe"),
-        (Join-Path ${env:ProgramFiles(x86)} "Python$($PythonVersion -replace '\.', '')\python.exe")
-    )
-
-    foreach ($candidate in $candidates) {
-        if (-not (Test-Path -LiteralPath $candidate)) {
-            continue
-        }
-
-        $installedVersion = (& $candidate -c "import platform; print(platform.python_version())").Trim()
-        if (Test-PythonVersionMatch -InstalledVersion $installedVersion -RequestedVersion $PythonVersion) {
-            return $candidate
-        }
-    }
-
-    return $null
-}
-
 function Test-PythonVersionMatch {
     param(
         [Parameter(Mandatory)]
@@ -312,37 +290,30 @@ function Ensure-IsolatedPython {
         )
 
     if (-not (Test-Path -LiteralPath $pythonExe)) {
-        $existingPython = Find-InstalledPython
-        if ($existingPython) {
-            Write-Host "Python $PythonVersion is already installed at $existingPython; using it for the Upload Assistant virtual environment."
-            return $existingPython
-        }
-
-        Fail "Python installation completed, but python.exe was not created at $PythonInstallDir. The installer may have reused an existing Python installation; install Python $PythonVersion manually or remove that installation and rerun this script."
+        Fail "Python installation completed, but python.exe was not created at $PythonInstallDir. Re-run the Upload Assistant installer; it must create and use its isolated Python runtime."
     }
 
     return $pythonExe
 }
 
 function Install-RepositoryFromZip {
-    param([string[]]$PreserveDirectories = @())
+    param([Parameter(Mandatory)][string]$DestinationDir)
 
-    $parentDir = Split-Path -Parent $UaDir
+    $parentDir = Split-Path -Parent $DestinationDir
     if (-not [string]::IsNullOrWhiteSpace($parentDir)) {
         New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
     }
 
-    $resolvedUaDir = [System.IO.Path]::GetFullPath($UaDir)
-    $rootDir = [System.IO.Path]::GetPathRoot($resolvedUaDir)
-    if ([System.StringComparer]::OrdinalIgnoreCase.Equals($resolvedUaDir, $rootDir)) {
-        Fail "UaDir cannot be a drive root. Choose a dedicated Upload Assistant directory."
+    $resolvedDestinationDir = [System.IO.Path]::GetFullPath($DestinationDir)
+    $rootDir = [System.IO.Path]::GetPathRoot($resolvedDestinationDir)
+    if ([System.StringComparer]::OrdinalIgnoreCase.Equals($resolvedDestinationDir, $rootDir)) {
+        Fail "DestinationDir cannot be a drive root. Choose a dedicated Upload Assistant directory."
     }
 
     $zipPath = New-TemporaryDownloadPath -FileName ("UploadAssistant-" + [guid]::NewGuid().ToString("N") + ".zip")
-    $extractRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantRepo-" + [guid]::NewGuid().ToString("N"))
-
-    $preserveRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("UploadAssistantPreserve-" + [guid]::NewGuid().ToString("N"))
-    $preservedDirectories = @()
+    $parentDir = Split-Path -Parent $resolvedDestinationDir
+    New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+    $extractRoot = Join-Path $parentDir (".UploadAssistant-extract-" + [guid]::NewGuid().ToString("N"))
 
     try {
         Invoke-DownloadFile -Url $RepositoryZipUrl -DestinationPath $zipPath -Label "Upload Assistant"
@@ -354,58 +325,43 @@ function Install-RepositoryFromZip {
             Fail "Downloaded Upload Assistant ZIP has an unexpected layout."
         }
 
-        foreach ($directory in $PreserveDirectories) {
-            if ([string]::IsNullOrWhiteSpace($directory)) {
-                continue
-            }
-
-            $resolvedDirectory = [System.IO.Path]::GetFullPath($directory)
-            $appPrefix = $resolvedUaDir.TrimEnd('\\') + '\\'
-            if (-not $resolvedDirectory.StartsWith($appPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-                continue
-            }
-
-            if (-not (Test-Path -LiteralPath $resolvedDirectory)) {
-                continue
-            }
-
-            $relativeDirectory = $resolvedDirectory.Substring($appPrefix.Length)
-            $preservedPath = Join-Path $preserveRoot $relativeDirectory
-            New-Item -ItemType Directory -Path (Split-Path -Parent $preservedPath) -Force | Out-Null
-            Move-Item -LiteralPath $resolvedDirectory -Destination $preservedPath
-            $preservedDirectories += [pscustomobject]@{
-                RelativePath = $relativeDirectory
-                PreservedPath = $preservedPath
-            }
+        if (Test-Path -LiteralPath $resolvedDestinationDir) {
+            Fail "Destination directory already exists and must be preserved. This appears to be a staging directory collision."
         }
 
-        if (Test-Path -LiteralPath $resolvedUaDir) {
-            Write-Step "Replacing existing Upload Assistant files"
-            Remove-Item -LiteralPath $resolvedUaDir -Recurse -Force
-        }
-
-        Move-Item -LiteralPath $sourceDir -Destination $resolvedUaDir
-
-        foreach ($preservedDirectory in $preservedDirectories) {
-            $restorePath = Join-Path $resolvedUaDir $preservedDirectory.RelativePath
-            New-Item -ItemType Directory -Path (Split-Path -Parent $restorePath) -Force | Out-Null
-            if (Test-Path -LiteralPath $restorePath) {
-                Remove-Item -LiteralPath $restorePath -Recurse -Force
-            }
-            Move-Item -LiteralPath $preservedDirectory.PreservedPath -Destination $restorePath
-        }
+        Move-Item -LiteralPath $sourceDir -Destination $resolvedDestinationDir
     }
     finally {
-        Remove-Item -LiteralPath $preserveRoot -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $extractRoot -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $zipPath -Force -ErrorAction SilentlyContinue
     }
 }
 
 function Install-Dependencies {
-    param([Parameter(Mandatory)][string]$PythonExe)
+    param(
+        [Parameter(Mandatory)][string]$PythonExe,
+        [Parameter(Mandatory)][string]$AppDir
+    )
 
-    $venvDir = Join-Path $UaDir ".venv"
+    & $PythonExe -c "import venv"
+    $supportsVirtualEnvironments = $LASTEXITCODE -eq 0
+
+    if (-not $supportsVirtualEnvironments) {
+        Write-Step "Installing dependencies in the embedded Python runtime"
+        & $PythonExe -m pip install -U pip --no-warn-script-location
+        if ($LASTEXITCODE -ne 0) {
+            Fail "pip upgrade failed"
+        }
+
+        & $PythonExe -m pip install --no-warn-script-location -r (Join-Path $AppDir "requirements.txt")
+        if ($LASTEXITCODE -ne 0) {
+            Fail "Base dependency installation failed"
+        }
+
+        return $PythonExe
+    }
+
+    $venvDir = Join-Path $AppDir ".venv"
     $venvPython = Join-Path $venvDir "Scripts\python.exe"
 
     if ($ForceUpdate -and (Test-Path -LiteralPath $venvDir)) {
@@ -437,17 +393,18 @@ function Install-Dependencies {
     }
 
     Write-Step "Upgrading pip"
-    & $venvPython -m pip install -U pip
+    & $venvPython -m pip install -U pip --no-warn-script-location
     if ($LASTEXITCODE -ne 0) {
         Fail "pip upgrade failed"
     }
 
     Write-Step "Installing Upload Assistant dependencies"
-    & $venvPython -m pip install -r (Join-Path $UaDir "requirements.txt")
+    & $venvPython -m pip install --no-warn-script-location -r (Join-Path $AppDir "requirements.txt")
     if ($LASTEXITCODE -ne 0) {
         Fail "Base dependency installation failed"
     }
 
+    return $venvPython
 }
 
 function Add-DirectoryToUserPath {
@@ -506,7 +463,9 @@ function Add-DirectoryToUserPath {
 }
 
 function Write-Runner {
-    $runnerPath = Join-Path $UaDir "run-ua.ps1"
+    param([Parameter(Mandatory)][string]$AppDir)
+
+    $runnerPath = Join-Path $AppDir "run-ua.ps1"
     $runnerContents = @'
 [CmdletBinding()]
 param(
@@ -519,7 +478,10 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $venvPython = Join-Path $scriptDir ".venv\Scripts\python.exe"
 
 if (-not (Test-Path -LiteralPath $venvPython)) {
-    throw "Virtual environment not found at $venvPython. Re-run scripts/install-windows.ps1 first."
+    $venvPython = Join-Path $scriptDir "python\python.exe"
+    if (-not (Test-Path -LiteralPath $venvPython)) {
+        throw "Python runtime not found. Re-run scripts/install-windows.ps1 first."
+    }
 }
 
 Set-Location $scriptDir
@@ -531,6 +493,8 @@ exit $LASTEXITCODE
 }
 
 function Write-GlobalLauncher {
+    param([Parameter(Mandatory)][string]$AppDir)
+
     New-Item -ItemType Directory -Path $LauncherDir -Force | Out-Null
 
     $launcherCmdPath = Join-Path $LauncherDir "ua.cmd"
@@ -539,25 +503,29 @@ function Write-GlobalLauncher {
     $webuiCmdPath = Join-Path $LauncherDir "ua-webui.cmd"
     $launcherCmdContents = @"
 @echo off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$UaDir\run-ua.ps1" %*
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$AppDir\run-ua.ps1" %*
 exit /b %errorlevel%
 "@
 $updateCmdContents = @"
 @echo off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$UaDir\scripts\update-windows.ps1" -UaDir "$UaDir" -PythonInstallDir "$PythonInstallDir" -LauncherDir "$LauncherDir" %*
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$AppDir\scripts\update-windows.ps1" -UaDir "$AppDir" -PythonInstallDir "$PythonInstallDir" -LauncherDir "$LauncherDir" %*
 exit /b %errorlevel%
 "@
     $configCmdContents = @"
 @echo off
-pushd "$UaDir"
-"$UaDir\.venv\Scripts\python.exe" "$UaDir\config-generator.py" %*
+pushd "$AppDir"
+if exist "$AppDir\python\python.exe" (
+    "$AppDir\python\python.exe" "$AppDir\config-generator.py" %*
+) else (
+    "$AppDir\.venv\Scripts\python.exe" "$AppDir\config-generator.py" %*
+)
 set "exit_code=%errorlevel%"
 popd
 exit /b %exit_code%
 "@
     $webuiCmdContents = @"
 @echo off
-start "" "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "$UaDir\scripts\run-webui-tray.ps1" -AppDir "$UaDir" %*
+start "" "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "$AppDir\scripts\run-webui-tray.ps1" -AppDir "$AppDir" %*
 exit /b 0
 "@
 
@@ -572,13 +540,127 @@ exit /b 0
     Add-DirectoryToUserPath -DirectoryPath $LauncherDir
 }
 
-$PythonExe = Ensure-IsolatedPython
-Install-RepositoryFromZip -PreserveDirectories @($PythonInstallDir)
-Install-Dependencies -PythonExe $PythonExe
-Write-Runner
-Write-GlobalLauncher
+function Complete-StagedInstallation {
+    param(
+        [Parameter(Mandatory)][string]$StagingDir,
+        [Parameter(Mandatory)][string]$DestinationDir,
+        [string[]]$PreserveDirectories = @()
+    )
 
-$venvPythonPath = Join-Path $UaDir ".venv\Scripts\python.exe"
+    $resolvedStagingDir = [System.IO.Path]::GetFullPath($StagingDir)
+    $resolvedDestinationDir = [System.IO.Path]::GetFullPath($DestinationDir)
+    $backupDir = Join-Path (Split-Path -Parent $resolvedDestinationDir) (".UploadAssistant-backup-" + [guid]::NewGuid().ToString("N"))
+    $movedDirectories = @()
+    $activated = $false
+
+    try {
+        if (Test-Path -LiteralPath $resolvedDestinationDir) {
+            Write-Step "Activating updated Upload Assistant"
+            Move-Item -LiteralPath $resolvedDestinationDir -Destination $backupDir
+
+            foreach ($directory in $PreserveDirectories) {
+                if ([string]::IsNullOrWhiteSpace($directory)) {
+                    continue
+                }
+
+                $resolvedDirectory = [System.IO.Path]::GetFullPath($directory)
+                $destinationPrefix = $resolvedDestinationDir.TrimEnd('\') + '\'
+                if (-not $resolvedDirectory.StartsWith($destinationPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    continue
+                }
+
+                $relativeDirectory = $resolvedDirectory.Substring($destinationPrefix.Length)
+                $backupPath = Join-Path $backupDir $relativeDirectory
+                if (-not (Test-Path -LiteralPath $backupPath)) {
+                    continue
+                }
+
+                $stagedPath = Join-Path $resolvedStagingDir $relativeDirectory
+                if (Test-Path -LiteralPath $stagedPath) {
+                    continue
+                }
+                New-Item -ItemType Directory -Path (Split-Path -Parent $stagedPath) -Force | Out-Null
+                Move-Item -LiteralPath $backupPath -Destination $stagedPath
+                $movedDirectories += [pscustomobject]@{
+                    StagedPath = $stagedPath
+                    BackupPath = $backupPath
+                }
+            }
+        }
+
+        Move-Item -LiteralPath $resolvedStagingDir -Destination $resolvedDestinationDir
+        $activated = $true
+    }
+    catch {
+        foreach ($movedDirectory in $movedDirectories) {
+            if (Test-Path -LiteralPath $movedDirectory.StagedPath) {
+                New-Item -ItemType Directory -Path (Split-Path -Parent $movedDirectory.BackupPath) -Force | Out-Null
+                Move-Item -LiteralPath $movedDirectory.StagedPath -Destination $movedDirectory.BackupPath -Force
+            }
+        }
+
+        if (Test-Path -LiteralPath $backupDir) {
+            if (Test-Path -LiteralPath $resolvedDestinationDir) {
+                Remove-Item -LiteralPath $resolvedDestinationDir -Recurse -Force
+            }
+            Move-Item -LiteralPath $backupDir -Destination $resolvedDestinationDir
+        }
+
+        throw
+    }
+    finally {
+        if ($activated) {
+            Remove-Item -LiteralPath $backupDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Remove-Item -LiteralPath $resolvedStagingDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+$PythonExe = Ensure-IsolatedPython
+$resolvedUaDir = [System.IO.Path]::GetFullPath($UaDir)
+$stagingDir = Join-Path (Split-Path -Parent $resolvedUaDir) (".UploadAssistant-staging-" + [guid]::NewGuid().ToString("N"))
+$actualPythonPath = $null
+try {
+    Install-RepositoryFromZip -DestinationDir $stagingDir
+
+    $stagedPythonExe = $PythonExe
+    $resolvedPythonInstallDir = [System.IO.Path]::GetFullPath($PythonInstallDir)
+    $destinationPrefix = $resolvedUaDir.TrimEnd('\') + '\'
+    if ($resolvedPythonInstallDir.StartsWith($destinationPrefix, [System.StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $resolvedPythonInstallDir)) {
+        $relativePythonDir = $resolvedPythonInstallDir.Substring($destinationPrefix.Length)
+        $stagedPythonDir = Join-Path $stagingDir $relativePythonDir
+        Copy-Item -LiteralPath $resolvedPythonInstallDir -Destination $stagedPythonDir -Recurse -Force
+        $relativePythonExe = $PythonExe.Substring($resolvedPythonInstallDir.Length).TrimStart('\')
+        $stagedPythonExe = Join-Path $stagedPythonDir $relativePythonExe
+    }
+
+    $actualPythonPath = Install-Dependencies -PythonExe $stagedPythonExe -AppDir $stagingDir
+    Write-Runner -AppDir $stagingDir
+    $preservePaths = @(
+        (Join-Path $resolvedUaDir "data")
+        (Join-Path $resolvedUaDir "tmp")
+        $PythonInstallDir
+        (Join-Path $resolvedUaDir "ffmpeg")
+    )
+    Complete-StagedInstallation -StagingDir $stagingDir -DestinationDir $resolvedUaDir -PreserveDirectories $preservePaths
+    Write-GlobalLauncher -AppDir $resolvedUaDir
+}
+finally {
+    Remove-Item -LiteralPath $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+if ($actualPythonPath -and $actualPythonPath.StartsWith($stagingDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $relativePath = $actualPythonPath.Substring($stagingDir.Length).TrimStart('\')
+    $actualPythonPath = Join-Path $resolvedUaDir $relativePath
+}
+
+if (-not $actualPythonPath) {
+    $actualPythonPath = Join-Path $resolvedUaDir ".venv\Scripts\python.exe"
+    if (-not (Test-Path -LiteralPath $actualPythonPath)) {
+        $actualPythonPath = $PythonExe
+    }
+}
+
 $launcherCmdPath = Join-Path $LauncherDir "ua.cmd"
 $updateCmdPath = Join-Path $LauncherDir "ua-update.cmd"
 $configCmdPath = Join-Path $LauncherDir "ua-config.cmd"
@@ -590,8 +672,8 @@ Write-Host ""
 Write-Host "Location:"
 Write-Host "  $UaDir"
 Write-Host ""
-Write-Host "Isolated Python:"
-Write-Host "  $PythonExe"
+Write-Host "Python interpreter:"
+Write-Host "  $actualPythonPath"
 Write-Host ""
 Write-Host "First step:"
 Write-Host "  Configure UA with: ua-config"
@@ -612,4 +694,4 @@ Write-Host "PATH note:"
 Write-Host "  A new PowerShell or Command Prompt window may be required before 'ua', 'ua-update', 'ua-config', and 'ua-webui' are available everywhere."
 Write-Host ""
 Write-Host "Configuration command (equivalent):"
-Write-Host "  & `"$venvPythonPath`" `"$UaDir\config-generator.py`""
+Write-Host "  & `"$actualPythonPath`" `"$UaDir\config-generator.py`""

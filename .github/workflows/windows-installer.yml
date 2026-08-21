@@ -1,61 +1,78 @@
 name: Build Windows installer
 
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
+  workflow_call:
     inputs:
       ref:
-        description: "Tag, branch, or commit to package"
         required: true
-        default: "development"
         type: string
       version:
-        description: "Version shown by the installer"
         required: true
-        default: "development"
         type: string
-      release_tag:
-        description: "Existing release tag to receive the installer (optional)"
-        required: false
-        type: string
-  pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     runs-on: windows-2025
+    env:
+      PYTHON_MINOR: "3.14"
+      FFMPEG_URL: "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
     steps:
-      - name: Validate manual release attachment
-        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
-        shell: pwsh
-        env:
-          SOURCE_REF: ${{ inputs.ref }}
-          INSTALLER_VERSION: ${{ inputs.version }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
-        run: |
-          if ($env:SOURCE_REF -ne $env:RELEASE_TAG -or $env:INSTALLER_VERSION -ne $env:RELEASE_TAG) {
-            throw 'ref, version, and release_tag must match when attaching an installer to a release.'
-          }
-
       - name: Checkout source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.ref || github.sha }}
+          ref: ${{ inputs.ref }}
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python for the Windows wheelhouse
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_MINOR }}
 
       - name: Prepare installer payload
         shell: pwsh
         env:
-          UA_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.version || github.sha }}
+          UA_VERSION: ${{ inputs.version }}
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path build/payload/source | Out-Null
           git archive --format=zip --output build/payload/source.zip HEAD
           Expand-Archive -LiteralPath build/payload/source.zip -DestinationPath build/payload/source -Force
+
+          $index = Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/' -UseBasicParsing
+          $versions = [regex]::Matches($index.Content, "$env:PYTHON_MINOR\.\d+/") |
+            ForEach-Object { $_.Value.TrimEnd('/') } |
+            Select-Object -Unique |
+            Sort-Object { [version]$_ } -Descending
+          if (-not $versions) { throw "No Python $env:PYTHON_MINOR release was found." }
+          $pythonVersion = $versions[0]
+          Invoke-WebRequest -Uri "https://www.python.org/ftp/python/$pythonVersion/python-$pythonVersion-embed-amd64.zip" -OutFile build/payload/python-runtime.zip -UseBasicParsing
+          Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile build/payload/get-pip.py -UseBasicParsing
+          Invoke-WebRequest -Uri $env:FFMPEG_URL -OutFile build/payload/ffmpeg.zip -UseBasicParsing
+          New-Item -ItemType Directory -Force -Path build/payload/wheels | Out-Null
+          python -m pip wheel --wheel-dir build/payload/wheels pip -r requirements.txt
           "UA_VERSION=$env:UA_VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Smoke-test the embedded Python runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $smokeDir = Join-Path $env:RUNNER_TEMP 'embedded-python-smoke'
+          if (Test-Path -LiteralPath $smokeDir) {
+            Remove-Item -LiteralPath $smokeDir -Recurse -Force
+          }
+          Expand-Archive -LiteralPath build/payload/python-runtime.zip -DestinationPath $smokeDir
+          $pth = Get-ChildItem -LiteralPath $smokeDir -Filter 'python*._pth' | Select-Object -First 1
+          if (-not $pth) { throw 'The embedded Python archive does not contain a python._pth file.' }
+          Add-Content -LiteralPath $pth.FullName -Value "`nimport site"
+          $python = Join-Path $smokeDir 'python.exe'
+          & $python build/payload/get-pip.py --no-index --find-links build/payload/wheels --disable-pip-version-check --no-warn-script-location
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $python -m pip install --no-index --find-links build/payload/wheels -r build/payload/source/requirements.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install Inno Setup
         shell: pwsh
@@ -80,17 +97,9 @@ jobs:
             Pop-Location
           }
 
-      - name: Upload workflow artifact
-        if: github.event_name != 'pull_request'
+      - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: Upload-Assistant-Windows-Setup-${{ env.UA_VERSION }}
           path: build/output/*.exe
           if-no-files-found: error
-
-      - name: Attach installer to release
-        if: github.event_name == 'release' || inputs.release_tag != ''
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
-          files: build/output/*.exe
