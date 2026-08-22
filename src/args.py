@@ -636,8 +636,25 @@ class Args:
             help="Set the upload order when both torrent trackers and Usenet are selected ('concurrent', 'usenet', 'tracker')",
         )
         parser.add_argument("-rtl", "--rtorrent-label", dest="rtorrent_label", nargs=1, required=False, help="Add to rtorrent with this label")
-        parser.add_argument("-tk", "--trackers", nargs=1, required=False, help="Upload to these trackers, comma separated (--trackers blu,bhd) including manual")
-        parser.add_argument(
+        
+        def _tracker_completer(prefix: str, parsed_args: Any, **kwargs: Any) -> list[str]:
+            trackers_dict = self.config.get("TRACKERS", {})
+            configured = []
+            for name, opts in trackers_dict.items():
+                if isinstance(opts, dict):
+                    if opts.get("api_key") or opts.get("auth_key") or opts.get("cookies") or opts.get("username"):
+                        configured.append(name.lower())
+            
+            if ',' in prefix:
+                base, current = prefix.rsplit(',', 1)
+                return [f"{base},{t}" for t in configured if t.startswith(current.lower())]
+            else:
+                return [t for t in configured if t.startswith(prefix.lower())]
+
+        tk_action = parser.add_argument("-tk", "--trackers", nargs=1, required=False, help="Upload to these trackers, comma separated (--trackers blu,bhd) including manual")
+        tk_action.completer = _tracker_completer
+        
+        rtk_action = parser.add_argument(
             "-rtk",
             "--trackers-remove",
             dest="trackers_remove",
@@ -645,6 +662,7 @@ class Args:
             required=False,
             help="Remove these trackers when processing default trackers, comma separated (--trackers-remove blu,bhd)",
         )
+        rtk_action.completer = _tracker_completer
         parser.add_argument(
             "-tpc",
             "--trackers-pass",
