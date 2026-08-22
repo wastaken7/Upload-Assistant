@@ -459,7 +459,7 @@ class BJShare:
 
                 width_num = round((16 / 9) * height_num)
                 width = str(width_num)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 pass
 
         else:
@@ -580,8 +580,19 @@ class BJShare:
                 title = f"{series}: {title}"
             if series_index:
                 normalized_index = legacy_match.group("index") if legacy_match else series_index
-                if re.fullmatch(r"\d+", normalized_index):
-                    normalized_index = normalized_index.zfill(2)
+                # Recognize decimal legacy indices like "4.0" as integer-valued and normalize
+                try:
+                    float_val = float(normalized_index)
+                    if float_val == int(float_val):
+                        normalized_index = str(int(float_val)).zfill(2)
+                    else:
+                        # Non-integer decimal, preserve as-is but try zero-padding if pure integer
+                        if re.fullmatch(r"\d+", normalized_index):
+                            normalized_index = normalized_index.zfill(2)
+                except (ValueError, TypeError):
+                    # Not a valid number, check if pure integer for zero-padding
+                    if re.fullmatch(r"\d+", normalized_index):
+                        normalized_index = normalized_index.zfill(2)
                 title += f" - Vol. {normalized_index}"
             return self.common.portuguese_title_capitalization(title), ""
 
@@ -1017,7 +1028,7 @@ class BJShare:
 
                 try:
                     size_in_gb = meta.bdinfo["size"]
-                except KeyError, IndexError, TypeError:
+                except (KeyError, IndexError, TypeError):
                     size_in_gb = 0
 
                 if size_in_gb > 66:
@@ -1238,7 +1249,7 @@ class BJShare:
                 bit_depth_str = meta.discs[0]["bdinfo"]["video"][0]["bit_depth"]
                 if "10" in bit_depth_str:
                     is_10_bit = True
-            except KeyError, IndexError, TypeError:
+            except (KeyError, IndexError, TypeError):
                 pass
         else:
             if meta.bit_depth == "10":

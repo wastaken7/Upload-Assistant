@@ -341,7 +341,9 @@ async def gather_book_prep(
             tracks = meta.mediainfo.get("media", {}).get("track", [])
             if not isinstance(tracks, list):
                 tracks = []
-            general_track = next((t for t in tracks if isinstance(t, dict) and t.get("@type") == "General"), None)
+            # Filter to only dictionary entries to prevent errors when calling .get() later
+            tracks = [t for t in tracks if isinstance(t, dict)]
+            general_track = next((t for t in tracks if t.get("@type") == "General"), None)
             if general_track:
                 # 1. Title/Album
                 album = _unescape_meta_val(general_track.get("Album") or general_track.get("album"))
