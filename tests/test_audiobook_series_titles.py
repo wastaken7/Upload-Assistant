@@ -1,4 +1,17 @@
 from src.book_extractors import extract_audiobook_series_from_title
+from src.book_prep import normalize_audiobook_title
+
+
+def test_normalize_audiobook_title_removes_repeated_series_suffix():
+    assert normalize_audiobook_title("O bobo: Os Contos de Hans Christian Andersen", "Os Contos de Hans Christian Andersen") == "O bobo"  # noqa: S101
+
+
+def test_normalize_audiobook_title_keeps_title_equal_to_series():
+    assert normalize_audiobook_title("Andersen", "Andersen") == "Andersen"  # noqa: S101
+
+
+def test_normalize_audiobook_title_removes_repeated_series_prefix():
+    assert normalize_audiobook_title("Os Contos de Hans Christian Andersen: O bobo", "Os Contos de Hans Christian Andersen") == "O bobo"  # noqa: S101
 
 
 def test_extract_audiobook_series_without_comma():
