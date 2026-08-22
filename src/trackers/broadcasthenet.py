@@ -241,12 +241,12 @@ class BroadcasTheNet:
         cookies = await self.common.parse_cookie_file(cookie_file)
         release_name = await self.get_name(meta)
         upload_type = "Season" if int(meta.tv_pack or 0) else "Episode"
-        if int(meta.tvdb_id or 0):
+        if meta.title:
             autofill_data: dict[str, str] = {
                 "type": upload_type,
                 "tvdb": "Get Info",
                 "scene_yesno": "No",
-                "auto_series": str(meta.tvdb_id),
+                "auto_series": str(meta.title),
             }
             if upload_type == "Episode":
                 autofill_data["auto_title"] = f"S{int(meta.season_int or 0):02d}E{int(meta.episode_int or 0):02d}"
