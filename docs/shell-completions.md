@@ -11,6 +11,18 @@ $ ua --[TAB]
 ...
 ```
 
+## Prerequisites
+
+Because you installed Upload Assistant in an isolated environment using `uv`, the `argcomplete` helper scripts are not automatically added to your global `$PATH`. You must install the `argcomplete` utility globally on your system first:
+
+```bash
+uv tool install argcomplete
+# OR using pip:
+pip install --user argcomplete
+# OR using apt (Debian/Ubuntu):
+sudo apt install python3-argcomplete
+```
+
 There are two main ways to enable completions in your shell: **Static File Registration** (recommended for zero startup overhead) and **Dynamic Registration**. In both methods, the completions themselves are always fetched dynamically when you press `[TAB]`.
 
 ---
