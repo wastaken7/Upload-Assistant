@@ -496,8 +496,8 @@ class CookieValidator:
         )
         failure_path = await self.common.save_html_file(meta, tracker, text, "Failed_Login")
         logger.info(
-            f"The web page has been saved to [yellow]{failure_path}[/yellow] for analysis.\n"
-            "[red]Do not share this file publicly[/red], as it may contain confidential information such as passkeys, IP address, e-mail, etc.\n"
+            f"The web page has been saved to {failure_path} for analysis.\n"
+            "Do not share this file publicly, as it may contain confidential information such as passkeys, IP address, e-mail, etc.\n"
             "You can open this file in a web browser to see what went wrong.\n"
         )
 
@@ -809,8 +809,8 @@ class CookieAuthUploader:
 
         failure_path = await self.common.save_html_file(meta, tracker, response.text, "Failed_Upload")
         message.append(
-            f"The web page has been saved to [yellow]{failure_path}[/yellow] for analysis.\n"
-            "[red]Do not share this file publicly[/red], as it may contain confidential information such as passkeys, IP address, e-mail, etc.\n"
+            f"The web page has been saved to {failure_path} for analysis.\n"
+            "Do not share this file publicly, as it may contain confidential information such as passkeys, IP address, e-mail, etc.\n"
             "You can open this file in a web browser to see what went wrong.\n"
         )
 

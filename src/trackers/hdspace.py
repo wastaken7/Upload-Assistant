@@ -240,7 +240,7 @@ class HDSpace:
         data: dict[str, Any] = {
             "category": await self.get_category_id(meta),
             "filename": await self.get_name(meta),
-            "genre": str(meta.genres),
+            "genre": ", ".join(meta.genres) if meta.genres else "",
             "imdb": str(meta.imdb),
             "info": await self.generate_description(meta),
             "nuk_rea": "",
@@ -282,6 +282,7 @@ class HDSpace:
 
         return await self.cookie_auth_uploader.handle_upload(
             meta=meta,
+            torrent_name=meta.clean_name,
             tracker=self.tracker,
             source_flag=self.source_flag,
             torrent_url=self.torrent_url,
