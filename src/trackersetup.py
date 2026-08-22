@@ -1,5 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
+import importlib
 import json
 import re
 import sys
@@ -16,99 +17,131 @@ from data.example_config import config as example_config
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
-from src.trackers.alpharatio import AlphaRatio
-from src.trackers.amigosshare import AmigosShare
-from src.trackers.anthelion import Anthelion
-from src.trackers.AVISTAZ.avistaz import AvistaZ
-from src.trackers.AVISTAZ.cinemaz import CinemaZ
-from src.trackers.AVISTAZ.privatehd import PrivateHD
-from src.trackers.beyondhd import BEYONDHD
-from src.trackers.bithdtv import BitHDTV
-from src.trackers.bjshare import BJShare
-from src.trackers.brasiltracker import BrasilTracker
-from src.trackers.broadcasthenet import BroadcasTheNet
-from src.trackers.cathoderaytube import CathodeRayTube
-from src.trackers.common import Common
-from src.trackers.digitalcore import DigitalCore
-from src.trackers.filelist import FileList
-from src.trackers.flood import Flood
-from src.trackers.funfile import FunFile
-from src.trackers.greatposterwall import GreatPosterWall
-from src.trackers.hdbits import HDBits
-from src.trackers.hdspace import HDSpace
-from src.trackers.hdtorrents import HDTorrents
-from src.trackers.immortalseed import ImmortalSeed
-from src.trackers.iptorrents import IPTorrents
-from src.trackers.makingoff import MakingOff
-from src.trackers.mteam import MTeam
-from src.trackers.nebulance import Nebulance
-from src.trackers.NEXUSPHP.lajidui import Lajidui
-from src.trackers.NEXUSPHP.lemonhd import LemonHD
-from src.trackers.NEXUSPHP.longpt import LongPT
-from src.trackers.NEXUSPHP.oneptba import OnePTBA
-from src.trackers.NEXUSPHP.ptcafe import PTCafe
-from src.trackers.NEXUSPHP.ptfans import PTFans
-from src.trackers.NEXUSPHP.ptgtk import PTGTK
-from src.trackers.NEXUSPHP.ptzone import PTZone
-from src.trackers.NEXUSPHP.railgunpt import RailgunPT
-from src.trackers.NEXUSPHP.xingyungept import XingyungePT
-from src.trackers.orpheus import Orpheus
-from src.trackers.passthepopcorn import PassThePopcorn
-from src.trackers.pterclub import PTerClub
-from src.trackers.ptskit import Ptskit
-from src.trackers.retroflix import RetroFlix
-from src.trackers.speedapp import SpeedApp
-from src.trackers.swarmazon import Swarmazon
-from src.trackers.torrentleech import TorrentLeech
-from src.trackers.totheglory import ToTheGlory
-from src.trackers.tvchaosuk import TVChaosUK
-from src.trackers.UNIT3D.aither import Aither
-from src.trackers.UNIT3D.asiancinema import AsianCinema
-from src.trackers.UNIT3D.bitporn import BitPorn
-from src.trackers.UNIT3D.blutopia import Blutopia
-from src.trackers.UNIT3D.capybarabr import CapybaraBR
-from src.trackers.UNIT3D.cinematik import Cinematik
-from src.trackers.UNIT3D.darkpeers import DarkPeers
-from src.trackers.UNIT3D.dreadvault import DreadVault
-from src.trackers.UNIT3D.emuwarez import Emuwarez
-from src.trackers.UNIT3D.hawkeuno import HawkeUno
-from src.trackers.UNIT3D.homiehelpdesk import HomieHelpDesk
-from src.trackers.UNIT3D.infinityhd import InfinityHD
-from src.trackers.UNIT3D.itatorrents import ItaTorrents
-from src.trackers.UNIT3D.lastdigitalunderground import LastDigitalUnderground
-from src.trackers.UNIT3D.latteam import LatTeam
-from src.trackers.UNIT3D.locadora import Locadora
-from src.trackers.UNIT3D.lst import LST
-from src.trackers.UNIT3D.luminarr import Luminarr
-from src.trackers.UNIT3D.midnightscene import MidnightScene
-from src.trackers.UNIT3D.nordicquality import NordicQuality
-from src.trackers.UNIT3D.oldtoonsworld import OldToonsWorld
-from src.trackers.UNIT3D.onlyencodes import OnlyEncodes
-from src.trackers.UNIT3D.peergarden import PeerGarden
-from src.trackers.UNIT3D.polishtorrent import PolishTorrent
-from src.trackers.UNIT3D.portugas import Portugas
-from src.trackers.UNIT3D.racing4everyone import Racing4Everyone
-from src.trackers.UNIT3D.rastastugan import Rastastugan
-from src.trackers.UNIT3D.reelflix import ReelFlix
-from src.trackers.UNIT3D.retromoviesclub import RetroMoviesClub
-from src.trackers.UNIT3D.rockethd import RocketHD
-from src.trackers.UNIT3D.samaritano import Samaritano
-from src.trackers.UNIT3D.seedpool import Seedpool
-from src.trackers.UNIT3D.shareisland import ShareIsland
-from src.trackers.UNIT3D.skipthecommercials import SkipTheCommercials
-from src.trackers.UNIT3D.theoldschool import TheOldSchool
-from src.trackers.UNIT3D.tlzdigital import TheLeachZone
-from src.trackers.UNIT3D.torrentdesi import DesiTorrents
-from src.trackers.UNIT3D.torrenteros import Torrenteros
-from src.trackers.UNIT3D.torrenthr import TorrentHR
-from src.trackers.UNIT3D.ulcx import ULCX
-from src.trackers.UNIT3D.utopia import Utopia
-from src.trackers.UNIT3D.yuscene import YUSCENE
-from src.trackers.UNIT3D.znth import Zenith
-from src.trackers.USENET.curupira import Curupira
-from src.trackers.USENET.drunkenslug import DrunkenSlug
-from src.trackers.USENET.nzbgeek import NZBGeek
-from src.trackers.USENET.suio import Suio
+
+
+class LazyTrackerDict(dict):
+    def __init__(self, modules):
+        self._modules = modules
+        super().__init__()
+
+    def __getitem__(self, key):
+        if key in self._modules:
+            if key not in super().keys():
+                mod_name, cls_name = self._modules[key]
+                mod = importlib.import_module(mod_name)
+                self[key] = getattr(mod, cls_name)
+            return super().__getitem__(key)
+        raise KeyError(key)
+
+    def __contains__(self, key):
+        return key in self._modules or super().__contains__(key)
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def items(self):
+        for key in self._modules:
+            yield key, self[key]
+
+
+# Static auth types to prevent loading all trackers at startup
+STATIC_AUTH_TYPES = {
+    "ASIANCINEMA": "unit3d_api",
+    "AITHER": "unit3d_api",
+    "ANTHELION": "other_api",
+    "ALPHARATIO": "cookies",
+    "AMIGOSSHARE": "cookies",
+    "AVISTAZ": "cookies",
+    "BEYONDHD": "unit3d_api",
+    "BITHDTV": "other_api",
+    "BITPORN": "unit3d_api",
+    "BJSHARE": "cookies",
+    "BLUTOPIA": "unit3d_api",
+    "BRASILTRACKER": "cookies",
+    "BROADCASTHENET": "cookies",
+    "CAPYBARABR": "unit3d_api",
+    "CATHODERAYTUBE": "cookies",
+    "CURUPIRA": "other_api",
+    "CINEMAZ": "cookies",
+    "DIGITALCORE": "other_api",
+    "DARKPEERS": "unit3d_api",
+    "DRUNKENSLUG": "other_api",
+    "NZBGEEK": "other_api",
+    "DESITORRENTS": "unit3d_api",
+    "EMUWAREZ": "unit3d_api",
+    "FUNFILE": "cookies",
+    "FILELIST": "cookies",
+    "FLOOD": "other_api",
+    "GREATPOSTERWALL": "other_api",
+    "HDBITS": "cookies",
+    "HDSPACE": "cookies",
+    "HDTORRENTS": "cookies",
+    "HOMIEHELPDESK": "unit3d_api",
+    "HAWKEUNO": "unit3d_api",
+    "INFINITYHD": "unit3d_api",
+    "IPTORRENTS": "cookies",
+    "IMMORTALSEED": "cookies",
+    "ITATORRENTS": "unit3d_api",
+    "LAJIDUI": "cookies",
+    "LEMONHD": "cookies",
+    "LOCADORA": "unit3d_api",
+    "LASTDIGITALUNDERGROUND": "unit3d_api",
+    "LONGPT": "cookies",
+    "LST": "unit3d_api",
+    "LATTEAM": "unit3d_api",
+    "LUMINARR": "unit3d_api",
+    "MAKINGOFF": "cookies",
+    "MIDNIGHTSCENE": "unit3d_api",
+    "MTEAM": "other_api",
+    "NEBULANCE": "other_api",
+    "NORDICQUALITY": "unit3d_api",
+    "ONLYENCODES": "unit3d_api",
+    "OLDTOONSWORLD": "unit3d_api",
+    "ORPHEUS": "other_api",
+    "PRIVATEHD": "cookies",
+    "PORTUGAS": "unit3d_api",
+    "PTCAFE": "cookies",
+    "PTERCLUB": "cookies",
+    "PTFANS": "cookies",
+    "PTGTK": "cookies",
+    "PTZONE": "cookies",
+    "PASSTHEPOPCORN": None,
+    "PTSKIT": "cookies",
+    "PEERGARDEN": "unit3d_api",
+    "POLISHTORRENT": "unit3d_api",
+    "RACING4EVERYONE": "unit3d_api",
+    "RASTASTUGAN": "unit3d_api",
+    "REELFLIX": "unit3d_api",
+    "RAILGUNPT": "cookies",
+    "RETROFLIX": "other_api",
+    "RETROMOVIESCLUB": "unit3d_api",
+    "ROCKETHD": "unit3d_api",
+    "SAMARITANO": "unit3d_api",
+    "SHAREISLAND": "unit3d_api",
+    "SWARMAZON": "other_api",
+    "SEEDPOOL": "unit3d_api",
+    "SPEEDAPP": "other_api",
+    "SKIPTHECOMMERCIALS": "unit3d_api",
+    "SUIO": "other_api",
+    "CINEMATIK": "unit3d_api",
+    "TORRENTLEECH": "other_api",
+    "THELEACHZONE": "unit3d_api",
+    "THEOLDSCHOOL": "unit3d_api",
+    "TOTHEGLORY": "cookies",
+    "TORRENTEROS": "unit3d_api",
+    "TORRENTHR": "unit3d_api",
+    "TVCHAOSUK": "other_api",
+    "1PTBA": "cookies",
+    "XINGYUNGEPT": "cookies",
+    "ULCX": "unit3d_api",
+    "UTOPIA": "unit3d_api",
+    "YUSCENE": "unit3d_api",
+    "ZENITH": "unit3d_api",
+}
+
 
 JsonDict = dict[str, Any]
 example_config: dict[str, Any]
@@ -1352,100 +1385,101 @@ class TrackerSetup:
             return True
 
 
-tracker_class_map: dict[str, Any] = {
-    "ASIANCINEMA": AsianCinema,
-    "AITHER": Aither,
-    "ANTHELION": Anthelion,
-    "ALPHARATIO": AlphaRatio,
-    "AMIGOSSHARE": AmigosShare,
-    "AVISTAZ": AvistaZ,
-    "BEYONDHD": BEYONDHD,
-    "BITHDTV": BitHDTV,
-    "BITPORN": BitPorn,
-    "BJSHARE": BJShare,
-    "BLUTOPIA": Blutopia,
-    "BRASILTRACKER": BrasilTracker,
-    "BROADCASTHENET": BroadcasTheNet,
-    "CAPYBARABR": CapybaraBR,
-    "CATHODERAYTUBE": CathodeRayTube,
-    "CURUPIRA": Curupira,
-    "CINEMAZ": CinemaZ,
-    "DIGITALCORE": DigitalCore,
-    "DARKPEERS": DarkPeers,
-    "DRUNKENSLUG": DrunkenSlug,
-    "NZBGEEK": NZBGeek,
-    "DESITORRENTS": DesiTorrents,
-    "DREADVAULT": DreadVault,
-    "EMUWAREZ": Emuwarez,
-    "FUNFILE": FunFile,
-    "FILELIST": FileList,
-    "FLOOD": Flood,
-    "GREATPOSTERWALL": GreatPosterWall,
-    "HDBITS": HDBits,
-    "HDSPACE": HDSpace,
-    "HDTORRENTS": HDTorrents,
-    "HOMIEHELPDESK": HomieHelpDesk,
-    "HAWKEUNO": HawkeUno,
-    "INFINITYHD": InfinityHD,
-    "IPTORRENTS": IPTorrents,
-    "IMMORTALSEED": ImmortalSeed,
-    "ITATORRENTS": ItaTorrents,
-    "LAJIDUI": Lajidui,
-    "LEMONHD": LemonHD,
-    "LOCADORA": Locadora,
-    "LASTDIGITALUNDERGROUND": LastDigitalUnderground,
-    "LONGPT": LongPT,
-    "LST": LST,
-    "LATTEAM": LatTeam,
-    "LUMINARR": Luminarr,
-    "MAKINGOFF": MakingOff,
-    "MIDNIGHTSCENE": MidnightScene,
-    "MTEAM": MTeam,
-    "NEBULANCE": Nebulance,
-    "NORDICQUALITY": NordicQuality,
-    "ONLYENCODES": OnlyEncodes,
-    "OLDTOONSWORLD": OldToonsWorld,
-    "ORPHEUS": Orpheus,
-    "PRIVATEHD": PrivateHD,
-    "PORTUGAS": Portugas,
-    "PTCAFE": PTCafe,
-    "PTERCLUB": PTerClub,
-    "PTFANS": PTFans,
-    "PTGTK": PTGTK,
-    "PTZONE": PTZone,
-    "PASSTHEPOPCORN": PassThePopcorn,
-    "PTSKIT": Ptskit,
-    "PEERGARDEN": PeerGarden,
-    "POLISHTORRENT": PolishTorrent,
-    "RACING4EVERYONE": Racing4Everyone,
-    "RASTASTUGAN": Rastastugan,
-    "REELFLIX": ReelFlix,
-    "RAILGUNPT": RailgunPT,
-    "RETROFLIX": RetroFlix,
-    "RETROMOVIESCLUB": RetroMoviesClub,
-    "ROCKETHD": RocketHD,
-    "SAMARITANO": Samaritano,
-    "SHAREISLAND": ShareIsland,
-    "SWARMAZON": Swarmazon,
-    "SEEDPOOL": Seedpool,
-    "SPEEDAPP": SpeedApp,
-    "SKIPTHECOMMERCIALS": SkipTheCommercials,
-    "SUIO": Suio,
-    "CINEMATIK": Cinematik,
-    "TORRENTLEECH": TorrentLeech,
-    "THELEACHZONE": TheLeachZone,
-    "THEOLDSCHOOL": TheOldSchool,
-    "TOTHEGLORY": ToTheGlory,
-    "TORRENTEROS": Torrenteros,
-    "TORRENTHR": TorrentHR,
-    "TVCHAOSUK": TVChaosUK,
-    "1PTBA": OnePTBA,
-    "XINGYUNGEPT": XingyungePT,
-    "ULCX": ULCX,
-    "UTOPIA": Utopia,
-    "YUSCENE": YUSCENE,
-    "ZENITH": Zenith,
-}
+tracker_class_map: Any = LazyTrackerDict(
+    {
+        "ASIANCINEMA": ("src.trackers.asiancinema", "AsianCinema"),
+        "AITHER": ("src.trackers.aither", "Aither"),
+        "ANTHELION": ("src.trackers.anthelion", "Anthelion"),
+        "ALPHARATIO": ("src.trackers.alpharatio", "AlphaRatio"),
+        "AMIGOSSHARE": ("src.trackers.amigosshare", "AmigosShare"),
+        "AVISTAZ": ("src.trackers.AVISTAZ.avistaz", "AvistaZ"),
+        "BEYONDHD": ("src.trackers.beyondhd", "BEYONDHD"),
+        "BITHDTV": ("src.trackers.bithdtv", "BitHDTV"),
+        "BITPORN": ("src.trackers.bitporn", "BitPorn"),
+        "BJSHARE": ("src.trackers.bjshare", "BJShare"),
+        "BLUTOPIA": ("src.trackers.blutopia", "Blutopia"),
+        "BRASILTRACKER": ("src.trackers.brasiltracker", "BrasilTracker"),
+        "BROADCASTHENET": ("src.trackers.broadcasthenet", "BroadcasTheNet"),
+        "CAPYBARABR": ("src.trackers.capybarabr", "CapybaraBR"),
+        "CATHODERAYTUBE": ("src.trackers.cathoderaytube", "CathodeRayTube"),
+        "CURUPIRA": ("src.trackers.curupira", "Curupira"),
+        "CINEMAZ": ("src.trackers.AVISTAZ.cinemaz", "CinemaZ"),
+        "DIGITALCORE": ("src.trackers.digitalcore", "DigitalCore"),
+        "DARKPEERS": ("src.trackers.darkpeers", "DarkPeers"),
+        "DRUNKENSLUG": ("src.trackers.drunkenslug", "DrunkenSlug"),
+        "NZBGEEK": ("src.trackers.nzbgeek", "NZBGeek"),
+        "DESITORRENTS": ("src.trackers.desitorrents", "DesiTorrents"),
+        "EMUWAREZ": ("src.trackers.emuwarez", "Emuwarez"),
+        "FUNFILE": ("src.trackers.funfile", "FunFile"),
+        "FILELIST": ("src.trackers.filelist", "FileList"),
+        "FLOOD": ("src.trackers.flood", "Flood"),
+        "GREATPOSTERWALL": ("src.trackers.greatposterwall", "GreatPosterWall"),
+        "HDBITS": ("src.trackers.hdbits", "HDBits"),
+        "HDSPACE": ("src.trackers.hdspace", "HDSpace"),
+        "HDTORRENTS": ("src.trackers.hdtorrents", "HDTorrents"),
+        "HOMIEHELPDESK": ("src.trackers.homiehelpdesk", "HomieHelpDesk"),
+        "HAWKEUNO": ("src.trackers.hawkeuno", "HawkeUno"),
+        "INFINITYHD": ("src.trackers.infinityhd", "InfinityHD"),
+        "IPTORRENTS": ("src.trackers.iptorrents", "IPTorrents"),
+        "IMMORTALSEED": ("src.trackers.immortalseed", "ImmortalSeed"),
+        "ITATORRENTS": ("src.trackers.itatorrents", "ItaTorrents"),
+        "LAJIDUI": ("src.trackers.lajidui", "Lajidui"),
+        "LEMONHD": ("src.trackers.lemonhd", "LemonHD"),
+        "LOCADORA": ("src.trackers.locadora", "Locadora"),
+        "LASTDIGITALUNDERGROUND": ("src.trackers.lastdigitalunderground", "LastDigitalUnderground"),
+        "LONGPT": ("src.trackers.longpt", "LongPT"),
+        "LST": ("src.trackers.lst", "LST"),
+        "LATTEAM": ("src.trackers.latteam", "LatTeam"),
+        "LUMINARR": ("src.trackers.luminarr", "Luminarr"),
+        "MAKINGOFF": ("src.trackers.makingoff", "MakingOff"),
+        "MIDNIGHTSCENE": ("src.trackers.midnightscene", "MidnightScene"),
+        "MTEAM": ("src.trackers.mteam", "MTeam"),
+        "NEBULANCE": ("src.trackers.nebulance", "Nebulance"),
+        "NORDICQUALITY": ("src.trackers.nordicquality", "NordicQuality"),
+        "ONLYENCODES": ("src.trackers.onlyencodes", "OnlyEncodes"),
+        "OLDTOONSWORLD": ("src.trackers.oldtoonsworld", "OldToonsWorld"),
+        "ORPHEUS": ("src.trackers.orpheus", "Orpheus"),
+        "PRIVATEHD": ("src.trackers.AVISTAZ.privatehd", "PrivateHD"),
+        "PORTUGAS": ("src.trackers.portugas", "Portugas"),
+        "PTCAFE": ("src.trackers.ptcafe", "PTCafe"),
+        "PTERCLUB": ("src.trackers.pterclub", "PTerClub"),
+        "PTFANS": ("src.trackers.ptfans", "PTFans"),
+        "PTGTK": ("src.trackers.ptgtk", "PTGTK"),
+        "PTZONE": ("src.trackers.ptzone", "PTZone"),
+        "PASSTHEPOPCORN": ("src.trackers.passthepopcorn", "PassThePopcorn"),
+        "PTSKIT": ("src.trackers.ptskit", "Ptskit"),
+        "PEERGARDEN": ("src.trackers.peergarden", "PeerGarden"),
+        "POLISHTORRENT": ("src.trackers.polishtorrent", "PolishTorrent"),
+        "RACING4EVERYONE": ("src.trackers.racing4everyone", "Racing4Everyone"),
+        "RASTASTUGAN": ("src.trackers.rastastugan", "Rastastugan"),
+        "REELFLIX": ("src.trackers.reelflix", "ReelFlix"),
+        "RAILGUNPT": ("src.trackers.railgunpt", "RailgunPT"),
+        "RETROFLIX": ("src.trackers.retroflix", "RetroFlix"),
+        "RETROMOVIESCLUB": ("src.trackers.retromoviesclub", "RetroMoviesClub"),
+        "ROCKETHD": ("src.trackers.rockethd", "RocketHD"),
+        "SAMARITANO": ("src.trackers.samaritano", "Samaritano"),
+        "SHAREISLAND": ("src.trackers.shareisland", "ShareIsland"),
+        "SWARMAZON": ("src.trackers.swarmazon", "Swarmazon"),
+        "SEEDPOOL": ("src.trackers.seedpool", "Seedpool"),
+        "SPEEDAPP": ("src.trackers.speedapp", "SpeedApp"),
+        "SKIPTHECOMMERCIALS": ("src.trackers.skipthecommercials", "SkipTheCommercials"),
+        "SUIO": ("src.trackers.suio", "Suio"),
+        "CINEMATIK": ("src.trackers.cinematik", "Cinematik"),
+        "TORRENTLEECH": ("src.trackers.torrentleech", "TorrentLeech"),
+        "THELEACHZONE": ("src.trackers.theleachzone", "TheLeachZone"),
+        "THEOLDSCHOOL": ("src.trackers.theoldschool", "TheOldSchool"),
+        "TOTHEGLORY": ("src.trackers.totheglory", "ToTheGlory"),
+        "TORRENTEROS": ("src.trackers.torrenteros", "Torrenteros"),
+        "TORRENTHR": ("src.trackers.torrenthr", "TorrentHR"),
+        "TVCHAOSUK": ("src.trackers.tvchaosuk", "TVChaosUK"),
+        "1PTBA": ("src.trackers.1ptba", "OnePTBA"),
+        "XINGYUNGEPT": ("src.trackers.xingyungept", "XingyungePT"),
+        "ULCX": ("src.trackers.ulcx", "ULCX"),
+        "UTOPIA": ("src.trackers.utopia", "Utopia"),
+        "YUSCENE": ("src.trackers.yuscene", "YUSCENE"),
+        "ZENITH": ("src.trackers.znth", "Zenith"),
+    }
+)
 
 
 def get_tracker_comment_hosts(config: dict[str, Any]) -> dict[str, tuple[str, ...]]:
@@ -1487,6 +1521,6 @@ def get_tracker_comment_hosts(config: dict[str, Any]) -> dict[str, tuple[str, ..
     return tracker_hosts
 
 
-api_trackers: set[str] = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "unit3d_api"}
-other_api_trackers: set[str] = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "other_api"}
-http_trackers: set[str] = {name for name, cls in tracker_class_map.items() if getattr(cls, "auth_type", None) == "cookies"}
+api_trackers: set[str] = {name for name, auth in STATIC_AUTH_TYPES.items() if auth == "unit3d_api"}
+other_api_trackers: set[str] = {name for name, auth in STATIC_AUTH_TYPES.items() if auth == "other_api"}
+http_trackers: set[str] = {name for name, auth in STATIC_AUTH_TYPES.items() if auth == "cookies"}
