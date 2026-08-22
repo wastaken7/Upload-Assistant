@@ -10,7 +10,7 @@ replaces the locally-created torrent with BTN's registered torrent afterwards.
 import re
 import unicodedata
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import aiofiles
 import httpx
@@ -41,7 +41,7 @@ class BroadcasTheNet:
     _input_pattern = re.compile(r"(?is)<input\b[^>]*>")
     _textarea_pattern = re.compile(r"(?is)<textarea[^>]*name=[\"']([^\"']+)[\"'][^>]*>(.*?)</textarea>")
     _select_pattern = re.compile(r"(?is)<select[^>]*name=[\"']([^\"']+)[\"'][^>]*>(.*?)</select>")
-    _country_map = {
+    _country_map: ClassVar[dict[str, str]] = {
         "se": "1",
         "swe": "1",
         "sweden": "1",
@@ -419,11 +419,14 @@ class BroadcasTheNet:
         except httpx.HTTPError as exc:
             logger.info(f"{self.tracker}: [red]Cookie validation failed: {exc}[/red]")
             return False
-        # The initial GET to upload.php might only return the autofill form now, not the file_input field.
-        valid = response.is_success and "login.php" not in str(response.url).lower() and ("file_input" in response.text.lower() or "autofill" in response.text.lower())
+        # The initial GET may expose either the upload control or the autofill control.
+        form_fields = self._form_fields(response.text)
+        has_file_input = "file_input" in form_fields
+        has_autofill = "autofill" in form_fields
+        valid = response.is_success and "login.php" not in str(response.url).lower() and (has_file_input or has_autofill)
         if not valid:
             logger.debug(
-                f"{self.tracker}: Validation details - is_success: {response.is_success}, url: {response.url}, has_file_input: {'file_input' in response.text.lower()}, has_autofill: {'autofill' in response.text.lower()}"
+                f"{self.tracker}: Validation details - is_success: {response.is_success}, url: {response.url}, has_file_input: {has_file_input}, has_autofill: {has_autofill}"
             )
             logger.info(f"{self.tracker}: [red]Cookie is expired/invalid or BTN upload access was not confirmed.[/red]")
         return valid
@@ -467,7 +470,10 @@ class BroadcasTheNet:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(self.api_url, json=payload)
         response.raise_for_status()
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise UploadError("BTN API returned an invalid JSON response", "red") from exc
         if not isinstance(data, dict) or data.get("error"):
             raise UploadError(f"BTN API error: {data.get('error') if isinstance(data, dict) else 'invalid response'}", "red")
         return data
@@ -677,7 +683,7 @@ class BroadcasTheNet:
                     if not torrent_id:
                         if not self.api_key:
                             raise UploadError(
-                                f"BTN upload reached intermediate page but failed to resolve torrent_id via HTML. Set an api_key in your BTN config to enable API fallback.",
+                                "BTN upload reached intermediate page but failed to resolve torrent_id via HTML. Set an api_key in your BTN config to enable API fallback.",
                                 "red",
                             )
 
