@@ -1355,7 +1355,7 @@ class BJShare:
 
         if BJShare.already_has_the_info:
             database_credit = BJShare.database_cast if role == "cast" else BJShare.database_creator
-        if database_credit:
+            if database_credit:
                 return database_credit
             return "N/A"
 
