@@ -4559,10 +4559,11 @@ def regenerate_execution_preview_cover():
         from src.takescreens import xxx_fallback_cover
 
         meta = Meta(dict(meta_data))
-        cover = asyncio.run(xxx_fallback_cover(list(meta.filelist or []), meta.uuid, meta.base_dir, meta, random_frame=True))
+        folder_id = meta.uuid or Path(execution_path).name
+        cover = asyncio.run(xxx_fallback_cover(list(meta.filelist or []), folder_id, meta.base_dir, meta, random_frame=True))
         if not cover:
             return jsonify({"success": False, "error": "Could not generate a new cover from the source video"}), 422
-        cache_key = _execution_preview_cover_cache_key(session_id, meta.uuid or str(meta_file))
+        cache_key = _execution_preview_cover_cache_key(session_id, folder_id)
         return jsonify(
             {
                 "success": True,

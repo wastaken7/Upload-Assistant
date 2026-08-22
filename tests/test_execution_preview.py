@@ -59,3 +59,31 @@ def test_cover_regeneration_rejects_a_preview_that_has_moved(monkeypatch):
     )
 
     assert response.status_code == 409  # noqa: S101
+
+
+def test_cover_regeneration_uses_execution_path_name_when_uuid_is_missing(monkeypatch):
+    captured = {}
+
+    async def fake_fallback_cover(_paths, folder_id, _base_dir, _meta, random_frame=False):
+        captured["folder_id"] = folder_id
+        captured["random_frame"] = random_frame
+        return "POSTER.png"
+
+    monkeypatch.setattr(server, "_webui_auth_ok", lambda: True)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(
+        server,
+        "_resolve_execution_preview_meta",
+        lambda _session_id: ("C:/media/release-folder", Path("meta.json"), {"base_dir": "C:/state", "category": "XXX", "filelist": []}),
+    )
+    monkeypatch.setattr("src.takescreens.xxx_fallback_cover", fake_fallback_cover)
+    monkeypatch.setattr(server, "_execution_preview_cover_cache_key", lambda _session_id, fallback: fallback)
+
+    response = server.app.test_client().post(
+        "/api/execution_preview_cover/regenerate",
+        json={"session_id": "session-1", "media_id": "C:/media/release-folder"},
+    )
+
+    assert response.status_code == 200  # noqa: S101
+    assert captured == {"folder_id": "release-folder", "random_frame": True}  # noqa: S101
