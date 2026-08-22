@@ -20,8 +20,9 @@ from src.screenshot_manifest import files as manifest_files
 from src.screenshot_manifest import forget_file, group_for
 from src.takescreens import capture_screenshot, determine_tonemapping, disc_screenshots, get_frame_info, screenshot_par_scale_factors
 
-_SCREENSHOT_FILE = re.compile(r"^(?P<prefix>.+)-(?P<index>\d+)\.png$", re.IGNORECASE)
+_SCREENSHOT_FILE = re.compile(r"^(?P<prefix>.+)-(?P<index>\d+)\.(?:png|jpe?g|webp)$", re.IGNORECASE)
 _EXCLUDED_NAMES = {"poster.png", "cover.png", "music_cover.png"}
+_EXCLUDED_STEMS = {Path(name).stem.casefold() for name in _EXCLUDED_NAMES}
 _review_locks: dict[str, threading.Lock] = {}
 _review_locks_guard = threading.Lock()
 
@@ -63,7 +64,7 @@ def _save_review(temp_dir: Path, review: Mapping[str, Any]) -> None:
 
 def _is_reviewable_file(path: Path) -> bool:
     name = path.name.casefold()
-    return path.is_file() and path.suffix.casefold() == ".png" and name not in _EXCLUDED_NAMES and "libplacebo-test" not in name
+    return path.is_file() and path.suffix.casefold() in {".png", ".jpg", ".jpeg", ".webp"} and path.stem.casefold() not in _EXCLUDED_STEMS and "libplacebo-test" not in name
 
 
 def _local_id(temp_dir: Path, path: Path) -> str:
@@ -80,7 +81,9 @@ def list_screenshots(temp_dir: Path, _meta_data: Mapping[str, object]) -> list[R
     candidates: list[ReviewedScreenshot] = []
     manifest_paths = manifest_files(temp_dir.parent.parent, temp_dir.name)
     manifest_names = {path.name for path in manifest_paths}
-    paths = [*manifest_paths, *(path for path in (temp_dir / "screenshots").glob("*.png") if path.name not in manifest_names)]
+    screenshot_dir = temp_dir / "screenshots"
+    local_paths = sorted(screenshot_dir.iterdir(), key=lambda path: path.name.casefold()) if screenshot_dir.is_dir() else ()
+    paths = [*manifest_paths, *(path for path in local_paths if path.name not in manifest_names)]
     for fallback_index, path in enumerate(paths):
         if not _is_reviewable_file(path):
             continue

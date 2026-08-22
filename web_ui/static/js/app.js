@@ -1241,6 +1241,22 @@ const SpinnerIcon = () => (
   </svg>
 );
 
+const RefreshIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M20 11a8.1 8.1 0 00-14.8-4.5L3 9m0 0V4m0 5h5M4 13a8.1 8.1 0 0014.8 4.5L21 15m0 0v5m0-5h-5"
+    />
+  </svg>
+);
+
 const metadataProviderStyles = {
   tmdb: {
     light: "border-[#06B4E2] bg-transparent text-[#067A98]",
@@ -1480,6 +1496,8 @@ function AudionutsUAGUI() {
   const [canAddExecutionScreenshot, setCanAddExecutionScreenshot] =
     useState(false);
   const [screenshotActionId, setScreenshotActionId] = useState("");
+  const [coverAction, setCoverAction] = useState("");
+  const coverRequestRef = useRef(0);
   const [expandedScreenshot, setExpandedScreenshot] = useState(null);
   const themePaletteRef = useRef(null);
   const screenshotModalRef = useRef(null);
@@ -2260,6 +2278,7 @@ function AudionutsUAGUI() {
   }, [hasDescFile, hasDescLink]);
 
   useEffect(() => {
+    coverRequestRef.current += 1;
     if (!isExecuting || !sessionId) {
       setExecutionPreview(null);
       setProgressItems([]);
@@ -2271,6 +2290,7 @@ function AudionutsUAGUI() {
       setDescriptionVersion(0);
       setDescriptionDirty(false);
       setCanAddExecutionScreenshot(false);
+      setCoverAction("");
       setExpandedScreenshot(null);
       setIsScreenshotReviewOpen(false);
       setIsDescriptionReviewOpen(false);
@@ -2376,6 +2396,11 @@ function AudionutsUAGUI() {
     };
   }, [API_BASE, isExecuting, sessionId]);
 
+  useEffect(() => {
+    coverRequestRef.current += 1;
+    setCoverAction("");
+  }, [executionPreview?.media_id]);
+
   const refreshExecutionScreenshots = async () => {
     const refreshed = await apiFetch(
       `${API_BASE}/execution_screenshots?session_id=${encodeURIComponent(sessionId)}`,
@@ -2412,6 +2437,37 @@ function AudionutsUAGUI() {
       window.alert(`Could not ${action} screenshot. Please try again.`);
     } finally {
       setScreenshotActionId("");
+    }
+  };
+
+  const regenerateExecutionCover = async () => {
+    const mediaId = executionPreview?.media_id;
+    if (!sessionId || !mediaId || coverAction) return;
+    const requestToken = ++coverRequestRef.current;
+    setCoverAction("regenerate");
+    try {
+      const response = await apiFetch(`${API_BASE}/execution_preview_cover/regenerate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, media_id: mediaId }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        window.alert(data?.error || "Could not regenerate the XXX cover.");
+        return;
+      }
+      if (coverRequestRef.current === requestToken) {
+        setExecutionPreview((previous) =>
+          previous?.media_id === mediaId
+            ? { ...previous, poster_url: data.poster_url }
+            : previous,
+        );
+      }
+    } catch (error) {
+      console.error("Could not regenerate XXX cover:", error);
+      window.alert("Could not regenerate the XXX cover. Please try again.");
+    } finally {
+      if (coverRequestRef.current === requestToken) setCoverAction("");
     }
   };
 
@@ -4728,13 +4784,36 @@ function AudionutsUAGUI() {
           >
             {media?.poster_url ? (
               <div
-                className={`w-full ${posterHeight} flex items-center justify-center p-3 ${isDarkMode ? "bg-gray-950" : "bg-stone-100"}`}
+                className={`w-full ${posterHeight} flex items-center justify-center gap-3 p-3 ${isDarkMode ? "bg-gray-950" : "bg-stone-100"}`}
               >
-                <img
-                  src={media.poster_url}
-                  alt={previewTitle}
-                  className="max-w-full max-h-full object-contain"
-                />
+                <div className="min-w-0 h-full flex-1 flex items-center justify-center">
+                  <img
+                    src={media.poster_url}
+                    alt={previewTitle}
+                    className="max-w-full max-h-full object-contain"
+                  />
+                </div>
+                {category === "XXX" &&
+                  String(media.poster_url).startsWith(
+                    "/api/execution_preview_cover?",
+                  ) && (
+                  <button
+                    type="button"
+                    onClick={regenerateExecutionCover}
+                    disabled={Boolean(coverAction)}
+                    aria-label={
+                      coverAction === "regenerate"
+                        ? "Generating a new XXX cover"
+                        : "Generate a new XXX cover"
+                    }
+                    className={`flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "bg-purple-700 text-white hover:bg-purple-600" : "bg-purple-600 text-white hover:bg-purple-700"}`}
+                    title="Generate another cover from a different video frame"
+                  >
+                    <span aria-hidden="true">
+                      {coverAction === "regenerate" ? <SpinnerIcon /> : <RefreshIcon />}
+                    </span>
+                  </button>
+                )}
               </div>
             ) : (
               <div

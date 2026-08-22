@@ -7,6 +7,7 @@ import os
 import platform
 import random
 import re
+import secrets
 import sys
 import time
 import traceback
@@ -25,6 +26,7 @@ from src.artwork import is_public_http_url, is_valid_cover_image, is_valid_image
 from src.binaries import configured_binary
 from src.cleanup import cleanup_manager
 from src.console import logger
+from src.media_extensions import VIDEO_EXTENSIONS
 from src.mediainfo import MediaInfo
 from src.meta import Meta
 from src.screenshot_manifest import clear_group as clear_screenshot_group
@@ -53,7 +55,7 @@ def is_valid_lostimg_image_size(image_size: int) -> bool:
 def _positive_config_int(key: str, default: int) -> int:
     try:
         return max(1, int(default_config.get(key, default) or default))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 
@@ -71,7 +73,7 @@ def xxx_contact_sheet_animation_settings() -> tuple[bool, float]:
     animated = _as_bool(default_config.get("xxx_contact_sheet_animated_webp"), default=False)
     try:
         duration = max(0.1, float(default_config.get("xxx_contact_sheet_animation_seconds", 5) or 5))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         duration = 5.0
     return animated, duration
 
@@ -181,6 +183,69 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
     return sheets
 
 
+async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, meta: Meta, random_frame: bool = False) -> str | None:
+    """Create a poster from a representative frame when XXX has no artwork."""
+    if meta.category != "XXX" or (is_valid_cover_image(meta.artwork_path) and not random_frame):
+        return meta.artwork_path if is_valid_cover_image(meta.artwork_path) else None
+
+    video_path: Path | None = None
+    duration = 0.0
+    for candidate in paths:
+        candidate_path = Path(candidate)
+        if not candidate_path.is_file():
+            continue
+        if candidate_path.suffix and candidate_path.suffix.casefold() not in VIDEO_EXTENSIONS:
+            continue
+        try:
+            probe = await asyncio.to_thread(ffmpeg.probe, str(candidate_path))
+            candidate_duration = float(probe["format"]["duration"])
+            streams = probe.get("streams", [])
+            has_video_stream = isinstance(streams, list) and any(isinstance(stream, Mapping) and stream.get("codec_type") == "video" for stream in streams)
+            if candidate_duration <= 0 or not has_video_stream:
+                continue
+        except (OSError, KeyError, TypeError, ValueError, ffmpeg.Error):
+            continue
+        video_path = candidate_path
+        duration = candidate_duration
+        break
+
+    if video_path is None:
+        logger.warning("[yellow]XXX has no valid video available to generate a fallback cover.[/yellow]")
+        return None
+
+    output_path = artwork_dir(base_dir, folder_id) / "POSTER.png"
+    try:
+        # Avoid the opening frame, which is frequently black or only a logo.
+        lower = min(max(duration * 0.10, 1.0), max(duration - 0.1, 0.0))
+        upper = max(lower, min(duration * 0.85, max(duration - 0.1, 0.0)))
+        timestamp = secrets.SystemRandom().uniform(lower, upper) if random_frame and upper > lower else lower
+        stream = ffmpeg.input(str(video_path), ss=str(timestamp))
+        command = ffmpeg.output(
+            stream,
+            str(output_path),
+            vframes=1,
+            vf="scale=1200:-2:force_original_aspect_ratio=decrease",
+            compression_level=ffmpeg_compression,
+        ).global_args("-y", "-loglevel", "verbose" if meta.ffdebug else "quiet")
+        return_code, _stdout, stderr = await run_ffmpeg(command)
+        if return_code != 0 or not is_valid_cover_image(output_path):
+            raise RuntimeError(stderr.decode(errors="replace").strip() or "FFmpeg did not produce a valid image")
+    except Exception as error:
+        logger.warning(f"[yellow]Unable to generate the XXX fallback cover from {video_path.name}: {error}[/yellow]")
+        return None
+
+    meta.artwork_path = str(output_path)
+    meta.artwork_url = ""
+    logger.warning(
+        "[yellow]No XXX cover was found after checking, in order: explicit --poster, "
+        "a local artwork sidecar, and provider artwork. For the local search, place a valid "
+        "GIF/JPG/JPEG/PNG/WEBP image beside the media (or inside the release folder) with a "
+        "filename containing one of: poster, cover, front, folder, artwork. "
+        f"Generated a fallback cover from a video frame: {output_path.name}.[/yellow]"
+    )
+    return str(output_path)
+
+
 def compile_ffmpeg_command(command: Any) -> list[str]:
     """Compile an ffmpeg-python command into subprocess-safe string arguments."""
     return [str(argument) for argument in command.compile()]
@@ -223,12 +288,12 @@ def _apply_config(config: Mapping[str, Any]) -> None:
 
     try:
         task_limit = int(default_config.get("process_limit", 1) or 1)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         task_limit = 1
 
     try:
         cutoff = int(default_config.get("cutoff_screens", 1) or 1)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         cutoff = 1
 
     ffmpeg_limit = default_config.get("ffmpeg_limit", False)
@@ -239,7 +304,7 @@ def _apply_config(config: Mapping[str, Any]) -> None:
     algorithm = str(default_config.get("algorithm", "mobius")).strip()
     try:
         desat = float(default_config.get("desat", 10.0))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         desat = 10.0
 
 
@@ -1003,7 +1068,7 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
                 try:
                     if track.duration is not None:
                         video_duration = float(track.duration)
-                except TypeError, ValueError:
+                except (TypeError, ValueError):
                     video_duration = None
                 break
 
@@ -2766,6 +2831,9 @@ class TakeScreensManager:
 
     async def xxx_contact_sheets(self, paths: list[str], folder_id: str, base_dir: str, meta: Meta, capture_group: str = "main") -> list[str]:
         return await xxx_contact_sheets(paths, folder_id, base_dir, meta, capture_group)
+
+    async def xxx_fallback_cover(self, paths: list[str], folder_id: str, base_dir: str, meta: Meta, random_frame: bool = False) -> str | None:
+        return await xxx_fallback_cover(paths, folder_id, base_dir, meta, random_frame)
 
     async def prepare_book_cover(self, path: str, folder_id: str, base_dir: str, meta: Meta) -> str | None:
         return await prepare_book_cover(path, folder_id, base_dir, meta)
