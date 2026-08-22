@@ -7,15 +7,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, cast
 
-import librosa
-import librosa.display
-import matplotlib
-
-matplotlib.use("Agg")
-
 import cli_ui
-import matplotlib.pyplot as plt
-import numpy as np
 
 from src.binaries import configured_binary
 from src.console import logger
@@ -123,6 +115,7 @@ def get_spectrogram_sources(category: str, filelist: list[Any], disc_final_path:
 
 def get_stft_parameters(sample_count: int) -> tuple[int, int]:
     """Bound the matrix plotted by Matplotlib while retaining useful frequency detail."""
+    import numpy as np
     n_fft = min(SPECTROGRAM_N_FFT, max(32, 2 ** int(np.floor(np.log2(max(sample_count, 1))))))
     hop_length = max(n_fft // 4, int(np.ceil(sample_count / MAX_TIME_BINS)))
     return n_fft, hop_length
@@ -191,6 +184,16 @@ def generate_spectrogram(
     if result.returncode or not result.stdout:
         detail = result.stderr.decode(errors="replace").strip() or "no audio was produced"
         raise RuntimeError(f"FFmpeg could not decode audio stream {stream_index}: {detail}")
+
+    try:
+        import librosa
+        import librosa.display
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import numpy as np
+    except ImportError:
+        raise RuntimeError("Missing required libraries for spectrogram generation. Install librosa and matplotlib.")
 
     try:
         samples, actual_sample_rate = librosa.load(io.BytesIO(result.stdout), sr=None, mono=True)
