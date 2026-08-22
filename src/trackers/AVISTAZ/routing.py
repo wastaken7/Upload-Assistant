@@ -250,7 +250,7 @@ class AvistaZNetworkRouter:
         """Determine whether the release year is at least fifty years old."""
         try:
             return datetime.now(UTC).year - int(meta.year) >= 50
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return False
 
     @staticmethod

@@ -803,7 +803,7 @@ async def _upload_screens(
     configured_concurrency = default_config.get("image_upload_concurrency", 0)
     try:
         configured_concurrency = int(configured_concurrency)
-    except OverflowError, TypeError, ValueError:
+    except (OverflowError, TypeError, ValueError):
         configured_concurrency = 0
     pool_size = configured_concurrency if configured_concurrency > 0 else host_limits.get(img_host, default_pool_size)
     max_workers = min(len(upload_tasks), pool_size)
@@ -813,7 +813,7 @@ async def _upload_screens(
     try:
         parsed_delay = float(configured_delay)
         image_upload_delay = max(0.0, parsed_delay) if math.isfinite(parsed_delay) else 0.0
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         image_upload_delay = 0.0
     wait_for_image_start_slot = _build_image_start_limiter(image_upload_delay)
 

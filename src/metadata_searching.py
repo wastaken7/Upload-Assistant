@@ -19,7 +19,7 @@ from src.tvmaze import tvmaze_manager
 def _coerce_int(value: Any) -> int | None:
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -959,7 +959,7 @@ async def get_douban_id(meta: Meta) -> int:
     douban_id: int = 0
     try:
         douban_manual = int(meta.douban_manual or 0)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         logger.info("[bold yellow]Invalid douban_manual value, ignoring.[/bold yellow]")
         douban_manual = 0
 

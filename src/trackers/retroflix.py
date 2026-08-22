@@ -218,12 +218,12 @@ class RetroFlix:
                         episode_date = datetime.datetime.strptime(aired_date, "%Y-%m-%d").replace(tzinfo=datetime.UTC).date()
                         if most_recent_aired_date is None or episode_date > most_recent_aired_date:
                             most_recent_aired_date = episode_date
-                    except ValueError, AttributeError:
+                    except (ValueError, AttributeError):
                         try:
                             episode_year_value = aired_date.split("-")[0]
                             if episode_year_value.isdigit():
                                 years.append(int(episode_year_value))
-                        except ValueError, AttributeError:
+                        except (ValueError, AttributeError):
                             continue
 
         # Add the year from most recent aired date if found
@@ -248,7 +248,7 @@ class RetroFlix:
                     if not meta.unattended:
                         logger.info(f"{self.tracker}: [red]Content must be older than 10 Years to upload at RETROFLIX")
                     return False
-            except ValueError, AttributeError:
+            except (ValueError, AttributeError):
                 # If date parsing fails, fall back to year comparison
                 release_year = meta.release_date.split("-")[0]
                 if release_year.isdigit():

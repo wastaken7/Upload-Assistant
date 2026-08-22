@@ -38,7 +38,7 @@ def _anitopy_parse(value: str) -> dict[str, Any]:
 def _safe_int(value: Any, default: int = 0) -> int:
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 
@@ -196,7 +196,7 @@ class SeasonEpisodeManager:
                                             episode_int = int(match.group(1))
                                             episode = f"E{str(episode_int).zfill(2)}"
                                             break
-                                        except ValueError, IndexError:
+                                        except (ValueError, IndexError):
                                             continue
 
                             if episode_int == 1:  # Still using fallback
@@ -427,7 +427,7 @@ class SeasonEpisodeManager:
         raw_season_int = meta.season_int
         try:
             default_season_num = int(raw_season_int)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             default_season_num = 1
 
         for file_path in files:

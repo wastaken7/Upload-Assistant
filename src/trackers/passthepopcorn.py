@@ -619,7 +619,7 @@ class PassThePopcorn:
             if tmdb_type == "movie":
                 try:
                     runtime = (meta.runtime) if meta.runtime is not None else 60
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     runtime = 60
                 ptp_type = "Feature Film" if runtime >= 45 or runtime == 0 else "Short Film"
             if tmdb_type == "miniseries" or "miniseries" in keywords:
@@ -1637,7 +1637,7 @@ class PassThePopcorn:
             torrent_create = f"[{self.tracker}]"
             try:
                 cooldown = int(self.config.get("DEFAULT", {}).get("rehash_cooldown", 0) or 0)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 cooldown = 0
             if cooldown > 0:
                 await asyncio.sleep(cooldown)  # Small cooldown before rehashing

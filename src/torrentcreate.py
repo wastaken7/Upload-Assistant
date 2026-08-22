@@ -315,7 +315,7 @@ class TorrentCreator:
 
                                 cmd.extend(["-l", str(power)])
                                 logger.info(f"[yellow]Setting mkbrr piece length to 2^{power} ({(2**power) / (1024 * 1024):.2f} MiB)")
-                            except ValueError, TypeError:
+                            except (ValueError, TypeError):
                                 logger.warning("[yellow]Warning: Invalid max_piece_size value, using default piece length")
 
                         if not piece_size and not tracker_url and not any(tracker in meta.trackers for tracker in ["HDBITS", "PASSTHEPOPCORN"]):

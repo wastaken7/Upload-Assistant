@@ -100,7 +100,7 @@ class TheOldSchool(UNIT3D):
             torrent_create = f"[{self.tracker}]"
             try:
                 cooldown = int(self.config.get("DEFAULT", {}).get("rehash_cooldown", 0) or 0)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 cooldown = 0
             if cooldown > 0:
                 await asyncio.sleep(cooldown)  # Small cooldown before rehashing

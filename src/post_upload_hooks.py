@@ -43,7 +43,7 @@ def _timeout_seconds(config: Mapping[str, Any]) -> float:
     value = config.get("DEFAULT", {}).get("post_upload_hook_timeout", DEFAULT_TIMEOUT_SECONDS)
     try:
         timeout = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         logger.warning(f"Invalid post_upload_hook_timeout {value!r}; using {DEFAULT_TIMEOUT_SECONDS:g} seconds.")
         return DEFAULT_TIMEOUT_SECONDS
     return timeout if timeout > 0 else DEFAULT_TIMEOUT_SECONDS
@@ -83,7 +83,7 @@ async def _terminate_hook_process_tree(process: asyncio.subprocess.Process) -> N
             await taskkill.wait()
         elif process.pid is not None:
             os.killpg(process.pid, signal.SIGTERM)
-    except OSError, ProcessLookupError:
+    except (OSError, ProcessLookupError):
         pass
 
     try:
@@ -94,7 +94,7 @@ async def _terminate_hook_process_tree(process: asyncio.subprocess.Process) -> N
                 process.kill()
             elif process.pid is not None:
                 os.killpg(process.pid, signal.SIGKILL)
-        except OSError, ProcessLookupError:
+        except (OSError, ProcessLookupError):
             pass
         await process.wait()
 

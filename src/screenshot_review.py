@@ -50,7 +50,7 @@ def _review_file(temp_dir: Path) -> Path:
 def _load_review(temp_dir: Path) -> dict[str, Any]:
     try:
         payload = json.loads(_review_file(temp_dir).read_text(encoding="utf-8"))
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return {}
     return payload if isinstance(payload, dict) else {}
 
@@ -139,7 +139,7 @@ def target_count(temp_dir: Path, fallback: int) -> int:
     value = _load_review(temp_dir).get("target_count")
     try:
         return max(0, int(value))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return fallback
 
 
@@ -150,7 +150,7 @@ def image_version(temp_dir: Path, screenshot_id: str, fallback: int) -> int:
         try:
             if screenshot_id in generations:
                 return int(generations[screenshot_id])
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             pass
     return fallback
 
@@ -398,7 +398,7 @@ def _disc_bdinfo_for_group(meta: Meta, group: str) -> dict[str, Any] | None:
     if group.startswith("FILE_"):
         try:
             disc = meta.discs[int(group.removeprefix("FILE_"))]
-        except IndexError, ValueError:
+        except (IndexError, ValueError):
             return None
         return disc.get("bdinfo") if isinstance(disc, dict) else None
     return None
@@ -488,7 +488,7 @@ def _video_properties(temp_dir: Path) -> tuple[float, float, float, float, float
     def number(value: object, fallback: float) -> float:
         try:
             return float(value)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return fallback
 
     duration = number(video.get("Duration"), number(general.get("Duration"), 3600.0))

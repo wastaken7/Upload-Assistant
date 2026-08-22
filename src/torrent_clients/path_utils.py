@@ -15,7 +15,7 @@ def coerce_str_list(value: object) -> list[str]:
         if value.startswith("[") and value.endswith("]"):
             try:
                 parsed = ast.literal_eval(value)
-            except SyntaxError, ValueError:
+            except (SyntaxError, ValueError):
                 parsed = None
             if isinstance(parsed, (list, tuple)):
                 parsed_values = cast(list[object] | tuple[object, ...], parsed)

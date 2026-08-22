@@ -216,7 +216,7 @@ class Blutopia(UNIT3D):
             return region_name
         try:
             normalized_id = int(region_id) if region_id is not None else 0
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return ""
         return await self.common.unit3d_region_ids(reverse=True, region_id=normalized_id)
 

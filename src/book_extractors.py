@@ -19,7 +19,7 @@ def normalize_series_index(value: str) -> str:
     """Drop a trailing .0 from a series index ("5.0" -> "5"), keeping "5.5"/"0.5"."""
     try:
         idx = float(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return (value).strip()
     return str(int(idx)) if idx.is_integer() else str(idx)
 

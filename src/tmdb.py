@@ -1503,7 +1503,7 @@ async def get_romaji(tmdb_name: str, mal: int | None, meta: Meta) -> tuple[str, 
                 media = typing_cast(list[dict[str, Any]], page_data.get("media", []))
                 await anilist_cache.set("anilist", "media", anilist_key, {"media": media, "demographic": demographic}, negative=not bool(media))
                 break  # Success - exit retry loop
-            except httpx.ReadTimeout, httpx.TimeoutException:
+            except (httpx.ReadTimeout, httpx.TimeoutException):
                 if attempt < 2:
                     logger.info(f"[yellow]AniList request timed out, retrying ({attempt + 2}/3)...[/yellow]")
                 else:

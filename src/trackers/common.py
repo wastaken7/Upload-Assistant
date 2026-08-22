@@ -135,7 +135,7 @@ class Common:
                         value_normalized = self._normalize_language_token(value)
                         if value_normalized:
                             candidates.add(value_normalized)
-            except tag_parser.LanguageTagError, LookupError, AttributeError, ValueError:
+            except (tag_parser.LanguageTagError, LookupError, AttributeError, ValueError):
                 continue
 
         expanded = set(candidates)
@@ -221,7 +221,7 @@ class Common:
             parsed_lang = langcodes.Language.get(language)
             display_name = parsed_lang.display_name()
             return display_name.lower() if display_name else language.lower()
-        except tag_parser.LanguageTagError, LookupError, AttributeError, ValueError:
+        except (tag_parser.LanguageTagError, LookupError, AttributeError, ValueError):
             return language.lower()
 
     async def path_exists(self, path: str) -> bool:
@@ -320,7 +320,7 @@ class Common:
                         new_torrent.metainfo["info"]["entropy"] = secrets.randbelow(2**32)  # type: ignore
                     elif entropy_int == 64:
                         new_torrent.metainfo["info"]["entropy"] = secrets.randbelow(2**64)  # type: ignore
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     # Skip entropy setting if value is invalid
                     pass
             out_path = f"{meta.base_dir}{'/' + 'tmp' + '/'}{meta.uuid}/[{tracker}].torrent"
@@ -767,7 +767,7 @@ class Common:
             # Convert to int to handle cases where API returns string
             try:
                 region_id = region_id
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 return ""
             for code, id_value in region_map.items():
                 if id_value == region_id:
@@ -2503,7 +2503,7 @@ class Common:
             # Convert to int to handle cases where API returns string
             try:
                 distributor_id = distributor_id
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 return ""
             for name, id_value in distributor_map.items():
                 if id_value == distributor_id:
@@ -2547,7 +2547,7 @@ class Common:
             selection = (await prompt_in_thread(cli_ui.ask_string, f"Do you want to use these IDs from {tracker_name}? (Y/n): ", default="") or "").strip().lower()
             try:
                 return selection == "" or selection == "y" or selection == "yes"
-            except KeyboardInterrupt, EOFError:
+            except (KeyboardInterrupt, EOFError):
                 sys.exit(1)
         else:
             return True
@@ -2748,7 +2748,7 @@ class Common:
                     if not await self.prompt_user_for_id_selection(meta, tmdb, imdb, tvdb, mal, file_name, tracker_name=tracker):
                         logger.info("[yellow]User chose to skip based on IDs.[/yellow]")
                         return None, None, None, None, None, None, None, [], None
-                except KeyboardInterrupt, EOFError:
+                except (KeyboardInterrupt, EOFError):
                     sys.exit(1)
 
             if description:
@@ -2822,7 +2822,7 @@ class Common:
                 response = await client.get(request_url, params=request_params, timeout=30.0)
                 json_data: dict[str, Any] = response.json()
                 return json_data
-            except httpx.RequestError, httpx.TimeoutException, ValueError:
+            except (httpx.RequestError, httpx.TimeoutException, ValueError):
                 return None
 
         try:
@@ -2845,7 +2845,7 @@ class Common:
                             params["url"] = ptgen_json["data"][0]["link"]
                         else:
                             raise KeyError("No data in response")
-                    except KeyError, IndexError, TypeError:
+                    except (KeyError, IndexError, TypeError):
                         logger.info("[red]Unable to get data from ptgen using IMDb")
                         if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                             params["url"] = await prompt_in_thread(cli_ui.ask_string, "Please enter Douban link:", default="") or ""

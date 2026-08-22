@@ -133,7 +133,7 @@ class SceneManager:
                                     for file in release_details_dict.get("files", []):
                                         if file["name"].endswith(".nfo"):
                                             release_lower = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(file["name"]).stem).strip("._") or release_lower
-                                except KeyError, ValueError:
+                                except (KeyError, ValueError):
                                     pass
 
                             nfo_url = f"https://www.srrdb.com/download/file/{release}/{release_lower}.nfo"

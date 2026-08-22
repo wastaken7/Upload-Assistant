@@ -30,7 +30,7 @@ def _path(base_dir: str | Path | None, release_id: str) -> Path:
 def _load(base_dir: str | Path, release_id: str) -> dict[str, Any]:
     try:
         value = json.loads(_path(base_dir, release_id).read_text(encoding="utf-8"))
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         value = {}
     return value if isinstance(value, dict) else {}
 

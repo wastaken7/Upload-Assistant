@@ -33,7 +33,7 @@ def is_public_http_url(value: str | None) -> bool:
     try:
         addresses = {result[4][0] for result in socket.getaddrinfo(parsed.hostname, None, type=socket.SOCK_STREAM)}
         return bool(addresses) and all(ipaddress.ip_address(address).is_global for address in addresses)
-    except OSError, ValueError:
+    except (OSError, ValueError):
         return False
 
 
@@ -50,7 +50,7 @@ def is_valid_image_bytes(image_bytes: bytes) -> bool:
                     return False
                 image.verify()
         return True
-    except OSError, SyntaxError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning:
+    except (OSError, SyntaxError, ValueError, Image.DecompressionBombError, Image.DecompressionBombWarning):
         return False
 
 
@@ -157,7 +157,7 @@ def _write_png(source: Path | bytes, destination: Path) -> bool:
             image.save(temporary, "PNG")
         temporary.replace(destination)
         return True
-    except OSError, SyntaxError, ValueError:
+    except (OSError, SyntaxError, ValueError):
         temporary.unlink(missing_ok=True)
         return False
 

@@ -126,7 +126,7 @@ def _normalize_search_year(value: Any) -> str | None:
 def _to_int(value: Any, default: int = 0) -> int:
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 
@@ -283,7 +283,7 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
                             "Choose category for audio release:",
                             choices=["1. Music", "2. Audiobook"],
                         )
-                    except EOFError, KeyboardInterrupt:
+                    except (EOFError, KeyboardInterrupt):
                         logger.error("[bold red]Category selection cancelled or failed.[/bold red]")
                         sys.exit(1)
                     if choice is None:
@@ -850,7 +850,7 @@ async def search_metadata(
             meta.tmdb_id = int(meta.tmdb_manual)
         elif not meta.tmdb_id:
             meta.tmdb_id = 0
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         if not meta.tmdb_id:
             meta.tmdb_id = 0
 
@@ -865,7 +865,7 @@ async def search_metadata(
                     meta.imdb_id = int(imdb_value)
             else:
                 meta.imdb_id = 0
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         meta.imdb_id = 0
 
     # Set mal_id
@@ -874,7 +874,7 @@ async def search_metadata(
             meta.mal_id = int(meta.mal_manual)
         elif not meta.mal_id:
             meta.mal_id = 0
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         if not meta.mal_id:
             meta.mal_id = 0
 
@@ -884,7 +884,7 @@ async def search_metadata(
             meta.tvdb_id = int(meta.tvdb_manual)
         elif not meta.tvdb_id:
             meta.tvdb_id = 0
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         if not meta.tvdb_id:
             meta.tvdb_id = 0
 
@@ -893,7 +893,7 @@ async def search_metadata(
             meta.tvmaze_id = meta.tvmaze_manual
         elif not meta.tvmaze_id:
             meta.tvmaze_id = 0
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         if not meta.tvmaze_id:
             meta.tvmaze_id = 0
 

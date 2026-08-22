@@ -153,7 +153,7 @@ class MakingOff:
         try:
             gb = meta.source_size / 1024**3
             return f"{gb:.2f} GB" if gb >= 1 else f"{meta.source_size / 1024**2:.0f} MB"
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return "N/A"
 
     def _mediainfo_duration(self, general_track: dict[str, Any], video_track: dict[str, Any]) -> str:
@@ -161,7 +161,7 @@ class MakingOff:
         raw = general_track.get("Duration") or video_track.get("Duration") or ""
         try:
             return str(int(float(raw)) // 60)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return ""
 
     def _aspect_ratio(self, width: Any, height: Any) -> str:
@@ -173,7 +173,7 @@ class MakingOff:
             if r < 1.85:
                 return "Widescreen (16x9)"
             return "Scope (2.35:1)"
-        except TypeError, ValueError, ZeroDivisionError:
+        except (TypeError, ValueError, ZeroDivisionError):
             return "Widescreen (16x9)"
 
     def _html_encode(self, text: str) -> str:
@@ -301,7 +301,7 @@ class MakingOff:
         try:
             if int(meta.video_width or 0) > 1024 or int(meta.video_height or 0) > 576:
                 return True
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             pass
         return str(getattr(meta, "resolution", "")).lower() in {"720p", "1080i", "1080p", "1440p", "2160p", "4320p"}
 
@@ -1170,7 +1170,7 @@ class MakingOff:
 
             try:
                 upload_height = int(resolution_str.replace("p", "").replace("i", ""))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 upload_height = 0
 
             if resolution >= upload_height:
@@ -1743,7 +1743,7 @@ class MakingOff:
             try:
                 bitrate = int(meta.video_bitrate or 0)
                 height = int(meta.video_height or 0)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 bitrate, height = 0, 0
             minimum = 5000 if height >= 1080 or str(meta.resolution) in {"1080i", "1080p", "1440p", "2160p", "4320p"} else 2200
             if bitrate and bitrate < minimum:

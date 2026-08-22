@@ -92,7 +92,7 @@ class PrivateHD(AZTrackerBase):
         current_year = datetime.now(UTC).year
         try:
             year = int(meta.year)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             year = 0
         if year:
             is_older_than_50_years = (current_year - year) >= 50

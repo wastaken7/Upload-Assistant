@@ -337,7 +337,7 @@ class Zenith(UNIT3D):
     def _music_sample_rate(value: Any) -> str:
         try:
             return f"{float(value) / 1000:g}kHz"
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return ""
 
     @classmethod
@@ -375,7 +375,7 @@ class Zenith(UNIT3D):
                 bitrate_kbps = round(float(bitrate) / 1000)
                 bitrate_mode = str(first_track.get("bitrate_mode") or "").upper().strip()
                 format_parts.append(f"{bitrate_kbps} {bitrate_mode}".strip())
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 pass
         release_type = str(cls._music_field(release, "release_type", "")).casefold()
         if release_type == "single":

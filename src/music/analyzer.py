@@ -137,7 +137,7 @@ class MusicReleaseAnalyzer:
         try:
             audio = mutagen.File(path, easy=True)
             technical = mutagen.File(path)
-        except mutagen.MutagenError, OSError:
+        except (mutagen.MutagenError, OSError):
             return None
         if audio is None and technical is None:
             return None

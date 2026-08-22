@@ -222,7 +222,7 @@ class TrackerDataManager:
             if not isinstance(review.get("content"), str):
                 try:
                     version = int(review.get("version", 0) or 0) + 1
-                except TypeError, ValueError:
+                except (TypeError, ValueError):
                     version = 1
                 await asyncio.to_thread(save_review, temp_dir, candidate.description, version)
             return
@@ -369,7 +369,7 @@ class TrackerDataManager:
                 search_limit = self.default_config.get("tracker_search_concurrency", 4)
                 try:
                     semaphore = asyncio.Semaphore(max(1, int(search_limit)))
-                except TypeError, ValueError:
+                except (TypeError, ValueError):
                     semaphore = asyncio.Semaphore(4)
 
                 async def collect(tracker_name: str) -> tuple[str, Meta, int] | None:

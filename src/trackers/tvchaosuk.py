@@ -97,7 +97,7 @@ class TVChaosUK:
         """
         try:
             return datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC).strftime("%d-%m-%Y")
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             return date_str
 
     async def _read_base_description(self, meta: Meta) -> str:

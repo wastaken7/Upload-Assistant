@@ -25,7 +25,7 @@ _tvdb_error_reported = False
 def _coerce_int(value: Any) -> int | None:
     try:
         return int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -246,17 +246,17 @@ class TvdbData:
             # Normalize numeric inputs
             try:
                 season_int = int(season) if season is not None else None
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 season_int = None
 
             try:
                 episode_int = int(episode) if episode is not None else None
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 episode_int = None
 
             try:
                 absolute_int = int(absolute_number) if absolute_number is not None else None
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 absolute_int = None
 
             # For daily-style episodes, match by aired date.

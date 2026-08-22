@@ -28,7 +28,7 @@ VIDEO_EXTENSIONS = {".m2ts", ".mkv", ".mp4", ".ts", ".hevc", ".h265"}
 def _positive_config_int(config: dict[str, Any], key: str, default: int) -> int:
     try:
         return max(1, int(config["DEFAULT"].get(key, default)))
-    except KeyError, TypeError, ValueError:
+    except (KeyError, TypeError, ValueError):
         return default
 
 
@@ -136,7 +136,7 @@ async def process_dynamic_hdr_plots(meta: Meta, config: dict[str, Any], uploadsc
         if cache.get("cache_version") == CACHE_VERSION and cache.get("fingerprint") == fingerprint and isinstance(cache.get("dynamic_hdr_plot_images"), list):
             meta.dynamic_hdr_plot_images = cache["dynamic_hdr_plot_images"]
             return []
-    except OSError, ValueError, TypeError:
+    except (OSError, ValueError, TypeError):
         pass
 
     jobs = [(kind, source) for source in sources for kind in formats]

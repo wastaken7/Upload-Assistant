@@ -97,7 +97,7 @@ class MediaInfoTrack:
                 if name == "duration" and value is not None:
                     try:
                         return float(value) * 1000
-                    except TypeError, ValueError:
+                    except (TypeError, ValueError):
                         return value
                 return value
         return None

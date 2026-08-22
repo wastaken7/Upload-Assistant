@@ -120,7 +120,7 @@ class RocketHD(UNIT3D):
         try:
             lang_obj = pycountry.languages.get(name=lang_str.title()) or pycountry.languages.get(alpha_2=lang_str) or pycountry.languages.get(alpha_3=lang_str)
             return lang_obj.alpha_2.lower() if lang_obj else lang_str
-        except AttributeError, KeyError, LookupError:
+        except (AttributeError, KeyError, LookupError):
             return lang_str
 
     def _get_german_title(self, imdb_info: dict[str, Any]) -> str | None:

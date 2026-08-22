@@ -17,7 +17,7 @@ def review_path(temp_dir: Path) -> Path:
 def load_review(temp_dir: Path) -> dict[str, Any]:
     try:
         value = json.loads(review_path(temp_dir).read_text(encoding="utf-8"))
-    except OSError, ValueError, TypeError:
+    except (OSError, ValueError, TypeError):
         return {}
     return value if isinstance(value, dict) else {}
 
@@ -55,7 +55,7 @@ def draft(meta: dict[str, Any], temp_dir: Path) -> tuple[str, int]:
     if isinstance(content, str):
         try:
             version = int(review.get("version", 0) or 0)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             version = 0
         return content, version
     override = meta.get("description_override")
