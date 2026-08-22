@@ -467,7 +467,7 @@ class BroadcasTheNet:
         return name
 
     async def _api(self, method: str, params: list[Any]) -> dict[str, Any]:
-        payload = {"jsonrpc": "2.0", "id": "upload-assistant-btn", "method": method, "params": [self.api_key, *params]}
+        payload: dict[str, Any] = {"jsonrpc": "2.0", "id": "upload-assistant-btn", "method": method, "params": [self.api_key, *params]}
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(self.api_url, json=payload)
         response.raise_for_status()
@@ -475,9 +475,12 @@ class BroadcasTheNet:
             data: Any = response.json()
         except ValueError as exc:
             raise UploadError("BTN API returned an invalid JSON response", "red") from exc
-        if not isinstance(data, dict) or data.get("error"):
-            raise UploadError(f"BTN API error: {data.get('error') if isinstance(data, dict) else 'invalid response'}", "red")
-        return data
+        if not isinstance(data, dict):
+            raise UploadError("BTN API error: invalid response", "red")
+        data_dict = cast(dict[str, Any], data)
+        if data_dict.get("error"):
+            raise UploadError(f"BTN API error: {data_dict['error']}", "red")
+        return data_dict
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
         if not self.api_key:
@@ -494,21 +497,22 @@ class BroadcasTheNet:
         except (httpx.HTTPError, ValueError, UploadError) as exc:
             logger.warning(f"{self.tracker}: duplicate lookup failed: {exc}")
             return []
-        payload: dict[str, Any] = result.get("result", {}) if isinstance(result.get("result"), dict) else {}
-        torrents: dict[Any, Any] = payload.get("torrents", {}) if isinstance(payload.get("torrents"), dict) else {}
-        if not isinstance(torrents, dict):
-            return []
+        result_payload = result.get("result")
+        payload: dict[str, Any] = cast(dict[str, Any], result_payload) if isinstance(result_payload, dict) else {}
+        torrent_payload = payload.get("torrents")
+        torrents: dict[str, dict[str, Any]] = cast(dict[str, dict[str, Any]], torrent_payload) if isinstance(torrent_payload, dict) else {}
         dupes: list[dict[str, Any]] = []
         for torrent_id, item in torrents.items():
             if not isinstance(item, dict):
                 continue
-            group_id = str(item.get("GroupID") or item.get("groupId") or "")
+            item_dict = cast(dict[str, Any], item)
+            group_id = str(item_dict.get("GroupID") or item_dict.get("groupId") or "")
             dupes.append(
                 {
-                    "name": str(item.get("ReleaseName") or item.get("releaseName") or item.get("Name") or ""),
-                    "size": int(item.get("Size") or item.get("size") or 0),
-                    "files": str(item.get("FileList") or item.get("fileList") or ""),
-                    "file_count": int(item.get("FileCount") or item.get("fileCount") or 1),
+                    "name": str(item_dict.get("ReleaseName") or item_dict.get("releaseName") or item_dict.get("Name") or ""),
+                    "size": int(item_dict.get("Size") or item_dict.get("size") or 0),
+                    "files": str(item_dict.get("FileList") or item_dict.get("fileList") or ""),
+                    "file_count": int(item_dict.get("FileCount") or item_dict.get("fileCount") or 1),
                     "link": f"{self.base_url}/torrents.php?id={group_id}&torrentid={torrent_id}",
                 }
             )
@@ -571,7 +575,7 @@ class BroadcasTheNet:
             match = re.search(rf"(?is)\b{re.escape(name)}\s*=\s*[\"']([^\"']*)[\"']", tag)
             return match.group(1) if match else ""
 
-        fields = {}
+        fields: dict[str, str] = {}
         for tag in self._input_pattern.findall(html):
             name = attribute(tag, "name")
             if name:
@@ -638,10 +642,13 @@ class BroadcasTheNet:
                 original_language = str(meta.get("original_language") or getattr(meta, "original_language", "") or "en").lower()
                 if original_language and original_language not in ("en", "eng", "english"):
                     payload["foreign"] = "on"
-                    origin_countries = getattr(meta, "origin_country", []) or getattr(meta, "origin_country_code", [])
-                    first_country: str = (
-                        origin_countries[0] if isinstance(origin_countries, list) and origin_countries else (origin_countries if isinstance(origin_countries, str) else "")
-                    )
+                    origin_countries: Any = getattr(meta, "origin_country", []) or getattr(meta, "origin_country_code", [])
+                    if isinstance(origin_countries, list) and origin_countries:
+                        first_country = str(origin_countries[0])
+                    elif isinstance(origin_countries, str):
+                        first_country = origin_countries
+                    else:
+                        first_country = ""
                     country_id = self._country_map.get(str(first_country).lower().strip())
                     if country_id:
                         payload["country"] = country_id
@@ -694,8 +701,13 @@ class BroadcasTheNet:
                             filters["group"] = group_id
 
                         search_results = await self._api("getTorrentsSearch", [filters, 5])
-                        search_payload = search_results.get("result", {})
-                        torrents: dict[Any, Any] = search_payload.get("torrents", {}) if isinstance(search_payload, dict) and isinstance(search_payload.get("torrents"), dict) else {}
+                        search_payload: Any = search_results.get("result", {})
+                        search_payload = cast(dict[str, Any], search_payload) if isinstance(search_payload, dict) else {}
+                        torrents: dict[str, dict[str, Any]] = (
+                            cast(dict[str, dict[str, Any]], search_payload.get("torrents"))
+                            if isinstance(search_payload.get("torrents"), dict)
+                            else {}
+                        )
 
                         if isinstance(torrents, dict):
                             for tid, tdata in torrents.items():
