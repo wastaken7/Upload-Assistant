@@ -240,7 +240,7 @@ class HDSpace:
         data: dict[str, Any] = {
             "category": await self.get_category_id(meta),
             "filename": await self.get_name(meta),
-            "genre": str(meta.genres),
+            "genre": ", ".join(meta.genres) if meta.genres else "",
             "imdb": str(meta.imdb),
             "info": await self.generate_description(meta),
             "nuk_rea": "",
