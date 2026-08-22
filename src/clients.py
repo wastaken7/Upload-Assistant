@@ -77,7 +77,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 "BEYONDHD": "bhd",
                 "BLUTOPIA": "blu",
                 "ONLYENCODES": "oe",
-                "BTN": "btn",
+                "BROADCASTHENET": "broadcasthenet",
             }
             tracker_key = _tracker_key_aliases.get(matched_tracker, matched_tracker.lower())
 
@@ -89,7 +89,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                 hdb_id = _query_id(parsed.query, "id")
                 if hdb_id:
                     tracker_ids[tracker_key] = hdb_id
-            elif matched_tracker == "BTN":
+            elif matched_tracker == "BROADCASTHENET":
                 btn_id = _query_id(parsed.query, "id")
                 if btn_id:
                     tracker_ids[tracker_key] = btn_id
