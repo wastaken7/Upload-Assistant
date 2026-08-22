@@ -139,7 +139,9 @@ class TrackerSetup:
                 supported_trackers.append(tracker_name)
                 continue
 
-            tracker_config: dict[str, Any] = self.config["TRACKERS"].get(tracker_name, self.config["TRACKERS"].get("BTN", {}))
+            tracker_config: dict[str, Any] = self.config["TRACKERS"].get(tracker_name, {})
+            if tracker_name == "BROADCASTHENET" and not tracker_config:
+                tracker_config = self.config["TRACKERS"].get("BTN", {})
             example_tracker_config = example_config["TRACKERS"].get(tracker_name, {})
 
             if isinstance(example_tracker_config, dict) and isinstance(tracker_config, dict):

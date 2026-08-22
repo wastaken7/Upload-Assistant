@@ -8,6 +8,8 @@ from src.trackersetup import tracker_class_map
 def test_flood_is_registered_with_full_tracker_name():
     assert tracker_class_map["FLOOD"] is Flood  # noqa: S101
     assert Flood.display_name == "Flood"  # noqa: S101
+    assert Meta.canonical_tracker_name("FLD") == "FLOOD"  # noqa: S101
+    assert Meta.canonical_tracker_name("BTN") == "BROADCASTHENET"  # noqa: S101
 
 
 def test_flood_multi_disc_dvd_description_has_valid_code_tags(tmp_path, monkeypatch):

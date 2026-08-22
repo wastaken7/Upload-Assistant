@@ -125,14 +125,11 @@ class Flood:
         try:
             async with aiofiles.open(torrent_file, "rb") as f:
                 torrent_data = await f.read()
-            bencode_module = cast(Any, bencodepy)
-            decode = cast(Callable[[bytes], Any], bencode_module.decode)
-            encode = cast(Callable[[Any], bytes], bencode_module.encode)
-            torrent = cast(dict[bytes, Any], decode(torrent_data))
+            torrent = cast(dict[bytes, Any], cast(Callable[[bytes], Any], cast(Any, bencodepy).decode)(torrent_data))
             if "torrent_url" in response_data:
                 torrent[b"comment"] = cast(str, response_data["torrent_url"]).encode("utf-8")
             async with aiofiles.open(torrent_file, "wb") as f:
-                await f.write(encode(torrent))
+                await f.write(cast(Callable[[Any], bytes], cast(Any, bencodepy).encode)(torrent))
 
             if meta.debug:
                 logger.info(f"{self.tracker}: Torrent file updated with comment: {response_data.get('torrent_url')}")
@@ -183,16 +180,10 @@ class Flood:
             comparison_groups = cast(dict[str, Any], meta.comparison_groups or {})
             sorted_group_indices = sorted(comparison_groups.keys(), key=lambda x: int(x))
 
-            comp_sources: list[str] = []
-            for group_idx in sorted_group_indices:
-                group_data = comparison_groups[group_idx]
-                group_name = group_data.get("name", f"Group {group_idx}")
-                comp_sources.append(group_name)
-
-            sources_string = ", ".join(comp_sources)
+            sources_string = ", ".join(comparison_groups[k].get("name", f"Group {k}") for k in sorted_group_indices)
             output.append(f"[comparison={sources_string}]\n")
 
-            images_per_group = min([len(comparison_groups[idx].get("urls", [])) for idx in sorted_group_indices]) if sorted_group_indices else 0
+            images_per_group = min((len(g.get("urls", [])) for g in comparison_groups.values()), default=0)
 
             for img_idx in range(images_per_group):
                 for group_idx in sorted_group_indices:
@@ -209,9 +200,9 @@ class Flood:
         if images:
             output.append("[align=center]")
             screens = meta.screens if meta.screens else len(images)
-            for each in range(len(images[:screens])):
-                web_url = images[each].get("web_url", "")
-                img_url = images[each].get("img_url", "")
+            for each, image in enumerate(images[:screens]):
+                web_url = image.get("web_url", "")
+                img_url = image.get("img_url", "")
                 if each == len(images) - 1:
                     output.append(f"[url={web_url}][img width=350]{img_url}[/img][/url]")
                 elif (each + 1) % 2 == 0:
@@ -242,7 +233,6 @@ class Flood:
             logger.info(f"{self.tracker}: [bold red]Unknown media type, could not check for dupes[/bold red]")
             return []
 
-        dupes: list[dict[str, Any]] = []
         headers = {"User-Agent": f"Upload Assistant/2.2 ({platform.system()} {platform.release()})", "Authorization": f"Bearer {self.api_key}"}
         try:
             async with httpx.AsyncClient() as client:
@@ -250,8 +240,8 @@ class Flood:
             if response.status_code == 200:
                 response_data = cast(dict[str, Any], response.json())
                 items = cast(list[dict[str, Any]], response_data.get("items", []))
-                for item in items:
-                    result: dict[str, Any] = {
+                return [
+                    {
                         "id": item.get("id"),
                         "name": item.get("name"),
                         "type": item.get("media_type"),
@@ -261,9 +251,9 @@ class Flood:
                         "files": [file.get("name") for file in item.get("files", [])],
                         "file_count": len(item.get("files", [])),
                     }
-                    dupes.append(result)
-            else:
-                logger.info(f"{self.tracker}: [bold red]HTTP request failed. Status: {response.status_code}[/bold red]")
+                    for item in items
+                ]
+            logger.info(f"{self.tracker}: [bold red]HTTP request failed. Status: {response.status_code}[/bold red]")
         except httpx.TimeoutException:
             logger.info(f"{self.tracker}: [bold red]request timed out after 5 seconds[/bold red]")
         except httpx.RequestError as e:
@@ -271,7 +261,7 @@ class Flood:
         except Exception as e:
             logger.info(f"{self.tracker}: [bold red]unexpected error: {e}[/bold red]")
 
-        return dupes
+        return []
 
     async def get_name(self, meta: Meta) -> str:
         name = meta.name
