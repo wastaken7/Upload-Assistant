@@ -32,7 +32,7 @@ except ImportError:
     logger = logging.getLogger(__name__)
 
 
-BDINFO_VERSION = "v0.3.1"
+BDINFO_VERSION = "v0.4.0"
 BASE_RELEASE_URL = "https://github.com/autobrr/go-bdinfo/releases/download"
 
 
