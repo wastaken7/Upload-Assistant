@@ -1899,6 +1899,7 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
     tv_pack_raw = _stringify_preview_value(meta_data.get("tv_pack")).lower()
 
     return {
+        "media_id": _stringify_preview_value(meta_data.get("uuid")) or fallback_path,
         "path": _stringify_preview_value(meta_data.get("path")) or fallback_path,
         "filename": Path(fallback_path).name,
         "title": title or _stringify_preview_value(music.get("album")),
@@ -2174,6 +2175,7 @@ class ProgressItem(TypedDict, total=False):
 class ExecutionPreview(TypedDict, total=False):
     """Serialized preview data for the media currently being processed."""
 
+    media_id: str
     path: str
     filename: str
     title: str
@@ -4543,9 +4545,13 @@ def regenerate_execution_preview_cover():
 
     payload = _request_json_dict()
     session_id = _stringify_preview_value(payload.get("session_id"))
-    _execution_path, meta_file, meta_data = _resolve_execution_preview_meta(session_id)
+    execution_path, meta_file, meta_data = _resolve_execution_preview_meta(session_id)
     if meta_file is None or meta_data is None:
         return jsonify({"success": False, "error": "Execution metadata is not available yet"}), 404
+    media_id = _stringify_preview_value(payload.get("media_id"))
+    current_media_id = _stringify_preview_value(meta_data.get("uuid")) or execution_path
+    if not media_id or media_id != current_media_id:
+        return jsonify({"success": False, "error": "The execution preview has moved to another item"}), 409
     if _stringify_preview_value(meta_data.get("category")).upper() != "XXX":
         return jsonify({"success": False, "error": "Cover regeneration is only available for XXX"}), 400
 

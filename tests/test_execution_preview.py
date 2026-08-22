@@ -1,3 +1,6 @@
+from pathlib import Path
+
+from web_ui import server
 from web_ui.server import _extract_execution_preview
 
 
@@ -37,3 +40,22 @@ def test_execution_preview_uses_local_cover_for_active_session(tmp_path, monkeyp
     preview = _extract_execution_preview({"uuid": "release-1", "category": "XXX"}, str(tmp_path), "session-1")
 
     assert preview["poster_url"].startswith("/api/execution_preview_cover?session_id=session-1&v=release-1%3A")  # noqa: S101
+    assert preview["media_id"] == "release-1"  # noqa: S101
+
+
+def test_cover_regeneration_rejects_a_preview_that_has_moved(monkeypatch):
+    monkeypatch.setattr(server, "_webui_auth_ok", lambda: True)
+    monkeypatch.setattr(server, "_verify_csrf_header", lambda: True)
+    monkeypatch.setattr(server, "_verify_same_origin", lambda: True)
+    monkeypatch.setattr(
+        server,
+        "_resolve_execution_preview_meta",
+        lambda _session_id: ("C:/media/second", Path("meta.json"), {"uuid": "second", "category": "XXX"}),
+    )
+
+    response = server.app.test_client().post(
+        "/api/execution_preview_cover/regenerate",
+        json={"session_id": "session-1", "media_id": "first"},
+    )
+
+    assert response.status_code == 409  # noqa: S101

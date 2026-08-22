@@ -2396,6 +2396,11 @@ function AudionutsUAGUI() {
     };
   }, [API_BASE, isExecuting, sessionId]);
 
+  useEffect(() => {
+    coverRequestRef.current += 1;
+    setCoverAction("");
+  }, [executionPreview?.media_id]);
+
   const refreshExecutionScreenshots = async () => {
     const refreshed = await apiFetch(
       `${API_BASE}/execution_screenshots?session_id=${encodeURIComponent(sessionId)}`,
@@ -2436,14 +2441,15 @@ function AudionutsUAGUI() {
   };
 
   const regenerateExecutionCover = async () => {
-    if (!sessionId || coverAction) return;
+    const mediaId = executionPreview?.media_id;
+    if (!sessionId || !mediaId || coverAction) return;
     const requestToken = ++coverRequestRef.current;
     setCoverAction("regenerate");
     try {
       const response = await apiFetch(`${API_BASE}/execution_preview_cover/regenerate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId }),
+        body: JSON.stringify({ session_id: sessionId, media_id: mediaId }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.success) {
@@ -2452,7 +2458,9 @@ function AudionutsUAGUI() {
       }
       if (coverRequestRef.current === requestToken) {
         setExecutionPreview((previous) =>
-          previous ? { ...previous, poster_url: data.poster_url } : previous,
+          previous?.media_id === mediaId
+            ? { ...previous, poster_url: data.poster_url }
+            : previous,
         );
       }
     } catch (error) {
