@@ -207,7 +207,7 @@ class HDBits:
         hdb_name = meta.name
         audio = meta.audio
         hdb_name = hdb_name.replace("H.265", "HEVC")
-        if meta.source or ("".upper() == "WEB" and meta.service) or "".strip() != "":
+        if meta.service:
             hdb_name = hdb_name.replace(f"{meta.service} ", "", 1)
         if "DV" in meta.hdr:
             hdb_name = hdb_name.replace(" DV ", " DoVi ")
