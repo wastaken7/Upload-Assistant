@@ -459,7 +459,7 @@ class BJShare:
 
                 width_num = round((16 / 9) * height_num)
                 width = str(width_num)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 pass
 
         else:
@@ -589,7 +589,7 @@ class BJShare:
                         # Non-integer decimal, preserve as-is but try zero-padding if pure integer
                         if re.fullmatch(r"\d+", normalized_index):
                             normalized_index = normalized_index.zfill(2)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     # Not a valid number, check if pure integer for zero-padding
                     if re.fullmatch(r"\d+", normalized_index):
                         normalized_index = normalized_index.zfill(2)
@@ -1028,7 +1028,7 @@ class BJShare:
 
                 try:
                     size_in_gb = meta.bdinfo["size"]
-                except (KeyError, IndexError, TypeError):
+                except KeyError, IndexError, TypeError:
                     size_in_gb = 0
 
                 if size_in_gb > 66:
@@ -1249,7 +1249,7 @@ class BJShare:
                 bit_depth_str = meta.discs[0]["bdinfo"]["video"][0]["bit_depth"]
                 if "10" in bit_depth_str:
                     is_10_bit = True
-            except (KeyError, IndexError, TypeError):
+            except KeyError, IndexError, TypeError:
                 pass
         else:
             if meta.bit_depth == "10":

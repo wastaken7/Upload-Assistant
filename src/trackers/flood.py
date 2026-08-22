@@ -1,7 +1,7 @@
 # Upload Assistant © 2026 Audionut & wastaken7 — Licensed under UAPL v1.0
-import asyncio
-import os
 import platform
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any, cast
 
 import aiofiles
@@ -15,7 +15,7 @@ from src.trackers.common import Common
 
 class Flood:
     """
-    Flood Private Torrent Tracker
+    Flood (FLD) is a Private Torrent Tracker for MOVIES / TV
     """
 
     tracker = "FLOOD"
@@ -50,7 +50,6 @@ class Flood:
     upload_url = f"{base_url}/api/torrents/upload"
     search_url = f"{base_url}/api/torrents"
     supported_categories = ("MOVIE", "TV")
-    signature = "\n[align=center][size=1][url=https://github.com/Audionut/Upload-Assistant]Created by Audionut's Upload Assistant[/url][/size][/align]"
 
     def __init__(self, config: dict[str, Any]) -> None:
         self.config = config
@@ -67,25 +66,23 @@ class Flood:
 
         anon = "checked" if self.config["TRACKERS"].get(self.tracker, {}).get("anon", False) else ""
 
-        if meta.bdinfo:
-            mi_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/BD_SUMMARY_00.txt"
-        else:
-            mi_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt"
+        mi_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / ("BD_SUMMARY_00.txt" if meta.bdinfo else "MEDIAINFO.txt")
 
         async with aiofiles.open(mi_file_path, encoding="utf-8") as f:
             mi_dump = await f.read()
 
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
+        desc_file_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}]DESCRIPTION.txt"
+        async with aiofiles.open(desc_file_path, encoding="utf-8") as f:
             desc = await f.read()
 
-        torrent_file = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
-        files = {}
-        if os.path.exists(torrent_file):
+        torrent_file = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}].torrent"
+        files: dict[str, bytes] = {}
+        if torrent_file.exists():
             # We read binary for httpx
-            with open(torrent_file, "rb") as open_torrent:
-                files["meta_info"] = open_torrent.read()
+            async with aiofiles.open(torrent_file, "rb") as open_torrent:
+                files["meta_info"] = await open_torrent.read()
 
-        data = {
+        data: dict[str, Any] = {
             "name": fld_name,
             "imdb_id": meta.imdb,
             "tmdb_id": tmdb_id,
@@ -93,17 +90,18 @@ class Flood:
             "description": desc,
             "media_info": mi_dump,
             "media_type": media_type,
-            "edition": meta.get("edition") or "",
+            "edition": meta.edition,
         }
 
         headers = {"User-Agent": f"Upload Assistant/2.2 ({platform.system()} {platform.release()})", "Authorization": f"Bearer {self.api_key}"}
 
+        response_data: dict[str, Any] = {}
         if not meta.debug:
             try:
                 async with httpx.AsyncClient() as client:
                     response = await client.post(url=self.upload_url, files=files, data=data, headers=headers)
                 response.raise_for_status()
-                response_data = response.json()
+                response_data = cast(dict[str, Any], response.json())
             except httpx.RequestError as e:
                 logger.info(f"{self.tracker}: [red]Upload failed (Request Error): {e}")
                 return False
@@ -125,13 +123,16 @@ class Flood:
             response_data = {"success": True, "torrent_url": "https://flood.st/torrent/12345"}
 
         try:
-            with open(torrent_file, "rb") as f:
-                torrent_data = f.read()
-            torrent = bencodepy.decode(torrent_data)
+            async with aiofiles.open(torrent_file, "rb") as f:
+                torrent_data = await f.read()
+            bencode_module = cast(Any, bencodepy)
+            decode = cast(Callable[[bytes], Any], bencode_module.decode)
+            encode = cast(Callable[[Any], bytes], bencode_module.encode)
+            torrent = cast(dict[bytes, Any], decode(torrent_data))
             if "torrent_url" in response_data:
-                torrent[b"comment"] = response_data["torrent_url"].encode("utf-8")
-            with open(torrent_file, "wb") as f:
-                f.write(bencodepy.encode(torrent))
+                torrent[b"comment"] = cast(str, response_data["torrent_url"]).encode("utf-8")
+            async with aiofiles.open(torrent_file, "wb") as f:
+                await f.write(encode(torrent))
 
             if meta.debug:
                 logger.info(f"{self.tracker}: Torrent file updated with comment: {response_data.get('torrent_url')}")
@@ -141,9 +142,8 @@ class Flood:
         return True
 
     async def get_media_type(self, meta: Meta) -> str:
-        is_tv_pack = meta.tv_pack == 1
         if meta.category == "TV":
-            return "show_season" if is_tv_pack else "show_episode"
+            return "show_season" if meta.tv_pack else "show_episode"
         return "movie"
 
     async def get_prefixed_tmdb_id(self, meta: Meta) -> str:
@@ -157,8 +157,8 @@ class Flood:
         base = get_base_description(meta)
         base = base.replace("[user]", "").replace("[/user]", "")
 
-        output = []
-        discs = meta.get("discs", [])
+        output: list[str] = []
+        discs = meta.discs
         if discs:
             if discs[0].get("type") == "DVD":
                 output.append(f"[spoiler=VOB MediaInfo][code]{discs[0].get('vob_mi', '')}[/code][/spoiler]\n")
@@ -170,20 +170,20 @@ class Flood:
                     elif disc_type == "DVD":
                         output.append(f"{each.get('name', '')}:\n")
                         output.append(
-                            f"[spoiler={os.path.basename(each.get('vob', ''))}][code]{each.get('vob_mi', '')}[/code][/spoiler] [spoiler={os.path.basename(each.get('ifo', ''))}][code]{each.get('ifo_mi', '')}[/code][/spoiler]\n"
+                            f"[spoiler={Path(each.get('vob', '')).name}][code]{each.get('vob_mi', '')}[/code][/spoiler] [spoiler={Path(each.get('ifo', '')).name}][code]{each.get('ifo_mi', '')}[/code][/spoiler]\n"
                         )
                     elif disc_type == "HDDVD":
                         output.append(f"{each.get('name', '')}:\n")
-                        output.append(f"[spoiler={os.path.basename(each.get('largest_evo', ''))}][code][{each.get('evo_mi', '')}[/code][/spoiler]\n\n")
+                        output.append(f"[spoiler={Path(each.get('largest_evo', '')).name}][code][{each.get('evo_mi', '')}[/code][/spoiler]\n\n")
 
         output.append(base.replace("[img]", "[img width=300]"))
 
-        if meta.get("comparison") and meta.get("comparison_groups"):
+        if meta.comparison and meta.comparison_groups:
             output.append("[center]")
-            comparison_groups = meta.get("comparison_groups", {})
+            comparison_groups = cast(dict[str, Any], meta.comparison_groups or {})
             sorted_group_indices = sorted(comparison_groups.keys(), key=lambda x: int(x))
 
-            comp_sources = []
+            comp_sources: list[str] = []
             for group_idx in sorted_group_indices:
                 group_data = comparison_groups[group_idx]
                 group_name = group_data.get("name", f"Group {group_idx}")
@@ -205,10 +205,10 @@ class Flood:
 
             output.append("[/comparison][/center]\n\n")
 
-        images = meta.get(f"{self.tracker}_images_key") or meta.image_list
+        images = meta.image_list
         if images:
             output.append("[align=center]")
-            screens = int(meta.get("screens", len(images)))
+            screens = meta.screens if meta.screens else len(images)
             for each in range(len(images[:screens])):
                 web_url = images[each].get("web_url", "")
                 img_url = images[each].get("img_url", "")
@@ -220,23 +220,24 @@ class Flood:
                     output.append(f"[url={web_url}][img width=350]{img_url}[/img][/url] ")
             output.append("[/align]")
 
-        output.append(self.signature)
+        output.append(f"\n[align=center][size=1][url=https://github.com/wastaken7/Upload-Assistant]{meta.ua_signature}[/url][/size][/align]")
 
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "w", encoding="utf-8") as f:
+        desc_out_file = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}]DESCRIPTION.txt"
+        async with aiofiles.open(desc_out_file, "w", encoding="utf-8") as f:
             await f.write("".join(output))
 
     async def search_existing(self, meta: Meta) -> list[dict[str, Any]]:
-        search_params = {}
+        search_params: dict[str, Any] = {}
         if meta.category == "MOVIE":
             search_params["tmdb_id"] = f"movie/{meta.tmdb}"
         elif meta.category == "TV":
             search_params["tmdb_id"] = f"tv/{meta.tmdb}"
 
-            if season_int := meta.get("season_int"):
-                search_params["show_season_number"] = season_int
+            if meta.season_int:
+                search_params["show_season_number"] = meta.season_int
 
-            if meta.get("episode_int") and meta.get("episode_int") != 0:
-                search_params["show_episode_number"] = meta.get("episode_int")
+            if meta.episode_int:
+                search_params["show_episode_number"] = meta.episode_int
         else:
             logger.info(f"{self.tracker}: [bold red]Unknown media type, could not check for dupes[/bold red]")
             return []
@@ -250,7 +251,7 @@ class Flood:
                 response_data = cast(dict[str, Any], response.json())
                 items = cast(list[dict[str, Any]], response_data.get("items", []))
                 for item in items:
-                    result = {
+                    result: dict[str, Any] = {
                         "id": item.get("id"),
                         "name": item.get("name"),
                         "type": item.get("media_type"),
@@ -269,15 +270,13 @@ class Flood:
             logger.info(f"{self.tracker}: [bold red]unable to search for existing torrents: {e}[/bold red]")
         except Exception as e:
             logger.info(f"{self.tracker}: [bold red]unexpected error: {e}[/bold red]")
-            await asyncio.sleep(5)
 
         return dupes
 
     async def get_name(self, meta: Meta) -> str:
-        name = str(meta.name)
-        if meta.get("source", "") in ("PAL DVD", "NTSC DVD", "DVD", "NTSC", "PAL"):
-            audio = str(meta.get("audio", ""))
+        name = meta.name
+        if meta.source in ("PAL DVD", "NTSC DVD", "DVD", "NTSC", "PAL"):
+            audio = meta.audio
             audio = " ".join(audio.split())
-            name = name.replace(audio, f"{meta.get('video_codec', '')} {audio}")
-        name = name.replace("DD+", "DDP")
-        return name
+            name = name.replace(audio, f"{meta.video_codec} {audio}")
+        return name.replace("DD+", "DDP")
