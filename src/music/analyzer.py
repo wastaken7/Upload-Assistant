@@ -13,10 +13,9 @@ from typing import Any
 
 import mutagen
 
+from src.media_extensions import ARTWORK_EXTENSIONS, AUDIO_EXTENSIONS
 from src.music.models import AudioTrack, MetadataSource, MusicRelease
 
-AUDIO_EXTENSIONS = {".flac", ".mp3", ".m4a", ".aac", ".ac3", ".dts", ".wav", ".aiff", ".alac", ".ogg", ".opus", ".ape", ".wv"}
-ARTWORK_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 LINEAGE_NAMES = ("lineage", "equipment", "transfer", "rip", "source")
 DISC_RE = re.compile(r"(?:^|[ _.-])(?:cd|disc|disk)[ _.-]?(\d{1,2})(?:$|[ _.-])", re.I)
 YEAR_RE = re.compile(r"(?:^|[^0-9])((?:19|20)\d{2})(?:[^0-9]|$)")

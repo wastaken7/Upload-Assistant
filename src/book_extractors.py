@@ -138,19 +138,22 @@ def extract_series_from_filename(filename: str) -> tuple[str, str]:
 
 
 def extract_audiobook_series_from_title(title: str) -> tuple[str, str, str]:
-    """Split ``Title: Series, Livro N`` audiobook metadata when unambiguous."""
-    match = re.match(
-        r"^(?P<title>.+)\s*:\s*(?P<series>.+),\s*(?:livro|book)\s*(?P<index>\d+(?:\.\d+)?)\s*$",
-        title.strip(),
-        re.IGNORECASE,
+    """Split unambiguous audiobook title/series formats."""
+    value = title.strip()
+    patterns = (
+        r"^(?P<title>.+?)\s*:\s*Hist[oó]ria\s+(?P<index>\d+(?:\.\d+)?)\s+de\s+(?P<series>.+)$",
+        r"^(?P<title>.+?)\s*:\s*(?P<series>.+?)[,]?\s*(?:livro|book)\s*(?P<index>\d+(?:\.\d+)?)\s*$",
+        r"^(?P<title>.+?)\s*:\s*(?P<series>(?:saga|série|serie|trilogia|duologia|antologia|coleção|colecao|universo)\b.+?)\s+(?P<index>\d+(?:\.\d+)?)\s*$",
     )
-    if not match:
-        return title.strip(), "", ""
-    return (
-        match.group("title").strip(),
-        match.group("series").strip(),
-        normalize_series_index(match.group("index")),
-    )
+    for pattern in patterns:
+        match = re.match(pattern, value, re.IGNORECASE)
+        if match:
+            return (
+                match.group("title").strip(),
+                match.group("series").strip(),
+                normalize_series_index(match.group("index")),
+            )
+    return value, "", ""
 
 
 def extract_cbr_cbz_metadata(filepath: str) -> dict[str, Any]:

@@ -3450,7 +3450,11 @@ class Common:
         tracker: str,
         tmdb_data: dict[str, Any] | None = None,
     ) -> str:
-        """Map genres from meta.genres, meta.keywords, or TMDB to Portuguese tags formatted with dots."""
+        """
+        Map genres from meta.genres, meta.keywords, or TMDB to Portuguese tags formatted with dots."
+
+        BJSHARE rejects more than 5 tags, so we limit the output to 5 tags.
+        """
         matched_tags: list[str] = []
 
         genres_list = meta.genres or meta.keywords or []
@@ -3493,7 +3497,7 @@ class Common:
         # If we have matched tags, return them
         if matched_tags:
             formatted_tags = [unidecode(t.strip()).replace(" ", ".") for t in matched_tags if t.strip()]
-            return ", ".join(formatted_tags)
+            return ", ".join(formatted_tags[:5])
 
         if meta.category not in ("GAME", "TV", "MOVIE"):
             return ""
@@ -3506,4 +3510,4 @@ class Common:
 
         tags_raw = await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {tracker}): ")
         raw_list = [unidecode(t.strip()).replace(" ", ".") for t in re.split(r"[,;]", tags_raw or "") if t.strip()]
-        return ", ".join(raw_list)
+        return ", ".join(raw_list[:5])

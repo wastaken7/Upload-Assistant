@@ -220,6 +220,9 @@ class Prep:
 
         await prepare_artwork(meta)
 
+        if meta.category == "XXX":
+            await self.takescreens_manager.xxx_fallback_cover(meta.filelist or [], meta.uuid, meta.base_dir, meta)
+
         await languages_manager.process_desc_language(meta)
 
         # Ensure the background capture is complete before the upload stage

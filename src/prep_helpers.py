@@ -26,6 +26,7 @@ from src.exportmi import export_info, get_conformance_error, mi_resolution, vali
 from src.get_source import get_source
 from src.imdb import imdb_manager
 from src.languages import languages_manager
+from src.media_extensions import VIDEO_EXTENSIONS
 from src.meta import Meta
 from src.region import get_distributor, get_region, get_service
 from src.tags import get_tag, tag_override
@@ -40,7 +41,7 @@ _URL_TOKEN_RE = re.compile(r"https?://[^\s<>'\"()]+", re.IGNORECASE)
 
 XXX_RELEASE_MARKERS = XXX_PLATFORM_KEYWORDS | {"xxx"}
 _XXX_RELEASE_MARKER_RE = re.compile(rf"(?<![a-z0-9])(?:{'|'.join(re.escape(marker) for marker in sorted(XXX_RELEASE_MARKERS))})(?![a-z0-9])", re.IGNORECASE)
-_VIDEO_EXTENSIONS = frozenset({".avi", ".m2ts", ".m4v", ".mkv", ".mov", ".mp4", ".mpeg", ".mpg", ".ts", ".webm", ".wmv"})
+_VIDEO_EXTENSIONS = VIDEO_EXTENSIONS
 
 
 def is_xxx_video_release(path: str | Path) -> bool:

@@ -459,7 +459,7 @@ class BJShare:
 
                 width_num = round((16 / 9) * height_num)
                 width = str(width_num)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 pass
 
         else:
@@ -550,9 +550,50 @@ class BJShare:
 
     def get_titles(self, meta: Meta) -> tuple[str, str]:
         if meta.category == "BOOK":
-            title = f"{meta.book_series.strip()}: " if meta.book_series else ""
-            title += meta.title.strip()
-            title += f" {meta.book_series_index.strip()}" if meta.book_series_index else ""
+            title = meta.title.strip()
+            series = meta.book_series.strip()
+            series_index = meta.book_series_index.strip()
+
+            # Some older audiobook metadata uses the legacy form
+            # "Book title: História N de Series".
+            legacy_match = re.fullmatch(
+                r"(?P<book>.+?)\s*:\s*Hist[oó]ria\s+(?P<index>\d+(?:\.\d+)?)\s+de\s+(?P<series>.+)",
+                title,
+                re.IGNORECASE,
+            )
+            if legacy_match:
+                title = legacy_match.group("book").strip()
+                series = legacy_match.group("series").strip()
+                series_index = legacy_match.group("index")
+            elif series:
+                legacy_match = re.fullmatch(
+                    r"Hist[oó]ria\s+(?P<index>\d+(?:\.\d+)?)\s+de\s+(?P<series>.+)",
+                    title,
+                    re.IGNORECASE,
+                )
+                if legacy_match:
+                    title = series
+                    series = legacy_match.group("series").strip()
+                    series_index = legacy_match.group("index")
+
+            if series:
+                title = f"{series}: {title}"
+            if series_index:
+                normalized_index = legacy_match.group("index") if legacy_match else series_index
+                # Recognize decimal legacy indices like "4.0" as integer-valued and normalize
+                try:
+                    float_val = float(normalized_index)
+                    if float_val == int(float_val):
+                        normalized_index = str(int(float_val)).zfill(2)
+                    else:
+                        # Non-integer decimal, preserve as-is but try zero-padding if pure integer
+                        if re.fullmatch(r"\d+", normalized_index):
+                            normalized_index = normalized_index.zfill(2)
+                except (ValueError, TypeError):
+                    # Not a valid number, check if pure integer for zero-padding
+                    if re.fullmatch(r"\d+", normalized_index):
+                        normalized_index = normalized_index.zfill(2)
+                title += f" - Vol. {normalized_index}"
             return self.common.portuguese_title_capitalization(title), ""
 
         if meta.category == "GAME":
@@ -987,7 +1028,7 @@ class BJShare:
 
                 try:
                     size_in_gb = meta.bdinfo["size"]
-                except KeyError, IndexError, TypeError:
+                except (KeyError, IndexError, TypeError):
                     size_in_gb = 0
 
                 if size_in_gb > 66:
@@ -1208,7 +1249,7 @@ class BJShare:
                 bit_depth_str = meta.discs[0]["bdinfo"]["video"][0]["bit_depth"]
                 if "10" in bit_depth_str:
                     is_10_bit = True
-            except KeyError, IndexError, TypeError:
+            except (KeyError, IndexError, TypeError):
                 pass
         else:
             if meta.bit_depth == "10":
