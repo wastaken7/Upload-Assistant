@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, TextIO
 
-from src.book_prep import detect_newspaper, sanitize_book_author, sanitize_book_language
+
 from src.console import logger
 from src.meta import Meta
 
@@ -1086,6 +1086,7 @@ class Args:
             meta.search_year = manual_year_arg
 
         # Detect newspapers in overridden titles
+        from src.book_prep import detect_newspaper, sanitize_book_author, sanitize_book_language
         detect_newspaper(meta)
         sanitize_book_language(meta)
         sanitize_book_author(meta)
