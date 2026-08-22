@@ -10,7 +10,7 @@ replaces the locally-created torrent with BTN's registered torrent afterwards.
 import re
 import unicodedata
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import aiofiles
 import httpx
@@ -388,10 +388,11 @@ class BroadcasTheNet:
     def __init__(self, config: Config) -> None:
         self.config = config
         self.common = Common(config)
-        trackers = config.get("TRACKERS", {})
-        settings = trackers.get(self.tracker, trackers.get("BTN", {})) if isinstance(trackers, dict) else {}
-        self.settings = settings if isinstance(settings, dict) else {}
-        self.api_key = str(self.settings.get("api_key") or config.get("DEFAULT", {}).get("btn_api") or "").strip()
+        trackers: dict[str, Any] = cast(dict[str, Any], config.get("TRACKERS", {}))
+        settings = trackers.get(self.tracker, trackers.get("BTN", {}))
+        self.settings: dict[str, Any] = cast(dict[str, Any], settings) if isinstance(settings, dict) else {}
+        defaults = cast(dict[str, Any], config.get("DEFAULT", {}))
+        self.api_key = str(self.settings.get("api_key") or defaults.get("btn_api") or "").strip()
         self.api_url = str(self.settings.get("api_url") or self.api_url).strip()
         self.base_url = str(self.settings.get("base_url") or self.base_url).rstrip("/")
         self.upload_url = f"{self.base_url}/upload.php"
@@ -471,7 +472,7 @@ class BroadcasTheNet:
             response = await client.post(self.api_url, json=payload)
         response.raise_for_status()
         try:
-            data = response.json()
+            data: Any = response.json()
         except ValueError as exc:
             raise UploadError("BTN API returned an invalid JSON response", "red") from exc
         if not isinstance(data, dict) or data.get("error"):
@@ -493,8 +494,8 @@ class BroadcasTheNet:
         except (httpx.HTTPError, ValueError, UploadError) as exc:
             logger.warning(f"{self.tracker}: duplicate lookup failed: {exc}")
             return []
-        payload = result.get("result", {})
-        torrents = payload.get("torrents", {}) if isinstance(payload, dict) else {}
+        payload: dict[str, Any] = result.get("result", {}) if isinstance(result.get("result"), dict) else {}
+        torrents: dict[Any, Any] = payload.get("torrents", {}) if isinstance(payload.get("torrents"), dict) else {}
         if not isinstance(torrents, dict):
             return []
         dupes: list[dict[str, Any]] = []
@@ -638,7 +639,7 @@ class BroadcasTheNet:
                 if original_language and original_language not in ("en", "eng", "english"):
                     payload["foreign"] = "on"
                     origin_countries = getattr(meta, "origin_country", []) or getattr(meta, "origin_country_code", [])
-                    first_country = (
+                    first_country: str = (
                         origin_countries[0] if isinstance(origin_countries, list) and origin_countries else (origin_countries if isinstance(origin_countries, str) else "")
                     )
                     country_id = self._country_map.get(str(first_country).lower().strip())
@@ -693,7 +694,8 @@ class BroadcasTheNet:
                             filters["group"] = group_id
 
                         search_results = await self._api("getTorrentsSearch", [filters, 5])
-                        torrents = search_results.get("result", {}).get("torrents", {})
+                        search_payload = search_results.get("result", {})
+                        torrents: dict[Any, Any] = search_payload.get("torrents", {}) if isinstance(search_payload, dict) and isinstance(search_payload.get("torrents"), dict) else {}
 
                         if isinstance(torrents, dict):
                             for tid, tdata in torrents.items():
