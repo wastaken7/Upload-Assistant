@@ -201,6 +201,11 @@ def _unescape_meta_val(val: Any) -> str | None:
     return html.unescape(str(val)).strip()
 
 
+def _is_chapter_title(value: str | None) -> bool:
+    """Return whether a MediaInfo title is only an audiobook chapter label."""
+    return bool(value and re.fullmatch(r"(?:cap[ií]tulo|chapter)\s+\d+(?:\.\d+)?", value.strip(), re.IGNORECASE))
+
+
 async def gather_book_prep(
     meta: Meta,
     videopath: str,
@@ -334,12 +339,18 @@ async def gather_book_prep(
     if meta.mediainfo:
         try:
             tracks = meta.mediainfo.get("media", {}).get("track", [])
+            if not isinstance(tracks, list):
+                tracks = []
+            # Filter to only dictionary entries to prevent errors when calling .get() later
+            tracks = [t for t in tracks if isinstance(t, dict)]
             general_track = next((t for t in tracks if t.get("@type") == "General"), None)
             if general_track:
                 # 1. Title/Album
                 album = _unescape_meta_val(general_track.get("Album") or general_track.get("album"))
                 track_name = _unescape_meta_val(general_track.get("Track_name") or general_track.get("track_name"))
                 title_tag = _unescape_meta_val(general_track.get("Title") or general_track.get("title"))
+                if _is_chapter_title(title_tag) and album and not _is_chapter_title(album):
+                    title_tag = album
 
                 # Detect if the audiobook is Unabridged or Abridged from file metadata
                 detected_edition = None
@@ -410,12 +421,14 @@ async def gather_book_prep(
                             meta.book_series_index = _normalize_series_index(part_val)
 
                 if not cli_overrides["title"] and meta.title:
-                    parsed_title, parsed_series, parsed_index = _extract_audiobook_series_from_title(meta.title)
+                    original_title = meta.title
+                    parsed_title, parsed_series, parsed_index = _extract_audiobook_series_from_title(original_title)
                     if parsed_series:
                         meta.title = parsed_title
-                        if not meta.book_series:
+                        localized_history_series = re.search(r":\s*Hist[oó]ria\s+\d+(?:\.\d+)?\s+de\s+.+$", original_title, re.IGNORECASE)
+                        if localized_history_series or not meta.book_series:
                             meta.book_series = parsed_series
-                        if parsed_index and not meta.book_series_index:
+                        if parsed_index and (localized_history_series or not meta.book_series_index):
                             meta.book_series_index = parsed_index
 
                 # 6. Overview/Comment
