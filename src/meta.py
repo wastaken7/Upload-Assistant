@@ -15,6 +15,7 @@ _TRACKER_ID_ALIASES = {
     "HUNO": "HAWKEUNO",
     "OE": "ONLYENCODES",
     "PTP": "PASSTHEPOPCORN",
+    "RHD": "ROCKETHD",
 }
 
 

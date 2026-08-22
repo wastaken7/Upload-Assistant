@@ -188,6 +188,7 @@ def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
         "NBL": "NEBULANCE",
         "LAJIDUI": "LAJIDUI",
         "PTP": "PASSTHEPOPCORN",
+        "RHD": "ROCKETHD",
         "LPT": "LONGPT",
         "PTER": "PTERCLUB",
         "PTCAFE": "PTCAFE",

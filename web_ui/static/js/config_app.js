@@ -337,6 +337,7 @@ const trackerNameMap = {
   REELFLIX: "ReelFLiX",
   RETROFLIX: "RetroFlix",
   RETROMOVIESCLUB: "RetroMoviesClub",
+  ROCKETHD: "RocketHD",
   SAMARITANO: "Samaritano",
   SEEDPOOL: "Seedpool",
   SHAREISLAND: "ShareIsland",
