@@ -51,6 +51,8 @@ class BJShare:
     database_title: str = ""
     database_identifier: str = ""
     database_overview: str = ""
+    database_creator: str = ""
+    database_cast: str = ""
     tmdb_localization_requirements: ClassVar = {
         "pt-BR": {
             "main": "credits,videos,content_ratings",
@@ -737,6 +739,19 @@ class BJShare:
             tag.decompose()
         return body.get_text(strip=True)
 
+    def get_database_credits(self, soup: BeautifulSoup, role: str) -> str:
+        """Extract credits shown on an existing BJShare details page."""
+        label = "Criador:" if role in ("director", "creator") else "Elenco:"
+        for box in soup.find_all("div", class_="box"):
+            header = box.find("div", class_="head")
+            if not header or "informa" not in unidecode(header.get_text()).lower():
+                continue
+            for row in box.find_all("tr"):
+                cells = row.find_all("td")
+                if len(cells) >= 2 and label.casefold() in unidecode(cells[0].get_text(" ", strip=True)).casefold():
+                    return cells[1].get_text(" ", strip=True)
+        return ""
+
     async def search_existing(self, meta: Meta) -> list[dict[str, str | list[str]]]:
         dupes: list[dict[str, str | list[str]]] = []
         category = meta.category
@@ -787,6 +802,8 @@ class BJShare:
         BJShare.database_title = ""
         BJShare.database_identifier = ""
         BJShare.database_overview = ""
+        BJShare.database_creator = ""
+        BJShare.database_cast = ""
 
         search_params = [params]
         title_already_queried = False
@@ -853,6 +870,8 @@ class BJShare:
             BJShare.database_title = self.get_database_title(soup)
             BJShare.database_identifier = self.get_database_identifier(soup)
             BJShare.database_overview = self.get_database_overview(soup)
+            BJShare.database_creator = self.get_database_credits(soup, "creator")
+            BJShare.database_cast = self.get_database_credits(soup, "cast")
 
             for row in torrent_details_table.find_all("tr"):
                 row_id = row.get("id")
@@ -1332,7 +1351,9 @@ class BJShare:
 
     async def get_credits(self, meta: Meta, role: str) -> str:
         if BJShare.already_has_the_info:
-            return "N/A"
+            database_credit = BJShare.database_cast if role == "cast" else BJShare.database_creator
+            if database_credit:
+                return database_credit
 
         role_map = {
             "director": ("directors", "tmdb_directors"),

@@ -98,6 +98,20 @@ def test_get_database_overview_extracts_synopsis():
     assert overview == "Em busca de uma vida melhor, Lu Xiao Fan deixa o interior..."  # noqa: S101
 
 
+def test_get_database_credits_extracts_creator_and_cast():
+    soup = BeautifulSoup(
+        '<div class="box"><div class="head">InformaÃ§Ãµes</div><table>'
+        '<tr><td><b>Criador:</b></td><td>Ron Howard</td></tr>'
+        '<tr><td><b>Elenco:</b></td><td>Russell Crowe, RenÃ©e Zellweger</td></tr>'
+        "</table></div>",
+        "html.parser",
+    )
+    tracker = object.__new__(BJShare)
+
+    assert tracker.get_database_credits(soup, "creator") == "Ron Howard"  # noqa: S101
+    assert tracker.get_database_credits(soup, "cast") == "Russell Crowe, RenÃ©e Zellweger"  # noqa: S101
+
+
 def test_get_overview_returns_database_overview_when_already_has_the_info():
     tracker = object.__new__(BJShare)
     tracker.main_tmdb_data = {}
