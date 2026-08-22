@@ -1350,10 +1350,14 @@ class BJShare:
         return normalized_names
 
     async def get_credits(self, meta: Meta, role: str) -> str:
+        if role not in {"director", "creator", "cast"}:
+            return "N/A"
+
         if BJShare.already_has_the_info:
             database_credit = BJShare.database_cast if role == "cast" else BJShare.database_creator
-            if database_credit:
+        if database_credit:
                 return database_credit
+            return "N/A"
 
         role_map = {
             "director": ("directors", "tmdb_directors"),
@@ -1366,9 +1370,6 @@ class BJShare:
             "creator": "Criador",
             "cast": "Elenco",
         }
-
-        if role not in role_map:
-            return "N/A"
 
         imdb_key, tmdb_key = role_map[role]
 
