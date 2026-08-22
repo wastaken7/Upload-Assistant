@@ -133,12 +133,16 @@ class TrackerDataManager:
         candidate_dir = Path(meta.base_dir) / "tmp" / candidate.uuid
         await asyncio.to_thread(candidate_dir.mkdir, mode=0o700, parents=True, exist_ok=True)
         try:
-            if tracker_name == "BTN":
-                btn_id = candidate.get_tracker_id("BTN") or ""
-                btn_api = self.default_config.get("btn_api")
+            if tracker_name == "BROADCASTHENET":
+                btn_id = candidate.get_tracker_id("BROADCASTHENET") or ""
+                trackers_config = self.config.get("TRACKERS", {})
+                btn_config = trackers_config.get("BROADCASTHENET", trackers_config.get("BTN", {})) if isinstance(trackers_config, dict) else {}
+                btn_api = btn_config.get("api_key") if isinstance(btn_config, dict) else None
+                btn_api = btn_api or self.default_config.get("btn_api")
                 if not isinstance(btn_api, str) or len(btn_api) <= 25:
                     return None
-                imdb, tvdb = await BtnIdManager.get_btn_torrents(btn_api, btn_id)
+                btn_api_url = btn_config.get("api_url", "https://api.broadcasthe.net/") if isinstance(btn_config, dict) else "https://api.broadcasthe.net/"
+                imdb, tvdb = await BtnIdManager.get_btn_torrents(btn_api, btn_id, str(btn_api_url))
                 if not (imdb or tvdb):
                     return None
                 candidate.imdb_id = imdb or candidate.imdb_id
@@ -326,8 +330,8 @@ class TrackerDataManager:
             if specific_tracker:
                 if meta.is_disc and "ANTHELION" in specific_tracker:
                     specific_tracker.remove("ANTHELION")
-                if meta.category == "MOVIE" and "BTN" in specific_tracker:
-                    specific_tracker.remove("BTN")
+                if meta.category == "MOVIE" and "BROADCASTHENET" in specific_tracker:
+                    specific_tracker.remove("BROADCASTHENET")
 
                 meta_trackers_raw = meta.trackers
                 meta_trackers: list[str]

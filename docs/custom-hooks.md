@@ -163,11 +163,13 @@ def send_discord_notification(payload: dict) -> None:
     }
 
     if failed_trackers:
-        embed["fields"].append({
-            "name": "Trackers (Failed / Skipped)",
-            "value": ", ".join(failed_trackers),
-            "inline": False,
-        })
+        embed["fields"].append(
+            {
+                "name": "Trackers (Failed / Skipped)",
+                "value": ", ".join(failed_trackers),
+                "inline": False,
+            }
+        )
 
     data = json.dumps({"embeds": [embed]}).encode("utf-8")
     req = urllib.request.Request(
@@ -316,14 +318,16 @@ def main() -> None:
             writer.writerow(["Timestamp_UTC", "Release_Name", "Category", "Resolution", "Type", "Trackers"])
 
         trackers = list(meta.get("tracker_status", {}).keys())
-        writer.writerow([
-            datetime.now(timezone.utc).isoformat(),
-            meta.get("name", ""),
-            meta.get("category", ""),
-            meta.get("resolution", ""),
-            meta.get("type", ""),
-            "; ".join(trackers),
-        ])
+        writer.writerow(
+            [
+                datetime.now(timezone.utc).isoformat(),
+                meta.get("name", ""),
+                meta.get("category", ""),
+                meta.get("resolution", ""),
+                meta.get("type", ""),
+                "; ".join(trackers),
+            ]
+        )
 
     print(f"Appended upload record to {CSV_LOG_PATH}")
 
