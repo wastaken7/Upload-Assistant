@@ -17,6 +17,7 @@ _TRACKER_ID_ALIASES = {
     "OE": "ONLYENCODES",
     "PTP": "PASSTHEPOPCORN",
     "RHD": "ROCKETHD",
+    "FLD": "FLOOD",
 }
 
 

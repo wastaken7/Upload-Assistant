@@ -189,6 +189,7 @@ def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
         "LAJIDUI": "LAJIDUI",
         "PTP": "PASSTHEPOPCORN",
         "RHD": "ROCKETHD",
+        "FLD": "FLOOD",
         "LPT": "LONGPT",
         "PTER": "PTERCLUB",
         "PTCAFE": "PTCAFE",

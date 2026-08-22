@@ -2446,11 +2446,14 @@ function AudionutsUAGUI() {
     const requestToken = ++coverRequestRef.current;
     setCoverAction("regenerate");
     try {
-      const response = await apiFetch(`${API_BASE}/execution_preview_cover/regenerate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, media_id: mediaId }),
-      });
+      const response = await apiFetch(
+        `${API_BASE}/execution_preview_cover/regenerate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId, media_id: mediaId }),
+        },
+      );
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.success) {
         window.alert(data?.error || "Could not regenerate the XXX cover.");
@@ -4797,23 +4800,27 @@ function AudionutsUAGUI() {
                   String(media.poster_url).startsWith(
                     "/api/execution_preview_cover?",
                   ) && (
-                  <button
-                    type="button"
-                    onClick={regenerateExecutionCover}
-                    disabled={Boolean(coverAction)}
-                    aria-label={
-                      coverAction === "regenerate"
-                        ? "Generating a new XXX cover"
-                        : "Generate a new XXX cover"
-                    }
-                    className={`flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "bg-purple-700 text-white hover:bg-purple-600" : "bg-purple-600 text-white hover:bg-purple-700"}`}
-                    title="Generate another cover from a different video frame"
-                  >
-                    <span aria-hidden="true">
-                      {coverAction === "regenerate" ? <SpinnerIcon /> : <RefreshIcon />}
-                    </span>
-                  </button>
-                )}
+                    <button
+                      type="button"
+                      onClick={regenerateExecutionCover}
+                      disabled={Boolean(coverAction)}
+                      aria-label={
+                        coverAction === "regenerate"
+                          ? "Generating a new XXX cover"
+                          : "Generate a new XXX cover"
+                      }
+                      className={`flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors disabled:cursor-wait disabled:opacity-60 ${isDarkMode ? "bg-purple-700 text-white hover:bg-purple-600" : "bg-purple-600 text-white hover:bg-purple-700"}`}
+                      title="Generate another cover from a different video frame"
+                    >
+                      <span aria-hidden="true">
+                        {coverAction === "regenerate" ? (
+                          <SpinnerIcon />
+                        ) : (
+                          <RefreshIcon />
+                        )}
+                      </span>
+                    </button>
+                  )}
               </div>
             ) : (
               <div

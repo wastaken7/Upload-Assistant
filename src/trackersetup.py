@@ -31,6 +31,7 @@ from src.trackers.cathoderaytube import CathodeRayTube
 from src.trackers.common import Common
 from src.trackers.digitalcore import DigitalCore
 from src.trackers.filelist import FileList
+from src.trackers.flood import Flood
 from src.trackers.funfile import FunFile
 from src.trackers.greatposterwall import GreatPosterWall
 from src.trackers.hdbits import HDBits
@@ -138,7 +139,9 @@ class TrackerSetup:
                 supported_trackers.append(tracker_name)
                 continue
 
-            tracker_config: dict[str, Any] = self.config["TRACKERS"].get(tracker_name, self.config["TRACKERS"].get("BTN", {}))
+            tracker_config: dict[str, Any] = self.config["TRACKERS"].get(tracker_name, {})
+            if tracker_name == "BROADCASTHENET" and not tracker_config:
+                tracker_config = self.config["TRACKERS"].get("BTN", {})
             example_tracker_config = example_config["TRACKERS"].get(tracker_name, {})
 
             if isinstance(example_tracker_config, dict) and isinstance(tracker_config, dict):
@@ -1374,6 +1377,7 @@ tracker_class_map: dict[str, Any] = {
     "EMUWAREZ": Emuwarez,
     "FUNFILE": FunFile,
     "FILELIST": FileList,
+    "FLOOD": Flood,
     "GREATPOSTERWALL": GreatPosterWall,
     "HDBITS": HDBits,
     "HDSPACE": HDSpace,
