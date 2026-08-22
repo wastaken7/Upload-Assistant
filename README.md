@@ -251,6 +251,16 @@ If you do not want to install Git, you can download a copy of the files directly
 2. Click the green **Code** button near the top right, and click **Download ZIP**.
 3. Extract the ZIP file to a folder of your choice on your computer.
 
+#### Option C: Install as a standalone CLI tool using `uv` (Modern)
+
+If you have [uv](https://github.com/astral-sh/uv) installed, you can install Upload Assistant directly from the repository as a globally available standalone CLI tool. This automatically manages the virtual environment and exposes the `ua` and `ua-config` commands directly to your system path.
+
+1. **Install Upload Assistant**:
+   ```bash
+   uv tool install git+https://github.com/wastaken7/Upload-Assistant.git
+   ```
+   *Note: If you use this method, you can skip Step 3.*
+
 ---
 
 ### Step 3: Install Python Packages (Linux/macOS)
@@ -288,10 +298,16 @@ If you plan to use the Web UI, **your configuration file will be generated autom
 In your terminal, run the command for your operating system and follow the on-screen prompts:
 
 - **Windows:** Install with the [`.exe` installer](docs/windows-install.md), then run `ua-config` in a new terminal.
-- **Linux / macOS:**
+- **Linux / macOS (Standard):**
 
   ```bash
   python3 config-generator.py
+  ```
+
+- **Linux / macOS (uv installation):**
+
+  ```bash
+  ua-config
   ```
 
 #### Method C: Manual Configuration
@@ -322,23 +338,24 @@ In your terminal, run the command for your operating system and follow the on-sc
 
 - Or, if you downloaded the ZIP file, download a fresh ZIP from GitHub and overwrite your existing files.
 - For the Windows installation, run `ua-update`.
+- For the `uv` standalone installation, run: `uv tool upgrade upload-assistant`
 - Run the command to update dependencies:
   - **Linux / macOS:** `python3 -m pip install --user -U -r requirements.txt`
 - Run the configuration generator to fetch any new settings:
-  - **Windows:** run `ua-config` from any folder.
-  - **Linux / macOS:** `python3 config-generator.py`
+  - **Windows / uv installations:** run `ua-config` from any folder.
+  - **Linux / macOS (Standard):** `python3 config-generator.py`
 
 ## **CLI Usage:**
 
 To run the assistant, use the command for your system:
 
-- **Windows:**
+- **Windows / uv installations:**
 
   ```cmd
-  ua "C:\path\to\content" --args
+  ua "/path/to/content" --args
   ```
 
-- **Linux / macOS:**
+- **Linux / macOS (Standard):**
 
   ```bash
   python3 upload.py "/path/to/content" --args
