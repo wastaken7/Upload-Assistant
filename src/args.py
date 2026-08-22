@@ -1,6 +1,7 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import argparse
 import datetime
+import argcomplete
 import re
 import sys
 import urllib.parse
@@ -733,6 +734,7 @@ class Args:
             type=str,
             dest="archive_password",
         )
+        argcomplete.autocomplete(parser)
         parsed_args_ns, before_args = parser.parse_known_args(input)
         parsed_args: dict[str, Any] = vars(parsed_args_ns)
         # console.print(args)
