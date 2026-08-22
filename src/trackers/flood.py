@@ -2,7 +2,6 @@
 import asyncio
 import os
 import platform
-import re
 from typing import Any, cast
 
 import aiofiles
@@ -73,10 +72,10 @@ class Flood:
         else:
             mi_file_path = f"{meta.base_dir}/tmp/{meta.uuid}/MEDIAINFO.txt"
 
-        async with aiofiles.open(mi_file_path, "r", encoding="utf-8") as f:
+        async with aiofiles.open(mi_file_path, encoding="utf-8") as f:
             mi_dump = await f.read()
 
-        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", "r", encoding="utf-8") as f:
+        async with aiofiles.open(f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]DESCRIPTION.txt", encoding="utf-8") as f:
             desc = await f.read()
 
         torrent_file = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}].torrent"
@@ -100,11 +99,14 @@ class Flood:
         headers = {"User-Agent": f"Upload Assistant/2.2 ({platform.system()} {platform.release()})", "Authorization": f"Bearer {self.api_key}"}
 
         if not meta.debug:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(url=self.upload_url, files=files, data=data, headers=headers)
             try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(url=self.upload_url, files=files, data=data, headers=headers)
                 response.raise_for_status()
                 response_data = response.json()
+            except httpx.RequestError as e:
+                logger.info(f"{self.tracker}: [red]Upload failed (Request Error): {e}")
+                return False
             except httpx.HTTPStatusError as e:
                 logger.info(f"{self.tracker}: [red]Upload failed (HTTP Error): {e}")
                 return False
@@ -147,11 +149,11 @@ class Flood:
     async def get_prefixed_tmdb_id(self, meta: Meta) -> str:
         if meta.category == "TV":
             return f"tv/{meta.tmdb}"
-        else:
-            return f"movie/{meta.tmdb}"
+        return f"movie/{meta.tmdb}"
 
     async def edit_desc(self, meta: Meta) -> None:
         from src.description_review import get_base_description
+
         base = get_base_description(meta)
         base = base.replace("[user]", "").replace("[/user]", "")
 
@@ -168,7 +170,7 @@ class Flood:
                     elif disc_type == "DVD":
                         output.append(f"{each.get('name', '')}:\n")
                         output.append(
-                            f"[spoiler={os.path.basename(each.get('vob', ''))}][code][{each.get('vob_mi', '')}[/code][/spoiler] [spoiler={os.path.basename(each.get('ifo', ''))}][code][{each.get('ifo_mi', '')}[/code][/spoiler]\n"
+                            f"[spoiler={os.path.basename(each.get('vob', ''))}][code]{each.get('vob_mi', '')}[/code][/spoiler] [spoiler={os.path.basename(each.get('ifo', ''))}][code]{each.get('ifo_mi', '')}[/code][/spoiler]\n"
                         )
                     elif disc_type == "HDDVD":
                         output.append(f"{each.get('name', '')}:\n")
