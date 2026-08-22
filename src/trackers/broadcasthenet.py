@@ -590,6 +590,7 @@ class BroadcasTheNet:
     async def upload(self, meta: Meta) -> bool:
         await self.common.create_torrent_for_upload(meta, self.tracker, self.source_flag)
         torrent_path = Path(meta.base_dir) / "tmp" / meta.uuid / f"[{self.tracker}].torrent"
+        work_dir = torrent_path.parent
         if meta.debug:
             meta.tracker_status[self.tracker]["status_message"] = "Debug mode enabled; BTN upload not submitted."
             return True
@@ -610,7 +611,7 @@ class BroadcasTheNet:
                 autofill_data["auto_season"] = f"S{int(meta.season_int or 0):02d}"
         else:
             autofill_data = {"type": upload_type, "tvdb": "Get Info", "scene_yesno": "Yes", "autofill": release_name}
-        async with aiofiles.open(Path(meta.base_dir) / "tmp" / meta.uuid / "MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as handle:
+        async with aiofiles.open(work_dir / "MEDIAINFO_CLEANPATH.txt", encoding="utf-8") as handle:
             mediainfo = strip_report_by_line(await handle.read())
         async with aiofiles.open(torrent_path, "rb") as handle:
             torrent = await handle.read()
@@ -663,7 +664,7 @@ class BroadcasTheNet:
                 match = re.search(r"torrents\.php\?id=(\d+)(?:&(?:amp;)?torrentid=(\d+))?", str(response.url) + response.text)
 
                 if not match:
-                    failure_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]BTN_upload_failure.html"
+                    failure_path = work_dir / f"[{self.tracker}]BTN_upload_failure.html"
                     async with aiofiles.open(failure_path, "w", encoding="utf-8") as f:
                         await f.write(response.text)
                     raise UploadError(f"BTN upload did not return a registered torrent ID. See {failure_path}", "red")
@@ -704,9 +705,7 @@ class BroadcasTheNet:
                         search_payload: Any = search_results.get("result", {})
                         search_payload = cast(dict[str, Any], search_payload) if isinstance(search_payload, dict) else {}
                         torrents: dict[str, dict[str, Any]] = (
-                            cast(dict[str, dict[str, Any]], search_payload.get("torrents"))
-                            if isinstance(search_payload.get("torrents"), dict)
-                            else {}
+                            cast(dict[str, dict[str, Any]], search_payload.get("torrents")) if isinstance(search_payload.get("torrents"), dict) else {}
                         )
 
                         if isinstance(torrents, dict):
@@ -716,7 +715,7 @@ class BroadcasTheNet:
                                     break
 
                     if not torrent_id:
-                        debug_path = f"{meta.base_dir}/tmp/{meta.uuid}/[{self.tracker}]BTN_intermediate_debug.html"
+                        debug_path = work_dir / f"[{self.tracker}]BTN_intermediate_debug.html"
                         async with aiofiles.open(debug_path, "w", encoding="utf-8") as f:
                             await f.write(detail_response.text)
                         raise UploadError(f"BTN upload reached intermediate page but failed to resolve torrent_id. Saved HTML to {debug_path}", "red")

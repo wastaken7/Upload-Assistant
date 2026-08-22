@@ -43,41 +43,34 @@ To enable Usenet uploads, add the `USENET` section to your `config.py`. Here are
 ```python
 config = {
     # ... other configuration sections ...
-
     "USENET": {
         # General toggles
-        "enabled": True,                 # Enable or disable the Usenet pipeline
-
+        "enabled": True,  # Enable or disable the Usenet pipeline
         # NNTP Server Details (Required if Usenet is active)
-        "host": "news.yourprovider.com", # Usenet server address
-        "port": 563,                     # Port (usually 563 for SSL/TLS, 119 for non-SSL)
-        "username": "your_username",     # Usenet account username
-        "password": "your_password",     # Usenet account password
-        "newsgroups": "alt.binaries.test", # Target newsgroup(s) to post to
-
+        "host": "news.yourprovider.com",  # Usenet server address
+        "port": 563,  # Port (usually 563 for SSL/TLS, 119 for non-SSL)
+        "username": "your_username",  # Usenet account username
+        "password": "your_password",  # Usenet account password
+        "newsgroups": "alt.binaries.test",  # Target newsgroup(s) to post to
         # Connections & SSL
-        "ssl": True,                     # Enable SSL/TLS encryption (highly recommended)
-        "connections": 20,               # Number of simultaneous NNTP upload connections
-
+        "ssl": True,  # Enable SSL/TLS encryption (highly recommended)
+        "connections": 20,  # Number of simultaneous NNTP upload connections
         # Anonymity & Privacy
-        "random_poster": True,           # Generate randomized poster name/email (default: True)
-        "poster": "Uploader <up@anon.org>", # Custom poster to use if random_poster is False
-        "obscure_subject": True,         # Use a randomized hex string for the post subject (default: True)
-
+        "random_poster": True,  # Generate randomized poster name/email (default: True)
+        "poster": "Uploader <up@anon.org>",  # Custom poster to use if random_poster is False
+        "obscure_subject": True,  # Use a randomized hex string for the post subject (default: True)
         # Archiving & Parity & Encryption
-        "rar_volume_size": "auto",       # Volume size (e.g. "100m", "500m", "1g", or "auto" for dynamic sizing)
-        "archive_password": "random",    # Password for 7z archive. "random" (default/recommended) generates a unique random password,
-                                         # a specific string (e.g. "mypass") uses a static password, and None/"" disables encryption.
-        "par2_percentage": 10,           # PAR2 redundancy percentage (default: 10)
-
+        "rar_volume_size": "auto",  # Volume size (e.g. "100m", "500m", "1g", or "auto" for dynamic sizing)
+        "archive_password": "random",  # Password for 7z archive. "random" (default/recommended) generates a unique random password,
+        # a specific string (e.g. "mypass") uses a static password, and None/"" disables encryption.
+        "par2_percentage": 10,  # PAR2 redundancy percentage (default: 10)
         # Binary Paths (Optional if available in system PATH)
-        "7z_path": "7z",                 # Custom path to 7z executable
-        "par2_path": "par2",             # Custom path to par2 executable
-        "nyuu_path": "nyuu",             # Custom path to nyuu executable
-
+        "7z_path": "7z",  # Custom path to 7z executable
+        "par2_path": "par2",  # Custom path to par2 executable
+        "nyuu_path": "nyuu",  # Custom path to nyuu executable
         # Staging & Output Directories
-        "nzb_output_dir": "/path/to/nzbs",   # Directory to save the completed .nzb file
-        "usenet_tmp_dir": "/path/to/staging" # Staging directory for temporary files during upload
+        "nzb_output_dir": "/path/to/nzbs",  # Directory to save the completed .nzb file
+        "usenet_tmp_dir": "/path/to/staging",  # Staging directory for temporary files during upload
     }
 }
 ```
