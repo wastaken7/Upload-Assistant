@@ -67,6 +67,17 @@ dependencies = [
     "waitress==3.0.2",
 ]
 
+[project.scripts]
+ua = "upload:run"
+ua-config = "upload:run_config_generator"
+
+[tool.setuptools]
+py-modules = ["upload", "config-generator"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests", "tmp"]
+
 [tool.ruff]
 line-length = 176
 target-version = "py314"
