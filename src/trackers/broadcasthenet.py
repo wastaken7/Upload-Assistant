@@ -69,14 +69,19 @@ class BroadcasTheNet:
             logger.info(f"{self.tracker}: [red]Missing cookie file (data/cookies/BROADCASTHENET.txt; BTN.txt is also accepted).[/red]")
             return False
         cookies = await self.common.parse_cookie_file(cookie_file)
+        logger.debug(f"{self.tracker}: Loaded {len(cookies)} cookies from {cookie_file}")
         try:
             async with httpx.AsyncClient(cookies=cookies, follow_redirects=True, timeout=30.0) as client:
                 response = await client.get(self.upload_url)
         except httpx.HTTPError as exc:
             logger.info(f"{self.tracker}: [red]Cookie validation failed: {exc}[/red]")
             return False
-        valid = response.is_success and "login.php" not in str(response.url).lower() and "file_input" in response.text.lower()
+        # The initial GET to upload.php might only return the autofill form now, not the file_input field.
+        valid = response.is_success and "login.php" not in str(response.url).lower() and ("file_input" in response.text.lower() or "autofill" in response.text.lower())
         if not valid:
+            logger.debug(
+                f"{self.tracker}: Validation details - is_success: {response.is_success}, url: {response.url}, has_file_input: {'file_input' in response.text.lower()}, has_autofill: {'autofill' in response.text.lower()}"
+            )
             logger.info(f"{self.tracker}: [red]Cookie is expired/invalid or BTN upload access was not confirmed.[/red]")
         return valid
 
