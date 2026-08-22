@@ -176,6 +176,7 @@ class DiscParse:
         for i in range(len(discs)):
             bdinfo_text = None
             path = str(Path(discs[i]["path"]).resolve())
+            disc_path = str(Path(path).parent)
             if discs[i]["type"] == "BDMV":
                 parent_path = str(Path(path).parent)
                 if not Path(Path(parent_path) / "CERTIFICATE").exists():
@@ -333,7 +334,7 @@ class DiscParse:
                         try:
                             bdinfo_executable = None
                             if configured := configured_binary("bdinfo_path", self.config):
-                                bdinfo_executable = [configured, path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
+                                bdinfo_executable = [configured, disc_path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
                             # Prefer the bundled bdinfo binary for the detected OS/arch.
                             system = platform.system().lower()
                             machine = platform.machine().lower()
@@ -346,22 +347,22 @@ class DiscParse:
                                     folder = "linux/arm"
                                 bdinfo_path = f"{base_dir}/bin/bdinfo/{folder}/bdinfo"
                                 if Path(bdinfo_path).exists():
-                                    bdinfo_executable = [bdinfo_path, path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
+                                    bdinfo_executable = [bdinfo_path, disc_path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
                             elif bdinfo_executable is None and system == "darwin":
                                 folder = "macos/arm64" if machine in ("arm64",) else "macos/x86_64"
                                 bdinfo_path = f"{base_dir}/bin/bdinfo/{folder}/bdinfo"
                                 if Path(bdinfo_path).exists():
-                                    bdinfo_executable = [bdinfo_path, path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
+                                    bdinfo_executable = [bdinfo_path, disc_path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
                             elif bdinfo_executable is None and system == "windows":
                                 # Windows builds are provided as x64
                                 bdinfo_path = f"{base_dir}/bin/bdinfo/windows/x86_64/bdinfo.exe"
                                 if Path(bdinfo_path).exists():
-                                    bdinfo_executable = [bdinfo_path, path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
+                                    bdinfo_executable = [bdinfo_path, disc_path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
 
                             # Fallback to system-installed commands if bundled binary not present
                             if bdinfo_executable is None:
                                 if shutil.which("bdinfo"):
-                                    bdinfo_executable = ["bdinfo", path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
+                                    bdinfo_executable = ["bdinfo", disc_path, "--playlist", playlist["file"], "--reportfilename", str(playlist_report_path)]
                                 else:
                                     logger.info(f"[bold red]go-bdinfo not found. Place it under {base_dir}/bin/bdinfo/ or install a system bdinfo binary[/bold red]")
                                     continue
