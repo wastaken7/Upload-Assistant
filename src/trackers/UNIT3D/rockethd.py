@@ -1,12 +1,12 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import os
 import re
-from typing import Any, ClassVar, Optional, cast
+from typing import Any, cast
 
 import cli_ui
 import pycountry
 
-from src.console import logger
+from src.console import logger, prompt_in_thread
 from src.languages import languages_manager
 from src.meta import Meta
 from src.trackers.common import Common
@@ -27,12 +27,29 @@ class RocketHD(UNIT3D):
     requests_url = f"{base_url}/api/requests/filter"
     torrent_url = f"{base_url}/torrents/"
     tracker_urls = ("https://rocket-hd.cc",)
-    
+
     banned_groups = (
-        "1XBET", "MEGA", "MTZ", "Whistler", "WOTT", "Taylor.D", "HELD", "FSX", "FuN", "MagicX", "w00t", "PaTroL", "BB",
-        "266ers", "GTF", "JellyfinPlex", "2BA", "FritzBox", "FUNXDTV"
+        "1XBET",
+        "MEGA",
+        "MTZ",
+        "Whistler",
+        "WOTT",
+        "Taylor.D",
+        "HELD",
+        "FSX",
+        "FuN",
+        "MagicX",
+        "w00t",
+        "PaTroL",
+        "BB",
+        "266ers",
+        "GTF",
+        "JellyfinPlex",
+        "2BA",
+        "FritzBox",
+        "FUNXDTV",
     )
-    
+
     INVALID_TAG_PATTERN = re.compile(r"^(nogrp|nogroup|unknown|unk)$", re.IGNORECASE)
     WHITESPACE_PATTERN = re.compile(r"\s{2,}")
     MARKER_PATTERN = re.compile(r"\b(UNTOUCHED|VU1080|VU720|VU)\b", re.IGNORECASE)
@@ -67,18 +84,17 @@ class RocketHD(UNIT3D):
         }
         if mapping_only:
             return resolution_id
-        elif reverse:
+        if reverse:
             return {v: k for k, v in resolution_id.items()}
-        elif resolution:
+        if resolution:
             return {'resolution_id': resolution_id.get(resolution, '10')}
-        else:
-            meta_resolution = str(meta.get('resolution', ''))
-            resolved_id = resolution_id.get(meta_resolution, '10')
-            return {'resolution_id': resolved_id}
+        meta_resolution = str(meta.resolution)
+        resolved_id = resolution_id.get(meta_resolution, "10")
+        return {"resolution_id": resolved_id}
 
     def get_basename(self, meta: Meta) -> str:
         """Extract basename from first file in filelist or path"""
-        path_value = next(iter(meta.get("filelist", [])), meta.get("path", ""))
+        path_value = meta.path or "" if meta.isdir else next(iter(meta.filelist), meta.path or "")
         path = path_value if isinstance(path_value, str) else ""
         return os.path.basename(path)
 
@@ -111,10 +127,10 @@ class RocketHD(UNIT3D):
         except (AttributeError, KeyError, LookupError):
             return lang_str
 
-    def _get_german_title(self, imdb_info: dict[str, Any]) -> Optional[str]:
+    def _get_german_title(self, imdb_info: dict[str, Any]) -> str | None:
         """Extract German title from IMDb AKAs with priority"""
-        country_match: Optional[str] = None
-        language_match: Optional[str] = None
+        country_match: str | None = None
+        language_match: str | None = None
 
         akas_value = imdb_info.get("akas", [])
         akas = cast(list[dict[str, Any]], akas_value) if isinstance(akas_value, list) else []
@@ -133,7 +149,7 @@ class RocketHD(UNIT3D):
 
     def _has_german_audio(self, meta: Meta) -> bool:
         """Check for German audio tracks, excluding commentary"""
-        mediainfo = meta.get("mediainfo")
+        mediainfo = meta.mediainfo
         if not mediainfo:
             return False
 
@@ -147,7 +163,7 @@ class RocketHD(UNIT3D):
 
     def _has_german_subtitles(self, meta: Meta) -> bool:
         """Check for German subtitle tracks"""
-        mediainfo = meta.get("mediainfo")
+        mediainfo = meta.mediainfo
         if not mediainfo:
             return False
 
@@ -185,38 +201,38 @@ class RocketHD(UNIT3D):
         """
         Rebuild release name from meta components following RocketHD naming rules.
         """
-        if not meta.get("language_checked", False):
+        if not meta.language_checked:
             await languages_manager.process_desc_language(meta, tracker=self.tracker)
 
         # Title and basic info
-        title = meta.get("title", "")
-        german_title = self._get_german_title(meta.get("imdb_info", {}))
+        title = meta.title
+        german_title = self._get_german_title(meta.imdb_info)
         use_german_title = self.config["TRACKERS"].get(self.tracker, {}).get(
             "use_german_title", False
         )
         if german_title and use_german_title:
             title = german_title
 
-        year_value: Any = meta.get("year", "")
-        resolution_value: Any = meta.get("resolution", "")
-        source_value: Any = meta.get("source", "")
+        year_value: Any = meta.year or ""
+        resolution_value: Any = meta.resolution
+        source_value: Any = meta.source or ""
         year = str(year_value)
         resolution = str(resolution_value)
         source = (
             str(cast(Any, source_value[0])) if source_value else ""
         ) if isinstance(source_value, list) else str(source_value)
-        video_codec = str(meta.get("video_codec", ""))
-        video_encode = str(meta.get("video_encode", ""))
+        video_codec = meta.video_codec
+        video_encode = meta.video_encode
 
         # TV specific
-        season = str(meta.get("season") or "")
-        episode = str(meta.get("episode") or "")
+        season = str(meta.season or "")
+        episode = str(meta.episode or "")
 
         # Optional fields
-        edition = str(meta.get("edition") or "")
-        hdr = str(meta.get("hdr") or "")
-        uhd = str(meta.get("uhd") or "")
-        three_d = str(meta.get("3D") or "")
+        edition = meta.edition
+        hdr = meta.hdr
+        uhd = str(meta.uhd or "")
+        three_d = meta.three_d
 
         # extract tags from basename for potential later use
         basename_up = self.get_basename(meta).upper()
@@ -224,15 +240,15 @@ class RocketHD(UNIT3D):
         incomplete = "INCOMPLETE" if "INCOMPLETE" in basename_up else  ""
 
         # Clean audio: remove Dual-Audio and trailing language codes
-        audio = str(meta.get("audio", ""))
+        audio = meta.audio
         if "DD+" in audio:
             audio = audio.replace("DD+", "DDP")
 
         # Build audio language tag
         audio_lang_str = ""
-        if meta.get("audio_languages"):
+        if meta.audio_languages:
             # Normalize all to abbreviated ISO 639-3 codes
-            audio_langs_value = meta.get("audio_languages", [])
+            audio_langs_value = meta.audio_languages
             audio_langs_raw = cast(list[Any], audio_langs_value) if isinstance(audio_langs_value, list) else []
             audio_langs = [self._get_language_name(str(lang)) for lang in audio_langs_raw]
             audio_langs = [lang for lang in audio_langs if lang]  # Remove empty
@@ -261,26 +277,22 @@ class RocketHD(UNIT3D):
         if not self._has_german_audio(meta) and self._has_german_subtitles(meta):
             audio_lang_str = "GERMAN SUBBED"
 
-        effective_type = str(meta.get("type", ""))
+        effective_type = str(meta.type or "")
 
         source = source.replace("Blu-ray", "BluRay")
 
         # Detect Hybrid from filename if not in title
         hybrid = ""
-        if (
-            not edition
-            and (meta.get("webdv", False) or isinstance(meta.get("source", ""), list))
-            and "HYBRID" not in title.upper()
-        ):
+        if not edition and (meta.webdv or isinstance(meta.source, list)) and "HYBRID" not in title.upper():
             hybrid = "Hybrid"
 
-        repack = str(meta.get("repack", "")).strip()
+        repack = meta.repack.strip()
 
         name = None
         # Build name per RocketHD type-specific format
         if effective_type == "DISC":
-            region = str(meta.get("region", ""))
-            dvd_size = str(meta.get("dvd_size", ""))
+            region = meta.region
+            dvd_size = meta.dvd_size
             name = f"{title} {year} {season}{episode} {three_d} {edition} {repack} {resolution} COMPLETE {region} {uhd} {source} {dvd_size} {audio} {hdr} {video_codec} {internal}"
         elif effective_type == "REMUX":
             name = f"{title} {year} {season}{episode} {incomplete} {three_d} {edition} {hybrid} {audio_lang_str} {repack} {resolution} {uhd} {source} REMUX {audio} {hdr} {video_codec} {internal}"
@@ -290,7 +302,7 @@ class RocketHD(UNIT3D):
         elif effective_type in ("ENCODE", "HDTV"):
             name = f"{title} {year} {season}{episode} {incomplete} {three_d} {edition} {hybrid} {audio_lang_str} {repack} {resolution} {uhd} {source} {audio} {hdr} {video_encode} {internal}"
         elif effective_type in ("WEBDL", "WEBRIP"):
-            service = str(meta.get("service", ""))
+            service = str(meta.service or "")
             type_str = "WEB-DL" if effective_type == "WEBDL" else "WEBRip"
             name = f"{title} {year} {season}{episode} {incomplete} {three_d} {edition} {hybrid} {audio_lang_str} {repack} {resolution} {uhd} {service} {type_str} {audio} {hdr} {video_encode} {internal}"
         else:
@@ -298,7 +310,7 @@ class RocketHD(UNIT3D):
 
         # Ensure name is always a string
         if not name:
-            name = str(meta.get("name", "UNKNOWN"))
+            name = meta.name or "UNKNOWN"
 
         # Remove any leftover "Dual-Audio" markers
         if "Dual-Audio" in name:
@@ -316,19 +328,14 @@ class RocketHD(UNIT3D):
 
     def _extract_clean_release_group(self, meta: Meta) -> str:
         """Extract release group - only accepts VU/UNTOUCHED markers from filename"""
-        raw_tag = meta.get("tag", "")
+        raw_tag = meta.tag or ""
         tag = raw_tag.strip().lstrip("-") if isinstance(raw_tag, str) else ""
         if tag and " " not in tag and not self.INVALID_TAG_PATTERN.search(tag):
             return tag
 
         basename = self.get_basename(meta)
         # Get extension from mediainfo and remove it
-        ext = (
-            meta.get("mediainfo", {})
-            .get("media", {})
-            .get("track", [{}])[0]
-            .get("FileExtension", "")
-        )
+        ext = meta.mediainfo.get("media", {}).get("track", [{}])[0].get("FileExtension", "")
         name_no_ext = (
             basename[: -len(ext) - 1]
             if ext and basename.endswith(f".{ext}")
@@ -365,30 +372,30 @@ class RocketHD(UNIT3D):
         basename_up = [tok for tok in re.split(r'[\.\s_-]+', str(basename).upper()) if tok]
         if any(x in basename_up for x in prohib_markers):
             logger.info(f"{self.tracker}: [bold red]Uploading MIC, CAM, TS or LD releases, is prohibited[/bold red]")
-            if meta.get("unattended") or not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+            if meta.unattended or not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
                 return False
 
         # Uploading upscaled releases is prohibited. Exception: The release is from a group on the upscale whitelist
         if "UPSCALE" in basename_up:
             logger.info(f"{self.tracker}: [bold red]Uploading upscaled releases is prohibited, unless the group is is whitelisted {self.base_url}/wikis/17[/bold red]")
-            if meta.get("unattended") or not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+            if meta.unattended or not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
                 return False
 
         # Uploading SD content is not allowed. Exception: No HD version exists. Check release databases beforehand to ensure an HD version doesn't exist
-        if meta.get("resolution") in ["384p", "480p", "480i", "540p", "576p", "576i"]:
+        if meta.resolution in ["384p", "480p", "480i", "540p", "576p", "576i"]:
             logger.info(f"{self.tracker}: [bold red]Uploading SD releases is not allowed on {self.tracker}, unless no HD version exists.[/bold red]")
             logger.info(f"{self.tracker}: [bold red]Please check release databases beforehand to be sure.[/bold red]")
-            if meta.get("unattended") or not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+            if meta.unattended or not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
                 return False
 
         # Uploads must contain a German audio track. Exception: The release was requested in its original language.
-        if not self._has_german_audio(meta) and not meta.get("requested_release", False):
+        if not self._has_german_audio(meta):
             logger.info(f"{self.tracker}: [bold red]Uploads must contain a German audio track, unless the release was requested in its original language.[/bold red]")
-            if meta.get("unattended") or not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+            if meta.unattended or not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
                 return False
 
         # check for samples, proofs, and images in the upload directory
-        filelist = meta.get("filelist", [])
+        filelist = meta.filelist
         if any(
             str(file).lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp", ".tiff", ".pdf"))
             or "sample" in str(file).lower()
@@ -396,6 +403,6 @@ class RocketHD(UNIT3D):
             for file in filelist
         ):
             logger.info(f"{self.tracker}: [bold red]Uploads containing samples, proofs, and images are prohibited.[/bold red]")
-            if meta.get("unattended") or not cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
+            if meta.unattended or not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
                 return False
         return True
