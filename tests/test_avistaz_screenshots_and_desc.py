@@ -7,6 +7,10 @@ from src.trackers.AVISTAZ.avistaz import AvistaZ
 
 
 def test_avistaz_get_screenshots_only_uploads_menus_and_standard_screenshots(tmp_path: Path, monkeypatch) -> None:
+    screens_dir = tmp_path / "tmp" / "test-uuid" / "screenshots"
+    screens_dir.mkdir(parents=True)
+    (screens_dir / "generated.png").write_bytes(b"local_png_data")
+
     meta = Meta(
         base_dir=str(tmp_path),
         uuid="test-uuid",
@@ -28,7 +32,7 @@ def test_avistaz_get_screenshots_only_uploads_menus_and_standard_screenshots(tmp
 
     uploaded_urls: list[str] = []
 
-    async def fake_img_host(self_meta, referer, image_bytes, filename):
+    async def fake_img_host(_self_meta, _referer, _image_bytes, filename):
         return f"id_{filename}"
 
     async def fake_session_get(url):
@@ -44,7 +48,9 @@ def test_avistaz_get_screenshots_only_uploads_menus_and_standard_screenshots(tmp
 
     results = asyncio.run(az.get_screenshots(meta))
 
-    assert results == ["id_menu1.png", "id_screen1.png", "id_screen2.png"]  # noqa: S101
+    assert results == ["id_menu1.png", "id_generated.png"]  # noqa: S101
+    assert "https://imgbox.com/screen1.png" not in uploaded_urls  # noqa: S101
+    assert "https://imgbox.com/screen2.png" not in uploaded_urls  # noqa: S101
     assert "https://imgbox.com/spectro.png" not in uploaded_urls  # noqa: S101
     assert "https://imgbox.com/dvplot.png" not in uploaded_urls  # noqa: S101
 
@@ -55,13 +61,9 @@ def test_avistaz_edit_desc_includes_spectrograms_and_dv_plots(tmp_path: Path) ->
         uuid="test-uuid",
         category="MOVIE",
         audio_spectrogram=True,
-        spectrograms_images=[
-            {"web_url": "https://imgbox.com/spec_web", "raw_url": "https://images2.imgbox.com/spec_raw.png"}
-        ],
+        spectrograms_images=[{"web_url": "https://imgbox.com/spec_web", "raw_url": "https://images2.imgbox.com/spec_raw.png"}],
         dynamic_hdr_plot=True,
-        dynamic_hdr_plot_images=[
-            {"web_url": "https://imgbox.com/plot_web", "raw_url": "https://images2.imgbox.com/plot_raw.png"}
-        ],
+        dynamic_hdr_plot_images=[{"web_url": "https://imgbox.com/plot_web", "raw_url": "https://images2.imgbox.com/plot_raw.png"}],
     )
 
     config = {

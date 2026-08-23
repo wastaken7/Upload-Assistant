@@ -524,7 +524,7 @@ class AZTrackerBase:
         # Always fill remaining slots from remote image_list after processing local files
         image_links = [str(img.get("raw_url")) for img in meta.image_list if img.get("raw_url")]
 
-        if len(results) < limit:
+        if not local_files and len(results) < limit:
             for url in image_links:
                 if len(results) >= limit:
                     break
