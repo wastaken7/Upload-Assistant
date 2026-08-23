@@ -228,7 +228,7 @@ For a manual Linux/macOS/Windows installation, Upload Assistant needs a few tool
 
 ### Install with `uv` (Windows, Linux, or macOS)
 
-If you have [uv](https://github.com/astral-sh/uv) installed, you can install Upload Assistant directly from the repository as a globally available standalone CLI tool. This automatically manages the virtual environment and exposes the `ua` and `ua-config` commands directly to your system path.
+If you have [uv](https://github.com/astral-sh/uv) installed, you can install Upload Assistant directly from the repository as a globally available standalone CLI tool. This automatically manages the virtual environment and exposes the `ua` and `ua-config` commands directly to your system path. This method resolves dependencies from `pyproject.toml`; skip Steps 2 and 3 below.
 
 ```bash
 uv tool install git+https://github.com/wastaken7/Upload-Assistant.git

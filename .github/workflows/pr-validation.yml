@@ -40,16 +40,17 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import tomllib
           from zipfile import ZipFile
 
           wheel = next(Path("dist").glob("*.whl"))
+          package_data = tomllib.loads(Path("pyproject.toml").read_text())["tool"]["setuptools"]["package-data"]
           required = {
-              "data/tags.json",
-              "data/templates/summary-mediainfo.csv",
-              "data/templates/user-args-template.json",
-              "web_ui/templates/index.html",
-              "web_ui/static/css/theme.css",
-              "web_ui/static/img/logo.svg",
+              path.as_posix()
+              for package, patterns in package_data.items()
+              for pattern in patterns
+              for path in Path(package).glob(pattern)
+              if path.is_file() and not path.name.startswith(".")
           }
           with ZipFile(wheel) as archive:
               missing = required - set(archive.namelist())
