@@ -783,7 +783,7 @@ class BJShare:
 
         media_search_terms: list[str] = []
         if category in ("TV", "MOVIE"):
-            imdb_id = str(dict(meta.imdb_info).get("imdbID", "")).strip()
+            imdb_id = meta.imdb_tt
             if imdb_id:
                 media_search_terms.append(imdb_id)
 
