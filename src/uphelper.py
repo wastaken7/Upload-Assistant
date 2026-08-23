@@ -522,7 +522,7 @@ class UploadHelper:
         if not possible:
             return
 
-        question = "[bold magenta]Found BDInfo content in potential duplicates.[/bold magenta] Perform a comparison?"
+        question = "Found BDInfo content in potential duplicates. Perform a comparison?"
         if await self.prompt_yes_no(question, default=True):
             warnings: list[str] = []
             results: list[str] = []

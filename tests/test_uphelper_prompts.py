@@ -77,7 +77,7 @@ async def test_dupe_check_keeps_each_result_list_with_its_prompt(monkeypatch: py
 
 
 @pytest.mark.asyncio
-async def test_bdinfo_comparison_prompt_uses_rich_markup(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_bdinfo_comparison_prompt_uses_plain_text(monkeypatch: pytest.MonkeyPatch) -> None:
     question: str | None = None
 
     async def prompt_yes_no(value: str, *, default: bool = False) -> bool:
@@ -91,7 +91,7 @@ async def test_bdinfo_comparison_prompt_uses_rich_markup(monkeypatch: pytest.Mon
 
     await helper.ask_bdinfo_comparison({}, [{}], "AITHER")
 
-    assert question == "[bold magenta]Found BDInfo content in potential duplicates.[/bold magenta] Perform a comparison?"
+    assert question == "Found BDInfo content in potential duplicates. Perform a comparison?"
     assert "\033" not in question
 
 
