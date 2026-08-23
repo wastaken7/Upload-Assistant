@@ -3935,9 +3935,100 @@ def torrent_clients():
     return jsonify({"success": True, "clients": sorted(client_names)})
 
 
+_TRACKER_CONFIGURATION_KEYS = frozenset(
+    {
+        "api_key",
+        "announce_url",
+        "my_announce_url",
+        "username",
+        "password",
+        "passkey",
+        "cookie_file",
+        "cookies",
+        "ApiUser",
+        "bhd_rss_key",
+        "bioma_api_key",
+        "ptgen_api",
+    }
+)
+
+
+def _has_configured_tracker_value(tracker_config: Mapping[str, Any], example_tracker_config: Mapping[str, Any]) -> bool:
+    """Return whether a tracker has a meaningful user-supplied setup value."""
+    for key in _TRACKER_CONFIGURATION_KEYS:
+        if key not in tracker_config:
+            continue
+
+        value = tracker_config[key]
+        if isinstance(value, str):
+            value = value.strip()
+        example_value = example_tracker_config.get(key)
+        if isinstance(example_value, str):
+            example_value = example_value.strip()
+        if value in (None, "", False) or value == example_value:
+            continue
+        return True
+
+    return False
+
+
+def _configured_tracker_names(
+    trackers_section: Mapping[str, Any],
+    example_trackers: Mapping[str, Any],
+    default_trackers: Sequence[str],
+    supported_trackers: Mapping[str, Any],
+    cookie_trackers: set[str] | None = None,
+    user_config: Mapping[str, Any] | None = None,
+) -> set[str]:
+    """Return supported tracker names that have enough setup to show by default."""
+    supported_names = {str(name).upper() for name in supported_trackers}
+    configured = {str(name).strip().upper() for name in default_trackers if str(name).strip()}
+    configured.update(str(name).upper() for name in (cookie_trackers or set()))
+
+    tracker_configs = {str(name).upper(): value for name, value in trackers_section.items() if isinstance(value, Mapping)}
+    example_configs = {str(name).upper(): value for name, value in example_trackers.items() if isinstance(value, Mapping)}
+
+    for tracker_name in supported_names:
+        tracker_config = tracker_configs.get(tracker_name)
+        if tracker_config is None:
+            continue
+        example_tracker_config = example_configs.get(tracker_name, {})
+        if _has_configured_tracker_value(tracker_config, example_tracker_config):
+            configured.add(tracker_name)
+
+    # Older configurations stored the BroadcasTheNet API key in DEFAULT.
+    default_section = user_config.get("DEFAULT", {}) if user_config else {}
+    legacy_btn_api = default_section.get("btn_api") if isinstance(default_section, Mapping) else None
+    if isinstance(legacy_btn_api, str):
+        legacy_btn_api = legacy_btn_api.strip()
+    if legacy_btn_api:
+        configured.add("BROADCASTHENET")
+
+    return configured & supported_names
+
+
+def _configured_cookie_tracker_names(
+    supported_trackers: Mapping[str, Any],
+    user_config: dict[str, Any],
+    state_dir: Path,
+    cookie_file_finder: Callable[[str, str, dict[str, Any] | None], str],
+) -> set[str]:
+    """Return cookie-configured trackers without one bad lookup stopping the rest."""
+    configured: set[str] = set()
+    for tracker_name in supported_trackers:
+        try:
+            has_cookie_file = Path(cookie_file_finder(str(state_dir), tracker_name, user_config)).is_file()
+        except (AttributeError, OSError, TypeError, ValueError):
+            has_cookie_file = False
+        if has_cookie_file:
+            configured.add(tracker_name.upper())
+
+    return configured
+
+
 @app.route("/api/trackers")
 def get_trackers():
-    """Return a list of available trackers and the configured default trackers"""
+    """Return supported trackers, including their default/configured status."""
     if not _is_authenticated():
         return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
 
@@ -3948,7 +4039,8 @@ def get_trackers():
     config_path = base_dir / "data" / "config.py"
     user_config = _load_config_from_file(config_path) or {}
 
-    trackers_section = user_config.get("TRACKERS", {})
+    trackers_section_raw = user_config.get("TRACKERS", {})
+    trackers_section = cast(dict[str, Any], trackers_section_raw) if isinstance(trackers_section_raw, Mapping) else {}
     default_trackers_val = trackers_section.get("default_trackers", "")
     default_trackers_list = []
     if isinstance(default_trackers_val, str):
@@ -3962,6 +4054,29 @@ def get_trackers():
     except Exception as e:
         return jsonify({"success": False, "error": f"Failed to load trackers: {e}"}), 500
 
+    example_config = _load_config_from_file(CODE_DIR / "data" / "example_config.py") or {}
+    example_trackers_raw = example_config.get("TRACKERS", {})
+    example_trackers = cast(dict[str, Any], example_trackers_raw) if isinstance(example_trackers_raw, Mapping) else {}
+
+    cookie_trackers: set[str] = set()
+    try:
+        from src.cookie_auth import find_cookie_file
+    except Exception:
+        # Cookie discovery is an additional configuration signal. A missing or
+        # unreadable cookies directory should not prevent the selector loading.
+        cookie_trackers = set()
+    else:
+        cookie_trackers = _configured_cookie_tracker_names(tracker_class_map, user_config, STATE_DIR, find_cookie_file)
+
+    configured_trackers = _configured_tracker_names(
+        trackers_section,
+        example_trackers,
+        default_trackers_list,
+        tracker_class_map,
+        cookie_trackers,
+        user_config,
+    )
+
     trackers_data = []
     for tracker_name, tracker_class in tracker_class_map.items():
         display_name = getattr(tracker_class, "display_name", tracker_name)
@@ -3974,7 +4089,15 @@ def get_trackers():
                 favicon_url = f"/static/img/trackers/{tracker_name.lower()}.{ext}"
                 break
 
-        trackers_data.append({"name": tracker_name, "display_name": display_name, "base_url": base_url, "favicon": favicon_url})
+        trackers_data.append(
+            {
+                "name": tracker_name,
+                "display_name": display_name,
+                "base_url": base_url,
+                "favicon": favicon_url,
+                "configured": tracker_name.upper() in configured_trackers,
+            }
+        )
 
     trackers_data.sort(key=lambda x: x["display_name"].lower())
 

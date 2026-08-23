@@ -1450,6 +1450,8 @@ function AudionutsUAGUI() {
   const [trackers, setTrackers] = useState([]);
   const [defaultTrackers, setDefaultTrackers] = useState(new Set());
   const [selectedTrackers, setSelectedTrackers] = useState(new Set());
+  const [showAllSupportedTrackers, setShowAllSupportedTrackers] =
+    useState(false);
   const [failedFavicons, setFailedFavicons] = useState(new Set());
   const [isExecuting, setIsExecuting] = useState(false);
   const [isOutputExpanded, setIsOutputExpanded] = useState(false);
@@ -2098,6 +2100,17 @@ function AudionutsUAGUI() {
   const renderTrackerSelector = () => {
     if (!trackers || trackers.length === 0) return null;
 
+    const hasConfiguredMetadata = trackers.some(
+      (tracker) => typeof tracker.configured === "boolean",
+    );
+    const visibleTrackers =
+      showAllSupportedTrackers || !hasConfiguredMetadata
+        ? trackers
+        : trackers.filter(
+            (tracker) =>
+              tracker.configured || selectedTrackers.has(tracker.name),
+          );
+
     const getInitialsColor = (name) => {
       let hash = 0;
       for (let i = 0; i < name.length; i++) {
@@ -2123,53 +2136,77 @@ function AudionutsUAGUI() {
       <div
         className={`mt-3 space-y-2 p-3 rounded-lg border ${isDarkMode ? "bg-gray-900 border-gray-700 text-white" : "bg-gray-50 border-gray-200 text-gray-800"}`}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider opacity-75">
             Select Trackers (-tk):
           </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setSelectedTrackers(new Set(defaultTrackers));
-                setCustomArgs(
-                  syncTrackersToArgs(
-                    customArgs,
-                    defaultTrackers,
-                    defaultTrackers,
-                  ),
-                );
-              }}
-              className="text-[10px] text-purple-500 hover:text-purple-400 underline font-medium"
-              disabled={isExecuting}
-            >
-              Reset to Defaults
-            </button>
-            <button
-              onClick={() => {
-                const nextSet = new Set();
-                setSelectedTrackers(nextSet);
-                setCustomArgs(
-                  syncTrackersToArgs(customArgs, nextSet, defaultTrackers),
-                );
-              }}
-              className="text-[10px] text-purple-500 hover:text-purple-400 underline font-medium"
-              disabled={isExecuting}
-            >
-              Clear All
-            </button>
+          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 text-[10px] font-medium">
+              <input
+                type="checkbox"
+                checked={showAllSupportedTrackers}
+                onChange={(event) =>
+                  setShowAllSupportedTrackers(event.target.checked)
+                }
+                className="h-3.5 w-3.5 accent-purple-600"
+                disabled={isExecuting}
+              />
+              <span>Show all supported trackers</span>
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTrackers(new Set(defaultTrackers));
+                  setCustomArgs(
+                    syncTrackersToArgs(
+                      customArgs,
+                      defaultTrackers,
+                      defaultTrackers,
+                    ),
+                  );
+                }}
+                className="text-[10px] text-purple-500 hover:text-purple-400 underline font-medium"
+                disabled={isExecuting}
+              >
+                Reset to Defaults
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextSet = new Set();
+                  setSelectedTrackers(nextSet);
+                  setCustomArgs(
+                    syncTrackersToArgs(customArgs, nextSet, defaultTrackers),
+                  );
+                }}
+                className="text-[10px] text-purple-500 hover:text-purple-400 underline font-medium"
+                disabled={isExecuting}
+              >
+                Clear All
+              </button>
+            </div>
           </div>
         </div>
         <div
           className={`flex flex-wrap gap-2 pr-1 ${!isExecuting && !isOutputExpanded ? "" : "max-h-48 overflow-y-auto"}`}
         >
-          {trackers.map((tracker) => {
+          {visibleTrackers.length === 0 && (
+            <span className="text-xs opacity-70">
+              No configured trackers. Turn on Show all supported trackers to
+              choose one.
+            </span>
+          )}
+          {visibleTrackers.map((tracker) => {
             const isSelected = selectedTrackers.has(tracker.name);
             const isDefault = defaultTrackers.has(tracker.name);
+            const isConfigured = tracker.configured !== false;
             const hasFavicon =
               tracker.favicon && !failedFavicons.has(tracker.name);
 
             return (
               <button
+                type="button"
                 key={tracker.name}
                 onClick={() => handleTrackerToggle(tracker.name)}
                 disabled={isExecuting}
@@ -2182,7 +2219,7 @@ function AudionutsUAGUI() {
                       ? "bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-gray-200"
                       : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
-                title={`${tracker.display_name}${isDefault ? " (Default)" : ""}`}
+                title={`${tracker.display_name}${isDefault ? " (Default)" : ""}${!isConfigured ? " (Not configured)" : ""}`}
               >
                 {hasFavicon ? (
                   <img
