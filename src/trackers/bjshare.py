@@ -162,7 +162,7 @@ class BJShare:
             pc_platforms = {"PC", "MAC", "LINUX"}
             platform = meta.platform.upper().strip()
             if platform in pc_platforms:
-                builder = DescriptionBuilder(self.tracker, self.config)
+                builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
                 has_install_notes = await builder.get_user_description(meta)
                 if not has_install_notes:
                     logger.info(
@@ -644,7 +644,7 @@ class BJShare:
         return "", ""
 
     async def build_description(self, meta: Meta) -> str:
-        builder = DescriptionBuilder(self.tracker, self.config)
+        builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
         meta.episode_tmdb_data = self.episode_tmdb_data
 
         return await builder.general_description_generator(
