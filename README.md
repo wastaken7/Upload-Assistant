@@ -32,6 +32,7 @@
 - [Docker Usage](#docker-usage)
 - [Seedbox / Linux Install](docs/seedbox.md)
 - [Attributions](#attributions)
+- [Contributors](#contributors)
 
 ## Fork Features & Differences from Upstream (Audionut/Upload-Assistant)
 
@@ -401,3 +402,6 @@ Features automated binary managers for:
   <a href="https://thetvdb.com/"><img src="https://i.postimg.cc/Hs1KKqsS/logo1.png" alt="TheTVDB" height="40px;"></a>&nbsp;&nbsp;
   <a href="https://www.tvmaze.com/"><img src="https://i.postimg.cc/2jdRzkJp/tvm-header-logo.png" alt="TVmaze" height="40px"></a>
 </p>
+
+## **Contributors:**
+[![Contributors](https://contrib.rocks/image?repo=wastaken7/Upload-Assistant)](https://github.com/wastaken7/Upload-Assistant/graphs/contributors)
