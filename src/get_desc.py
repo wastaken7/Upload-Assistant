@@ -20,7 +20,7 @@ from langcodes.tag_parser import LanguageTagError
 from src.bbcode import BBCODE
 from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
-from src.description_languages import COMMON_LABELS, MUSIC_LABELS, get_book_labels, get_labels
+from src.description_languages import COMMON_LABELS, GAME_LABELS, MUSIC_LABELS, get_book_labels, get_labels
 from src.description_review import apply_saved_draft
 from src.languages import languages_manager
 from src.mediainfo import MediaInfo
@@ -837,6 +837,20 @@ class DescriptionBuilder:
         str_official_supported_languages = "Officially Supported Languages" if not use_pt_br else "Idiomas Oficialmente Suportados"
         str_language = "Language" if not use_pt_br else "Idioma"
         str_support = "Support" if not use_pt_br else "Suporte"
+        game_labels = get_labels(GAME_LABELS, self.language)
+        str_technical_details = game_labels["technical_details"]
+        str_overview = game_labels["overview"]
+        str_platform = game_labels["platform"]
+        str_version = game_labels["version"]
+        str_genre = game_labels["genre"]
+        str_developer = game_labels["developer"]
+        str_publisher = game_labels["publisher"]
+        str_system_requirements = game_labels["system_requirements"]
+        str_minimum = game_labels["minimum"]
+        str_recommended = game_labels["recommended"]
+        str_official_supported_languages = game_labels["official_supported_languages"]
+        str_language = game_labels["language"]
+        str_support = game_labels["support"]
 
         # 1. Technical Details
         fields: list[tuple[str, str]] = []
@@ -1041,6 +1055,7 @@ class DescriptionBuilder:
             "external_ids": "External IDs" if not use_pt_br else "IDs Externos",
         }
         text.update(get_labels(MUSIC_LABELS, self.language))
+        external_id_labels = text["external_id_labels"]
 
         def musicbrainz_link(kind: str, identifier: Any) -> str:
             """Return a safe MusicBrainz BBCode link for a canonical UUID."""
@@ -1061,10 +1076,10 @@ class DescriptionBuilder:
             return f"[url=https://www.discogs.com/{kind}/{numeric_identifier}]{numeric_identifier}[/url]" if numeric_identifier else ""
 
         external_id_links = [
-            ("MusicBrainz Release", musicbrainz_link("release", external_ids.get("musicbrainz_release"))),
-            ("MusicBrainz Release Group", musicbrainz_link("release-group", external_ids.get("musicbrainz_release_group"))),
-            ("Discogs Release", discogs_link("release", external_ids.get("discogs_release"))),
-            ("Discogs Master", discogs_link("master", external_ids.get("discogs_master"))),
+            (external_id_labels["musicbrainz_release"], musicbrainz_link("release", external_ids.get("musicbrainz_release"))),
+            (external_id_labels["musicbrainz_release_group"], musicbrainz_link("release-group", external_ids.get("musicbrainz_release_group"))),
+            (external_id_labels["discogs_release"], discogs_link("release", external_ids.get("discogs_release"))),
+            (external_id_labels["discogs_master"], discogs_link("master", external_ids.get("discogs_master"))),
         ]
         external_id_links = [f"{label}: {link}" for label, link in external_id_links if link]
 

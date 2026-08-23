@@ -1,3 +1,5 @@
+from typing import Any
+
 BOOK_LABELS = {
     "en": {
         "author": "Author",
@@ -89,6 +91,12 @@ MUSIC_LABELS = {
         "channels": "Channels",
         "bitrate": "Bitrate",
         "external_ids": "External IDs",
+        "external_id_labels": {
+            "musicbrainz_release": "MusicBrainz Release",
+            "musicbrainz_release_group": "MusicBrainz Release Group",
+            "discogs_release": "Discogs Release",
+            "discogs_master": "Discogs Master",
+        },
     },
     "pt-BR": {
         "details": "Detalhes da Música",
@@ -112,6 +120,12 @@ MUSIC_LABELS = {
         "channels": "Canais",
         "bitrate": "Bitrate",
         "external_ids": "IDs Externos",
+        "external_id_labels": {
+            "musicbrainz_release": "Lançamento MusicBrainz",
+            "musicbrainz_release_group": "Grupo de Lançamentos MusicBrainz",
+            "discogs_release": "Lançamento Discogs",
+            "discogs_master": "Master Discogs",
+        },
     },
 }
 
@@ -129,7 +143,7 @@ COMMON_LABELS = {
 }
 
 
-def get_labels(labels: dict[str, dict[str, str]], language: str) -> dict[str, str]:
+def get_labels(labels: dict[str, dict[str, Any]], language: str) -> dict[str, Any]:
     try:
         return labels[language]
     except KeyError as error:
