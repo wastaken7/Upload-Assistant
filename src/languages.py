@@ -16,6 +16,13 @@ from src.meta import Meta
 
 class LanguagesManager:
     @staticmethod
+    def _has_hardcoded_subtitle_marker(meta: Meta) -> bool:
+        names = [Path(str(meta.path)).name]
+        if meta.filelist:
+            names.append(Path(str(meta.filelist[0])).name)
+        return any(re.search(r"(?:^|[.\s_\-\[\]()])HC(?:$|[.\s_\-\[\]()])", name, re.IGNORECASE) for name in names)
+
+    @staticmethod
     def _dedupe_preserve_order(values: list[str]) -> list[str]:
         seen: set[str] = set()
         deduped: list[str] = []
@@ -176,6 +183,10 @@ class LanguagesManager:
         return parsed_data
 
     async def process_desc_language(self, meta: Meta, tracker: str = "") -> None:
+        if not meta.hardcoded_subs and self._has_hardcoded_subtitle_marker(meta):
+            meta.hardcoded_subs = True
+            logger.info("[cyan]Detected hardcoded subtitles from the filename.[/cyan]")
+
         if meta.category not in ["MOVIE", "TV"]:
             meta.language_checked = True
             meta.audio_languages = []
@@ -325,7 +336,10 @@ class LanguagesManager:
                                 meta.subtitle_languages = subtitle_languages
 
                         if meta.hardcoded_subs:
-                            if not meta.unattended or (meta.unattended and meta.unattended_confirm):
+                            if meta.hardcoded_subs_language:
+                                meta.subtitle_languages = [meta.hardcoded_subs_language]
+                                meta.write_hc_languages = True
+                            elif not meta.unattended or (meta.unattended and meta.unattended_confirm):
                                 try:
                                     hc_lang = cli_ui.ask_string("What language/s are the hardcoded subtitles?")
                                 except EOFError:
