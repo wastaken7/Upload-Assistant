@@ -1100,7 +1100,7 @@ def generate_config_file(
     return True
 
 
-if __name__ == "__main__":
+def run() -> None:
     parser = argparse.ArgumentParser(description="Upload-Assistant Configuration Generator")
     parser.parse_args()
 
@@ -1238,3 +1238,7 @@ if __name__ == "__main__":
         config_data["DEFAULT"]["default_torrent_client"] = default_client
 
         generate_config_file(config_data, comments=config_comments)
+
+
+if __name__ == "__main__":
+    run()

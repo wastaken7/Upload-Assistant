@@ -220,7 +220,7 @@ class BrasilTracker:
             pc_platforms = {"PC", "MAC", "LINUX"}
             platform = meta.platform.upper().strip()
             if platform in pc_platforms:
-                builder = DescriptionBuilder(self.tracker, self.config)
+                builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
                 has_install_notes = await builder.get_user_description(meta)
                 if not has_install_notes:
                     logger.info(
@@ -608,7 +608,7 @@ class BrasilTracker:
         return "", ""
 
     async def get_description(self, meta: Meta) -> str:
-        builder = DescriptionBuilder(self.tracker, self.config)
+        builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
         # Set episode_tmdb_data on meta for general_description_generator to pick it up
         meta.episode_tmdb_data = self.episode_tmdb_data
 
@@ -1152,7 +1152,7 @@ class BrasilTracker:
 
     def build_book_desc(self, meta: Meta) -> str:
         """Build the BBCode table for BOOK-category uploads."""
-        builder = DescriptionBuilder(self.tracker, self.config)
+        builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
         return builder._build_book_desc_section(meta, header_size=3, table=False)
 
     async def get_book_cover(self, meta: Meta) -> str:
