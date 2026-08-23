@@ -27,6 +27,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
       - name: Validate version
         env:
           NEW_VERSION: ${{ inputs.version }}
@@ -104,6 +107,11 @@ jobs:
           path.write_text(updated, encoding="utf-8")
           PY
 
+      - name: Update locked dependencies
+        run: |
+          uv lock
+          uv export --format requirements-txt --no-hashes --no-emit-project --no-header --no-annotate --output-file requirements.txt
+
       - name: Commit the version bump
         id: version_commit
         env:
@@ -112,7 +120,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/version.py pyproject.toml
+          git add src/version.py pyproject.toml uv.lock requirements.txt
           git diff --cached --check
           git commit -m "bump: version to ${NEW_VERSION#v}"
           git push origin "HEAD:$TARGET_BRANCH"
