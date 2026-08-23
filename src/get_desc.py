@@ -1178,12 +1178,12 @@ class DescriptionBuilder:
                 if not meta.language_checked:
                     await languages_manager.process_desc_language(meta, self.tracker)
                 if meta.audio_languages and meta.write_audio_languages:
-                    desc_parts.append(f"[code]{language_labels['audio_languages']}: {', '.join(meta.audio_languages)}[/code]")
+                    desc_parts.append(f"[code]{language_labels['audio_languages']}: {', '.join(meta.audio_languages)}[/code]\n")
 
                 if meta.subtitle_languages and meta.write_subtitle_languages:
-                    desc_parts.append(f"[code]{language_labels['subtitle_languages']}: {', '.join(meta.subtitle_languages)}[/code]")
+                    desc_parts.append(f"[code]{language_labels['subtitle_languages']}: {', '.join(meta.subtitle_languages)}[/code]\n")
                 if meta.subtitle_languages and meta.write_hc_languages:
-                    desc_parts.append(f"[code]{language_labels['hardcoded_subtitles']}: {', '.join(meta.subtitle_languages)}[/code]")
+                    desc_parts.append(f"[code]{language_labels['hardcoded_subtitles']}: {', '.join(meta.subtitle_languages)}[/code]\n")
             except Exception as e:
                 logger.warning(f"[yellow]Warning: Error processing language: {e!s}[/yellow]")
 
