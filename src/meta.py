@@ -251,6 +251,7 @@ class Meta:
     manual_language: str | dict[str, Any] | None = None
     manual_multi: bool = False
     manual_name: str | None = None
+    manual_overview: str | None = None
     manual_platform: str | None = None
     manual_season: str | int | None = None
     manual_source: str | None = None

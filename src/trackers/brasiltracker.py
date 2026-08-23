@@ -1043,6 +1043,8 @@ class BrasilTracker:
                     }
                 )
         elif meta.category in ("MOVIE", "TV"):
+            if meta.overview:
+                self.main_tmdb_data["overview"] = meta.overview
             has_pt_subtitles, subtitle_ids = await self.get_subtitle(meta)
             resolution_width, resolution_height = await self.get_resolution(meta)
             data.update(
