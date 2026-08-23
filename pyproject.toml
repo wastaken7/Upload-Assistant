@@ -73,10 +73,12 @@ ua-config = "upload:run_config_generator"
 
 [tool.setuptools]
 py-modules = ["upload", "config-generator"]
+include-package-data = false
 
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["tests", "tmp"]
+include = ["bin*", "data*", "src*", "web_ui*"]
+exclude = ["tests", "tmp", "build", "build.*"]
 
 [tool.setuptools.package-data]
 data = ["tags.json", "templates/*.csv", "templates/*.json"]

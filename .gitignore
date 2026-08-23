@@ -24,6 +24,7 @@ bin/nyuu/*
 bin/par2/*
 bin/pesto/*
 build/
+.setuptools-build/
 CLAUDE.md
 custom_hooks
 custom_hooks/
