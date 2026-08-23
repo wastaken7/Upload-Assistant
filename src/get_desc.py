@@ -20,6 +20,7 @@ from langcodes.tag_parser import LanguageTagError
 from src.bbcode import BBCODE
 from src.cogs.redaction import PathAwareEncoder
 from src.console import logger
+from src.description_languages import COMMON_LABELS, MUSIC_LABELS, get_book_labels, get_labels
 from src.description_review import apply_saved_draft
 from src.languages import languages_manager
 from src.mediainfo import MediaInfo
@@ -204,10 +205,11 @@ async def gen_desc(
 
 
 class DescriptionBuilder:
-    def __init__(self, tracker: str, config: dict[str, Any]):
+    def __init__(self, tracker: str, config: dict[str, Any], language: str = "en"):
         self.config: dict[str, Any] = config
         self.common = Common(config)
         self.tracker: str = tracker
+        self.language = language
         self.takescreens_manager = TakeScreensManager(config)
         self.uploadscreens_manager = UploadScreensManager(config)
 
@@ -711,20 +713,19 @@ class DescriptionBuilder:
         publisher = meta.publisher
         year = str(meta.year) if meta.year is not None else ""
 
-        use_pt_br = self.tracker in ("AMIGOSSHARE", "BRASILTRACKER", "CAPYBARABR", "SAMARITANO", "BJSHARE")
-
+        labels = get_book_labels(self.language)
         str_asin = "ASIN"
-        str_author = "Author" if not use_pt_br else "Autor"
-        str_avg_bitrate = "Average Bitrate" if not use_pt_br else "Bitrate Médio"
-        str_book_translator = "Translator" if not use_pt_br else "Tradutor"
-        str_duration = "Duration" if not use_pt_br else "Duração"
-        str_edition = "Edition" if not use_pt_br else "Edição"
+        str_author = labels["author"]
+        str_avg_bitrate = labels["average_bitrate"]
+        str_book_translator = labels["book_translator"]
+        str_duration = labels["duration"]
+        str_edition = labels["edition"]
         str_isbn = "ISBN"
-        str_narrator = "Narrator" if not use_pt_br else "Narrador"
-        str_overview = "Overview" if not use_pt_br else "Visão Geral"
-        str_publisher = "Publisher" if not use_pt_br else "Editora"
-        str_technical_details = "Technical Details" if not use_pt_br else "Detalhes Técnicos"
-        str_year = "Release Year" if not use_pt_br else "Ano de Lançamento"
+        str_narrator = labels["narrator"]
+        str_overview = labels["overview"]
+        str_publisher = labels["publisher"]
+        str_technical_details = labels["technical_details"]
+        str_year = labels["year"]
 
         if overview:
             overview = html_to_bbcode(overview)
@@ -822,7 +823,7 @@ class DescriptionBuilder:
         header = "[h2]" if not header_size else f"[size={header_size}][b]"
         header_end = "[/h2]" if not header_size else "[/b][/size]\n"
 
-        use_pt_br = self.tracker in ("AMIGOSSHARE", "BRASILTRACKER", "CAPYBARABR", "SAMARITANO", "BJSHARE")
+        use_pt_br = self.language == "pt-BR"
         str_technical_details = "Technical Details" if not use_pt_br else "Detalhes Técnicos"
         str_overview = "Overview" if not use_pt_br else "Visão Geral"
         str_platform = "Platform" if not use_pt_br else "Plataforma"
@@ -983,7 +984,7 @@ class DescriptionBuilder:
 
         header = "[h2]" if not header_size else f"[size={header_size}][b]"
         header_end = "[/h2]" if not header_size else "[/b][/size]\n"
-        use_pt_br = self.tracker in ("AMIGOSSHARE", "BRASILTRACKER", "CAPYBARABR", "SAMARITANO", "BJSHARE")
+        use_pt_br = self.language == "pt-BR"
 
         def value(name: str, fallback: Any = "") -> Any:
             """Return a populated normalized release field or its fallback."""
@@ -1039,6 +1040,7 @@ class DescriptionBuilder:
             "bitrate": "Bitrate",
             "external_ids": "External IDs" if not use_pt_br else "IDs Externos",
         }
+        text.update(get_labels(MUSIC_LABELS, self.language))
 
         def musicbrainz_link(kind: str, identifier: Any) -> str:
             """Return a safe MusicBrainz BBCode link for a canonical UUID."""
@@ -1156,16 +1158,17 @@ class DescriptionBuilder:
 
         # Language
         if languages:
+            language_labels = get_labels(COMMON_LABELS, self.language)
             try:
                 if not meta.language_checked:
                     await languages_manager.process_desc_language(meta, self.tracker)
                 if meta.audio_languages and meta.write_audio_languages:
-                    desc_parts.append(f"[code]Audio Language/s: {', '.join(meta.audio_languages)}[/code]")
+                    desc_parts.append(f"[code]{language_labels['audio_languages']}: {', '.join(meta.audio_languages)}[/code]")
 
                 if meta.subtitle_languages and meta.write_subtitle_languages:
-                    desc_parts.append(f"[code]Subtitle Language/s: {', '.join(meta.subtitle_languages)}[/code]")
+                    desc_parts.append(f"[code]{language_labels['subtitle_languages']}: {', '.join(meta.subtitle_languages)}[/code]")
                 if meta.subtitle_languages and meta.write_hc_languages:
-                    desc_parts.append(f"[code]Hardcoded Subtitle Language/s: {', '.join(meta.subtitle_languages)}[/code]")
+                    desc_parts.append(f"[code]{language_labels['hardcoded_subtitles']}: {', '.join(meta.subtitle_languages)}[/code]")
             except Exception as e:
                 logger.warning(f"[yellow]Warning: Error processing language: {e!s}[/yellow]")
 
