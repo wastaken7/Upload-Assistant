@@ -59,6 +59,7 @@ class NameManager:
         if resolution == "OTHER":
             resolution = ""
         audio = meta.audio
+        hardcoded_subs = "HC" if meta.hardcoded_subs else ""
         service = str(meta.service)
         season = str(meta.season)
         episode = meta.episode
@@ -141,10 +142,10 @@ class NameManager:
                 name = f"{title} {alt_title} {year} {edition} {hybrid} {repack} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"
                 potential_missing = ["edition", "description"]
             elif type == "WEBDL":  # WEB-DL
-                name = f"{title} {alt_title} {year} {edition} {hybrid} {repack} {resolution} {uhd} {service} WEB-DL {audio} {hdr} {video_encode}"
+                name = f"{title} {alt_title} {year} {edition} {hybrid} {repack} {resolution} {uhd} {service} WEB-DL {hardcoded_subs} {audio} {hdr} {video_encode}"
                 potential_missing = ["edition", "service"]
             elif type == "WEBRIP":  # WEBRip
-                name = f"{title} {alt_title} {year} {edition} {hybrid} {repack} {resolution} {uhd} {service} WEBRip {audio} {hdr} {video_encode}"
+                name = f"{title} {alt_title} {year} {edition} {hybrid} {repack} {resolution} {uhd} {service} WEBRip {hardcoded_subs} {audio} {hdr} {video_encode}"
                 potential_missing = ["edition", "service"]
             elif type == "HDTV":  # HDTV
                 name = f"{title} {alt_title} {year} {edition} {repack} {resolution} {source} {audio} {video_encode}"
@@ -175,10 +176,10 @@ class NameManager:
                 name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {hybrid} {repack} {resolution} {uhd} {source} {audio} {hdr} {video_encode}"  # SOURCE
                 potential_missing = ["edition", "description"]
             elif type == "WEBDL":  # WEB-DL
-                name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {hybrid} {repack} {resolution} {uhd} {service} WEB-DL {audio} {hdr} {video_encode}"
+                name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {hybrid} {repack} {resolution} {uhd} {service} WEB-DL {hardcoded_subs} {audio} {hdr} {video_encode}"
                 potential_missing = ["edition", "service"]
             elif type == "WEBRIP":  # WEBRip
-                name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {hybrid} {repack} {resolution} {uhd} {service} WEBRip {audio} {hdr} {video_encode}"
+                name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {hybrid} {repack} {resolution} {uhd} {service} WEBRip {hardcoded_subs} {audio} {hdr} {video_encode}"
                 potential_missing = ["edition", "service"]
             elif type == "HDTV":  # HDTV
                 name = f"{title} {year} {alt_title} {season}{episode} {episode_title} {part} {edition} {repack} {resolution} {source} {audio} {video_encode}"
