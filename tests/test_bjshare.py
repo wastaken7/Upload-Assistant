@@ -1,8 +1,11 @@
 import asyncio
+from pathlib import Path
 from types import SimpleNamespace
 
 from bs4 import BeautifulSoup
+from PIL import Image
 
+from src.meta import Meta
 from src.trackers.bjshare import BJShare
 
 
@@ -16,6 +19,25 @@ class FakeResponse:
 
 class FakeSearchResponse(FakeResponse):
     text = '<a href="logout.php?auth=abcdef"></a><table id="torrent_table"></table>'
+
+
+def test_get_screenshots_converts_webp_to_png(tmp_path: Path) -> None:
+    screenshots = tmp_path / "tmp" / "release" / "screenshots"
+    screenshots.mkdir(parents=True)
+    Image.new("RGB", (2, 2), "red").save(screenshots / "Release-0.webp", format="WEBP")
+    uploaded: list[tuple[bytes, str]] = []
+    tracker = object.__new__(BJShare)
+
+    async def fake_img_host(image_bytes: bytes, filename: str) -> str:
+        uploaded.append((image_bytes, filename))
+        return "https://img.example/release-0.png"
+
+    tracker.img_host = fake_img_host
+    result = asyncio.run(tracker.get_screenshots(Meta({"base_dir": str(tmp_path), "uuid": "release"})))
+
+    assert result == ["https://img.example/release-0.png"]  # noqa: S101
+    assert uploaded[0][1] == "Release-0.png"  # noqa: S101
+    assert uploaded[0][0].startswith(b"\x89PNG\r\n\x1a\n")  # noqa: S101
 
 
 class FakeSession:

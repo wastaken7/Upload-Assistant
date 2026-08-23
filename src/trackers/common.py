@@ -3499,6 +3499,9 @@ class Common:
             formatted_tags = [unidecode(t.strip()).replace(" ", ".") for t in matched_tags if t.strip()]
             return ", ".join(formatted_tags[:5])
 
+        if meta.category == "XXX":
+            return "adulto"
+
         if meta.category not in ("GAME", "TV", "MOVIE"):
             return ""
 

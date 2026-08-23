@@ -43,6 +43,30 @@ XXX_RELEASE_MARKERS = XXX_PLATFORM_KEYWORDS | {"xxx"}
 _XXX_RELEASE_MARKER_RE = re.compile(rf"(?<![a-z0-9])(?:{'|'.join(re.escape(marker) for marker in sorted(XXX_RELEASE_MARKERS))})(?![a-z0-9])", re.IGNORECASE)
 _VIDEO_EXTENSIONS = VIDEO_EXTENSIONS
 
+_XXX_NAMING_RE = re.compile(
+    r"^(?P<publisher>[^.]+)\.(?P<date>\d{4}|\d{2}\.\d{2}\.\d{2})\."
+    r"(?P<title>.+?)\.XXX(?:\.(?P<format>[^.]+))?(?:-.*)?$",
+    re.IGNORECASE,
+)
+
+
+def extract_xxx_metadata(name: str) -> dict[str, Any]:
+    """Extract metadata from the supported XXX release naming convention."""
+    candidate = Path(name).stem if Path(name).suffix else name
+    match = _XXX_NAMING_RE.fullmatch(candidate)
+    if not match:
+        return {}
+    date = match.group("date")
+    if len(date) == 8:
+        year, month, day = date.split(".")
+        year = str(2000 + int(year))
+        release_date = f"{year}-{month}-{day}"
+    else:
+        year, release_date = date, date
+    title = match.group("title").replace(".", " ")
+    title = re.sub(r"\s+\d{3,4}[pi]$", "", title, flags=re.IGNORECASE)
+    return {"publisher": match.group("publisher"), "release_date": release_date, "year": int(year), "title": title}
+
 
 def is_xxx_video_release(path: str | Path) -> bool:
     """Return whether a video release name carries a specific XXX platform marker."""
@@ -398,6 +422,11 @@ async def detect_disc_and_category(prep_instance: Any, meta: Meta) -> tuple[str,
     if not meta.category and not meta.manual_category and not meta.is_disc and meta.path and await asyncio.to_thread(is_xxx_video_release, meta.path):
         meta.category = "XXX"
         logger.debug("[cyan]Auto-detected category: XXX[/cyan]")
+
+    if meta.category == "XXX":
+        for field_name, value in extract_xxx_metadata(meta.basename_no_ext).items():
+            if not getattr(meta, field_name):
+                setattr(meta, field_name, value)
 
     return videoloc, bdinfo
 
@@ -1587,6 +1616,11 @@ async def finalize_metadata(
 
         meta.combined_genres = ", ".join(unique_genres) if unique_genres else ""
 
+    if meta.category == "XXX" and not meta.audio:
+        meta.audio, meta.channels, meta.has_commentary = await prep_instance.audio_manager.get_audio_v2(mi_data, meta, bdinfo)
+    if meta.category == "XXX" and not meta.video_codec:
+        meta.video_encode, meta.video_codec, meta.has_encode_settings, meta.bit_depth = await video_manager.get_video_encode(mi_data, meta.type, bdinfo)
+
     if meta.category in ("TV", "MOVIE", "XXX"):
         meta.adult_media = prep_instance.check_adult_media(meta)
 
@@ -1682,6 +1716,8 @@ async def finalize_metadata(
             meta.overview = ""
         if not meta.genres:
             meta.genres = []
+    elif meta.category == "XXX":
+        meta.container = Path(videopath).suffix.lstrip(".").lower()
     elif meta.category == "GAME":
         meta.container = Path(videopath).suffix.lstrip(".").lower()
         meta.audio = ""
