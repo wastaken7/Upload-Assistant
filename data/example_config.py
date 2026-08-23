@@ -246,6 +246,8 @@ config: dict[str, Any] = {
         # Create XXX contact sheets as 5-second animated WebP files instead of PNG.
         "xxx_contact_sheet_animated_webp": False,
         "xxx_contact_sheet_animation_seconds": "5",
+        # Add this many normal screenshots to the contact sheet for a single-video XXX release.
+        "xxx_single_file_screens": "0",
         # Set true to automatically capture DVD menu screenshots from menu VOBs
         "auto_dvd_menus": True,
         # Keep screenshots at the coded dimensions reported by MediaInfo.

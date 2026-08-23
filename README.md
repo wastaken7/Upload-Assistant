@@ -113,7 +113,7 @@ This branch introduces new media categories and automation features not present 
 | <img src="web_ui/static/img/trackers/bithdtv.png" width="16" height="16" />                | BitHDTV                | BITHDTV                | MOVIE, TV                    |
 | <img src="web_ui/static/img/trackers/bitporn.png" width="16" height="16" />                | BitPorn                | BITPORN                | XXX                          |
 | <img src="web_ui/static/img/trackers/blutopia.png" width="16" height="16" />               | Blutopia               | BLUTOPIA               | MOVIE, TV                    |
-| <img src="web_ui/static/img/trackers/bjshare.png" width="16" height="16" />                | BrasilJapão-Share      | BJSHARE                | MOVIE, TV, BOOK, GAME        |
+| <img src="web_ui/static/img/trackers/bjshare.png" width="16" height="16" />                | BrasilJapão-Share      | BJSHARE                | MOVIE, TV, BOOK, GAME, XXX   |
 | <img src="web_ui/static/img/trackers/brasiltracker.png" width="16" height="16" />          | BrasilTracker          | BRASILTRACKER          | MOVIE, TV, BOOK, GAME        |
 | <img src="web_ui/static/img/trackers/broadcasthenet.png" width="16" height="16" />         | BroadcasTheNet         | BROADCASTHENET         | TV                           |
 | <img src="web_ui/static/img/trackers/capybarabr.png" width="16" height="16" />             | CapybaraBR             | CAPYBARABR             | MOVIE, TV, BOOK, GAME        |

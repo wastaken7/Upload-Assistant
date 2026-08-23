@@ -3,6 +3,7 @@ import asyncio
 import platform
 import re
 from datetime import UTC, datetime
+from io import BytesIO
 from pathlib import Path
 from typing import Any, ClassVar
 from urllib.parse import urlparse
@@ -14,6 +15,7 @@ import langcodes
 import pycountry
 from bs4 import BeautifulSoup, Tag
 from langcodes.tag_parser import LanguageTagError
+from PIL import Image
 from unidecode import unidecode
 
 from src.console import logger, prompt_in_thread
@@ -43,7 +45,7 @@ class BJShare:
     torrent_url = f"{base_url}/torrents.php?torrentid="
     torrent_download_url = f"{base_url}/torrents.php?action=download&id="
     requests_url = f"{base_url}/requests.php?"
-    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "XXX")
     tracker_urls = ("tracker.bj-share.info",)
     allows_bloated_audio = True
     secret_token: str = ""
@@ -147,6 +149,11 @@ class BJShare:
                 return False
             return True
 
+        if meta.category == "XXX" and len(meta.filelist) < 2 and int(self.config.get("DEFAULT", {}).get("xxx_single_file_screens", 0)) < 1:
+            logger.info(
+                f"{self.tracker}: [red]XXX uploads require at least 2 screenshots. This upload contains a single file, and 'xxx_single_file_screens' is not configured above 0; the upload may fail.[/red]"
+            )
+
         if meta.category == "GAME":
             pc_platforms = {"PC", "MAC", "LINUX"}
             platform = meta.platform.upper().strip()
@@ -193,7 +200,7 @@ class BJShare:
         container: str = meta.container
         category = meta.category
 
-        if category in ("MOVIE", "TV"):
+        if category in ("MOVIE", "TV", "XXX"):
             if container in ["mkv", "mp4", "avi", "vob", "m2ts", "ts"]:
                 return container.upper()
             return "Outro"
@@ -240,7 +247,7 @@ class BJShare:
                 return magazine
             return ebook
 
-        category_map = {"TV": tv, "MOVIE": movie, "GAME": game}
+        category_map = {"TV": tv, "MOVIE": movie, "GAME": game, "XXX": movie}
 
         return category_map.get(category, 0)
 
@@ -549,6 +556,13 @@ class BJShare:
         if not brazilian_title:
             return original_title
         return f"{brazilian_title} [{original_title}]"
+
+    async def get_xxx_title(self, meta: Meta) -> str:
+        if meta.manual_name:
+            return meta.manual_name
+        if meta.publisher and meta.title:
+            return f"{meta.publisher} - {meta.title}"
+        return await prompt_in_thread(cli_ui.ask_string, f'{self.tracker}: Argumento "--name" não fornecido.\nDigite o título do upload:') or ""
 
     def get_titles(self, meta: Meta) -> tuple[str, str]:
         if meta.category == "BOOK":
@@ -1163,7 +1177,7 @@ class BJShare:
                 logger.info(f"{self.tracker}: Falha ao processar pôster da URL {cover_tmdb_url}: {e}", extra={"markup": False})
                 return None
 
-        if category in ("BOOK", "GAME"):
+        if category in ("BOOK", "GAME", "XXX"):
             cover_path = meta.artwork_path
             if not cover_path or not await self.common.path_exists(cover_path):
                 logger.info("Nenhum cover_path válido encontrado.", extra={"markup": False})
@@ -1182,13 +1196,20 @@ class BJShare:
 
     async def get_screenshots(self, meta: Meta) -> list[str]:
         screens_dir = screenshots_dir(meta.base_dir, meta.uuid)
-        local_files = sorted(screens_dir.glob("*.png"))
+        local_files = sorted((*screens_dir.glob("*.png"), *screens_dir.glob("*.webp")))
 
         disc_menu_links = [img.get("raw_url") for img in meta.menu_images if img.get("raw_url")][:3]
 
         async def upload_local_file(path: Path):
             async with aiofiles.open(path, "rb") as f:
                 image_bytes = await f.read()
+            if path.suffix.lower() == ".webp":
+                logger.info(f"{self.tracker}: Convertendo de WebP para PNG.", extra={"markup": False})
+                with Image.open(BytesIO(image_bytes)) as image:
+                    converted = BytesIO()
+                    image.save(converted, format="PNG")
+                    image_bytes = converted.getvalue()
+                return await self.img_host(image_bytes, f"{path.stem}.png")
             return await self.img_host(image_bytes, Path(path).name)
 
         async def upload_remote_file(url: str):
@@ -1670,7 +1691,35 @@ class BJShare:
                             "adulto": self.get_adulto(meta),
                         }
                     )
+        elif category == "XXX":
+            width, height = self.get_resolution(meta)
+            hours, minutes = self.get_runtime(meta)
 
+            data.update(
+                {
+                    "adulto": 1,
+                    "audio": "Outro",
+                    "codecaudio": self.get_audio_codec(meta),
+                    "codecvideo": self.get_video_codec(meta),
+                    "diretorserie": "",
+                    "duracaoHR": str(hours),
+                    "duracaoMIN": str(minutes),
+                    "duracaotipo": "selectbox",
+                    "elenco": await self.get_credits(meta, "cast"),
+                    "fichatecnica": await self.build_description(meta),
+                    "idioma": "Inglês",
+                    "qualidade": self.get_bitrate(meta),
+                    "release": "",
+                    "remaster_title": "",
+                    "resolucaoh": height,
+                    "resolucaow": width,
+                    "sinopse": "",
+                    "year": str(meta.year)
+                    if meta.year is not None
+                    else await prompt_in_thread(cli_ui.ask_string, f'{self.tracker}: Argumento "--year" não fornecido.\nDigite o ano do upload:'),
+                    "title": await self.get_xxx_title(meta),
+                }
+            )
         # Anon
         anon = not (meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
         if anon:

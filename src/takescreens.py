@@ -78,6 +78,14 @@ def xxx_contact_sheet_animation_settings() -> tuple[bool, float]:
     return animated, duration
 
 
+def xxx_single_file_screens() -> int:
+    """Return the number of normal screenshots to add for a single XXX video."""
+    try:
+        return max(0, int(default_config.get("xxx_single_file_screens", 0) or 0))
+    except TypeError, ValueError:
+        return 0
+
+
 def _xxx_contact_sheet_fontfile() -> str | None:
     candidates = (
         Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "arial.ttf",
@@ -140,46 +148,47 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
     if meta.retake or (existing and len(existing) < len(video_paths)):
         clear_screenshot_group(base_dir, folder_id, capture_group)
         existing = []
-    if not meta.retake and len(existing) >= len(video_paths):
-        sheets = [str(path) for path in existing[: len(video_paths)]]
-        meta.screens = len(sheets)
-        return sheets
+    sheets = [str(path) for path in existing[: len(video_paths)]] if not meta.retake and len(existing) >= len(video_paths) else []
 
-    screenshot_dir = screenshots_dir(base_dir, folder_id)
-    results: list[str] = []
-    frame_count = rows * columns
-    fontfile = _xxx_contact_sheet_fontfile()
-    if fontfile is None:
-        logger.warning("[yellow]No system font found for XXX contact-sheet labels; generating sheets without labels.[/yellow]")
-    for index, video_path in enumerate(video_paths, start=1):
-        output_path = screenshot_dir / f"xxx-contact-sheet-{index}.{'webp' if animated_webp else 'png'}"
-        if output_path.exists() and not meta.retake:
-            results.append(str(output_path))
-            continue
-
-        try:
-            probe = await asyncio.to_thread(ffmpeg.probe, str(video_path))
-            duration = float(probe["format"]["duration"])
-            if duration <= 0:
-                raise ValueError("duration must be positive")
-            if animated_webp:
-                stream = _xxx_contact_sheet_animated_stream(video_path, frame_count, duration, columns, rows, animation_seconds, fontfile)
-                output_options: dict[str, Any] = {"vcodec": "libwebp_anim", "loop": 0, "r": 8, "t": animation_seconds}
-            else:
-                stream = _xxx_contact_sheet_static_stream(video_path, frame_count, duration, columns, rows, fontfile)
-                output_options = {"vframes": 1, "compression_level": ffmpeg_compression}
-            stream = _xxx_contact_sheet_title_filter(stream, video_path.name, len(video_paths) > 1, fontfile)
-            command = ffmpeg.output(stream, str(output_path), **output_options).global_args("-y", "-loglevel", "verbose" if meta.ffdebug else "quiet")
-            return_code, _stdout, stderr = await run_ffmpeg(command)
-            if return_code != 0 or not output_path.is_file():
-                logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {stderr.decode(errors='replace')}[/yellow]")
+    if not sheets:
+        screenshot_dir = screenshots_dir(base_dir, folder_id)
+        results: list[str] = []
+        frame_count = rows * columns
+        fontfile = _xxx_contact_sheet_fontfile()
+        if fontfile is None:
+            logger.warning("[yellow]No system font found for XXX contact-sheet labels; generating sheets without labels.[/yellow]")
+        for index, video_path in enumerate(video_paths, start=1):
+            output_path = screenshot_dir / f"xxx-contact-sheet-{index}.{'webp' if animated_webp else 'png'}"
+            if output_path.exists() and not meta.retake:
+                results.append(str(output_path))
                 continue
-            results.append(str(output_path))
-        except Exception as error:
-            logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {error}[/yellow]")
 
-    sheets = [str(path) for path in register_screenshots(base_dir, folder_id, results, capture_group)] if results else []
-    meta.screens = len(sheets)
+            try:
+                probe = await asyncio.to_thread(ffmpeg.probe, str(video_path))
+                duration = float(probe["format"]["duration"])
+                if duration <= 0:
+                    raise ValueError("duration must be positive")
+                if animated_webp:
+                    stream = _xxx_contact_sheet_animated_stream(video_path, frame_count, duration, columns, rows, animation_seconds, fontfile)
+                    output_options: dict[str, Any] = {"vcodec": "libwebp_anim", "loop": 0, "r": 8, "t": animation_seconds}
+                else:
+                    stream = _xxx_contact_sheet_static_stream(video_path, frame_count, duration, columns, rows, fontfile)
+                    output_options = {"vframes": 1, "compression_level": ffmpeg_compression}
+                stream = _xxx_contact_sheet_title_filter(stream, video_path.name, len(video_paths) > 1, fontfile)
+                command = ffmpeg.output(stream, str(output_path), **output_options).global_args("-y", "-loglevel", "verbose" if meta.ffdebug else "quiet")
+                return_code, _stdout, stderr = await run_ffmpeg(command)
+                if return_code != 0 or not output_path.is_file():
+                    logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {stderr.decode(errors='replace')}[/yellow]")
+                    continue
+                results.append(str(output_path))
+            except Exception as error:
+                logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {error}[/yellow]")
+
+        sheets = [str(path) for path in register_screenshots(base_dir, folder_id, results, capture_group)] if results else []
+    normal_screens = xxx_single_file_screens()
+    if len(video_paths) == 1 and normal_screens:
+        await screenshots(str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, normal_screens, True, cleanup_after_capture=False, capture_group=capture_group)
+    meta.screens = len(manifest_files(base_dir, folder_id, capture_group))
     return sheets
 
 

@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import re
+from pathlib import Path
 from typing import Any, cast
 
 import cli_ui
@@ -96,7 +96,7 @@ class RocketHD(UNIT3D):
         """Extract basename from first file in filelist or path"""
         path_value = meta.path or "" if meta.isdir else next(iter(meta.filelist), meta.path or "")
         path = path_value if isinstance(path_value, str) else ""
-        return os.path.basename(path)
+        return Path(path).name
 
     def _get_language_code(self, track_or_string: Any) -> str:
         """Extract and normalize language to ISO alpha-2 code"""
