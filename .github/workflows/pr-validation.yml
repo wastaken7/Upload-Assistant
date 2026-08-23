@@ -22,6 +22,31 @@ jobs:
       - name: Install Python dependencies
         run: python -m pip install -r requirements.txt
 
+      - name: Build package wheel
+        run: python -m pip wheel --no-deps --wheel-dir dist .
+
+      - name: Verify package assets
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheel = next(Path("dist").glob("*.whl"))
+          required = {
+              "data/tags.json",
+              "data/templates/summary-mediainfo.csv",
+              "data/templates/user-args-template.json",
+              "web_ui/templates/index.html",
+              "web_ui/static/css/theme.css",
+              "web_ui/static/img/logo.svg",
+          }
+          with ZipFile(wheel) as archive:
+              missing = required - set(archive.namelist())
+          if missing:
+              raise SystemExit(f"Wheel is missing: {', '.join(sorted(missing))}")
+          PY
+
       - name: Compile Python sources
         run: python -m compileall src web_ui upload.py config-generator.py
 
