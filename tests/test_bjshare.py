@@ -79,30 +79,30 @@ def test_get_database_identifier_returns_tmdb_id():
     assert BJShare.get_database_identifier(object.__new__(BJShare), soup) == "tv/999999999"  # noqa: S101
 
 
-def test_search_existing_queries_both_media_identifiers_before_title_fallback():
+def test_search_existing_queries_only_media_identifiers():
     tracker = object.__new__(BJShare)
     tracker.session = FakeSession()
     tracker.cookie_validator = FakeCookieValidator()
     tracker.base_url = "https://bj-share.info"
     tracker.tracker = "BJSHARE"
-    meta = SimpleNamespace(category="TV", title="Example", imdb_info={"imdbID": "tt1234567"}, tmdb_id="76543")
+    meta = SimpleNamespace(category="TV", title="Example", imdb_tt="tt1234567", tmdb_id="76543")
 
     asyncio.run(tracker.search_existing(meta))
 
     assert tracker.session.calls == [{"searchstr": "tt1234567"}, {"searchstr": "tv/76543"}]  # noqa: S101
 
 
-def test_search_existing_queries_title_once_without_media_identifiers():
+def test_search_existing_does_not_query_title_without_media_identifiers():
     tracker = object.__new__(BJShare)
     tracker.session = FakeSession(FakeSearchResponse())
     tracker.cookie_validator = FakeCookieValidator()
     tracker.base_url = "https://bj-share.info"
     tracker.tracker = "BJSHARE"
-    meta = SimpleNamespace(category="TV", title="Example", imdb_info={}, tmdb_id="")
+    meta = SimpleNamespace(category="TV", title="Example", imdb_tt="", tmdb_id="")
 
     asyncio.run(tracker.search_existing(meta))
 
-    assert tracker.session.calls == [{"searchstr": "Example"}]  # noqa: S101
+    assert tracker.session.calls == []  # noqa: S101
 
 
 def test_get_database_overview_extracts_synopsis():

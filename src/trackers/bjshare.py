@@ -826,14 +826,11 @@ class BJShare:
         BJShare.database_cast = ""
 
         search_params = [params]
-        title_already_queried = False
         if category in ("TV", "MOVIE"):
-            # Query both exact IDs. The first group page found is retained, while
-            # a title search remains available for older groups lacking either ID.
+            # Search media only by identifiers; title search produces unrelated matches.
             search_params = [{"searchstr": term} for term in dict.fromkeys(media_search_terms)]
-            title_already_queried = not search_params
             if not search_params:
-                search_params.append({"searchstr": title})
+                return dupes
 
         response: httpx.Response | None = None
         fallback_response: httpx.Response | None = None
@@ -854,24 +851,6 @@ class BJShare:
 
             fallback_response = candidate
             if response is None and BeautifulSoup(candidate.text, "html.parser").find("div", class_="main_column"):
-                response = candidate
-
-        if category in ("TV", "MOVIE") and response is None and title and not title_already_queried and title not in media_search_terms:
-            candidate = await self.session.get(search_url, params={"searchstr": title}, follow_redirects=True)
-            candidate.raise_for_status()
-            if "login.php" in str(candidate.url) or "login.php" in candidate.text:
-                await self.cookie_validator.handle_validation_failure(meta, self.tracker, candidate.text)
-                meta.skipping = f"{self.tracker}"
-                return dupes
-
-            auth_match = re.search(r"logout\.php\?auth=([a-f0-9]+)", candidate.text)
-            if not auth_match:
-                logger.info(f"{self.tracker}: [bold red]Failed to find auth token on page.[/bold red]")
-                meta.skipping = f"{self.tracker}"
-                return dupes
-            BJShare.secret_token = auth_match.group(1)
-            fallback_response = candidate
-            if BeautifulSoup(candidate.text, "html.parser").find("div", class_="main_column"):
                 response = candidate
 
         response = response or fallback_response
