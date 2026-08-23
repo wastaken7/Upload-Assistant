@@ -3158,10 +3158,10 @@ def run() -> None:
 def run_config_generator() -> None:
     import runpy
     import sys
-    import os
-    script_path = os.path.join(os.path.dirname(__file__), "config-generator.py")
-    sys.argv[0] = script_path
-    runpy.run_path(script_path, run_name="__main__")
+
+    script_path = Path(__file__).with_name("config-generator.py")
+    sys.argv[0] = str(script_path)
+    runpy.run_path(str(script_path), run_name="__main__")
 
 
 if __name__ == "__main__":

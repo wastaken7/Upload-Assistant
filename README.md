@@ -226,6 +226,18 @@ For a manual Linux/macOS/Windows installation, Upload Assistant needs a few tool
 
 ---
 
+### Install with `uv` (Windows, Linux, or macOS)
+
+If you have [uv](https://github.com/astral-sh/uv) installed, you can install Upload Assistant directly from the repository as a globally available standalone CLI tool. This automatically manages the virtual environment and exposes the `ua` and `ua-config` commands directly to your system path.
+
+```bash
+uv tool install git+https://github.com/wastaken7/Upload-Assistant.git
+```
+
+If `uv` reports that its tool directory is not on your `PATH`, run `uv tool update-shell`, then open a new terminal.
+
+---
+
 ### Step 2: Download Upload Assistant (Linux/macOS)
 
 Choose **one** of the two options below to get the files onto your computer:
@@ -252,16 +264,6 @@ If you do not want to install Git, you can download a copy of the files directly
 1. Go to the [GitHub Repository Page](https://github.com/wastaken7/Upload-Assistant).
 2. Click the green **Code** button near the top right, and click **Download ZIP**.
 3. Extract the ZIP file to a folder of your choice on your computer.
-
-#### Option C: Install as a standalone CLI tool using `uv` (Modern)
-
-If you have [uv](https://github.com/astral-sh/uv) installed, you can install Upload Assistant directly from the repository as a globally available standalone CLI tool. This automatically manages the virtual environment and exposes the `ua` and `ua-config` commands directly to your system path.
-
-1. **Install Upload Assistant**:
-   ```bash
-   uv tool install git+https://github.com/wastaken7/Upload-Assistant.git
-   ```
-   *Note: If you use this method, you can skip Step 3.*
 
 ---
 

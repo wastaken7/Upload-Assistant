@@ -78,6 +78,10 @@ py-modules = ["upload", "config-generator"]
 where = ["."]
 exclude = ["tests", "tmp"]
 
+[tool.setuptools.package-data]
+data = ["tags.json", "templates/*.csv", "templates/*.json"]
+web_ui = ["static/**/*", "templates/*.html"]
+
 [tool.ruff]
 line-length = 176
 target-version = "py314"
