@@ -190,7 +190,7 @@ def test_upload_uses_only_registered_main_screenshots(tmp_path: Path, monkeypatc
         _, uploaded_count = asyncio.run(_upload_screens(config, meta, 1, 1, 0, 1, [], {}))
 
     assert uploaded_count == 1
-    assert calls == [str(main_screen)]
+    assert calls == [main_screen.name]
 
 
 def test_early_bdmv_capture_includes_alternate_playlists() -> None:
@@ -224,48 +224,3 @@ def test_early_bdmv_capture_includes_extra_discs() -> None:
 
     assert len(screenshot_spy.calls) == 2
     assert screenshot_spy.calls[1][0][-1] == "FILE_1"
-
-
-def test_early_capture_returns_meta_with_tonemapping() -> None:
-    prep = Prep.__new__(Prep)
-
-    class _TonemappingTakeScreens:
-        async def screenshots(self, *_args: object, **kwargs: object) -> None:
-            meta_arg = _args[4] if len(_args) > 4 else kwargs.get("meta")
-            if isinstance(meta_arg, Meta):
-                meta_arg.tonemapped = True
-                meta_arg.libplacebo = True
-
-    prep.takescreens_manager = _TonemappingTakeScreens()
-    prep.config = {"DEFAULT": {"multiScreens": 2}}
-    meta = Meta(category="MOVIE", keep_images=False, screens=6, hdr="HDR")
-
-    result = asyncio.run(prep._capture_early_screenshots(meta, "Release", "C:/media/Release.mkv", {}))
-
-    assert result is not None
-    assert result.tonemapped is True
-    assert result.libplacebo is True
-
-
-def test_screenshots_sets_tonemapped_when_reusing_existing_screenshots(tmp_path: Path) -> None:
-    release_id = "release_tonemap"
-    release_dir = tmp_path / "tmp" / release_id
-    screenshot_dir = release_dir / "screenshots"
-    screenshot_dir.mkdir(parents=True)
-    (release_dir / "MediaInfo.json").write_text(
-        '{"media": {"track": [{"Duration": "100"}, {"Duration": "100", "Width": "1920", "Height": "1080", "PixelAspectRatio": "1", "DisplayAspectRatio": "1.777", "FrameRate": "24"}]}}',
-        encoding="utf-8",
-    )
-    for index in range(2):
-        image = screenshot_dir / f"title-{index}.png"
-        image.write_bytes(b"image")
-    meta = Meta(category="MOVIE", base_dir=str(tmp_path), uuid=release_id, screens=2, hdr="HDR10", imghost="imgbb")
-
-    with (
-        patch("src.takescreens.tone_map", True),
-        patch("src.takescreens.get_image_host", new=AsyncMock(return_value="imgbb")),
-    ):
-        result = asyncio.run(screenshots("unused.mkv", "title", release_id, str(tmp_path), meta, num_screens=2))
-
-    assert len(result or []) == 2
-    assert meta.tonemapped is True

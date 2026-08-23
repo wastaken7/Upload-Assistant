@@ -34,7 +34,6 @@ import psutil
 import web_ui.auth as auth_mod
 from src.webui_progress import ProgressEvent, clear_progress_callback, reset_progress, set_progress_callback
 from src.app_paths import CODE_DIR, STATE_DIR
-from src.meta import Meta
 
 
 def _module_name(*parts: str) -> str:
@@ -548,18 +547,21 @@ def _get_ip_whitelist() -> list[str]:
     return []
 
 
-def _set_ip_whitelist(ips: list[str]) -> None:
+def _set_ip_whitelist(ips: list[str]) -> bool:
     """Set the list of whitelisted IPs."""
-    with contextlib.suppress(Exception):
+    try:
         path = cfg_dir / "webui_auth.json"
         data: dict[str, Any] = {}
         if path.exists():
             try:
                 data = _json_load_dict(path.read_text(encoding="utf-8"))
             except Exception:
-                return
+                return False
         data["ip_whitelist"] = ips
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True
+    except Exception:
+        return False
 
 
 def _get_ip_blacklist() -> list[str]:
@@ -575,18 +577,36 @@ def _get_ip_blacklist() -> list[str]:
     return []
 
 
-def _set_ip_blacklist(ips: list[str]) -> None:
+def _set_ip_blacklist(ips: list[str]) -> bool:
     """Set the list of blacklisted IPs."""
-    with contextlib.suppress(Exception):
+    try:
         path = cfg_dir / "webui_auth.json"
         data: dict[str, Any] = {}
         if path.exists():
             try:
                 data = _json_load_dict(path.read_text(encoding="utf-8"))
             except Exception:
-                return
+                return False
         data["ip_blacklist"] = ips
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+def _set_ip_control(whitelist: list[str], blacklist: list[str]) -> bool:
+    """Persist both IP access lists in one write."""
+    try:
+        path = cfg_dir / "webui_auth.json"
+        data: dict[str, Any] = {}
+        if path.exists():
+            data = _json_load_dict(path.read_text(encoding="utf-8"))
+        data["ip_whitelist"] = whitelist
+        data["ip_blacklist"] = blacklist
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        return True
+    except Exception:
+        return False
 
 
 def _get_ip_failures() -> dict[str, list[int]]:
@@ -903,14 +923,18 @@ def _load_token_store() -> dict[str, Any]:
         return {}
 
 
-def _persist_token_store(store: dict[str, Any]) -> None:
-    with suppress(Exception):
+def _persist_token_store(store: dict[str, Any]) -> bool:
+    try:
         set_api_tokens_fn = getattr(auth_mod, "set_api_tokens", None)
-        if callable(set_api_tokens_fn):
-            set_api_tokens_fn(store)
+        if not callable(set_api_tokens_fn):
+            return False
+        set_api_tokens_fn(store)
+        return True
+    except Exception:
+        return False
 
 
-def _create_api_token(username: str, label: str = "", persist: bool = True, token_value: str | None = None) -> str:
+def _create_api_token(username: str, label: str = "", persist: bool = True, token_value: str | None = None) -> tuple[str, bool]:
     """Create a new API token. If `persist` is False, do not write the token store to durable storage.
     Optionally accept `token_value` to use an externally-provided token string when persisting.
     """
@@ -920,11 +944,10 @@ def _create_api_token(username: str, label: str = "", persist: bool = True, toke
     token_id = secrets.token_hex(16)
     expiry = None
     store[token_hash] = {"token_id": token_id, "user": username, "label": label, "created": int(datetime.now(UTC).timestamp()), "expiry": expiry}
-    if persist:
-        _persist_token_store(store)
+    persisted = _persist_token_store(store) if persist else False
     with contextlib.suppress(Exception):
         _write_audit_log("create_api_token", [username], None, {"id": token_id, "label": label}, True)
-    return token
+    return token, persisted
 
 
 def _persist_existing_api_token(token: str, username: str, label: str = "") -> bool:
@@ -938,7 +961,8 @@ def _persist_existing_api_token(token: str, username: str, label: str = "") -> b
     expiry = None
     token_id = secrets.token_hex(16)
     store[token_hash] = {"token_id": token_id, "user": username, "label": label, "created": int(datetime.now(UTC).timestamp()), "expiry": expiry}
-    _persist_token_store(store)
+    if not _persist_token_store(store):
+        return False
     with contextlib.suppress(Exception):
         _write_audit_log("create_api_token", [username], None, {"id": token_id, "label": label}, True)
     return True
@@ -1026,7 +1050,8 @@ def _revoke_api_token(token_or_id: str) -> bool:
     owner = owner_info.get("user")
     token_id = owner_info.get("token_id")
     del store[store_key]
-    _persist_token_store(store)
+    if not _persist_token_store(store):
+        return False
     with contextlib.suppress(Exception):
         _write_audit_log("revoke_api_token", [str(owner)] if owner is not None else [], {"id": token_id}, None, True)
     return True
@@ -1489,16 +1514,6 @@ def _execution_preview_cover_url(preview_session_id: str, cache_key: str) -> str
     return f"/api/execution_preview_cover?session_id={urllib.parse.quote(preview_session_id, safe='')}&v={version}"
 
 
-def _execution_preview_cover_cache_key(session_id: str, fallback: str) -> str:
-    cover_file = _find_execution_preview_cover_file(session_id)
-    if cover_file is None:
-        return fallback
-    try:
-        return f"{fallback}:{cover_file.stat().st_mtime_ns}"
-    except OSError:
-        return fallback
-
-
 def _music_cover_from_meta(meta_data: Mapping[str, object], preview_session_id: str) -> str:
     """Return a public cover URL or the authenticated local-preview endpoint."""
     for key in ("cover", "poster"):
@@ -1871,7 +1886,7 @@ def _music_preview_from_meta(meta_data: Mapping[str, object]) -> dict[str, objec
     }
 
 
-def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: str, preview_session_id: str = "") -> ExecutionPreview:
+def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: str) -> ExecutionPreview:
     title = _stringify_preview_value(meta_data.get("title")) or _stringify_preview_value(meta_data.get("name"))
     original_title = _stringify_preview_value(meta_data.get("original_title"))
     category = _stringify_preview_value(meta_data.get("category")).upper()
@@ -1879,12 +1894,6 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
     # contract for MOVIE/TV.  Keep the older fields as fallbacks so previews
     # remain available for already-created temp metadata.
     poster_url = _stringify_preview_value(meta_data.get("artwork_url")) or _stringify_preview_value(meta_data.get("poster"))
-    if not poster_url and preview_session_id and _find_execution_preview_cover_file(preview_session_id) is not None:
-        cache_key = _execution_preview_cover_cache_key(
-            preview_session_id,
-            _stringify_preview_value(meta_data.get("uuid")) or fallback_path,
-        )
-        poster_url = _execution_preview_cover_url(preview_session_id, cache_key)
     if category == "MUSIC":
         poster_url = _music_cover_from_meta(meta_data, _stringify_preview_value(meta_data.get("webui_session_id")))
     tmdb_poster = _stringify_preview_value(meta_data.get("tmdb_poster_path")) or _stringify_preview_value(meta_data.get("tmdb_poster"))
@@ -1899,7 +1908,6 @@ def _extract_execution_preview(meta_data: Mapping[str, object], fallback_path: s
     tv_pack_raw = _stringify_preview_value(meta_data.get("tv_pack")).lower()
 
     return {
-        "media_id": _stringify_preview_value(meta_data.get("uuid")) or fallback_path,
         "path": _stringify_preview_value(meta_data.get("path")) or fallback_path,
         "filename": Path(fallback_path).name,
         "title": title or _stringify_preview_value(music.get("album")),
@@ -1968,7 +1976,7 @@ def _find_execution_preview(session_id: str) -> ExecutionPreview | None:
                         console.print(f"Execution preview cover enrichment failed for session {session_id}: {err}", markup=False)
             if _stringify_preview_value(meta_data.get("category")).upper() == "MUSIC":
                 meta_data = {**meta_data, "webui_session_id": session_id}
-            preview = _extract_execution_preview(meta_data, execution_path, session_id)
+            preview = _extract_execution_preview(meta_data, execution_path)
             preview["awaiting_input"] = bool(process_info.get("awaiting_input"))
             preview["input_type"] = process_info.get("input_type")
             preview["progress"] = _progress_items_for_process(process_info)
@@ -2175,7 +2183,6 @@ class ProgressItem(TypedDict, total=False):
 class ExecutionPreview(TypedDict, total=False):
     """Serialized preview data for the media currently being processed."""
 
-    media_id: str
     path: str
     filename: str
     title: str
@@ -2230,6 +2237,9 @@ class ConfigItem(TypedDict, total=False):
     children: list[ConfigItem]
     help: list[str]
     subsection: str | bool
+    overridden: bool
+    sensitive: bool
+    redacted: bool
 
 
 class ConfigSection(TypedDict, total=False):
@@ -2461,6 +2471,23 @@ def set_runtime_browse_roots(browse_roots: str) -> None:
     _runtime_browse_roots = browse_roots
 
 
+def _find_config_assignment(tree: ast.Module) -> ast.Assign | ast.AnnAssign | None:
+    """Return the top-level assignment that defines ``config``."""
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "config" for target in node.targets):
+            return node
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "config":
+            return node
+    return None
+
+
+def _config_dict_node(tree: ast.Module) -> ast.Dict | None:
+    assignment = _find_config_assignment(tree)
+    if assignment is None or not isinstance(assignment.value, ast.Dict):
+        return None
+    return assignment.value
+
+
 def _load_config_from_file(path: Path) -> dict[str, Any] | None:
     """Load and return the ``config`` dict from a Python config file.
 
@@ -2492,24 +2519,15 @@ def _load_config_from_file(path: Path) -> dict[str, Any] | None:
         with Path(path).open(encoding="utf-8") as f:
             content = f.read()
         tree = ast.parse(content)
-        for node in ast.walk(tree):
-            config_node: ast.expr | None = None
-            if isinstance(node, ast.Assign):
-                for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id == "config":
-                        config_node = node.value
-                        break
-            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == "config":
-                config_node = node.value
-
-            if config_node is not None:
-                config_value = ast.literal_eval(config_node)
-                if isinstance(config_value, dict):
-                    config_value_dict = cast(dict[Any, Any], config_value)
-                    result: dict[str, Any] = {}
-                    for key, value in config_value_dict.items():
-                        result[str(key)] = value
-                    return result
+        config_node = _config_dict_node(tree)
+        if config_node is not None:
+            config_value = ast.literal_eval(config_node)
+            if isinstance(config_value, dict):
+                config_value_dict = cast(dict[Any, Any], config_value)
+                result: dict[str, Any] = {}
+                for key, value in config_value_dict.items():
+                    result[str(key)] = value
+                return result
         console.print(f"[yellow]Config file {path.name} does not contain a valid 'config' dict assignment.[/yellow]")
         return None
     except Exception as exc:
@@ -2566,6 +2584,16 @@ def _is_sensitive_key(key: Any) -> bool:
     return any(part in lowered for part in sensitive_parts)
 
 
+def _is_sensitive_config_key(key: str, path: Sequence[str]) -> bool:
+    """Return whether a config leaf must be redacted before reaching the browser."""
+    lowered = key.lower()
+    if re.search(r"api|username|password|secret|token|credential|auth|announce_url|rss_key|passkey|qui_proxy_url", lowered):
+        return True
+    if "TORRENT_CLIENTS" in path and re.search(r"(^|_)(user|pass)$", lowered):
+        return True
+    return False
+
+
 def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: Any, success: bool, error: str | None = None) -> None:
     """Append an audit record to data/config_audit.log.
 
@@ -2608,15 +2636,20 @@ def _write_audit_log(action: str, path: list[str], old_value: Any, new_value: An
             console.print(f"Failed to write config audit record: {ae}", markup=False)
 
 
-def _get_nested_value(data: Any, path: list[str]) -> Any:
+_MISSING_CONFIG_VALUE = object()
+
+
+def _get_nested_value(data: Any, path: list[str], default: Any = None) -> Any:
     current: Any = data
     for key in path:
         if not isinstance(current, dict):
-            return None
+            return default
         current_dict = _as_dict(current)
         if current_dict is None:
-            return None
-        current = current_dict.get(key)
+            return default
+        if key not in current_dict:
+            return default
+        current = current_dict[key]
     return current
 
 
@@ -2687,17 +2720,15 @@ def _format_config_tree(tree: ast.AST) -> str:
     if not isinstance(tree, ast.Module):
         return ast.unparse(tree)
 
+    config_assignment = _find_config_assignment(tree)
     for node in tree.body:
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "config":
-                    if isinstance(node.value, ast.Dict):
-                        lines.append("config = {")
-                        lines.extend(_format_dict(node.value, 1))
-                        lines.append("}")
-                    else:
-                        lines.append(ast.unparse(node))
-                    break
+        if node is config_assignment and isinstance(node.value, ast.Dict):
+            if isinstance(node, ast.AnnAssign):
+                lines.append(f"config: {ast.unparse(node.annotation)} = {{")
+            else:
+                lines.append("config = {")
+            lines.extend(_format_dict(node.value, 1))
+            lines.append("}")
         else:
             # Keep other statements as-is
             lines.append(ast.unparse(node))
@@ -2724,123 +2755,138 @@ def _format_dict(dict_node: ast.Dict, indent_level: int) -> list[str]:
     return lines
 
 
-def _replace_config_value_in_source(source: str, key_path: list[str], new_value: str) -> str:
-    tree = ast.parse(source)
-    config_assign = None
-    for node in tree.body:
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "config":
-                    config_assign = node
-                    break
-        if config_assign:
-            break
-
-    if config_assign is None or not isinstance(config_assign.value, ast.Dict):
-        raise ValueError("Config assignment not found")
-
-    current_dict = config_assign.value
-    target_node: ast.AST | None = None
-
-    for i, key in enumerate(key_path):
-        found = False
-        for k_node, v_node in zip(current_dict.keys, current_dict.values, strict=False):
-            if isinstance(k_node, ast.Constant) and isinstance(k_node.value, str) and k_node.value == key:
-                if isinstance(v_node, ast.Dict):
-                    if i < len(key_path) - 1:  # Not the final key
-                        current_dict = v_node
-                        found = True
-                        break
-                    # Final key - update existing value
-                    target_node = v_node
-                    found = True
-                    break
-                target_node = v_node
-                found = True
-                break
-
-        if not found:
-            if i == len(key_path) - 1:  # Final key doesn't exist - need to add it
-                # Add new key-value pair to current_dict
-                new_key_node = ast.Constant(value=key)
-                new_value_node = ast.parse(new_value, mode="eval").body
-
-                current_dict.keys.append(new_key_node)
-                current_dict.values.append(new_value_node)
-
-                # Reconstruct the source with the new key using proper formatting
-                return _format_config_tree(tree)
-            raise ValueError(f"Key not found in config: {key}")
-
-        if target_node is not None and i < len(key_path) - 1:
-            raise ValueError("Invalid path for config update")
-
-    if target_node is None:
-        raise ValueError("Target node not found")
-
-    if not hasattr(target_node, "lineno") or not hasattr(target_node, "end_lineno"):
-        raise ValueError("Unable to locate config value position")
-
-    lineno = cast(int | None, getattr(target_node, "lineno", None))
-    end_lineno = cast(int | None, getattr(target_node, "end_lineno", None))
-    col_offset = cast(int, getattr(target_node, "col_offset", 0))
-    end_col_offset = cast(int, getattr(target_node, "end_col_offset", 0))
+def _node_source_offsets(source: str, node: ast.AST) -> tuple[int, int]:
+    lineno = cast(int | None, getattr(node, "lineno", None))
+    end_lineno = cast(int | None, getattr(node, "end_lineno", None))
     if lineno is None or end_lineno is None:
         raise ValueError("Unable to locate config value position")
-
     lines = source.splitlines(keepends=True)
-    start = sum(len(line) for line in lines[: lineno - 1]) + col_offset
-    end = sum(len(line) for line in lines[: end_lineno - 1]) + end_col_offset
 
-    updated_source = f"{source[:start]}{new_value}{source[end:]}"
+    def character_column(line: str, byte_column: int) -> int:
+        # AST columns are UTF-8 byte offsets, while Python string slices use
+        # Unicode character offsets.
+        return len(line.encode("utf-8")[:byte_column].decode("utf-8"))
 
-    # Reformat the entire config to ensure consistent styling
-    updated_tree = ast.parse(updated_source)
-    return _format_config_tree(updated_tree)
+    start_col = character_column(lines[lineno - 1], cast(int, getattr(node, "col_offset", 0)))
+    end_col = character_column(lines[end_lineno - 1], cast(int, getattr(node, "end_col_offset", 0)))
+    start = sum(len(line) for line in lines[: lineno - 1]) + start_col
+    end = sum(len(line) for line in lines[: end_lineno - 1]) + end_col
+    return start, end
+
+
+def _nested_config_literal(keys: Sequence[str], leaf_literal: str) -> str:
+    result = leaf_literal
+    for key in reversed(keys):
+        result = f"{{{key!r}: {result}}}"
+    return result
+
+
+def _insert_config_entry_in_source(source: str, dict_node: ast.Dict, key: str, value_literal: str, indent_level: int) -> str:
+    start, end = _node_source_offsets(source, dict_node)
+    if end <= start or source[end - 1] != "}":
+        raise ValueError("Unable to locate config dictionary boundary")
+
+    child_indent = "    " * indent_level
+    closing_indent = "    " * max(indent_level - 1, 0)
+    entry = f"{key!r}: {value_literal}"
+
+    if not dict_node.keys:
+        replacement = f"{{\n{child_indent}{entry},\n{closing_indent}}}"
+        return f"{source[:start]}{replacement}{source[end:]}"
+
+    closing_offset = end - 1
+    lines = source.splitlines(keepends=True)
+    end_lineno = cast(int, getattr(dict_node, "end_lineno"))
+    closing_line_start = sum(len(line) for line in lines[: end_lineno - 1])
+    if not source[closing_line_start:closing_offset].strip():
+        return f"{source[:closing_line_start]}{child_indent}{entry},\n{source[closing_line_start:]}"
+
+    inner = source[start + 1 : closing_offset]
+    separator = " " if inner.rstrip().endswith(",") else ", "
+    return f"{source[:closing_offset]}{separator}{entry}{source[closing_offset:]}"
+
+
+def _replace_config_value_in_source(source: str, key_path: list[str], new_value: str) -> str:
+    tree = ast.parse(source)
+    current_dict = _config_dict_node(tree)
+    if current_dict is None:
+        raise ValueError("Config assignment not found")
+
+    for index, key in enumerate(key_path):
+        value_node: ast.AST | None = None
+        for key_node, candidate in zip(current_dict.keys, current_dict.values, strict=False):
+            if isinstance(key_node, ast.Constant) and isinstance(key_node.value, str) and key_node.value == key:
+                value_node = candidate
+                break
+
+        if value_node is None:
+            nested_value = _nested_config_literal(key_path[index + 1 :], new_value)
+            return _insert_config_entry_in_source(source, current_dict, key, nested_value, index + 1)
+
+        if index < len(key_path) - 1:
+            if not isinstance(value_node, ast.Dict):
+                raise ValueError("Invalid path for config update")
+            current_dict = value_node
+            continue
+
+        start, end = _node_source_offsets(source, value_node)
+        return f"{source[:start]}{new_value}{source[end:]}"
+
+    raise ValueError("Invalid path for config update")
 
 
 def _remove_config_key_in_source(source: str, key_path: list[str]) -> str:
     """Remove a key from the config source if it exists"""
     tree = ast.parse(source)
-    config_assign = None
-    for node in tree.body:
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "config":
-                    config_assign = node
-                    break
-        if config_assign:
-            break
-
-    if config_assign is None or not isinstance(config_assign.value, ast.Dict):
+    current_dict = _config_dict_node(tree)
+    if current_dict is None:
         return source  # No config found, return as-is
 
-    current_dict = config_assign.value
-
     for i, key in enumerate(key_path):
-        found = False
-        for j, (k_node, v_node) in enumerate(zip(current_dict.keys, current_dict.values, strict=False)):
-            if isinstance(k_node, ast.Constant) and isinstance(k_node.value, str) and k_node.value == key:
-                if isinstance(v_node, ast.Dict):
-                    if i < len(key_path) - 1:  # Not the final key
-                        current_dict = v_node
-                        found = True
-                        break
-                    # Final key - remove it
-                    # Remove the key-value pair
-                    del current_dict.keys[j]
-                    del current_dict.values[j]
-                    # Reconstruct the source
-                    return _format_config_tree(tree)
-                if i == len(key_path) - 1:  # Final key - remove it
-                    del current_dict.keys[j]
-                    del current_dict.values[j]
-                    return _format_config_tree(tree)
-                found = True
+        match: tuple[ast.AST, ast.AST] | None = None
+        for key_node, value_node in zip(current_dict.keys, current_dict.values, strict=False):
+            if isinstance(key_node, ast.Constant) and isinstance(key_node.value, str) and key_node.value == key:
+                match = (key_node, value_node)
                 break
-
-        if not found:
+        if match is None:
             return source  # Key not found, return as-is
+
+        key_node, value_node = match
+        if i < len(key_path) - 1:
+            if not isinstance(value_node, ast.Dict):
+                return source
+            current_dict = value_node
+            continue
+
+        key_start, _ = _node_source_offsets(source, key_node)
+        _, value_end = _node_source_offsets(source, value_node)
+        lines = source.splitlines(keepends=True)
+        key_lineno = cast(int, getattr(key_node, "lineno"))
+        value_end_lineno = cast(int, getattr(value_node, "end_lineno"))
+        key_line_start = sum(len(line) for line in lines[: key_lineno - 1])
+
+        # Generated configs keep each mapping entry on its own line. Removing
+        # whole lines preserves all unrelated comments and formatting.
+        if not source[key_line_start:key_start].strip():
+            value_line_start = sum(len(line) for line in lines[: value_end_lineno - 1])
+            remove_end = value_line_start + len(lines[value_end_lineno - 1])
+            return f"{source[:key_line_start]}{source[remove_end:]}"
+
+        # Fall back to removing an inline mapping entry and an adjacent comma.
+        remove_start = key_start
+        remove_end = value_end
+        while remove_end < len(source) and source[remove_end] in " \t":
+            remove_end += 1
+        if remove_end < len(source) and source[remove_end] == ",":
+            remove_end += 1
+            while remove_end < len(source) and source[remove_end] in " \t":
+                remove_end += 1
+        else:
+            while remove_start > 0 and source[remove_start - 1] in " \t":
+                remove_start -= 1
+            if remove_start > 0 and source[remove_start - 1] == ",":
+                remove_start -= 1
+        return f"{source[:remove_start]}{source[remove_end:]}"
 
     return source  # Should not reach here
 
@@ -2879,6 +2925,7 @@ def _build_config_items(
     for key in merged_keys:
         example_value = example_section.get(key)
         user_value = user_dict.get(key)
+        is_overridden = key in user_dict and (key not in example_section or user_value != example_value)
         key_path = [*path, key]
         help_text = comments_map.get("/".join(key_path), [])
         subsection_label = subsection_map.get("/".join(key_path))
@@ -2895,6 +2942,7 @@ def _build_config_items(
                 "source": source,
                 "children": children,
                 "help": help_text,
+                "overridden": is_overridden,
             }
         else:
             if key in user_dict:
@@ -2903,11 +2951,16 @@ def _build_config_items(
             else:
                 value = example_value
                 source = "example"
+            sensitive = (isinstance(example_value, str) or isinstance(user_value, str)) and _is_sensitive_config_key(key, key_path)
+            redacted = sensitive and source == "config" and value not in (None, "")
             item = {
                 "key": key,
-                "value": _json_safe(value),
+                "value": "<REDACTED>" if redacted else _json_safe(value),
                 "source": source,
                 "help": help_text,
+                "overridden": is_overridden,
+                "sensitive": sensitive,
+                "redacted": redacted,
             }
 
         if current_subsection:
@@ -2928,21 +2981,25 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
     lines = source.splitlines()
     tree = ast.parse(source)
 
-    config_assign: ast.Assign | None = None
-    for node in tree.body:
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "config":
-                    config_assign = node
-                    break
-        if config_assign:
-            break
-
+    config_assign = _find_config_assignment(tree)
     if config_assign is None or not isinstance(config_assign.value, ast.Dict):
         return {}, {}
 
     comment_map: dict[str, list[str]] = {}
     subsection_map: dict[str, str] = {}
+    default_subsection_headers = {
+        "MAIN SETTINGS",
+        "METADATA CACHE",
+        "TRACKER METADATA CACHE",
+        "IMAGE HOSTING SETTINGS",
+        "GETTING METADATA",
+        "SCREENSHOT HANDLING",
+        "DESCRIPTION SETTINGS",
+        "CLIENT SETUP",
+        "ARR* INTEGRATION SETTINGS",
+        "TORRENT CREATION",
+        "POST UPLOAD",
+    }
 
     def collect_comments(lineno: int) -> list[str]:
         idx = lineno - 2
@@ -2963,10 +3020,17 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
         return comments
 
     def find_headers(
+        path: list[str],
         start_line: int,
         end_line: int,
         child_ranges: list[tuple[int, int]],
     ) -> list[tuple[int, str]]:
+        # Only DEFAULT currently uses comment headings as WebUI subsections.
+        # Other sections can contain uppercase data in comments (notably the
+        # multiline TRACKERS catalog), which must remain ordinary help text.
+        if path != ["DEFAULT"]:
+            return []
+
         headers: list[tuple[int, str]] = []
         for idx in range(start_line - 1, end_line):
             if idx <= 0 or idx + 1 >= len(lines):
@@ -2977,11 +3041,7 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
             title = stripped.lstrip("#").strip()
             if not title:
                 continue
-            if title != title.upper():
-                continue
-            if not any(char.isalpha() for char in title):
-                continue
-            if lines[idx - 1].strip() or lines[idx + 1].strip():
+            if title not in default_subsection_headers:
                 continue
             line_no = idx + 1
             if any(start <= line_no <= end for start, end in child_ranges):
@@ -3013,7 +3073,10 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
         start_line = getattr(node, "lineno", None)
         end_line = getattr(node, "end_lineno", None)
         if isinstance(start_line, int) and isinstance(end_line, int) and key_entries:
-            headers = sorted(find_headers(start_line, end_line, child_ranges), key=lambda h: h[0])
+            headers = sorted(
+                find_headers(path, start_line, end_line, child_ranges),
+                key=lambda header: header[0],
+            )
             key_entries.sort(key=lambda entry: entry[1])
             header_idx = 0
             current_header: str | None = None
@@ -3645,8 +3708,8 @@ def ip_control_api():
                 except ValueError:
                     return jsonify({"success": False, "error": f"Invalid IP address: {ip}"}), 400
 
-            _set_ip_whitelist(whitelist)
-            _set_ip_blacklist(blacklist)
+            if not _set_ip_control(whitelist, blacklist):
+                return jsonify({"success": False, "error": "Failed to persist IP control settings"}), 500
             return jsonify({"success": True})
         except Exception as e:
             console.print(f"Error updating IP control: {e}", markup=False)
@@ -3708,18 +3771,17 @@ def twofa_enable():
     if not totp.verify(code):
         return jsonify({"error": "Invalid code", "success": False}), 400
 
-    # Save the secret permanently to encrypted user record
-    with suppress(Exception):
-        auth_mod.set_totp_secret(temp_secret)
-
-    # Persist recovery codes (hashes) if provided
+    # Persist the secret and recovery codes atomically in the encrypted user record.
     temp_codes_raw: object = _session_get("temp_recovery_codes", [])
     temp_codes: list[str] = []
     if isinstance(temp_codes_raw, Sequence) and not isinstance(temp_codes_raw, (str, bytes, bytearray)):
         temp_codes_seq = cast(Sequence[Any], temp_codes_raw)
         temp_codes = [str(c) for c in temp_codes_seq]
     hashes = [_hash_code(c) for c in temp_codes]
-    _persist_recovery_hashes(hashes)
+    try:
+        auth_mod.set_twofa_state(str(temp_secret), hashes)
+    except Exception:
+        return jsonify({"error": "Failed to persist 2FA settings", "success": False}), 500
 
     # Update global variable
     global saved_totp_secret
@@ -3858,35 +3920,33 @@ def config_options():
 
         # Add special client list items to DEFAULT section
         if section_name == "DEFAULT":
-            # Check if they already exist in items
-            existing_keys = {str(item["key"]) for item in items if "key" in item}
-            if "injecting_client_list" not in existing_keys:
-                items.append(
-                    {
-                        "key": "injecting_client_list",
-                        "value": user_section.get("injecting_client_list", []),
-                        "source": "config" if "injecting_client_list" in user_section else "example",
-                        "help": [
-                            "A list of clients to use for injection (aka actually adding the torrent for uploading)",
-                            'eg: ["qbittorrent", "rtorrent"]',
-                        ],
-                        "subsection": "CLIENT SETUP",
-                    }
-                )
-            if "searching_client_list" not in existing_keys:
-                items.append(
-                    {
-                        "key": "searching_client_list",
-                        "value": user_section.get("searching_client_list", []),
-                        "source": "config" if "searching_client_list" in user_section else "example",
-                        "help": [
-                            "A list of clients to search for torrents.",
-                            'eg: ["qbittorrent", "qbittorrent_searching"]',
-                            "will fallback to default_torrent_client if empty",
-                        ],
-                        "subsection": "CLIENT SETUP",
-                    }
-                )
+            client_list_fields = {
+                "injecting_client_list": [
+                    "A list of clients to use for injection (aka actually adding the torrent for uploading)",
+                    'eg: ["qbittorrent", "rtorrent"]',
+                ],
+                "searching_client_list": [
+                    "A list of clients to search for torrents.",
+                    'eg: ["qbittorrent", "qbittorrent_searching"]',
+                    "will fallback to default_torrent_client if empty",
+                ],
+            }
+            for client_key, client_help in client_list_fields.items():
+                existing_item = next((item for item in items if item.get("key") == client_key), None)
+                if existing_item is None:
+                    items.append(
+                        {
+                            "key": client_key,
+                            "value": user_section.get(client_key, []),
+                            "source": "config" if client_key in user_section else "example",
+                            "overridden": client_key in user_section and user_section.get(client_key) != [],
+                            "help": client_help,
+                            "subsection": "CLIENT SETUP",
+                        }
+                    )
+                else:
+                    existing_item["help"] = client_help
+                    existing_item["subsection"] = "CLIENT SETUP"
             # Update subsection_map for these items
             subsection_map["DEFAULT/injecting_client_list"] = "CLIENT SETUP"
             subsection_map["DEFAULT/searching_client_list"] = "CLIENT SETUP"
@@ -3935,78 +3995,44 @@ def torrent_clients():
     return jsonify({"success": True, "clients": sorted(client_names)})
 
 
-_TRACKER_CONFIGURATION_KEYS = frozenset(
-    {
-        "api_key",
-        "announce_url",
-        "my_announce_url",
-        "username",
-        "password",
-        "passkey",
-        "cookie_file",
-        "cookies",
-        "ApiUser",
-        "bhd_rss_key",
-        "bioma_api_key",
-        "ptgen_api",
-    }
-)
-
-
-def _has_configured_tracker_value(tracker_config: Mapping[str, Any], example_tracker_config: Mapping[str, Any]) -> bool:
-    """Return whether a tracker has a meaningful user-supplied setup value."""
-    for key in _TRACKER_CONFIGURATION_KEYS:
-        if key not in tracker_config:
-            continue
-
-        value = tracker_config[key]
-        if isinstance(value, str):
-            value = value.strip()
-        example_value = example_tracker_config.get(key)
-        if isinstance(example_value, str):
-            example_value = example_value.strip()
-        if value in (None, "", False) or value == example_value:
-            continue
-        return True
-
-    return False
-
-
 def _configured_tracker_names(
-    trackers_section: Mapping[str, Any],
-    example_trackers: Mapping[str, Any],
+    user_config: Mapping[str, Any],
+    example_config: Mapping[str, Any],
     default_trackers: Sequence[str],
-    supported_trackers: Mapping[str, Any],
-    cookie_trackers: set[str] | None = None,
-    user_config: Mapping[str, Any] | None = None,
-) -> set[str]:
-    """Return supported tracker names that have enough setup to show by default."""
-    supported_names = {str(name).upper() for name in supported_trackers}
+) -> list[str]:
+    """Return defaults plus tracker sections that differ from the example."""
     configured = {str(name).strip().upper() for name in default_trackers if str(name).strip()}
-    configured.update(str(name).upper() for name in (cookie_trackers or set()))
+    user_trackers = _as_dict(user_config.get("TRACKERS")) or {}
+    example_trackers = _as_dict(example_config.get("TRACKERS")) or {}
 
-    tracker_configs = {str(name).upper(): value for name, value in trackers_section.items() if isinstance(value, Mapping)}
-    example_configs = {str(name).upper(): value for name, value in example_trackers.items() if isinstance(value, Mapping)}
-
-    for tracker_name in supported_names:
-        tracker_config = tracker_configs.get(tracker_name)
-        if tracker_config is None:
+    for tracker_name, tracker_settings in user_trackers.items():
+        if tracker_name == "default_trackers" or not isinstance(tracker_settings, Mapping):
             continue
-        example_tracker_config = example_configs.get(tracker_name, {})
-        if _has_configured_tracker_value(tracker_config, example_tracker_config):
-            configured.add(tracker_name)
+        example_settings = example_trackers.get(tracker_name)
+        if not isinstance(example_settings, Mapping) or _mapping_has_user_overrides(tracker_settings, example_settings):
+            configured.add(str(tracker_name).upper())
 
-    # Older configurations stored the BroadcasTheNet API key in DEFAULT.
-    default_section = user_config.get("DEFAULT", {}) if user_config else {}
-    if isinstance(default_section, Mapping) and default_section.get("btn_api"):
-        configured.add("BROADCASTHENET")
+    return sorted(configured)
 
-    return configured & supported_names
+
+def _mapping_has_user_overrides(user_values: Mapping[str, Any], example_values: Mapping[str, Any]) -> bool:
+    """Return whether recognized user values differ from the example."""
+    for key, user_value in user_values.items():
+        if key not in example_values:
+            # Ignore settings left behind by an older tracker schema.
+            continue
+        example_value = example_values[key]
+        if isinstance(user_value, Mapping) and isinstance(example_value, Mapping):
+            if _mapping_has_user_overrides(user_value, example_value):
+                return True
+        elif user_value != example_value:
+            return True
+    return False
 
 
 @app.route("/api/trackers")
 def get_trackers():
-    """Return supported trackers, including their default/configured status."""
+    """Return a list of available trackers and the configured default trackers"""
     if not _is_authenticated():
         return jsonify({"success": False, "error": "Authentication required (web session)"}), 401
 
@@ -4016,9 +4042,9 @@ def get_trackers():
     base_dir = STATE_DIR
     config_path = base_dir / "data" / "config.py"
     user_config = _load_config_from_file(config_path) or {}
+    example_config = _load_config_from_file(CODE_DIR / "data" / "example_config.py") or {}
 
-    trackers_section_raw = user_config.get("TRACKERS", {})
-    trackers_section = cast(dict[str, Any], trackers_section_raw) if isinstance(trackers_section_raw, Mapping) else {}
+    trackers_section = user_config.get("TRACKERS", {})
     default_trackers_val = trackers_section.get("default_trackers", "")
     default_trackers_list = []
     if isinstance(default_trackers_val, str):
@@ -4026,37 +4052,13 @@ def get_trackers():
     elif isinstance(default_trackers_val, list):
         default_trackers_list = [str(t).strip().upper() for t in default_trackers_val if str(t).strip()]
 
+    configured_trackers = _configured_tracker_names(user_config, example_config, default_trackers_list)
+
     # Load tracker_class_map from src.trackersetup
     try:
         from src.trackersetup import tracker_class_map
     except Exception as e:
         return jsonify({"success": False, "error": f"Failed to load trackers: {e}"}), 500
-
-    example_config = _load_config_from_file(CODE_DIR / "data" / "example_config.py") or {}
-    example_trackers_raw = example_config.get("TRACKERS", {})
-    example_trackers = cast(dict[str, Any], example_trackers_raw) if isinstance(example_trackers_raw, Mapping) else {}
-
-    cookie_trackers: set[str] = set()
-    try:
-        from src.cookie_auth import find_cookie_file
-
-        for tracker_name in tracker_class_map:
-            cookie_path = Path(find_cookie_file(str(STATE_DIR), tracker_name, user_config))
-            if cookie_path.is_file():
-                cookie_trackers.add(tracker_name.upper())
-    except Exception:
-        # Cookie discovery is an additional configuration signal. A missing or
-        # unreadable cookies directory should not prevent the selector loading.
-        cookie_trackers.clear()
-
-    configured_trackers = _configured_tracker_names(
-        trackers_section,
-        example_trackers,
-        default_trackers_list,
-        tracker_class_map,
-        cookie_trackers,
-        user_config,
-    )
 
     trackers_data = []
     for tracker_name, tracker_class in tracker_class_map.items():
@@ -4070,19 +4072,18 @@ def get_trackers():
                 favicon_url = f"/static/img/trackers/{tracker_name.lower()}.{ext}"
                 break
 
-        trackers_data.append(
-            {
-                "name": tracker_name,
-                "display_name": display_name,
-                "base_url": base_url,
-                "favicon": favicon_url,
-                "configured": tracker_name.upper() in configured_trackers,
-            }
-        )
+        trackers_data.append({"name": tracker_name, "display_name": display_name, "base_url": base_url, "favicon": favicon_url})
 
     trackers_data.sort(key=lambda x: x["display_name"].lower())
 
-    return jsonify({"success": True, "default_trackers": default_trackers_list, "trackers": trackers_data})
+    return jsonify(
+        {
+            "success": True,
+            "configured_trackers": configured_trackers,
+            "default_trackers": default_trackers_list,
+            "trackers": trackers_data,
+        }
+    )
 
 
 @app.route("/api/config_update", methods=["POST"])
@@ -4110,17 +4111,24 @@ def config_update():
     config_path = base_dir / "data" / "config.py"
 
     example_config = _load_config_from_file(example_path) or {}
-    example_value = _get_nested_value(example_config, path)
+    example_value = _get_nested_value(example_config, path, _MISSING_CONFIG_VALUE)
 
     # Special handling for client lists that don't exist in example config
     key = path[-1] if path else ""
     if key in ["injecting_client_list", "searching_client_list"]:
         example_value = []  # Default to empty list
-    elif example_value is None:
+    elif example_value is _MISSING_CONFIG_VALUE:
         return jsonify({"success": False, "error": "Path not found in example config"}), 400
 
     coerced_value = _coerce_config_value(raw_value, example_value)
     new_value_literal = _python_literal(coerced_value)
+
+    if not config_path.exists():
+        try:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            config_path.write_text("from typing import Any\n\nconfig: dict[str, Any] = {}\n", encoding="utf-8")
+        except Exception:
+            return jsonify({"success": False, "error": "Unable to create the configuration file"}), 500
 
     # Special handling for client lists that should remain commented unless user provides values
     key = path[-1] if path else ""
@@ -4167,7 +4175,10 @@ def config_update():
             console.print(f"Failed to write config audit failure record: {ae}", markup=False)
         return jsonify({"success": False, "error": "An error occurred while updating the configuration"}), 500
 
-    return jsonify({"success": True, "value": _json_safe(coerced_value)})
+    response_value: Any = _json_safe(coerced_value)
+    if isinstance(coerced_value, str) and coerced_value and _is_sensitive_config_key(key, path):
+        response_value = "<REDACTED>"
+    return jsonify({"success": True, "value": response_value})
 
 
 @app.route("/api/config_remove_subsection", methods=["POST"])
@@ -4192,6 +4203,9 @@ def config_remove_subsection():
 
     base_dir = STATE_DIR
     config_path = base_dir / "data" / "config.py"
+
+    if not config_path.exists():
+        return jsonify({"success": True, "value": None})
 
     try:
         source = config_path.read_text(encoding="utf-8")
@@ -4270,8 +4284,9 @@ def api_tokens():
 
         # default/generate
         persist_flag = bool(data.get("persist", True))
-        token = _create_api_token(username, label=label, persist=persist_flag)
-        persisted = persist_flag
+        token, persisted = _create_api_token(username, label=label, persist=persist_flag)
+        if persist_flag and not persisted:
+            return jsonify({"success": False, "error": "Failed to persist token"}), 500
         return jsonify({"success": True, "token": token, "persisted": persisted})
 
     if request.method == "DELETE":
@@ -4639,46 +4654,6 @@ def execution_preview_cover():
 
     mimetype = mimetypes.guess_type(str(cover_file))[0] or "application/octet-stream"
     return send_file(cover_file, mimetype=mimetype, conditional=True, max_age=30)
-
-
-@app.route("/api/execution_preview_cover/regenerate", methods=["POST"])
-def regenerate_execution_preview_cover():
-    """Regenerate the local XXX preview cover from another video frame."""
-    if not _verify_csrf_header() or not _verify_same_origin():
-        return jsonify({"success": False, "error": "CSRF/Origin validation failed"}), 403
-
-    payload = _request_json_dict()
-    session_id = _stringify_preview_value(payload.get("session_id"))
-    execution_path, meta_file, meta_data = _resolve_execution_preview_meta(session_id)
-    if meta_file is None or meta_data is None:
-        return jsonify({"success": False, "error": "Execution metadata is not available yet"}), 404
-    media_id = _stringify_preview_value(payload.get("media_id"))
-    current_media_id = _stringify_preview_value(meta_data.get("uuid")) or execution_path
-    if not media_id or media_id != current_media_id:
-        return jsonify({"success": False, "error": "The execution preview has moved to another item"}), 409
-    if _stringify_preview_value(meta_data.get("category")).upper() != "XXX":
-        return jsonify({"success": False, "error": "Cover regeneration is only available for XXX"}), 400
-
-    try:
-        from src.takescreens import xxx_fallback_cover
-
-        meta = Meta(dict(meta_data))
-        folder_id = meta.uuid or Path(execution_path).name
-        cover = asyncio.run(xxx_fallback_cover(list(meta.filelist or []), folder_id, meta.base_dir, meta, random_frame=True))
-        if not cover:
-            return jsonify({"success": False, "error": "Could not generate a new cover from the source video"}), 422
-        cache_key = _execution_preview_cover_cache_key(session_id, folder_id)
-        return jsonify(
-            {
-                "success": True,
-                "poster_url": _execution_preview_cover_url(session_id, cache_key),
-            }
-        )
-    except (FileNotFoundError, ValueError) as error:
-        return jsonify({"success": False, "error": str(error)}), 404
-    except Exception as error:
-        console.print(f"XXX cover regeneration failed for {session_id}: {error}", markup=False)
-        return jsonify({"success": False, "error": "Could not regenerate the XXX cover"}), 500
 
 
 @app.route("/api/execution_screenshots")

@@ -67,6 +67,21 @@
     return nextTheme;
   }
 
+  function filterUATrackerChoices(
+    trackers,
+    configuredTrackerNames,
+    selectedTrackerNames,
+    showAllSupported,
+  ) {
+    if (showAllSupported) return Array.isArray(trackers) ? trackers : [];
+    const configured = new Set(configuredTrackerNames || []);
+    const selected = new Set(selectedTrackerNames || []);
+    return (Array.isArray(trackers) ? trackers : []).filter(
+      (tracker) =>
+        tracker && (configured.has(tracker.name) || selected.has(tracker.name)),
+    );
+  }
+
   applyUAColorTheme();
 
   // CSRF + apiFetch helpers with automatic refresh on 401/403 responses.
@@ -205,6 +220,8 @@
     window.getUAStoredColorTheme =
       window.getUAStoredColorTheme || getUAStoredColorTheme;
     window.setUAColorTheme = window.setUAColorTheme || setUAColorTheme;
+    window.filterUATrackerChoices =
+      window.filterUATrackerChoices || filterUATrackerChoices;
     window.loadCsrfToken = window.loadCsrfToken || loadCsrfToken;
     window.clearCsrfToken = window.clearCsrfToken || clearCsrfToken;
     window.uaApiFetch = window.uaApiFetch || uaApiFetch;

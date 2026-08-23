@@ -25,12 +25,3 @@ def test_populate_cast_normalizes_and_limits_entries() -> None:
     meta.populate_cast()
 
     assert meta.cast == ["One", "Two", "Three", "Four", "Five"]
-
-
-def test_meta_base_dir_defaults_to_state_dir() -> None:
-    from src.app_paths import STATE_DIR
-
-    assert Meta().base_dir == str(STATE_DIR)
-    assert Meta(base_dir="").base_dir == str(STATE_DIR)
-    assert Meta({"base_dir": ""}).base_dir == str(STATE_DIR)
-    assert Meta(base_dir="/custom/dir").base_dir == "/custom/dir"

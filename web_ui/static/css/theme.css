@@ -143,6 +143,42 @@ button:focus-visible {
   background-color: var(--ua-stone) !important;
 }
 
+/* Preserve each palette on translucent utility surfaces. Tailwind's opacity
+   variants are separate class names, so the solid-color translations above
+   do not apply to them automatically. */
+:where([class~="bg-gray-900/20"]) {
+  background-color: color-mix(
+    in srgb,
+    var(--ua-obsidian) 20%,
+    transparent
+  ) !important;
+}
+
+:where([class~="bg-gray-900/30"]) {
+  background-color: color-mix(
+    in srgb,
+    var(--ua-obsidian) 30%,
+    transparent
+  ) !important;
+}
+
+:where([class~="bg-gray-800/30"]) {
+  background-color: color-mix(
+    in srgb,
+    var(--ua-charcoal) 30%,
+    transparent
+  ) !important;
+}
+
+:where([class~="bg-gray-800/40"]),
+:where([class~="hover:bg-gray-800/40"]):hover {
+  background-color: color-mix(
+    in srgb,
+    var(--ua-charcoal) 40%,
+    transparent
+  ) !important;
+}
+
 :where(
   [class~="border-gray-700"],
   [class~="border-gray-600"],

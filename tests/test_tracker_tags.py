@@ -3,33 +3,17 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.trackers.common import Common
+from src.trackers.bjshare import BJShare
+from src.trackers.brasiltracker import BrasilTracker
 
 
-@pytest.mark.parametrize("tracker_name", ["BJShare", "BrasilTracker"])
-def test_get_tags_removes_accents_from_mapped_tags(tracker_name):
-    common = Common(config={})
-    meta = SimpleNamespace(category="MOVIE", genres=["Action", "Mystery"], keywords=[], unattended=False, unattended_confirm=False)
+@pytest.mark.parametrize("tracker_class", [BJShare, BrasilTracker])
+def test_get_tags_removes_accents_from_mapped_tags(tracker_class):
+    tracker = object.__new__(tracker_class)
+    tracker.main_tmdb_data = {}
+    meta = SimpleNamespace(category="MOVIE", genres=["Action", "Mystery"], keywords=[])
 
-    tags = asyncio.run(common.get_portuguese_tags(meta, tracker=tracker_name, tmdb_data={}))
+    tags = asyncio.run(tracker.get_tags(meta))
 
     assert tags == "acao, misterio"  # noqa: S101
     assert tags.isascii()  # noqa: S101
-
-
-@pytest.mark.parametrize("tracker_name", ["BJShare", "BrasilTracker"])
-def test_get_tags_limits_to_maximum_5_tags(tracker_name):
-    common = Common(config={})
-    meta = SimpleNamespace(
-        category="MOVIE",
-        genres=["Action", "Mystery", "Comedy", "Drama", "Horror", "Thriller", "Adventure"],
-        keywords=[],
-        unattended=False,
-        unattended_confirm=False,
-    )
-
-    tags = asyncio.run(common.get_portuguese_tags(meta, tracker=tracker_name, tmdb_data={}))
-
-    tag_list = [t.strip() for t in tags.split(",") if t.strip()]
-    assert len(tag_list) == 5  # noqa: S101
-

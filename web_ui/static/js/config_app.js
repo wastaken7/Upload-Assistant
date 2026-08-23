@@ -190,6 +190,20 @@ const getStoredTheme = window.getUAStoredTheme;
 const colorThemes = window.UAThemes || [];
 const getStoredColorTheme = window.getUAStoredColorTheme;
 const setColorTheme = window.setUAColorTheme;
+const {
+  filterItemsForSubTab,
+  getAvailableTrackers,
+  getConfiguredTrackerNames,
+  getMetadataCacheServiceLabel,
+  getMergedDefaultSubsectionHeading,
+  getSubTabsForSection,
+  getTrackerCatalogForSection,
+  getTorrentClientInstanceLabel,
+  getTorrentClientTypeLabel,
+  groupMetadataCacheServices,
+  sortTrackerNames,
+  usesConfigSettingsPanels,
+} = window.UAConfigPageHelpers;
 
 // Local CSRF cache used by fallback `apiFetch` when `uaApiFetch` isn't present.
 let localCsrf = null;
@@ -239,7 +253,7 @@ const loadCsrfToken =
   (typeof window !== "undefined" && window.loadCsrfToken) || (async () => {});
 
 const sensitiveKeyPattern =
-  /(api|username|password|announce_url|rss_key|passkey|qui_proxy_url)/i;
+  /(api|username|password|secret|token|credential|auth|announce_url|rss_key|passkey|qui_proxy_url)/i;
 const isSensitiveKey = (key) => sensitiveKeyPattern.test(key || "");
 const isTorrentClientUserPass = (key, pathParts) =>
   pathParts.includes("TORRENT_CLIENTS") && /(user|pass)/i.test(key || "");
@@ -276,6 +290,7 @@ const trackerNameMap = {
   AMIGOSSHARE: "Amigos-Share",
   ANTHELION: "Anthelion",
   ASIANCINEMA: "AsianCinema",
+  AURA4K: "Aura4K",
   AVISTAZ: "AvistaZ",
   BEYONDHD: "Beyond-HD",
   BITHDTV: "BitHDTV",
@@ -293,7 +308,6 @@ const trackerNameMap = {
   DRUNKENSLUG: "DrunkenSlug",
   EMUWAREZ: "Emuwarez",
   FILELIST: "FileList",
-  FLOOD: "Flood",
   FUNFILE: "FunFile",
   GREATPOSTERWALL: "GreatPosterWall",
   HAWKEUNO: "hawke-uno",
@@ -338,7 +352,6 @@ const trackerNameMap = {
   REELFLIX: "ReelFLiX",
   RETROFLIX: "RetroFlix",
   RETROMOVIESCLUB: "RetroMoviesClub",
-  ROCKETHD: "RocketHD",
   SAMARITANO: "Samaritano",
   SEEDPOOL: "Seedpool",
   SHAREISLAND: "ShareIsland",
@@ -392,26 +405,6 @@ const getImageHostOptions = (item, allHosts, usedHosts) => {
     const normalizedHost = String(host).trim().toLowerCase();
     return !usedHosts.has(normalizedHost) || currentValue === normalizedHost;
   });
-};
-
-const getAvailableTrackers = (item) => {
-  if (!item || !item.help || !item.help.length) {
-    return [];
-  }
-  const helpLine = item.help.find((line) =>
-    line.toLowerCase().includes("available tracker"),
-  );
-  if (!helpLine) {
-    return [];
-  }
-  const parts = helpLine.split(":");
-  if (parts.length < 2) {
-    return [];
-  }
-  return parts[1]
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean);
 };
 
 const statusClassFor = (type, isDarkMode) => {
@@ -512,11 +505,13 @@ function ConfigLeaf({
   allImageHosts,
   usedImageHosts,
   torrentClients,
+  trackerCatalog,
   onValueChange,
 }) {
   const path = [...pathParts, item.key];
 
   const helpText = item.help && item.help.length ? item.help.join("\n") : "";
+  const displayLabel = item.displayLabel || formatDisplayLabel(item.key);
   const labelClass = isDarkMode
     ? "text-sm font-medium text-gray-200"
     : "text-sm font-medium text-gray-700";
@@ -551,6 +546,12 @@ function ConfigLeaf({
       "bluray_score",
       "bluray_single_score",
       "rehash_cooldown",
+      "ttl_hours",
+      "localized_ttl_hours",
+      "metadata_cache_default_ttl_hours",
+      "metadata_cache_negative_ttl_minutes",
+      "tracker_metadata_cache_ttl_hours",
+      "tracker_metadata_cache_negative_ttl_minutes",
       "custom_layout",
       "screens_per_row",
     ];
@@ -595,6 +596,13 @@ function ConfigLeaf({
       case "bluray_single_score":
       case "desat":
         return 10;
+      case "ttl_hours":
+      case "localized_ttl_hours":
+      case "metadata_cache_default_ttl_hours":
+      case "metadata_cache_negative_ttl_minutes":
+      case "tracker_metadata_cache_ttl_hours":
+      case "tracker_metadata_cache_negative_ttl_minutes":
+        return 0;
       case "screens_per_row":
         return 2;
       case "custom_layout":
@@ -694,7 +702,7 @@ function ConfigLeaf({
           }
         >
           <div className="flex items-center gap-2">
-            <div className={labelClass}>{formatDisplayLabel(item.key)}</div>
+            <div className={labelClass}>{displayLabel}</div>
             {helpText && (
               <Tooltip content={helpText}>
                 <InfoIcon
@@ -786,6 +794,14 @@ function ConfigLeaf({
           return { min: 0, max: 100, step: 0.1 };
         case "rehash_cooldown":
           return { min: 0, max: 300, step: 5 };
+        case "ttl_hours":
+        case "localized_ttl_hours":
+        case "metadata_cache_default_ttl_hours":
+        case "tracker_metadata_cache_ttl_hours":
+          return { min: 0, max: 8760, step: 1 };
+        case "metadata_cache_negative_ttl_minutes":
+        case "tracker_metadata_cache_negative_ttl_minutes":
+          return { min: 0, max: 10080, step: 1 };
         case "screens_per_row":
           return { min: 1, max: 10, step: 1 };
         case "custom_layout":
@@ -805,7 +821,7 @@ function ConfigLeaf({
           }
         >
           <div className="flex items-center gap-2">
-            <div className={labelClass}>{formatDisplayLabel(item.key)}</div>
+            <div className={labelClass}>{displayLabel}</div>
             {helpText && (
               <Tooltip content={helpText}>
                 <InfoIcon
@@ -859,7 +875,7 @@ function ConfigLeaf({
           }
         >
           <div className="flex items-center gap-2">
-            <div className={labelClass}>{formatDisplayLabel(item.key)}</div>
+            <div className={labelClass}>{displayLabel}</div>
             {helpText && (
               <Tooltip content={helpText}>
                 <InfoIcon
@@ -895,12 +911,15 @@ function ConfigLeaf({
   }
 
   if (item.key === "default_trackers") {
-    const availableTrackers = getAvailableTrackers(item);
+    const availableTrackers = sortTrackerNames(
+      getAvailableTrackers(item, trackerCatalog),
+      getTrackerDisplayName,
+    );
 
     return (
       <div className="col-span-full px-4 py-3">
         <div className="flex items-center gap-2 mb-2">
-          <div className={labelClass}>{formatDisplayLabel(item.key)}</div>
+          <div className={labelClass}>{displayLabel}</div>
           {helpText && (
             <Tooltip content={helpText}>
               <InfoIcon
@@ -962,7 +981,7 @@ function ConfigLeaf({
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <label htmlFor={item.key} className={labelClass}>
-            {formatDisplayLabel(item.key)}
+            {displayLabel}
           </label>
           {helpText && (
             <Tooltip content={helpText}>
@@ -1082,7 +1101,7 @@ function ConfigLeaf({
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <label className={labelClass}>{formatDisplayLabel(item.key)}</label>
+          <label className={labelClass}>{displayLabel}</label>
           {helpText && (
             <Tooltip content={helpText}>
               <InfoIcon
@@ -1226,7 +1245,7 @@ function ConfigLeaf({
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <label className={labelClass}>{formatDisplayLabel(item.key)}</label>
+          <label className={labelClass}>{displayLabel}</label>
           {helpText && (
             <Tooltip content={helpText}>
               <InfoIcon
@@ -1259,15 +1278,16 @@ function ConfigLeaf({
       : typeof item.value === "string"
         ? item.value
         : JSON.stringify(item.value);
-  const sensitive = isSensitiveKeyForPath(item.key, pathParts);
+  const sensitive =
+    Boolean(item.sensitive) || isSensitiveKeyForPath(item.key, pathParts);
   const readOnly = isReadOnlyKeyForPath(item.key, pathParts);
-  const originalValue =
-    sensitive && String(rawValue).trim() !== "" ? "<REDACTED>" : rawValue;
+  const serverRedacted = Boolean(item.redacted) || rawValue === "<REDACTED>";
+  const originalValue = serverRedacted ? "<REDACTED>" : rawValue;
 
-  const [textValue, setTextValue] = useState(rawValue);
-  const [redacted, setRedacted] = useState(
-    sensitive && String(rawValue).trim() !== "",
+  const [textValue, setTextValue] = useState(
+    serverRedacted ? "<REDACTED>" : rawValue,
   );
+  const [redacted, setRedacted] = useState(serverRedacted);
 
   useEffect(() => {
     const nextRaw =
@@ -1276,10 +1296,10 @@ function ConfigLeaf({
         : typeof item.value === "string"
           ? item.value
           : JSON.stringify(item.value);
-    const isRedacted = sensitive && String(nextRaw).trim() !== "";
+    const isRedacted = Boolean(item.redacted) || nextRaw === "<REDACTED>";
     setTextValue(isRedacted ? "<REDACTED>" : nextRaw);
     setRedacted(isRedacted);
-  }, [item.value, sensitive]);
+  }, [item.value, item.redacted, sensitive]);
 
   const onFocus = () => {
     if (redacted) {
@@ -1292,7 +1312,7 @@ function ConfigLeaf({
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         <label htmlFor={item.key} className={labelClass}>
-          {formatDisplayLabel(item.key)}
+          {displayLabel}
         </label>
         {helpText && (
           <Tooltip content={helpText}>
@@ -1324,10 +1344,171 @@ function ConfigLeaf({
   );
 }
 
+function MetadataCacheServicesEditor({
+  item,
+  pathParts,
+  isOpen,
+  onToggle,
+  isDarkMode,
+  allImageHosts,
+  usedImageHosts,
+  torrentClients,
+  trackerCatalog,
+  onValueChange,
+}) {
+  const groups = groupMetadataCacheServices(item.children);
+  const sectionHelp = item.help && item.help.length ? item.help.join(" ") : "";
+  const serviceCount = groups.reduce(
+    (count, group) => count + group.items.length,
+    0,
+  );
+  const fieldLabels = {
+    enabled: "Caching enabled",
+    ttl_hours: "Cache lifetime (hours)",
+    localized_ttl_hours: "Localized data lifetime (hours)",
+  };
+
+  return (
+    <div
+      data-testid="metadata-cache-services-accordion"
+      className={`overflow-hidden rounded-lg border ${
+        isDarkMode
+          ? "border-gray-700 bg-gray-900/20"
+          : "border-gray-200 bg-white"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        aria-controls="metadata-cache-service-overrides"
+        className={`flex w-full flex-col items-stretch gap-3 p-4 text-left sm:flex-row sm:items-start sm:justify-between ${
+          isDarkMode ? "hover:bg-gray-800/40" : "hover:bg-gray-50"
+        }`}
+      >
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            className="mt-0.5 shrink-0 transition-transform"
+            style={{ transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}
+          >
+            &gt;
+          </span>
+          <div
+            className={
+              isDarkMode
+                ? "text-sm font-semibold text-gray-200"
+                : "text-sm font-semibold text-gray-700"
+            }
+          >
+            Service Cache Overrides
+            <p
+              className={`mt-1 text-xs font-normal ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+            >
+              {sectionHelp ||
+                "Control caching and retention separately for each metadata provider."}
+            </p>
+          </div>
+        </div>
+        <span
+          className={`shrink-0 text-xs ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}
+        >
+          {isOpen ? "Hide services" : `Show ${serviceCount} services`}
+        </span>
+      </button>
+
+      <div
+        id="metadata-cache-service-overrides"
+        className={
+          isOpen
+            ? `space-y-5 border-t p-4 ${isDarkMode ? "border-gray-700" : "border-gray-200"}`
+            : "hidden"
+        }
+      >
+        {groups.map((group) => (
+          <div key={group.label} className="space-y-2">
+            <div
+              className={
+                isDarkMode
+                  ? "text-xs font-semibold uppercase tracking-wide text-purple-300"
+                  : "text-xs font-semibold uppercase tracking-wide text-purple-700"
+              }
+            >
+              {group.label}
+            </div>
+            <div
+              className={`overflow-hidden rounded-lg border divide-y ${
+                isDarkMode
+                  ? "border-gray-700 divide-gray-700 bg-gray-900/20"
+                  : "border-gray-200 divide-gray-200 bg-white"
+              }`}
+            >
+              {group.items.map((service) => {
+                const serviceHelp =
+                  service.help && service.help.length
+                    ? service.help.join(" ")
+                    : "";
+                return (
+                  <div
+                    key={service.key}
+                    data-testid="metadata-cache-service-row"
+                    className="grid grid-cols-1 gap-2 p-3 md:grid-cols-[minmax(11rem,1fr)_minmax(0,3fr)] md:items-start"
+                  >
+                    <div className="px-2 py-3">
+                      <div
+                        className={
+                          isDarkMode
+                            ? "text-sm font-semibold text-gray-100"
+                            : "text-sm font-semibold text-gray-800"
+                        }
+                      >
+                        {getMetadataCacheServiceLabel(service.key)}
+                      </div>
+                      {serviceHelp && (
+                        <p
+                          className={`mt-1 text-xs leading-relaxed ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                        >
+                          {serviceHelp}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                      {(service.children || []).map((field) => (
+                        <ConfigLeaf
+                          key={field.key}
+                          item={{
+                            ...field,
+                            displayLabel:
+                              fieldLabels[field.key] ||
+                              formatDisplayLabel(field.key),
+                            help: [],
+                          }}
+                          pathParts={[...pathParts, item.key, service.key]}
+                          isDarkMode={isDarkMode}
+                          fullWidth={true}
+                          allImageHosts={allImageHosts}
+                          usedImageHosts={usedImageHosts}
+                          torrentClients={torrentClients}
+                          trackerCatalog={trackerCatalog}
+                          onValueChange={onValueChange}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ItemList({
   items,
   pathParts,
   depth,
+  panelHeading,
   isDarkMode,
   allImageHosts,
   usedImageHosts,
@@ -1335,6 +1516,7 @@ function ItemList({
   expandedGroups,
   toggleGroup,
   torrentClients,
+  trackerCatalog,
   onValueChange,
 }) {
   // Group items into regular fields and subsections
@@ -1342,11 +1524,6 @@ function ItemList({
   const subsections = [];
 
   for (const item of items || []) {
-    const apiHost = getImageHostForApiKey(item.key);
-    if (apiHost && !usedImageHosts.has(apiHost)) {
-      continue;
-    }
-
     if (item.children && item.children.length) {
       subsections.push(item);
     } else {
@@ -1365,10 +1542,99 @@ function ItemList({
       defaultTrackersItem = regularItems.splice(idx, 1)[0];
     }
   }
+  const trackerCatalogForSection = isTrackerConfig
+    ? getTrackerCatalogForSection(trackerCatalog, subsections)
+    : trackerCatalog;
 
-  // Define known subgroupings for better visual breakdown (screenshots-related)
+  // Define known subgroupings for better visual breakdown.
   const subgroupDefinitions = {
-    "General ffmpeg": ["ffmpeg_compression", "process_limit", "ffmpeg_limit"],
+    Updates: [
+      "update_notification",
+      "verbose_notification",
+      "update_notification_cache_hours",
+    ],
+    "Console & Logging": [
+      "sfx_on_prompt",
+      "console_show_time",
+      "console_show_level",
+      "console_show_path",
+      "console_markup",
+      "write_log",
+      "debug",
+      "console_debug_show_time",
+      "console_debug_show_level",
+      "console_debug_show_path",
+      "console_debug_markup",
+      "suppress_warnings",
+      "embed_links",
+    ],
+    "Upload Checks": [
+      "tracker_pass_checks",
+      "show_dupe_size_diff",
+      "dupe_size_difference_tolerance",
+    ],
+    "Release Handling": ["user_overrides", "personal_release_groups"],
+    "External Tool Paths": [
+      "ffmpeg_path",
+      "ffprobe_path",
+      "mediainfo_path",
+      "dvd_mediainfo_path",
+      "bdinfo_path",
+      "dovi_tool_path",
+      "hdr10plus_tool_path",
+      "mkbrr_path",
+      "unrar_path",
+    ],
+    "Metadata Provider Credentials": [
+      "tmdb_api",
+      "google_books_api_key",
+      "twitch_client_id",
+      "twitch_client_secret",
+      "mam_api_key",
+      "tvdb_api",
+      "tvdb_token",
+      "btn_api",
+    ],
+    "Music Metadata": ["music_enrichment_enabled", "music_discogs_token"],
+    "Scene Metadata": ["check_predb"],
+    "Tracker Metadata Import": [
+      "tracker_description_mode",
+      "tracker_search_concurrency",
+      "tracker_comment_only",
+    ],
+    "Upload Behavior": [
+      "smart_image_host_selection",
+      "image_upload_concurrency",
+      "image_upload_delay",
+      "min_successful_image_uploads",
+    ],
+    "Upload Scheduling": [
+      "upload_order",
+      "qbit_bandwidth_control",
+      "qbit_bandwidth_threshold",
+      "qbit_bandwidth_time",
+    ],
+    "Client Selection": ["default_torrent_client"],
+    "Client Lists": ["injecting_client_list", "searching_client_list"],
+    "Client Search": ["skip_auto_torrent", "prefer_max_16_torrent"],
+    "Torrent Generation": ["mkbrr", "mkbrr_threads", "rehash_cooldown"],
+    "Screenshot Basics": [
+      "screens",
+      "scale_screenshots_for_par",
+      "cutoff_screens",
+    ],
+    "XXX Contact Sheets": [
+      "xxx_contact_sheet_rows",
+      "xxx_contact_sheet_columns",
+      "xxx_contact_sheet_max_videos",
+      "xxx_contact_sheet_animated_webp",
+      "xxx_contact_sheet_animation_seconds",
+    ],
+    "FFmpeg Processing": [
+      "ffmpeg_compression",
+      "process_limit",
+      "ffmpeg_limit",
+    ],
     Overlay: ["frame_overlay", "overlay_text_size"],
     "HDR Tonemapping": [
       "tone_map",
@@ -1378,22 +1644,20 @@ function ItemList({
       "ffmpeg_is_good",
       "ffmpeg_warmup",
     ],
-    "Bluray & DVD": [
+    "Disc Metadata": [
       "use_largest_playlist",
       "get_bluray_info",
       "bluray_score",
       "bluray_single_score",
       "ping_unit3d",
     ],
-    Extra: ["btn_api", "user_overrides"],
+    "General Layout": ["thumbnail_size", "screens_per_row", "episode_overview"],
     Logos: ["add_logo", "logo_size", "logo_language"],
-    "Bluray/DVD": [
+    "Disc Menu Capture": ["auto_dvd_menus", "max_menu_screens"],
+    "Disc Description": [
       "add_bluray_link",
       "use_bluray_images",
       "bluray_image_size",
-      "disc_menu_header",
-      "auto_dvd_menus",
-      "max_menu_screens",
     ],
     "multi-file/disc": [
       "multiScreens",
@@ -1402,12 +1666,35 @@ function ItemList({
       "processLimit",
       "charLimit",
     ],
-    Headers: [
+    "Description Headers": [
       "custom_description_header",
       "tonemapped_header",
       "screenshot_header",
+      "disc_menu_header",
+      "audio_spectrogram_header",
+      "dynamic_hdr_plot_header",
+    ],
+    "Audio & HDR Analysis": [
+      "add_audio_spectrogram",
+      "add_dynamic_hdr_plot",
+      "process_all_audio_spectrogram",
+      "audio_spectrogram_duration",
+      "audio_spectrogram_sample_rate",
+      "audio_spectrogram_max_files",
+      "dynamic_hdr_plot_max_files",
     ],
     Signature: ["custom_signature"],
+    "Client Injection": ["inject_delay"],
+    "Upload Results": [
+      "show_upload_duration",
+      "print_tracker_messages",
+      "print_tracker_links",
+    ],
+    "Requests & Cross-seeding": [
+      "search_requests",
+      "cross_seeding",
+      "cross_seed_check_everything",
+    ],
     Sonarr: [
       "use_sonarr",
       "sonarr_url",
@@ -1423,6 +1710,64 @@ function ItemList({
       "radarr_api_key_1",
     ],
   };
+
+  if (pathParts.length === 1 && pathParts[0] === "IMAGES") {
+    subgroupDefinitions["Database Link Images"] = [
+      "imdb_75",
+      "tmdb_75",
+      "tvdb_75",
+      "tvmaze_75",
+      "mal_75",
+    ];
+  }
+
+  if (pathParts.length === 1 && pathParts[0] === "USENET") {
+    subgroupDefinitions.Connection = [
+      "enabled",
+      "host",
+      "port",
+      "username",
+      "password",
+      "ssl",
+      "connections",
+    ];
+    subgroupDefinitions.Posting = [
+      "newsgroups",
+      "poster",
+      "random_poster",
+      "obscure_subject",
+      "usenet_uploader",
+    ];
+    subgroupDefinitions["Archive & Recovery"] = [
+      "skip_archive",
+      "rar_volume_size",
+      "archive_password",
+      "par2_percentage",
+    ];
+    subgroupDefinitions["Pesto Verification"] = [
+      "pesto_check",
+      "pesto_check_delay",
+      "pesto_check_retries",
+      "pesto_check_connections",
+      "pesto_check_post_retries",
+    ];
+    subgroupDefinitions["Nyuu Verification"] = [
+      "nyuu_check",
+      "nyuu_check_delay",
+      "nyuu_check_retries",
+      "nyuu_check_connections",
+    ];
+    subgroupDefinitions["Usenet Tool Paths"] = [
+      "nyuu_path",
+      "par2_path",
+      "pesto_path",
+      "7z_path",
+    ];
+    subgroupDefinitions["Output Directories"] = [
+      "nzb_output_dir",
+      "usenet_tmp_dir",
+    ];
+  }
 
   // Partition regularItems into subgroups and an "Other" bucket
   const grouped = {};
@@ -1482,18 +1827,13 @@ function ItemList({
   let configuredArray = [];
   let availableArray = [];
   if (isTrackerConfig && defaultTrackersItem) {
-    availableFromExample = getAvailableTrackers(defaultTrackersItem).map((t) =>
-      String(t).toUpperCase(),
-    );
+    availableFromExample = getAvailableTrackers(
+      defaultTrackersItem,
+      trackerCatalogForSection,
+    ).map((t) => String(t).toUpperCase());
     selectedFromDefault = new Set(normalizeTrackers(defaultTrackersItem.value));
     configuredFromSubsections = new Set(
-      (subsections || [])
-        .filter(
-          (s) =>
-            Array.isArray(s.children) &&
-            s.children.some((c) => c.source === "config"),
-        )
-        .map((s) => String(s.key).toUpperCase()),
+      getConfiguredTrackerNames(subsections, selectedFromDefault),
     );
     configuredSet = new Set([
       ...selectedFromDefault,
@@ -1503,55 +1843,77 @@ function ItemList({
       (t) => !configuredSet.has(t),
     );
     // Present configured and available lists in alphabetical order by display name
-    configuredArray = Array.from(configuredSet).sort((a, b) =>
-      getTrackerDisplayName(a).localeCompare(getTrackerDisplayName(b)),
+    configuredArray = sortTrackerNames(
+      Array.from(configuredSet),
+      getTrackerDisplayName,
     );
-    availableArray = (availableRemaining || [])
-      .slice()
-      .sort((a, b) =>
-        getTrackerDisplayName(a).localeCompare(getTrackerDisplayName(b)),
-      );
+    availableArray = sortTrackerNames(
+      availableRemaining,
+      getTrackerDisplayName,
+    );
   }
   // Ensure arrays are defined in outer scope for rendering even when not tracker config
   if (!configuredArray) configuredArray = [];
   if (!availableArray) availableArray = [];
+
+  const useSettingsPanels = usesConfigSettingsPanels(pathParts);
+  const settingsPanelClass = useSettingsPanels
+    ? isDarkMode
+      ? "rounded-lg border border-gray-700 bg-gray-900/20 p-3"
+      : "rounded-lg border border-gray-200 bg-white p-3"
+    : "";
 
   return (
     <div className="space-y-6">
       {/* TRACKERS tabbed subsections: Default / Configured / Available */}
       {isTrackerConfig && defaultTrackersItem && (
         <div>
-          <div className="flex space-x-1 rounded-lg p-1 bg-gray-700 mb-3 overflow-x-auto">
+          <div
+            data-testid="tracker-category-tabs"
+            className={`ua-config-tabs mb-3 flex space-x-1 overflow-x-auto rounded-lg p-1 ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
+          >
             <button
               type="button"
               onClick={() => setTrackerTab("default")}
-              className={
+              className={`md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
                 trackerTab === "default"
-                  ? "md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap bg-gray-600 text-white"
-                  : "md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap text-gray-400 hover:text-white hover:bg-gray-600"
-              }
+                  ? isDarkMode
+                    ? "bg-gray-600 text-white"
+                    : "bg-white text-gray-900 shadow-sm"
+                  : isDarkMode
+                    ? "text-gray-400 hover:text-white hover:bg-gray-600"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-300"
+              }`}
             >
               Default trackers
             </button>
             <button
               type="button"
               onClick={() => setTrackerTab("configured")}
-              className={
+              className={`md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
                 trackerTab === "configured"
-                  ? "md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap bg-gray-600 text-white"
-                  : "md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap text-gray-400 hover:text-white hover:bg-gray-600"
-              }
+                  ? isDarkMode
+                    ? "bg-gray-600 text-white"
+                    : "bg-white text-gray-900 shadow-sm"
+                  : isDarkMode
+                    ? "text-gray-400 hover:text-white hover:bg-gray-600"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-300"
+              }`}
             >
               Configured trackers
             </button>
             <button
               type="button"
               onClick={() => setTrackerTab("available")}
-              className={
+              className={`md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
                 trackerTab === "available"
-                  ? "md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap bg-gray-600 text-white"
-                  : "md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap text-gray-400 hover:text-white hover:bg-gray-600"
-              }
+                  ? isDarkMode
+                    ? "bg-gray-600 text-white"
+                    : "bg-white text-gray-900 shadow-sm"
+                  : isDarkMode
+                    ? "text-gray-400 hover:text-white hover:bg-gray-600"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-300"
+              }`}
             >
               Available trackers
             </button>
@@ -1569,6 +1931,7 @@ function ItemList({
                 allImageHosts={allImageHosts}
                 usedImageHosts={usedImageHosts}
                 torrentClients={torrentClients}
+                trackerCatalog={trackerCatalogForSection}
                 onValueChange={onValueChange}
               />
             </div>
@@ -1654,6 +2017,7 @@ function ItemList({
                                   expandedGroups={expandedGroups}
                                   toggleGroup={toggleGroup}
                                   torrentClients={torrentClients}
+                                  trackerCatalog={trackerCatalog}
                                   onValueChange={onValueChange}
                                 />
                                 <div className="mt-2 flex items-center justify-end">
@@ -1913,6 +2277,7 @@ function ItemList({
                                   expandedGroups={expandedGroups}
                                   toggleGroup={toggleGroup}
                                   torrentClients={torrentClients}
+                                  trackerCatalog={trackerCatalog}
                                   onValueChange={onValueChange}
                                 />
                                 <div className="mt-2">
@@ -2056,24 +2421,38 @@ function ItemList({
         <div className="space-y-4">
           {/* Ungrouped items */}
           {ungrouped.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {ungrouped.map((item) => {
-                const leafPath = [...pathParts, item.key].join("/");
-                return (
-                  <ConfigLeaf
-                    key={leafPath}
-                    item={item}
-                    pathParts={pathParts}
-                    depth={depth}
-                    isDarkMode={isDarkMode}
-                    fullWidth={fullWidth}
-                    allImageHosts={allImageHosts}
-                    usedImageHosts={usedImageHosts}
-                    torrentClients={torrentClients}
-                    onValueChange={onValueChange}
-                  />
-                );
-              })}
+            <div className={settingsPanelClass}>
+              {panelHeading && (
+                <div
+                  className={
+                    isDarkMode
+                      ? "mb-3 border-b border-gray-700 pb-2 text-sm font-semibold text-gray-200"
+                      : "mb-3 border-b border-gray-200 pb-2 text-sm font-semibold text-gray-700"
+                  }
+                >
+                  {panelHeading}
+                </div>
+              )}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {ungrouped.map((item) => {
+                  const leafPath = [...pathParts, item.key].join("/");
+                  return (
+                    <ConfigLeaf
+                      key={leafPath}
+                      item={item}
+                      pathParts={pathParts}
+                      depth={depth}
+                      isDarkMode={isDarkMode}
+                      fullWidth={fullWidth}
+                      allImageHosts={allImageHosts}
+                      usedImageHosts={usedImageHosts}
+                      torrentClients={torrentClients}
+                      trackerCatalog={trackerCatalog}
+                      onValueChange={onValueChange}
+                    />
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -2082,12 +2461,12 @@ function ItemList({
             const itemsInGroup = grouped[gname] || [];
             if (!itemsInGroup.length) return null;
             const headerClass = isDarkMode
-              ? "text-sm font-semibold text-gray-200 border-b pb-1 mb-3"
-              : "text-sm font-semibold text-gray-700 border-b pb-1 mb-3";
+              ? "text-sm font-semibold text-gray-200 border-b border-gray-700 pb-2 mb-3"
+              : "text-sm font-semibold text-gray-700 border-b border-gray-200 pb-2 mb-3";
             return (
-              <div key={gname}>
+              <div key={gname} className={settingsPanelClass}>
                 <div className={headerClass}>{gname}</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {itemsInGroup.map((item) => {
                     const leafPath = [...pathParts, item.key].join("/");
                     return (
@@ -2101,6 +2480,7 @@ function ItemList({
                         allImageHosts={allImageHosts}
                         usedImageHosts={usedImageHosts}
                         torrentClients={torrentClients}
+                        trackerCatalog={trackerCatalog}
                         onValueChange={onValueChange}
                       />
                     );
@@ -2120,20 +2500,45 @@ function ItemList({
         if (pathParts.includes("TRACKERS") && depth === 0) {
           return null;
         }
-        const isTorrentClientConfig =
-          pathParts.includes("TORRENT_CLIENTS") && depth === 0;
-        const isCollapsible =
-          item.subsection === true || isTrackerConfig || isTorrentClientConfig;
+        // Every real nested mapping needs a visible label. Without this,
+        // structures such as metadata_cache_services rendered repeated fields
+        // with no indication of which service they belonged to.
+        const isCollapsible = true;
         const nextPath = item.subsection ? pathParts : [...pathParts, item.key];
         const nextDepth = item.subsection ? depth : depth + 1;
         const groupKey = [...pathParts, item.key].join("/");
         const isOpen = expandedGroups.has(groupKey);
+        const mergedDefaultSubsectionHeading =
+          getMergedDefaultSubsectionHeading(item, pathParts);
+
+        if (
+          item.key === "metadata_cache_services" &&
+          pathParts.length === 1 &&
+          pathParts[0] === "DEFAULT"
+        ) {
+          return (
+            <MetadataCacheServicesEditor
+              key={groupKey}
+              item={item}
+              pathParts={pathParts}
+              isOpen={isOpen}
+              onToggle={() => toggleGroup(groupKey)}
+              isDarkMode={isDarkMode}
+              allImageHosts={allImageHosts}
+              usedImageHosts={usedImageHosts}
+              torrentClients={torrentClients}
+              trackerCatalog={trackerCatalog}
+              onValueChange={onValueChange}
+            />
+          );
+        }
 
         const nested = (
           <ItemList
             items={item.children}
             pathParts={nextPath}
             depth={nextDepth}
+            panelHeading={mergedDefaultSubsectionHeading}
             isDarkMode={isDarkMode}
             allImageHosts={allImageHosts}
             usedImageHosts={usedImageHosts}
@@ -2141,9 +2546,85 @@ function ItemList({
             expandedGroups={expandedGroups}
             toggleGroup={toggleGroup}
             torrentClients={torrentClients}
+            trackerCatalog={trackerCatalog}
             onValueChange={onValueChange}
           />
         );
+
+        if (pathParts.length === 1 && pathParts[0] === "TORRENT_CLIENTS") {
+          const clientTypeItem = (item.children || []).find(
+            (child) => child.key === "torrent_client",
+          );
+          const clientTypeLabel = getTorrentClientTypeLabel(
+            clientTypeItem && clientTypeItem.value,
+          );
+          const accordionId = `torrent-client-${String(item.key)
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]+/g, "-")}`;
+          return (
+            <div
+              key={groupKey}
+              data-testid="torrent-client-accordion"
+              className={`overflow-hidden rounded-lg border ${
+                isDarkMode
+                  ? "border-gray-700 bg-gray-900/20"
+                  : "border-gray-200 bg-white"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => toggleGroup(groupKey)}
+                aria-expanded={isOpen}
+                aria-controls={accordionId}
+                className={`flex w-full flex-col items-stretch gap-3 p-4 text-left sm:flex-row sm:items-start sm:justify-between ${
+                  isDarkMode ? "hover:bg-gray-800/40" : "hover:bg-gray-50"
+                }`}
+              >
+                <div className="flex min-w-0 items-start gap-3">
+                  <span
+                    className="mt-0.5 shrink-0 transition-transform"
+                    style={{
+                      transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
+                    }}
+                  >
+                    &gt;
+                  </span>
+                  <div>
+                    <div
+                      className={
+                        isDarkMode
+                          ? "text-sm font-semibold text-gray-200"
+                          : "text-sm font-semibold text-gray-700"
+                      }
+                    >
+                      {getTorrentClientInstanceLabel(item.key)}
+                    </div>
+                    <p
+                      className={`mt-1 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
+                    >
+                      {clientTypeLabel} configuration
+                    </p>
+                  </div>
+                </div>
+                <span
+                  className={`shrink-0 text-xs ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}
+                >
+                  {isOpen ? "Hide settings" : "Show settings"}
+                </span>
+              </button>
+              <div
+                id={accordionId}
+                className={
+                  isOpen
+                    ? `border-t p-4 ${isDarkMode ? "border-gray-700" : "border-gray-200"}`
+                    : "hidden"
+                }
+              >
+                {nested}
+              </div>
+            </div>
+          );
+        }
 
         // For subsection items that are being displayed as sub-tabs, show content directly
         if (item.subsection === true) {
@@ -2651,12 +3132,11 @@ function SecurityTab({ isDarkMode }) {
               <code
                 className={`px-1 py-0.5 rounded text-xs ${isDarkMode ? "bg-gray-600" : "bg-gray-200"}`}
               >
-                UA_WEBUI_TOTP_SECRET={"{"}setupData.secret
+                {`UA_WEBUI_TOTP_SECRET=${setupData.secret}`}
               </code>
               <br />
               <strong>To copy to password manager:</strong> Save the secret{" "}
-              {"{"}setupData.secret{"}"} in your password manager&#39;s TOTP
-              field.
+              {setupData.secret} in your password manager&#39;s TOTP field.
             </p>
             <div className="flex gap-2">
               <input
@@ -3294,6 +3774,7 @@ function ConfigApp() {
     }
   });
   const [torrentClients, setTorrentClients] = useState([]);
+  const [trackerCatalog, setTrackerCatalog] = useState([]);
 
   useEffect(() => {
     const handleColorThemeChange = (event) => {
@@ -3307,41 +3788,6 @@ function ConfigApp() {
   const handleColorThemeChange = (event) => {
     setColorThemeState(setColorTheme(event.target.value));
   };
-  const getSubTabsForSection = (section) => {
-    if (section.client_types) {
-      return section.client_types.map((type) => {
-        let label = type.charAt(0).toUpperCase() + type.slice(1);
-        if (type === "qbit") label = "qBitTorrent";
-        return { id: type, label };
-      });
-    }
-    const subTabs = [];
-    const seenSubsections = new Set();
-
-    section.items.forEach((item) => {
-      let subsectionName = null;
-
-      // Check for string subsections
-      if (item.subsection && typeof item.subsection === "string") {
-        subsectionName = formatDisplayLabel(item.subsection);
-      }
-      // Check for collapsible subsections (subsection === true)
-      else if (item.subsection === true) {
-        subsectionName = formatDisplayLabel(item.key);
-      }
-
-      if (subsectionName && !seenSubsections.has(subsectionName)) {
-        seenSubsections.add(subsectionName);
-        subTabs.push({
-          id: subsectionName.toLowerCase().replace(/\s+/g, "-"),
-          label: subsectionName,
-        });
-      }
-    });
-
-    return subTabs;
-  };
-
   const setStatusWithClear = (text, type = "info", clearAfterMs = 0) => {
     setStatus({ text, type });
     if (clearAfterMs > 0) {
@@ -3419,6 +3865,21 @@ function ConfigApp() {
       } catch (error) {
         console.warn("Failed to load torrent clients:", error);
         setTorrentClients([]);
+      }
+
+      // Load the canonical tracker catalog instead of deriving tracker names
+      // from presentation comments in example_config.py.
+      try {
+        const trackersResponse = await apiFetch(`${API_BASE}/trackers`);
+        const trackersData = await trackersResponse.json();
+        if (trackersData.success) {
+          setTrackerCatalog(trackersData.trackers || []);
+        } else {
+          setTrackerCatalog([]);
+        }
+      } catch (error) {
+        console.warn("Failed to load tracker catalog:", error);
+        setTrackerCatalog([]);
       }
 
       // Only set default tabs if we don't have any sections loaded yet
@@ -3886,6 +4347,7 @@ function ConfigApp() {
                       {/* Sub-tab Navigation */}
                       {hasSubTabs && (
                         <div
+                          data-testid="config-subtabs"
                           className={`ua-config-tabs flex space-x-1 rounded-lg p-1 overflow-x-auto ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
                         >
                           {subTabs.map((subTab) => {
@@ -3915,37 +4377,7 @@ function ConfigApp() {
                       <ItemList
                         items={
                           hasSubTabs
-                            ? section.items.filter((item) => {
-                                if (section.section === "TORRENT_CLIENTS") {
-                                  const clientTypeItem =
-                                    item.children &&
-                                    item.children.find(
-                                      (c) => c.key === "torrent_client",
-                                    );
-                                  return (
-                                    clientTypeItem &&
-                                    clientTypeItem.value === activeSubTab
-                                  );
-                                }
-                                if (
-                                  item.subsection &&
-                                  typeof item.subsection === "string"
-                                ) {
-                                  return (
-                                    formatDisplayLabel(item.subsection)
-                                      .toLowerCase()
-                                      .replace(/\s+/g, "-") === activeSubTab
-                                  );
-                                }
-                                if (item.subsection === true) {
-                                  return (
-                                    formatDisplayLabel(item.key)
-                                      .toLowerCase()
-                                      .replace(/\s+/g, "-") === activeSubTab
-                                  );
-                                }
-                                return false;
-                              })
+                            ? filterItemsForSubTab(section, activeSubTab)
                             : section.items
                         }
                         pathParts={[section.section]}
@@ -3957,6 +4389,7 @@ function ConfigApp() {
                         expandedGroups={expandedGroups}
                         toggleGroup={toggleGroup}
                         torrentClients={torrentClients}
+                        trackerCatalog={trackerCatalog}
                         onValueChange={onValueChange}
                       />
                     </div>

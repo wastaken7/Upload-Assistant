@@ -11,7 +11,7 @@ import pytest
 
 from src.meta import Meta
 from src.prep import Prep
-from src.prep_helpers import detect_disc_and_category, extract_xxx_metadata, is_xxx_video_release
+from src.prep_helpers import detect_disc_and_category, is_xxx_video_release
 from src.trackers.USENET.suio import Suio
 from src.xxx_keywords import extract_xxx_keywords
 from src.xxx_platforms import XXX_PLATFORM_KEYWORDS
@@ -96,23 +96,6 @@ def test_xxx_category_is_always_marked_as_adult_media():
     meta = Meta(category="XXX")
 
     assert Prep.check_adult_media(SimpleNamespace(), meta)
-
-
-@pytest.mark.parametrize(
-    ("name", "date", "year", "title"),
-    [
-        ("OnlyFans.2026.Sophia.Isabella.XXX.MP4-P0RNL0V3RSD", "2026", 2026, "Sophia Isabella"),
-        ("Bellesa.26.08.21.Addison.Vodka.720p.XXX.MP4-P0RNL0V3RSD", "2026-08-21", 2026, "Addison Vodka"),
-    ],
-)
-def test_xxx_release_name_extracts_metadata(name, date, year, title):
-    metadata = extract_xxx_metadata(name)
-    assert metadata == {
-        "publisher": name.split(".")[0],
-        "release_date": date,
-        "year": year,
-        "title": title,
-    }
 
 
 def test_xxx_keywords_extract_platform_and_descriptive_tags_from_release_name():
