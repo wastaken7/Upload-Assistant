@@ -142,3 +142,43 @@ def test_get_overview_returns_database_overview_when_already_has_the_info():
 
     result = asyncio.run(tracker.get_overview())
     assert result == "Sinopse do site BJ-Share"  # noqa: S101
+
+
+def test_get_subtitle_hardcoded_portuguese():
+    tracker = object.__new__(BJShare)
+    tracker.tracker = "BJSHARE"
+    meta = Meta({
+        "language_checked": True,
+        "subtitle_languages": ["Portuguese"],
+        "hardcoded_subs": True,
+    })
+
+    result = asyncio.run(tracker.get_subtitle(meta))
+    assert result == "Queimada no vídeo"  # noqa: S101
+
+
+def test_get_subtitle_embedded_portuguese():
+    tracker = object.__new__(BJShare)
+    tracker.tracker = "BJSHARE"
+    meta = Meta({
+        "language_checked": True,
+        "subtitle_languages": ["Portuguese"],
+        "hardcoded_subs": False,
+    })
+
+    result = asyncio.run(tracker.get_subtitle(meta))
+    assert result == "Embutida"  # noqa: S101
+
+
+def test_get_subtitle_no_portuguese():
+    tracker = object.__new__(BJShare)
+    tracker.tracker = "BJSHARE"
+    meta = Meta({
+        "language_checked": True,
+        "subtitle_languages": ["English"],
+        "hardcoded_subs": False,
+    })
+
+    result = asyncio.run(tracker.get_subtitle(meta))
+    assert result == "Nenhuma"  # noqa: S101
+

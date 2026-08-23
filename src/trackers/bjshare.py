@@ -458,6 +458,8 @@ class BJShare:
 
         if found_language_strings is not None and "Portuguese" in found_language_strings:
             subtitle_type = "Embutida"
+            if meta.hardcoded_subs:
+                subtitle_type = "Queimada no vídeo"
 
         return subtitle_type
 
