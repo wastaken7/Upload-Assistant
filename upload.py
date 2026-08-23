@@ -3117,7 +3117,7 @@ async def main() -> None:
             logger.error(f"[bold red]Unexpected error: {e}[/bold red]")
 
 
-if __name__ == "__main__":
+def run() -> None:
     check_python_version()
 
     # Register signal handlers only when run as main script (not when imported)
@@ -3153,3 +3153,16 @@ if __name__ == "__main__":
             logger.info("[green]Shutdown complete[/green]")
 
         sys.exit(0)
+
+
+def run_config_generator() -> None:
+    import runpy
+    import sys
+
+    script_path = Path(__file__).with_name("config-generator.py")
+    sys.argv[0] = str(script_path)
+    runpy.run_path(str(script_path), run_name="__main__")
+
+
+if __name__ == "__main__":
+    run()
