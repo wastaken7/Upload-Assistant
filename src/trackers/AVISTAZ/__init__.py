@@ -420,7 +420,7 @@ class AZTrackerBase:
                         return {}
                     logger.info(f"{self.tracker}: No audio language/s found.")
                     logger.info(f"{self.tracker}: You must enter (comma-separated) languages for all audio tracks, eg: English, Spanish: ")
-                    user_input_raw = await prompt_in_thread(cli_ui.ask_string, "[bold yellow]Enter languages: [/bold yellow]")
+                    user_input_raw = await prompt_in_thread(cli_ui.ask_string, "Enter languages: ")
                     user_input = (user_input_raw or "").strip()
                     langs = [lang.strip() for lang in user_input.split(",")]
                     for lang in langs:

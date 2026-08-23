@@ -1854,7 +1854,7 @@ class BJShare:
             return ""
 
         logger.info(f"{self.tracker}: [bold red]Sinopse não encontrada no TMDb. Por favor, insira manualmente.[/bold red]")
-        user_input_raw = await prompt_in_thread(cli_ui.ask_string, f'"{self.tracker}: [green]Digite a sinopse:[/green]"')
+        user_input_raw = await prompt_in_thread(cli_ui.ask_string, f"{self.tracker}: Digite a sinopse: ")
         user_input = (user_input_raw or "").strip()
         if user_input:
             return user_input
