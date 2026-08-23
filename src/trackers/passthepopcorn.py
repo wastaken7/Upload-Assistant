@@ -1599,6 +1599,10 @@ class PassThePopcorn:
 
         return url, data
 
+    async def get_name(self, meta: Meta) -> str:
+        # PTP doesn't use a custom releasename in the upload form, so just return the filename
+        return meta.name
+
     async def upload(self, meta: Meta, url: str, data: dict[str, Any]) -> bool:
         common = Common(config=self.config)
         base_piece_mb = meta.base_torrent_piece_mb or 0

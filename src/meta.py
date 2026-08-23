@@ -10,12 +10,14 @@ _TRACKER_ID_ALIASES = {
     "ANT": "ANTHELION",
     "BHD": "BEYONDHD",
     "BLU": "BLUTOPIA",
-    "BTN": "BTN",
+    "BTN": "BROADCASTHENET",
+    "BROADCASTHENET": "BROADCASTHENET",
     "HDB": "HDBITS",
     "HUNO": "HAWKEUNO",
     "OE": "ONLYENCODES",
     "PTP": "PASSTHEPOPCORN",
     "RHD": "ROCKETHD",
+    "FLD": "FLOOD",
 }
 
 
@@ -179,6 +181,7 @@ class Meta:
     genre: str = ""
     genres: list[str] = field(default_factory=list)
     hardcoded_subs: bool = False
+    hardcoded_subs_language: str | None = None
     has_commentary: bool = False
     has_encode_settings: bool = False
     has_languages: str = ""

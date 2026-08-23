@@ -449,6 +449,72 @@ class TVChaosUK:
 
         return await asyncio.to_thread(_read)
 
+    async def get_name(self, meta: Meta) -> str:
+        # Naming logic
+        if meta.type == "ENCODE" and ("bluray" in str(meta.path).lower() or "brrip" in str(meta.path).lower() or "bdrip" in str(meta.path).lower()):
+            release_type = "BRRip"
+        else:
+            release_type = str(meta.type).replace("WEBDL", "WEB-DL")
+
+        if meta.category == "MOVIE":
+            year_str_val = str(meta.year) if meta.year is not None else ""
+            tvc_name = f"{meta.title} ({year_str_val}) [{meta.resolution} {release_type} {str(meta.video[-3:]).upper()}]"
+        elif meta.category == "TV":
+            # Use safe lookups to avoid KeyError if 'search_year' is missing
+            search_year = meta.search_year
+            # If search_year is empty, fall back to year
+            year = search_year if search_year else (meta.year if meta.year is not None else "")
+            if meta.no_year:
+                year = ""
+            year_str = f" ({year})" if year else ""
+
+            if meta.tv_pack:
+                season_first = (meta.season_air_first_date or "")[:4]
+                season_year = season_first or year
+                tvc_name = f"{meta.title} - Series {meta.season_int} ({season_year}) [{meta.resolution} {release_type} {str(meta.video[-3:]).upper()}]"
+            else:
+                if meta.episode_airdate:
+                    formatted_date = self.format_date_ddmmyyyy(meta.episode_airdate)
+                    tvc_name = f"{meta.title}{year_str} {meta.season}{meta.episode} ({formatted_date}) [{meta.resolution} {release_type} {str(meta.video[-3:]).upper()}]"
+                else:
+                    tvc_name = f"{meta.title}{year_str} {meta.season}{meta.episode} [{meta.resolution} {release_type} {str(meta.video[-3:]).upper()}]"
+        else:
+            # Defensive guard for unsupported categories
+            raise ValueError(f"Unsupported category for TVCHAOSUK: {meta.category}")
+
+        # Add original language title if foreign
+        original_lang = str(meta.original_language)
+        is_foreign = False
+        if original_lang and not original_lang.startswith("en") and original_lang not in ["ga", "gd", "cy"]:
+            is_foreign = True
+        elif not original_lang:
+            if not meta.is_disc:
+                mi = meta.mediainfo
+            else:
+                mi = meta.bdinfo if meta.bdinfo else {}
+            if isinstance(mi, dict) and mi:
+                audio_langs = self.get_audio_languages(mi)
+                if audio_langs and "English" not in audio_langs:
+                    is_foreign = True
+
+        if is_foreign and meta.original_title and meta.original_title != meta.title:
+            tvc_name = tvc_name.replace(meta.title, f"{meta.title} ({meta.original_title})")
+
+        if not meta.is_disc:
+            # We need to make sure subs are fetched before checking eng_subs/sdh_subs
+            mi = meta.mediainfo
+            self.get_subs_info(meta, mi)
+
+        if meta.video_codec == "HEVC":
+            tvc_name = tvc_name.replace("]", " HEVC]")
+        if meta.eng_subs:
+            tvc_name = tvc_name.replace("]", " SUBS]")
+        if meta.sdh_subs:
+            tvc_name = tvc_name.replace(" SUBS]", " (ENG + SDH SUBS)]") if meta.eng_subs else tvc_name.replace("]", " (SDH SUBS)]")
+
+        tvc_name = await self.append_country_code(meta, tvc_name)
+        return tvc_name
+
     async def upload(self, meta: Meta) -> bool | None:
         common = Common(config=self.config)
 
@@ -504,54 +570,8 @@ class TVChaosUK:
             logger.warning(f"{self.tracker}: [yellow]Warning: tracker-specific description file not found at {descfile_path}")
             desc = ""
 
-        # Naming logic
-        if meta.type == "ENCODE" and ("bluray" in str(meta.path).lower() or "brrip" in str(meta.path).lower() or "bdrip" in str(meta.path).lower()):
-            release_type = "BRRip"
-        else:
-            release_type = str(meta.type).replace("WEBDL", "WEB-DL")
-
-        if meta.category == "MOVIE":
-            year_str_val = str(meta.year) if meta.year is not None else ""
-            tvc_name = f"{meta.title} ({year_str_val}) [{meta.resolution} {release_type} {str(meta.video[-3:]).upper()}]"
-        elif meta.category == "TV":
-            # Use safe lookups to avoid KeyError if 'search_year' is missing
-            search_year = meta.search_year
-            # If search_year is empty, fall back to year
-            year = search_year if search_year else (meta.year if meta.year is not None else "")
-            if meta.no_year:
-                year = ""
-            year_str = f" ({year})" if year else ""
-
-            if meta.tv_pack:
-                season_first = (meta.season_air_first_date or "")[:4]
-                season_year = season_first or year
-                tvc_name = f"{meta.title} - Series {meta.season_int} ({season_year}) [{meta.resolution} {type} {str(meta.video[-3:]).upper()}]"
-            else:
-                if meta.episode_airdate:
-                    formatted_date = self.format_date_ddmmyyyy(meta.episode_airdate)
-                    tvc_name = f"{meta.title}{year_str} {meta.season}{meta.episode} ({formatted_date}) [{meta.resolution} {type} {str(meta.video[-3:]).upper()}]"
-                else:
-                    tvc_name = f"{meta.title}{year_str} {meta.season}{meta.episode} [{meta.resolution} {type} {str(meta.video[-3:]).upper()}]"
-        else:
-            # Defensive guard for unsupported categories
-            raise ValueError(f"Unsupported category for TVCHAOSUK: {meta.category}")
-
-        # Add original language title if foreign
-        if cat_id == self.tv_type_map["foreign"] and meta.original_title and meta.original_title != meta.title:
-            tvc_name = tvc_name.replace(meta.title, f"{meta.title} ({meta.original_title})")
-
-        if not meta.is_disc:
-            # Pass the full MediaInfo dict; get_subs_info handles missing/invalid data internally
-            self.get_subs_info(meta, mi)
-
-        if meta.video_codec == "HEVC":
-            tvc_name = tvc_name.replace("]", " HEVC]")
-        if meta.eng_subs:
-            tvc_name = tvc_name.replace("]", " SUBS]")
-        if meta.sdh_subs:
-            tvc_name = tvc_name.replace(" SUBS]", " (ENG + SDH SUBS)]") if meta.eng_subs else tvc_name.replace("]", " (SDH SUBS)]")
-
-        tvc_name = await self.append_country_code(meta, tvc_name)
+        # Naming logic is handled by get_name
+        tvc_name = await self.get_name(meta)
 
         upload_to_tvc = True
         if meta.unattended is False:

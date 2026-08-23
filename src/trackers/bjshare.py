@@ -3,6 +3,7 @@ import asyncio
 import platform
 import re
 from datetime import UTC, datetime
+from io import BytesIO
 from pathlib import Path
 from typing import Any, ClassVar
 from urllib.parse import urlparse
@@ -14,6 +15,7 @@ import langcodes
 import pycountry
 from bs4 import BeautifulSoup, Tag
 from langcodes.tag_parser import LanguageTagError
+from PIL import Image
 from unidecode import unidecode
 
 from src.console import logger, prompt_in_thread
@@ -43,7 +45,7 @@ class BJShare:
     torrent_url = f"{base_url}/torrents.php?torrentid="
     torrent_download_url = f"{base_url}/torrents.php?action=download&id="
     requests_url = f"{base_url}/requests.php?"
-    supported_categories = ("TV", "MOVIE", "BOOK", "GAME")
+    supported_categories = ("TV", "MOVIE", "BOOK", "GAME", "XXX")
     tracker_urls = ("tracker.bj-share.info",)
     allows_bloated_audio = True
     secret_token: str = ""
@@ -51,6 +53,8 @@ class BJShare:
     database_title: str = ""
     database_identifier: str = ""
     database_overview: str = ""
+    database_creator: str = ""
+    database_cast: str = ""
     tmdb_localization_requirements: ClassVar = {
         "pt-BR": {
             "main": "credits,videos,content_ratings",
@@ -145,11 +149,20 @@ class BJShare:
                 return False
             return True
 
+        try:
+            xxx_screens = max(0, int(self.config.get("DEFAULT", {}).get("xxx_single_file_screens", 0) or 0))
+        except TypeError, ValueError:
+            xxx_screens = 0
+        if meta.category == "XXX" and len(meta.filelist) < 2 and xxx_screens < 1:
+            logger.info(
+                f"{self.tracker}: [red]XXX uploads require at least 2 screenshots. This upload contains a single file, and 'xxx_single_file_screens' is not configured above 0; the upload may fail.[/red]"
+            )
+
         if meta.category == "GAME":
             pc_platforms = {"PC", "MAC", "LINUX"}
             platform = meta.platform.upper().strip()
             if platform in pc_platforms:
-                builder = DescriptionBuilder(self.tracker, self.config)
+                builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
                 has_install_notes = await builder.get_user_description(meta)
                 if not has_install_notes:
                     logger.info(
@@ -191,7 +204,7 @@ class BJShare:
         container: str = meta.container
         category = meta.category
 
-        if category in ("MOVIE", "TV"):
+        if category in ("MOVIE", "TV", "XXX"):
             if container in ["mkv", "mp4", "avi", "vob", "m2ts", "ts"]:
                 return container.upper()
             return "Outro"
@@ -238,7 +251,7 @@ class BJShare:
                 return magazine
             return ebook
 
-        category_map = {"TV": tv, "MOVIE": movie, "GAME": game}
+        category_map = {"TV": tv, "MOVIE": movie, "GAME": game, "XXX": movie}
 
         return category_map.get(category, 0)
 
@@ -459,7 +472,7 @@ class BJShare:
 
                 width_num = round((16 / 9) * height_num)
                 width = str(width_num)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 pass
 
         else:
@@ -548,6 +561,13 @@ class BJShare:
             return original_title
         return f"{brazilian_title} [{original_title}]"
 
+    async def get_xxx_title(self, meta: Meta) -> str:
+        if meta.manual_name:
+            return meta.manual_name
+        if meta.publisher and meta.title:
+            return f"{meta.publisher} - {meta.title}"
+        return await prompt_in_thread(cli_ui.ask_string, f'{self.tracker}: Argumento "--name" não fornecido.\nDigite o título do upload:') or ""
+
     def get_titles(self, meta: Meta) -> tuple[str, str]:
         if meta.category == "BOOK":
             title = meta.title.strip()
@@ -589,7 +609,7 @@ class BJShare:
                         # Non-integer decimal, preserve as-is but try zero-padding if pure integer
                         if re.fullmatch(r"\d+", normalized_index):
                             normalized_index = normalized_index.zfill(2)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     # Not a valid number, check if pure integer for zero-padding
                     if re.fullmatch(r"\d+", normalized_index):
                         normalized_index = normalized_index.zfill(2)
@@ -624,7 +644,7 @@ class BJShare:
         return "", ""
 
     async def build_description(self, meta: Meta) -> str:
-        builder = DescriptionBuilder(self.tracker, self.config)
+        builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
         meta.episode_tmdb_data = self.episode_tmdb_data
 
         return await builder.general_description_generator(
@@ -737,6 +757,19 @@ class BJShare:
             tag.decompose()
         return body.get_text(strip=True)
 
+    def get_database_credits(self, soup: BeautifulSoup, role: str) -> str:
+        """Extract credits shown on an existing BJShare details page."""
+        label = "Criador:" if role in ("director", "creator") else "Elenco:"
+        for box in soup.find_all("div", class_="box"):
+            header = box.find("div", class_="head")
+            if not header or "informa" not in unidecode(header.get_text()).lower():
+                continue
+            for row in box.find_all("tr"):
+                cells = row.find_all("td")
+                if len(cells) >= 2 and label.casefold() in unidecode(cells[0].get_text(" ", strip=True)).casefold():
+                    return cells[1].get_text(" ", strip=True)
+        return ""
+
     async def search_existing(self, meta: Meta) -> list[dict[str, str | list[str]]]:
         dupes: list[dict[str, str | list[str]]] = []
         category = meta.category
@@ -787,6 +820,8 @@ class BJShare:
         BJShare.database_title = ""
         BJShare.database_identifier = ""
         BJShare.database_overview = ""
+        BJShare.database_creator = ""
+        BJShare.database_cast = ""
 
         search_params = [params]
         title_already_queried = False
@@ -853,6 +888,8 @@ class BJShare:
             BJShare.database_title = self.get_database_title(soup)
             BJShare.database_identifier = self.get_database_identifier(soup)
             BJShare.database_overview = self.get_database_overview(soup)
+            BJShare.database_creator = self.get_database_credits(soup, "creator")
+            BJShare.database_cast = self.get_database_credits(soup, "cast")
 
             for row in torrent_details_table.find_all("tr"):
                 row_id = row.get("id")
@@ -1028,7 +1065,7 @@ class BJShare:
 
                 try:
                     size_in_gb = meta.bdinfo["size"]
-                except (KeyError, IndexError, TypeError):
+                except KeyError, IndexError, TypeError:
                     size_in_gb = 0
 
                 if size_in_gb > 66:
@@ -1144,7 +1181,7 @@ class BJShare:
                 logger.info(f"{self.tracker}: Falha ao processar pôster da URL {cover_tmdb_url}: {e}", extra={"markup": False})
                 return None
 
-        if category in ("BOOK", "GAME"):
+        if category in ("BOOK", "GAME", "XXX"):
             cover_path = meta.artwork_path
             if not cover_path or not await self.common.path_exists(cover_path):
                 logger.info("Nenhum cover_path válido encontrado.", extra={"markup": False})
@@ -1163,13 +1200,20 @@ class BJShare:
 
     async def get_screenshots(self, meta: Meta) -> list[str]:
         screens_dir = screenshots_dir(meta.base_dir, meta.uuid)
-        local_files = sorted(screens_dir.glob("*.png"))
+        local_files = sorted((*screens_dir.glob("*.png"), *screens_dir.glob("*.webp")))
 
         disc_menu_links = [img.get("raw_url") for img in meta.menu_images if img.get("raw_url")][:3]
 
         async def upload_local_file(path: Path):
             async with aiofiles.open(path, "rb") as f:
                 image_bytes = await f.read()
+            if path.suffix.lower() == ".webp":
+                logger.info(f"{self.tracker}: Convertendo de WebP para PNG.", extra={"markup": False})
+                with Image.open(BytesIO(image_bytes)) as image:
+                    converted = BytesIO()
+                    image.save(converted, format="PNG")
+                    image_bytes = converted.getvalue()
+                return await self.img_host(image_bytes, f"{path.stem}.png")
             return await self.img_host(image_bytes, Path(path).name)
 
         async def upload_remote_file(url: str):
@@ -1249,7 +1293,7 @@ class BJShare:
                 bit_depth_str = meta.discs[0]["bdinfo"]["video"][0]["bit_depth"]
                 if "10" in bit_depth_str:
                     is_10_bit = True
-            except (KeyError, IndexError, TypeError):
+            except KeyError, IndexError, TypeError:
                 pass
         else:
             if meta.bit_depth == "10":
@@ -1331,7 +1375,13 @@ class BJShare:
         return normalized_names
 
     async def get_credits(self, meta: Meta, role: str) -> str:
+        if role not in {"director", "creator", "cast"}:
+            return "N/A"
+
         if BJShare.already_has_the_info:
+            database_credit = BJShare.database_cast if role == "cast" else BJShare.database_creator
+            if database_credit:
+                return database_credit
             return "N/A"
 
         role_map = {
@@ -1345,9 +1395,6 @@ class BJShare:
             "creator": "Criador",
             "cast": "Elenco",
         }
-
-        if role not in role_map:
-            return "N/A"
 
         imdb_key, tmdb_key = role_map[role]
 
@@ -1648,7 +1695,35 @@ class BJShare:
                             "adulto": self.get_adulto(meta),
                         }
                     )
+        elif category == "XXX":
+            width, height = self.get_resolution(meta)
+            hours, minutes = self.get_runtime(meta)
 
+            data.update(
+                {
+                    "adulto": 1,
+                    "audio": "Outro",
+                    "codecaudio": self.get_audio_codec(meta),
+                    "codecvideo": self.get_video_codec(meta),
+                    "diretorserie": "",
+                    "duracaoHR": str(hours),
+                    "duracaoMIN": str(minutes),
+                    "duracaotipo": "selectbox",
+                    "elenco": await self.get_credits(meta, "cast"),
+                    "fichatecnica": await self.build_description(meta),
+                    "idioma": "Inglês",
+                    "qualidade": self.get_bitrate(meta),
+                    "release": "",
+                    "remaster_title": "",
+                    "resolucaoh": height,
+                    "resolucaow": width,
+                    "sinopse": "",
+                    "year": str(meta.year)
+                    if meta.year is not None
+                    else await prompt_in_thread(cli_ui.ask_string, f'{self.tracker}: Argumento "--year" não fornecido.\nDigite o ano do upload:'),
+                    "title": await self.get_xxx_title(meta),
+                }
+            )
         # Anon
         anon = not (meta.anon == 0 and not self.config["TRACKERS"][self.tracker].get("anon", False))
         if anon:

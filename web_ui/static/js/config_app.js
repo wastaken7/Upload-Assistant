@@ -293,6 +293,7 @@ const trackerNameMap = {
   DRUNKENSLUG: "DrunkenSlug",
   EMUWAREZ: "Emuwarez",
   FILELIST: "FileList",
+  FLOOD: "Flood",
   FUNFILE: "FunFile",
   GREATPOSTERWALL: "GreatPosterWall",
   HAWKEUNO: "hawke-uno",

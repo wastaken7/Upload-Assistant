@@ -383,7 +383,7 @@ class AmigosShare:
         description_parts.append("[/center]")
 
         # Book details using DescriptionBuilder
-        builder = DescriptionBuilder(self.tracker, self.config)
+        builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
         book_section = builder._build_book_desc_section(meta, header_size=3, table=False)
         if book_section:
             description_parts.append(book_section)
@@ -733,7 +733,7 @@ class AmigosShare:
 
     async def build_game_description(self, meta: Meta) -> str:
         """Build GAME description using only the _build_game_desc_section block."""
-        builder = DescriptionBuilder(self.tracker, self.config)
+        builder = DescriptionBuilder(self.tracker, self.config, "pt-BR")
         desc_parts: list[str] = []
 
         game_section = builder._build_game_desc_section(meta, header_size=5, table=False)

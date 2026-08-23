@@ -1,6 +1,6 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
-import os
 import re
+from pathlib import Path
 from typing import Any, cast
 
 import cli_ui
@@ -68,26 +68,26 @@ class RocketHD(UNIT3D):
     ) -> dict[str, str]:
         """map each resolution to the correct id on the tracker"""
         resolution_id = {
-            '8640p': '10',
-            '4320p': '1',
-            '2160p': '2',
-            '1440p': '3',
-            '1080p': '3',
-            '1080i': '4',
-            '720p': '5',
-            '576p': '12',
-            '576i': '13',
-            '540p': '16',
-            '480p': '11',
-            '480i': '18',
-            '384p': '14',
+            "8640p": "10",
+            "4320p": "1",
+            "2160p": "2",
+            "1440p": "3",
+            "1080p": "3",
+            "1080i": "4",
+            "720p": "5",
+            "576p": "12",
+            "576i": "13",
+            "540p": "16",
+            "480p": "11",
+            "480i": "18",
+            "384p": "14",
         }
         if mapping_only:
             return resolution_id
         if reverse:
             return {v: k for k, v in resolution_id.items()}
         if resolution:
-            return {'resolution_id': resolution_id.get(resolution, '10')}
+            return {"resolution_id": resolution_id.get(resolution, "10")}
         meta_resolution = str(meta.resolution)
         resolved_id = resolution_id.get(meta_resolution, "10")
         return {"resolution_id": resolved_id}
@@ -96,7 +96,7 @@ class RocketHD(UNIT3D):
         """Extract basename from first file in filelist or path"""
         path_value = meta.path or "" if meta.isdir else next(iter(meta.filelist), meta.path or "")
         path = path_value if isinstance(path_value, str) else ""
-        return os.path.basename(path)
+        return Path(path).name
 
     def _get_language_code(self, track_or_string: Any) -> str:
         """Extract and normalize language to ISO alpha-2 code"""
@@ -118,13 +118,9 @@ class RocketHD(UNIT3D):
         if len(lang_str) == 2:
             return lang_str
         try:
-            lang_obj = (
-                pycountry.languages.get(name=lang_str.title())
-                or pycountry.languages.get(alpha_2=lang_str)
-                or pycountry.languages.get(alpha_3=lang_str)
-            )
+            lang_obj = pycountry.languages.get(name=lang_str.title()) or pycountry.languages.get(alpha_2=lang_str) or pycountry.languages.get(alpha_3=lang_str)
             return lang_obj.alpha_2.lower() if lang_obj else lang_str
-        except (AttributeError, KeyError, LookupError):
+        except AttributeError, KeyError, LookupError:
             return lang_str
 
     def _get_german_title(self, imdb_info: dict[str, Any]) -> str | None:
@@ -154,12 +150,7 @@ class RocketHD(UNIT3D):
             return False
 
         tracks = mediainfo.get("media", {}).get("track", [])
-        return any(
-            track.get("@type") == "Audio"
-            and self._get_language_code(track) in {"de"}
-            and "commentary" not in str(track.get("Title", "")).lower()
-            for track in tracks
-        )
+        return any(track.get("@type") == "Audio" and self._get_language_code(track) in {"de"} and "commentary" not in str(track.get("Title", "")).lower() for track in tracks)
 
     def _has_german_subtitles(self, meta: Meta) -> bool:
         """Check for German subtitle tracks"""
@@ -168,10 +159,7 @@ class RocketHD(UNIT3D):
             return False
 
         tracks = mediainfo.get("media", {}).get("track", [])
-        return any(
-            track.get("@type") == "Text" and self._get_language_code(track) in {"de"}
-            for track in tracks
-        )
+        return any(track.get("@type") == "Text" and self._get_language_code(track) in {"de"} for track in tracks)
 
     def _get_language_name(self, iso_code: str) -> str:
         """Convert ISO language code to full name (e.g. GERMAN, ENGLISH)"""
@@ -182,17 +170,17 @@ class RocketHD(UNIT3D):
 
         # Try full language name (Italian, English, etc)
         lang = pycountry.languages.get(name=iso_code.title())
-        if lang and hasattr(lang, 'name'):
+        if lang and hasattr(lang, "name"):
             return str(lang.name).upper()
 
         # Try alpha_2 (IT, EN, etc)
         lang = pycountry.languages.get(alpha_2=iso_lower)
-        if lang and hasattr(lang, 'name'):
+        if lang and hasattr(lang, "name"):
             return str(lang.name).upper()
 
         # Try alpha_3 (ITA, ENG, etc)
         lang = pycountry.languages.get(alpha_3=iso_lower)
-        if lang and hasattr(lang, 'name'):
+        if lang and hasattr(lang, "name"):
             return str(lang.name).upper()
 
         return iso_code.upper()
@@ -207,9 +195,7 @@ class RocketHD(UNIT3D):
         # Title and basic info
         title = meta.title
         german_title = self._get_german_title(meta.imdb_info)
-        use_german_title = self.config["TRACKERS"].get(self.tracker, {}).get(
-            "use_german_title", False
-        )
+        use_german_title = self.config["TRACKERS"].get(self.tracker, {}).get("use_german_title", False)
         if german_title and use_german_title:
             title = german_title
 
@@ -218,9 +204,7 @@ class RocketHD(UNIT3D):
         source_value: Any = meta.source or ""
         year = str(year_value)
         resolution = str(resolution_value)
-        source = (
-            str(cast(Any, source_value[0])) if source_value else ""
-        ) if isinstance(source_value, list) else str(source_value)
+        source = (str(cast(Any, source_value[0])) if source_value else "") if isinstance(source_value, list) else str(source_value)
         video_codec = meta.video_codec
         video_encode = meta.video_encode
 
@@ -237,7 +221,7 @@ class RocketHD(UNIT3D):
         # extract tags from basename for potential later use
         basename_up = self.get_basename(meta).upper()
         internal = "iNTERNAL" if "INTERNAL" in basename_up else ""
-        incomplete = "INCOMPLETE" if "INCOMPLETE" in basename_up else  ""
+        incomplete = "INCOMPLETE" if "INCOMPLETE" in basename_up else ""
 
         # Clean audio: remove Dual-Audio and trailing language codes
         audio = meta.audio
@@ -293,7 +277,9 @@ class RocketHD(UNIT3D):
         if effective_type == "DISC":
             region = meta.region
             dvd_size = meta.dvd_size
-            name = f"{title} {year} {season}{episode} {three_d} {edition} {repack} {resolution} COMPLETE {region} {uhd} {source} {dvd_size} {audio} {hdr} {video_codec} {internal}"
+            name = (
+                f"{title} {year} {season}{episode} {three_d} {edition} {repack} {resolution} COMPLETE {region} {uhd} {source} {dvd_size} {audio} {hdr} {video_codec} {internal}"
+            )
         elif effective_type == "REMUX":
             name = f"{title} {year} {season}{episode} {incomplete} {three_d} {edition} {hybrid} {audio_lang_str} {repack} {resolution} {uhd} {source} REMUX {audio} {hdr} {video_codec} {internal}"
         elif effective_type in ("DVDRIP", "BRRIP"):
@@ -336,11 +322,7 @@ class RocketHD(UNIT3D):
         basename = self.get_basename(meta)
         # Get extension from mediainfo and remove it
         ext = meta.mediainfo.get("media", {}).get("track", [{}])[0].get("FileExtension", "")
-        name_no_ext = (
-            basename[: -len(ext) - 1]
-            if ext and basename.endswith(f".{ext}")
-            else basename
-        )
+        name_no_ext = basename[: -len(ext) - 1] if ext and basename.endswith(f".{ext}") else basename
         parts = re.split(r"[-.]", name_no_ext)
         if not parts:
             return "NOGRP"
@@ -350,11 +332,7 @@ class RocketHD(UNIT3D):
         if " " in potential_tag:
             potential_tag = potential_tag.split()[-1]
 
-        if (
-            not potential_tag
-            or len(potential_tag) > 30
-            or not potential_tag.replace("_", "").isalnum()
-        ):
+        if not potential_tag or len(potential_tag) > 30 or not potential_tag.replace("_", "").isalnum():
             return "NOGRP"
 
         # ONLY accept if it's a VU/UNTOUCHED marker
@@ -369,7 +347,7 @@ class RocketHD(UNIT3D):
         prohib_markers = ["MIC", "CAM", "TS", "TELESYNC", "LD", "LINE"]
         basename = self.get_basename(meta)
         # Split on delimiters (dot, hyphen, underscore) or whitespace so tags like "LD" only match as separate tokens
-        basename_up = [tok for tok in re.split(r'[\.\s_-]+', str(basename).upper()) if tok]
+        basename_up = [tok for tok in re.split(r"[\.\s_-]+", str(basename).upper()) if tok]
         if any(x in basename_up for x in prohib_markers):
             logger.info(f"{self.tracker}: [bold red]Uploading MIC, CAM, TS or LD releases, is prohibited[/bold red]")
             if meta.unattended or not await prompt_in_thread(cli_ui.ask_yes_no, "Do you want to upload anyway?", default=False):
@@ -397,9 +375,7 @@ class RocketHD(UNIT3D):
         # check for samples, proofs, and images in the upload directory
         filelist = meta.filelist
         if any(
-            str(file).lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp", ".tiff", ".pdf"))
-            or "sample" in str(file).lower()
-            or "proof" in str(file).lower()
+            str(file).lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp", ".tiff", ".pdf")) or "sample" in str(file).lower() or "proof" in str(file).lower()
             for file in filelist
         ):
             logger.info(f"{self.tracker}: [bold red]Uploads containing samples, proofs, and images are prohibited.[/bold red]")

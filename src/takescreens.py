@@ -55,7 +55,7 @@ def is_valid_lostimg_image_size(image_size: int) -> bool:
 def _positive_config_int(key: str, default: int) -> int:
     try:
         return max(1, int(default_config.get(key, default) or default))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -73,9 +73,17 @@ def xxx_contact_sheet_animation_settings() -> tuple[bool, float]:
     animated = _as_bool(default_config.get("xxx_contact_sheet_animated_webp"), default=False)
     try:
         duration = max(0.1, float(default_config.get("xxx_contact_sheet_animation_seconds", 5) or 5))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         duration = 5.0
     return animated, duration
+
+
+def xxx_single_file_screens() -> int:
+    """Return the number of normal screenshots to add for a single XXX video."""
+    try:
+        return max(0, int(default_config.get("xxx_single_file_screens", 0) or 0))
+    except TypeError, ValueError:
+        return 0
 
 
 def _xxx_contact_sheet_fontfile() -> str | None:
@@ -140,46 +148,51 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
     if meta.retake or (existing and len(existing) < len(video_paths)):
         clear_screenshot_group(base_dir, folder_id, capture_group)
         existing = []
-    if not meta.retake and len(existing) >= len(video_paths):
-        sheets = [str(path) for path in existing[: len(video_paths)]]
-        meta.screens = len(sheets)
-        return sheets
+    sheets = [str(path) for path in existing[: len(video_paths)]] if not meta.retake and len(existing) >= len(video_paths) else []
 
-    screenshot_dir = screenshots_dir(base_dir, folder_id)
-    results: list[str] = []
-    frame_count = rows * columns
-    fontfile = _xxx_contact_sheet_fontfile()
-    if fontfile is None:
-        logger.warning("[yellow]No system font found for XXX contact-sheet labels; generating sheets without labels.[/yellow]")
-    for index, video_path in enumerate(video_paths, start=1):
-        output_path = screenshot_dir / f"xxx-contact-sheet-{index}.{'webp' if animated_webp else 'png'}"
-        if output_path.exists() and not meta.retake:
-            results.append(str(output_path))
-            continue
-
-        try:
-            probe = await asyncio.to_thread(ffmpeg.probe, str(video_path))
-            duration = float(probe["format"]["duration"])
-            if duration <= 0:
-                raise ValueError("duration must be positive")
-            if animated_webp:
-                stream = _xxx_contact_sheet_animated_stream(video_path, frame_count, duration, columns, rows, animation_seconds, fontfile)
-                output_options: dict[str, Any] = {"vcodec": "libwebp_anim", "loop": 0, "r": 8, "t": animation_seconds}
-            else:
-                stream = _xxx_contact_sheet_static_stream(video_path, frame_count, duration, columns, rows, fontfile)
-                output_options = {"vframes": 1, "compression_level": ffmpeg_compression}
-            stream = _xxx_contact_sheet_title_filter(stream, video_path.name, len(video_paths) > 1, fontfile)
-            command = ffmpeg.output(stream, str(output_path), **output_options).global_args("-y", "-loglevel", "verbose" if meta.ffdebug else "quiet")
-            return_code, _stdout, stderr = await run_ffmpeg(command)
-            if return_code != 0 or not output_path.is_file():
-                logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {stderr.decode(errors='replace')}[/yellow]")
+    if not sheets:
+        screenshot_dir = screenshots_dir(base_dir, folder_id)
+        results: list[str] = []
+        frame_count = rows * columns
+        fontfile = _xxx_contact_sheet_fontfile()
+        if fontfile is None:
+            logger.warning("[yellow]No system font found for XXX contact-sheet labels; generating sheets without labels.[/yellow]")
+        for index, video_path in enumerate(video_paths, start=1):
+            output_path = screenshot_dir / f"xxx-contact-sheet-{index}.{'webp' if animated_webp else 'png'}"
+            if output_path.exists() and not meta.retake:
+                results.append(str(output_path))
                 continue
-            results.append(str(output_path))
-        except Exception as error:
-            logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {error}[/yellow]")
 
-    sheets = [str(path) for path in register_screenshots(base_dir, folder_id, results, capture_group)] if results else []
-    meta.screens = len(sheets)
+            try:
+                probe = await asyncio.to_thread(ffmpeg.probe, str(video_path))
+                duration = float(probe["format"]["duration"])
+                if duration <= 0:
+                    raise ValueError("duration must be positive")
+                if animated_webp:
+                    stream = _xxx_contact_sheet_animated_stream(video_path, frame_count, duration, columns, rows, animation_seconds, fontfile)
+                    output_options: dict[str, Any] = {"vcodec": "libwebp_anim", "loop": 0, "r": 8, "t": animation_seconds}
+                else:
+                    stream = _xxx_contact_sheet_static_stream(video_path, frame_count, duration, columns, rows, fontfile)
+                    output_options = {"vframes": 1, "compression_level": ffmpeg_compression}
+                stream = _xxx_contact_sheet_title_filter(stream, video_path.name, len(video_paths) > 1, fontfile)
+                command = ffmpeg.output(stream, str(output_path), **output_options).global_args("-y", "-loglevel", "verbose" if meta.ffdebug else "quiet")
+                return_code, _stdout, stderr = await run_ffmpeg(command)
+                if return_code != 0 or not output_path.is_file():
+                    logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {stderr.decode(errors='replace')}[/yellow]")
+                    continue
+                results.append(str(output_path))
+            except Exception as error:
+                logger.warning(f"[yellow]Unable to create XXX contact sheet for {video_path.name}: {error}[/yellow]")
+
+        sheets = [str(path) for path in register_screenshots(base_dir, folder_id, results, capture_group)] if results else []
+    normal_screens = xxx_single_file_screens()
+    if len(video_paths) == 1 and normal_screens:
+        existing_in_group = len(manifest_files(base_dir, folder_id, capture_group))
+        screens_to_request = max(0, normal_screens + existing_in_group)
+        await screenshots(
+            str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, screens_to_request, False, cleanup_after_capture=False, capture_group=capture_group
+        )
+    meta.screens = len(manifest_files(base_dir, folder_id, capture_group))
     return sheets
 
 
@@ -203,7 +216,7 @@ async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, me
             has_video_stream = isinstance(streams, list) and any(isinstance(stream, Mapping) and stream.get("codec_type") == "video" for stream in streams)
             if candidate_duration <= 0 or not has_video_stream:
                 continue
-        except (OSError, KeyError, TypeError, ValueError, ffmpeg.Error):
+        except OSError, KeyError, TypeError, ValueError, ffmpeg.Error:
             continue
         video_path = candidate_path
         duration = candidate_duration
@@ -288,12 +301,12 @@ def _apply_config(config: Mapping[str, Any]) -> None:
 
     try:
         task_limit = int(default_config.get("process_limit", 1) or 1)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         task_limit = 1
 
     try:
         cutoff = int(default_config.get("cutoff_screens", 1) or 1)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         cutoff = 1
 
     ffmpeg_limit = default_config.get("ffmpeg_limit", False)
@@ -304,7 +317,7 @@ def _apply_config(config: Mapping[str, Any]) -> None:
     algorithm = str(default_config.get("algorithm", "mobius")).strip()
     try:
         desat = float(default_config.get("desat", 10.0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         desat = 10.0
 
 
@@ -1068,7 +1081,7 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
                 try:
                     if track.duration is not None:
                         video_duration = float(track.duration)
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     video_duration = None
                 break
 
