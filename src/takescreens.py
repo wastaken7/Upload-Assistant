@@ -55,7 +55,7 @@ def is_valid_lostimg_image_size(image_size: int) -> bool:
 def _positive_config_int(key: str, default: int) -> int:
     try:
         return max(1, int(default_config.get(key, default) or default))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
 
@@ -73,7 +73,7 @@ def xxx_contact_sheet_animation_settings() -> tuple[bool, float]:
     animated = _as_bool(default_config.get("xxx_contact_sheet_animated_webp"), default=False)
     try:
         duration = max(0.1, float(default_config.get("xxx_contact_sheet_animation_seconds", 5) or 5))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         duration = 5.0
     return animated, duration
 
@@ -82,7 +82,7 @@ def xxx_single_file_screens() -> int:
     """Return the number of normal screenshots to add for a single XXX video."""
     try:
         return max(0, int(default_config.get("xxx_single_file_screens", 0) or 0))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return 0
 
 
@@ -187,7 +187,9 @@ async def xxx_contact_sheets(paths: list[str], folder_id: str, base_dir: str, me
         sheets = [str(path) for path in register_screenshots(base_dir, folder_id, results, capture_group)] if results else []
     normal_screens = xxx_single_file_screens()
     if len(video_paths) == 1 and normal_screens:
-        await screenshots(str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, normal_screens, True, cleanup_after_capture=False, capture_group=capture_group)
+        existing_in_group = len(manifest_files(base_dir, folder_id, capture_group))
+        screens_to_request = max(0, normal_screens + existing_in_group)
+        await screenshots(str(video_paths[0]), video_paths[0].name, folder_id, base_dir, meta, screens_to_request, False, cleanup_after_capture=False, capture_group=capture_group)
     meta.screens = len(manifest_files(base_dir, folder_id, capture_group))
     return sheets
 
@@ -212,7 +214,7 @@ async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, me
             has_video_stream = isinstance(streams, list) and any(isinstance(stream, Mapping) and stream.get("codec_type") == "video" for stream in streams)
             if candidate_duration <= 0 or not has_video_stream:
                 continue
-        except OSError, KeyError, TypeError, ValueError, ffmpeg.Error:
+        except (OSError, KeyError, TypeError, ValueError, ffmpeg.Error):
             continue
         video_path = candidate_path
         duration = candidate_duration
@@ -297,12 +299,12 @@ def _apply_config(config: Mapping[str, Any]) -> None:
 
     try:
         task_limit = int(default_config.get("process_limit", 1) or 1)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         task_limit = 1
 
     try:
         cutoff = int(default_config.get("cutoff_screens", 1) or 1)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         cutoff = 1
 
     ffmpeg_limit = default_config.get("ffmpeg_limit", False)
@@ -313,7 +315,7 @@ def _apply_config(config: Mapping[str, Any]) -> None:
     algorithm = str(default_config.get("algorithm", "mobius")).strip()
     try:
         desat = float(default_config.get("desat", 10.0))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         desat = 10.0
 
 
@@ -1077,7 +1079,7 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
                 try:
                     if track.duration is not None:
                         video_duration = float(track.duration)
-                except TypeError, ValueError:
+                except (TypeError, ValueError):
                     video_duration = None
                 break
 

@@ -149,7 +149,11 @@ class BJShare:
                 return False
             return True
 
-        if meta.category == "XXX" and len(meta.filelist) < 2 and int(self.config.get("DEFAULT", {}).get("xxx_single_file_screens", 0)) < 1:
+        try:
+            xxx_screens = max(0, int(self.config.get("DEFAULT", {}).get("xxx_single_file_screens", 0) or 0))
+        except (TypeError, ValueError):
+            xxx_screens = 0
+        if meta.category == "XXX" and len(meta.filelist) < 2 and xxx_screens < 1:
             logger.info(
                 f"{self.tracker}: [red]XXX uploads require at least 2 screenshots. This upload contains a single file, and 'xxx_single_file_screens' is not configured above 0; the upload may fail.[/red]"
             )
@@ -468,7 +472,7 @@ class BJShare:
 
                 width_num = round((16 / 9) * height_num)
                 width = str(width_num)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 pass
 
         else:
@@ -605,7 +609,7 @@ class BJShare:
                         # Non-integer decimal, preserve as-is but try zero-padding if pure integer
                         if re.fullmatch(r"\d+", normalized_index):
                             normalized_index = normalized_index.zfill(2)
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     # Not a valid number, check if pure integer for zero-padding
                     if re.fullmatch(r"\d+", normalized_index):
                         normalized_index = normalized_index.zfill(2)
@@ -1061,7 +1065,7 @@ class BJShare:
 
                 try:
                     size_in_gb = meta.bdinfo["size"]
-                except KeyError, IndexError, TypeError:
+                except (KeyError, IndexError, TypeError):
                     size_in_gb = 0
 
                 if size_in_gb > 66:
@@ -1289,7 +1293,7 @@ class BJShare:
                 bit_depth_str = meta.discs[0]["bdinfo"]["video"][0]["bit_depth"]
                 if "10" in bit_depth_str:
                     is_10_bit = True
-            except KeyError, IndexError, TypeError:
+            except (KeyError, IndexError, TypeError):
                 pass
         else:
             if meta.bit_depth == "10":
