@@ -4018,7 +4018,7 @@ def _configured_cookie_tracker_names(
     for tracker_name in supported_trackers:
         try:
             has_cookie_file = Path(cookie_file_finder(str(state_dir), tracker_name, user_config)).is_file()
-        except (AttributeError, OSError, TypeError, ValueError):
+        except AttributeError, OSError, TypeError, ValueError:
             has_cookie_file = False
         if has_cookie_file:
             configured.add(tracker_name.upper())

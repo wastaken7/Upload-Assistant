@@ -488,10 +488,7 @@ class TVChaosUK:
         if original_lang and not original_lang.startswith("en") and original_lang not in ["ga", "gd", "cy"]:
             is_foreign = True
         elif not original_lang:
-            if not meta.is_disc:
-                mi = meta.mediainfo
-            else:
-                mi = meta.bdinfo if meta.bdinfo else {}
+            mi = meta.mediainfo if not meta.is_disc else meta.bdinfo if meta.bdinfo else {}
             if isinstance(mi, dict) and mi:
                 audio_langs = self.get_audio_languages(mi)
                 if audio_langs and "English" not in audio_langs:
@@ -512,8 +509,7 @@ class TVChaosUK:
         if meta.sdh_subs:
             tvc_name = tvc_name.replace(" SUBS]", " (ENG + SDH SUBS)]") if meta.eng_subs else tvc_name.replace("]", " (SDH SUBS)]")
 
-        tvc_name = await self.append_country_code(meta, tvc_name)
-        return tvc_name
+        return await self.append_country_code(meta, tvc_name)
 
     async def upload(self, meta: Meta) -> bool | None:
         common = Common(config=self.config)

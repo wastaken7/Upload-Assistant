@@ -214,6 +214,7 @@ These can be [overridden per-tracker](#tracker-overridable-settings) by adding t
 
 - `default_torrent_client` (str): Name of the client config to use (matches a key under `TORRENT_CLIENTS`, e.g. `"qbittorrent"`).
 - `skip_auto_torrent` (bool): Skip automated torrent searching in your qBitTorrent client.
+- `skip_auto_torrent_personalrelease` (bool): Also skip automated torrent searching when the upload is a personal release.
 
 Implementation notes:
 

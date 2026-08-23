@@ -171,7 +171,10 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     base_dir = meta.base_dir
     meta.saved_description = False
     client = Clients(config=prep_instance.config)
-    meta.skip_auto_torrent = meta.skip_auto_torrent or prep_instance.config["DEFAULT"].get("skip_auto_torrent", False)
+    default_config = prep_instance.config["DEFAULT"]
+    meta.skip_auto_torrent = (
+        meta.skip_auto_torrent or default_config.get("skip_auto_torrent", False) or (meta.personalrelease and default_config.get("skip_auto_torrent_personalrelease", False))
+    )
     hash_ids = ["infohash", "torrent_hash", "skip_auto_torrent"]
     from src.trackersetup import api_trackers
 

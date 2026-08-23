@@ -194,6 +194,8 @@ config: dict[str, Any] = {
         # this will search qbittorrent clients for matching torrents
         # and use found torrent id's for existing hash and site searching
         "skip_auto_torrent": False,
+        # Set true to also skip automated torrent searching for personal releases
+        "skip_auto_torrent_personalrelease": False,
         # Set to true to always just use the largest playlist on a blu-ray, without selection prompt.
         "use_largest_playlist": False,
         # Import policy for releases found on other trackers. Choose one:

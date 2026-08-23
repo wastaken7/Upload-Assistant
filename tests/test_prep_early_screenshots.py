@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from src import prep_helpers
 from src.meta import Meta
 from src.prep import Prep, populate_hdr_for_early_capture
 from src.screenshot_manifest import register
@@ -73,6 +74,16 @@ def test_early_capture_skips_hdr_probe_without_video_metadata() -> None:
     asyncio.run(populate_hdr_for_early_capture(meta, None, None))
 
     assert meta.hdr == ""
+
+
+def test_personal_release_config_skips_auto_torrent_before_client_search(tmp_path: Path) -> None:
+    prep = Prep.__new__(Prep)
+    prep.config = {"DEFAULT": {"skip_auto_torrent_personalrelease": True}}
+    meta = Meta(base_dir=str(tmp_path), path=str(tmp_path), personalrelease=True)
+
+    prep_helpers.init_meta(prep, meta, "cli")
+
+    assert meta.skip_auto_torrent
 
 
 def test_registered_main_screenshots_are_reused_when_title_changes(tmp_path: Path) -> None:
