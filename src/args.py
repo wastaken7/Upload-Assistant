@@ -547,6 +547,7 @@ class Args:
         parser.add_argument("-st", "--stream", action="store_true", required=False, help="Stream Optimized Upload")
         parser.add_argument("-webdv", "--webdv", action="store_true", required=False, help="Contains a Dolby Vision layer converted using dovi_tool (HYBRID)")
         parser.add_argument("-hc", "--hardcoded-subs", action="store_true", required=False, help="Contains hardcoded subs", dest="hardcoded_subs")
+        parser.add_argument("--hardcoded-subs-language", nargs=1, required=False, help="Language/s of hardcoded subtitles", dest="hardcoded_subs_language")
         parser.add_argument("-pr", "--personalrelease", action="store_true", required=False, help="Personal Release")
         parser.add_argument("-sdc", "--skip-dupe-check", action="store_true", required=False, help="Ignore dupes and upload anyway (Skips dupe check)", dest="dupe")
         parser.add_argument(
