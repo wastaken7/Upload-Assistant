@@ -784,19 +784,52 @@ class Args:
         action_uo.completer = upload_order_completer
         parser.add_argument("-rtl", "--rtorrent-label", dest="rtorrent_label", nargs=1, required=False, help="Add to rtorrent with this label")
 
-        def _tracker_completer(prefix: str, parsed_args: Any, **kwargs: Any) -> list[str]:
+        def _tracker_completer(prefix: str, parsed_args: Any, **kwargs: Any) -> dict[str, str]:
+            import os
+            import re
+            from pathlib import Path
+
             trackers_dict = self.config.get("TRACKERS", {})
-            configured = []
+            configured = {}
             for name, opts in trackers_dict.items():
                 if isinstance(opts, dict):
                     if opts.get("api_key") or opts.get("auth_key") or opts.get("cookies") or opts.get("username"):
-                        configured.append(name.lower())
+                        configured[name.lower()] = name.title()
+
+            try:
+                tracker_dir = Path(__file__).parent / "trackers"
+                if tracker_dir.exists():
+                    display_name_re = re.compile(r'^\s*display_name\s*=\s*(["\'])(.*?)\1', re.MULTILINE)
+                    supported_cats_re = re.compile(r"^\s*supported_categories\s*=\s*\((.*?)\)", re.MULTILINE | re.DOTALL)
+
+                    for file in tracker_dir.rglob("*.py"):
+                        if file.name in ("__init__.py", "common.py", "routing.py") or file.name.endswith("_TEMPLATE.py"):
+                            continue
+
+                        tracker_name = file.stem.lower()
+                        if tracker_name in configured:
+                            content_file = file.read_text(encoding="utf-8")
+                            dn_match = display_name_re.search(content_file)
+                            sc_match = supported_cats_re.search(content_file)
+
+                            disp = dn_match.group(2) if dn_match else file.stem.title()
+
+                            cats = []
+                            if sc_match:
+                                cats_raw = sc_match.group(1)
+                                cats = [c.strip().strip("\"'") for c in cats_raw.split(",") if c.strip()]
+
+                            desc = f"{disp} ({', '.join(cats)})" if cats else disp
+
+                            configured[tracker_name] = desc
+            except Exception as e:
+                pass
 
             if "," in prefix:
                 base, current = prefix.rsplit(",", 1)
-                return [f"{base},{t}" for t in configured if t.startswith(current.lower())]
+                return {f"{base},{t}": desc for t, desc in configured.items() if t.startswith(current.lower())}
             else:
-                return [t for t in configured if t.startswith(prefix.lower())]
+                return {t: desc for t, desc in configured.items() if t.startswith(prefix.lower())}
 
         tk_action = parser.add_argument("-tk", "--trackers", nargs=1, required=False, help="Upload to these trackers, comma separated (--trackers blu,bhd) including manual")
         tk_action.completer = _tracker_completer
