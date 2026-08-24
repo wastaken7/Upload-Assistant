@@ -185,13 +185,14 @@ class PassThePopcorn:
     ) -> tuple[int | None, int | str | None, str | None]:
         headers = {
             "ApiUser": self.api_user,
-            "api_key": self.api_key,
+            "ApiKey": self.api_key,
             "User-Agent": self.user_agent,
         }
         url = f"{self.base_url}/torrents.php"
         search_value = search_term or _search_file_folder
         params = {
             "searchstr": search_value,
+            "json": "noredirect",
         }
 
         try:
@@ -239,8 +240,8 @@ class PassThePopcorn:
             return None, None, None
 
     async def get_imdb_from_torrent_id(self, ptp_torrent_id: int | str) -> tuple[int | None, str | None]:
-        params = {"torrentid": ptp_torrent_id}
-        headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
+        params = {"torrentid": ptp_torrent_id, "json": "noredirect"}
+        headers = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
         url = f"{self.base_url}/torrents.php"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url, params=params, headers=headers)
@@ -266,7 +267,7 @@ class PassThePopcorn:
 
     async def get_ptp_description(self, ptp_torrent_id: int | str, meta: Meta, is_disc: str) -> list[Any]:
         params = {"id": ptp_torrent_id, "action": "get_description"}
-        headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
+        headers = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
         url = f"{self.base_url}/torrents.php"
         logger.info(f"{self.tracker}: [yellow]Requesting description from {url} with ID {ptp_torrent_id}")
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
@@ -311,8 +312,9 @@ class PassThePopcorn:
     async def get_group_by_imdb(self, imdb: int | str) -> str | None:
         params = {
             "imdb": imdb,
+            "json": "noredirect",
         }
-        headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
+        headers = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
         url = f"{self.base_url}/torrents.php"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url=url, headers=headers, params=params)
@@ -398,7 +400,7 @@ class PassThePopcorn:
 
     async def get_torrent_info(self, imdb: int | str, meta: Meta) -> dict[str, Any]:
         params = {"imdb": imdb, "action": "torrent_info", "fast": 1}
-        headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
+        headers = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
         url = f"{self.base_url}/ajax.php"
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url=url, params=params, headers=headers)
@@ -490,8 +492,10 @@ class PassThePopcorn:
         # Prepare request parameters and headers
         params = {
             "id": group_id,
+            "json": "1",
+            "jsontrumpable": "1",
         }
-        headers = {"ApiUser": self.api_user, "api_key": self.api_key, "User-Agent": self.user_agent}
+        headers = {"ApiUser": self.api_user, "ApiKey": self.api_key, "User-Agent": self.user_agent}
         url = f"{self.base_url}/torrents.php"
 
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
@@ -499,7 +503,14 @@ class PassThePopcorn:
             await asyncio.sleep(1)  # Mimic server-friendly delay
             response.raise_for_status()
             existing: list[str] = []
-            data = response.json()
+            try:
+                data = response.json()
+            except Exception as e:
+                logger.info(f"{self.tracker}: [red]Error searching for duplicates, response was not valid JSON: {e}[/red]")
+                if response.text:
+                    logger.info(f"{self.tracker}: [red]Response body (truncated): {response.text[:200]}[/red]")
+                return existing
+
             torrents = cast(list[dict[str, Any]], data.get("Torrents", []))
             existing.extend(
                 f"[{torrent.get('Resolution')}] {torrent.get('ReleaseName', 'RELEASE NAME NOT FOUND')}"
