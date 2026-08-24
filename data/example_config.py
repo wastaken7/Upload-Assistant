@@ -54,6 +54,12 @@ config: dict[str, Any] = {
         # TMDB API key (required).
         # Create a key at https://www.themoviedb.org/settings/api and paste it below.
         "tmdb_api": "",
+        # TVDB API key.
+        # Sign up at https://www.thetvdb.com/api-information/signup and paste the key below.
+        "tvdb_api": "",
+        # Generate a TVDB token at https://thetvdb.github.io/v4-api/#/Login/post_login.
+        # Enter only your API key in the login form and leave the PIN unchanged.
+        "tvdb_token": "",
         # Google Books API key. Leave blank to disable.
         # Obtain a key from https://console.cloud.google.com/apis/library/books.googleapis.com.
         "google_books_api_key": "",
@@ -64,12 +70,6 @@ config: dict[str, Any] = {
         # MyAnonamouse (MAM) API key or session cookie (mam_id). Leave blank to disable.
         # Find it under Preferences > Security > View IP locked session cookie.
         "mam_api_key": "",
-        # TVDB API key.
-        # Sign up at https://www.thetvdb.com/api-information/signup and paste the key below.
-        "tvdb_api": "",
-        # Generate a TVDB token at https://thetvdb.github.io/v4-api/#/Login/post_login.
-        # Enter only your API key in the login form and leave the PIN unchanged.
-        "tvdb_token": "",
         # BTN API key used to retrieve metadata from BTN.
         "btn_api": "",
 
