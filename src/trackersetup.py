@@ -69,6 +69,7 @@ from src.trackers.UNIT3D.blutopia import Blutopia
 from src.trackers.UNIT3D.capybarabr import CapybaraBR
 from src.trackers.UNIT3D.cinematik import Cinematik
 from src.trackers.UNIT3D.darkpeers import DarkPeers
+from src.trackers.UNIT3D.dreadvault import DreadVault
 from src.trackers.UNIT3D.emuwarez import Emuwarez
 from src.trackers.UNIT3D.hawkeuno import HawkeUno
 from src.trackers.UNIT3D.homiehelpdesk import HomieHelpDesk
@@ -1374,6 +1375,7 @@ tracker_class_map: dict[str, Any] = {
     "DRUNKENSLUG": DrunkenSlug,
     "NZBGEEK": NZBGeek,
     "DESITORRENTS": DesiTorrents,
+    "DREADVAULT": DreadVault,
     "EMUWAREZ": Emuwarez,
     "FUNFILE": FunFile,
     "FILELIST": FileList,

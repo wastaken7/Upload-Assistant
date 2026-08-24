@@ -290,6 +290,7 @@ const trackerNameMap = {
   DARKPEERS: "DarkPeers",
   DESITORRENTS: "DesiTorrents",
   DIGITALCORE: "DigitalCore",
+  DREADVAULT: "DreadVault",
   DRUNKENSLUG: "DrunkenSlug",
   EMUWAREZ: "Emuwarez",
   FILELIST: "FileList",
