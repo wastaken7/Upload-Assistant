@@ -80,8 +80,18 @@ class PassThePopcorn:
         "LAMA",
         "WORLD",
     )
-    approved_image_hosts = ("pixhost",)
-    image_host_policy = ImageHostPolicy({"pixhost.to": "pixhost"}, approved_image_hosts)
+    approved_image_hosts = ("pixhost", "imgbb", "onlyimage", "ptscreens", "passtheimage")
+    image_host_policy = ImageHostPolicy(
+        {
+            "pixhost.to": "pixhost",
+            "ibb.co": "imgbb",
+            "imgbb.com": "imgbb",
+            "onlyimage.org": "onlyimage",
+            "ptscreens.com": "ptscreens",
+            "passtheima.ge": "passtheimage",
+        },
+        approved_image_hosts,
+    )
     sub_lang_map: ClassVar[dict[tuple[str, ...], int]] = {
         ("Arabic", "ara", "ar"): 22,
         ("Brazilian Portuguese", "Brazilian", "Portuguese-BR", "pt-br", "pt-BR"): 49,
