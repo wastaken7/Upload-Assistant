@@ -3870,7 +3870,7 @@ def config_options():
                             "A list of clients to use for injection (aka actually adding the torrent for uploading)",
                             'eg: ["qbittorrent", "rtorrent"]',
                         ],
-                        "subsection": "CLIENT SETUP",
+                        "subsection": "CLIENT SELECTION",
                     }
                 )
             if "searching_client_list" not in existing_keys:
@@ -3884,12 +3884,12 @@ def config_options():
                             'eg: ["qbittorrent", "qbittorrent_searching"]',
                             "will fallback to default_torrent_client if empty",
                         ],
-                        "subsection": "CLIENT SETUP",
+                        "subsection": "CLIENT SELECTION",
                     }
                 )
             # Update subsection_map for these items
-            subsection_map["DEFAULT/injecting_client_list"] = "CLIENT SETUP"
-            subsection_map["DEFAULT/searching_client_list"] = "CLIENT SETUP"
+            subsection_map["DEFAULT/injecting_client_list"] = "CLIENT SELECTION"
+            subsection_map["DEFAULT/searching_client_list"] = "CLIENT SELECTION"
 
         sections.append({"section": section_name, "items": items})
 
