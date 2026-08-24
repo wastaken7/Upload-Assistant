@@ -3,7 +3,7 @@ from typing import Any
 
 config: dict[str, Any] = {
     "DEFAULT": {
-        # MAIN SETTINGS
+        # --- MAIN SETTINGS ---
         # will print a notice if an update is available
         "update_notification": True,
         # will print the changelog if an update is available
@@ -13,7 +13,8 @@ config: dict[str, Any] = {
         # tmdb api key **REQUIRED**
         # visit "https://www.themoviedb.org/settings/api" copy api key and insert below
         "tmdb_api": "",
-        # METADATA CACHE
+
+        # --- METADATA CACHE ---
         # Temporarily saves responses from sites such as TMDB and IMDb. Future
         # runs can reuse this data and make fewer API requests.
         # Leave this as True in most cases. Use False only to test fresh data
@@ -59,7 +60,8 @@ config: dict[str, Any] = {
             "musicbrainz": {"enabled": True, "ttl_hours": 720},
             "discogs": {"enabled": True, "ttl_hours": 720},
         },
-        # TRACKER METADATA CACHE
+
+        # --- TRACKER METADATA CACHE ---
         # Saves metadata fetched from a tracker when you provide a specific
         # torrent ID (for example, --ptp, --hdb, or a tracker link in a torrent
         # comment). It never caches dupe checks or broad name searches.
@@ -149,7 +151,8 @@ config: dict[str, Any] = {
         # Maximum time allowed for each subprocess post-upload script. Invalid or
         # zero values use 30 seconds. A failed hook never changes the upload result.
         "post_upload_hook_timeout": 30,
-        # IMAGE HOSTING SETTINGS
+
+        # --- IMAGE HOSTING SETTINGS ---
         # Order of image hosts. primary host as first with others as backup
         # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, midnightscene, passtheimage, seedpool_cdn, sharex, utppm, lostimg
         "img_host_1": "",
@@ -187,7 +190,8 @@ config: dict[str, Any] = {
         "sharex_api_key": "",
         # utp.pm API key
         "utppm_api": "",
-        # GETTING METADATA
+
+        # --- METADATA LOOKUP SETTINGS ---
         # btn api key used to get details from btn
         "btn_api": "",
         # set true to skip automated client torrent searching
@@ -236,7 +240,8 @@ config: dict[str, Any] = {
         # Set true to also try searching predb for scene release
         # predb is not consistent, can timeout, but can find some releases not found on SRRDB
         "check_predb": False,
-        # SCREENSHOT HANDLING
+
+        # --- SCREENSHOT HANDLING ---
         # Number of screenshots to capture
         "screens": "4",
         # XXX releases generate one contact sheet per video instead of individual frames.
@@ -310,7 +315,8 @@ config: dict[str, Any] = {
         # The default of 2.0 is somewhat conservative and will mostly just apply to skies or directly sunlit surfaces. A setting of 0.0 disables this option.
         # This option works only if the input frame has a supported color tag.
         "desat": "10.0",
-        # DESCRIPTION SETTINGS
+
+        # --- DESCRIPTION SETTINGS ---
         # Detailed documentation on how description layout settings work and affect description building:
         # https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
         # Whether to add a logo for the show/movie from TMDB to the top of the description
@@ -410,7 +416,8 @@ config: dict[str, Any] = {
         "audio_spectrogram_max_files": 12,
         # Limit plots generated for multi-file releases.
         "dynamic_hdr_plot_max_files": 1,
-        # CLIENT SETUP
+
+        # --- CLIENT SETUP ---
         # Configures the order of uploads when both torrent trackers and Usenet are selected.
         # "concurrent" (default) -> Upload to Usenet and torrent trackers at the same time.
         # "usenet"               -> Upload to Usenet first. Torrent tracker uploads will start after Usenet upload finishes.
@@ -432,7 +439,8 @@ config: dict[str, Any] = {
         # eg: ["qbittorrent", "qbittorrent_searching"]
         # will fallback to default_torrent_client if empty
         # "searching_client_list": [""],
-        # ARR* INTEGRATION SETTINGS
+
+        # --- ARR INTEGRATION SETTINGS ---
         # set true to use sonarr for tv show searching
         "use_sonarr": False,
         "sonarr_url": "http://localhost:8989",
@@ -449,7 +457,8 @@ config: dict[str, Any] = {
         # additional radarr instances can be added by adding more radarr_url_x and radarr_api_key_x entries
         "radarr_url_1": "http://my-second-instance:7878",
         "radarr_api_key_1": "",
-        # TORRENT CREATION
+
+        # --- TORRENT CREATION ---
         # set true to use mkbrr for torrent creation
         "mkbrr": True,
         # Create using a specific number of worker threads for hashing (e.g., 8) with mkbrr
@@ -462,7 +471,8 @@ config: dict[str, Any] = {
         # For trackers that might need specific piece size rehashing, using a value higher than 0 will add the specified cooldown
         # in (seconds) before rehashing begins, to allow other tasks to complete quickly, before resources are consumed by rehashing
         "rehash_cooldown": "0",
-        # POST UPLOAD
+
+        # --- POST-UPLOAD SETTINGS ---
         # Delay (in seconds) before injecting the torrent to allow the tracker to register the hash and avoid 'unregistered torrent' errors.
         # Can be overridden in a per-tracker setting by adding this same config
         "inject_delay": 0,
@@ -500,12 +510,42 @@ config: dict[str, Any] = {
         # Which trackers do you want to upload to?
         # Note: Description layout settings (like screenshot grids, logos, etc.) can be overridden per-tracker.
         # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
-        # Available tracker: 1PTBA, ASIANCINEMA, AITHER, ANTHELION, ALPHARATIO, AMIGOSSHARE, AVISTAZ, BEYONDHD, BITHDTV, BITPORN, BJSHARE, BLUTOPIA, BRASILTRACKER, BROADCASTHENET, CAPYBARABR, CURUPIRA, SUIO, CINEMAZ, DIGITALCORE, DRUNKENSLUG, DARKPEERS, DESITORRENTS, EMUWAREZ, FUNFILE, FILELIST, FLOOD,
-        # GREATPOSTERWALL, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK, HAWKEUNO, INFINITYHD, IMMORTALSEED, ITATORRENTS, LAJIDUI, LEMONHD, LOCADORA, LASTDIGITALUNDERGROUND, LONGPT, LST, LATTEAM, LUMINARR, MIDNIGHTSCENE, MTEAM, NEBULANCE, ONLYENCODES,
-        # NORDICQUALITY, NZBGEEK, OLDTOONSWORLD, PRIVATEHD, PORTUGAS, PTCAFE, PTERCLUB, PTFANS, PTGTK, PTZONE, PASSTHEPOPCORN, PEERGARDEN, PTSKIT, POLISHTORRENT, RACING4EVERYONE, RASTASTUGAN, REELFLIX, RAILGUNPT, RETROFLIX, RETROMOVIESCLUB, ROCKETHD, SAMARITANO, SHAREISLAND, SWARMAZON, SEEDPOOL, SPEEDAPP, SKIPTHECOMMERCIALS, TORRENTHR,
-        # CINEMATIK, MAKINGOFF, ORPHEUS, TORRENTLEECH, THELEACHZONE, THEOLDSCHOOL, TOTHEGLORY, TORRENTEROS, TVCHAOSUK, ULCX, UTOPIA, XINGYUNGEPT, YUSCENE, ZENITH
+        # The tracker blocks below are the source of truth for the available trackers.
+        # The config generator derives its tracker list directly from these keys.
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
+        "1PTBA": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # Cookies required (export from https://1ptba.com/ to data/cookies/1PTBA.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
+            "announce_url": "",
+            "anon": True,
+            # The configurations below override the DEFAULT configuration
+            "add_logo": True,
+            "logo_size": "",
+            "thumbnail_size": "",
+            "screens_per_row": "",
+            "episode_overview": True,
+            "multiScreens": "",
+            "pack_thumb_size": "",
+            "charLimit": "",
+            "fileLimit": "",
+            "processLimit": "",
+            "custom_description_header": "",
+            "screenshot_header": "",
+            "disc_menu_header": "",
+            "mediainfo_header": "",
+            "audio_spectrogram_header": "",
+            "custom_signature": "",
+            "user_description": "",
+            "custom_header": "",
+            "custom_footer": "",
+            "use_bluray_images": True,
+            "bluray_image_size": "",
+            "add_audio_spectrogram": True,
+            "inject_delay": 0,
+        },
         "AITHER": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
@@ -741,18 +781,6 @@ config: dict[str, Any] = {
             "anon": True,
             "inject_delay": 0,
         },
-        "BROADCASTHENET": {
-            # BTN accepts TV only. An API key is required for dupe searching and
-            # downloading BTN's registered torrent; upload authentication uses
-            # browser-exported cookies in data/cookies/BROADCASTHENET.txt.
-            "link_dir_name": "",
-            "use_for_search": False,
-            "api_key": "",
-            "announce_url": "",
-            # Optional override for BTN's JSON-RPC endpoint.
-            "api_url": "https://api.broadcasthe.net/",
-            "inject_delay": 0,
-        },
         "BITPORN": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
@@ -889,6 +917,18 @@ config: dict[str, Any] = {
             "add_bluray_link": True,
             "use_bluray_images": True,
             "bluray_image_size": "",
+            "inject_delay": 0,
+        },
+        "BROADCASTHENET": {
+            # BTN accepts TV only. An API key is required for dupe searching and
+            # downloading BTN's registered torrent; upload authentication uses
+            # browser-exported cookies in data/cookies/BROADCASTHENET.txt.
+            "link_dir_name": "",
+            "use_for_search": False,
+            "api_key": "",
+            "announce_url": "",
+            # Optional override for BTN's JSON-RPC endpoint.
+            "api_url": "https://api.broadcasthe.net/",
             "inject_delay": 0,
         },
         "CAPYBARABR": {
@@ -1188,6 +1228,13 @@ config: dict[str, Any] = {
             "anon": True,
             "inject_delay": 0,
         },
+        "FLOOD": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            "api_key": "",
+            "announce_url": "https://flood.st/announce/Custom_Announce_URL",
+            "anon": False,
+        },
         "FUNFILE": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
@@ -1220,13 +1267,6 @@ config: dict[str, Any] = {
             "bluray_image_size": "",
             "add_audio_spectrogram": True,
             "inject_delay": 0,
-        },
-        "FLOOD": {
-            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
-            "link_dir_name": "",
-            "api_key": "",
-            "announce_url": "https://flood.st/announce/Custom_Announce_URL",
-            "anon": False,
         },
         "GREATPOSTERWALL": {
             "link_dir_name": "",
@@ -1566,38 +1606,6 @@ config: dict[str, Any] = {
             "dynamic_hdr_plot_header": "[h2]Dynamic HDR Metadata[/h2]",
             "custom_signature": "",
             "add_bluray_link": True,
-            "use_bluray_images": True,
-            "bluray_image_size": "",
-            "add_audio_spectrogram": True,
-            "inject_delay": 0,
-        },
-        "1PTBA": {
-            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
-            "link_dir_name": "",
-            # Cookies required (export from https://1ptba.com/ to data/cookies/1PTBA.txt).
-            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
-            "announce_url": "",
-            "anon": True,
-            # The configurations below override the DEFAULT configuration
-            "add_logo": True,
-            "logo_size": "",
-            "thumbnail_size": "",
-            "screens_per_row": "",
-            "episode_overview": True,
-            "multiScreens": "",
-            "pack_thumb_size": "",
-            "charLimit": "",
-            "fileLimit": "",
-            "processLimit": "",
-            "custom_description_header": "",
-            "screenshot_header": "",
-            "disc_menu_header": "",
-            "mediainfo_header": "",
-            "audio_spectrogram_header": "",
-            "custom_signature": "",
-            "user_description": "",
-            "custom_header": "",
-            "custom_footer": "",
             "use_bluray_images": True,
             "bluray_image_size": "",
             "add_audio_spectrogram": True,
@@ -2130,38 +2138,6 @@ config: dict[str, Any] = {
             "announce_url": "",
             "inject_delay": 0,
         },
-        "PTZONE": {
-            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
-            "link_dir_name": "",
-            # Cookies required (export from https://ptzone.xyz/ to data/cookies/PTZONE.txt).
-            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
-            "announce_url": "",
-            "anon": True,
-            # The configurations below override the DEFAULT configuration
-            "add_logo": True,
-            "logo_size": "",
-            "thumbnail_size": "",
-            "screens_per_row": "",
-            "episode_overview": True,
-            "multiScreens": "",
-            "pack_thumb_size": "",
-            "charLimit": "",
-            "fileLimit": "",
-            "processLimit": "",
-            "custom_description_header": "",
-            "screenshot_header": "",
-            "disc_menu_header": "",
-            "mediainfo_header": "",
-            "audio_spectrogram_header": "",
-            "custom_signature": "",
-            "user_description": "",
-            "custom_header": "",
-            "custom_footer": "",
-            "use_bluray_images": True,
-            "bluray_image_size": "",
-            "add_audio_spectrogram": True,
-            "inject_delay": 0,
-        },
         "PASSTHEPOPCORN": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
@@ -2349,7 +2325,8 @@ config: dict[str, Any] = {
             "add_audio_spectrogram": True,
             "inject_delay": 0,
         },
-        "PTERCLUB": {  # Does not appear to be working at all
+        # PTERCLUB support is currently experimental and may not work reliably.
+        "PTERCLUB": {
             # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
             "link_dir_name": "",
             "passkey": "passkey",
@@ -2444,6 +2421,38 @@ config: dict[str, Any] = {
             "dynamic_hdr_plot_header": "",
             "custom_signature": "",
             "add_bluray_link": True,
+            "use_bluray_images": True,
+            "bluray_image_size": "",
+            "add_audio_spectrogram": True,
+            "inject_delay": 0,
+        },
+        "PTZONE": {
+            # Instead of using the tracker acronym for folder name when sym/hard linking, you can use a custom name
+            "link_dir_name": "",
+            # Cookies required (export from https://ptzone.xyz/ to data/cookies/PTZONE.txt).
+            # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/example-config.md#how-to-export-cookies
+            "announce_url": "",
+            "anon": True,
+            # The configurations below override the DEFAULT configuration
+            "add_logo": True,
+            "logo_size": "",
+            "thumbnail_size": "",
+            "screens_per_row": "",
+            "episode_overview": True,
+            "multiScreens": "",
+            "pack_thumb_size": "",
+            "charLimit": "",
+            "fileLimit": "",
+            "processLimit": "",
+            "custom_description_header": "",
+            "screenshot_header": "",
+            "disc_menu_header": "",
+            "mediainfo_header": "",
+            "audio_spectrogram_header": "",
+            "custom_signature": "",
+            "user_description": "",
+            "custom_header": "",
+            "custom_footer": "",
             "use_bluray_images": True,
             "bluray_image_size": "",
             "add_audio_spectrogram": True,
@@ -3375,10 +3384,11 @@ config: dict[str, Any] = {
             "qbit_cross_tag": "",
             "qbit_cross_cat": "",
             "content_layout": "Original",
-            # Here you can chose to use either symbolic or hard links, or None to use original path.
+            # Choose symbolic links, hard links, or an empty value to use the original path.
             # This will disable any automatic torrent management if set.
             # use either "symlink" or "hardlink"
-            # on windows, symlinks needs admin privs, both link types need ntfs/refs filesytem (and same drive)
+            # On Windows, symbolic links may require administrator privileges. Both link types
+            # require an NTFS/ReFS filesystem, and hard links must remain on the same drive.
             "linking": "",
             # Allow fallback to inject torrent into qBitTorrent using the original path
             # when linking error. eg: unsupported file system.
@@ -3415,10 +3425,11 @@ config: dict[str, Any] = {
             # path/to/session folder
             "torrent_storage_dir": "",
             "rtorrent_label": "",
-            # here you can chose to use either symbolic or hard links, or None to use original path
+            # Choose symbolic links, hard links, or an empty value to use the original path.
             # this will disable any automatic torrent management if set
             # use either "symlink" or "hardlink"
-            # on windows, symlinks needs admin privs, both link types need ntfs/refs filesytem (and same drive)
+            # On Windows, symbolic links may require administrator privileges. Both link types
+            # require an NTFS/ReFS filesystem, and hard links must remain on the same drive.
             "linking": "",
             # Allow fallback to inject torrent into qBitTorrent using the original path
             # when linking error. eg: unsupported file system.
@@ -3468,8 +3479,11 @@ config: dict[str, Any] = {
         },
     },
     "USENET": {
+        # --- GENERAL SETTINGS ---
         # Set to True to enable Usenet uploading
         "enabled": False,
+
+        # --- SERVER CONNECTION ---
         # Usenet NNTP host, port, credentials
         "host": "",
         "port": "443",
@@ -3482,6 +3496,8 @@ config: dict[str, Any] = {
         "poster": "Uploader <upload@assistant.org>",
         # If True, poster will be randomized for anonymity/obfuscation
         "random_poster": True,
+
+        # --- ARCHIVING AND PARITY ---
         # Set to True to skip 7z archiving entirely and post files directly.
         # Useful with pesto, which handles obfuscation and PAR2 natively.
         "skip_archive": False,
@@ -3494,6 +3510,8 @@ config: dict[str, Any] = {
         "par2_percentage": "10",
         # Obfuscate the subject line of the NNTP post to prevent DMCA takedowns
         "obscure_subject": True,
+
+        # --- UPLOADER AND VERIFICATION ---
         # Uploader backend: "nyuu" (default) or "pesto"
         # pesto handles PAR2 and NZB password injection internally
         "usenet_uploader": "nyuu",
@@ -3505,9 +3523,8 @@ config: dict[str, Any] = {
         # posted" article can still be missing/unpropagated on the server,
         # producing a broken NZB.
         "pesto_check": True,
-        # Seconds to wait after EACH article posts before its first STAT check
-        # (streaming, concurrent with the upload — not a single wait at the end
-        # of the whole run) (pesto --check-delay)
+        # Seconds to wait after each article posts before its first STAT check
+        # (pesto --check-delay).
         "pesto_check_delay": 5,
         # Number of STAT attempts per article before marking it missing (pesto --check-retries)
         "pesto_check_retries": 3,
@@ -3529,11 +3546,9 @@ config: dict[str, Any] = {
         # recommended — without this, a "successfully posted" article can
         # still be missing/unpropagated on the server, producing a broken NZB.
         "nyuu_check": True,
-        # Seconds to wait after EACH article is posted before verifying that
-        # specific article (nyuu --check-delay). Unlike pesto's check_delay
-        # (a single wait after the whole upload finishes), this applies
-        # per-article, so keep it low — nyuu's own default is 5. A larger value
-        # here backs up the check queue on big uploads and can stall posting.
+        # Seconds to wait after each article posts before verifying that article
+        # (nyuu --check-delay). Keep this low; a larger value can back up the
+        # check queue on large uploads and stall posting.
         "nyuu_check_delay": 5,
         # Number of check attempts per article before marking it missing (nyuu --check-tries)
         "nyuu_check_retries": 3,
@@ -3545,6 +3560,8 @@ config: dict[str, Any] = {
         # to instead post at the full "connections" count with this many
         # additional connections dedicated to checking.
         "nyuu_check_connections": "",
+
+        # --- BINARY PATHS ---
         # Paths to binaries (defaults to looking in PATH, downloaded automatically if not found)
         # Available at: https://github.com/animetosho/nyuu
         "nyuu_path": "nyuu",
@@ -3554,6 +3571,8 @@ config: dict[str, Any] = {
         "pesto_path": "pesto",
         # Available at: https://www.7-zip.org/
         "7z_path": "7z",
+
+        # --- OUTPUT PATHS ---
         # Where to output generated NZB files (if empty, saves to tmp directory)
         "nzb_output_dir": "",
         # Temporary directory for Usenet uploads where compressed volumes are stored (if empty, saves to tmp directory)
