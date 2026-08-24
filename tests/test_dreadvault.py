@@ -17,6 +17,21 @@ def test_dreadvault_is_registered_with_full_tracker_name():
     assert DreadVault.supported_categories == ("TV", "MOVIE")  # noqa: S101
 
 
+def test_dreadvault_bans_the_published_groups():
+    # Published on the site's rules page 2026-08-24; DreadVault exposes no
+    # /api/bannedReleaseGroups endpoint, so this list is maintained by hand.
+    assert set(DreadVault.banned_groups) == {  # noqa: S101
+        "BONE",
+        "EVO",
+        "NeoNoir",
+        "PSA",
+        "RARBG",
+        "VXT",
+        "YIFY",
+        "YTS",
+    }
+
+
 @pytest.mark.parametrize(
     "combined_genres",
     [

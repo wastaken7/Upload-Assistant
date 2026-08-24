@@ -21,7 +21,16 @@ class DreadVault(UNIT3D):
     display_name = "DreadVault"
     allows_bloated_audio = True
     base_url = "https://dreadvault.org"
-    banned_groups: tuple[str, ...] = ()
+    banned_groups = (
+        "BONE",
+        "EVO",
+        "NeoNoir",
+        "PSA",
+        "RARBG",
+        "VXT",
+        "YIFY",
+        "YTS",
+    )
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"
     requests_url = f"{base_url}/api/requests/filter"
