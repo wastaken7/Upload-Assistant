@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from src.meta import Meta, _TRACKER_ID_ALIASES
+from src.meta import _TRACKER_ID_ALIASES, Meta
 from src.trackers.UNIT3D.dreadvault import DreadVault
 from src.trackersetup import tracker_class_map
 
