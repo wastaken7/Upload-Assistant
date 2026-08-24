@@ -108,7 +108,7 @@ config: dict[str, Any] = {
         # Example: "C:\\Program Files\\WinRAR\\UnRAR.exe"
         "unrar_path": "",
 
-        # --- CLIENT SETUP ---
+        # --- CLIENT SELECTION ---
         # Default client used for torrent injection and existing-torrent searches.
         "default_torrent_client": "qbittorrent",
         # The optional lists below can override this default for each operation.
@@ -118,20 +118,8 @@ config: dict[str, Any] = {
         # Clients searched for existing torrents:
         # "searching_client_list": ["qbittorrent", "qbittorrent_searching"],
 
-        # --- UPLOAD SCHEDULING ---
-        # Configures the order of uploads when both torrent trackers and Usenet are selected.
-        # "concurrent" (default) -> Upload to Usenet and torrent trackers at the same time.
-        # "usenet"               -> Upload to Usenet first. Torrent tracker uploads will start after Usenet upload finishes.
-        # "tracker"              -> Upload to torrent trackers first. Once finished, we run the bandwidth check, and then start the Usenet upload.
-        "upload_order": "concurrent",
-        # Enable bandwidth control to wait for lower qBittorrent upload speed before uploading next tracker
-        "qbit_bandwidth_control": False,
-        # Threshold in KB/s. If the average upload speed is below this value, the next upload can start.
-        "qbit_bandwidth_threshold": 0,
-        # The duration of time in seconds to average the upload speed over.
-        "qbit_bandwidth_time": 0,
-
-        # --- METADATA CACHE ---
+        # --- METADATA CACHING ---
+        # Public metadata cache
         # Temporarily saves responses from sites such as TMDB and IMDb. Future
         # runs can reuse this data and make fewer API requests.
         # Leave this as True in most cases. Use False only to test fresh data
@@ -178,7 +166,7 @@ config: dict[str, Any] = {
             "discogs": {"enabled": True, "ttl_hours": 720},
         },
 
-        # --- TRACKER METADATA CACHE ---
+        # Tracker-ID metadata cache
         # Saves metadata fetched from a tracker when you provide a specific
         # torrent ID (for example, --ptp, --hdb, or a tracker link in a torrent
         # comment). It never caches dupe checks or broad name searches.
@@ -232,44 +220,10 @@ config: dict[str, Any] = {
         # Set true to also try searching predb for scene release
         # predb is not consistent, can timeout, but can find some releases not found on SRRDB
         "check_predb": False,
-        # Set false to disable adding cross-seed suitable torrents found during existing search (dupe) checking
-        "cross_seeding": True,
-        # Set true to cross-seed check every valid tracker defined in your config
-        # regardless of whether the tracker was selected for upload or not (needs cross-seeding above to be True)
-        "cross_seed_check_everything": False,
-
-        # --- BLU-RAY SETTINGS ---
-        # Set to true to always just use the largest playlist on a blu-ray, without selection prompt.
-        "use_largest_playlist": False,
-        # If processing a dvd/bluray disc, get related information from bluray.com
-        # This will set region and distribution info
-        # Must have imdb id to work
-        "get_bluray_info": False,
-        # A release with 100% score will have complete matching details between bluray.com and bdinfo
-        # Each missing Audio OR Subtitle track will reduce the score by 5
-        # Partial matched audio tracks have a 2.5 score penalty
-        # If only a single bdinfo audio/subtitle track, penalties are doubled
-        # Video codec/resolution and disc size mismatches have huge penalties
-        # Only useful in unattended mode. If not unattended you will be prompted to confirm release
-        # Final score must be greater than this value to be considered a match
-        # Only works with blu-ray discs, not dvd
-        "bluray_score": 94.5,
-        # If there is only a single release on bluray.com, you may wish to relax the score a little
-        "bluray_single_score": 89.5,
-        # Add bluray.com link to description
-        # Requires "get_bluray_info" to be set to True
-        "add_bluray_link": True,
-        # Add cover/back/slip images from bluray.com to description if available
-        # Requires "get_bluray_info" to be set to True
-        "use_bluray_images": True,
-        # Size of bluray.com cover images.
-        # bbcode is width limited, cover images are mostly height dominant
-        # So you probably want a smaller size than screenshots for instance
-        "bluray_image_size": "250",
 
         # --- IMAGE HOSTING ---
         # Order of image hosts. primary host as first with others as backup
-        # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, midnightscene, passtheimage, seedpool_cdn, sharex, utppm, lostimg
+        # Available image hosts: dalexni, imgbb, imgbox, lensdump, lostimg, midnightscene, onlyimage, passtheimage, pixhost, ptscreens, seedpool_cdn, sharex, utppm, zipline
         "img_host_1": "",
         "img_host_2": "",
         "img_host_3": "",
@@ -286,17 +240,16 @@ config: dict[str, Any] = {
         "image_upload_delay": 0.0,
         # Minimum successful image uploads required to continue
         "min_successful_image_uploads": "3",
-        # image host api keys
-        "imgbb_api": "",
-        "lostimg_api": "",
-        "lensdump_api": "",
-        "ptscreens_api": "",
-        "onlyimage_api": "",
+
+        # Image-host credentials
         "dalexni_api": "",
+        "imgbb_api": "",
+        "lensdump_api": "",
+        "lostimg_api": "",
+        "onlyimage_api": "",
         "passtheima_ge_api": "",
-        # custom zipline url
-        "zipline_url": "",
-        "zipline_api_key": "",
+        "ptscreens_api": "",
+
         # MidnightScene (Zipline) API key. Sign in, click your avatar, then choose
         # "Copy token" (or open Settings > User). Never share or commit this token.
         "midnightscene_api_key": "",
@@ -307,8 +260,11 @@ config: dict[str, Any] = {
         "sharex_api_key": "",
         # utp.pm API key
         "utppm_api": "",
+        # custom zipline url
+        "zipline_url": "",
+        "zipline_api_key": "",
 
-        # --- SCREENSHOT CAPTURE ---
+        # --- SCREENSHOT CAPTURE AND PROCESSING ---
         # Number of screenshots to capture
         "screens": "4",
         # Number of cutoff screenshots
@@ -320,7 +276,6 @@ config: dict[str, Any] = {
         # this can change dimensions such as 1920x1040 to 1924x1040.
         "scale_screenshots_for_par": False,
 
-        # --- SCREENSHOT PROCESSING ---
         # Limit how many ffmpeg processes can run at once
         # The final value will be the minimum, between this value and number of screens being processed
         "process_limit": "4",
@@ -331,7 +286,8 @@ config: dict[str, Any] = {
         # 6 is a good balance between compression and speed
         "ffmpeg_compression": "6",
 
-        # --- HDR TONEMAPPING ---
+        # --- SCREENSHOT ENHANCEMENTS ---
+        # HDR tonemapping
         # Tonemap HDR - DV+HDR screenshots
         "tone_map": True,
         # Set false to disable libplacebo ffmpeg tonemapping and use ffmpeg only
@@ -351,7 +307,7 @@ config: dict[str, Any] = {
         # This option works only if the input frame has a supported color tag.
         "desat": "10.0",
 
-        # --- SCREENSHOT OVERLAYS ---
+        # Screenshot overlays
         # Overlay Frame number/type and "Tonemapped" if applicable to screenshots
         "frame_overlay": False,
         # Overlay text size (scales with resolution)
@@ -376,7 +332,7 @@ config: dict[str, Any] = {
         # Add this many normal screenshots to the contact sheet for a single-video XXX release.
         "xxx_single_file_screens": "0",
 
-        # --- DESCRIPTION LAYOUT ---
+        # --- GENERAL DESCRIPTION SETTINGS ---
         # Detailed documentation on how description layout settings work and affect description building:
         # https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
         # Whether to add a logo for the show/movie from TMDB to the top of the description
@@ -455,13 +411,39 @@ config: dict[str, Any] = {
             },
         },
 
-        # --- MEDIA ANALYSIS EXTRAS ---
+        # --- BLU-RAY SETTINGS ---
+        # Set to true to always just use the largest playlist on a blu-ray, without selection prompt.
+        "use_largest_playlist": False,
+        # If processing a dvd/bluray disc, get related information from bluray.com
+        # This will set region and distribution info
+        # Must have imdb id to work
+        "get_bluray_info": False,
+        # A release with 100% score will have complete matching details between bluray.com and bdinfo
+        # Each missing Audio OR Subtitle track will reduce the score by 5
+        # Partial matched audio tracks have a 2.5 score penalty
+        # If only a single bdinfo audio/subtitle track, penalties are doubled
+        # Video codec/resolution and disc size mismatches have huge penalties
+        # Only useful in unattended mode. If not unattended you will be prompted to confirm release
+        # Final score must be greater than this value to be considered a match
+        # Only works with blu-ray discs, not dvd
+        "bluray_score": 94.5,
+        # If there is only a single release on bluray.com, you may wish to relax the score a little
+        "bluray_single_score": 89.5,
+        # Add bluray.com link to description
+        # Requires "get_bluray_info" to be set to True
+        "add_bluray_link": True,
+        # Add cover/back/slip images from bluray.com to description if available
+        # Requires "get_bluray_info" to be set to True
+        "use_bluray_images": True,
+        # Size of bluray.com cover images.
+        # bbcode is width limited, cover images are mostly height dominant
+        # So you probably want a smaller size than screenshots for instance
+        "bluray_image_size": "250",
+
+        # --- AUDIO SPECTROGRAMS AND HDR PLOTS ---
+        # Audio spectrograms
         # Set true to add audio spectrograms to the description
         "add_audio_spectrogram": True,
-        # Set true to generate and add Dolby Vision/HDR10+ dynamic metadata plots.
-        # Required third-party tools are downloaded automatically on first use.
-        # Warning: metadata extraction reads each selected video file in full and may take a while for large releases.
-        "add_dynamic_hdr_plot": False,
         # Set true to generate spectrograms for all audio streams
         "process_all_audio_spectrogram": False,
         # Seconds from the beginning of each selected stream to analyse.
@@ -470,6 +452,12 @@ config: dict[str, Any] = {
         "audio_spectrogram_sample_rate": 48000,
         # For MUSIC and audiobooks, limit the number of tracks/chapters processed.
         "audio_spectrogram_max_files": 12,
+
+        # Dynamic HDR plots
+        # Set true to generate and add Dolby Vision/HDR10+ dynamic metadata plots.
+        # Required third-party tools are downloaded automatically on first use.
+        # Warning: metadata extraction reads each selected video file in full and may take a while for large releases.
+        "add_dynamic_hdr_plot": False,
         # Limit plots generated for multi-file releases.
         "dynamic_hdr_plot_max_files": 1,
 
@@ -496,6 +484,17 @@ config: dict[str, Any] = {
         # For example: 20 means a 20% or more difference in size (larger or smaller) will exclude the dupe
         # Set to None/null or remove to disable this feature.
         "dupe_size_difference_tolerance": None,
+        # upload_order configures the order of uploads when both torrent trackers and Usenet are selected.
+        # "concurrent" (default) -> Upload to Usenet and torrent trackers at the same time.
+        # "usenet"               -> Upload to Usenet first. Torrent tracker uploads will start after Usenet upload finishes.
+        # "tracker"              -> Upload to torrent trackers first. Once finished, we run the bandwidth check, and then start the Usenet upload.
+        "upload_order": "concurrent",
+        # Enable bandwidth control to wait for lower qBittorrent upload speed before uploading next tracker
+        "qbit_bandwidth_control": False,
+        # Threshold in KB/s. If the average upload speed is below this value, the next upload can start.
+        "qbit_bandwidth_threshold": 0,
+        # The duration of time in seconds to average the upload speed over.
+        "qbit_bandwidth_time": 0,
         # Number of upload retry attempts for network/server errors (e.g. 500, timeouts).
         # Trackers can override this individually in their section.
         "max_retries": 3,
@@ -511,6 +510,11 @@ config: dict[str, Any] = {
         # Delay (in seconds) before injecting the torrent to allow the tracker to register the hash and avoid 'unregistered torrent' errors.
         # Can be overridden in a per-tracker setting by adding this same config
         "inject_delay": 0,
+        # Set false to disable adding cross-seed suitable torrents found during existing search (dupe) checking
+        "cross_seeding": True,
+        # Set true to cross-seed check every valid tracker defined in your config
+        # regardless of whether the tracker was selected for upload or not (needs cross-seeding above to be True)
+        "cross_seed_check_everything": False,
         # Set true to search for matching requests on supported trackers
         "search_requests": True,
         # Optional trusted scripts from STATE_DIR/custom_hooks/ (Docker: /state/custom_hooks/),
