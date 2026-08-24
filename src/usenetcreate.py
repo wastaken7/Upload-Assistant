@@ -209,7 +209,7 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
         try:
             archive_process = psutil.Process(process.pid)
             read_bytes_start = archive_process.io_counters().read_bytes
-        except (psutil.AccessDenied, psutil.NoSuchProcess, OSError):
+        except psutil.AccessDenied, psutil.NoSuchProcess, OSError:
             # 7z output and archive-size monitoring remain available on
             # systems where the child process I/O counters cannot be read.
             archive_process = None
@@ -265,7 +265,7 @@ async def run_7z_with_progress(cmd: list[str], usenet_dir: str, safe_name: str, 
                     if archive_process is not None and read_bytes_start is not None:
                         try:
                             bytes_read = max(archive_process.io_counters().read_bytes - read_bytes_start, 0)
-                        except (psutil.AccessDenied, psutil.NoSuchProcess, OSError):
+                        except psutil.AccessDenied, psutil.NoSuchProcess, OSError:
                             archive_process = None
                     try:
                         archive_prefix = f"{safe_name}.7z"

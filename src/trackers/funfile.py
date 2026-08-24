@@ -323,7 +323,7 @@ class FunFile:
                         try:
                             dar = float(dar_str)
                             return "16_9" if dar > 1.34 else "4_3"
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             return "16_9"
 
             return "16_9"

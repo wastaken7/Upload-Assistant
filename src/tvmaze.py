@@ -33,7 +33,7 @@ class TvmazeManager:
         if isinstance(tvdb_id, (int, str)) and tvdb_id not in ("", "0"):
             try:
                 tvdb_id = int(tvdb_id)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 logger.error(f"[red]Error: tvdb_id is not a valid integer. Received: {tvdb_id}[/red]")
                 tvdb_id = 0
         else:
@@ -47,7 +47,7 @@ class TvmazeManager:
                 imdb_id = int(imdb_id)
             else:
                 imdb_id = 0
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             logger.error(f"[red]Error: imdb_id is not a valid integer. Received: {imdb_id}[/red]")
             imdb_id = 0
 
@@ -56,7 +56,7 @@ class TvmazeManager:
             try:
                 tvmaze_id = int(tvmaze_manual)
                 return (tvmaze_id, imdb_id, tvdb_id) if return_full_tuple else tvmaze_id
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 logger.error(f"[red]Error: tvmaze_manual is not a valid integer. Received: {tvmaze_manual}[/red]")
                 tvmaze_id = 0
                 return (tvmaze_id, imdb_id, tvdb_id) if return_full_tuple else tvmaze_id

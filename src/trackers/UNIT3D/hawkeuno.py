@@ -152,7 +152,7 @@ class HawkeUno(UNIT3D):
                             if bit_rate and "Animation" not in meta.genre:
                                 try:
                                     bit_rate_num = int(bit_rate)
-                                except (ValueError, TypeError):
+                                except ValueError, TypeError:
                                     bit_rate_num = None
 
                                 if bit_rate_num is not None:

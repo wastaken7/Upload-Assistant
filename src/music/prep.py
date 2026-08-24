@@ -37,7 +37,7 @@ def _extract_embedded_artwork(audio_paths: list[str], output_dir: Path) -> Path 
     for audio_path in audio_paths:
         try:
             audio = mutagen.File(audio_path)
-        except (mutagen.MutagenError, OSError):
+        except mutagen.MutagenError, OSError:
             continue
         if audio is None:
             continue
@@ -55,7 +55,7 @@ def _extract_embedded_artwork(audio_paths: list[str], output_dir: Path) -> Path 
         if data is None:
             try:
                 covr = audio["covr"]
-            except (KeyError, TypeError):
+            except KeyError, TypeError:
                 covr = []
             if covr:
                 data = bytes(covr[0])
@@ -91,7 +91,7 @@ def _music_override_year(value: Any, name: str) -> str:
         return ""
     try:
         year = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return ""
     if 1000 <= year <= 3000:
         return str(year)
@@ -249,7 +249,7 @@ async def _find_discogs_release(meta: Meta, release: Any, token: str) -> str:
     while True:
         try:
             choice = (cli_ui.ask_string(f"Discogs release (1-{len(matches)}, 0 to skip): ") or "").strip()
-        except (EOFError, KeyboardInterrupt):
+        except EOFError, KeyboardInterrupt:
             logger.info("[yellow]MUSIC: Discogs selection cancelled; skipping Discogs.[/yellow]")
             return ""
         if choice in {"", "0"}:

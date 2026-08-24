@@ -92,7 +92,7 @@ class DiscMenus:
         default_section = self.config.get("DEFAULT", {})
         try:
             max_menu_screens = int(default_section.get("max_menu_screens", 6))
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             max_menu_screens = 6
         screenshot_config = cast(Mapping[str, Any], default_section) if isinstance(default_section, Mapping) else {}
         scale_for_par = should_scale_screenshots_for_par(screenshot_config)

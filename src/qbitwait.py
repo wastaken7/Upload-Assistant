@@ -285,7 +285,7 @@ class Wait:
                             state_str = str(state) if state is not None else "unknown"
                             try:
                                 progress_float = float(progress or 0)
-                            except (TypeError, ValueError):
+                            except TypeError, ValueError:
                                 progress_float = 0.0
                         else:
                             raise Exception("No torrents found in response")

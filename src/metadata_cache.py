@@ -21,7 +21,7 @@ def _default_config() -> dict[str, Any]:
         from data.config import config
 
         return config if isinstance(config, dict) else {}
-    except (ImportError, ModuleNotFoundError):
+    except ImportError, ModuleNotFoundError:
         return {}
 
 
@@ -33,7 +33,7 @@ def _project_root() -> Path:
         config_file = getattr(config_module, "__file__", None)
         if config_file:
             return Path(config_file).resolve().parent.parent
-    except (ImportError, ModuleNotFoundError):
+    except ImportError, ModuleNotFoundError:
         pass
     return Path.cwd()
 
@@ -56,11 +56,11 @@ class MetadataCache:
         self.root = cache_dir if cache_dir.is_absolute() else root / cache_dir
         try:
             self.default_ttl = max(0, int(default.get("metadata_cache_default_ttl_hours", 168))) * 3600
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self.default_ttl = 168 * 3600
         try:
             self.negative_ttl = max(0, int(default.get("metadata_cache_negative_ttl_minutes", 60))) * 60
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self.negative_ttl = 60 * 60
         services = default.get("metadata_cache_services", {})
         self.services = services if isinstance(services, dict) else {}
@@ -79,7 +79,7 @@ class MetadataCache:
         resource_ttl = settings.get(f"{resource}_ttl_hours", settings.get("ttl_hours", self.default_ttl // 3600))
         try:
             return max(0, int(resource_ttl)) * 3600
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return self.default_ttl
 
     def _path(self, provider: str, resource: str, key: str) -> Path:
@@ -98,7 +98,7 @@ class MetadataCache:
             if not isinstance(entry, dict) or entry.get("version") != _VERSION or float(entry.get("expires_at", 0)) < time.time():
                 return _MISSING
             return entry.get("value", _MISSING)
-        except (OSError, ValueError, TypeError):
+        except OSError, ValueError, TypeError:
             return _MISSING
 
     async def set(self, provider: str, resource: str, key: str, value: Any, *, negative: bool = False) -> None:
@@ -111,7 +111,7 @@ class MetadataCache:
         entry = {"version": _VERSION, "fetched_at": time.time(), "expires_at": time.time() + ttl, "value": value}
         try:
             serialized = json.dumps(entry, ensure_ascii=False, indent=2)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return
         lock = _LOCKS.setdefault(path, asyncio.Lock())
         async with lock:

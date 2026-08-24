@@ -105,13 +105,13 @@ class Redaction:
                 json_str = val[start:end]
                 try:
                     parsed = json.loads(json_str)
-                except (json.JSONDecodeError, TypeError):
+                except json.JSONDecodeError, TypeError:
                     continue
 
                 try:
                     redacted = Redaction.redact_private_info(parsed, keys)
                     redacted_str = json.dumps(redacted)
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     continue
 
                 val = val[:start] + redacted_str + val[end:]
@@ -141,7 +141,7 @@ class Redaction:
                 parsed_json = json.loads(data)
                 redacted_json = Redaction.redact_private_info(parsed_json, keys)
                 return json.dumps(redacted_json)
-            except (json.JSONDecodeError, TypeError):
+            except json.JSONDecodeError, TypeError:
                 # Not valid JSON, treat as regular string
                 return Redaction.redact_value(data, keys)
         return data

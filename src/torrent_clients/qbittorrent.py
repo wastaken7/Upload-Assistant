@@ -1479,7 +1479,7 @@ class QbittorrentClientMixin:
                             lambda qbt_client=qbt_client, torrent_hash=torrent.hash: asyncio.to_thread(qbt_client.torrents_trackers, torrent_hash=torrent_hash),
                             f"Get trackers for torrent {torrent.name}",
                         )
-                except (TimeoutError, qbittorrentapi.APIError):
+                except TimeoutError, qbittorrentapi.APIError:
                     logger.debug(f"[yellow]Failed to get trackers for torrent {torrent.name} after retries")
                     continue
                 except Exception as e:

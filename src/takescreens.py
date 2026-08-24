@@ -55,7 +55,7 @@ def is_valid_lostimg_image_size(image_size: int) -> bool:
 def _positive_config_int(key: str, default: int) -> int:
     try:
         return max(1, int(default_config.get(key, default) or default))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -73,7 +73,7 @@ def xxx_contact_sheet_animation_settings() -> tuple[bool, float]:
     animated = _as_bool(default_config.get("xxx_contact_sheet_animated_webp"), default=False)
     try:
         duration = max(0.1, float(default_config.get("xxx_contact_sheet_animation_seconds", 5) or 5))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         duration = 5.0
     return animated, duration
 
@@ -216,7 +216,7 @@ async def xxx_fallback_cover(paths: list[str], folder_id: str, base_dir: str, me
             has_video_stream = isinstance(streams, list) and any(isinstance(stream, Mapping) and stream.get("codec_type") == "video" for stream in streams)
             if candidate_duration <= 0 or not has_video_stream:
                 continue
-        except (OSError, KeyError, TypeError, ValueError, ffmpeg.Error):
+        except OSError, KeyError, TypeError, ValueError, ffmpeg.Error:
             continue
         video_path = candidate_path
         duration = candidate_duration
@@ -301,12 +301,12 @@ def _apply_config(config: Mapping[str, Any]) -> None:
 
     try:
         task_limit = int(default_config.get("process_limit", 1) or 1)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         task_limit = 1
 
     try:
         cutoff = int(default_config.get("cutoff_screens", 1) or 1)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         cutoff = 1
 
     ffmpeg_limit = default_config.get("ffmpeg_limit", False)
@@ -317,7 +317,7 @@ def _apply_config(config: Mapping[str, Any]) -> None:
     algorithm = str(default_config.get("algorithm", "mobius")).strip()
     try:
         desat = float(default_config.get("desat", 10.0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         desat = 10.0
 
 
@@ -1081,7 +1081,7 @@ async def capture_dvd_screenshot(task: tuple[int, str, str, str, Meta, float, fl
                 try:
                     if track.duration is not None:
                         video_duration = float(track.duration)
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     video_duration = None
                 break
 

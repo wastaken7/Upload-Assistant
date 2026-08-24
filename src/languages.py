@@ -481,7 +481,7 @@ class LanguagesManager:
     def _find_language_name(self, word: str) -> str | None:
         try:
             lang = langcodes.find(word)
-        except (LanguageTagError, LookupError):
+        except LanguageTagError, LookupError:
             return None
         if lang and lang.is_valid():
             return lang.display_name()

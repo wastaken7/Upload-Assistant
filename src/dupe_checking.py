@@ -123,7 +123,7 @@ class DupeChecker:
                 if "file_count" in d:
                     try:
                         entry["file_count"] = int(d["file_count"])
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         entry["file_count"] = 0
 
                 processed_dupes.append(entry)
@@ -131,7 +131,7 @@ class DupeChecker:
         def coerce_int(value: Any) -> int | None:
             try:
                 return int(value) if value is not None else None
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return None
 
         new_dupes: list[DupeEntry]
@@ -876,7 +876,7 @@ class DupeChecker:
         candidate_file_count_raw = candidate.get("file_count")
         try:
             candidate_file_count = int(candidate_file_count_raw) if candidate_file_count_raw is not None else len(candidate_files)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             candidate_file_count = len(candidate_files)
 
         local_file_count = len(local_files) if local_files else None

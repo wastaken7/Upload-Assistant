@@ -242,7 +242,7 @@ class DescriptionBuilder:
                 return False
         try:
             return bool(int(val))
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return default
 
     def _get_int_config(self, key: str, default: Any = 0) -> int:
@@ -253,10 +253,10 @@ class DescriptionBuilder:
 
         try:
             return int(val)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             try:
                 return int(default)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 return 0
 
     def _get_tag_override(self, key: str, meta: Meta | None) -> str | None:
@@ -437,7 +437,7 @@ class DescriptionBuilder:
         def format_duration(seconds: str) -> str:
             try:
                 milliseconds = int((Decimal(seconds) * 1000).to_integral_value(rounding=ROUND_HALF_UP))
-            except (InvalidOperation, ValueError):
+            except InvalidOperation, ValueError:
                 return ""
             hours, milliseconds = divmod(milliseconds, 3_600_000)
             minutes, milliseconds = divmod(milliseconds, 60_000)
@@ -1025,7 +1025,7 @@ class DescriptionBuilder:
                 try:
                     hash(item)
                     formatted = display(formatter(item))
-                except (TypeError, ValueError, OverflowError):
+                except TypeError, ValueError, OverflowError:
                     continue
                 if formatted:
                     formatted_values[item] = formatted

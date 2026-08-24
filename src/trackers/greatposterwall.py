@@ -557,7 +557,7 @@ class GreatPosterWall:
 
                 try:
                     size_in_gb = meta.bdinfo["size"]
-                except (KeyError, IndexError, TypeError):
+                except KeyError, IndexError, TypeError:
                     size_in_gb = 0
 
                 if size_in_gb > 66:

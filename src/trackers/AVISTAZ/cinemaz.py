@@ -280,7 +280,7 @@ class CinemaZ(AZTrackerBase):
         origin_countries_codes = meta.origin_country
         try:
             year = int(meta.year)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             year = 0
         is_older_than_50_years = False
 

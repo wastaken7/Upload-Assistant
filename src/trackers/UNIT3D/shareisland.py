@@ -74,7 +74,7 @@ class ShareIsland(UNIT3D):
         try:
             lang_obj = pycountry.languages.get(name=lang_str.title()) or pycountry.languages.get(alpha_2=lang_str) or pycountry.languages.get(alpha_3=lang_str)
             return lang_obj.alpha_2.lower() if lang_obj else lang_str
-        except (AttributeError, KeyError, LookupError):
+        except AttributeError, KeyError, LookupError:
             return lang_str
 
     async def get_additional_data(self, meta: Meta) -> dict[str, Any]:
@@ -500,7 +500,7 @@ class ShareIsland(UNIT3D):
             if any(s in ("NTSC", "PAL", "NTSC DVD", "PAL DVD", "DVD") for s in source) and not has_settings and not has_library:
                 return "REMUX"
 
-        except (IndexError, KeyError):
+        except IndexError, KeyError:
             # Fallback on mediainfo parsing errors
             pass
 
@@ -571,7 +571,7 @@ class ShareIsland(UNIT3D):
             if isinstance(italian_name, str) and italian_name:
                 return italian_name.title()
             return self._get_language_name(iso_code).title()
-        except (ValueError, AttributeError, KeyError, UnknownLocaleError):
+        except ValueError, AttributeError, KeyError, UnknownLocaleError:
             return self._get_language_name(iso_code).title()
 
     async def _get_best_italian_audio_format(self, meta: Meta) -> str:
@@ -782,7 +782,7 @@ class ShareIsland(UNIT3D):
             """Convert to int, handling dict/None cases"""
             try:
                 return default if isinstance(val, dict) else int(val)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 return default
 
         def get_audio_format_details(audio_track: dict[str, Any]) -> tuple[str, str]:

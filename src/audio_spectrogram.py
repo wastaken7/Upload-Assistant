@@ -92,7 +92,7 @@ def _positive_config_int(config: dict[str, Any], key: str, default: int) -> int:
     value = config.get("DEFAULT", {}).get(key, default)
     try:
         value_as_int = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         logger.warning(f"[yellow]Invalid {key!r} value {value!r}; using {default}.[/yellow]")
         return default
     if value_as_int <= 0:

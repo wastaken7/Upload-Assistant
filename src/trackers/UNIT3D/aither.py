@@ -77,7 +77,7 @@ class Aither(UNIT3D):
                 fl_until_val = int(freeleech_until)
                 if fl_until_val > 0:
                     data["fl_until"] = fl_until_val
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 pass
 
         double_upload_until = meta.get("double_upload_until", 0) or self.tracker_config.get("double_upload_until", 0)
@@ -86,7 +86,7 @@ class Aither(UNIT3D):
                 du_until_val = int(double_upload_until)
                 if du_until_val > 0:
                     data["du_until"] = du_until_val
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 pass
 
         return data
@@ -103,7 +103,7 @@ class Aither(UNIT3D):
             return region_name
         try:
             normalized_id = int(region_id) if region_id is not None else 0
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return ""
         return await self.common.unit3d_region_ids(reverse=True, region_id=normalized_id)
 

@@ -136,7 +136,7 @@ class AmigosShare:
                 return "6"
             if file_extension == "mp4":
                 return "8"
-        except (StopIteration, AttributeError, TypeError):
+        except StopIteration, AttributeError, TypeError:
             return None
         return None
 
@@ -176,7 +176,7 @@ class AmigosShare:
 
             try:
                 size_in_gb = meta.bdinfo["size"]
-            except (KeyError, IndexError, TypeError):
+            except KeyError, IndexError, TypeError:
                 size_in_gb = 0
 
             if size_in_gb > 66:
@@ -908,7 +908,7 @@ class AmigosShare:
         def _try_format(fmt: str) -> str | None:
             try:
                 return datetime.strptime(date_str, fmt).replace(tzinfo=UTC).strftime("%d/%m/%Y")
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 return None
 
         for fmt in ("%Y-%m-%d", "%d %b %Y"):
@@ -943,7 +943,7 @@ class AmigosShare:
                     async with aiofiles.open(cache_path, encoding="utf-8") as f:
                         cache = await f.read()
                         return json.loads(cache)
-                except (OSError, json.JSONDecodeError):
+                except OSError, json.JSONDecodeError:
                     logger.info(f"{self.tracker}: [yellow]Failed to read cached layout data.[/yellow]")
 
             try:

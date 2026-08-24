@@ -468,7 +468,7 @@ class DarkPeers(UNIT3D):
                 )
                 response.raise_for_status()
                 payload_raw: Any = response.json()
-        except (httpx.HTTPError, ValueError, TypeError):
+        except httpx.HTTPError, ValueError, TypeError:
             return False
 
         title_key = " ".join(title.casefold().split())

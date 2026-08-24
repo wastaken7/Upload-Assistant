@@ -225,7 +225,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
 
         try:
             inject_delay = int(inject_delay)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             if has_tracker_delay:
                 logger.info(f"{tracker}: [bold red]CONFIG ERROR: 'inject_delay' must be an integer")
             else:
@@ -382,7 +382,7 @@ class Clients(QbittorrentClientMixin, RtorrentClientMixin, DelugeClientMixin, Tr
                                     ),
                                     f"Export torrent {hash_value_str}",
                                 )
-                            except (TimeoutError, qbittorrentapi.APIError):
+                            except TimeoutError, qbittorrentapi.APIError:
                                 continue
                         if not torrent_file_content:
                             logger.info(f"[bold red]qBittorrent returned an empty response for hash {hash_value_str}")

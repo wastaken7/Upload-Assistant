@@ -435,7 +435,7 @@ class ImdbManager:
 
                 try:
                     season_int = int(season_str) if season_str != "unknown" and season_str else None
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     season_int = None
 
                 if season_int is not None and release_year and isinstance(release_year, int):
@@ -798,7 +798,7 @@ class ImdbManager:
                 while True:
                     try:
                         selection = await prompt_in_thread(cli_ui.ask_string, "Enter the number of the correct entry, 0 for none, or manual IMDb ID (tt1234567): ") or ""
-                    except (EOFError, KeyboardInterrupt):
+                    except EOFError, KeyboardInterrupt:
                         logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                         await cleanup_manager.cleanup()
                         cleanup_manager.reset_terminal()
@@ -836,7 +836,7 @@ class ImdbManager:
             if not unattended:
                 try:
                     selection = await prompt_in_thread(cli_ui.ask_string, "No results found. Please enter a manual IMDb ID (tt1234567) or 0 to skip: ") or ""
-                except (EOFError, KeyboardInterrupt):
+                except EOFError, KeyboardInterrupt:
                     logger.info("\n[red]Exiting on user request (Ctrl+C)[/red]")
                     await cleanup_manager.cleanup()
                     cleanup_manager.reset_terminal()

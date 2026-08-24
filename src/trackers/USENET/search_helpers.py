@@ -60,7 +60,7 @@ def build_newznab_search_query(meta: Meta) -> str:
     raw_year = meta.year or meta.search_year or 0
     try:
         year = int(raw_year)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         year = 0
 
     if meta.category.upper() == "TV":
@@ -128,7 +128,7 @@ def parse_newznab_dupes(
 def get_daily_api_hit_limit(tracker_cfg: dict[str, Any]) -> int:
     try:
         limit = int(tracker_cfg.get("daily_api_hit_limit", 0))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 0
     return max(limit, 0)
 
@@ -180,7 +180,7 @@ def _acquire_api_hit_counter_lock(lock_path: Path) -> BinaryIO:
         try:
             _lock_api_hit_counter_file(lock_file)
             return lock_file
-        except (BlockingIOError, OSError):
+        except BlockingIOError, OSError:
             if time.monotonic() >= deadline:
                 lock_file.close()
                 raise TimeoutError(f"Timed out waiting for API hit counter lock: {lock_path}") from None
@@ -212,7 +212,7 @@ def _reserve_daily_api_hit_sync(base_dir: str, tracker: str, limit: int) -> tupl
                 loaded_cache = json.loads(cache_path.read_text(encoding="utf-8"))
                 if isinstance(loaded_cache, list):
                     tracker_hits = loaded_cache  # type: ignore
-            except (OSError, json.JSONDecodeError):
+            except OSError, json.JSONDecodeError:
                 tracker_hits = []
 
         now = time.time()

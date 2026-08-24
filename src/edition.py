@@ -41,7 +41,7 @@ async def get_edition(video: str, bdinfo: dict[str, Any] | None, filelist: list[
     imdb_edition_count_value = imdb_info.get("edition_count", len(edition_details))
     try:
         imdb_edition_count = int(imdb_edition_count_value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         imdb_edition_count = len(edition_details)
 
     if meta.category == "MOVIE" and not meta.anime and edition_details and imdb_edition_count > 1 and not manual_edition:

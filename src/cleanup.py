@@ -68,7 +68,7 @@ class CleanupManager:
                             # console.print(f"[red]Subprocess {proc.pid} did not exit in time, force killing.[/red]")
                             with contextlib.suppress(PermissionError, OSError):
                                 proc.kill()  # Force kill if it doesn't exit
-                except (PermissionError, OSError):
+                except PermissionError, OSError:
                     # Android doesn't allow process termination in many cases
                     if not IS_ANDROID:
                         logger.info(f"[yellow]Cannot terminate process {proc.pid}: Permission denied[/yellow]")
@@ -162,7 +162,7 @@ class CleanupManager:
                             # console.print(f"[red]Force killing stubborn process: {child.pid}[/red]")
                             with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied, PermissionError):
                                 child.kill()
-                    except (psutil.AccessDenied, PermissionError):
+                    except psutil.AccessDenied, PermissionError:
                         # Handle systems where we can't wait for processes
                         pass
             except (PermissionError, psutil.AccessDenied, OSError) as e:
@@ -225,7 +225,7 @@ class CleanupManager:
                     sys.stdout.flush()
                     sys.stdout.write("\033[?25h")
                     sys.stdout.flush()
-                except (OSError, ValueError):
+                except OSError, ValueError:
                     pass
 
             # Kill background jobs
@@ -252,7 +252,7 @@ if os.name == "posix" and not IS_ANDROID and hasattr(sys.stdin, "isatty") and sy
         match = re.search(r" erase = (\S+);", output)
         if match:
             erase_key = match.group(1)
-    except (OSError, subprocess.SubprocessError):
+    except OSError, subprocess.SubprocessError:
         pass
 
 

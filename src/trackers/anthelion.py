@@ -338,7 +338,7 @@ class Anthelion:
             try:
                 default_retries = self.config.get("DEFAULT", {}).get("max_retries", 5)
                 max_retries = max(1, int(self.tracker_config.get("max_retries", default_retries)))
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 max_retries = 5
             retry_delay = 5
             timeout = 40.0

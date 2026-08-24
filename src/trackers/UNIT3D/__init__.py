@@ -522,7 +522,7 @@ class UNIT3D:
             try:
                 default_retries = self.config.get("DEFAULT", {}).get("max_retries", 2)
                 max_retries = max(1, int(self.tracker_config.get("max_retries", default_retries)))
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 max_retries = 2
             retry_delay = 5
             timeout = 40.0
@@ -625,7 +625,7 @@ class UNIT3D:
             match = re.search(r"/(\d+)\.", response_data["data"])
             if match:
                 torrent_id = match.group(1)
-        except (IndexError, KeyError):
+        except IndexError, KeyError:
             logger.info(f"{self.tracker}: Could not parse torrent_id from response data.")
         return torrent_id
 

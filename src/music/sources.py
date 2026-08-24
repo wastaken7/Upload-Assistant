@@ -29,7 +29,7 @@ async def _read_music_cache(path: Path | None) -> Any | None:
         return None
     try:
         return json.loads(await asyncio.to_thread(path.read_text, encoding="utf-8"))
-    except (OSError, ValueError, json.JSONDecodeError):
+    except OSError, ValueError, json.JSONDecodeError:
         return None
 
 
@@ -39,7 +39,7 @@ async def _write_music_cache(path: Path | None, value: Any) -> None:
     try:
         await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
         await asyncio.to_thread(path.write_text, json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
-    except (OSError, TypeError, ValueError):
+    except OSError, TypeError, ValueError:
         pass
 
 
@@ -122,7 +122,7 @@ class MusicBrainzEnricher:
                     releases = response.json().get("releases", [])
                     result = self._select_release(releases, album, track_count, media, catalogue_number)
                     request_succeeded = True
-            except (httpx.HTTPError, ValueError):
+            except httpx.HTTPError, ValueError:
                 result = None
             type(self)._last_request = time.monotonic()
             type(self)._cache[key] = result
@@ -186,7 +186,7 @@ class MusicBrainzEnricher:
                 return sum(counts)
         try:
             return int(result.get("track-count", 0) or 0)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return 0
 
     @staticmethod
@@ -326,7 +326,7 @@ class DiscogsEnricher:
                     results = payload.get("results", []) if isinstance(payload, dict) else []
                     matches = [item for item in results if isinstance(item, dict) and self._is_exact_release(item, artist, album)]
                     request_succeeded = True
-            except (httpx.HTTPError, ValueError):
+            except httpx.HTTPError, ValueError:
                 matches = []
             type(self)._last_request = time.monotonic()
             cached = {"results": matches}
@@ -443,7 +443,7 @@ class DiscogsEnricher:
                     result = response.json()
                     if not isinstance(result, dict):
                         result = None
-            except (httpx.HTTPError, ValueError):
+            except httpx.HTTPError, ValueError:
                 result = None
             type(self)._last_request = time.monotonic()
             type(self)._cache[key] = result
