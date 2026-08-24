@@ -36,7 +36,6 @@ Fish natively supports lazy-loading completion scripts from a specific directory
 mkdir -p ~/.config/fish/completions
 register-python-argcomplete --shell fish ua > ~/.config/fish/completions/ua.fish
 ```
-*(Alternatively, you can place the dynamic command `register-python-argcomplete --shell fish ua | source` inside `~/.config/fish/completions/ua.fish`. This gives you zero startup overhead while still dynamically evaluating the hook script when you first type `ua`).*
 
 ### Bash
 If you have the `bash-completion` package installed, Bash can lazy-load completions when a command is invoked:
@@ -69,7 +68,7 @@ If you prefer not to manage static files, you can dynamically evaluate the compl
 ```bash
 activate-global-python-argcomplete --user
 ```
-This drops a tiny bash script into your `~/.bash_completion.d/` directory. It has zero overhead at startup and will automatically trigger completions for `ua`. 
+This updates `~/.bash_completion` and the user-level Zsh configuration. It has zero overhead at startup and will automatically trigger completions for `ua`.
 
 ### Option B: Immediate `eval` (All Shells)
 You can directly evaluate the hook in your shell configuration file (e.g., `~/.bashrc`, `~/.zshrc`, or `~/.config/fish/config.fish`). 
