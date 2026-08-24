@@ -510,8 +510,17 @@ config: dict[str, Any] = {
         # Which trackers do you want to upload to?
         # Note: Description layout settings (like screenshot grids, logos, etc.) can be overridden per-tracker.
         # See: https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
-        # The tracker blocks below are the source of truth for the available trackers.
-        # The config generator derives its tracker list directly from these keys.
+        # Available trackers:
+        #   1PTBA, AITHER, ALPHARATIO, AMIGOSSHARE, ANTHELION, ASIANCINEMA, AVISTAZ, BEYONDHD, BITHDTV, BITPORN, BJSHARE, BLUTOPIA,
+        #   BRASILTRACKER, BROADCASTHENET, CAPYBARABR, CATHODERAYTUBE, CINEMATIK, CINEMAZ, CURUPIRA, DARKPEERS, DESITORRENTS, DIGITALCORE,
+        #   DRUNKENSLUG, EMUWAREZ, FILELIST, FLOOD, FUNFILE, GREATPOSTERWALL, HAWKEUNO, HDBITS, HDSPACE, HDTORRENTS, HOMIEHELPDESK,
+        #   IMMORTALSEED, INFINITYHD, IPTORRENTS, ITATORRENTS, LAJIDUI, LASTDIGITALUNDERGROUND, LATTEAM, LEMONHD, LOCADORA, LONGPT, LST,
+        #   LUMINARR, MAKINGOFF, MIDNIGHTSCENE, MTEAM, NEBULANCE, NORDICQUALITY, NZBGEEK, OLDTOONSWORLD, ONLYENCODES, ORPHEUS, PASSTHEPOPCORN,
+        #   PEERGARDEN, POLISHTORRENT, PORTUGAS, PRIVATEHD, PTCAFE, PTERCLUB, PTFANS, PTGTK, PTSKIT, PTZONE, RACING4EVERYONE, RAILGUNPT,
+        #   RASTASTUGAN, REELFLIX, RETROFLIX, RETROMOVIESCLUB, ROCKETHD, SAMARITANO, SEEDPOOL, SHAREISLAND, SKIPTHECOMMERCIALS, SPEEDAPP,
+        #   SUIO, SWARMAZON, THELEACHZONE, THEOLDSCHOOL, TORRENTEROS, TORRENTHR, TORRENTLEECH, TOTHEGLORY, TVCHAOSUK, ULCX, UTOPIA,
+        #   XINGYUNGEPT, YUSCENE, ZENITH
+        # This list is validated against the tracker blocks below by the test suite.
         # Only add the trackers you want to upload to on a regular basis
         "default_trackers": "",
         "1PTBA": {
