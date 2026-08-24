@@ -10,9 +10,126 @@ config: dict[str, Any] = {
         "verbose_notification": False,
         # Number of hours to reuse a successful update check. Set to 0 to check every run.
         "update_notification_cache_hours": 4,
+        # Play the bell sound effect when asking for confirmation
+        "sfx_on_prompt": True,
+        # set true to use argument overrides from data/templates/user-args.json
+        "user_overrides": False,
+        # Automatically set --personalrelease to True if the detected release group matches any of these tags (case-insensitive)
+        "personal_release_groups": [],
+        # Set true to suppress config warnings on startup
+        "suppress_warnings": False,
+        # Will prevent meta.json file from being deleted before running
+        "keep_meta": False,
+
+        # --- LOGGING ---
+        # Console logging configuration
+        # Show time in console logs
+        "console_show_time": False,
+        # Show log level in console logs
+        "console_show_level": False,
+        # Show file path of log source in console logs
+        "console_show_path": False,
+        # Enable rich markup parsing in console logs
+        "console_markup": True,
+        # Set true to embed terminal links using hyperlinks (OSC 8)
+        # Set false to display the full raw URLs (recommended for terminals that do not support embedded links)
+        "embed_links": True,
+        # File logging configuration
+        # Set true to save a plain text log file of the upload flow in each release's tmp folder
+        "write_log": False,
+        # Debug configuration
+        # Set true to enable debug mode globally (same as running with --debug)
+        "debug": False,
+        # Console logging configuration when running in debug mode
+        # Show time in console logs under debug mode
+        "console_debug_show_time": True,
+        # Show log level in console logs under debug mode
+        "console_debug_show_level": True,
+        # Show file path of log source in console logs under debug mode
+        "console_debug_show_path": True,
+        # Enable rich markup parsing in console logs under debug mode
+        "console_debug_markup": True,
+
+        # --- METADATA API CREDENTIALS ---
         # tmdb api key **REQUIRED**
         # visit "https://www.themoviedb.org/settings/api" copy api key and insert below
         "tmdb_api": "",
+        # Google Books API key. "" = disabled
+        # You can get one here https://console.cloud.google.com/apis/library/books.googleapis.com
+        "google_books_api_key": "",
+        # Twitch/IGDB API credentials. "" = disabled
+        # You can get them from the Twitch Developer Console (https://dev.twitch.tv/console)
+        "twitch_client_id": "",
+        "twitch_client_secret": "",
+        # MyAnonamouse (MAM) API key / session cookie (mam_id). "" = disabled
+        # You can get it from Preferences > Security > View IP locked session cookie
+        "mam_api_key": "",
+        # tvdb api key
+        # visit "https://www.thetvdb.com/api-information/signup" copy api key and insert below
+        "tvdb_api": "",
+        # visit "https://thetvdb.github.io/v4-api/#/Login/post_login" enter api key, generate token and insert token below
+        # the pin in the login form is not needed (don't modify), only enter your api key
+        "tvdb_token": "",
+        # btn api key used to get details from btn
+        "btn_api": "",
+
+        # --- ARR INTEGRATION ---
+        # set true to use sonarr for tv show searching
+        "use_sonarr": False,
+        "sonarr_url": "http://localhost:8989",
+        "sonarr_api_key": "",
+        # details for a second sonarr instance
+        # additional sonarr instances can be added by adding more sonarr_url_x and sonarr_api_key_x entries
+        "sonarr_url_1": "http://my-second-instance:8989",
+        "sonarr_api_key_1": "",
+        # set true to use radarr for movie searching
+        "use_radarr": False,
+        "radarr_url": "http://localhost:7878",
+        "radarr_api_key": "",
+        # details for a second radarr instance
+        # additional radarr instances can be added by adding more radarr_url_x and radarr_api_key_x entries
+        "radarr_url_1": "http://my-second-instance:7878",
+        "radarr_api_key_1": "",
+
+        # --- EXTERNAL TOOL PATHS ---
+        # Optional paths to external media tools. Leave blank to use the bundled
+        # tool (when available) or the system PATH. MediaInfo DVD must remain
+        # on 23.04 because newer versions do not preserve its DVD parsing.
+        "ffmpeg_path": "",
+        "ffprobe_path": "",
+        "mediainfo_path": "",
+        "dvd_mediainfo_path": "",
+        "bdinfo_path": "",
+        "mkbrr_path": "",
+        "dovi_tool_path": "",
+        "hdr10plus_tool_path": "",
+        # Optional path to the unRAR executable for CBR/CBZ extraction.
+        # Leave blank to use the system PATH.
+        # Example: "C:\\Program Files\\WinRAR\\UnRAR.exe"
+        "unrar_path": "",
+
+        # --- CLIENT SETUP ---
+        # Default client used for torrent injection and existing-torrent searches.
+        "default_torrent_client": "qbittorrent",
+        # The optional lists below can override this default for each operation.
+        # If either list is omitted or empty, that operation uses the default above.
+        # Clients used for injection (adding uploaded torrents for seeding):
+        # "injecting_client_list": ["qbittorrent", "rtorrent"],
+        # Clients searched for existing torrents:
+        # "searching_client_list": ["qbittorrent", "qbittorrent_searching"],
+
+        # --- UPLOAD SCHEDULING ---
+        # Configures the order of uploads when both torrent trackers and Usenet are selected.
+        # "concurrent" (default) -> Upload to Usenet and torrent trackers at the same time.
+        # "usenet"               -> Upload to Usenet first. Torrent tracker uploads will start after Usenet upload finishes.
+        # "tracker"              -> Upload to torrent trackers first. Once finished, we run the bandwidth check, and then start the Usenet upload.
+        "upload_order": "concurrent",
+        # Enable bandwidth control to wait for lower qBittorrent upload speed before uploading next tracker
+        "qbit_bandwidth_control": False,
+        # Threshold in KB/s. If the average upload speed is below this value, the next upload can start.
+        "qbit_bandwidth_threshold": 0,
+        # The duration of time in seconds to average the upload speed over.
+        "qbit_bandwidth_time": 0,
 
         # --- METADATA CACHE ---
         # Temporarily saves responses from sites such as TMDB and IMDb. Future
@@ -77,82 +194,80 @@ config: dict[str, Any] = {
         # 15 minutes avoids repeated requests without hiding a newly available
         # torrent for too long.
         "tracker_metadata_cache_negative_ttl_minutes": 15,
-        # Google Books API key. "" = disabled
-        # You can get one here https://console.cloud.google.com/apis/library/books.googleapis.com
-        "google_books_api_key": "",
-        # Twitch/IGDB API credentials. "" = disabled
-        # You can get them from the Twitch Developer Console (https://dev.twitch.tv/console)
-        "twitch_client_id": "",
-        "twitch_client_secret": "",
-        # MyAnonamouse (MAM) API key / session cookie (mam_id). "" = disabled
-        # You can get it from Preferences > Security > View IP locked session cookie
-        "mam_api_key": "",
-        # tvdb api key
-        # visit "https://www.thetvdb.com/api-information/signup" copy api key and insert below
-        "tvdb_api": "",
-        # visit "https://thetvdb.github.io/v4-api/#/Login/post_login" enter api key, generate token and insert token below
-        # the pin in the login form is not needed (don't modify), only enter your api key
-        "tvdb_token": "",
-        # Play the bell sound effect when asking for confirmation
-        "sfx_on_prompt": True,
-        # Console logging configuration
-        # Show time in console logs
-        "console_show_time": False,
-        # Show log level in console logs
-        "console_show_level": False,
-        # Show file path of log source in console logs
-        "console_show_path": False,
-        # Enable rich markup parsing in console logs
-        "console_markup": True,
-        # File logging configuration
-        # Set true to save a plain text log file of the upload flow in each release's tmp folder
-        "write_log": False,
-        # Debug configuration
-        # Set true to enable debug mode globally (same as running with --debug)
-        "debug": False,
-        # Console logging configuration when running in debug mode
-        # Show time in console logs under debug mode
-        "console_debug_show_time": True,
-        # Show log level in console logs under debug mode
-        "console_debug_show_level": True,
-        # Show file path of log source in console logs under debug mode
-        "console_debug_show_path": True,
-        # Enable rich markup parsing in console logs under debug mode
-        "console_debug_markup": True,
-        # How many trackers need to pass successful checking to continue with the upload process
-        # Default = 1. If 1 (or more) tracker/s pass banned_group, content and dupe checking, uploading will continue
-        # If less than the number of trackers pass the checking, exit immediately.
-        "tracker_pass_checks": 1,
-        # Number of upload retry attempts for network/server errors (e.g. 500, timeouts).
-        # Trackers can override this individually in their section.
-        "max_retries": 3,
-        # Set true to suppress config warnings on startup
-        "suppress_warnings": False,
-        # Set true to embed terminal links using hyperlinks (OSC 8)
-        # Set false to display the full raw URLs (recommended for terminals that do not support embedded links)
-        "embed_links": True,
-        # Set true to show size difference between duplicate and the upload in duplicate checks
-        "show_dupe_size_diff": True,
-        # Ignore duplicates if the size difference between the dupe and our upload is greater than or equal to this percentage
-        # For example: 20 means a 20% or more difference in size (larger or smaller) will exclude the dupe
-        # Set to None/null or remove to disable this feature.
-        "dupe_size_difference_tolerance": None,
-        # NOT RECOMMENDED UNLESS YOU KNOW WHAT YOU ARE DOING.
-        # Will prevent meta.json file from being deleted before running
-        "keep_meta": False,
-        # Optional trusted scripts from STATE_DIR/custom_hooks/ (Docker: /state/custom_hooks/),
-        # run after each item's tracker uploads and request search. Scripts receive
-        # final meta as JSON through stdin and may write status lines to the terminal.
-        # Example: ["notify.py"]
-        "post_upload_hooks": [],
-        # Trusted hooks loaded in Upload Assistant's process. Each must expose
-        # async or sync on_upload_finished(meta, config); it receives deep copies.
-        "post_upload_inprocess_hooks": [],
-        # Maximum time allowed for each subprocess post-upload script. Invalid or
-        # zero values use 30 seconds. A failed hook never changes the upload result.
-        "post_upload_hook_timeout": 30,
 
-        # --- IMAGE HOSTING SETTINGS ---
+        # --- MUSIC METADATA ---
+        # Use MusicBrainz only as corroborating metadata. Local file tags remain
+        # authoritative and no external lookup is made unless this is enabled.
+        "music_enrichment_enabled": False,
+        # Optional Discogs personal access token. Automatic or supplied Discogs
+        # lookups are bounded and read-only; this token raises Discogs API
+        # limits but is never written to release metadata or logs.
+        "music_discogs_token": "",
+
+        # --- TRACKER SEARCH AND IMPORT ---
+        # set true to skip automated client torrent searching
+        # this will search qbittorrent clients for matching torrents
+        # and use found torrent id's for existing hash and site searching
+        "skip_auto_torrent": False,
+        # Set true to also skip automated torrent searching for personal releases
+        "skip_auto_torrent_personalrelease": False,
+        # Set true to prefer torrents with piece size <= 16 MiB when searching for existing torrents in clients
+        "prefer_max_16_torrent": False,
+        # Import policy for releases found on other trackers. Choose one:
+        # - "ids": import only IMDb/TMDb/TVDb/MAL and related release metadata.
+        # - "images": import IDs/metadata and validated description screenshots, but no text.
+        # - "text": import IDs/metadata and cleaned description text, but no screenshots.
+        # - "text_and_images": import IDs/metadata, cleaned text, and validated screenshots.
+        # Use --onlyID to temporarily force "ids" for one execution.
+        "tracker_description_mode": "text",
+        # Maximum number of tracker-ID metadata candidates queried at once.
+        "tracker_search_concurrency": 4,
+        # Only query tracker metadata when a torrent ID is known from a client comment or --tracker-id.
+        "tracker_comment_only": True,
+        # If there is no region/distributor ids specified, we can use existing torrents to check
+        # This will use data from matching torrents in qBitTorrent/RuTorrent to find matching site ids
+        # and then try and find region/distributor ids from those sites
+        # Requires "skip_auto_torrent" to be set to False
+        "ping_unit3d": False,
+        # Set true to also try searching predb for scene release
+        # predb is not consistent, can timeout, but can find some releases not found on SRRDB
+        "check_predb": False,
+        # Set false to disable adding cross-seed suitable torrents found during existing search (dupe) checking
+        "cross_seeding": True,
+        # Set true to cross-seed check every valid tracker defined in your config
+        # regardless of whether the tracker was selected for upload or not (needs cross-seeding above to be True)
+        "cross_seed_check_everything": False,
+
+        # --- BLU-RAY SETTINGS ---
+        # Set to true to always just use the largest playlist on a blu-ray, without selection prompt.
+        "use_largest_playlist": False,
+        # If processing a dvd/bluray disc, get related information from bluray.com
+        # This will set region and distribution info
+        # Must have imdb id to work
+        "get_bluray_info": False,
+        # A release with 100% score will have complete matching details between bluray.com and bdinfo
+        # Each missing Audio OR Subtitle track will reduce the score by 5
+        # Partial matched audio tracks have a 2.5 score penalty
+        # If only a single bdinfo audio/subtitle track, penalties are doubled
+        # Video codec/resolution and disc size mismatches have huge penalties
+        # Only useful in unattended mode. If not unattended you will be prompted to confirm release
+        # Final score must be greater than this value to be considered a match
+        # Only works with blu-ray discs, not dvd
+        "bluray_score": 94.5,
+        # If there is only a single release on bluray.com, you may wish to relax the score a little
+        "bluray_single_score": 89.5,
+        # Add bluray.com link to description
+        # Requires "get_bluray_info" to be set to True
+        "add_bluray_link": True,
+        # Add cover/back/slip images from bluray.com to description if available
+        # Requires "get_bluray_info" to be set to True
+        "use_bluray_images": True,
+        # Size of bluray.com cover images.
+        # bbcode is width limited, cover images are mostly height dominant
+        # So you probably want a smaller size than screenshots for instance
+        "bluray_image_size": "250",
+
+        # --- IMAGE HOSTING ---
         # Order of image hosts. primary host as first with others as backup
         # Available image hosts: imgbb, imgbox, pixhost, lensdump, ptscreens, onlyimage, dalexni, zipline, midnightscene, passtheimage, seedpool_cdn, sharex, utppm, lostimg
         "img_host_1": "",
@@ -169,6 +284,8 @@ config: dict[str, Any] = {
         "image_upload_concurrency": 0,
         # Delay between starting image uploads, in seconds.
         "image_upload_delay": 0.0,
+        # Minimum successful image uploads required to continue
+        "min_successful_image_uploads": "3",
         # image host api keys
         "imgbb_api": "",
         "lostimg_api": "",
@@ -191,94 +308,30 @@ config: dict[str, Any] = {
         # utp.pm API key
         "utppm_api": "",
 
-        # --- METADATA LOOKUP SETTINGS ---
-        # btn api key used to get details from btn
-        "btn_api": "",
-        # set true to skip automated client torrent searching
-        # this will search qbittorrent clients for matching torrents
-        # and use found torrent id's for existing hash and site searching
-        "skip_auto_torrent": False,
-        # Set true to also skip automated torrent searching for personal releases
-        "skip_auto_torrent_personalrelease": False,
-        # Set to true to always just use the largest playlist on a blu-ray, without selection prompt.
-        "use_largest_playlist": False,
-        # Import policy for releases found on other trackers. Choose one:
-        # - "ids": import only IMDb/TMDb/TVDb/MAL and related release metadata.
-        # - "images": import IDs/metadata and validated description screenshots, but no text.
-        # - "text": import IDs/metadata and cleaned description text, but no screenshots.
-        # - "text_and_images": import IDs/metadata, cleaned text, and validated screenshots.
-        # Use --onlyID to temporarily force "ids" for one execution.
-        "tracker_description_mode": "text",
-        # Maximum number of tracker-ID metadata candidates queried at once.
-        "tracker_search_concurrency": 4,
-        # Only query tracker metadata when a torrent ID is known from a client comment or --tracker-id.
-        "tracker_comment_only": True,
-        # set true to use argument overrides from data/templates/user-args.json
-        "user_overrides": False,
-        # Automatically set --personalrelease to True if the detected release group matches any of these tags (case-insensitive)
-        "personal_release_groups": [],
-        # If there is no region/distributor ids specified, we can use existing torrents to check
-        # This will use data from matching torrents in qBitTorrent/RuTorrent to find matching site ids
-        # and then try and find region/distributor ids from those sites
-        # Requires "skip_auto_torrent" to be set to False
-        "ping_unit3d": False,
-        # If processing a dvd/bluray disc, get related information from bluray.com
-        # This will set region and distribution info
-        # Must have imdb id to work
-        "get_bluray_info": False,
-        # A release with 100% score will have complete matching details between bluray.com and bdinfo
-        # Each missing Audio OR Subtitle track will reduce the score by 5
-        # Partial matched audio tracks have a 2.5 score penalty
-        # If only a single bdinfo audio/subtitle track, penalties are doubled
-        # Video codec/resolution and disc size mismatches have huge penalties
-        # Only useful in unattended mode. If not unattended you will be prompted to confirm release
-        # Final score must be greater than this value to be considered a match
-        # Only works with blu-ray discs, not dvd
-        "bluray_score": 94.5,
-        # If there is only a single release on bluray.com, you may wish to relax the score a little
-        "bluray_single_score": 89.5,
-        # Set true to also try searching predb for scene release
-        # predb is not consistent, can timeout, but can find some releases not found on SRRDB
-        "check_predb": False,
-
-        # --- SCREENSHOT HANDLING ---
+        # --- SCREENSHOT CAPTURE ---
         # Number of screenshots to capture
         "screens": "4",
-        # XXX releases generate one contact sheet per video instead of individual frames.
-        # Rows are vertical and columns are horizontal: 12 x 5 produces 60 thumbnails.
-        "xxx_contact_sheet_rows": "12",
-        "xxx_contact_sheet_columns": "5",
-        # Maximum number of video files for which to generate XXX contact sheets.
-        "xxx_contact_sheet_max_videos": "6",
-        # Create XXX contact sheets as 5-second animated WebP files instead of PNG.
-        "xxx_contact_sheet_animated_webp": False,
-        "xxx_contact_sheet_animation_seconds": "5",
-        # Add this many normal screenshots to the contact sheet for a single-video XXX release.
-        "xxx_single_file_screens": "0",
-        # Set true to automatically capture DVD menu screenshots from menu VOBs
-        "auto_dvd_menus": True,
-        # Keep screenshots at the coded dimensions reported by MediaInfo.
-        # Set true only to convert non-square-pixel video for display geometry;
-        # this can change dimensions such as 1920x1040 to 1924x1040.
-        "scale_screenshots_for_par": False,
-        # Max number of disc menu screenshots to upload
-        "max_menu_screens": "6",
-        # Minimum successful image uploads required to continue
-        "min_successful_image_uploads": "3",
         # Number of cutoff screenshots
         # If there are at least this many screenshots already, perhaps pulled from existing
         # description, skip creating and uploading any further screenshots.
         "cutoff_screens": "4",
-        # Overlay Frame number/type and "Tonemapped" if applicable to screenshots
-        "frame_overlay": False,
-        # Overlay text size (scales with resolution)
-        "overlay_text_size": "18",
+        # Keep screenshots at the coded dimensions reported by MediaInfo.
+        # Set true only to convert non-square-pixel video for display geometry;
+        # this can change dimensions such as 1920x1040 to 1924x1040.
+        "scale_screenshots_for_par": False,
+
+        # --- SCREENSHOT PROCESSING ---
         # Limit how many ffmpeg processes can run at once
         # The final value will be the minimum, between this value and number of screens being processed
         "process_limit": "4",
         # Set true to limit the amount of CPU when running ffmpeg.
         # This places an additional limitation on ffmpeg to reduce CPU usage
         "ffmpeg_limit": False,
+        # Set ffmpeg compression level for screenshots (0-9)
+        # 6 is a good balance between compression and speed
+        "ffmpeg_compression": "6",
+
+        # --- HDR TONEMAPPING ---
         # Tonemap HDR - DV+HDR screenshots
         "tone_map": True,
         # Set false to disable libplacebo ffmpeg tonemapping and use ffmpeg only
@@ -290,24 +343,6 @@ config: dict[str, Any] = {
         # Set true to skip "warming up" libplacebo
         # Some systems are slow to compile libplacebo shaders, which will cause the first screenshot to fail
         "ffmpeg_warmup": False,
-        # Set ffmpeg compression level for screenshots (0-9)
-        # 6 is a good balance between compression and speed
-        "ffmpeg_compression": "6",
-        # Optional paths to external media tools. Leave blank to use the bundled
-        # tool (when available) or the system PATH. MediaInfo DVD must remain
-        # on 23.04 because newer versions do not preserve its DVD parsing.
-        "ffmpeg_path": "",
-        "ffprobe_path": "",
-        "mediainfo_path": "",
-        "dvd_mediainfo_path": "",
-        "bdinfo_path": "",
-        "mkbrr_path": "",
-        "dovi_tool_path": "",
-        "hdr10plus_tool_path": "",
-        # Optional path to the unRAR executable for CBR/CBZ extraction.
-        # Leave blank to use the system PATH.
-        # Example: "C:\\Program Files\\WinRAR\\UnRAR.exe"
-        "unrar_path": "",
         # Tonemap screenshots with the following settings (doesn't apply when using libplacebo)
         # See https://ayosec.github.io/ffmpeg-filters-docs/7.1/Filters/Video/tonemap.html
         "algorithm": "mobius",
@@ -316,7 +351,32 @@ config: dict[str, Any] = {
         # This option works only if the input frame has a supported color tag.
         "desat": "10.0",
 
-        # --- DESCRIPTION SETTINGS ---
+        # --- SCREENSHOT OVERLAYS ---
+        # Overlay Frame number/type and "Tonemapped" if applicable to screenshots
+        "frame_overlay": False,
+        # Overlay text size (scales with resolution)
+        "overlay_text_size": "18",
+
+        # --- DISC MENU SCREENSHOTS ---
+        # Set true to automatically capture DVD menu screenshots from menu VOBs
+        "auto_dvd_menus": True,
+        # Max number of disc menu screenshots to upload
+        "max_menu_screens": "6",
+
+        # --- XXX CONTACT SHEETS ---
+        # XXX releases generate one contact sheet per video instead of individual frames.
+        # Rows are vertical and columns are horizontal: 12 x 5 produces 60 thumbnails.
+        "xxx_contact_sheet_rows": "12",
+        "xxx_contact_sheet_columns": "5",
+        # Maximum number of video files for which to generate XXX contact sheets.
+        "xxx_contact_sheet_max_videos": "6",
+        # Create XXX contact sheets as 5-second animated WebP files instead of PNG.
+        "xxx_contact_sheet_animated_webp": False,
+        "xxx_contact_sheet_animation_seconds": "5",
+        # Add this many normal screenshots to the contact sheet for a single-video XXX release.
+        "xxx_single_file_screens": "0",
+
+        # --- DESCRIPTION LAYOUT ---
         # Detailed documentation on how description layout settings work and affect description building:
         # https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
         # Whether to add a logo for the show/movie from TMDB to the top of the description
@@ -334,9 +394,8 @@ config: dict[str, Any] = {
         "screens_per_row": "",
         # set true to add episode overview to description
         "episode_overview": True,
-        # Add this header above screenshots in description when screens have been tonemapped (in bbcode)
-        # Can be overridden in a per-tracker setting by adding this same config
-        "tonemapped_header": "[center]Screenshots have been adapted for SDR viewing, for reference only.[/center]",
+
+        # --- PACK DESCRIPTIONS ---
         # Number of screenshots to use for each (ALL) disc/episode when uploading packs to supported sites.
         # 0 equals old behavior where only the original description and images are added.
         # This setting also affects PASSTHEPOPCORN, however PASSTHEPOPCORN requires at least 2 images for each.
@@ -359,12 +418,17 @@ config: dict[str, Any] = {
         # Absolute limit on processed files in packs.
         # You might not want to process screens/mediainfo for 40 episodes in a season pack.
         "processLimit": "10",
+
+        # --- DESCRIPTION HEADERS AND OVERRIDES ---
         # Providing the option to add a description header, in bbcode, at the top of the description section where supported
         # Can be overridden in a per-tracker setting by adding this same config
         "custom_description_header": "",
         # Providing the option to add a header, in bbcode, above the screenshot section where supported
         # Can be overridden in a per-tracker setting by adding this same config
         "screenshot_header": "[h2]Screenshots[/h2]",
+        # Add this header above screenshots in description when screens have been tonemapped (in bbcode)
+        # Can be overridden in a per-tracker setting by adding this same config
+        "tonemapped_header": "[center]Screenshots have been adapted for SDR viewing, for reference only.[/center]",
         # Applicable only to raw discs (Blu-ray/DVD).
         # Providing the option to add a header, in bbcode, above the section featuring screenshots of the Disc menus, where supported
         # Can be overridden in a per-tracker setting by adding this same config
@@ -390,16 +454,8 @@ config: dict[str, Any] = {
                 "custom_signature": "[center]MyAwesomeGroupTag signature[/center]",
             },
         },
-        # Add bluray.com link to description
-        # Requires "get_bluray_info" to be set to True
-        "add_bluray_link": True,
-        # Add cover/back/slip images from bluray.com to description if available
-        # Requires "get_bluray_info" to be set to True
-        "use_bluray_images": True,
-        # Size of bluray.com cover images.
-        # bbcode is width limited, cover images are mostly height dominant
-        # So you probably want a smaller size than screenshots for instance
-        "bluray_image_size": "250",
+
+        # --- MEDIA ANALYSIS EXTRAS ---
         # Set true to add audio spectrograms to the description
         "add_audio_spectrogram": True,
         # Set true to generate and add Dolby Vision/HDR10+ dynamic metadata plots.
@@ -417,47 +473,6 @@ config: dict[str, Any] = {
         # Limit plots generated for multi-file releases.
         "dynamic_hdr_plot_max_files": 1,
 
-        # --- CLIENT SETUP ---
-        # Configures the order of uploads when both torrent trackers and Usenet are selected.
-        # "concurrent" (default) -> Upload to Usenet and torrent trackers at the same time.
-        # "usenet"               -> Upload to Usenet first. Torrent tracker uploads will start after Usenet upload finishes.
-        # "tracker"              -> Upload to torrent trackers first. Once finished, we run the bandwidth check, and then start the Usenet upload.
-        "upload_order": "concurrent",
-        # Enable bandwidth control to wait for lower qBittorrent upload speed before uploading next tracker
-        "qbit_bandwidth_control": False,
-        # Threshold in KB/s. If the average upload speed is below this value, the next upload can start.
-        "qbit_bandwidth_threshold": 0,
-        # The duration of time in seconds to average the upload speed over.
-        "qbit_bandwidth_time": 0,
-        # Which client are you using.
-        "default_torrent_client": "qbittorrent",
-        # A list of clients to use for injection (aka actually adding the torrent for uploading)
-        # eg: ["qbittorrent", "rtorrent"]
-        # Will fallback to default_torrent_client if empty
-        # "injecting_client_list": [""],
-        # A list of clients to search for torrents.
-        # eg: ["qbittorrent", "qbittorrent_searching"]
-        # will fallback to default_torrent_client if empty
-        # "searching_client_list": [""],
-
-        # --- ARR INTEGRATION SETTINGS ---
-        # set true to use sonarr for tv show searching
-        "use_sonarr": False,
-        "sonarr_url": "http://localhost:8989",
-        "sonarr_api_key": "",
-        # details for a second sonarr instance
-        # additional sonarr instances can be added by adding more sonarr_url_x and sonarr_api_key_x entries
-        "sonarr_url_1": "http://my-second-instance:8989",
-        "sonarr_api_key_1": "",
-        # set true to use radarr for movie searching
-        "use_radarr": False,
-        "radarr_url": "http://localhost:7878",
-        "radarr_api_key": "",
-        # details for a second radarr instance
-        # additional radarr instances can be added by adding more radarr_url_x and radarr_api_key_x entries
-        "radarr_url_1": "http://my-second-instance:7878",
-        "radarr_api_key_1": "",
-
         # --- TORRENT CREATION ---
         # set true to use mkbrr for torrent creation
         "mkbrr": True,
@@ -465,17 +480,25 @@ config: dict[str, Any] = {
         # Experimenting with different values might yield better performance than the default automatic setting.
         # Conversely, you can set a lower amount such as 1 to protect system resources (default "0" (auto))
         "mkbrr_threads": "0",
-        # Set true to prefer torrents with piece size <= 16 MiB when searching for existing torrents in clients
-        "prefer_max_16_torrent": False,
         # Tracker based rehashing cooldown.
         # For trackers that might need specific piece size rehashing, using a value higher than 0 will add the specified cooldown
         # in (seconds) before rehashing begins, to allow other tasks to complete quickly, before resources are consumed by rehashing
         "rehash_cooldown": "0",
 
-        # --- POST-UPLOAD SETTINGS ---
-        # Delay (in seconds) before injecting the torrent to allow the tracker to register the hash and avoid 'unregistered torrent' errors.
-        # Can be overridden in a per-tracker setting by adding this same config
-        "inject_delay": 0,
+        # --- TRACKER CHECKS AND UPLOAD ---
+        # How many trackers need to pass successful checking to continue with the upload process
+        # Default = 1. If 1 (or more) tracker/s pass banned_group, content and dupe checking, uploading will continue
+        # If less than the number of trackers pass the checking, exit immediately.
+        "tracker_pass_checks": 1,
+        # Set true to show size difference between duplicate and the upload in duplicate checks
+        "show_dupe_size_diff": True,
+        # Ignore duplicates if the size difference between the dupe and our upload is greater than or equal to this percentage
+        # For example: 20 means a 20% or more difference in size (larger or smaller) will exclude the dupe
+        # Set to None/null or remove to disable this feature.
+        "dupe_size_difference_tolerance": None,
+        # Number of upload retry attempts for network/server errors (e.g. 500, timeouts).
+        # Trackers can override this individually in their section.
+        "max_retries": 3,
         # Whether or not to print how long the upload process took for each tracker
         # Useful for knowing which trackers are slowing down the overall upload process
         "show_upload_duration": True,
@@ -483,20 +506,25 @@ config: dict[str, Any] = {
         "print_tracker_messages": False,
         # Whether or not to print direct torrent links for the uploaded content
         "print_tracker_links": True,
+
+        # --- POST-UPLOAD ---
+        # Delay (in seconds) before injecting the torrent to allow the tracker to register the hash and avoid 'unregistered torrent' errors.
+        # Can be overridden in a per-tracker setting by adding this same config
+        "inject_delay": 0,
         # Set true to search for matching requests on supported trackers
         "search_requests": True,
-        # Set false to disable adding cross-seed suitable torrents found during existing search (dupe) checking
-        "cross_seeding": True,
-        # Set true to cross-seed check every valid tracker defined in your config
-        # regardless of whether the tracker was selected for upload or not (needs cross-seeding above to be True)
-        "cross_seed_check_everything": False,
-        # Use MusicBrainz only as corroborating metadata. Local file tags remain
-        # authoritative and no external lookup is made unless this is enabled.
-        "music_enrichment_enabled": False,
-        # Optional Discogs personal access token. Automatic or supplied Discogs
-        # lookups are bounded and read-only; this token raises Discogs API
-        # limits but is never written to release metadata or logs.
-        "music_discogs_token": "",
+        # Optional trusted scripts from STATE_DIR/custom_hooks/ (Docker: /state/custom_hooks/),
+        # run after each item's tracker uploads and request search. Scripts receive
+        # final meta as JSON through stdin and may write status lines to the terminal.
+        # Example: ["notify.py"]
+        "post_upload_hooks": [],
+        # Trusted hooks loaded in Upload Assistant's process. Each must expose
+        # async or sync on_upload_finished(meta, config); it receives deep copies.
+        "post_upload_inprocess_hooks": [],
+        # Maximum time allowed for each subprocess post-upload script. Invalid or
+        # zero values use 30 seconds. A failed hook never changes the upload result.
+        "post_upload_hook_timeout": 30,
+
     },
     # these are used for DB links on ALPHARATIO
     "IMAGES": {
