@@ -10,6 +10,10 @@ def test_normalize_audiobook_title_keeps_title_equal_to_series():
     assert normalize_audiobook_title("Andersen", "Andersen") == "Andersen"  # noqa: S101
 
 
+def test_normalize_audiobook_title_keeps_title_without_series():
+    assert normalize_audiobook_title("Meu irmãozinho me atrapalha", "") == "Meu irmãozinho me atrapalha"  # noqa: S101
+
+
 def test_normalize_audiobook_title_removes_repeated_series_prefix():
     assert normalize_audiobook_title("Os Contos de Hans Christian Andersen: O bobo", "Os Contos de Hans Christian Andersen") == "O bobo"  # noqa: S101
 
