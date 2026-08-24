@@ -708,6 +708,8 @@ def normalize_audiobook_title(title: str, series: str) -> str:
     """Remove a repeated series name from the beginning or end of an audiobook title."""
     title = title.strip()
     series = series.strip()
+    if not series:
+        return title
     if len(title) > len(series):
         if title.casefold().endswith(series.casefold()):
             return title[: -len(series)].rstrip(" :-\u2013\u2014")
