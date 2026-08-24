@@ -17,6 +17,7 @@ from data.example_config import config as example_config
 from src.cleanup import cleanup_manager
 from src.console import logger
 from src.meta import Meta
+from src.trackers.common import Common
 
 
 class LazyTrackerDict(dict):
@@ -46,6 +47,18 @@ class LazyTrackerDict(dict):
         for key in self._modules:
             yield key, self[key]
 
+    def keys(self):
+        return self._modules.keys()
+
+    def __iter__(self):
+        return iter(self._modules)
+
+    def __len__(self):
+        return len(self._modules)
+
+    def values(self):
+        for key in self._modules:
+            yield self[key]
 
 # Static auth types to prevent loading all trackers at startup
 STATIC_AUTH_TYPES = {
@@ -1408,7 +1421,7 @@ tracker_class_map: Any = LazyTrackerDict(
         "DARKPEERS": ("src.trackers.UNIT3D.darkpeers", "DarkPeers"),
         "DRUNKENSLUG": ("src.trackers.USENET.drunkenslug", "DrunkenSlug"),
         "NZBGEEK": ("src.trackers.USENET.nzbgeek", "NZBGeek"),
-        "DESITORRENTS": ("src.trackers.desitorrents", "DesiTorrents"),
+        "DESITORRENTS": ("src.trackers.UNIT3D.torrentdesi", "DesiTorrents"),
         "EMUWAREZ": ("src.trackers.UNIT3D.emuwarez", "Emuwarez"),
         "FUNFILE": ("src.trackers.funfile", "FunFile"),
         "FILELIST": ("src.trackers.filelist", "FileList"),
@@ -1466,13 +1479,13 @@ tracker_class_map: Any = LazyTrackerDict(
         "SUIO": ("src.trackers.USENET.suio", "Suio"),
         "CINEMATIK": ("src.trackers.UNIT3D.cinematik", "Cinematik"),
         "TORRENTLEECH": ("src.trackers.torrentleech", "TorrentLeech"),
-        "THELEACHZONE": ("src.trackers.theleachzone", "TheLeachZone"),
+        "THELEACHZONE": ("src.trackers.UNIT3D.tlzdigital", "TheLeachZone"),
         "THEOLDSCHOOL": ("src.trackers.UNIT3D.theoldschool", "TheOldSchool"),
         "TOTHEGLORY": ("src.trackers.totheglory", "ToTheGlory"),
         "TORRENTEROS": ("src.trackers.UNIT3D.torrenteros", "Torrenteros"),
         "TORRENTHR": ("src.trackers.UNIT3D.torrenthr", "TorrentHR"),
         "TVCHAOSUK": ("src.trackers.tvchaosuk", "TVChaosUK"),
-        "1PTBA": ("src.trackers.1ptba", "OnePTBA"),
+        "1PTBA": ("src.trackers.NEXUSPHP.oneptba", "OnePTBA"),
         "XINGYUNGEPT": ("src.trackers.NEXUSPHP.xingyungept", "XingyungePT"),
         "ULCX": ("src.trackers.UNIT3D.ulcx", "ULCX"),
         "UTOPIA": ("src.trackers.UNIT3D.utopia", "Utopia"),

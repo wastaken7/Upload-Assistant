@@ -192,8 +192,8 @@ def generate_spectrogram(
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
-    except ImportError:
-        raise RuntimeError("Missing required libraries for spectrogram generation. Install librosa and matplotlib.")
+    except ImportError as e:
+        raise RuntimeError("Missing required libraries for spectrogram generation. Install librosa and matplotlib.") from e
 
     try:
         samples, actual_sample_rate = librosa.load(io.BytesIO(result.stdout), sr=None, mono=True)

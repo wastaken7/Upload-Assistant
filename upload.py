@@ -3,7 +3,6 @@
 
 import sys
 
-import sys
 if "-h" in sys.argv or "--help" in sys.argv:
     from src.args import Args
     try:
@@ -2229,7 +2228,7 @@ async def update_notification() -> str:
 
 
 
-def load_heavy_globals():
+def load_heavy_globals() -> None:
     global aiofiles, requests, CLI_UI, TORF_Torrent
     import aiofiles
     import requests
