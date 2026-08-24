@@ -212,6 +212,7 @@ def migrate_old_config(config_dict: ConfigDict) -> ConfigDict:
         "CBR": "CAPYBARABR",
         "TIK": "CINEMATIK",
         "DP": "DARKPEERS",
+        "DV": "DREADVAULT",
         "EMUW": "EMUWAREZ",
         "HUNO": "HAWKEUNO",
         "HHD": "HOMIEHELPDESK",
