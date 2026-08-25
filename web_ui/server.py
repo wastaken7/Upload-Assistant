@@ -1556,6 +1556,8 @@ def _subprocess_prompt_type(buffer: str) -> str | None:
     stripped = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", last_line).strip()
     if not stripped:
         return None
+    if stripped.startswith(PROGRESS_STDOUT_PREFIX):
+        return None
     lowered = stripped.lower()
     if "running:" in lowered:
         return None
@@ -1588,6 +1590,10 @@ def _subprocess_progress_event(chunk: str) -> dict[str, object] | None:
     except json.JSONDecodeError:
         return None
     return event if isinstance(event, dict) else None
+
+
+def _should_flush_subprocess_output(buffer: str, char: str) -> bool:
+    return char == "\n" or (len(buffer) > 512 and not buffer.lstrip().startswith(PROGRESS_STDOUT_PREFIX))
 
 
 def _append_metadata_source(
@@ -5798,7 +5804,7 @@ def execute_command():
                                     _set_process_awaiting_input_if_current(session_id, process_state, True, prompt_type)
 
                                 # Flush on newline or when buffer grows large
-                                if char == "\n" or len(buffers[output_type]) > 512:
+                                if _should_flush_subprocess_output(buffers[output_type], char):
                                     if not prompt_type:
                                         _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     chunk = buffers[output_type]
