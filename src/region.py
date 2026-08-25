@@ -2007,6 +2007,8 @@ async def get_service(
     video: str | None = None, tag: str | None = None, audio: str | None = None, guess_title: str | None = None, get_services_only: bool = False
 ) -> dict[str, str] | tuple[str, str]:
     services = {
+        "3Sat": "3SAT",
+        "3SAT": "3SAT",
         "9Now": "9NOW",
         "9NOW": "9NOW",
         "À LA CARTE": "BELA",
@@ -2032,7 +2034,11 @@ async def get_service(
         "AOL": "AOL",
         "Apple TV": "ATV",
         "Apple TV+": "ATVP",
+        "ARD Mediathek": "ARD",
         "ARD": "ARD",
+        "ARD Plus": "ARDP",
+        "ARDP": "ARDP",
+        "ARTE": "ARTE",
         "AS": "AS",
         "ATK": "ATK",
         "ATV": "ATV",
@@ -2198,6 +2204,7 @@ async def get_service(
         "Kanopy": "KNPY",
         "KAYO": "KAYO",
         "KCW": "KCW",
+        "KiKA": "KiKA",
         "KNOW": "KNOW",
         "Knowledge Network": "KNOW",
         "KNPY": "KNPY",
