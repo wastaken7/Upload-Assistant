@@ -91,8 +91,8 @@ def resolve_book_filelist(
 
     Returns:
         A 4-tuple ``(videopath, filelist, search_term, search_file_folder)``
-        where *videopath* is the primary/largest file used as the "video"
-        reference for downstream processing.
+        where *videopath* is the primary file used as the "video" reference
+        for downstream processing (the largest audio file for audiobooks).
     """
     allowed_extensions = BOOK_EXTENSIONS | AUDIOBOOK_EXTENSIONS
 
@@ -110,16 +110,15 @@ def resolve_book_filelist(
         richer_book_files = [file for file in filelist if Path(file).suffix.lower() in BOOK_EXTENSIONS - {".txt", ".html", ".htm"}]
         if richer_book_files:
             filelist = [file for file in filelist if not (Path(file).suffix.lower() in {".txt", ".html", ".htm"} and Path(file).stem.casefold() in _TEXT_SIDECAR_STEMS)]
-        videopath = sorted(filelist, key=os.path.getsize, reverse=True)[0]
     else:
-        videopath = videoloc
         filelist.append(videoloc)
 
     meta.filelist = filelist
     meta.imdb_id = 0
 
-    primary_ext = Path(videopath).suffix.lower()
-    meta.audiobook = bool(meta.audiobook or (primary_ext in AUDIOBOOK_EXTENSIONS) or any(Path(f).suffix.lower() in AUDIOBOOK_EXTENSIONS for f in filelist))
+    audio_files = [file for file in filelist if Path(file).suffix.lower() in AUDIOBOOK_EXTENSIONS]
+    meta.audiobook = bool(meta.audiobook or audio_files)
+    videopath = max(audio_files if meta.audiobook and audio_files else filelist, key=os.path.getsize)
 
     search_term = Path(filelist[0]).name if filelist else ""
     search_file_folder = "file"

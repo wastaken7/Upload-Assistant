@@ -56,7 +56,7 @@ from src.console import rich_handler as _rich_handler
 from src.disc_menus import process_disc_menus
 from src.dupe_checking import DupeChecker
 from src.dynamic_hdr_plot import dynamic_hdr_plot_enabled, process_dynamic_hdr_plots
-from src.early_tasks import cancel_and_drain_early_artifact_tasks, get_early_artifact_tasks, start_early_artifact_tasks
+from src.early_tasks import cancel_and_drain_early_artifact_tasks, get_early_artifact_tasks, release_early_artifact_progress, start_early_artifact_tasks
 from src.early_tasks import is_usenet_only as _is_usenet_only
 from src.get_desc import gen_desc
 from src.get_name import NameManager
@@ -1425,6 +1425,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     # Prep normally starts these while metadata and screenshots are being
     # generated. Keep this fallback for paths which bypass normal prep.
     early_artifact_tasks = get_early_artifact_tasks(meta.uuid) or start_early_artifact_tasks(meta, client, config)
+    release_early_artifact_progress(meta.uuid)
     early_base_torrent_task, early_usenet_prepare_task = early_artifact_tasks
 
     filename: str = meta.title

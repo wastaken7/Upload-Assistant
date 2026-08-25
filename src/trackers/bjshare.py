@@ -1392,7 +1392,7 @@ class BJShare:
 
         display_name = prompt_labels.get(role, role.capitalize())
         if meta.unattended and not meta.unattended_confirm:
-            logger.info(f"{self.tracker}: [yellow]Unattended mode: {display_name} não encontrado(s). Plando upload para {self.tracker}.[/yellow]")
+            logger.info(f"{self.tracker}: [yellow]Unattended mode: {display_name} não encontrado(s). Pulando upload para {self.tracker}.[/yellow]")
             meta.skipping = f"{self.tracker}"
             return "skipped"
 
@@ -1830,7 +1830,7 @@ class BJShare:
             return overview
 
         if meta and meta.unattended and not meta.unattended_confirm:
-            logger.info(f"{self.tracker}: [yellow]Sinopse não encontrada em modo unattended. Plando upload para {self.tracker}.[/yellow]")
+            logger.info(f"{self.tracker}: [yellow]Sinopse não encontrada em modo unattended. Pulando upload para {self.tracker}.[/yellow]")
             meta.skipping = f"{self.tracker}"
             return ""
 
