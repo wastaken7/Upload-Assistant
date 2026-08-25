@@ -1823,14 +1823,14 @@ async def screenshots(
     if "image_list" not in meta:
         meta.image_list = []
 
-    image_list_entries = meta.image_list
+    group = capture_group or "main"
+    image_list_entries = meta.image_list if group == "main" else []
     existing_images: list[dict[str, Any]] = [img for img in image_list_entries if str(img.get("img_url", "")).startswith("http")]
 
     if len(existing_images) >= cutoff and not force_screenshots:
         logger.info(f"[yellow]There are already at least {cutoff} images in the image list. Skipping additional screenshots.")
         return None
 
-    group = capture_group or "main"
     if num_screens:
         requested_screens = num_screens
     elif isinstance(manual_frames, str):
