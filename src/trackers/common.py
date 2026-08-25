@@ -2544,8 +2544,8 @@ class Common:
             logger.info(f"Filename: {filename}")  # Ensure filename is printed if available
 
         if not meta.unattended:
-            selection = (await prompt_in_thread(cli_ui.ask_string, f"Do you want to use these IDs from {tracker_name}? (Y/n): ", default="") or "").strip().lower()
             try:
+                selection = (await prompt_in_thread(cli_ui.ask_string, f"Do you want to use these IDs from {tracker_name}? (Y/n): ", default="") or "").strip().lower()
                 return selection == "" or selection == "y" or selection == "yes"
             except KeyboardInterrupt, EOFError:
                 sys.exit(1)

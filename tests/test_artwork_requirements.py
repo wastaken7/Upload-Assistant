@@ -10,6 +10,12 @@ from src.artwork import prepare_artwork
 from src.meta import Meta
 from src.trackers.UNIT3D import UNIT3D
 from upload import _prompt_book_meta, _prompt_music_meta
+import upload
+
+
+@pytest.fixture(autouse=True)
+def setup_globals():
+    upload.load_heavy_globals()
 
 
 @pytest.mark.asyncio
