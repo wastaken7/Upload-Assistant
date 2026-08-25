@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
 # PYTHON_ARGCOMPLETE_OK
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+
+import sys
+
+if "-h" in sys.argv or "--help" in sys.argv:
+    from src.args import Args
+    try:
+        Args({"DEFAULT": {"screens": 0}}).parse(sys.argv[1:], None)
+    except SystemExit:
+        pass
+    sys.exit(0)
+
 import ast
 import asyncio
 import contextlib
@@ -27,10 +38,6 @@ check_dependencies()
 
 import logging
 
-import aiofiles
-import cli_ui  # pyright: ignore[reportMissingImports]
-import requests
-from torf import Torrent as _Torrent  # pyright: ignore[reportMissingImports,reportUnknownVariableType]
 
 from bin.get_ffmpeg import FfmpegBinaryManager
 from bin.get_mkbrr import MkbrrBinaryManager
@@ -50,7 +57,7 @@ from src.console import rich_handler as _rich_handler
 from src.disc_menus import process_disc_menus
 from src.dupe_checking import DupeChecker
 from src.dynamic_hdr_plot import dynamic_hdr_plot_enabled, process_dynamic_hdr_plots
-from src.early_tasks import cancel_and_drain_early_artifact_tasks, get_early_artifact_tasks, start_early_artifact_tasks
+from src.early_tasks import cancel_and_drain_early_artifact_tasks, get_early_artifact_tasks, release_early_artifact_progress, start_early_artifact_tasks
 from src.early_tasks import is_usenet_only as _is_usenet_only
 from src.get_desc import gen_desc
 from src.get_name import NameManager
@@ -72,11 +79,10 @@ from src.uploadscreens import UploadScreensManager
 
 # Runtime artifacts are user-owned; CODE_DIR remains the read-only checkout.
 base_dir = str(STATE_DIR)
-CLI_UI: Any = cli_ui
-TORF_Torrent: Any = cast(Any, _Torrent)
+CLI_UI: Any = None
+TORF_Torrent: Any = None
 RICH_HANDLER: Any = cast(Any, _rich_handler)
 TORRENT_CREATOR: Any = cast(Any, TorrentCreator)
-CLI_UI.setup(color="always", title="Upload Assistant")
 
 
 def _parse_version_tuple(value: str) -> tuple[int, ...]:
@@ -1420,6 +1426,7 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     # Prep normally starts these while metadata and screenshots are being
     # generated. Keep this fallback for paths which bypass normal prep.
     early_artifact_tasks = get_early_artifact_tasks(meta.uuid) or start_early_artifact_tasks(meta, client, config)
+    release_early_artifact_progress(meta.uuid)
     early_base_torrent_task, early_usenet_prepare_task = early_artifact_tasks
 
     filename: str = meta.title
@@ -2222,7 +2229,19 @@ async def update_notification() -> str:
     return local_version
 
 
+
+def load_heavy_globals() -> None:
+    global aiofiles, requests, CLI_UI, TORF_Torrent
+    import aiofiles
+    import requests
+    import cli_ui
+    from torf import Torrent
+    CLI_UI = cli_ui
+    TORF_Torrent = Torrent
+    CLI_UI.setup(color="always", title="Upload Assistant")
+
 async def do_the_thing(base_dir: str) -> None:
+    load_heavy_globals()
     # Reload config from disk so that changes made via the WebUI config
     # editor (or manual file edits between runs) are picked up.  The
     # module-level ``config`` dict is imported once at startup and would

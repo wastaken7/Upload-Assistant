@@ -1,4 +1,5 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+import asyncio
 import unicodedata
 from typing import Any, cast
 
@@ -248,20 +249,46 @@ class DigitalCore:
                     torrent_bytes = await torrent_file.read()
                 files = {"file": (torrent_title + ".torrent", torrent_bytes, "application/x-bittorrent")}
 
-                response = await self.session.post(upload_url, data=data, files=files, headers=dict(self.session.headers), timeout=90)
-                response.raise_for_status()
-                response_json = response.json()
-                response_data: dict[str, Any] = cast(dict[str, Any], response_json) if isinstance(response_json, dict) else {}
+                tracker_config = self.config["TRACKERS"].get(self.tracker, {})
+                try:
+                    default_retries = self.config.get("DEFAULT", {}).get("max_retries", 5)
+                    max_retries = max(1, int(tracker_config.get("max_retries", default_retries)))
+                except ValueError, TypeError:
+                    max_retries = 5
 
-                if response.status_code == 200 and response_data.get("id"):
-                    torrent_id = str(response_data["id"])
-                    meta.tracker_status[self.tracker]["torrent_id"] = torrent_id + "/"
-                    meta.tracker_status[self.tracker]["status_message"] = response_data.get("message")
+                retry_delay = 5
+                for attempt in range(max_retries):
+                    response = await self.session.post(upload_url, data=data, files=files, headers=dict(self.session.headers), timeout=90)
+                    if response.status_code == 200:
+                        try:
+                            response_json = response.json()
+                        except ValueError:
+                            if attempt < max_retries - 1:
+                                logger.info(f"{self.tracker}: JSON decode error, retrying in {retry_delay}s... (attempt {attempt + 1}/{max_retries})")
+                                await asyncio.sleep(retry_delay)
+                                continue
+                            raise
 
-                    await self.common.download_tracker_torrent(meta, self.tracker, headers=dict(self.session.headers), downurl=f"{self.api_base_url}/download/{torrent_id}")
-                    return True
+                        response_data: dict[str, Any] = cast(dict[str, Any], response_json) if isinstance(response_json, dict) else {}
+                        if response_data.get("id"):
+                            torrent_id = str(response_data["id"])
+                            meta.tracker_status[self.tracker]["torrent_id"] = torrent_id + "/"
+                            meta.tracker_status[self.tracker]["status_message"] = response_data.get("message")
+                            await self.common.download_tracker_torrent(
+                                meta, self.tracker, headers=dict(self.session.headers), downurl=f"{self.api_base_url}/download/{torrent_id}"
+                            )
+                            return True
 
-                meta.tracker_status[self.tracker]["status_message"] = f"data error: {response_data.get('message', 'Unknown API error.')}"
+                        meta.tracker_status[self.tracker]["status_message"] = f"data error: {response_data.get('message', 'Unknown API error.')}"
+                        return False
+
+                    if response.status_code in (401, 403):
+                        response.raise_for_status()
+                    if attempt < max_retries - 1:
+                        logger.info(f"{self.tracker}: HTTP {response.status_code} error, retrying in {retry_delay}s... (attempt {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    response.raise_for_status()
                 return False
 
             except httpx.HTTPStatusError as e:
