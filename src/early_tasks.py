@@ -1,23 +1,26 @@
 """Background artifact preparation shared by prep and upload stages."""
 
 import asyncio
+import os
 import time
 from collections.abc import Awaitable, Mapping
 from pathlib import Path
 from typing import Any, cast
 
 from src.clients import Clients
-from src.console import logger, suppress_cli_progress
+from src.console import CliProgressGate, logger, suppress_cli_progress
 from src.meta import Meta
 from src.torrentcreate import TorrentCreator
 from src.trackersetup import tracker_class_map
+from src.webui_progress import has_progress_callback
 
 _early_artifact_tasks: dict[str, tuple[asyncio.Task[None], asyncio.Task[None]]] = {}
+_early_progress_gates: dict[str, CliProgressGate] = {}
 
 
-async def _run_early_artifact_task(task: Awaitable[None]) -> None:
+async def _run_early_artifact_task(task: Awaitable[None], gate: CliProgressGate) -> None:
     """Run preparatory work without rendering CLI progress bars."""
-    with suppress_cli_progress():
+    with suppress_cli_progress(gate):
         await task
 
 
@@ -26,9 +29,11 @@ def start_early_artifact_tasks(meta: Meta, client: Clients, config: Mapping[str,
     release_id = str(meta.uuid)
     tasks = _early_artifact_tasks.get(release_id)
     if tasks is None:
+        gate = CliProgressGate()
+        _early_progress_gates[release_id] = gate
         tasks = (
-            asyncio.create_task(_run_early_artifact_task(create_base_torrents_early(meta, client))),
-            asyncio.create_task(_run_early_artifact_task(prepare_usenet_archive_early(meta, config))),
+            asyncio.create_task(_run_early_artifact_task(create_base_torrents_early(meta, client), gate)),
+            asyncio.create_task(_run_early_artifact_task(prepare_usenet_archive_early(meta, config), gate)),
         )
         _early_artifact_tasks[release_id] = tasks
     return tasks
@@ -39,9 +44,19 @@ def get_early_artifact_tasks(release_id: str) -> tuple[asyncio.Task[None], async
     return _early_artifact_tasks.get(str(release_id))
 
 
+def release_early_artifact_progress(release_id: str) -> None:
+    """Show any in-progress background artifact work after prompts finish."""
+    if has_progress_callback() or os.environ.get("UA_WEBUI_ACTIVE") == "1":
+        return
+    gate = _early_progress_gates.get(str(release_id))
+    if gate is not None:
+        gate.release()
+
+
 async def cancel_and_drain_early_artifact_tasks(release_id: str) -> None:
     """Cancel unfinished preparation tasks and wait for both before forgetting them."""
     tasks = _early_artifact_tasks.pop(str(release_id), None)
+    _early_progress_gates.pop(str(release_id), None)
     if tasks is None:
         return
     for task in tasks:
@@ -120,11 +135,7 @@ async def prepare_usenet_archive_early(meta: Meta, config: Mapping[str, Any]) ->
         from src.usenetcreate import prepare_and_upload_usenet
 
         logger.debug("[cyan]Preparing Usenet archive and PAR2 files while metadata and screenshots are processed.[/cyan]")
-        # Archive/PAR2 generation overlaps metadata and duplicate checking. Keep
-        # its Rich updates out of the CLI until the actual posting stage, while
-        # structured WebUI progress remains available.
-        with suppress_cli_progress():
-            prepared_path = await prepare_and_upload_usenet(meta, dict(config), prepare_only=True)
+        prepared_path = await prepare_and_upload_usenet(meta, dict(config), prepare_only=True)
         if not prepared_path:
             logger.warning("[yellow]Early Usenet preparation did not complete; posting stage will retry.[/yellow]")
     except asyncio.CancelledError:
