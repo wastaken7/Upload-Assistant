@@ -104,6 +104,50 @@ def test_registered_main_screenshots_are_reused_when_title_changes(tmp_path: Pat
     assert set(result or []) == {str(path) for path in registered}
 
 
+def test_pack_capture_ignores_uploaded_images_from_main_group(tmp_path: Path) -> None:
+    release_id = "release"
+    release_dir = tmp_path / "tmp" / release_id
+    release_dir.mkdir(parents=True)
+    (release_dir / "MediaInfo.json").write_text(
+        '{"media": {"track": [{"Duration": "100"}, {"Duration": "100", "Width": "1920", "Height": "1080", "PixelAspectRatio": "1", "DisplayAspectRatio": "1.777", "FrameRate": "24"}]}}',
+        encoding="utf-8",
+    )
+    meta = Meta(
+        category="MOVIE",
+        base_dir=str(tmp_path),
+        uuid=release_id,
+        screens=2,
+        imghost="imgbb",
+        image_list=[{"img_url": "https://images.example/main.png"}],
+    )
+    capture_calls: list[object] = []
+
+    async def capture_stub(args: tuple[object, ...]):
+        capture_calls.append(args)
+        output = Path(str(args[3]))
+        output.write_bytes(b"image")
+        return args[0], str(output)
+
+    with (
+        patch("src.takescreens.get_image_host", new=AsyncMock(return_value="imgbb")),
+        patch("src.takescreens.capture_screenshot", new=capture_stub),
+    ):
+        result = asyncio.run(
+            screenshots(
+                "unused.mkv",
+                "FILE_1",
+                release_id,
+                str(tmp_path),
+                meta,
+                manual_frames=[100, 200],
+                capture_group="FILE_1",
+            )
+        )
+
+    assert len(capture_calls) == 2
+    assert len(result or []) == 2
+
+
 def test_partial_registered_group_captures_only_missing_screenshots(tmp_path: Path) -> None:
     release_id = "release"
     release_dir = tmp_path / "tmp" / release_id
