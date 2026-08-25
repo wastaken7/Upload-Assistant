@@ -1,17 +1,21 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+from __future__ import annotations
+
 import argparse
 import datetime
-import argcomplete
 import re
 import sys
 import urllib.parse
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, TextIO
+from typing import TYPE_CHECKING, Any, TextIO
 
+import argcomplete
 
-from src.console import logger
-from src.meta import Meta
+from src.app_paths import DATA_DIR
+
+if TYPE_CHECKING:
+    from src.meta import Meta
 
 MUSIC_MEDIA_CHOICES = ("cd", "web", "vinyl", "dvd", "bd", "soundboard", "sacd", "dat", "cassette")
 MUSIC_RELEASE_TYPE_CHOICES = (
@@ -35,6 +39,81 @@ MUSIC_RELEASE_TYPE_CHOICES = (
 )
 
 PATHS_FROM_STDIN_OPTION = "--paths-from-stdin"
+TRACKER_CONFIGURATION_KEYS = ("api_key", "auth_key", "username", "password", "passkey", "cookie_file", "cookies", "ApiUser", "bioma_api_key", "ptgen_api")
+
+
+def _has_configured_value(options: Mapping[str, Any]) -> bool:
+    for key in TRACKER_CONFIGURATION_KEYS:
+        value = options.get(key)
+        if isinstance(value, str):
+            value = value.strip()
+        if value not in (None, "", False):
+            return True
+    return False
+
+
+def configured_tracker_completions(config: Mapping[str, Any], cookies_dir: Path | None = None) -> dict[str, str]:
+    """Return configured tracker names suitable for shell completion."""
+    trackers = config.get("TRACKERS", {})
+    if not isinstance(trackers, Mapping):
+        return {}
+
+    configured: dict[str, str] = {}
+    default_trackers = trackers.get("default_trackers", "")
+    if isinstance(default_trackers, str):
+        default_names = default_trackers.split(",")
+    elif isinstance(default_trackers, Sequence):
+        default_names = default_trackers
+    else:
+        default_names = ()
+    for name in default_names:
+        normalized = str(name).strip()
+        if normalized:
+            configured[normalized.lower()] = normalized
+
+    cookie_files: tuple[Path, ...] = ()
+    cookie_root = cookies_dir or DATA_DIR / "cookies"
+    try:
+        if cookie_root.is_dir():
+            cookie_files = tuple(path for path in cookie_root.iterdir() if path.is_file())
+    except OSError:
+        cookie_files = ()
+
+    for name, options in trackers.items():
+        if not isinstance(options, Mapping):
+            continue
+        tracker_name = str(name).strip()
+        if not tracker_name:
+            continue
+        tracker_key = tracker_name.lower()
+        has_config_value = _has_configured_value(options)
+        has_cookie_file = any(tracker_key == path.stem.lower() or tracker_key in path.name.lower() for path in cookie_files)
+        if has_config_value or has_cookie_file:
+            configured[tracker_key] = tracker_name
+
+    display_name_re = re.compile(r'^\s*display_name\s*=\s*(["\'])(.*?)\1', re.MULTILINE)
+    supported_cats_re = re.compile(r"^\s*supported_categories\s*=\s*\((.*?)\)", re.MULTILINE | re.DOTALL)
+    tracker_dir = Path(__file__).parent / "trackers"
+    try:
+        source_files = tracker_dir.rglob("*.py") if tracker_dir.is_dir() else ()
+        for source_file in source_files:
+            if source_file.name in ("__init__.py", "common.py", "routing.py") or source_file.name.endswith("_TEMPLATE.py"):
+                continue
+            tracker_key = source_file.stem.lower()
+            if tracker_key not in configured:
+                continue
+            source = source_file.read_text(encoding="utf-8")
+            display_match = display_name_re.search(source)
+            categories_match = supported_cats_re.search(source)
+            display_name = display_match.group(2) if display_match else configured[tracker_key].title()
+            categories = []
+            if categories_match:
+                categories = [category.strip().strip("\"'") for category in categories_match.group(1).split(",") if category.strip()]
+            configured[tracker_key] = f"{display_name} ({', '.join(categories)})" if categories else display_name
+    except OSError, UnicodeError:
+        pass
+
+    return configured
 
 
 def read_paths_from_stdin(argv: Sequence[str], stream: TextIO) -> tuple[list[str], list[str]]:
@@ -48,6 +127,8 @@ def read_paths_from_stdin(argv: Sequence[str], stream: TextIO) -> tuple[list[str
     args.remove(PATHS_FROM_STDIN_OPTION)
     interactive = stream.isatty()
     if interactive:
+        from src.console import logger
+
         logger.info("[cyan]Paste one full path per line, then press Enter on an empty line to start.[/cyan]")
 
     paths: list[str] = []
@@ -135,7 +216,7 @@ class Args:
         )
 
         def make_dict_completer(choices_dict):
-            def completer(prefix, parsed_args, **kwargs):
+            def completer(prefix: str, **_: Any):
                 return {k: v for k, v in choices_dict.items() if k.lower().startswith(prefix.lower())}
 
             return completer
@@ -784,52 +865,13 @@ class Args:
         action_uo.completer = upload_order_completer
         parser.add_argument("-rtl", "--rtorrent-label", dest="rtorrent_label", nargs=1, required=False, help="Add to rtorrent with this label")
 
-        def _tracker_completer(prefix: str, parsed_args: Any, **kwargs: Any) -> dict[str, str]:
-            import os
-            import re
-            from pathlib import Path
-
-            trackers_dict = self.config.get("TRACKERS", {})
-            configured = {}
-            for name, opts in trackers_dict.items():
-                if isinstance(opts, dict):
-                    if opts.get("api_key") or opts.get("auth_key") or opts.get("cookies") or opts.get("username"):
-                        configured[name.lower()] = name.title()
-
-            try:
-                tracker_dir = Path(__file__).parent / "trackers"
-                if tracker_dir.exists():
-                    display_name_re = re.compile(r'^\s*display_name\s*=\s*(["\'])(.*?)\1', re.MULTILINE)
-                    supported_cats_re = re.compile(r"^\s*supported_categories\s*=\s*\((.*?)\)", re.MULTILINE | re.DOTALL)
-
-                    for file in tracker_dir.rglob("*.py"):
-                        if file.name in ("__init__.py", "common.py", "routing.py") or file.name.endswith("_TEMPLATE.py"):
-                            continue
-
-                        tracker_name = file.stem.lower()
-                        if tracker_name in configured:
-                            content_file = file.read_text(encoding="utf-8")
-                            dn_match = display_name_re.search(content_file)
-                            sc_match = supported_cats_re.search(content_file)
-
-                            disp = dn_match.group(2) if dn_match else file.stem.title()
-
-                            cats = []
-                            if sc_match:
-                                cats_raw = sc_match.group(1)
-                                cats = [c.strip().strip("\"'") for c in cats_raw.split(",") if c.strip()]
-
-                            desc = f"{disp} ({', '.join(cats)})" if cats else disp
-
-                            configured[tracker_name] = desc
-            except Exception as e:
-                pass
+        def _tracker_completer(prefix: str, **_: Any) -> dict[str, str]:
+            configured = configured_tracker_completions(self.config)
 
             if "," in prefix:
                 base, current = prefix.rsplit(",", 1)
                 return {f"{base},{t}": desc for t, desc in configured.items() if t.startswith(current.lower())}
-            else:
-                return {t: desc for t, desc in configured.items() if t.startswith(prefix.lower())}
+            return {t: desc for t, desc in configured.items() if t.startswith(prefix.lower())}
 
         tk_action = parser.add_argument("-tk", "--trackers", nargs=1, required=False, help="Upload to these trackers, comma separated (--trackers blu,bhd) including manual")
         tk_action.completer = _tracker_completer
@@ -933,6 +975,8 @@ class Args:
             dest="archive_password",
         )
         argcomplete.autocomplete(parser)
+        from src.console import logger
+
         parsed_args_ns, before_args = parser.parse_known_args(input)
         parsed_args: dict[str, Any] = vars(parsed_args_ns)
         # console.print(args)
@@ -1287,6 +1331,7 @@ class Args:
 
         # Detect newspapers in overridden titles
         from src.book_prep import detect_newspaper, sanitize_book_author, sanitize_book_language
+
         detect_newspaper(meta)
         sanitize_book_language(meta)
         sanitize_book_author(meta)
@@ -1351,6 +1396,7 @@ class Args:
 
     def parse_tracker_id(self, value: str) -> tuple[str, str]:
         """Normalize ``--tracker-id`` values without exposing tracker-specific CLI flags."""
+        from src.meta import Meta
         from src.trackersetup import get_tracker_comment_hosts, tracker_class_map
 
         candidate = value.strip()

@@ -116,6 +116,7 @@ def get_spectrogram_sources(category: str, filelist: list[Any], disc_final_path:
 def get_stft_parameters(sample_count: int) -> tuple[int, int]:
     """Bound the matrix plotted by Matplotlib while retaining useful frequency detail."""
     import numpy as np
+
     n_fft = min(SPECTROGRAM_N_FFT, max(32, 2 ** int(np.floor(np.log2(max(sample_count, 1))))))
     hop_length = max(n_fft // 4, int(np.ceil(sample_count / MAX_TIME_BINS)))
     return n_fft, hop_length
@@ -189,6 +190,7 @@ def generate_spectrogram(
         import librosa
         import librosa.display
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np

@@ -27,7 +27,7 @@ class LazyTrackerDict(dict):
 
     def __getitem__(self, key):
         if key in self._modules:
-            if key not in super().keys():
+            if not super().__contains__(key):
                 mod_name, cls_name = self._modules[key]
                 mod = importlib.import_module(mod_name)
                 self[key] = getattr(mod, cls_name)
