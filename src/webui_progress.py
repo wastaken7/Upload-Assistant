@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import os
+import sys
 import time
 from collections.abc import Callable
 from threading import Lock
@@ -21,6 +24,8 @@ class ProgressEvent(TypedDict, total=False):
 
 _callback: Callable[[ProgressEvent], None] | None = None
 _callback_lock = Lock()
+_stdout_lock = Lock()
+PROGRESS_STDOUT_PREFIX = "UA_PROGRESS_JSON:"
 
 
 def set_progress_callback(callback: Callable[[ProgressEvent], None] | None) -> None:
@@ -29,20 +34,28 @@ def set_progress_callback(callback: Callable[[ProgressEvent], None] | None) -> N
         _callback = callback
 
 
-def clear_progress_callback() -> None:
-    set_progress_callback(None)
+def clear_progress_callback(callback: Callable[[ProgressEvent], None] | None = None) -> None:
+    """Clear the callback only if it still belongs to the finishing run."""
+    with _callback_lock:
+        global _callback
+        if callback is None or _callback is callback:
+            _callback = None
 
 
 def has_progress_callback() -> bool:
     """Return whether the current process is publishing structured Web UI progress."""
     with _callback_lock:
-        return _callback is not None
+        return _callback is not None or os.environ.get("UA_WEBUI_PROGRESS_STDOUT") == "1"
 
 
 def _emit(event: ProgressEvent) -> None:
     with _callback_lock:
         callback = _callback
     if callback is None:
+        if os.environ.get("UA_WEBUI_PROGRESS_STDOUT") == "1":
+            with _stdout_lock:
+                sys.stdout.write(f"\n{PROGRESS_STDOUT_PREFIX}{json.dumps(event, separators=(',', ':'))}\n")
+                sys.stdout.flush()
         return
     callback(event)
 

@@ -456,7 +456,7 @@ class AmigosShare:
         overview: str = season_tmdb.get("overview", "") or main_tmdb.get("overview", "")
         if not overview:
             if meta.unattended and not meta.unattended_confirm:
-                logger.info(f"{self.tracker}: [yellow]Sinopse não encontrada no TMDb em modo unattended. Plando upload para {self.tracker}.[/yellow]")
+                logger.info(f"{self.tracker}: [yellow]Sinopse não encontrada no TMDb em modo unattended. Pulando upload para {self.tracker}.[/yellow]")
                 meta.skipping = f"{self.tracker}"
                 return ""
             user_input_raw = await prompt_in_thread(cli_ui.ask_string, f"{self.tracker}: Sinopse não encontrada no TMDb. Por favor, insira manualmente.")
@@ -596,7 +596,7 @@ class AmigosShare:
 
         if not tags:
             if not meta.genre and meta.unattended and not meta.unattended_confirm:
-                logger.info(f"{self.tracker}: [yellow]Gêneros não encontrados em modo unattended. Plando upload para {self.tracker}.[/yellow]")
+                logger.info(f"{self.tracker}: [yellow]Gêneros não encontrados em modo unattended. Pulando upload para {self.tracker}.[/yellow]")
                 meta.skipping = f"{self.tracker}"
                 return ""
             tags_raw = meta.genre or await prompt_in_thread(cli_ui.ask_string, f"Digite os gêneros (no formato do {self.tracker}): ")

@@ -20,6 +20,7 @@ class RocketHD(UNIT3D):
 
     tracker = "ROCKETHD"
     display_name = "RocketHD"
+    supported_categories = ("MOVIE", "TV")
     base_url = "https://rocket-hd.cc"
     id_url = f"{base_url}/api/torrents/"
     upload_url = f"{base_url}/api/torrents/upload"

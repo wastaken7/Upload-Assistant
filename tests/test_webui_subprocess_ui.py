@@ -9,6 +9,7 @@ def test_subprocess_yes_no_prompt_is_classified_for_dedicated_buttons() -> None:
     assert server._subprocess_prompt_type(":: Continue? (y/N)\n") == "yes_no"
     assert server._subprocess_prompt_type("\x1b[1;31mContinue? (Y/n)\x1b[0m") == "yes_no"
     assert server._subprocess_prompt_type("Enter a new title:") == "text"
+    assert server._subprocess_prompt_type(server.PROGRESS_STDOUT_PREFIX + '{"detail":"Please select a stream"}') is None
 
 
 def test_webui_child_environment_overrides_no_color(monkeypatch) -> None:
@@ -26,3 +27,25 @@ def test_webui_child_environment_overrides_no_color(monkeypatch) -> None:
     assert "NO_COLOR" not in env
     assert "\x1b[" in result.stdout
     assert "31m" in result.stdout
+
+
+def test_webui_child_reports_structured_progress() -> None:
+    result = subprocess.run(
+        [sys.executable, "-u", "-c", "from src.webui_progress import publish_progress; publish_progress('hash', 'Hashing', current=9, total=100)"],
+        text=True,
+        capture_output=True,
+        env=server._webui_subprocess_env(),
+        check=True,
+    )
+
+    event = server._subprocess_progress_event(result.stdout)
+    assert event is not None
+    assert event["id"] == "hash"
+    assert event["current"] == 9.0
+
+
+def test_long_progress_record_waits_for_newline() -> None:
+    partial = f"{server.PROGRESS_STDOUT_PREFIX}{'x' * 600}"
+
+    assert not server._should_flush_subprocess_output(partial, "x")
+    assert server._should_flush_subprocess_output(f"{partial}\n", "\n")
