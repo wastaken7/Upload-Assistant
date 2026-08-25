@@ -26,3 +26,18 @@ def test_webui_child_environment_overrides_no_color(monkeypatch) -> None:
     assert "NO_COLOR" not in env
     assert "\x1b[" in result.stdout
     assert "31m" in result.stdout
+
+
+def test_webui_child_reports_structured_progress() -> None:
+    result = subprocess.run(
+        [sys.executable, "-u", "-c", "from src.webui_progress import publish_progress; publish_progress('hash', 'Hashing', current=9, total=100)"],
+        text=True,
+        capture_output=True,
+        env=server._webui_subprocess_env(),
+        check=True,
+    )
+
+    event = server._subprocess_progress_event(result.stdout)
+    assert event is not None
+    assert event["id"] == "hash"
+    assert event["current"] == 9.0

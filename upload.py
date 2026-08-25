@@ -49,7 +49,7 @@ from src.console import rich_handler as _rich_handler
 from src.disc_menus import process_disc_menus
 from src.dupe_checking import DupeChecker
 from src.dynamic_hdr_plot import dynamic_hdr_plot_enabled, process_dynamic_hdr_plots
-from src.early_tasks import cancel_and_drain_early_artifact_tasks, get_early_artifact_tasks, start_early_artifact_tasks
+from src.early_tasks import cancel_and_drain_early_artifact_tasks, get_early_artifact_tasks, release_early_artifact_progress, start_early_artifact_tasks
 from src.early_tasks import is_usenet_only as _is_usenet_only
 from src.get_desc import gen_desc
 from src.get_name import NameManager
@@ -1366,6 +1366,8 @@ async def process_meta(meta: Meta, base_dir: str) -> bool:
     if successful_trackers < skip_uploading_int and not meta.debug:
         logger.info(f"[red]Not enough successful trackers ({successful_trackers}/{skip_uploading_int}). No uploads being processed.[/red]")
         return True
+
+    release_early_artifact_progress(meta.uuid)
 
     meta.we_are_uploading = True
     common = Common(config)

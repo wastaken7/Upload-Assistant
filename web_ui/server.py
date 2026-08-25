@@ -32,7 +32,7 @@ from collections.abc import Iterator, Mapping, Sequence
 import psutil
 
 import web_ui.auth as auth_mod
-from src.webui_progress import ProgressEvent, clear_progress_callback, reset_progress, set_progress_callback
+from src.webui_progress import PROGRESS_STDOUT_PREFIX, ProgressEvent, clear_progress_callback, reset_progress, set_progress_callback
 from src.app_paths import CODE_DIR, STATE_DIR
 from src.meta import Meta
 
@@ -1575,7 +1575,19 @@ def _webui_subprocess_env() -> dict[str, str]:
     # consumes ANSI itself, so its child must not inherit that CLI preference.
     env.pop("NO_COLOR", None)
     env["UA_WEBUI_FORCE_COLOR"] = "1"
+    env["UA_WEBUI_PROGRESS_STDOUT"] = "1"
     return env
+
+
+def _subprocess_progress_event(chunk: str) -> dict[str, object] | None:
+    payload = chunk.strip()
+    if not payload.startswith(PROGRESS_STDOUT_PREFIX):
+        return None
+    try:
+        event = json.loads(payload.removeprefix(PROGRESS_STDOUT_PREFIX))
+    except json.JSONDecodeError:
+        return None
+    return event if isinstance(event, dict) else None
 
 
 def _append_metadata_source(
@@ -5471,7 +5483,7 @@ def execute_command():
                                     with contextlib.suppress(Exception):
                                         console.print("In-process run ended", markup=False)
                             finally:
-                                clear_progress_callback()
+                                clear_progress_callback(emit_progress)
                                 if previous_webui_active is None:
                                     os.environ.pop("UA_WEBUI_ACTIVE", None)
                                 else:
@@ -5791,6 +5803,12 @@ def execute_command():
                                         _set_process_awaiting_input_if_current(session_id, process_state, False)
                                     chunk = buffers[output_type]
                                     buffers[output_type] = ""
+
+                                    progress_event = _subprocess_progress_event(chunk)
+                                    if progress_event is not None:
+                                        _set_process_progress_if_current(session_id, process_state, progress_event)
+                                        yield f"data: {json.dumps({'type': 'progress', 'data': progress_event})}\n\n"
+                                        continue
 
                                     # Convert to HTML fragment. If helper missing, escape and wrap in <pre>
                                     try:

@@ -72,22 +72,40 @@ console = Console(
 _live_progress_lock = threading.Lock()
 _shared_progress: Progress | None = None
 _shared_progress_users = 0
-_suppress_cli_progress = contextvars.ContextVar("suppress_cli_progress", default=False)
+
+
+class CliProgressGate:
+    """A hidden progress display that can become visible after CLI prompts."""
+
+    def __init__(self) -> None:
+        self.progress: Progress | None = None
+        self.users = 0
+        self.released = False
+
+    def release(self) -> None:
+        with _live_progress_lock:
+            self.released = True
+            if self.progress is not None:
+                self.progress.start()
+
+
+_cli_progress_gate = contextvars.ContextVar[CliProgressGate | None]("cli_progress_gate", default=None)
 
 
 @contextlib.contextmanager
-def suppress_cli_progress() -> Generator[None]:
+def suppress_cli_progress(gate: CliProgressGate | None = None) -> Generator[None]:
     """Temporarily hide terminal progress while background preparation runs."""
-    token = _suppress_cli_progress.set(True)
+    token = _cli_progress_gate.set(gate or CliProgressGate())
     try:
         yield
     finally:
-        _suppress_cli_progress.reset(token)
+        _cli_progress_gate.reset(token)
 
 
 def is_cli_progress_suppressed() -> bool:
     """Return whether the current task should avoid rendering terminal progress."""
-    return _suppress_cli_progress.get()
+    gate = _cli_progress_gate.get()
+    return gate is not None and not gate.released
 
 
 @contextlib.contextmanager
@@ -95,10 +113,12 @@ def progress_display(*columns: Any, **kwargs: Any) -> Generator[Progress]:
     """Yield a progress panel that safely shares the console's single Live display."""
     global _shared_progress, _shared_progress_users
 
-    requested_disabled = bool(kwargs.get("disable", False)) or is_cli_progress_suppressed()
-    if requested_disabled:
-        kwargs["disable"] = True
-    shared = not requested_disabled
+    gate = _cli_progress_gate.get()
+    explicitly_disabled = bool(kwargs.get("disable", False))
+    gated = gate is not None and not explicitly_disabled
+    shared = gate is None and not explicitly_disabled
+    if gated:
+        kwargs.pop("disable", None)
     if shared:
         with _live_progress_lock:
             if _shared_progress is None:
@@ -107,7 +127,16 @@ def progress_display(*columns: Any, **kwargs: Any) -> Generator[Progress]:
                 _shared_progress = new_progress
             progress = _shared_progress
             _shared_progress_users += 1
+    elif gated:
+        with _live_progress_lock:
+            if gate.progress is None:
+                gate.progress = Progress(*columns, **kwargs)
+                if gate.released:
+                    gate.progress.start()
+            progress = gate.progress
+            gate.users += 1
     else:
+        kwargs["disable"] = True
         progress = Progress(*columns, **kwargs)
         progress.start()
 
@@ -120,6 +149,12 @@ def progress_display(*columns: Any, **kwargs: Any) -> Generator[Progress]:
                 if _shared_progress_users == 0 and _shared_progress is not None:
                     _shared_progress.stop()
                     _shared_progress = None
+        elif gated:
+            with _live_progress_lock:
+                gate.users -= 1
+                if gate.users == 0 and gate.progress is not None:
+                    gate.progress.stop()
+                    gate.progress = None
         else:
             progress.stop()
 
