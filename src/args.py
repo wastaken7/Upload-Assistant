@@ -1,16 +1,21 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
+from __future__ import annotations
+
 import argparse
 import datetime
 import re
 import sys
 import urllib.parse
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, TextIO
+from typing import TYPE_CHECKING, Any, TextIO
 
+import argcomplete
 
-from src.console import logger
-from src.meta import Meta
+from src.app_paths import DATA_DIR
+
+if TYPE_CHECKING:
+    from src.meta import Meta
 
 MUSIC_MEDIA_CHOICES = ("cd", "web", "vinyl", "dvd", "bd", "soundboard", "sacd", "dat", "cassette")
 MUSIC_RELEASE_TYPE_CHOICES = (
@@ -34,6 +39,81 @@ MUSIC_RELEASE_TYPE_CHOICES = (
 )
 
 PATHS_FROM_STDIN_OPTION = "--paths-from-stdin"
+TRACKER_CONFIGURATION_KEYS = ("api_key", "auth_key", "username", "password", "passkey", "cookie_file", "cookies", "ApiUser", "bioma_api_key", "ptgen_api")
+
+
+def _has_configured_value(options: Mapping[str, Any]) -> bool:
+    for key in TRACKER_CONFIGURATION_KEYS:
+        value = options.get(key)
+        if isinstance(value, str):
+            value = value.strip()
+        if value not in (None, "", False):
+            return True
+    return False
+
+
+def configured_tracker_completions(config: Mapping[str, Any], cookies_dir: Path | None = None) -> dict[str, str]:
+    """Return configured tracker names suitable for shell completion."""
+    trackers = config.get("TRACKERS", {})
+    if not isinstance(trackers, Mapping):
+        return {}
+
+    configured: dict[str, str] = {}
+    default_trackers = trackers.get("default_trackers", "")
+    if isinstance(default_trackers, str):
+        default_names = default_trackers.split(",")
+    elif isinstance(default_trackers, Sequence):
+        default_names = default_trackers
+    else:
+        default_names = ()
+    for name in default_names:
+        normalized = str(name).strip()
+        if normalized:
+            configured[normalized.lower()] = normalized
+
+    cookie_files: tuple[Path, ...] = ()
+    cookie_root = cookies_dir or DATA_DIR / "cookies"
+    try:
+        if cookie_root.is_dir():
+            cookie_files = tuple(path for path in cookie_root.iterdir() if path.is_file())
+    except OSError:
+        cookie_files = ()
+
+    for name, options in trackers.items():
+        if not isinstance(options, Mapping):
+            continue
+        tracker_name = str(name).strip()
+        if not tracker_name:
+            continue
+        tracker_key = tracker_name.lower()
+        has_config_value = _has_configured_value(options)
+        has_cookie_file = any(tracker_key == path.stem.lower() or tracker_key in path.name.lower() for path in cookie_files)
+        if has_config_value or has_cookie_file:
+            configured[tracker_key] = tracker_name
+
+    display_name_re = re.compile(r'^\s*display_name\s*=\s*(["\'])(.*?)\1', re.MULTILINE)
+    supported_cats_re = re.compile(r"^\s*supported_categories\s*=\s*\((.*?)\)", re.MULTILINE | re.DOTALL)
+    tracker_dir = Path(__file__).parent / "trackers"
+    try:
+        source_files = tracker_dir.rglob("*.py") if tracker_dir.is_dir() else ()
+        for source_file in source_files:
+            if source_file.name in ("__init__.py", "common.py", "routing.py") or source_file.name.endswith("_TEMPLATE.py"):
+                continue
+            tracker_key = source_file.stem.lower()
+            if tracker_key not in configured:
+                continue
+            source = source_file.read_text(encoding="utf-8")
+            display_match = display_name_re.search(source)
+            categories_match = supported_cats_re.search(source)
+            display_name = display_match.group(2) if display_match else configured[tracker_key].title()
+            categories = []
+            if categories_match:
+                categories = [category.strip().strip("\"'") for category in categories_match.group(1).split(",") if category.strip()]
+            configured[tracker_key] = f"{display_name} ({', '.join(categories)})" if categories else display_name
+    except OSError, UnicodeError:
+        pass
+
+    return configured
 
 
 def read_paths_from_stdin(argv: Sequence[str], stream: TextIO) -> tuple[list[str], list[str]]:
@@ -47,6 +127,8 @@ def read_paths_from_stdin(argv: Sequence[str], stream: TextIO) -> tuple[list[str
     args.remove(PATHS_FROM_STDIN_OPTION)
     interactive = stream.isatty()
     if interactive:
+        from src.console import logger
+
         logger.info("[cyan]Paste one full path per line, then press Enter on an empty line to start.[/cyan]")
 
     paths: list[str] = []
@@ -133,6 +215,142 @@ class Args:
             usage="upload.py [path...] [options]",
         )
 
+        def make_dict_completer(choices_dict):
+            def completer(prefix: str, **_: Any):
+                return {k: v for k, v in choices_dict.items() if k.lower().startswith(prefix.lower())}
+
+            return completer
+
+        category_completer = make_dict_completer(
+            {"movie": "Movie", "tv": "TV Show", "fanres": "Fan Restoration", "book": "E-Book or Audiobook", "game": "Video Game", "music": "Music Release"}
+        )
+
+        music_media_completer = make_dict_completer(
+            {
+                "cd": "Compact Disc",
+                "web": "Web Release",
+                "vinyl": "Vinyl Record",
+                "dvd": "DVD Audio / Video",
+                "bd": "Blu-ray Disc",
+                "soundboard": "Soundboard Recording",
+                "sacd": "Super Audio CD",
+                "dat": "Digital Audio Tape",
+                "cassette": "Cassette Tape",
+            }
+        )
+
+        music_release_type_completer = make_dict_completer(
+            {
+                "album": "Studio Album",
+                "soundtrack": "Original Soundtrack",
+                "ep": "Extended Play",
+                "anthology": "Anthology Collection",
+                "compilation": "Compilation Album",
+                "sampler": "Label Sampler",
+                "single": "Single Release",
+                "demo": "Demo Recording",
+                "live album": "Live Concert Album",
+                "split": "Split Release",
+                "remix": "Remix Album",
+                "bootleg": "Unofficial Bootleg",
+                "interview": "Artist Interview",
+                "mixtape": "Mixtape",
+                "concert recording": "Live Concert Recording",
+                "dj mix": "DJ Mix",
+                "unknown": "Unknown Type",
+            }
+        )
+
+        type_completer = make_dict_completer(
+            {
+                "disc": "Full Disc (BDMV/ISO)",
+                "remux": "Remuxed MKV",
+                "encode": "Encoded Release",
+                "web-dl": "Web-DL (untouched)",
+                "webrip": "Web-Rip (re-encoded)",
+                "hdtv": "HDTV Capture",
+                "dvdrip": "DVD Rip",
+            }
+        )
+
+        source_completer = make_dict_completer(
+            {
+                "BluRay": "Blu-ray Disc",
+                "DVD": "Standard DVD",
+                "DVD5": "Single-layer DVD",
+                "DVD9": "Dual-layer DVD",
+                "HDDVD": "HD-DVD",
+                "WEB": "Web Release",
+                "HDTV": "HDTV Broadcast",
+                "UHDTV": "UHDTV Broadcast",
+                "LaserDisc": "LaserDisc",
+                "DCP": "Digital Cinema Package",
+            }
+        )
+
+        resolution_completer = make_dict_completer(
+            {
+                "2160p": "4K UHD (3840x2160)",
+                "1080p": "Full HD (1920x1080)",
+                "1080i": "Full HD Interlaced",
+                "720p": "HD (1280x720)",
+                "576p": "SD PAL (720x576)",
+                "576i": "SD PAL Interlaced",
+                "480p": "SD NTSC (720x480)",
+                "480i": "SD NTSC Interlaced",
+                "8640p": "16K Resolution",
+                "4320p": "8K UHD (7680x4320)",
+                "other": "Other/Unknown Resolution",
+            }
+        )
+
+        platform_completer = make_dict_completer(
+            {
+                "pc": "Windows PC",
+                "ps5": "PlayStation 5",
+                "ps4": "PlayStation 4",
+                "ps3": "PlayStation 3",
+                "ps2": "PlayStation 2",
+                "xbox": "Original Xbox",
+                "x360": "Xbox 360",
+                "xone": "Xbox One",
+                "xsx": "Xbox Series X/S",
+                "switch": "Nintendo Switch",
+                "3ds": "Nintendo 3DS",
+                "nds": "Nintendo DS",
+                "wiiu": "Nintendo Wii U",
+                "wii": "Nintendo Wii",
+                "mac": "macOS",
+                "linux": "Linux",
+            }
+        )
+
+        imghost_completer = make_dict_completer(
+            {
+                "imgbb": "ImgBB",
+                "imgbox": "Imgbox",
+                "pixhost": "Pixhost",
+                "lensdump": "Lensdump",
+                "ptscreens": "PTScreens",
+                "onlyimage": "OnlyImage",
+                "dalexni": "Dalexni",
+                "zipline": "Zipline",
+                "midnightscene": "MidnightScene",
+                "passtheimage": "PassTheImage",
+                "seedpool_cdn": "Seedpool CDN",
+                "utppm": "UTPPM",
+                "lostimg": "LostImg",
+            }
+        )
+
+        game_subcategory_completer = make_dict_completer({"full_game": "Base Game", "full_game_dlc": "Game + DLCs", "dlc": "DLC Only", "update": "Game Update/Patch"})
+
+        max_piece_size_completer = make_dict_completer(
+            {"1": "1 MiB", "2": "2 MiB", "4": "4 MiB", "8": "8 MiB", "16": "16 MiB", "32": "32 MiB", "64": "64 MiB", "128": "128 MiB"}
+        )
+
+        upload_order_completer = make_dict_completer({"concurrent": "Upload to both simultaneously", "usenet": "Upload to Usenet first", "tracker": "Upload to Trackers first"})
+
         parser.add_argument("path", nargs="*", help="Path to file/directory (in single/double quotes is best)")
         parser.add_argument(
             PATHS_FROM_STDIN_OPTION,
@@ -182,7 +400,7 @@ class Args:
         parser.add_argument("-mf", "--manual_frames", nargs=1, required=False, help="Comma-separated frame numbers to use as screenshots", type=str, default=None)
         parser.add_argument("--poster", nargs=1, required=False, help="Public artwork URL or local poster image path", dest="explicit_poster")
         parser.add_argument("--banner", nargs=1, required=False, help="Public artwork URL or local banner image path", dest="explicit_banner")
-        parser.add_argument(
+        action_c = parser.add_argument(
             "-c",
             "--category",
             nargs=1,
@@ -191,9 +409,10 @@ class Args:
             choices=["movie", "tv", "fanres", "book", "game", "music"],
             dest="manual_category",
         )
+        action_c.completer = category_completer
         parser.add_argument("--music-artist", nargs=1, required=False, help="MUSIC: main artist(s), separated by &", dest="music_artist")
         parser.add_argument("--music-album", nargs=1, required=False, help="MUSIC: album/release title", dest="music_album")
-        parser.add_argument(
+        action_music_media = parser.add_argument(
             "--music-media",
             nargs=1,
             required=False,
@@ -202,7 +421,8 @@ class Args:
             help="MUSIC: source medium (CD, WEB, Vinyl, DVD, BD, Soundboard, SACD, DAT, Cassette)",
             dest="music_media",
         )
-        parser.add_argument(
+        action_music_media.completer = music_media_completer
+        action_music_rel_type = parser.add_argument(
             "--music-release-type",
             nargs=1,
             required=False,
@@ -211,6 +431,7 @@ class Args:
             help="MUSIC: Orpheus release type (album, ep, single, compilation, live album, etc.)",
             dest="music_release_type",
         )
+        action_music_rel_type.completer = music_release_type_completer
         parser.add_argument(
             "--music-release-year", nargs=1, required=False, help="MUSIC: concrete release/pressing year (not the original group year)", dest="music_release_year"
         )
@@ -230,7 +451,7 @@ class Args:
         parser.add_argument("--no-music-discogs", dest="music_discogs_enabled", action="store_false", default=True, help="MUSIC: disable Discogs lookup and metadata")
         parser.add_argument("--music-enrich", dest="music_enrichment", action="store_true", default=None, help="MUSIC: enable bounded MusicBrainz enrichment for this run")
         parser.add_argument("--no-music-enrich", dest="music_enrichment", action="store_false", help="MUSIC: disable MusicBrainz enrichment for this run")
-        parser.add_argument(
+        action_t = parser.add_argument(
             "-t",
             "--type",
             nargs=1,
@@ -239,7 +460,8 @@ class Args:
             choices=["disc", "remux", "encode", "webdl", "web-dl", "webrip", "hdtv", "dvdrip"],
             dest="manual_type",
         )
-        parser.add_argument(
+        action_t.completer = type_completer
+        action_source = parser.add_argument(
             "--source",
             nargs=1,
             required=False,
@@ -247,7 +469,8 @@ class Args:
             choices=["Blu-ray", "BluRay", "DVD", "DVD5", "DVD9", "HDDVD", "WEB", "HDTV", "UHDTV", "LaserDisc", "DCP"],
             dest="manual_source",
         )
-        parser.add_argument(
+        action_source.completer = source_completer
+        action_res = parser.add_argument(
             "-res",
             "--resolution",
             nargs=1,
@@ -255,6 +478,7 @@ class Args:
             help="Resolution [2160p, 1080p, 1080i, 720p, 576p, 576i, 480p, 480i, 8640p, 4320p, OTHER]",
             choices=["2160p", "1080p", "1080i", "720p", "576p", "576i", "480p", "480i", "8640p", "4320p", "other"],
         )
+        action_res.completer = resolution_completer
         parser.add_argument("-tmdb", "--tmdb", nargs=1, required=False, help="TMDb ID (use movie/ or tv/ prefix)", type=str, dest="tmdb_manual")
         parser.add_argument("-imdb", "--imdb", nargs=1, required=False, help="IMDb ID", type=str, dest="imdb_manual")
         parser.add_argument("--cast", nargs=1, required=False, help="Comma-separated cast override (takes priority over API metadata)", type=str, dest="manual_cast")
@@ -366,7 +590,7 @@ class Args:
             type=str,
             dest="book_publisher",
         )
-        parser.add_argument(
+        action_plat = parser.add_argument(
             "-plat",
             "--platform",
             "--platforms",
@@ -377,6 +601,7 @@ class Args:
             choices=["pc", "ps5", "ps4", "ps3", "ps2", "xbox", "x360", "xone", "xsx", "switch", "3ds", "nds", "wiiu", "wii", "mac", "linux"],
             dest="manual_platform",
         )
+        action_plat.completer = platform_completer
         parser.add_argument(
             "-gv",
             "--game-version",
@@ -393,7 +618,7 @@ class Args:
             required=False,
             help="Force a MULTI language tag for GAME releases",
         )
-        parser.add_argument(
+        action_gsc = parser.add_argument(
             "-gsc",
             "--game-subcategory",
             nargs=1,
@@ -403,6 +628,7 @@ class Args:
             choices=["full_game", "full_game_dlc", "dlc", "update"],
             dest="game_subcategory",
         )
+        action_gsc.completer = game_subcategory_completer
         parser.add_argument(
             "-mc", "--commentary", dest="manual_commentary", action="store_true", required=False, help="Manually indicate whether commentary tracks are included"
         )
@@ -501,7 +727,7 @@ class Args:
             type=str,
             default="",
         )
-        parser.add_argument(
+        action_ih = parser.add_argument(
             "-ih",
             "--imghost",
             nargs=1,
@@ -523,6 +749,7 @@ class Args:
                 "lostimg",
             ],
         )
+        action_ih.completer = imghost_completer
         parser.add_argument("-siu", "--skip-imagehost-upload", dest="skip_imghost_upload", action="store_true", required=False, help="Skip Uploading to an image host")
         parser.add_argument("-th", "--torrenthash", nargs=1, required=False, help="Torrent Hash to re-use from your client's session directory")
         parser.add_argument("-nfo", "--nfo", action="store_true", required=False, help="Use .nfo in directory for description")
@@ -576,7 +803,7 @@ class Args:
         parser.add_argument(
             "-uptimer", "--upload-timer", action="store_true", required=False, help="Prints the time it takes to upload to each individual site.", dest="upload_timer"
         )
-        parser.add_argument(
+        action_mps = parser.add_argument(
             "-mps",
             "--max-piece-size",
             nargs=1,
@@ -584,6 +811,7 @@ class Args:
             help="Set max piece size allowed in MiB for default torrent creation (default 128 MiB)",
             choices=["1", "2", "4", "8", "16", "32", "64", "128"],
         )
+        action_mps.completer = max_piece_size_completer
         parser.add_argument("-nh", "--nohash", action="store_true", required=False, help="Don't hash .torrent")
         parser.add_argument("-rh", "--rehash", action="store_true", required=False, help="DO hash .torrent")
         parser.add_argument("-mkbrr", "--mkbrr", action="store_true", required=False, help="Use mkbrr for torrent hashing")
@@ -625,7 +853,7 @@ class Args:
         )
         parser.add_argument("-qbcrl", "--qbit-bw-threshold", nargs=1, required=False, help="qBittorrent bandwidth limit threshold (KB/s)", dest="qbit_bandwidth_threshold")
         parser.add_argument("-qbctime", "--qbit-bw-time", nargs=1, required=False, help="Time to stay under qBittorrent threshold (seconds)", dest="qbit_bandwidth_time")
-        parser.add_argument(
+        action_uo = parser.add_argument(
             "-uo",
             "--upload-order",
             dest="upload_order",
@@ -634,9 +862,21 @@ class Args:
             choices=["concurrent", "usenet", "tracker"],
             help="Set the upload order when both torrent trackers and Usenet are selected ('concurrent', 'usenet', 'tracker')",
         )
+        action_uo.completer = upload_order_completer
         parser.add_argument("-rtl", "--rtorrent-label", dest="rtorrent_label", nargs=1, required=False, help="Add to rtorrent with this label")
-        parser.add_argument("-tk", "--trackers", nargs=1, required=False, help="Upload to these trackers, comma separated (--trackers blu,bhd) including manual")
-        parser.add_argument(
+
+        def _tracker_completer(prefix: str, **_: Any) -> dict[str, str]:
+            configured = configured_tracker_completions(self.config)
+
+            if "," in prefix:
+                base, current = prefix.rsplit(",", 1)
+                return {f"{base},{t}": desc for t, desc in configured.items() if t.startswith(current.lower())}
+            return {t: desc for t, desc in configured.items() if t.startswith(prefix.lower())}
+
+        tk_action = parser.add_argument("-tk", "--trackers", nargs=1, required=False, help="Upload to these trackers, comma separated (--trackers blu,bhd) including manual")
+        tk_action.completer = _tracker_completer
+
+        rtk_action = parser.add_argument(
             "-rtk",
             "--trackers-remove",
             dest="trackers_remove",
@@ -644,6 +884,7 @@ class Args:
             required=False,
             help="Remove these trackers when processing default trackers, comma separated (--trackers-remove blu,bhd)",
         )
+        rtk_action.completer = _tracker_completer
         parser.add_argument(
             "-tpc",
             "--trackers-pass",
@@ -733,6 +974,9 @@ class Args:
             type=str,
             dest="archive_password",
         )
+        argcomplete.autocomplete(parser)
+        from src.console import logger
+
         parsed_args_ns, before_args = parser.parse_known_args(input)
         parsed_args: dict[str, Any] = vars(parsed_args_ns)
         # console.print(args)
@@ -1087,6 +1331,7 @@ class Args:
 
         # Detect newspapers in overridden titles
         from src.book_prep import detect_newspaper, sanitize_book_author, sanitize_book_language
+
         detect_newspaper(meta)
         sanitize_book_language(meta)
         sanitize_book_author(meta)
@@ -1151,6 +1396,7 @@ class Args:
 
     def parse_tracker_id(self, value: str) -> tuple[str, str]:
         """Normalize ``--tracker-id`` values without exposing tracker-specific CLI flags."""
+        from src.meta import Meta
         from src.trackersetup import get_tracker_comment_hosts, tracker_class_map
 
         candidate = value.strip()

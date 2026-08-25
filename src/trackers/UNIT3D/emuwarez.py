@@ -15,6 +15,7 @@ class Emuwarez(UNIT3D):
     eMuwarez is a SPANISH Private Torrent Tracker for MOVIES / TV / GENERAL
     """
 
+    display_name = "eMuwarez"
     allows_bloated_audio = True
     base_url = "https://emuwarez.com"
     banned_groups = ()

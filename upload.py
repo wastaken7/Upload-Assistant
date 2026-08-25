@@ -1,28 +1,37 @@
 #!/usr/bin/env python3
+# PYTHON_ARGCOMPLETE_OK
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 
+import contextlib
+import os
 import sys
+
+if "_ARGCOMPLETE" in os.environ:
+    from src.args import Args
+
+    try:
+        from data.config import config as _completion_config
+    except ModuleNotFoundError:
+        _completion_config = {"DEFAULT": {"screens": 0}, "TRACKERS": {}}
+    Args(_completion_config).parse(sys.argv[1:], None)
+    sys.exit(0)
 
 if "-h" in sys.argv or "--help" in sys.argv:
     from src.args import Args
-    try:
+
+    with contextlib.suppress(SystemExit):
         Args({"DEFAULT": {"screens": 0}}).parse(sys.argv[1:], None)
-    except SystemExit:
-        pass
     sys.exit(0)
 
 import ast
 import asyncio
-import contextlib
 import gc
 import json
-import os
 import platform
 import re
 import shlex
 import shutil
 import signal
-import sys
 import threading
 import time
 import traceback
@@ -36,7 +45,6 @@ from src.check_requirements import check_dependencies
 check_dependencies()
 
 import logging
-
 
 from bin.get_ffmpeg import FfmpegBinaryManager
 from bin.get_mkbrr import MkbrrBinaryManager
@@ -2228,16 +2236,17 @@ async def update_notification() -> str:
     return local_version
 
 
-
 def load_heavy_globals() -> None:
     global aiofiles, requests, CLI_UI, TORF_Torrent
     import aiofiles
-    import requests
     import cli_ui
+    import requests
     from torf import Torrent
+
     CLI_UI = cli_ui
     TORF_Torrent = Torrent
     CLI_UI.setup(color="always", title="Upload Assistant")
+
 
 async def do_the_thing(base_dir: str) -> None:
     load_heavy_globals()

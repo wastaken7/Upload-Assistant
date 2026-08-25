@@ -29,6 +29,7 @@
   - [Step 4: Configure the Assistant](#step-4-configure-the-assistant)
 - [Updating](#updating)
 - [CLI Usage](#cli-usage)
+- [Shell Completions](docs/shell-completions.md)
 - [Docker Usage](#docker-usage)
 - [Seedbox / Linux Install](docs/seedbox.md)
 - [Attributions](#attributions)

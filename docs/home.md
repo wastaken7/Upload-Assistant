@@ -9,3 +9,5 @@
 [Windows Install](windows-install.md)
 
 [ffmpeg / max worker issues](ffmpeg-max-workers-issues.md)
+
+[Shell Completions](shell-completions.md)
