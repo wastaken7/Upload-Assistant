@@ -20,7 +20,6 @@ config: dict[str, Any] = {
         "suppress_warnings": False,
         # Set to True to keep meta.json between runs instead of deleting it before processing begins.
         "keep_meta": False,
-
         # --- LOGGING ---
         # Console logging configuration
         # Show the time in console logs.
@@ -49,7 +48,6 @@ config: dict[str, Any] = {
         "console_debug_show_path": True,
         # Enable Rich markup parsing in debug console logs.
         "console_debug_markup": True,
-
         # --- METADATA API CREDENTIALS ---
         # TMDB API key (required).
         # Create a key at https://www.themoviedb.org/settings/api and paste it below.
@@ -72,7 +70,6 @@ config: dict[str, Any] = {
         "mam_api_key": "",
         # BTN API key used to retrieve metadata from BTN.
         "btn_api": "",
-
         # --- ARR INTEGRATION ---
         # Set to True to use Sonarr when searching for TV shows.
         "use_sonarr": False,
@@ -90,7 +87,6 @@ config: dict[str, Any] = {
         # Add additional Radarr instances by adding more radarr_url_x and radarr_api_key_x entries.
         "radarr_url_1": "http://my-second-instance:7878",
         "radarr_api_key_1": "",
-
         # --- EXTERNAL TOOL PATHS ---
         # Optional paths to external media tools. Leave blank to use the bundled
         # tool when available, or the corresponding executable on the system PATH.
@@ -108,7 +104,6 @@ config: dict[str, Any] = {
         # Leave blank to use the system PATH.
         # Example: "C:\\Program Files\\WinRAR\\UnRAR.exe"
         "unrar_path": "",
-
         # --- CLIENT SELECTION ---
         # Default client used for torrent injection and existing-torrent searches.
         "default_torrent_client": "qbittorrent",
@@ -118,7 +113,6 @@ config: dict[str, Any] = {
         # "injecting_client_list": ["qbittorrent", "rtorrent"],
         # Clients searched for existing torrents:
         # "searching_client_list": ["qbittorrent", "qbittorrent_searching"],
-
         # --- METADATA CACHING ---
         # Public metadata cache
         # Cache responses from sites such as TMDB and IMDb for reuse in future runs, reducing API requests.
@@ -164,7 +158,6 @@ config: dict[str, Any] = {
             "musicbrainz": {"enabled": True, "ttl_hours": 720},
             "discogs": {"enabled": True, "ttl_hours": 720},
         },
-
         # Tracker-ID metadata cache
         # Cache tracker metadata when you provide a specific torrent ID, such as --ptp, --hdb,
         # or a tracker link in a torrent comment. Duplicate checks and broad searches are never cached.
@@ -180,7 +173,6 @@ config: dict[str, Any] = {
         # 15 minutes avoids repeated requests without hiding a newly available
         # torrent for too long.
         "tracker_metadata_cache_negative_ttl_minutes": 15,
-
         # --- MUSIC METADATA ---
         # Use MusicBrainz only as corroborating metadata. Local file tags remain
         # authoritative, and no external lookup is made unless this setting is enabled.
@@ -189,7 +181,6 @@ config: dict[str, Any] = {
         # lookups are bounded and read-only; this token raises Discogs API
         # limits but is never written to release metadata or logs.
         "music_discogs_token": "",
-
         # --- TRACKER SEARCH AND IMPORT ---
         # Skip automatic searches for matching torrents in configured clients.
         # When False, Upload Assistant reuses matching hashes and searches supported trackers.
@@ -216,7 +207,6 @@ config: dict[str, Any] = {
         # Set to True to also search PreDB for a matching scene release.
         # PreDB can be inconsistent or time out, but it may find releases absent from SRRDB.
         "check_predb": False,
-
         # --- IMAGE HOSTING ---
         # Order of image hosts, with the primary host first and backups after it.
         # Available image hosts: dalexni, imgbb, imgbox, lensdump, lostimg, midnightscene, onlyimage, passtheimage, pixhost, ptscreens, seedpool_cdn, sharex, utppm, zipline
@@ -236,7 +226,6 @@ config: dict[str, Any] = {
         "image_upload_delay": 0.0,
         # Minimum number of successful image uploads required to continue.
         "min_successful_image_uploads": "3",
-
         # Image-host credentials
         "dalexni_api": "",
         "imgbb_api": "",
@@ -245,7 +234,6 @@ config: dict[str, Any] = {
         "onlyimage_api": "",
         "passtheima_ge_api": "",
         "ptscreens_api": "",
-
         # MidnightScene (Zipline) API key. Sign in, click your avatar, then choose
         # "Copy token" (or open Settings > User). Never share or commit this token.
         "midnightscene_api_key": "",
@@ -259,7 +247,6 @@ config: dict[str, Any] = {
         # Custom Zipline URL and API key
         "zipline_url": "",
         "zipline_api_key": "",
-
         # --- SCREENSHOT CAPTURE AND PROCESSING ---
         # Number of screenshots to capture
         "screens": "4",
@@ -270,7 +257,6 @@ config: dict[str, Any] = {
         # Set to True only to convert non-square-pixel video to its display geometry.
         # This can change dimensions such as 1920x1040 to 1924x1040.
         "scale_screenshots_for_par": False,
-
         # Maximum number of FFmpeg processes that can run at once.
         # The effective limit is the lower of this value and the number of screenshots.
         "process_limit": "4",
@@ -279,7 +265,6 @@ config: dict[str, Any] = {
         # FFmpeg compression level for screenshots (0-9).
         # A value of 6 provides a good balance between compression and speed.
         "ffmpeg_compression": "6",
-
         # --- SCREENSHOT ENHANCEMENTS ---
         # HDR tone mapping
         # Set to True to tone-map HDR, Dolby Vision, and HLG screenshots.
@@ -301,20 +286,17 @@ config: dict[str, Any] = {
         # Set to 0.0 to disable. FFmpeg defaults to 2.0; this example uses 10.0.
         # Works only when the input frame has a supported color tag.
         "desat": "10.0",
-
         # Screenshot overlays
         # Set to True to overlay the frame number, frame type, and "Tonemapped" label when applicable.
         # Enabling overlays uses FFmpeg tone mapping instead of libplacebo.
         "frame_overlay": False,
         # Overlay text size, scaled with resolution.
         "overlay_text_size": "18",
-
         # --- DISC MENU SCREENSHOTS ---
         # Set to True to capture DVD menu screenshots from menu VOBs.
         "auto_dvd_menus": True,
         # Maximum number of disc menu screenshots to upload.
         "max_menu_screens": "6",
-
         # --- XXX CONTACT SHEETS ---
         # XXX releases generate one contact sheet per video instead of individual frames.
         # Rows are vertical and columns are horizontal: 12 x 5 produces 60 thumbnails.
@@ -328,7 +310,6 @@ config: dict[str, Any] = {
         "xxx_contact_sheet_animation_seconds": "5",
         # Add this many normal screenshots to the contact sheet for a single-video XXX release.
         "xxx_single_file_screens": "0",
-
         # --- GENERAL DESCRIPTION SETTINGS ---
         # See detailed documentation on how these settings affect description building:
         # https://github.com/wastaken7/Upload-Assistant/blob/development/docs/description-builder.md
@@ -346,7 +327,6 @@ config: dict[str, Any] = {
         "screens_per_row": "",
         # Set to True to add the episode overview to the description.
         "episode_overview": True,
-
         # --- PACK DESCRIPTIONS ---
         # Number of screenshots to use for each disc or episode in packs on supported sites.
         # Set to 0 to use only the original description and images for later items.
@@ -369,7 +349,6 @@ config: dict[str, Any] = {
         # Maximum number of files processed for screenshots and MediaInfo in a pack.
         # You may not want to process screenshots and MediaInfo for 40 episodes in a season pack.
         "processLimit": "10",
-
         # --- DESCRIPTION HEADERS AND OVERRIDES ---
         # Header added to the top of the description where supported.
         # Can be overridden per tracker by adding the same setting to its configuration.
@@ -405,7 +384,6 @@ config: dict[str, Any] = {
                 "custom_signature": "[center]MyAwesomeGroupTag signature[/center]",
             },
         },
-
         # --- BLU-RAY SETTINGS ---
         # Set to True to use the largest Blu-ray playlist without a selection prompt.
         "use_largest_playlist": False,
@@ -432,7 +410,6 @@ config: dict[str, Any] = {
         # Width of Blu-ray.com cover images in pixels. BBCode limits image width, and
         # covers are usually taller than screenshots, so a smaller value is preferable.
         "bluray_image_size": "250",
-
         # --- AUDIO SPECTROGRAMS AND HDR PLOTS ---
         # Audio spectrograms
         # Set to True to add audio spectrograms to the description.
@@ -445,7 +422,6 @@ config: dict[str, Any] = {
         "audio_spectrogram_sample_rate": 48000,
         # For music and audiobooks, limit the number of tracks or chapters processed.
         "audio_spectrogram_max_files": 12,
-
         # Dynamic HDR plots
         # Set to True to generate and add Dolby Vision and HDR10+ metadata plots.
         # Required third-party tools are downloaded automatically on first use.
@@ -453,7 +429,6 @@ config: dict[str, Any] = {
         "add_dynamic_hdr_plot": False,
         # Limit plots generated for multi-file releases.
         "dynamic_hdr_plot_max_files": 1,
-
         # --- TORRENT CREATION ---
         # Set to True to use mkbrr for torrent creation.
         "mkbrr": True,
@@ -464,7 +439,6 @@ config: dict[str, Any] = {
         # Cooldown, in seconds, before tracker-specific piece-size rehashing begins.
         # Values above 0 let other tasks finish before resource-intensive rehashing starts.
         "rehash_cooldown": "0",
-
         # --- TRACKER CHECKS AND UPLOAD ---
         # Minimum number of trackers that must pass banned-group, content, and duplicate checks before uploading continues.
         # Default: 1. Upload Assistant exits if fewer trackers pass.
@@ -496,7 +470,6 @@ config: dict[str, Any] = {
         "print_tracker_messages": False,
         # Set to True to print direct torrent links for uploaded content.
         "print_tracker_links": True,
-
         # --- POST-UPLOAD ---
         # Delay, in seconds, before injecting the torrent. This allows the tracker to register the hash and avoid "unregistered torrent" errors.
         # Can be overridden per tracker by adding the same setting to its configuration.
@@ -518,7 +491,6 @@ config: dict[str, Any] = {
         # Maximum time, in seconds, allowed for each subprocess post-upload script.
         # Invalid or zero values use 30 seconds. A failed hook never changes the upload result.
         "post_upload_hook_timeout": 30,
-
     },
     # these are used for DB links on ALPHARATIO
     "IMAGES": {
@@ -3553,7 +3525,6 @@ config: dict[str, Any] = {
         # --- GENERAL SETTINGS ---
         # Set to True to enable Usenet uploading
         "enabled": False,
-
         # --- SERVER CONNECTION ---
         # Usenet NNTP host, port, credentials
         "host": "",
@@ -3567,7 +3538,6 @@ config: dict[str, Any] = {
         "poster": "Uploader <upload@assistant.org>",
         # If True, poster will be randomized for anonymity/obfuscation
         "random_poster": True,
-
         # --- ARCHIVING AND PARITY ---
         # Set to True to skip 7z archiving entirely and post files directly.
         # Useful with pesto, which handles obfuscation and PAR2 natively.
@@ -3581,7 +3551,6 @@ config: dict[str, Any] = {
         "par2_percentage": "10",
         # Obfuscate the subject line of the NNTP post to prevent DMCA takedowns
         "obscure_subject": True,
-
         # --- UPLOADER AND VERIFICATION ---
         # Uploader backend: "nyuu" (default) or "pesto"
         # pesto handles PAR2 and NZB password injection internally
@@ -3631,7 +3600,6 @@ config: dict[str, Any] = {
         # to instead post at the full "connections" count with this many
         # additional connections dedicated to checking.
         "nyuu_check_connections": "",
-
         # --- BINARY PATHS ---
         # Paths to binaries (defaults to looking in PATH, downloaded automatically if not found)
         # Available at: https://github.com/animetosho/nyuu
@@ -3642,7 +3610,6 @@ config: dict[str, Any] = {
         "pesto_path": "pesto",
         # Available at: https://www.7-zip.org/
         "7z_path": "7z",
-
         # --- OUTPUT PATHS ---
         # Where to output generated NZB files (if empty, saves to tmp directory)
         "nzb_output_dir": "",

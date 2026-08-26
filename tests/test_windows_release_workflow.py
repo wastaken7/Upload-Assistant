@@ -16,7 +16,7 @@ def test_windows_installer_runs_only_as_a_reusable_release_build():
 def test_release_publication_waits_for_the_windows_installer():
     for expected_text in (
         "uses: ./.github/workflows/windows-installer.yml",
-        "needs: [prepare-release, build-windows-installer]",
+        "needs: [prepare-release, build-windows-installer, build-python-distribution]",
         "ref: ${{ needs.prepare-release.outputs.release_sha }}",
         "GH_REPO: ${{ github.repository }}",
         '--target "$RELEASE_SHA"',
@@ -25,3 +25,18 @@ def test_release_publication_waits_for_the_windows_installer():
     ):
         if expected_text not in CREATE_RELEASE:
             raise AssertionError(f"The release workflow is missing: {expected_text}")
+
+
+def test_release_builds_and_publishes_python_distributions_with_oidc():
+    for expected_text in (
+        "build-python-distribution:",
+        "run: uv build",
+        "run: uvx twine check dist/*",
+        "name: python-distributions-${{ inputs.version }}",
+        "publish-pypi:",
+        "name: pypi",
+        "id-token: write",
+        "uses: pypa/gh-action-pypi-publish@release/v1",
+    ):
+        if expected_text not in CREATE_RELEASE:
+            raise AssertionError(f"The PyPI release workflow is missing: {expected_text}")

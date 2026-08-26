@@ -53,9 +53,13 @@ jobs:
               if path.is_file() and not path.name.startswith(".")
           }
           with ZipFile(wheel) as archive:
-              missing = required - set(archive.namelist())
+              members = set(archive.namelist())
+              missing = required - members
           if missing:
               raise SystemExit(f"Wheel is missing: {', '.join(sorted(missing))}")
+          forbidden = {"data/config.py", "requirements.txt"} & members
+          if forbidden:
+              raise SystemExit(f"Wheel contains local-only files: {', '.join(sorted(forbidden))}")
           PY
 
       - name: Compile Python sources

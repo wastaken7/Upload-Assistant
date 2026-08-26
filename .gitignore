@@ -24,6 +24,8 @@ bin/nyuu/*
 bin/par2/*
 bin/pesto/*
 build/
+dist/
+*.egg-info/
 .setuptools-build/
 CLAUDE.md
 custom_hooks
