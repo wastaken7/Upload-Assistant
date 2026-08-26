@@ -51,8 +51,9 @@ class DreadVault(UNIT3D):
         else:
             combined_genres = [genre.strip() for genre in str(combined_genres_value).split(",") if genre.strip()]
 
+        # substring per term: the horror signal is often a compound keyword
         searchable = {term.lower() for term in [*combined_genres, *meta.keywords]}
-        if "horror" not in searchable:
+        if not any("horror" in term for term in searchable):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
                 logger.info(f"{self.tracker}: [bold red]Only horror content is allowed at {self.tracker}.[/bold red]")
                 if cli_ui.ask_yes_no("Do you want to upload anyway?", default=False):
