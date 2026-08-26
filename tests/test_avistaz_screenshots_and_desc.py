@@ -81,3 +81,22 @@ def test_avistaz_edit_desc_includes_spectrograms_and_dv_plots(tmp_path: Path) ->
     assert "https://imgbox.com/plot_web" in html_desc  # noqa: S101
     assert "https://images2.imgbox.com/plot_raw.png" in html_desc  # noqa: S101
     assert "<img" in html_desc  # noqa: S101
+
+
+def test_avistaz_edit_desc_deduplicates_imported_tonemapped_header(tmp_path: Path) -> None:
+    header = "[center]Screenshots have been adapted for SDR viewing, for reference only.[/center]"
+    meta = Meta(
+        base_dir=str(tmp_path),
+        uuid="test-uuid",
+        description_file_content=f"Imported description\n{header}",
+        tonemapped=True,
+    )
+    config = {
+        "DEFAULT": {"tonemapped_header": header},
+        "TRACKERS": {"AVISTAZ": {}},
+    }
+
+    html_desc = asyncio.run(AvistaZ(config).edit_desc(meta))
+
+    assert html_desc.count("adapted for SDR viewing") == 1  # noqa: S101
+    assert "Imported description" in html_desc  # noqa: S101

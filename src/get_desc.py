@@ -316,6 +316,47 @@ class DescriptionBuilder:
             logger.warning(f"[yellow]Warning: Error setting tonemapped header: {e!s}[/yellow]")
         return ""
 
+    def _tonemapped_header_candidates(self, meta: Meta) -> tuple[str, ...]:
+        """Header spellings an imported description can carry: tag override, tracker
+        override, DEFAULT and the legacy literal. Markup-bearing only (a bare word is
+        indistinguishable from prose), longest first, deterministic tie-break."""
+        # uploads made before a config change carry this exact spelling
+        candidates = {"[center][code] Screenshots have been tonemapped for reference [/code][/center]"}
+        tag_override = self._get_tag_override("tonemapped_header", meta)
+        if tag_override is not None:
+            candidates.add(str(tag_override))
+        for source in (self.tracker_config, self.config["DEFAULT"]):
+            value = source.get("tonemapped_header")
+            if value is not None:
+                candidates.add(str(value))
+        return tuple(sorted((candidate for candidate in candidates if "[" in candidate), key=lambda candidate: (-len(candidate), candidate)))
+
+    def _strip_tonemapped_header(self, text: str, meta: Meta, *, replacing: bool) -> str:
+        """Collapse duplicated tonemapped headers in an imported description.
+
+        ``clean_unit3d_description`` keeps plain BBCode, so an imported header
+        survives and ``get_tonemapped_header`` may append another. Leave one copy
+        when nothing is re-added, none when it is. One pass over the original text
+        only (re-scanning a splice could eat body text), anchored to whitespace,
+        a bracket or a string edge, loose whitespace between tokens.
+        """
+        try:
+            headers = self._tonemapped_header_candidates(meta)
+        except Exception as e:
+            logger.warning(f"[yellow]Warning: Error reading tonemapped header: {e!s}[/yellow]")
+            return text
+        alternatives = "|".join("(?:" + r"\s*".join(re.escape(token) for token in header.split()) + ")" for header in headers)
+        pattern = re.compile(r"(?:^|(?<=[\s\]]))(?:" + alternatives + r")(?=[\s\[]|$)", re.IGNORECASE)
+        keep = 0 if replacing else 1
+        matches = list(pattern.finditer(text))
+        pieces = []
+        cursor = 0
+        for match in matches[keep:]:
+            pieces.append(text[cursor : match.start()])
+            cursor = match.end()
+        pieces.append(text[cursor:])
+        return "".join(pieces)
+
     async def get_logo_section(self, meta: Meta) -> tuple[str, str]:
         """Returns the logo URL and size if applicable."""
         logo, logo_size = "", ""
@@ -1292,6 +1333,10 @@ class DescriptionBuilder:
         ):
             desc_parts.append(meta.nexusphp_description)
 
+        # resolve once: the strip decision must match what is actually appended
+        tonemapped_header_text = await self.get_tonemapped_header(meta) if tonemapped_header else ""
+        replacing_tonemapped_header = bool(tonemapped_header_text.strip())
+
         meta_description_value = meta.description
         if isinstance(meta_description_value, str):
             meta_description = meta_description_value
@@ -1322,9 +1367,9 @@ class DescriptionBuilder:
                         flags=re.DOTALL,
                     )
                     if meta_description:
-                        desc_parts.append(meta_description)
+                        desc_parts.append(self._strip_tonemapped_header(meta_description, meta, replacing=replacing_tonemapped_header))
             elif meta_description:
-                desc_parts.append(meta_description)
+                desc_parts.append(self._strip_tonemapped_header(meta_description, meta, replacing=replacing_tonemapped_header))
 
         # NFO details
         if nfo:
@@ -1352,7 +1397,7 @@ class DescriptionBuilder:
 
         # Tonemapped Header
         if tonemapped_header:
-            desc_parts.append(await self.get_tonemapped_header(meta))
+            desc_parts.append(tonemapped_header_text)
 
         # Discs and Screenshots
         if screenshots:
