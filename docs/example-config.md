@@ -22,6 +22,7 @@ The config is a Python dict named `config` with these top-level sections:
 - `IMAGES`: static icon URLs used in some descriptions.
 - `TRACKERS`: which trackers to upload to + per-tracker credentials/options.
 - `TORRENT_CLIENTS`: qBittorrent/ruTorrent/etc client configuration.
+- `USENET`: NNTP upload, archiving, parity, and verification settings.
 
 Notes:
 
