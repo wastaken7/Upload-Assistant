@@ -647,6 +647,7 @@ class AZTrackerBase:
     async def edit_desc(self, meta: Meta) -> str:
         builder = DescriptionBuilder(self.tracker, self.config)
         desc_parts: list[str] = []
+        tonemapped_header = await builder.get_tonemapped_header(meta)
 
         # Custom Header
         desc_parts.append(await builder.get_custom_header(meta))
@@ -658,10 +659,17 @@ class AZTrackerBase:
             desc_parts.append(f"[b]Overview:[/b] {episode_overview}")
 
         # User description
-        desc_parts.append(await builder.get_user_description(meta))
+        user_description = await builder.get_user_description(meta)
+        desc_parts.append(
+            builder._strip_tonemapped_header(
+                user_description,
+                meta,
+                replacing=bool(tonemapped_header.strip()),
+            )
+        )
 
         # Tonemapped Header
-        desc_parts.append(await builder.get_tonemapped_header(meta))
+        desc_parts.append(tonemapped_header)
 
         # Audio Spectrograms
         desc_parts.append(await builder.get_audio_spectrogram_section(meta))
