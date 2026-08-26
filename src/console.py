@@ -1,10 +1,12 @@
 # Upload Assistant © 2025 Audionut & wastaken7 — Licensed under UAPL v1.0
 import asyncio
+import builtins
 import contextlib
 import contextvars
 import logging
 import os
 import re
+import sys
 import threading
 from collections.abc import AsyncGenerator, Callable, Generator
 from pathlib import Path
@@ -14,6 +16,28 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress
 from rich.text import Text
+
+_original_input = builtins.input
+
+
+def _safe_input(prompt: str = "") -> str:
+    """Thread-safe input that avoids readline terminal state corruption.
+
+    When `readline` is imported, calling `input()` in a background thread makes it
+    vulnerable to terminal state corruption (like losing echo) if a SIGWINCH occurs
+    (e.g., when resizing the terminal or switching windows). Bypassing `readline`
+    by using `sys.stdin.readline` natively fixes this at the cost of history and
+    advanced editing commands, which aren't needed for our CLI prompts.
+    """
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    line = sys.stdin.readline()
+    if not line:
+        raise EOFError
+    return line.rstrip("\n")
+
+
+builtins.input = _safe_input
 
 
 def ansi_to_html(ansi_chunk: str, width: int = 120) -> str:
