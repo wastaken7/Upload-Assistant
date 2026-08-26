@@ -171,7 +171,7 @@ def _handle_shutdown_signal(signum: int, _frame: Any) -> None:
     else:
         # Second signal = force exit
         logger.info("[red]Forced exit[/red]")
-        sys.exit(1)
+        os._exit(1)
 
 
 # ── Restore built-in data/ files when a Docker volume mount hides them ──
