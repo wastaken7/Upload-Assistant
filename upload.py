@@ -5,8 +5,12 @@
 import contextlib
 import os
 import sys
+from pathlib import Path
 
-if "_ARGCOMPLETE" in os.environ:
+_entrypoint_name = Path(sys.argv[0]).stem.lower()
+_is_uploader_entrypoint = __name__ == "__main__" or _entrypoint_name == "ua"
+
+if _is_uploader_entrypoint and "_ARGCOMPLETE" in os.environ:
     from src.args import Args
 
     try:
@@ -16,7 +20,7 @@ if "_ARGCOMPLETE" in os.environ:
     Args(_completion_config).parse(sys.argv[1:], None)
     sys.exit(0)
 
-if "-h" in sys.argv or "--help" in sys.argv:
+if _is_uploader_entrypoint and ("-h" in sys.argv or "--help" in sys.argv):
     from src.args import Args
 
     with contextlib.suppress(SystemExit):
@@ -36,7 +40,6 @@ import threading
 import time
 import traceback
 from collections.abc import Iterable, Mapping
-from pathlib import Path
 from typing import Any, Protocol, cast
 from urllib.parse import urljoin, urlparse
 

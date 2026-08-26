@@ -229,7 +229,17 @@ For a manual Linux/macOS/Windows installation, Upload Assistant needs a few tool
 
 ---
 
-### Install with `uv` (Windows, Linux, or macOS)
+### Install from PyPI with `uv` (Windows, Linux, or macOS)
+
+The recommended command-line installation uses the published PyPI package. It automatically manages the virtual environment and exposes the `ua` and `ua-config` commands on your system path:
+
+```bash
+uv tool install upload-assistant
+```
+
+If `uv` reports that its tool directory is not on your `PATH`, run `uv tool update-shell`, then open a new terminal.
+
+### Install the latest development version with `uv`
 
 If you have [uv](https://github.com/astral-sh/uv) installed, you can install Upload Assistant directly from the repository as a globally available standalone CLI tool. This automatically manages the virtual environment and exposes the `ua` and `ua-config` commands directly to your system path. This method resolves dependencies from `pyproject.toml`; skip Steps 2 and 3 below.
 

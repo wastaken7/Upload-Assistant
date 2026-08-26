@@ -4,6 +4,23 @@ version = "3.8"
 requires-python = ">=3.14"
 description = "A simple tool to take the work out of uploading."
 readme = "README.md"
+license-files = ["LICENSE"]
+authors = [
+    { name = "wastaken7" },
+]
+maintainers = [
+    { name = "wastaken7" },
+]
+keywords = ["media", "torrent", "upload-assistant"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Multimedia",
+    "Topic :: Utilities",
+]
 dependencies = [
     "aiofiles==25.1.0",
     "aiohttp==3.14.3",
@@ -67,6 +84,12 @@ dependencies = [
     "urllib3==2.7.0",
     "waitress==3.0.2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/wastaken7/Upload-Assistant"
+Documentation = "https://github.com/wastaken7/Upload-Assistant/tree/master/docs"
+Issues = "https://github.com/wastaken7/Upload-Assistant/issues"
+Source = "https://github.com/wastaken7/Upload-Assistant"
 
 [build-system]
 requires = ["setuptools>=83"]

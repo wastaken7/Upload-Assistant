@@ -133,8 +133,57 @@ jobs:
       ref: ${{ needs.prepare-release.outputs.release_sha }}
       version: ${{ inputs.version }}
 
+  build-python-distribution:
+    needs: prepare-release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.release_sha }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Build wheel and source distribution
+        run: uv build
+
+      - name: Check distribution metadata
+        run: uvx twine check dist/*
+
+      - name: Verify local configuration is excluded
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import tarfile
+          from zipfile import ZipFile
+
+          wheel = next(Path("dist").glob("*.whl"))
+          sdist = next(Path("dist").glob("*.tar.gz"))
+          with ZipFile(wheel) as archive:
+              wheel_members = set(archive.namelist())
+          with tarfile.open(sdist) as archive:
+              sdist_members = {Path(name).as_posix() for name in archive.getnames()}
+
+          forbidden_wheel = {"data/config.py", "requirements.txt"} & wheel_members
+          forbidden_sdist = {
+              name
+              for name in sdist_members
+              if name.endswith(("/data/config.py", "/requirements.txt"))
+          }
+          if forbidden_wheel or forbidden_sdist:
+              raise SystemExit(f"Distribution contains local-only files: {sorted(forbidden_wheel | forbidden_sdist)}")
+          PY
+
+      - name: Save Python distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions-${{ inputs.version }}
+          path: dist/
+          if-no-files-found: error
+
   publish-release:
-    needs: [prepare-release, build-windows-installer]
+    needs: [prepare-release, build-windows-installer, build-python-distribution]
     runs-on: ubuntu-24.04
     permissions:
       actions: write
@@ -173,3 +222,23 @@ jobs:
           NEW_VERSION: ${{ inputs.version }}
         run: |
           gh workflow run docker-image.yml --ref "$NEW_VERSION" -f use_latest_tag=true
+
+  publish-pypi:
+    needs: [prepare-release, publish-release]
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/upload-assistant
+    permissions:
+      id-token: write
+    steps:
+      - name: Download Python distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-distributions-${{ inputs.version }}
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
