@@ -32,6 +32,7 @@ def test_release_builds_and_publishes_python_distributions_with_oidc():
         "build-python-distribution:",
         "run: uv build",
         "run: uvx twine check dist/*",
+        'name.endswith(("/data/config.py", "/requirements.txt"))',
         "name: python-distributions-${{ inputs.version }}",
         "publish-pypi:",
         "name: pypi",

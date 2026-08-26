@@ -166,9 +166,13 @@ jobs:
               sdist_members = {Path(name).as_posix() for name in archive.getnames()}
 
           forbidden_wheel = {"data/config.py", "requirements.txt"} & wheel_members
-          forbidden_sdist = {name for name in sdist_members if name.endswith("/data/config.py")}
+          forbidden_sdist = {
+              name
+              for name in sdist_members
+              if name.endswith(("/data/config.py", "/requirements.txt"))
+          }
           if forbidden_wheel or forbidden_sdist:
-              raise SystemExit(f"Distribution contains local configuration: {sorted(forbidden_wheel | forbidden_sdist)}")
+              raise SystemExit(f"Distribution contains local-only files: {sorted(forbidden_wheel | forbidden_sdist)}")
           PY
 
       - name: Save Python distributions
