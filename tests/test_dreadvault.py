@@ -61,6 +61,12 @@ def test_dreadvault_accepts_horror_from_keywords():
     assert asyncio.run(tracker.get_additional_checks(meta))  # noqa: S101
 
 
+def test_dreadvault_accepts_horror_inside_a_compound_keyword():
+    tracker = _tracker()
+    meta = Meta(combined_genres="Drama, Thriller", keywords=["psychological horror"], unattended=True)
+    assert asyncio.run(tracker.get_additional_checks(meta))  # noqa: S101
+
+
 def test_dreadvault_rejects_non_horror_when_unattended():
     tracker = _tracker()
     meta = Meta(combined_genres="Action, Comedy", unattended=True)
