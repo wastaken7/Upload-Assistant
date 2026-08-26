@@ -2419,6 +2419,8 @@ async def do_the_thing(base_dir: str) -> None:
                     sys.exit(1)
             finally:
                 logger.info("[yellow]Web UI server stopped[/yellow]")
+                with contextlib.suppress(Exception):
+                    asyncio.run(cleanup_manager.cleanup())
 
             return  # Exit early when running web UI only
 
