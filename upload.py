@@ -171,7 +171,7 @@ def _handle_shutdown_signal(signum: int, _frame: Any) -> None:
     else:
         # Second signal = force exit
         logger.info("[red]Forced exit[/red]")
-        sys.exit(1)
+        os._exit(1)
 
 
 # ── Restore built-in data/ files when a Docker volume mount hides them ──
@@ -2419,6 +2419,8 @@ async def do_the_thing(base_dir: str) -> None:
                     sys.exit(1)
             finally:
                 logger.info("[yellow]Web UI server stopped[/yellow]")
+                with contextlib.suppress(Exception):
+                    await cleanup_manager.cleanup()
 
             return  # Exit early when running web UI only
 
