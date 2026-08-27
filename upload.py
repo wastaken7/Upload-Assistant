@@ -84,6 +84,7 @@ from src.trackers.common import Common
 from src.trackers.passthepopcorn import PassThePopcorn
 from src.trackersetup import TrackerSetup, api_trackers, http_trackers, other_api_trackers, tracker_class_map
 from src.trackerstatus import TrackerStatusManager
+from src.tvdb import close_tvdb
 from src.uphelper import UploadHelper
 from src.uploadscreens import UploadScreensManager
 
@@ -3148,6 +3149,9 @@ async def main() -> None:
     except Exception as e:
         if not _shutdown_requested:
             logger.error(f"[bold red]Unexpected error: {e}[/bold red]")
+    finally:
+        with contextlib.suppress(Exception):
+            await close_tvdb()
 
 
 def run() -> None:

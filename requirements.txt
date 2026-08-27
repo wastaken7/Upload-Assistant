@@ -122,7 +122,6 @@ tmdbsimple==2.9.1
 torf==4.3.0
 tqdm==4.67.1
 transmission-rpc==7.0.11
-tvdb-v4-official==1.1.0
 typing-extensions==4.15.0
 unidecode==1.4.0
 urllib3==2.7.0

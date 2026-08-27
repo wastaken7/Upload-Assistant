@@ -154,8 +154,8 @@ class TvmazeManager:
         cache_key = json.dumps({"url": url, "params": params}, sort_keys=True, default=str)
         cache = cache_for(base_dir, config)
         cached = await cache.get("tvmaze", "response", cache_key)
-        if not is_cache_miss(cached) and isinstance(cached, (dict, list)):
-            return cast(dict[str, Any] | list[dict[str, Any]], cached)
+        if not is_cache_miss(cached) and (cached is None or isinstance(cached, (dict, list))):
+            return cast(dict[str, Any] | list[dict[str, Any]] | None, cached)
         try:
             async with httpx.AsyncClient(follow_redirects=True) as client:
                 resp = await client.get(url, params=params, timeout=10)
@@ -168,6 +168,9 @@ class TvmazeManager:
                         result = [cast(dict[str, Any], item) for item in data if isinstance(item, dict)]
                         await cache.set("tvmaze", "response", cache_key, result, negative=not bool(result))
                         return result
+                    return None
+                if resp.status_code == 404:
+                    await cache.set("tvmaze", "response", cache_key, None, negative=True)
                     return None
                 return None
         except httpx.HTTPStatusError as e:
