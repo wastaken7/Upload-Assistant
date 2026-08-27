@@ -81,6 +81,7 @@ async def gen_desc(
 
     description_link = meta.description_link
     description_file = meta.description_file
+    description_inline = meta.description_inline
     scene_nfo = False
     bhd_nfo = False
 
@@ -109,6 +110,12 @@ async def gen_desc(
                 content_written = True
         except FileNotFoundError:
             logger.info(f"[ERROR] Template '{meta.description_template}' not found.")
+
+    if description_inline and not content_written:
+        cleaned_content = clean_text(description_inline)
+        if cleaned_content:
+            description_lines.append(cleaned_content)
+            content_written = True
     if meta.nfo:
         logger.debug(f"specified_dir_path: {specified_dir}")
         logger.debug(f"sourcedir_path: {source_dir}")

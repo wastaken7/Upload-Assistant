@@ -169,6 +169,7 @@ Common options:
   -tvdb, --tvdb              Specify the TVDB id to use
   --queue (queue name)       Process an entire folder (including files/subfolders) in a queue
   -mf, --manual_frames       Comma-separated list of frame numbers to use for screenshots
+  --description              Inline custom description block
   -df, --descfile            Path to custom description file
   -boverview, --book-overview  Book/Audiobook overview/synopsis (overrides auto-detected value)
   -serv, --service           Streaming service
@@ -698,6 +699,13 @@ class Args:
             nargs=1,
             required=False,
             help="Custom description block to insert (link to hastebin/pastebin). This is added as a section inside the final description and does NOT replace the auto-generated description (MediaInfo, screenshots, etc.)",
+        )
+        parser.add_argument(
+            "--description",
+            dest="description_inline",
+            nargs=1,
+            required=False,
+            help="Inline custom description block to insert. This is added as a section inside the final description and does NOT replace auto-generated sections (MediaInfo, screenshots, etc.)",
         )
         parser.add_argument(
             "-df",

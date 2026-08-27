@@ -79,6 +79,7 @@ If you pass a `.txt` file as the main positional input path (without specifying 
 ## Description inputs
 
 - `-pb`, `--desclink URL`: Custom description link (hastebin/pastebin).
+- `--description TEXT`: Inline custom description block (quote text containing spaces or BBCode).
 - `-df`, `--descfile PATH`: Custom description file path (or filename in current working directory).
   - Stored as an absolute path.
 - `-nfo`, `--nfo`: Use `.nfo` in directory for description.

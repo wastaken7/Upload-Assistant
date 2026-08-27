@@ -109,6 +109,7 @@ class Meta:
     demographic: str = ""
     description_file_content: str = ""
     description_file: str = ""
+    description_inline: str = ""
     description_link_content: str = ""
     description_link: str = ""
     description_nfo_content: str = ""
