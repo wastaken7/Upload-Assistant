@@ -64,10 +64,7 @@ class DreadVault(UNIT3D):
                 return False
 
         genres = ", ".join([*meta.keywords, *combined_genres])
-        # only terms with no mainstream-horror keyword collisions: "adult animation"
-        # (El Superbeasto), "orgy" (Infinity Pool, Society) and "erotic" (Suitable
-        # Flesh) are TMDB keywords on legitimate horror, and TMDB already excludes
-        # adult=true content from its API
+        # only terms that never appear as TMDB keywords on legitimate horror
         adult_keywords = ["xxx", "porn", "adult", "hentai", "softcore"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
             if not meta.unattended or (meta.unattended and meta.unattended_confirm):
