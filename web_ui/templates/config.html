@@ -69,6 +69,9 @@
         </div>
       </div>
     </div>
+    <script>
+      window.UA_LOGO_URL = {{ url_for('static', filename='img/logo.svg') | tojson }};
+    </script>
     <script
       type="text/javascript"
       src="{{ url_for('static', filename='js/shared_utils.js') }}"

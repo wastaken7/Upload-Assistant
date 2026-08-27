@@ -2938,6 +2938,52 @@ def _build_config_items(
     return items
 
 
+def _prepare_default_webui_section(
+    example_section: dict[str, Any],
+    comments_map: dict[str, list[str]],
+    subsection_map: dict[str, str],
+) -> dict[str, Any]:
+    client_list_defaults: tuple[tuple[str, list[str], list[str]], ...] = (
+        (
+            "injecting_client_list",
+            [],
+            [
+                "Clients used for injection (adding uploaded torrents for seeding).",
+                "If omitted or empty, injection uses default_torrent_client.",
+                'Example: ["qbittorrent", "rtorrent"]',
+            ],
+        ),
+        (
+            "searching_client_list",
+            [],
+            [
+                "Clients searched for existing torrents.",
+                "If omitted or empty, searching uses default_torrent_client.",
+                'Example: ["qbittorrent", "qbittorrent_searching"]',
+            ],
+        ),
+    )
+
+    prepared: dict[str, Any] = {}
+    inserted_client_lists = False
+    for key, value in example_section.items():
+        prepared[key] = value
+        if key == "default_torrent_client":
+            for client_key, default_value, help_text in client_list_defaults:
+                prepared[client_key] = default_value
+                comments_map.setdefault(f"DEFAULT/{client_key}", help_text)
+                subsection_map[f"DEFAULT/{client_key}"] = "CLIENT SELECTION"
+            inserted_client_lists = True
+
+    if not inserted_client_lists:
+        for client_key, default_value, help_text in client_list_defaults:
+            prepared[client_key] = default_value
+            comments_map.setdefault(f"DEFAULT/{client_key}", help_text)
+            subsection_map[f"DEFAULT/{client_key}"] = "CLIENT SELECTION"
+
+    return prepared
+
+
 def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]], dict[str, str]]:
     if not example_path.exists():
         return {}, {}
@@ -2946,13 +2992,19 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
     lines = source.splitlines()
     tree = ast.parse(source)
 
-    config_assign: ast.Assign | None = None
+    config_assign: ast.Assign | ast.AnnAssign | None = None
     for node in tree.body:
         if isinstance(node, ast.Assign):
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id == "config":
                     config_assign = node
                     break
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "config"
+        ):
+            config_assign = node
         if config_assign:
             break
 
@@ -2961,6 +3013,13 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
 
     comment_map: dict[str, list[str]] = {}
     subsection_map: dict[str, str] = {}
+
+    def delimited_header_title(line: str) -> str | None:
+        match = re.fullmatch(r"#\s*---\s*(.+?)\s*---\s*", line.strip())
+        if not match:
+            return None
+        title = match.group(1).strip()
+        return title if any(char.isalpha() for char in title) else None
 
     def collect_comments(lineno: int) -> list[str]:
         idx = lineno - 2
@@ -2973,6 +3032,8 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
                     break
                 idx -= 1
                 continue
+            if delimited_header_title(stripped):
+                break
             if stripped.startswith("#"):
                 comments.insert(0, stripped.lstrip("#").strip())
                 idx -= 1
@@ -2995,12 +3056,16 @@ def _extract_example_metadata(example_path: Path) -> tuple[dict[str, list[str]],
             title = stripped.lstrip("#").strip()
             if not title:
                 continue
-            if title != title.upper():
-                continue
-            if not any(char.isalpha() for char in title):
-                continue
-            if lines[idx - 1].strip() or lines[idx + 1].strip():
-                continue
+            delimited_title = delimited_header_title(stripped)
+            if delimited_title:
+                title = delimited_title
+            else:
+                if title != title.upper():
+                    continue
+                if not any(char.isalpha() for char in title):
+                    continue
+                if lines[idx - 1].strip() or lines[idx + 1].strip():
+                    continue
             line_no = idx + 1
             if any(start <= line_no <= end for start, end in child_ranges):
                 continue
@@ -3870,44 +3935,16 @@ def config_options():
             continue
         example_section = cast(dict[str, Any], example_section_raw)
 
+        if section_name == "DEFAULT":
+            example_section = _prepare_default_webui_section(
+                example_section,
+                comments_map,
+                subsection_map,
+            )
+
         user_section_raw = user_config.get(section_name, {})
         user_section = cast(dict[str, Any], user_section_raw) if isinstance(user_section_raw, Mapping) else {}
         items = _build_config_items(example_section, user_section, comments_map, subsection_map, [section_name])
-
-        # Add special client list items to DEFAULT section
-        if section_name == "DEFAULT":
-            # Check if they already exist in items
-            existing_keys = {str(item["key"]) for item in items if "key" in item}
-            if "injecting_client_list" not in existing_keys:
-                items.append(
-                    {
-                        "key": "injecting_client_list",
-                        "value": user_section.get("injecting_client_list", []),
-                        "source": "config" if "injecting_client_list" in user_section else "example",
-                        "help": [
-                            "A list of clients to use for injection (aka actually adding the torrent for uploading)",
-                            'eg: ["qbittorrent", "rtorrent"]',
-                        ],
-                        "subsection": "CLIENT SELECTION",
-                    }
-                )
-            if "searching_client_list" not in existing_keys:
-                items.append(
-                    {
-                        "key": "searching_client_list",
-                        "value": user_section.get("searching_client_list", []),
-                        "source": "config" if "searching_client_list" in user_section else "example",
-                        "help": [
-                            "A list of clients to search for torrents.",
-                            'eg: ["qbittorrent", "qbittorrent_searching"]',
-                            "will fallback to default_torrent_client if empty",
-                        ],
-                        "subsection": "CLIENT SELECTION",
-                    }
-                )
-            # Update subsection_map for these items
-            subsection_map["DEFAULT/injecting_client_list"] = "CLIENT SELECTION"
-            subsection_map["DEFAULT/searching_client_list"] = "CLIENT SELECTION"
 
         sections.append({"section": section_name, "items": items})
 

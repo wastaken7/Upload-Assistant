@@ -6,6 +6,11 @@
   const UA_THEMES = Object.freeze([
     { id: "obsidian", label: "Obsidian", description: "Copper and gold" },
     { id: "graphite", label: "Graphite", description: "Cool blue graphite" },
+    {
+      id: "charcoal",
+      label: "Charcoal",
+      description: "Neutral charcoal and blue",
+    },
   ]);
   const UA_THEME_IDS = new Set(UA_THEMES.map((theme) => theme.id));
 
@@ -45,6 +50,10 @@
 
   function getUAStoredColorTheme() {
     const stored = uaStorage.get(COLOR_THEME_KEY);
+    if (stored === "dark") {
+      uaStorage.set(COLOR_THEME_KEY, "charcoal");
+      return "charcoal";
+    }
     return UA_THEME_IDS.has(stored) ? stored : DEFAULT_COLOR_THEME;
   }
 

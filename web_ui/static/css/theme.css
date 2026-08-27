@@ -41,6 +41,27 @@
   --ua-card-glow: rgba(37, 99, 235, 0.1);
 }
 
+[data-ua-theme="charcoal"] {
+  --ua-obsidian: #151718;
+  --ua-charcoal: #1a1d1f;
+  --ua-stone: #25292c;
+  --ua-stone-light: #555b60;
+  --ua-copper: #1d5fc2;
+  --ua-copper-bright: #3b82f6;
+  --ua-gold: #93c5fd;
+  --ua-gold-soft: #dbeafe;
+  --ua-ink: #e5e7eb;
+  --ua-muted: #9ca3af;
+  --ua-border: rgba(156, 163, 175, 0.22);
+  --ua-glow: rgba(59, 130, 246, 0.18);
+  --ua-light-panel-start: #f3f4f6;
+  --ua-light-panel-end: #f9fafb;
+  --ua-atmosphere: rgba(107, 114, 128, 0.055);
+  --ua-card: rgba(26, 29, 31, 0.94);
+  --ua-card-border: rgba(156, 163, 175, 0.2);
+  --ua-card-glow: rgba(0, 0, 0, 0);
+}
+
 html,
 body {
   min-height: 100%;
@@ -201,7 +222,7 @@ a:hover {
 }
 
 .ua-theme-picker {
-  background: color-mix(in srgb, var(--ua-charcoal) 88%, transparent);
+  background-color: color-mix(in srgb, var(--ua-charcoal) 88%, transparent);
   border: 1px solid var(--ua-border);
   color: var(--ua-ink);
 }
@@ -236,7 +257,436 @@ a:hover {
   flex: 0 0 auto;
 }
 
-/* Config sections remain horizontally navigable on narrow screens without a
+/* The config editor uses the shared colour theme while maintaining its own
+   light/dark surface hierarchy. */
+.ua-config-page.ua-mode-dark {
+  --ua-config-bg: var(--ua-obsidian);
+  --ua-config-surface: color-mix(
+    in srgb,
+    var(--ua-charcoal) 94%,
+    transparent
+  );
+  --ua-config-surface-raised: color-mix(
+    in srgb,
+    var(--ua-stone) 74%,
+    var(--ua-charcoal)
+  );
+  --ua-config-text: var(--ua-ink);
+  --ua-config-muted: var(--ua-muted);
+  --ua-config-border: var(--ua-border);
+  --ua-config-hover: color-mix(
+    in srgb,
+    var(--ua-stone) 72%,
+    transparent
+  );
+  --ua-config-warning-bg: rgba(120, 53, 15, 0.34);
+  --ua-config-warning-border: rgba(251, 191, 36, 0.42);
+  --ua-config-warning-text: #fde68a;
+}
+
+.ua-config-page.ua-mode-light {
+  --ua-config-bg: color-mix(
+    in srgb,
+    var(--ua-light-panel-start) 38%,
+    #f5f5f4
+  );
+  --ua-config-surface: rgba(255, 255, 255, 0.94);
+  --ua-config-surface-raised: #ffffff;
+  --ua-config-text: #1c1917;
+  --ua-config-muted: #57534e;
+  --ua-config-border: rgba(87, 83, 78, 0.2);
+  --ua-config-hover: color-mix(
+    in srgb,
+    var(--ua-light-panel-start) 62%,
+    #f5f5f4
+  );
+  --ua-config-warning-bg: #fffbeb;
+  --ua-config-warning-border: #fcd34d;
+  --ua-config-warning-text: #92400e;
+}
+
+[data-ua-theme="graphite"] .ua-config-page.ua-mode-light {
+  --ua-config-bg: color-mix(
+    in srgb,
+    var(--ua-light-panel-start) 48%,
+    #f8fafc
+  );
+  --ua-config-text: #0f172a;
+  --ua-config-muted: #475569;
+  --ua-config-border: rgba(71, 85, 105, 0.2);
+}
+
+[data-ua-theme="charcoal"] .ua-config-page.ua-mode-light {
+  --ua-config-bg: #f3f4f6;
+  --ua-config-text: #202326;
+  --ua-config-muted: #4b5563;
+  --ua-config-border: rgba(75, 85, 99, 0.2);
+}
+
+.ua-config-page {
+  background:
+    radial-gradient(
+      circle at 100% 0%,
+      var(--ua-atmosphere),
+      transparent 30rem
+    ),
+    var(--ua-config-bg);
+  color: var(--ua-config-text);
+}
+
+.ua-config-sidebar,
+.ua-config-header {
+  background: var(--ua-config-surface);
+  color: var(--ua-config-text);
+}
+
+.ua-config-sidebar {
+  border-right: 1px solid var(--ua-config-border);
+  box-shadow: 12px 0 36px rgba(0, 0, 0, 0.2);
+}
+
+.ua-config-header {
+  border-color: var(--ua-config-border);
+  backdrop-filter: blur(14px);
+}
+
+.ua-config-sidebar-brand,
+.ua-config-sidebar-footer {
+  border-color: var(--ua-config-border);
+}
+
+.ua-config-sidebar-nav {
+  scrollbar-color: var(--ua-config-border) transparent;
+  scrollbar-width: thin;
+}
+
+.ua-config-nav-heading,
+.ua-config-page-subtitle,
+.ua-config-pending-count {
+  color: var(--ua-config-muted);
+}
+
+.ua-config-nav-button {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 0.625rem;
+  color: var(--ua-config-muted);
+  display: flex;
+  font-size: 0.875rem;
+  font-weight: 550;
+  gap: 0.625rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+  width: 100%;
+}
+
+.ua-config-nav-button-nested {
+  padding-left: 0.875rem;
+}
+
+.ua-config-nav-button:hover {
+  background: var(--ua-config-hover);
+  color: var(--ua-config-text);
+}
+
+.ua-config-nav-button[data-active="true"] {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 17%,
+    var(--ua-config-surface-raised)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 42%,
+    transparent
+  );
+  color: var(--ua-config-text);
+}
+
+.ua-config-nav-indicator {
+  background: transparent;
+  border-radius: 999px;
+  flex: 0 0 0.2rem;
+  height: 1.15rem;
+}
+
+.ua-config-nav-button[data-active="true"] .ua-config-nav-indicator {
+  background: var(--ua-copper-bright);
+  box-shadow: 0 0 12px var(--ua-glow);
+}
+
+.ua-config-icon-button {
+  align-items: center;
+  background: var(--ua-config-hover);
+  border: 1px solid var(--ua-config-border);
+  border-radius: 0.625rem;
+  color: var(--ua-config-text);
+  display: inline-flex;
+  font-size: 1.25rem;
+  height: 2.5rem;
+  justify-content: center;
+  line-height: 1;
+  width: 2.5rem;
+}
+
+.ua-config-drawer-overlay {
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(2px);
+}
+
+.ua-config-page .ua-theme-picker,
+.ua-config-mode-button,
+.ua-config-sidebar-action {
+  background-color: var(--ua-config-surface-raised);
+  border: 1px solid var(--ua-config-border);
+  color: var(--ua-config-text);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.ua-config-page .ua-theme-picker option {
+  background: var(--ua-config-surface-raised);
+  color: var(--ua-config-text);
+}
+
+/* Use one consistently inset arrow instead of each browser's native placement. */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%23a8a29e' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem;
+  padding-right: 2.5rem !important;
+}
+
+.ua-config-mode-button:hover,
+.ua-config-sidebar-action:hover {
+  background: var(--ua-config-hover);
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 36%,
+    var(--ua-config-border)
+  );
+}
+
+.ua-config-mode-switch {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-muted) 38%,
+    var(--ua-config-surface-raised)
+  );
+  padding: 0.25rem;
+  transition: background-color 150ms ease;
+}
+
+.ua-config-mode-switch[data-enabled="true"] {
+  background: var(--ua-copper);
+}
+
+.ua-config-mode-knob {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transform: translateX(0);
+}
+
+.ua-config-mode-switch[data-enabled="true"] .ua-config-mode-knob {
+  transform: translateX(1.25rem);
+}
+
+.ua-config-boolean-toggle {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-muted) 48%,
+    var(--ua-config-surface-raised)
+  );
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--ua-config-muted) 62%,
+      var(--ua-config-border)
+    );
+  box-sizing: border-box;
+}
+
+.ua-config-boolean-control-row {
+  min-height: 2.5rem;
+}
+
+.ua-config-boolean-toggle[data-enabled="true"] {
+  background: var(--ua-copper);
+  border-color: color-mix(
+    in srgb,
+    var(--ua-copper-bright) 72%,
+    var(--ua-copper)
+  );
+}
+
+.ua-config-boolean-knob {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-text) 90%,
+    var(--ua-config-muted)
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--ua-config-muted) 48%, transparent);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.38),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.ua-config-page.ua-mode-light .ua-config-boolean-knob {
+  background: #ffffff;
+  border-color: color-mix(
+    in srgb,
+    var(--ua-config-muted) 42%,
+    transparent
+  );
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+}
+
+.ua-config-sidebar-action-danger {
+  color: #ef4444;
+}
+
+.ua-config-save-button {
+  background: var(--ua-copper);
+  color: #ffffff;
+  transition:
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+
+.ua-config-save-button:not(:disabled):hover {
+  background: var(--ua-copper-bright);
+  transform: translateY(-1px);
+}
+
+.ua-config-main {
+  color: var(--ua-config-text);
+}
+
+.ua-config-state-panel,
+.ua-config-inline-status,
+.ua-config-accordion,
+.ua-config-section {
+  background: var(--ua-config-surface);
+  border-color: var(--ua-config-border);
+}
+
+.ua-config-section-heading {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 8%,
+    var(--ua-config-surface)
+  );
+  border-color: var(--ua-config-border);
+  color: var(--ua-config-text);
+}
+
+.ua-config-accordion-trigger {
+  background: transparent;
+  color: var(--ua-config-text);
+}
+
+.ua-config-accordion-trigger:hover {
+  background: var(--ua-config-hover);
+}
+
+.ua-config-accordion[data-open="true"] .ua-config-accordion-trigger {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 10%,
+    var(--ua-config-surface)
+  );
+}
+
+.ua-config-accordion-panel,
+.ua-config-section-panel {
+  background: color-mix(
+    in srgb,
+    var(--ua-config-surface-raised) 78%,
+    transparent
+  );
+  border-color: var(--ua-config-border);
+}
+
+.ua-config-accordion-chevron {
+  color: var(--ua-copper-bright);
+}
+
+.ua-config-service-action,
+.ua-config-service-group-title {
+  color: var(--ua-copper-bright);
+}
+
+.ua-config-service-description {
+  color: var(--ua-config-muted);
+}
+
+.ua-config-service-group-title {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 6%,
+    var(--ua-config-surface)
+  );
+  border-color: var(--ua-config-border);
+}
+
+.ua-config-service-row {
+  border-bottom: 1px solid var(--ua-config-border);
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+  .ua-config-service-row {
+    align-items: start;
+    grid-template-columns:
+      minmax(12rem, 1.1fr) repeat(3, minmax(0, 1fr));
+  }
+}
+
+.ua-config-warning {
+  background: var(--ua-config-warning-bg);
+  border-color: var(--ua-config-warning-border);
+  color: var(--ua-config-warning-text);
+}
+
+.ua-config-tracker-tabs {
+  background: var(--ua-config-surface-raised);
+  border: 1px solid var(--ua-config-border);
+}
+
+.ua-config-tracker-tab {
+  color: var(--ua-config-muted);
+}
+
+.ua-config-tracker-tab:hover {
+  background: var(--ua-config-hover);
+  color: var(--ua-config-text);
+}
+
+.ua-config-tracker-tab[data-active="true"] {
+  background: color-mix(
+    in srgb,
+    var(--ua-copper) 16%,
+    var(--ua-config-surface-raised)
+  );
+  color: var(--ua-config-text);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--ua-copper-bright) 32%, transparent);
+}
+
+/* Tracker tabs remain horizontally navigable on narrow screens without a
    distracting native scrollbar or accidental page-wide overflow. */
 .ua-config-tabs {
   scrollbar-width: none;
@@ -249,6 +699,10 @@ a:hover {
 }
 
 @media (max-width: 767px) {
+  .ua-config-sidebar {
+    max-width: calc(100vw - 3rem);
+  }
+
   .ua-config-tabs > button {
     flex: 0 0 auto;
     scroll-snap-align: start;
@@ -257,5 +711,12 @@ a:hover {
   .ua-output-box-empty {
     flex-basis: 7rem;
     min-height: 7rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .ua-config-sidebar {
+    box-shadow: none;
+    flex: 0 0 18rem;
   }
 }

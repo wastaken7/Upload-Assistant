@@ -191,6 +191,192 @@ const colorThemes = window.UAThemes || [];
 const getStoredColorTheme = window.getUAStoredColorTheme;
 const setColorTheme = window.setUAColorTheme;
 
+const DEFAULT_WORKFLOW_GROUPS = [
+  {
+    id: "general",
+    label: "General",
+    headings: ["MAIN SETTINGS", "LOGGING"],
+  },
+  {
+    id: "setup",
+    label: "Connections & Tools",
+    headings: [
+      "ARR INTEGRATION",
+      "EXTERNAL TOOL PATHS",
+      "CLIENT SELECTION",
+    ],
+  },
+  {
+    id: "metadata",
+    label: "Metadata",
+    headings: [
+      "METADATA API CREDENTIALS",
+      "METADATA CACHING",
+      "MUSIC METADATA",
+      "TRACKER SEARCH AND IMPORT",
+    ],
+  },
+  {
+    id: "image-hosting",
+    label: "Image Hosting",
+    headings: ["IMAGE HOSTING"],
+  },
+  {
+    id: "screenshots",
+    label: "Screenshots",
+    headings: [
+      "SCREENSHOT CAPTURE AND PROCESSING",
+      "SCREENSHOT ENHANCEMENTS",
+      "DISC MENU SCREENSHOTS",
+      "XXX CONTACT SHEETS",
+    ],
+  },
+  {
+    id: "descriptions",
+    label: "Descriptions",
+    headings: [
+      "GENERAL DESCRIPTION SETTINGS",
+      "PACK DESCRIPTIONS",
+      "DESCRIPTION HEADERS AND OVERRIDES",
+      "BLU-RAY SETTINGS",
+      "AUDIO SPECTROGRAMS AND HDR PLOTS",
+    ],
+  },
+  {
+    id: "release-preparation",
+    label: "Release Preparation",
+    headings: ["TORRENT CREATION"],
+  },
+  {
+    id: "upload",
+    label: "Upload",
+    headings: ["TRACKER CHECKS AND UPLOAD", "POST-UPLOAD"],
+  },
+];
+
+const CONFIG_SECTION_LABELS = {
+  IMAGES: "Database Link Images",
+  TRACKERS: "Trackers",
+  TORRENT_CLIENTS: "Torrent Clients",
+  USENET: "Usenet",
+};
+
+const CONFIG_BLOCK_LABELS = {
+  qbittorrent: "qBittorrent",
+  qbittorrent_searching: "qBittorrent (searching)",
+  rtorrent: "rTorrent",
+};
+
+const METADATA_CACHE_SERVICE_LABELS = {
+  tmdb: "TMDB",
+  imdb: "IMDb",
+  tvdb: "TVDB",
+  tvmaze: "TVmaze",
+  anilist: "AniList",
+  douban: "Douban",
+  thexem: "TheXEM",
+  igdb: "IGDB",
+  steam: "Steam",
+  google_books: "Google Books",
+  openlibrary: "OpenLibrary",
+  myanonamouse: "MyAnonamouse",
+  musicbrainz: "MusicBrainz",
+  discogs: "Discogs",
+};
+
+const METADATA_CACHE_SERVICE_GROUPS = [
+  {
+    label: "Film, TV & Anime",
+    services: [
+      "tmdb",
+      "imdb",
+      "tvdb",
+      "tvmaze",
+      "anilist",
+      "douban",
+      "thexem",
+    ],
+  },
+  { label: "Games", services: ["igdb", "steam"] },
+  {
+    label: "Books, Audiobooks & Comics",
+    services: ["google_books", "openlibrary", "myanonamouse"],
+  },
+  { label: "Music", services: ["musicbrainz", "discogs"] },
+];
+
+const CONFIG_HEADING_LABELS = {
+  "MAIN SETTINGS": "Main Settings",
+  LOGGING: "Logging",
+  "METADATA API CREDENTIALS": "Metadata API Credentials",
+  "ARR INTEGRATION": "ARR Integration",
+  "EXTERNAL TOOL PATHS": "External Tool Paths",
+  "CLIENT SELECTION": "Client Selection",
+  "METADATA CACHING": "Metadata Caching",
+  "MUSIC METADATA": "Music Metadata",
+  "TRACKER SEARCH AND IMPORT": "Tracker Search and Import",
+  "IMAGE HOSTING": "Image Hosting",
+  "SCREENSHOT CAPTURE AND PROCESSING": "Screenshot Capture and Processing",
+  "SCREENSHOT ENHANCEMENTS": "Screenshot Enhancements",
+  "DISC MENU SCREENSHOTS": "Disc Menu Screenshots",
+  "XXX CONTACT SHEETS": "XXX Contact Sheets",
+  "GENERAL DESCRIPTION SETTINGS": "General Description Settings",
+  "PACK DESCRIPTIONS": "Pack Descriptions",
+  "DESCRIPTION HEADERS AND OVERRIDES":
+    "Description Headers and Overrides",
+  "BLU-RAY SETTINGS": "Blu-ray Settings",
+  "AUDIO SPECTROGRAMS AND HDR PLOTS":
+    "Audio Spectrograms and HDR Plots",
+  "TORRENT CREATION": "Torrent Creation",
+  "TRACKER CHECKS AND UPLOAD": "Tracker Checks and Upload",
+  "POST-UPLOAD": "Post-Upload",
+  "GENERAL SETTINGS": "General Settings",
+  "SERVER CONNECTION": "Server Connection",
+  "ARCHIVING AND PARITY": "Archiving and Parity",
+  "UPLOADER AND VERIFICATION": "Uploader and Verification",
+  "BINARY PATHS": "Binary Paths",
+  "OUTPUT PATHS": "Output Paths",
+};
+
+const normalizeConfigHeading = (value) => String(value || "").trim().toUpperCase();
+
+const formatConfigHeading = (value) => {
+  const normalized = normalizeConfigHeading(value);
+  return CONFIG_HEADING_LABELS[normalized] || formatDisplayLabel(value);
+};
+
+const getDefaultItemGroupId = (item) => {
+  const heading = normalizeConfigHeading(
+    item?.subsection === true ? item.key : item?.subsection,
+  );
+  const group = DEFAULT_WORKFLOW_GROUPS.find((candidate) =>
+    candidate.headings.includes(heading),
+  );
+  return group?.id || "other";
+};
+
+const getDefaultNavigationGroups = (section) => {
+  if (!section || section.section !== "DEFAULT") return [];
+  const presentGroupIds = new Set(
+    (section.items || []).map(getDefaultItemGroupId),
+  );
+  const groups = DEFAULT_WORKFLOW_GROUPS.filter((group) =>
+    presentGroupIds.has(group.id),
+  );
+  if (presentGroupIds.has("other")) {
+    groups.push({ id: "other", label: "Other", headings: [] });
+  }
+  return groups;
+};
+
+const getConfigSectionLabel = (sectionName) =>
+  CONFIG_SECTION_LABELS[String(sectionName || "").toUpperCase()] ||
+  formatDisplayLabel(sectionName);
+
+const getConfigBlockLabel = (blockName) =>
+  CONFIG_BLOCK_LABELS[String(blockName || "").toLowerCase()] ||
+  formatDisplayLabel(blockName);
+
 // Local CSRF cache used by fallback `apiFetch` when `uaApiFetch` isn't present.
 let localCsrf = null;
 const loadLocalCsrf = async (force = false) => {
@@ -255,9 +441,22 @@ const formatDisplayLabel = (key) => {
     .join(" ");
 };
 
+const formatConfigFieldLabel = (key, pathParts = []) => {
+  if (pathParts.includes("metadata_cache_services")) {
+    const serviceFieldLabels = {
+      enabled: "Caching enabled",
+      ttl_hours: "Cache lifetime (hours)",
+      localized_ttl_hours: "Localized data lifetime (hours)",
+    };
+    if (serviceFieldLabels[key]) return serviceFieldLabels[key];
+  }
+  return formatDisplayLabel(key);
+};
+
 const imageHostApiKeys = {
   imgbb: ["imgbb_api"],
   lensdump: ["lensdump_api"],
+  lostimg: ["lostimg_api"],
   ptscreens: ["ptscreens_api"],
   onlyimage: ["onlyimage_api"],
   dalexni: ["dalexni_api"],
@@ -516,6 +715,8 @@ function ConfigLeaf({
   onValueChange,
 }) {
   const path = [...pathParts, item.key];
+  const fieldId = path.join("--");
+  const displayLabel = formatConfigFieldLabel(item.key, pathParts);
 
   const helpText = item.help && item.help.length ? item.help.join("\n") : "";
   const labelClass = isDarkMode
@@ -688,14 +889,16 @@ function ConfigLeaf({
     const originalValue = Boolean(item.value);
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start px-4 py-3">
-        <div
-          className={
-            fullWidth ? "col-span-1 md:col-span-12" : "col-span-1 md:col-span-4"
-          }
-        >
+      <div
+        className={
+          fullWidth
+            ? "space-y-2"
+            : "grid grid-cols-1 items-start gap-3 px-4 py-3 md:grid-cols-12"
+        }
+      >
+        <div className={fullWidth ? "" : "col-span-1 md:col-span-4"}>
           <div className="flex items-center gap-2">
-            <div className={labelClass}>{formatDisplayLabel(item.key)}</div>
+            <div className={labelClass}>{displayLabel}</div>
             {helpText && (
               <Tooltip content={helpText}>
                 <InfoIcon
@@ -705,12 +908,10 @@ function ConfigLeaf({
             )}
           </div>
         </div>
-        <div
-          className={
-            fullWidth ? "col-span-1 md:col-span-12" : "col-span-1 md:col-span-7"
-          }
-        >
-          <div className="flex items-center gap-3">
+        <div className={fullWidth ? "" : "col-span-1 md:col-span-7"}>
+          <div
+            className={`flex items-center gap-3${fullWidth ? " ua-config-boolean-control-row" : ""}`}
+          >
             <button
               onClick={() => {
                 const nextValue = !checked;
@@ -723,10 +924,12 @@ function ConfigLeaf({
                 });
               }}
               aria-pressed={checked}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? "bg-purple-600" : "bg-gray-300"}`}
+              aria-label={`${displayLabel}: ${checked ? "True" : "False"}`}
+              className="ua-config-boolean-toggle relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+              data-enabled={checked ? "true" : "false"}
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${checked ? "translate-x-6" : "translate-x-1"}`}
+                className={`ua-config-boolean-knob inline-block h-4 w-4 transform rounded-full transition-transform ${checked ? "translate-x-6" : "translate-x-1"}`}
               />
             </button>
             <span className={isDarkMode ? "text-gray-200" : "text-gray-700"}>
@@ -799,14 +1002,16 @@ function ConfigLeaf({
     const limits = getFieldLimits(item.key);
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start px-4 py-3">
-        <div
-          className={
-            fullWidth ? "col-span-1 md:col-span-12" : "col-span-1 md:col-span-4"
-          }
-        >
+      <div
+        className={
+          fullWidth
+            ? "space-y-2"
+            : "grid grid-cols-1 items-start gap-3 px-4 py-3 md:grid-cols-12"
+        }
+      >
+        <div className={fullWidth ? "" : "col-span-1 md:col-span-4"}>
           <div className="flex items-center gap-2">
-            <div className={labelClass}>{formatDisplayLabel(item.key)}</div>
+            <div className={labelClass}>{displayLabel}</div>
             {helpText && (
               <Tooltip content={helpText}>
                 <InfoIcon
@@ -816,11 +1021,7 @@ function ConfigLeaf({
             )}
           </div>
         </div>
-        <div
-          className={
-            fullWidth ? "col-span-1 md:col-span-12" : "col-span-1 md:col-span-7"
-          }
-        >
+        <div className={fullWidth ? "" : "col-span-1 md:col-span-7"}>
           <NumberInput
             value={numericValue}
             onChange={(newValue) => {
@@ -860,7 +1061,7 @@ function ConfigLeaf({
           }
         >
           <div className="flex items-center gap-2">
-            <div className={labelClass}>{formatDisplayLabel(item.key)}</div>
+            <div className={labelClass}>{displayLabel}</div>
             {helpText && (
               <Tooltip content={helpText}>
                 <InfoIcon
@@ -901,7 +1102,7 @@ function ConfigLeaf({
     return (
       <div className="col-span-full px-4 py-3">
         <div className="flex items-center gap-2 mb-2">
-          <div className={labelClass}>{formatDisplayLabel(item.key)}</div>
+          <div className={labelClass}>{displayLabel}</div>
           {helpText && (
             <Tooltip content={helpText}>
               <InfoIcon
@@ -962,8 +1163,8 @@ function ConfigLeaf({
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <label htmlFor={item.key} className={labelClass}>
-            {formatDisplayLabel(item.key)}
+          <label htmlFor={fieldId} className={labelClass}>
+            {displayLabel}
           </label>
           {helpText && (
             <Tooltip content={helpText}>
@@ -974,7 +1175,7 @@ function ConfigLeaf({
           )}
         </div>
         <select
-          id={item.key}
+          id={fieldId}
           value={value}
           onChange={(e) => {
             const nextValue = e.target.value;
@@ -1083,7 +1284,7 @@ function ConfigLeaf({
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <label className={labelClass}>{formatDisplayLabel(item.key)}</label>
+          <label className={labelClass}>{displayLabel}</label>
           {helpText && (
             <Tooltip content={helpText}>
               <InfoIcon
@@ -1227,7 +1428,7 @@ function ConfigLeaf({
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <label className={labelClass}>{formatDisplayLabel(item.key)}</label>
+          <label className={labelClass}>{displayLabel}</label>
           {helpText && (
             <Tooltip content={helpText}>
               <InfoIcon
@@ -1292,8 +1493,8 @@ function ConfigLeaf({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <label htmlFor={item.key} className={labelClass}>
-          {formatDisplayLabel(item.key)}
+        <label htmlFor={fieldId} className={labelClass}>
+          {displayLabel}
         </label>
         {helpText && (
           <Tooltip content={helpText}>
@@ -1304,7 +1505,7 @@ function ConfigLeaf({
         )}
       </div>
       <input
-        id={item.key}
+        id={fieldId}
         type="text"
         value={textValue}
         onChange={(e) => {
@@ -1322,6 +1523,296 @@ function ConfigLeaf({
         className={`${inputClass}${readOnly ? " opacity-70 cursor-not-allowed" : ""}`}
       />
     </div>
+  );
+}
+
+function MetadataCacheServices({
+  item,
+  pathParts,
+  depth,
+  isDarkMode,
+  allImageHosts,
+  usedImageHosts,
+  expandedGroups,
+  toggleGroup,
+  torrentClients,
+  onValueChange,
+}) {
+  const groupKey = [...pathParts, item.key].join("/");
+  const isOpen = expandedGroups.has(groupKey);
+  const services = item.children || [];
+  const serviceByKey = new Map(
+    services.map((service) => [String(service.key).toLowerCase(), service]),
+  );
+  const groupedServiceKeys = new Set(
+    METADATA_CACHE_SERVICE_GROUPS.flatMap((group) => group.services),
+  );
+  const serviceGroups = METADATA_CACHE_SERVICE_GROUPS.map((group) => ({
+    label: group.label,
+    services: group.services
+      .map((serviceKey) => serviceByKey.get(serviceKey))
+      .filter(Boolean),
+  })).filter((group) => group.services.length > 0);
+  const otherServices = services.filter(
+    (service) => !groupedServiceKeys.has(String(service.key).toLowerCase()),
+  );
+  if (otherServices.length > 0) {
+    serviceGroups.push({ label: "Other", services: otherServices });
+  }
+  const helpText = (item.help || []).join(" ");
+
+  return (
+    <section
+      className="ua-config-accordion overflow-hidden rounded-xl border"
+      data-open={isOpen ? "true" : "false"}
+    >
+      <button
+        type="button"
+        onClick={() => toggleGroup(groupKey)}
+        className="ua-config-accordion-trigger flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+        aria-expanded={isOpen}
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold">
+            Service Cache Overrides
+          </span>
+          {helpText && (
+            <span className="ua-config-service-description mt-1 block text-xs font-normal">
+              {helpText}
+            </span>
+          )}
+        </span>
+        <span className="flex shrink-0 items-center gap-3">
+          <span className="ua-config-service-action hidden text-xs font-medium sm:inline">
+            {isOpen ? "Hide services" : `Show ${services.length} services`}
+          </span>
+          <span
+            className="ua-config-accordion-chevron transition-transform"
+            style={{
+              transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
+            }}
+            aria-hidden="true"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m9 18 6-6-6-6"></path>
+            </svg>
+          </span>
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="ua-config-accordion-panel border-t">
+          {serviceGroups.map((serviceGroup) => (
+            <section key={serviceGroup.label}>
+              <h3 className="ua-config-service-group-title border-b px-4 py-3 text-xs font-semibold uppercase tracking-wider">
+                {serviceGroup.label}
+              </h3>
+              <div>
+                {serviceGroup.services.map((service) => {
+                  const serviceKey = String(service.key).toLowerCase();
+                  const serviceHelp = (service.help || []).join(" ");
+                  return (
+                    <div
+                      key={service.key}
+                      className="ua-config-service-row px-4 py-4"
+                    >
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-semibold">
+                          {METADATA_CACHE_SERVICE_LABELS[serviceKey] ||
+                            formatDisplayLabel(service.key)}
+                        </h4>
+                        {serviceHelp && (
+                          <p className="ua-config-service-description mt-1 text-xs leading-relaxed">
+                            {serviceHelp}
+                          </p>
+                        )}
+                      </div>
+                      {(service.children || []).map((field) => (
+                        <ConfigLeaf
+                          key={`${groupKey}/${service.key}/${field.key}`}
+                          item={field}
+                          pathParts={[...pathParts, item.key, service.key]}
+                          depth={depth + 2}
+                          isDarkMode={isDarkMode}
+                          fullWidth={true}
+                          allImageHosts={allImageHosts}
+                          usedImageHosts={usedImageHosts}
+                          torrentClients={torrentClients}
+                          onValueChange={onValueChange}
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ReleaseGroupOverrides({
+  item,
+  pathParts,
+  depth,
+  isDarkMode,
+  allImageHosts,
+  usedImageHosts,
+  expandedGroups,
+  toggleGroup,
+  torrentClients,
+  onValueChange,
+}) {
+  const groupKey = [...pathParts, item.key].join("/");
+  const isOpen = expandedGroups.has(groupKey);
+  const releaseGroups = item.children || [];
+  const helpText = (item.help || []).join(" ");
+  const groupLabel = releaseGroups.length === 1 ? "group" : "groups";
+
+  return (
+    <section
+      className="ua-config-accordion overflow-hidden rounded-xl border"
+      data-open={isOpen ? "true" : "false"}
+    >
+      <button
+        type="button"
+        onClick={() => toggleGroup(groupKey)}
+        className="ua-config-accordion-trigger flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+        aria-expanded={isOpen}
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold">
+            Release Group Overrides
+          </span>
+          {helpText && (
+            <span className="ua-config-service-description mt-1 block text-xs font-normal">
+              {helpText}
+            </span>
+          )}
+        </span>
+        <span className="flex shrink-0 items-center gap-3">
+          <span className="ua-config-service-action hidden text-xs font-medium sm:inline">
+            {isOpen
+              ? `Hide ${groupLabel}`
+              : `Show ${releaseGroups.length} ${groupLabel}`}
+          </span>
+          <span
+            className="ua-config-accordion-chevron transition-transform"
+            style={{
+              transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
+            }}
+            aria-hidden="true"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m9 18 6-6-6-6"></path>
+            </svg>
+          </span>
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="ua-config-accordion-panel space-y-3 border-t p-4">
+          {releaseGroups.map((releaseGroup) => {
+            const releaseGroupKey = [
+              ...pathParts,
+              item.key,
+              releaseGroup.key,
+            ].join("/");
+            const isReleaseGroupOpen = expandedGroups.has(releaseGroupKey);
+            const fields = releaseGroup.children || [];
+            return (
+              <div
+                key={releaseGroupKey}
+                className="ua-config-accordion overflow-hidden rounded-lg border"
+                data-open={isReleaseGroupOpen ? "true" : "false"}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(releaseGroupKey)}
+                  className="ua-config-accordion-trigger flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                  aria-expanded={isReleaseGroupOpen}
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">
+                      {releaseGroup.key}
+                    </span>
+                    <span className="ua-config-service-description mt-1 block text-xs font-normal">
+                      {fields.length} description overrides
+                    </span>
+                  </span>
+                  <span
+                    className="ua-config-accordion-chevron shrink-0 transition-transform"
+                    style={{
+                      transform: isReleaseGroupOpen
+                        ? "rotate(90deg)"
+                        : "rotate(0deg)",
+                    }}
+                    aria-hidden="true"
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="m9 18 6-6-6-6"></path>
+                    </svg>
+                  </span>
+                </button>
+                {isReleaseGroupOpen && (
+                  <div className="ua-config-accordion-panel border-t p-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                      {fields.map((field) => (
+                        <ConfigLeaf
+                          key={`${releaseGroupKey}/${field.key}`}
+                          item={field}
+                          pathParts={[
+                            ...pathParts,
+                            item.key,
+                            releaseGroup.key,
+                          ]}
+                          depth={depth + 2}
+                          isDarkMode={isDarkMode}
+                          fullWidth={true}
+                          allImageHosts={allImageHosts}
+                          usedImageHosts={usedImageHosts}
+                          torrentClients={torrentClients}
+                          onValueChange={onValueChange}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1343,11 +1834,6 @@ function ItemList({
   const subsections = [];
 
   for (const item of items || []) {
-    const apiHost = getImageHostForApiKey(item.key);
-    if (apiHost && !usedImageHosts.has(apiHost)) {
-      continue;
-    }
-
     if (item.children && item.children.length) {
       subsections.push(item);
     } else {
@@ -1369,8 +1855,6 @@ function ItemList({
 
   // Define known subgroupings for better visual breakdown (screenshots-related)
   const subgroupDefinitions = {
-    "General ffmpeg": ["ffmpeg_compression", "process_limit", "ffmpeg_limit"],
-    Overlay: ["frame_overlay", "overlay_text_size"],
     "HDR Tonemapping": [
       "tone_map",
       "algorithm",
@@ -1379,29 +1863,13 @@ function ItemList({
       "ffmpeg_is_good",
       "ffmpeg_warmup",
     ],
+    "Screenshot Overlays": ["frame_overlay", "overlay_text_size"],
     "Bluray & DVD": [
       "use_largest_playlist",
       "get_bluray_info",
       "bluray_score",
       "bluray_single_score",
       "ping_unit3d",
-    ],
-    Extra: ["btn_api", "user_overrides"],
-    Logos: ["add_logo", "logo_size", "logo_language"],
-    "Bluray/DVD": [
-      "add_bluray_link",
-      "use_bluray_images",
-      "bluray_image_size",
-      "disc_menu_header",
-      "auto_dvd_menus",
-      "max_menu_screens",
-    ],
-    "multi-file/disc": [
-      "multiScreens",
-      "pack_thumb_size",
-      "fileLimit",
-      "processLimit",
-      "charLimit",
     ],
     Headers: [
       "custom_description_header",
@@ -1425,26 +1893,54 @@ function ItemList({
     ],
   };
 
+  const isImageHostingSection =
+    pathParts[0] === "DEFAULT" &&
+    regularItems.some((item) => item.key === "img_host_1") &&
+    regularItems.some((item) => item.key === "smart_image_host_selection");
+  const isScreenshotCaptureProcessingSection =
+    pathParts[0] === "DEFAULT" &&
+    regularItems.some((item) => item.key === "screens") &&
+    regularItems.some((item) => item.key === "ffmpeg_compression");
+  const isScreenshotEnhancementsSection =
+    pathParts[0] === "DEFAULT" &&
+    regularItems.some((item) => item.key === "tone_map") &&
+    regularItems.some((item) => item.key === "frame_overlay");
+
   // Partition regularItems into subgroups and an "Other" bucket
   const grouped = {};
   const ungrouped = [];
-  // Ensure image host groups appear first
-  grouped["Image Hosts"] = [];
-  grouped["Image Host API Keys"] = [];
+  if (isImageHostingSection) {
+    grouped["Image Hosts"] = [];
+    grouped["Image Host API Keys"] = [];
+    grouped["Upload Behavior"] = [];
+  } else if (isScreenshotCaptureProcessingSection) {
+    grouped["Screenshot Capture"] = [];
+    grouped["FFmpeg Processing"] = [];
+  }
   // Pre-create keys for consistent ordering for other subgroup definitions
   for (const g of Object.keys(subgroupDefinitions)) grouped[g] = [];
 
   for (const it of regularItems) {
-    // Image host selection fields (e.g., img_host_1) should be top-level Image Hosts
-    if (it.key && it.key.startsWith && it.key.startsWith("img_host_")) {
-      grouped["Image Hosts"].push(it);
+    if (isImageHostingSection) {
+      if (it.key && it.key.startsWith && it.key.startsWith("img_host_")) {
+        grouped["Image Hosts"].push(it);
+      } else if (getImageHostForApiKey(it.key)) {
+        grouped["Image Host API Keys"].push(it);
+      } else {
+        grouped["Upload Behavior"].push(it);
+      }
       continue;
     }
-
-    // API key fields for image hosts (recognized via helper) go into Image Host API Keys
-    const apiHost = getImageHostForApiKey(it.key);
-    if (apiHost) {
-      grouped["Image Host API Keys"].push(it);
+    if (isScreenshotCaptureProcessingSection) {
+      if (
+        ["screens", "cutoff_screens", "scale_screenshots_for_par"].includes(
+          it.key,
+        )
+      ) {
+        grouped["Screenshot Capture"].push(it);
+      } else {
+        grouped["FFmpeg Processing"].push(it);
+      }
       continue;
     }
 
@@ -1522,37 +2018,28 @@ function ItemList({
       {/* TRACKERS tabbed subsections: Default / Configured / Available */}
       {isTrackerConfig && defaultTrackersItem && (
         <div>
-          <div className="flex space-x-1 rounded-lg p-1 bg-gray-700 mb-3 overflow-x-auto">
+          <div className="ua-config-tabs ua-config-tracker-tabs mb-3 flex space-x-1 overflow-x-auto rounded-lg p-1">
             <button
               type="button"
               onClick={() => setTrackerTab("default")}
-              className={
-                trackerTab === "default"
-                  ? "md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap bg-gray-600 text-white"
-                  : "md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap text-gray-400 hover:text-white hover:bg-gray-600"
-              }
+              className="ua-config-tracker-tab whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors md:flex-1"
+              data-active={trackerTab === "default" ? "true" : "false"}
             >
               Default trackers
             </button>
             <button
               type="button"
               onClick={() => setTrackerTab("configured")}
-              className={
-                trackerTab === "configured"
-                  ? "md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap bg-gray-600 text-white"
-                  : "md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap text-gray-400 hover:text-white hover:bg-gray-600"
-              }
+              className="ua-config-tracker-tab whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors md:flex-1"
+              data-active={trackerTab === "configured" ? "true" : "false"}
             >
               Configured trackers
             </button>
             <button
               type="button"
               onClick={() => setTrackerTab("available")}
-              className={
-                trackerTab === "available"
-                  ? "md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap bg-gray-600 text-white"
-                  : "md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap text-gray-400 hover:text-white hover:bg-gray-600"
-              }
+              className="ua-config-tracker-tab whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors md:flex-1"
+              data-active={trackerTab === "available" ? "true" : "false"}
             >
               Available trackers
             </button>
@@ -2057,7 +2544,7 @@ function ItemList({
         <div className="space-y-4">
           {/* Ungrouped items */}
           {ungrouped.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {ungrouped.map((item) => {
                 const leafPath = [...pathParts, item.key].join("/");
                 return (
@@ -2082,13 +2569,60 @@ function ItemList({
           {Object.keys(grouped).map((gname) => {
             const itemsInGroup = grouped[gname] || [];
             if (!itemsInGroup.length) return null;
+            if (
+              isImageHostingSection ||
+              isScreenshotCaptureProcessingSection ||
+              isScreenshotEnhancementsSection
+            ) {
+              const subgroupParentKey = isImageHostingSection
+                ? "IMAGE HOSTING"
+                : isScreenshotCaptureProcessingSection
+                  ? "SCREENSHOT CAPTURE AND PROCESSING"
+                  : "SCREENSHOT ENHANCEMENTS";
+              const subgroupKey = [
+                ...pathParts,
+                subgroupParentKey,
+                gname,
+              ].join("/");
+              return (
+                <section
+                  key={subgroupKey}
+                  className="ua-config-section overflow-hidden rounded-xl border"
+                >
+                  <div className="ua-config-section-heading border-b px-4 py-3">
+                    <h3 className="text-sm font-semibold">{gname}</h3>
+                  </div>
+                  <div className="ua-config-section-panel p-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                      {itemsInGroup.map((item) => {
+                        const leafPath = [...pathParts, item.key].join("/");
+                        return (
+                          <ConfigLeaf
+                            key={leafPath}
+                            item={item}
+                            pathParts={pathParts}
+                            depth={depth}
+                            isDarkMode={isDarkMode}
+                            fullWidth={fullWidth}
+                            allImageHosts={allImageHosts}
+                            usedImageHosts={usedImageHosts}
+                            torrentClients={torrentClients}
+                            onValueChange={onValueChange}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                </section>
+              );
+            }
             const headerClass = isDarkMode
               ? "text-sm font-semibold text-gray-200 border-b pb-1 mb-3"
               : "text-sm font-semibold text-gray-700 border-b pb-1 mb-3";
             return (
               <div key={gname}>
                 <div className={headerClass}>{gname}</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                   {itemsInGroup.map((item) => {
                     const leafPath = [...pathParts, item.key].join("/");
                     return (
@@ -2123,12 +2657,194 @@ function ItemList({
         }
         const isTorrentClientConfig =
           pathParts.includes("TORRENT_CLIENTS") && depth === 0;
+        const isMetadataCachingSubsection =
+          pathParts[0] === "DEFAULT" &&
+          depth === 0 &&
+          item.subsection === true &&
+          normalizeConfigHeading(item.key) === "METADATA CACHING";
+        const isImageHostingSubsection =
+          pathParts[0] === "DEFAULT" &&
+          depth === 0 &&
+          item.subsection === true &&
+          normalizeConfigHeading(item.key) === "IMAGE HOSTING";
+        const isScreenshotCaptureProcessingSubsection =
+          pathParts[0] === "DEFAULT" &&
+          depth === 0 &&
+          item.subsection === true &&
+          normalizeConfigHeading(item.key) ===
+            "SCREENSHOT CAPTURE AND PROCESSING";
+        const isScreenshotEnhancementsSubsection =
+          pathParts[0] === "DEFAULT" &&
+          depth === 0 &&
+          item.subsection === true &&
+          normalizeConfigHeading(item.key) === "SCREENSHOT ENHANCEMENTS";
+        const isGeneralDescriptionSettingsSubsection =
+          pathParts[0] === "DEFAULT" &&
+          depth === 0 &&
+          item.subsection === true &&
+          normalizeConfigHeading(item.key) ===
+            "GENERAL DESCRIPTION SETTINGS";
+        const isDescriptionHeadersOverridesSubsection =
+          pathParts[0] === "DEFAULT" &&
+          depth === 0 &&
+          item.subsection === true &&
+          normalizeConfigHeading(item.key) ===
+            "DESCRIPTION HEADERS AND OVERRIDES";
+        const isStaticSubsection =
+          item.subsection === true && !isMetadataCachingSubsection;
         const isCollapsible =
-          item.subsection === true || isTrackerConfig || isTorrentClientConfig;
+          isTrackerConfig || isTorrentClientConfig;
         const nextPath = item.subsection ? pathParts : [...pathParts, item.key];
         const nextDepth = item.subsection ? depth : depth + 1;
         const groupKey = [...pathParts, item.key].join("/");
         const isOpen = expandedGroups.has(groupKey);
+
+        if (isMetadataCachingSubsection) {
+          const serviceOverrides = (item.children || []).find(
+            (child) => child.key === "metadata_cache_services",
+          );
+          const cacheSettings = (item.children || []).filter(
+            (child) => child.key !== "metadata_cache_services",
+          );
+          return (
+            <React.Fragment key={groupKey}>
+              <section className="ua-config-section overflow-hidden rounded-xl border">
+                <div className="ua-config-section-heading border-b px-4 py-3">
+                  <h2 className="text-sm font-semibold">Metadata Cache</h2>
+                </div>
+                <div className="ua-config-section-panel p-4">
+                  <ItemList
+                    items={cacheSettings}
+                    pathParts={pathParts}
+                    depth={depth}
+                    isDarkMode={isDarkMode}
+                    allImageHosts={allImageHosts}
+                    usedImageHosts={usedImageHosts}
+                    fullWidth={true}
+                    expandedGroups={expandedGroups}
+                    toggleGroup={toggleGroup}
+                    torrentClients={torrentClients}
+                    onValueChange={onValueChange}
+                  />
+                </div>
+              </section>
+              {serviceOverrides && (
+                <MetadataCacheServices
+                  item={serviceOverrides}
+                  pathParts={pathParts}
+                  depth={depth}
+                  isDarkMode={isDarkMode}
+                  allImageHosts={allImageHosts}
+                  usedImageHosts={usedImageHosts}
+                  expandedGroups={expandedGroups}
+                  toggleGroup={toggleGroup}
+                  torrentClients={torrentClients}
+                  onValueChange={onValueChange}
+                />
+              )}
+            </React.Fragment>
+          );
+        }
+
+        if (isGeneralDescriptionSettingsSubsection) {
+          const logoKeys = new Set([
+            "add_logo",
+            "logo_size",
+            "logo_language",
+          ]);
+          const logoSettings = (item.children || []).filter((child) =>
+            logoKeys.has(child.key),
+          );
+          const generalDescriptionSettings = (item.children || []).filter(
+            (child) => !logoKeys.has(child.key),
+          );
+
+          const renderDescriptionSettings = (heading, settings) => (
+            <section className="ua-config-section overflow-hidden rounded-xl border">
+              <div className="ua-config-section-heading border-b px-4 py-3">
+                <h2 className="text-sm font-semibold">{heading}</h2>
+              </div>
+              <div className="ua-config-section-panel p-4">
+                <ItemList
+                  items={settings}
+                  pathParts={pathParts}
+                  depth={depth}
+                  isDarkMode={isDarkMode}
+                  allImageHosts={allImageHosts}
+                  usedImageHosts={usedImageHosts}
+                  fullWidth={true}
+                  expandedGroups={expandedGroups}
+                  toggleGroup={toggleGroup}
+                  torrentClients={torrentClients}
+                  onValueChange={onValueChange}
+                />
+              </div>
+            </section>
+          );
+
+          return (
+            <React.Fragment key={groupKey}>
+              {renderDescriptionSettings(
+                "General Description Settings",
+                generalDescriptionSettings,
+              )}
+              {renderDescriptionSettings("Logo Settings", logoSettings)}
+            </React.Fragment>
+          );
+        }
+
+        if (isDescriptionHeadersOverridesSubsection) {
+          const releaseGroupOverrides = (item.children || []).find(
+            (child) => child.key === "tag_overrides",
+          );
+          const descriptionSettings = (item.children || []).filter(
+            (child) => child.key !== "tag_overrides",
+          );
+
+          return (
+            <React.Fragment key={groupKey}>
+              <section className="ua-config-section overflow-hidden rounded-xl border">
+                <div className="ua-config-section-heading border-b px-4 py-3">
+                  <h2 className="text-sm font-semibold">
+                    Description Headers and Signature
+                  </h2>
+                </div>
+                <div className="ua-config-section-panel p-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                    {descriptionSettings.map((field) => (
+                      <ConfigLeaf
+                        key={`${groupKey}/${field.key}`}
+                        item={field}
+                        pathParts={pathParts}
+                        depth={depth}
+                        isDarkMode={isDarkMode}
+                        fullWidth={true}
+                        allImageHosts={allImageHosts}
+                        usedImageHosts={usedImageHosts}
+                        torrentClients={torrentClients}
+                        onValueChange={onValueChange}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </section>
+              {releaseGroupOverrides && (
+                <ReleaseGroupOverrides
+                  item={releaseGroupOverrides}
+                  pathParts={pathParts}
+                  depth={depth}
+                  isDarkMode={isDarkMode}
+                  allImageHosts={allImageHosts}
+                  usedImageHosts={usedImageHosts}
+                  expandedGroups={expandedGroups}
+                  toggleGroup={toggleGroup}
+                  torrentClients={torrentClients}
+                  onValueChange={onValueChange}
+                />
+              )}
+            </React.Fragment>
+          );
+        }
 
         const nested = (
           <ItemList
@@ -2138,7 +2854,7 @@ function ItemList({
             isDarkMode={isDarkMode}
             allImageHosts={allImageHosts}
             usedImageHosts={usedImageHosts}
-            fullWidth={isCollapsible}
+            fullWidth={isStaticSubsection || isCollapsible}
             expandedGroups={expandedGroups}
             toggleGroup={toggleGroup}
             torrentClients={torrentClients}
@@ -2146,46 +2862,73 @@ function ItemList({
           />
         );
 
-        // For subsection items that are being displayed as sub-tabs, show content directly
-        if (item.subsection === true) {
+        if (
+          isImageHostingSubsection ||
+          isScreenshotCaptureProcessingSubsection ||
+          isScreenshotEnhancementsSubsection
+        ) {
+          return <React.Fragment key={groupKey}>{nested}</React.Fragment>;
+        }
+
+        if (isStaticSubsection) {
           return (
-            <div key={groupKey} className="space-y-4">
-              {nested}
-            </div>
+            <section
+              key={groupKey}
+              className="ua-config-section overflow-hidden rounded-xl border"
+            >
+              <div className="ua-config-section-heading border-b px-4 py-3">
+                <h2 className="text-sm font-semibold">
+                  {formatConfigHeading(item.key)}
+                </h2>
+              </div>
+              <div className="ua-config-section-panel p-4">{nested}</div>
+            </section>
           );
         }
 
         if (isCollapsible) {
           return (
-            <div key={groupKey} className="space-y-4">
+            <div
+              key={groupKey}
+              className="ua-config-accordion overflow-hidden rounded-xl border"
+              data-open={isOpen ? "true" : "false"}
+            >
               <button
                 type="button"
                 onClick={() => toggleGroup(groupKey)}
-                className={`flex items-center gap-2 text-left w-full text-sm font-medium ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}
+                className="ua-config-accordion-trigger flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold"
                 aria-expanded={isOpen}
               >
+                <span>
+                  {item.subsection === true
+                    ? formatConfigHeading(item.key)
+                    : isTorrentClientConfig
+                      ? getConfigBlockLabel(item.key)
+                      : getTrackerDisplayName(item.key)}
+                </span>
                 <span
-                  className="transition-transform"
+                  className="ua-config-accordion-chevron text-lg transition-transform"
                   style={{
                     transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
                   }}
+                  aria-hidden="true"
                 >
-                  &gt;
-                </span>
-                <span
-                  className={
-                    isDarkMode
-                      ? "text-purple-300 font-mono"
-                      : "text-purple-700 font-mono"
-                  }
-                >
-                  {getTrackerDisplayName(item.key)}
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="m9 18 6-6-6-6"></path>
+                  </svg>
                 </span>
               </button>
               {isOpen && (
-                <div
-                  className={`rounded-lg border p-4 ${isDarkMode ? "border-gray-700 bg-gray-900/30" : "border-gray-200 bg-gray-50"}`}
-                >
+                <div className="ua-config-accordion-panel border-t p-4">
                   {nested}
                 </div>
               )}
@@ -3263,6 +4006,182 @@ function AccessLogTab({ isDarkMode }) {
   );
 }
 
+function ConfigSidebar({
+  sections,
+  activeTab,
+  activeSubTab,
+  onNavigate,
+  onClose,
+  colorTheme,
+  onColorThemeChange,
+  isDarkMode,
+  onToggleMode,
+  onLogout,
+}) {
+  const defaultSection = sections.find(
+    (section) => section.section === "DEFAULT",
+  );
+  const defaultGroups = getDefaultNavigationGroups(defaultSection);
+  const configurationSections = sections.filter(
+    (section) => section.section !== "DEFAULT",
+  );
+
+  const navButton = ({ id, label, tab, subTab = "", nested = false }) => {
+    const isActive = activeTab === tab && (!subTab || activeSubTab === subTab);
+    return (
+      <button
+        key={id}
+        type="button"
+        className={`ua-config-nav-button ${nested ? "ua-config-nav-button-nested" : ""}`}
+        data-active={isActive ? "true" : "false"}
+        aria-current={isActive ? "page" : undefined}
+        onClick={() => onNavigate(tab, subTab)}
+      >
+        <span className="ua-config-nav-indicator" aria-hidden="true"></span>
+        <span>{label}</span>
+      </button>
+    );
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="ua-config-sidebar-brand flex h-20 shrink-0 items-center justify-between gap-3 border-b px-5 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <img
+            src={window.UA_LOGO_URL || "/static/img/logo.svg"}
+            alt="Upload-Assistant logo"
+            className="h-8 w-8 shrink-0"
+          />
+          <div className="min-w-0">
+            <div className="truncate text-xs font-semibold uppercase tracking-widest opacity-60">
+              Upload Assistant
+            </div>
+            <div className="mt-1 truncate text-lg font-bold">
+              Configuration
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="ua-config-icon-button md:hidden"
+          aria-label="Close configuration navigation"
+          onClick={onClose}
+        >
+          ×
+        </button>
+      </div>
+
+      <nav
+        className="ua-config-sidebar-nav min-h-0 flex-1 overflow-y-auto px-3 py-4"
+        aria-label="Configuration sections"
+      >
+        {defaultGroups.length > 0 && (
+          <div className="mb-5">
+            <div className="ua-config-nav-heading px-3 pb-2 text-xs font-semibold uppercase tracking-wider">
+              General Settings
+            </div>
+            <div className="space-y-1">
+              {defaultGroups.map((group) =>
+                navButton({
+                  id: `default-${group.id}`,
+                  label: group.label,
+                  tab: "default",
+                  subTab: group.id,
+                  nested: true,
+                }),
+              )}
+            </div>
+          </div>
+        )}
+
+        {configurationSections.length > 0 && (
+          <div className="mb-5">
+            <div className="ua-config-nav-heading px-3 pb-2 text-xs font-semibold uppercase tracking-wider">
+              Configuration
+            </div>
+            <div className="space-y-1">
+              {configurationSections.map((section) =>
+                navButton({
+                  id: section.section,
+                  label: getConfigSectionLabel(section.section),
+                  tab: section.section.toLowerCase(),
+                }),
+              )}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <div className="ua-config-nav-heading px-3 pb-2 text-xs font-semibold uppercase tracking-wider">
+            Administration
+          </div>
+          <div className="space-y-1">
+            {navButton({
+              id: "security",
+              label: "Security",
+              tab: "security",
+            })}
+            {navButton({
+              id: "access-log",
+              label: "Access Log",
+              tab: "access-log",
+            })}
+          </div>
+        </div>
+      </nav>
+
+      <div className="ua-config-sidebar-footer border-t p-4">
+        <div className="ua-config-nav-heading mb-2 text-xs font-semibold uppercase tracking-wider">
+          Appearance
+        </div>
+        <select
+          value={colorTheme}
+          onChange={onColorThemeChange}
+          aria-label="Color theme"
+          className="ua-theme-picker w-full rounded-lg px-3 py-2 text-sm"
+        >
+          {colorThemes.map((theme) => (
+            <option key={theme.id} value={theme.id}>
+              {theme.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="ua-config-mode-button mt-2 flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm"
+          onClick={onToggleMode}
+          aria-label={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
+        >
+          <span>{isDarkMode ? "Dark mode" : "Light mode"}</span>
+          <span
+            className="ua-config-mode-switch relative inline-flex h-6 w-11 items-center rounded-full"
+            data-enabled={isDarkMode ? "true" : "false"}
+            aria-hidden="true"
+          >
+            <span className="ua-config-mode-knob inline-block h-4 w-4 rounded-full bg-white transition-transform"></span>
+          </span>
+        </button>
+
+        <div className="mt-4 grid gap-2">
+          <a
+            href="/"
+            className="ua-config-sidebar-action rounded-lg px-3 py-2 text-center text-sm font-semibold"
+          >
+            ← Back to Upload
+          </a>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="ua-config-sidebar-action ua-config-sidebar-action-danger rounded-lg px-3 py-2 text-sm font-semibold"
+          >
+            Log out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ConfigApp() {
   const [sections, setSections] = useState([]);
   // Keep a ref to the latest sections to avoid stale closures inside async loaders
@@ -3282,18 +4201,19 @@ function ConfigApp() {
   const [configWarning, setConfigWarning] = useState("");
   const [activeTab, setActiveTab] = useState(() => {
     try {
-      return sessionStorage.getItem("ua_active_tab") || "general";
+      return sessionStorage.getItem("ua_active_tab") || "default";
     } catch (e) {
-      return "general";
+      return "default";
     }
   });
   const [activeSubTab, setActiveSubTab] = useState(() => {
     try {
-      return sessionStorage.getItem("ua_active_subtab") || "";
+      return sessionStorage.getItem("ua_active_subtab") || "general";
     } catch (e) {
-      return "";
+      return "general";
     }
   });
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [torrentClients, setTorrentClients] = useState([]);
 
   useEffect(() => {
@@ -3309,38 +4229,10 @@ function ConfigApp() {
     setColorThemeState(setColorTheme(event.target.value));
   };
   const getSubTabsForSection = (section) => {
-    if (section.client_types) {
-      return section.client_types.map((type) => {
-        let label = type.charAt(0).toUpperCase() + type.slice(1);
-        if (type === "qbit") label = "qBitTorrent";
-        return { id: type, label };
-      });
+    if (section?.section === "DEFAULT") {
+      return getDefaultNavigationGroups(section);
     }
-    const subTabs = [];
-    const seenSubsections = new Set();
-
-    section.items.forEach((item) => {
-      let subsectionName = null;
-
-      // Check for string subsections
-      if (item.subsection && typeof item.subsection === "string") {
-        subsectionName = formatDisplayLabel(item.subsection);
-      }
-      // Check for collapsible subsections (subsection === true)
-      else if (item.subsection === true) {
-        subsectionName = formatDisplayLabel(item.key);
-      }
-
-      if (subsectionName && !seenSubsections.has(subsectionName)) {
-        seenSubsections.add(subsectionName);
-        subTabs.push({
-          id: subsectionName.toLowerCase().replace(/\s+/g, "-"),
-          label: subsectionName,
-        });
-      }
-    });
-
-    return subTabs;
+    return [];
   };
 
   const setStatusWithClear = (text, type = "info", clearAfterMs = 0) => {
@@ -3364,6 +4256,26 @@ function ConfigApp() {
     });
   };
 
+  const navigateTo = (tab, subTab = "") => {
+    setActiveTab(tab);
+    setActiveSubTab(subTab);
+    setIsMobileNavOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isMobileNavOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setIsMobileNavOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isMobileNavOpen]);
+
   const loadConfigOptions = async (isRetry = false) => {
     try {
       setStatus({
@@ -3376,6 +4288,9 @@ function ConfigApp() {
         throw new Error(data.error || "Failed to load config options");
       }
       const newSections = data.sections || [];
+      const fallbackSection =
+        newSections.find((section) => section.section === "DEFAULT") ||
+        newSections[0];
       setSections(newSections);
       setPendingChanges(new Map());
       setConfigWarning(data.config_warning || "");
@@ -3434,24 +4349,25 @@ function ConfigApp() {
       if (currentlyHaveSections === 0 && newSections.length > 0) {
         // If we restored a tab from sessionStorage above, don't override it.
         if (!didRestoreTab) {
-          setActiveTab(newSections[0].section.toLowerCase());
+          setActiveTab(fallbackSection.section.toLowerCase());
           // Set first sub-tab if available
-          const firstSection = newSections[0];
-          const subTabs = getSubTabsForSection(firstSection);
+          const subTabs = getSubTabsForSection(fallbackSection);
           if (subTabs.length > 0) {
             setActiveSubTab(subTabs[0].id);
           }
         }
       } else if (newSections.length > 0) {
         // Validate that current active tab still exists
-        const currentTabExists = newSections.some(
-          (section) => section.section.toLowerCase() === activeTab,
-        );
+        const currentTabExists =
+          activeTab === "security" ||
+          activeTab === "access-log" ||
+          newSections.some(
+            (section) => section.section.toLowerCase() === activeTab,
+          );
         if (!currentTabExists) {
           // Reset to first tab if current tab no longer exists
-          setActiveTab(newSections[0].section.toLowerCase());
-          const firstSection = newSections[0];
-          const subTabs = getSubTabsForSection(firstSection);
+          setActiveTab(fallbackSection.section.toLowerCase());
+          const subTabs = getSubTabsForSection(fallbackSection);
           if (subTabs.length > 0) {
             setActiveSubTab(subTabs[0].id);
           } else {
@@ -3663,28 +4579,46 @@ function ConfigApp() {
     return used;
   }, [sections]);
 
-  const pageRootClass = isDarkMode
-    ? "min-h-screen flex flex-col bg-gray-900 text-gray-100"
-    : "min-h-screen flex flex-col bg-gray-100 text-gray-900";
-  const headerClass = isDarkMode
-    ? "border-b border-gray-700 bg-gray-800"
-    : "border-b border-gray-200 bg-white";
-  const titleClass = isDarkMode
-    ? "font-bold text-white"
-    : "font-bold text-gray-800";
-  const statusClass = isDarkMode
-    ? "text-sm text-gray-300"
-    : "text-sm text-gray-600";
-  const themeToggleClass = isDarkMode
-    ? "relative inline-flex h-6 w-11 items-center rounded-full transition-colors bg-purple-600"
-    : "relative inline-flex h-6 w-11 items-center rounded-full transition-colors bg-gray-300";
-  const themeKnobClass = isDarkMode
-    ? "inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-6"
-    : "inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1";
+  const activeSection = sections.find(
+    (section) => section.section.toLowerCase() === activeTab,
+  );
+  const activeDefaultGroup =
+    activeSection?.section === "DEFAULT"
+      ? getDefaultNavigationGroups(activeSection).find(
+          (group) => group.id === activeSubTab,
+        )
+      : null;
+  const activeTitle =
+    activeTab === "security"
+      ? "Security"
+      : activeTab === "access-log"
+        ? "Access Log"
+        : activeDefaultGroup?.label ||
+          getConfigSectionLabel(activeSection?.section || "Configuration");
+  const activeSubtitle =
+    activeSection?.section === "DEFAULT"
+      ? "General settings arranged in the order they are used."
+      : activeTab === "security"
+        ? "Manage WebUI authentication and access controls."
+        : activeTab === "access-log"
+          ? "Review and configure WebUI access logging."
+          : activeSection
+            ? "Manage settings for " +
+              getConfigSectionLabel(activeSection.section).toLowerCase() +
+              "."
+            : "Manage Upload Assistant settings.";
+  const visibleItems =
+    activeSection?.section === "DEFAULT" && activeSubTab
+      ? activeSection.items.filter(
+          (item) => getDefaultItemGroupId(item) === activeSubTab,
+        )
+      : activeSection?.items || [];
+
+  const statusClass = "ua-config-status text-sm";
   const saveDisabled = isSaving || pendingChanges.size === 0;
-  const saveButtonClass = isDarkMode
-    ? `px-3 py-1.5 rounded-lg text-sm font-semibold bg-purple-600 text-white hover:bg-purple-700${saveDisabled ? " opacity-50 cursor-not-allowed" : ""}`
-    : `px-3 py-1.5 rounded-lg text-sm font-semibold bg-purple-600 text-white hover:bg-purple-700${saveDisabled ? " opacity-50 cursor-not-allowed" : ""}`;
+  const saveButtonClass =
+    "ua-config-save-button rounded-lg px-4 py-2 text-sm font-semibold" +
+    (saveDisabled ? " cursor-not-allowed opacity-50" : "");
   const statusTypeClass = statusClassFor(status.type, isDarkMode);
 
   const handleLogout = async () => {
@@ -3702,254 +4636,164 @@ function ConfigApp() {
   };
 
   return (
-    <div className={pageRootClass}>
-      <header className={headerClass}>
-        <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h1 className={`${titleClass} text-lg md:text-2xl`}>
-              Upload-Assistant Config
-            </h1>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700"
-            >
-              Logout
-            </button>
-          </div>
-          <div className="flex items-center gap-2 md:gap-3 flex-wrap">
-            <select
-              value={colorTheme}
-              onChange={handleColorThemeChange}
-              aria-label="Color theme"
-              className="ua-theme-picker rounded-lg px-2 py-1.5 text-sm"
-            >
-              {colorThemes.map((theme) => (
-                <option key={theme.id} value={theme.id}>
-                  {theme.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className={saveButtonClass}
-              onClick={saveAllChanges}
-              disabled={saveDisabled}
-            >
-              {isSaving ? "Saving..." : "Save Config"}
-            </button>
-            <a
-              href="/"
-              className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-gray-700 text-white hover:bg-gray-600"
-            >
-              Back to Upload
-            </a>
-            <span className="text-sm">
-              {isDarkMode ? "🌙 Dark" : "☀️ Light"}
-            </span>
-            <button
-              className={themeToggleClass}
-              type="button"
-              aria-label="Toggle theme"
-              onClick={() => setIsDarkMode((prev) => !prev)}
-            >
-              <span className={themeKnobClass}></span>
-            </button>
-          </div>
-        </div>
-      </header>
+    <div
+      className={
+        "ua-config-page min-h-screen " +
+        (isDarkMode ? "ua-mode-dark" : "ua-mode-light")
+      }
+    >
+      {isMobileNavOpen && (
+        <button
+          type="button"
+          className="ua-config-drawer-overlay fixed inset-0 z-40 md:hidden"
+          aria-label="Close configuration navigation"
+          onClick={() => setIsMobileNavOpen(false)}
+        ></button>
+      )}
 
-      <main className="flex-1">
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          {/* Always show loading/error area until content loads - prevents empty screen on first run */}
-          {(status.text || sections.length === 0) && (
-            <div
-              className={`min-h-[120px] flex flex-col justify-center ${status.text ? "mb-6" : ""}`}
-            >
-              {status.text && (
-                <div className={`${statusClass} ${statusTypeClass} mb-3`}>
-                  {status.text}
-                </div>
-              )}
-              {status.type === "error" && (
+      <div className="min-h-screen md:flex">
+        <aside
+          id="config-sidebar"
+          className={
+            "ua-config-sidebar fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-200 " +
+            "md:sticky md:top-0 md:z-20 md:h-screen md:translate-x-0 " +
+            (isMobileNavOpen ? "translate-x-0" : "-translate-x-full")
+          }
+        >
+          <ConfigSidebar
+            sections={sections}
+            activeTab={activeTab}
+            activeSubTab={activeSubTab}
+            onNavigate={navigateTo}
+            onClose={() => setIsMobileNavOpen(false)}
+            colorTheme={colorTheme}
+            onColorThemeChange={handleColorThemeChange}
+            isDarkMode={isDarkMode}
+            onToggleMode={() => setIsDarkMode((prev) => !prev)}
+            onLogout={handleLogout}
+          />
+        </aside>
+
+        <div className="min-w-0 flex-1">
+          <header className="ua-config-header sticky top-0 z-30 h-20 border-b">
+            <div className="flex h-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+              <div className="flex min-w-0 items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => loadConfigOptions(true)}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700"
+                  className="ua-config-icon-button shrink-0 md:hidden"
+                  aria-label="Open configuration navigation"
+                  aria-controls="config-sidebar"
+                  aria-expanded={isMobileNavOpen}
+                  onClick={() => setIsMobileNavOpen(true)}
                 >
-                  Retry
+                  <span aria-hidden="true">☰</span>
                 </button>
-              )}
-              {status.type === "info" && status.text && (
-                <div
-                  className={`text-sm mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}
-                >
-                  If this takes too long, check your connection or try
-                  refreshing.
+                <div className="min-w-0">
+                  <h1 className="ua-config-page-title truncate text-lg font-bold sm:text-xl">
+                    {activeTitle}
+                  </h1>
+                  <p className="ua-config-page-subtitle mt-0.5 hidden truncate text-sm sm:block">
+                    {activeSubtitle}
+                  </p>
                 </div>
-              )}
-            </div>
-          )}
-
-          {sections.length > 0 && (
-            <div className="space-y-6">
-              {/* Config load warning banner */}
-              {configWarning && (
-                <div
-                  className={`rounded-lg border px-4 py-3 text-sm ${
-                    isDarkMode
-                      ? "bg-yellow-900/40 border-yellow-700 text-yellow-200"
-                      : "bg-yellow-50 border-yellow-300 text-yellow-800"
-                  }`}
-                >
-                  <span className="font-semibold">Warning: </span>
-                  {configWarning}
-                </div>
-              )}
-              {/* Tab Navigation */}
-              <div
-                className={`ua-config-tabs flex space-x-1 rounded-lg p-1 overflow-x-auto ${isDarkMode ? "bg-gray-800" : "bg-gray-100"}`}
-              >
-                <button
-                  onClick={() => setActiveTab("security")}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
-                    activeTab === "security"
-                      ? isDarkMode
-                        ? "bg-gray-700 text-white"
-                        : "bg-white text-gray-900 shadow-sm"
-                      : isDarkMode
-                        ? "text-gray-400 hover:text-white hover:bg-gray-700"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
-                  }`}
-                >
-                  Security
-                </button>
-                <button
-                  onClick={() => setActiveTab("access-log")}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
-                    activeTab === "access-log"
-                      ? isDarkMode
-                        ? "bg-gray-700 text-white"
-                        : "bg-white text-gray-900 shadow-sm"
-                      : isDarkMode
-                        ? "text-gray-400 hover:text-white hover:bg-gray-700"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
-                  }`}
-                >
-                  Access Log
-                </button>
-                {sections.map((section) => {
-                  const sectionId = section.section.toLowerCase();
-                  const isActive = activeTab === sectionId;
-                  return (
-                    <button
-                      key={sectionId}
-                      onClick={() => {
-                        setActiveTab(sectionId);
-                        const subTabs = getSubTabsForSection(section);
-                        if (subTabs.length > 0) {
-                          setActiveSubTab(subTabs[0].id);
-                        }
-                      }}
-                      className={`md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
-                        isActive
-                          ? isDarkMode
-                            ? "bg-gray-700 text-white"
-                            : "bg-white text-gray-900 shadow-sm"
-                          : isDarkMode
-                            ? "text-gray-400 hover:text-white hover:bg-gray-700"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
-                      }`}
-                    >
-                      {section.section}
-                    </button>
-                  );
-                })}
               </div>
 
-              {/* Tab Content */}
-              <div className="space-y-4">
-                {activeTab === "security" && (
-                  <SecurityTab isDarkMode={isDarkMode} />
+              <div className="flex shrink-0 items-center gap-3">
+                {status.text && sections.length > 0 && (
+                  <span
+                    className={statusClass + " " + statusTypeClass + " hidden lg:inline"}
+                    role="status"
+                  >
+                    {status.text}
+                  </span>
                 )}
-                {activeTab === "access-log" && (
-                  <AccessLogTab isDarkMode={isDarkMode} />
+                {pendingChanges.size > 0 && !status.text && (
+                  <span className="ua-config-pending-count hidden text-sm lg:inline">
+                    {pendingChanges.size} unsaved{" "}
+                    {pendingChanges.size === 1 ? "change" : "changes"}
+                  </span>
                 )}
-                {sections.map((section) => {
-                  const sectionId = section.section.toLowerCase();
-                  if (activeTab !== sectionId) return null;
+                <button
+                  type="button"
+                  className={saveButtonClass}
+                  onClick={saveAllChanges}
+                  disabled={saveDisabled}
+                >
+                  {isSaving ? "Saving..." : "Save Config"}
+                </button>
+              </div>
+            </div>
+          </header>
 
-                  const subTabs = getSubTabsForSection(section);
-                  const hasSubTabs = subTabs.length > 0;
+          <main className="ua-config-main px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
+            <div className="w-full">
+              {/* Always show loading/error area until content loads - prevents an empty screen on first run. */}
+              {sections.length === 0 && (
+                <div className="ua-config-state-panel flex min-h-48 flex-col items-start justify-center rounded-xl border p-6">
+                  {status.text && (
+                    <div
+                      className={statusClass + " " + statusTypeClass + " mb-3"}
+                      role="status"
+                    >
+                      {status.text}
+                    </div>
+                  )}
+                  {status.type === "error" && (
+                    <button
+                      type="button"
+                      onClick={() => loadConfigOptions(true)}
+                      className="ua-config-save-button rounded-lg px-4 py-2 text-sm font-semibold"
+                    >
+                      Retry
+                    </button>
+                  )}
+                  {status.type === "info" && status.text && (
+                    <div className="ua-config-page-subtitle mt-2 text-sm">
+                      If this takes too long, check your connection or try
+                      refreshing.
+                    </div>
+                  )}
+                </div>
+              )}
 
-                  return (
-                    <div key={sectionId} className="space-y-4">
-                      {/* Sub-tab Navigation */}
-                      {hasSubTabs && (
-                        <div
-                          className={`ua-config-tabs flex space-x-1 rounded-lg p-1 overflow-x-auto ${isDarkMode ? "bg-gray-700" : "bg-gray-200"}`}
-                        >
-                          {subTabs.map((subTab) => {
-                            const isActive = activeSubTab === subTab.id;
-                            return (
-                              <button
-                                key={subTab.id}
-                                onClick={() => setActiveSubTab(subTab.id)}
-                                className={`md:flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
-                                  isActive
-                                    ? isDarkMode
-                                      ? "bg-gray-600 text-white"
-                                      : "bg-white text-gray-900 shadow-sm"
-                                    : isDarkMode
-                                      ? "text-gray-400 hover:text-white hover:bg-gray-600"
-                                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-300"
-                                }`}
-                              >
-                                {subTab.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+              {sections.length > 0 && (
+                <div className="space-y-5">
+                  {/* Config load warning banner */}
+                  {configWarning && (
+                    <div
+                      className="ua-config-warning rounded-xl border px-4 py-3 text-sm"
+                      role="alert"
+                    >
+                      <span className="font-semibold">Warning: </span>
+                      {configWarning}
+                    </div>
+                  )}
+                  {status.text && (
+                    <div
+                      className={
+                        "ua-config-inline-status rounded-lg border px-4 py-3 lg:hidden " +
+                        statusClass +
+                        " " +
+                        statusTypeClass
+                      }
+                      role="status"
+                    >
+                      {status.text}
+                    </div>
+                  )}
 
-                      {/* Content */}
+                  {/* Tab Content */}
+                  <div className="space-y-4">
+                    {activeTab === "security" && (
+                      <SecurityTab isDarkMode={isDarkMode} />
+                    )}
+                    {activeTab === "access-log" && (
+                      <AccessLogTab isDarkMode={isDarkMode} />
+                    )}
+                    {activeSection && (
                       <ItemList
-                        items={
-                          hasSubTabs
-                            ? section.items.filter((item) => {
-                                if (section.section === "TORRENT_CLIENTS") {
-                                  const clientTypeItem =
-                                    item.children &&
-                                    item.children.find(
-                                      (c) => c.key === "torrent_client",
-                                    );
-                                  return (
-                                    clientTypeItem &&
-                                    clientTypeItem.value === activeSubTab
-                                  );
-                                }
-                                if (
-                                  item.subsection &&
-                                  typeof item.subsection === "string"
-                                ) {
-                                  return (
-                                    formatDisplayLabel(item.subsection)
-                                      .toLowerCase()
-                                      .replace(/\s+/g, "-") === activeSubTab
-                                  );
-                                }
-                                if (item.subsection === true) {
-                                  return (
-                                    formatDisplayLabel(item.key)
-                                      .toLowerCase()
-                                      .replace(/\s+/g, "-") === activeSubTab
-                                  );
-                                }
-                                return false;
-                              })
-                            : section.items
-                        }
-                        pathParts={[section.section]}
+                        items={visibleItems}
+                        pathParts={[activeSection.section]}
                         depth={0}
                         isDarkMode={isDarkMode}
                         allImageHosts={allImageHosts}
@@ -3960,14 +4804,14 @@ function ConfigApp() {
                         torrentClients={torrentClients}
                         onValueChange={onValueChange}
                       />
-                    </div>
-                  );
-                })}
-              </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </main>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
