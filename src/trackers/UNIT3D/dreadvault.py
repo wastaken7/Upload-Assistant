@@ -38,6 +38,9 @@ class DreadVault(UNIT3D):
     torrent_url = f"{base_url}/torrents/"
     supported_categories = ("TV", "MOVIE")
     tracker_urls = ("https://dreadvault.org",)
+    # site rules allow coexisting releases; only a literal duplicate (same files
+    # and size) is a dupe
+    exact_match_only = True
 
     def __init__(self, config: Config) -> None:
         super().__init__(config, tracker_name="DREADVAULT")
