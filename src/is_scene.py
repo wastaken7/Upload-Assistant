@@ -63,7 +63,7 @@ class SceneManager:
         Path(details_cache_dir).mkdir(parents=True, exist_ok=True)
 
         async with httpx.AsyncClient() as client:
-            if "scene" not in meta and not lower:
+            if not meta.scene and not lower:
                 # Cache file for search
                 search_cache_file = Path(search_cache_dir) / f"{quoted_base}.json"
                 response_json = None
