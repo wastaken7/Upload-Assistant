@@ -1352,6 +1352,10 @@ class DescriptionBuilder:
         else:
             meta_description = str(meta_description_value)
 
+        if not nfo and meta.auto_nfo and meta.description_nfo_content:
+            scene_nfo_block = f"[center][spoiler=Scene NFO:][code]{meta.description_nfo_content}[/code][/spoiler][/center]"
+            meta_description = meta_description.replace(scene_nfo_block, "").strip()
+
         # Description that may come from API requests
         if description:
             # Add FraMeSToR NFO to AITHER
