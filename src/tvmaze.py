@@ -169,7 +169,7 @@ class TvmazeManager:
                         await cache.set("tvmaze", "response", cache_key, result, negative=not bool(result))
                         return result
                     return None
-                elif resp.status_code == 404:
+                if resp.status_code == 404:
                     await cache.set("tvmaze", "response", cache_key, None, negative=True)
                     return None
                 return None

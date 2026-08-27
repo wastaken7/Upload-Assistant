@@ -138,7 +138,7 @@ class TVDB:
         if not self.token:
             success = await self.login()
             if not success:
-                return None
+                raise RuntimeError("TVDB authentication failed")
 
         try:
             resp = await self._client.request(method, endpoint, **kwargs)
@@ -146,33 +146,40 @@ class TVDB:
                 logger.debug("[yellow]TVDB token expired. Refreshing...[/yellow]")
                 success = await self.login()
                 if not success:
-                    return None
+                    raise RuntimeError("TVDB authentication refresh failed")
                 resp = await self._client.request(method, endpoint, **kwargs)
 
-            if resp.status_code == 200:
-                return resp.json().get("data")
-                return resp.json().get("data")
-            return None
+            resp.raise_for_status()
+            payload = resp.json()
+            if not isinstance(payload, dict) or "data" not in payload:
+                raise ValueError("TVDB response did not contain data")
+            return payload["data"]
         except Exception as e:
             logger.debug(f"[red]TVDB API request failed: {e}[/red]")
-            return None
+            raise
 
     async def search(self, query, **kwargs) -> list[dict[str, Any]]:
         # Handle the case where `{filename}` is passed as a set
         if isinstance(query, set):
-            query = list(query)[0]
+            query = next(iter(query))
         params = {"query": query}
         params.update(kwargs)
         res = await self._request("GET", "/search", params=params)
-        return res if isinstance(res, list) else []
+        if not isinstance(res, list):
+            raise TypeError("TVDB search response data was not a list")
+        return res
 
     async def search_by_remote_id(self, remoteid: str) -> list[dict[str, Any]]:
         res = await self._request("GET", f"/search/remoteid/{remoteid}")
-        return res if isinstance(res, list) else []
+        if not isinstance(res, list):
+            raise TypeError("TVDB remote ID search response data was not a list")
+        return res
 
     async def get_series_extended(self, id: int, **kwargs) -> dict[str, Any]:
         res = await self._request("GET", f"/series/{id}/extended", params=kwargs)
-        return res if isinstance(res, dict) else {}
+        if not isinstance(res, dict):
+            raise TypeError("TVDB extended series response data was not a dictionary")
+        return res
 
     async def get_series_episodes(self, id: int, season_type="default", page=0, lang=None, **kwargs) -> dict[str, Any]:
         url = f"/series/{id}/episodes/{season_type}"
@@ -181,15 +188,21 @@ class TVDB:
         params = {"page": page}
         params.update(kwargs)
         res = await self._request("GET", url, params=params)
-        return res if isinstance(res, dict) else {}
+        if not isinstance(res, dict):
+            raise TypeError("TVDB series episodes response data was not a dictionary")
+        return res
 
     async def get_episode_extended(self, id: int, **kwargs) -> dict[str, Any]:
         res = await self._request("GET", f"/episodes/{id}/extended", params=kwargs)
-        return res if isinstance(res, dict) else {}
+        if not isinstance(res, dict):
+            raise TypeError("TVDB extended episode response data was not a dictionary")
+        return res
 
     async def get_series_translation(self, id: int, lang: str, **kwargs) -> dict[str, Any]:
         res = await self._request("GET", f"/series/{id}/translations/{lang}", params=kwargs)
-        return res if isinstance(res, dict) else {}
+        if not isinstance(res, dict):
+            raise TypeError("TVDB series translation response data was not a dictionary")
+        return res
 
 
 def _get_tvdb_or_warn(config: dict[str, Any] | None = None) -> TVDB | None:
