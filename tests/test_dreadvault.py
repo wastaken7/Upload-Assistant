@@ -67,9 +67,25 @@ def test_dreadvault_accepts_horror_inside_a_compound_keyword():
     assert asyncio.run(tracker.get_additional_checks(meta))  # noqa: S101
 
 
+def test_dreadvault_accepts_horror_with_incidental_mature_keywords():
+    tracker = _tracker()
+    meta = Meta(combined_genres="Horror, Thriller", keywords=["adult animation", "orgy", "erotic"], unattended=True)
+    assert asyncio.run(tracker.get_additional_checks(meta))  # noqa: S101
+
+
 def test_dreadvault_rejects_non_horror_when_unattended():
     tracker = _tracker()
     meta = Meta(combined_genres="Action, Comedy", unattended=True)
+    assert not asyncio.run(tracker.get_additional_checks(meta))  # noqa: S101
+
+
+def test_dreadvault_only_blocks_exact_duplicates():
+    assert DreadVault.exact_match_only is True  # noqa: S101
+
+
+def test_dreadvault_adult_keyword_skips_when_unattended():
+    tracker = _tracker()
+    meta = Meta(combined_genres="Horror", keywords=["porn"], unattended=True)
     assert not asyncio.run(tracker.get_additional_checks(meta))  # noqa: S101
 
 
