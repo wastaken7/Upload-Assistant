@@ -172,6 +172,10 @@ def init_meta(prep_instance: Any, meta: Meta, mode: str) -> tuple[bool, bool, Cl
     meta.saved_description = False
     client = Clients(config=prep_instance.config)
     default_config = prep_instance.config["DEFAULT"]
+    # Screenshot capture starts during prep, before the upload stage. Populate
+    # the overlay setting here so that the early capture sees the configured
+    # value instead of Meta's default.
+    meta.frame_overlay = default_config.get("frame_overlay", False)
     meta.skip_auto_torrent = (
         meta.skip_auto_torrent or default_config.get("skip_auto_torrent", False) or (meta.personalrelease and default_config.get("skip_auto_torrent_personalrelease", False))
     )
