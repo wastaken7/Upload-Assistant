@@ -86,6 +86,26 @@ def test_personal_release_config_skips_auto_torrent_before_client_search(tmp_pat
     assert meta.skip_auto_torrent
 
 
+def test_frame_overlay_config_is_set_before_early_capture(tmp_path: Path) -> None:
+    prep = Prep.__new__(Prep)
+    prep.config = {"DEFAULT": {"frame_overlay": True}}
+    meta = Meta(base_dir=str(tmp_path), path=str(tmp_path))
+
+    prep_helpers.init_meta(prep, meta, "cli")
+
+    assert meta.frame_overlay is True
+
+
+def test_forbidden_tracker_defers_frame_overlay_capture() -> None:
+    prep, screenshot_spy = _prep_with_screenshot_spy()
+    prep.config["TRACKERS"] = {"default_trackers": "AVISTAZ"}
+    meta = Meta(category="MOVIE", keep_images=False, screens=6, frame_overlay=True)
+
+    asyncio.run(prep._capture_early_screenshots(meta, "Release", "C:/media/Release.mkv", {}))
+
+    assert screenshot_spy.calls == []
+
+
 def test_registered_main_screenshots_are_reused_when_title_changes(tmp_path: Path) -> None:
     release_id = "release"
     screenshot_dir = tmp_path / "tmp" / release_id / "screenshots"
