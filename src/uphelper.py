@@ -596,12 +596,13 @@ class UploadHelper:
             lines.append(("Cover", poster))
 
         elif meta.category == "GAME":
-            notes = meta.description_link or meta.description_file or ""
-            if notes:
+            notes = "Inline description provided" if meta.description_inline else ""
+            if not notes:
+                notes = meta.description_link or meta.description_file or ""
                 # don't leak links or file paths
                 notes = notes[:16] if notes.startswith("http") else f"./{Path(notes).name}"
             if meta.platform == "PC":
-                notes = notes if notes else "[yellow][italic]Installation instructions missing. Use -df or -dp to add them.[/italic][/yellow]"
+                notes = notes if notes else "[yellow][italic]Installation instructions missing. Use --description, -df, or -pb to add them.[/italic][/yellow]"
 
             game_subcategory_str = {"full_game": "Full Game", "full_game_dlc": "Full Game + DLC", "dlc": "DLC", "update": "Update"}.get(meta.game_subcategory, "Unknown")
             game_subcategory = f"[italic]{meta.game_subcategory}[/italic] ({game_subcategory_str})"
