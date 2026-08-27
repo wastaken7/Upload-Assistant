@@ -119,6 +119,9 @@ class TVDB:
         self._client = httpx.AsyncClient(base_url=self.base_url, timeout=15.0)
         self._login_lock = asyncio.Lock()
 
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
     async def login(self) -> bool:
         async with self._login_lock:
             try:
@@ -203,6 +206,15 @@ class TVDB:
         if not isinstance(res, dict):
             raise TypeError("TVDB series translation response data was not a dictionary")
         return res
+
+
+async def close_tvdb() -> None:
+    global tvdb
+
+    client = tvdb
+    tvdb = None
+    if client is not None:
+        await client.aclose()
 
 
 def _get_tvdb_or_warn(config: dict[str, Any] | None = None) -> TVDB | None:

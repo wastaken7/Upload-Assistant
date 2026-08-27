@@ -45,6 +45,14 @@ class _RequestClient:
         return _ErrorResponse()
 
 
+class _ClosableClient:
+    def __init__(self):
+        self.closed = False
+
+    async def aclose(self):
+        self.closed = True
+
+
 def _install_failing_tvdb(monkeypatch):
     cache = _RecordingCache()
     monkeypatch.setattr(tvdb_module, "_get_tvdb_or_warn", lambda _config: _FailingClient())
@@ -61,6 +69,42 @@ def test_tvdb_request_preserves_http_failures():
 
         with pytest.raises(RuntimeError, match="TVDB unavailable"):
             await client._request("GET", "/search")
+
+    asyncio.run(run())
+
+
+def test_close_tvdb_closes_and_resets_shared_client(monkeypatch):
+    async def run():
+        client = _ClosableClient()
+        monkeypatch.setattr(tvdb_module, "tvdb", client)
+
+        await tvdb_module.close_tvdb()
+
+        assert client.closed is True
+        assert tvdb_module.tvdb is None
+
+    asyncio.run(run())
+
+
+def test_upload_main_closes_tvdb_after_failure(monkeypatch):
+    async def run():
+        import upload
+
+        closed = False
+
+        async def fail_upload(_base_dir):
+            raise RuntimeError("upload failed")
+
+        async def record_close():
+            nonlocal closed
+            closed = True
+
+        monkeypatch.setattr(upload, "do_the_thing", fail_upload)
+        monkeypatch.setattr(upload, "close_tvdb", record_close)
+
+        await upload.main()
+
+        assert closed is True
 
     asyncio.run(run())
 
