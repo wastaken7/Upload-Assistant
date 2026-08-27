@@ -64,8 +64,11 @@ class DreadVault(UNIT3D):
                 return False
 
         genres = ", ".join([*meta.keywords, *combined_genres])
-        # "adult animation" is a TMDB demographic keyword for R-rated animation, not a porn marker
-        adult_keywords = ["xxx", "erotic", "porn", "adult", "orgy", "hentai", "softcore"]
+        # only terms with no mainstream-horror keyword collisions: "adult animation"
+        # (El Superbeasto), "orgy" (Infinity Pool, Society) and "erotic" (Suitable
+        # Flesh) are TMDB keywords on legitimate horror, and TMDB already excludes
+        # adult=true content from its API
+        adult_keywords = ["xxx", "porn", "adult", "hentai", "softcore"]
         if any(re.search(rf"(^|,\s*){re.escape(keyword)}(\s*,|$)", genres, re.IGNORECASE) for keyword in adult_keywords):
             logger.info(f"{self.tracker}: [bold red]Porn/xxx is not allowed at {self.tracker}.[/bold red]")
             return False
