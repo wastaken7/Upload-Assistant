@@ -163,6 +163,7 @@ class ShortHelpFormatter(argparse.HelpFormatter):
 Common options:
   -tmdb, --tmdb              Specify the TMDb id to use with movie/ or tv/ prefix
   -imdb, --imdb              Specify the IMDb id to use
+  --no-imdb                  Do not search for or use IMDb metadata
   --cast                     Comma-separated cast override (takes priority over API metadata)
   -tvmaze, --tvmaze          Specify the TVMaze id to use
   -tvdb, --tvdb              Specify the TVDB id to use
@@ -480,7 +481,9 @@ class Args:
         )
         action_res.completer = resolution_completer
         parser.add_argument("-tmdb", "--tmdb", nargs=1, required=False, help="TMDb ID (use movie/ or tv/ prefix)", type=str, dest="tmdb_manual")
-        parser.add_argument("-imdb", "--imdb", nargs=1, required=False, help="IMDb ID", type=str, dest="imdb_manual")
+        imdb_group = parser.add_mutually_exclusive_group()
+        imdb_group.add_argument("-imdb", "--imdb", nargs=1, required=False, help="IMDb ID", type=str, dest="imdb_manual")
+        imdb_group.add_argument("--no-imdb", action="store_true", required=False, help="Do not search for or use IMDb metadata")
         parser.add_argument("--cast", nargs=1, required=False, help="Comma-separated cast override (takes priority over API metadata)", type=str, dest="manual_cast")
         parser.add_argument("-mal", "--mal", nargs=1, required=False, help="MAL ID", type=str, dest="mal_manual")
         parser.add_argument("-tvmaze", "--tvmaze", nargs=1, required=False, help="TVMAZE ID", type=str, dest="tvmaze_manual")

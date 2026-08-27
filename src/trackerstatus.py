@@ -64,7 +64,7 @@ class TrackerStatusManager:
                 status_map[tracker] = {}
 
         # Prompt for IMDB ID once if any tracker needs it and it's missing in attended mode
-        if not meta.get("unattended", False) and meta.get("imdb_id", 0) == 0:
+        if not meta.get("unattended", False) and not meta.get("no_imdb", False) and meta.get("imdb_id", 0) == 0:
             needs_imdb = "PASSTHEPOPCORN" in meta.trackers
             if needs_imdb:
                 while True:

@@ -14,6 +14,8 @@ from src.screenshot_manifest import files as manifest_files
 
 console: Any = None
 
+_FRAME_OVERLAY_FORBIDDEN_TRACKERS = frozenset({"AVISTAZ", "CINEMAZ", "PRIVATEHD"})
+
 try:
     import re
     import time
@@ -59,6 +61,19 @@ async def populate_hdr_for_early_capture(meta: Meta, mi: dict[str, Any] | None, 
     if meta.hdr or not (mi or bdinfo):
         return
     meta.hdr = await prep_helpers.video_manager.get_hdr(mi or {}, bdinfo)
+
+
+def _frame_overlay_requires_late_capture(meta: Meta, config: dict[str, Any]) -> bool:
+    """Defer overlays until tracker upload eligibility is known."""
+    if not meta.frame_overlay:
+        return False
+
+    selected = meta.trackers or config.get("TRACKERS", {}).get("default_trackers", "")
+    if isinstance(selected, str):
+        tracker_names = {tracker.strip().upper() for tracker in selected.split(",") if tracker.strip()}
+    else:
+        tracker_names = {str(tracker).strip().upper() for tracker in selected if str(tracker).strip()}
+    return bool(tracker_names & _FRAME_OVERLAY_FORBIDDEN_TRACKERS)
 
 
 class Prep:
@@ -257,6 +272,9 @@ class Prep:
         if meta.keep_images:
             return None
         if meta.category in ("MUSIC", "GAME", "BOOK") or meta.screens <= 0:
+            return None
+        if _frame_overlay_requires_late_capture(meta, self.config):
+            logger.debug("[cyan]Deferring frame-overlay screenshots until tracker upload eligibility is known.[/cyan]")
             return None
 
         try:
