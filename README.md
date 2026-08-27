@@ -329,9 +329,12 @@ In your terminal, run the command for your operating system and follow the on-sc
 
 #### Method C: Manual Configuration
 
-1. Go to the `data/` folder inside the project.
-2. Copy `example_config.py` and rename the copy to `config.py` (leave the original `example_config.py` file as-is).
-3. Open `config.py` in a text editor (like Notepad, VS Code, or TextEdit) and fill in your information.
+1. Create the user-state `data` directory if it does not already exist:
+   - **Windows:** `%LOCALAPPDATA%\Upload-Assistant\data`
+   - **Linux / macOS:** `$XDG_DATA_HOME/Upload-Assistant/data` (normally `~/.local/share/Upload-Assistant/data`)
+   - **Custom location:** `$UA_DATA_DIR/data` when `UA_DATA_DIR` is set
+2. Copy the bundled `data/example_config.py` from the project into that directory as `config.py` (leave the original file unchanged).
+3. Open the user-state `config.py` in a text editor (like Notepad, VS Code, or TextEdit) and fill in your information.
    - For detailed info on what each setting does, see [Example Config Docs](docs/example-config.md).
    - Get a free TMDb API key from [TheMovieDB API settings](https://www.themoviedb.org/settings/api).
 
