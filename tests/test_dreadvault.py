@@ -67,6 +67,12 @@ def test_dreadvault_accepts_horror_inside_a_compound_keyword():
     assert asyncio.run(tracker.get_additional_checks(meta))  # noqa: S101
 
 
+def test_dreadvault_accepts_r_rated_animated_horror():
+    tracker = _tracker()
+    meta = Meta(combined_genres="Animation, Comedy, Horror", keywords=["adult animation", "nudity"], unattended=True)
+    assert asyncio.run(tracker.get_additional_checks(meta))  # noqa: S101
+
+
 def test_dreadvault_rejects_non_horror_when_unattended():
     tracker = _tracker()
     meta = Meta(combined_genres="Action, Comedy", unattended=True)
